@@ -208,11 +208,10 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
     }
 
     [Fact]
-    public void Convert_TextMode_SurfacesPostconditionRefusalWarning()
+    public void Convert_TextMode_LowersEarlyReturnPostcondition()
     {
-        // M3 pin: the Calor1001 §S-early-return refusal must be visible on
-        // the DEFAULT eject path, not only under --format json.
         var path = Path.Combine(_tempDir, "eject.calr");
+        var outputPath = Path.Combine(_tempDir, "eject.out.cs");
         File.WriteAllText(path,
             "§M{m001:Pricing}\n"
             + "  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
@@ -223,11 +222,14 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
             + "    §R amount\n");
 
         var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir,
-            "convert", path, "-o", Path.Combine(_tempDir, "eject.out.cs"));
+            "convert", path, "-o", outputPath);
 
         Assert.Equal(0, exitCode);
         Assert.Contains("Conversion successful", stdOut);
-        Assert.Contains("Calor1001", stdErr);
+        Assert.DoesNotContain("Calor1001", stdErr);
+        Assert.Contains(
+            "ContractKind.Ensures",
+            File.ReadAllText(outputPath));
     }
 
     [Fact]

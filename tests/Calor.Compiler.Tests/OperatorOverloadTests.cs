@@ -439,8 +439,8 @@ public class OperatorOverloadTests
         var result = ParseAndEmit(source);
 
         Assert.Contains("operator +(int left, int right)", result);
-        // Postcondition should capture result in __result__ variable
-        Assert.Contains("__result__", result);
+        // Postcondition should capture the result in the structural lowering local.
+        Assert.Contains("__calorPostconditionResult", result);
         Assert.Contains("ContractViolationException", result);
     }
 

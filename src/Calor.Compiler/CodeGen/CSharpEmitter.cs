@@ -60,6 +60,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentInlineReturnRefinement;
     private string? _currentYieldRefinement;
     private int _inlineReturnGuardCounter;
+    private ReturnLoweringContext? _currentReturnLowering;
+    private string? _postconditionResultIdentifier;
+    private int _postconditionResultShadowDepth;
+    private int _returnLoweringCounter;
     private readonly EmitContractMode _contractMode;
     private readonly ModuleVerificationResult? _verificationResults;
     private readonly ModuleInheritanceResult? _inheritanceResult;
@@ -84,6 +88,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         ExpressionNode Predicate,
         string Description,
         string TypeName);
+    private sealed record CallableReturnShape(
+        string DeclarationType,
+        string? ValueType)
+    {
+        public bool HasValue => ValueType != null;
+    }
+    private sealed record PostconditionEmission(
+        EnsuresNode Contract,
+        string? InheritedFrom = null);
+    private sealed record ReturnLoweringContext(
+        string ExitLabel,
+        string? ResultIdentifier);
     private readonly List<Dictionary<string, RefinementConstraint?>> _refinementDeclScopes =
         new() { new(StringComparer.Ordinal) };
     private readonly List<Dictionary<string, string?>> _indexedBoundScopes =
@@ -450,92 +466,468 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return Emit(module, null);
     }
 
-    /// <summary>
-    /// Emits a single statement, sandwiched between <c>#line</c> directives when
-    /// source mapping is enabled (see <see cref="LineDirectiveFilePath"/>).
-    /// Block statements (if/while/for/...) write directly to the builder and
-    /// return an empty string; the trailing empty <c>AppendLine</c> preserves the
-    /// blank line the previous inline emission produced.
-    /// </summary>
-    /// <summary>
-    /// W1 Slice 1 (T2, #764 stopgap): the postcondition lowering rewrites only
-    /// DIRECT-CHILD return statements — a nested return would bypass the emitted
-    /// postcondition check entirely, and an early top-level return would become an
-    /// assignment that keeps executing the rest of the body. Lowering is therefore
-    /// refused — loudly, via Calor1001 — unless every return is the single final
-    /// top-level statement. Unknown statement kinds (and raw C#) are conservatively
-    /// assumed to contain returns.
-    /// </summary>
-    private static bool CanLowerPostconditions(IReadOnlyList<StatementNode> body)
+    private static IEnumerable<AstNode> DescendantStatementNodesAndSelf(
+        AstNode node)
     {
-        for (var i = 0; i < body.Count; i++)
+        yield return node;
+        foreach (var child in Analysis.RecursiveAstWalker.GetChildren(node))
         {
-            if (i == body.Count - 1 && body[i] is ReturnStatementNode)
+            foreach (var descendant in DescendantStatementNodesAndSelf(child))
             {
-                continue; // the single final top-level return: the shape the lowering handles
-            }
-            if (StatementSubtreeMayContainReturn(body[i]))
-            {
-                return false;
+                yield return descendant;
             }
         }
-        return true;
     }
 
-    private static bool BodyContainsAnyReturn(IReadOnlyList<StatementNode> body)
-        => body.Any(StatementSubtreeMayContainReturn);
+    private static IEnumerable<StatementNode> TraverseStatements(
+        IReadOnlyList<StatementNode> body) =>
+        body.SelectMany(DescendantStatementNodesAndSelf)
+            .OfType<StatementNode>();
 
-    private static bool StatementSubtreeMayContainReturn(StatementNode stmt) => stmt switch
+    private static bool ContainsOpaqueCSharp(IReadOnlyList<StatementNode> body) =>
+        TraverseStatements(body).Any(statement => statement is RawCSharpNode);
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
     {
-        ReturnStatementNode => true,
-        IfStatementNode i => i.ThenBody.Any(StatementSubtreeMayContainReturn)
-            || i.ElseIfClauses.Any(c => c.Body.Any(StatementSubtreeMayContainReturn))
-            || (i.ElseBody != null && i.ElseBody.Any(StatementSubtreeMayContainReturn)),
-        ForStatementNode f => f.Body.Any(StatementSubtreeMayContainReturn),
-        WhileStatementNode w => w.Body.Any(StatementSubtreeMayContainReturn),
-        DoWhileStatementNode d => d.Body.Any(StatementSubtreeMayContainReturn),
-        ForeachStatementNode fe => fe.Body.Any(StatementSubtreeMayContainReturn),
-        DictionaryForeachNode df => df.Body.Any(StatementSubtreeMayContainReturn),
-        TryStatementNode t => t.TryBody.Any(StatementSubtreeMayContainReturn)
-            || t.CatchClauses.Any(c => c.Body.Any(StatementSubtreeMayContainReturn))
-            || (t.FinallyBody != null && t.FinallyBody.Any(StatementSubtreeMayContainReturn)),
-        UsingStatementNode u => u.Body.Any(StatementSubtreeMayContainReturn),
-        UnsafeBlockNode ub => ub.Body.Any(StatementSubtreeMayContainReturn),
-        FixedStatementNode fx => fx.Body.Any(StatementSubtreeMayContainReturn),
-        SyncBlockNode sb => sb.Body.Any(StatementSubtreeMayContainReturn),
-        MatchStatementNode m => m.Cases.Any(c => c.Body.Any(StatementSubtreeMayContainReturn)),
-        // Leaves that cannot contain a function-level return. Lambda-carrying
-        // statements are deliberately leaves: a return inside a lambda exits the
-        // lambda, not the enclosing function.
-        AssignmentStatementNode or CompoundAssignmentStatementNode or BindStatementNode
-            or CallStatementNode or ExpressionStatementNode or PrintStatementNode
-            or ThrowStatementNode or RethrowStatementNode or BreakStatementNode
-            or ContinueStatementNode or GotoStatementNode or LabelStatementNode
-            or YieldReturnStatementNode or YieldBreakStatementNode
-            or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode
-            or CollectionSetIndexNode or CollectionClearNode or CollectionInsertNode
-            or EventSubscribeNode or EventUnsubscribeNode or ProofObligationNode
-            or FallbackCommentNode or PreprocessorDirectiveNode => false,
-        // RawCSharpNode can literally contain `return ...;`; unknown kinds are
-        // conservatively assumed to.
-        _ => true
-    };
+        yield return node;
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
 
-    /// <summary>
-    /// Substitutes the postcondition's `result` pseudo-variable with the lowered
-    /// local using a word boundary — the previous plain string Replace corrupted
-    /// every identifier CONTAINING "result" (`resultCode` → `__result__Code`).
-    /// </summary>
-    private static string SubstituteResultIdentifier(string check)
-        => System.Text.RegularExpressions.Regex.Replace(check, @"\bresult\b", "__result__");
-
-    private void ReportPostconditionChecksNotLowered(string declarationName, Parsing.TextSpan span)
+    private static HashSet<string> CollectReservedCallableIdentifiers(
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<PostconditionEmission> postconditions)
     {
-        _diagnostics?.Add(new Diagnostics.Diagnostic(
-            Diagnostics.DiagnosticCode.PostconditionCheckNotLowered,
-            $"Postcondition runtime checks for '{declarationName}' were NOT emitted: its body has an early, nested, or raw-C# return that the current check lowering cannot instrument (the check would be silently skipped or the body's execution order changed). Static verification is unaffected; a non-proven postcondition on this declaration has no runtime net until the structural lowering (#764) lands.",
+        var reserved = parameters
+            .Select(parameter => SanitizeIdentifier(parameter.Name))
+            .ToHashSet(StringComparer.Ordinal);
+        reserved.UnionWith(typeParameters.Select(parameter =>
+            SanitizeIdentifier(parameter.Name)));
+
+        foreach (var node in body.SelectMany(DescendantsAndSelf))
+        {
+            string? name = node switch
+            {
+                BindStatementNode bind => bind.Name,
+                ForStatementNode loop => loop.VariableName,
+                ForeachStatementNode loop => loop.VariableName,
+                DictionaryForeachNode loop => loop.KeyName,
+                UsingStatementNode usingStatement => usingStatement.VariableName,
+                CatchClauseNode catchClause => catchClause.VariableName,
+                FixedStatementNode fixedStatement => fixedStatement.PointerName,
+                LabelStatementNode label => label.Label,
+                LambdaParameterNode parameter => parameter.Name,
+                QuantifierVariableNode variable => variable.Name,
+                IsPatternNode pattern => pattern.VariableName,
+                VariablePatternNode pattern => pattern.Name,
+                VarPatternNode pattern => pattern.Name,
+                TypePatternNode pattern => pattern.BindingName,
+                ReferenceNode reference when !reference.Name.Contains('.') =>
+                    reference.Name,
+                _ => null
+            };
+            if (!string.IsNullOrEmpty(name))
+            {
+                reserved.Add(SanitizeIdentifier(name));
+            }
+
+            if (node is ForeachStatementNode { IndexVariableName: { } indexName })
+            {
+                reserved.Add(SanitizeIdentifier(indexName));
+            }
+            else if (node is DictionaryForeachNode dictionaryLoop)
+            {
+                reserved.Add(SanitizeIdentifier(dictionaryLoop.ValueName));
+            }
+        }
+
+        foreach (var node in postconditions
+                     .SelectMany(postcondition =>
+                         DescendantsAndSelf(
+                             postcondition.Contract.Condition)))
+        {
+            var name = node switch
+            {
+                LambdaParameterNode parameter => parameter.Name,
+                QuantifierVariableNode variable => variable.Name,
+                IsPatternNode pattern => pattern.VariableName,
+                VariablePatternNode pattern => pattern.Name,
+                VarPatternNode pattern => pattern.Name,
+                TypePatternNode pattern => pattern.BindingName,
+                ReferenceNode reference when !reference.Name.Contains('.') =>
+                    reference.Name,
+                _ => null
+            };
+            if (!string.IsNullOrEmpty(name))
+            {
+                reserved.Add(SanitizeIdentifier(name));
+            }
+        }
+
+        return reserved;
+    }
+
+    private static string ReserveUniqueIdentifier(
+        HashSet<string> reserved,
+        string baseName)
+    {
+        var candidate = baseName;
+        var suffix = 1;
+        while (!reserved.Add(candidate))
+        {
+            candidate = $"{baseName}_{suffix++}";
+        }
+        return candidate;
+    }
+
+    private static bool PatternBindsName(
+        PatternNode pattern,
+        string name) =>
+        DescendantsAndSelf(pattern).Any(node => node switch
+        {
+            VariablePatternNode variable =>
+                variable.Name.Equals(name, StringComparison.Ordinal),
+            VarPatternNode variable =>
+                variable.Name.Equals(name, StringComparison.Ordinal),
+            TypePatternNode { BindingName: { } bindingName } =>
+                bindingName.Equals(name, StringComparison.Ordinal),
+            _ => false
+        });
+
+    private static bool ExpressionBindsPatternName(
+        ExpressionNode expression,
+        string name,
+        bool whenTruth = true)
+    {
+        var outcomes = AnalyzeBindingOutcomes(expression, name);
+        return outcomes.Any(outcome => outcome.Truth == whenTruth)
+            && outcomes
+                .Where(outcome => outcome.Truth == whenTruth)
+                .All(outcome => outcome.Bound);
+    }
+
+    private static IReadOnlySet<(bool Truth, bool Bound)> AnalyzeBindingOutcomes(
+        ExpressionNode expression,
+        string name)
+    {
+        if (expression is IsPatternNode pattern)
+        {
+            return pattern.VariableName?.Equals(
+                    name,
+                    StringComparison.Ordinal) == true
+                ? new HashSet<(bool, bool)> { (true, true), (false, false) }
+                : UnknownBindingOutcomes();
+        }
+        if (expression is BoolLiteralNode boolean)
+        {
+            return new HashSet<(bool, bool)> { (boolean.Value, false) };
+        }
+        if (expression is UnaryOperationNode
+            {
+                Operator: UnaryOperator.Not
+            } unary)
+        {
+            return AnalyzeBindingOutcomes(unary.Operand, name)
+                .Select(outcome => (!outcome.Truth, outcome.Bound))
+                .ToHashSet();
+        }
+        if (expression is BinaryOperationNode binary
+            && binary.Operator is BinaryOperator.And or BinaryOperator.Or)
+        {
+            return CombineBindingOutcomes(
+                AnalyzeBindingOutcomes(binary.Left, name),
+                AnalyzeBindingOutcomes(binary.Right, name),
+                binary.Operator == BinaryOperator.And);
+        }
+        if (expression is ImplicationExpressionNode implication)
+        {
+            var negatedAntecedent = AnalyzeBindingOutcomes(
+                    implication.Antecedent,
+                    name)
+                .Select(outcome => (!outcome.Truth, outcome.Bound))
+                .ToHashSet();
+            return CombineBindingOutcomes(
+                negatedAntecedent,
+                AnalyzeBindingOutcomes(implication.Consequent, name),
+                isAnd: false);
+        }
+        if (expression is ConditionalExpressionNode conditional)
+        {
+            var outcomes = new HashSet<(bool, bool)>();
+            foreach (var condition in AnalyzeBindingOutcomes(
+                         conditional.Condition,
+                         name))
+            {
+                var branch = condition.Truth
+                    ? conditional.WhenTrue
+                    : conditional.WhenFalse;
+                foreach (var branchOutcome in AnalyzeBindingOutcomes(
+                             branch,
+                             name))
+                {
+                    outcomes.Add((
+                        branchOutcome.Truth,
+                        condition.Bound || branchOutcome.Bound));
+                }
+            }
+            return outcomes;
+        }
+        return UnknownBindingOutcomes();
+    }
+
+    private static IReadOnlySet<(bool Truth, bool Bound)> CombineBindingOutcomes(
+        IReadOnlySet<(bool Truth, bool Bound)> leftOutcomes,
+        IReadOnlySet<(bool Truth, bool Bound)> rightOutcomes,
+        bool isAnd)
+    {
+        var outcomes = new HashSet<(bool, bool)>();
+        foreach (var left in leftOutcomes)
+        {
+            var shortCircuits = isAnd ? !left.Truth : left.Truth;
+            if (shortCircuits)
+            {
+                outcomes.Add((left.Truth, left.Bound));
+                continue;
+            }
+            foreach (var right in rightOutcomes)
+            {
+                outcomes.Add((
+                    right.Truth,
+                    left.Bound || right.Bound));
+            }
+        }
+        return outcomes;
+    }
+
+    private static IReadOnlySet<(bool Truth, bool Bound)>
+        UnknownBindingOutcomes() =>
+        new HashSet<(bool, bool)> { (true, false), (false, false) };
+
+    private void ReportUnsupportedPostconditionLowering(
+        string declarationName,
+        Parsing.TextSpan span,
+        string reason,
+        string diagnosticCode)
+    {
+        var message =
+            $"Postconditions on '{declarationName}' are unsupported: {reason}";
+        if (_diagnostics is null)
+        {
+            throw new InvalidOperationException(message);
+        }
+
+        _diagnostics.Add(new Diagnostics.Diagnostic(
+            diagnosticCode,
+            message,
             span,
-            Diagnostics.DiagnosticSeverity.Warning));
+            Diagnostics.DiagnosticSeverity.Error));
+    }
+
+    private CallableReturnShape GetCallableReturnShape(
+        string returnType,
+        bool isAsync,
+        bool isIterator)
+    {
+        var mappedType = MapTypeName(returnType);
+        if (isIterator)
+        {
+            return new CallableReturnShape(
+                WrapInIEnumerable(mappedType),
+                mappedType.Equals("void", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : mappedType);
+        }
+
+        if (!isAsync)
+        {
+            return new CallableReturnShape(
+                mappedType,
+                mappedType.Equals("void", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : mappedType);
+        }
+
+        if (TryUnwrapAsyncValueType(mappedType, out var asyncValueType))
+        {
+            return new CallableReturnShape(mappedType, asyncValueType);
+        }
+
+        if (mappedType is "Task" or "ValueTask")
+        {
+            return new CallableReturnShape(mappedType, null);
+        }
+
+        return mappedType.Equals("void", StringComparison.OrdinalIgnoreCase)
+            ? new CallableReturnShape("Task", null)
+            : new CallableReturnShape(WrapInTask(mappedType), mappedType);
+    }
+
+    private static bool TryUnwrapAsyncValueType(
+        string mappedType,
+        out string valueType)
+    {
+        var genericStart = mappedType.IndexOf('<');
+        if (genericStart > 0
+            && mappedType.EndsWith('>')
+            && (mappedType[..genericStart].EndsWith(
+                    "Task",
+                    StringComparison.Ordinal)
+                || mappedType[..genericStart].EndsWith(
+                    "ValueTask",
+                    StringComparison.Ordinal)))
+        {
+            valueType = mappedType[(genericStart + 1)..^1];
+            return true;
+        }
+
+        valueType = "";
+        return false;
+    }
+
+    private void EmitCallableBody(
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<PostconditionEmission> postconditions,
+        string declarationName,
+        Parsing.TextSpan declarationSpan,
+        CallableReturnShape returnShape,
+        string returnRefinementType,
+        bool isIterator)
+    {
+        var emitsPostconditions =
+            postconditions.Count > 0
+            && _contractMode != EmitContractMode.Off;
+        if (emitsPostconditions && isIterator)
+        {
+            ReportUnsupportedPostconditionLowering(
+                declarationName,
+                declarationSpan,
+                "iterator postcondition semantics are not defined; remove the postcondition or the yield statements",
+                Diagnostics.DiagnosticCode.IteratorPostconditionUnsupported);
+            foreach (var statement in body)
+            {
+                EmitStatement(statement);
+            }
+            return;
+        }
+
+        if (emitsPostconditions && ContainsOpaqueCSharp(body))
+        {
+            ReportUnsupportedPostconditionLowering(
+                declarationName,
+                declarationSpan,
+                "its body contains raw C# whose returns cannot be identified structurally",
+                Diagnostics.DiagnosticCode.PostconditionCheckNotLowered);
+            foreach (var statement in body)
+            {
+                EmitStatement(statement);
+            }
+            return;
+        }
+
+        var hasReturnRefinement =
+            _refinementTypes.ContainsKey(returnRefinementType);
+        if (!emitsPostconditions)
+        {
+            if (!hasReturnRefinement || isIterator)
+            {
+                foreach (var statement in body)
+                {
+                    EmitStatement(statement);
+                }
+                return;
+            }
+        }
+
+        var loweringIndex = _returnLoweringCounter++;
+        var reservedIdentifiers =
+            CollectReservedCallableIdentifiers(
+                body,
+                parameters,
+                typeParameters,
+                postconditions);
+        var exitLabel = ReserveUniqueIdentifier(
+            reservedIdentifiers,
+            $"__calorPostconditionExit{loweringIndex}");
+        var resultIdentifier = returnShape.HasValue
+            ? ReserveUniqueIdentifier(
+                reservedIdentifiers,
+                $"__calorPostconditionResult{loweringIndex}")
+            : null;
+        if (resultIdentifier != null)
+        {
+            AppendLine($"{returnShape.ValueType} {resultIdentifier};");
+        }
+
+        var previousLowering = _currentReturnLowering;
+        _currentReturnLowering = new ReturnLoweringContext(
+            exitLabel,
+            resultIdentifier);
+        try
+        {
+            foreach (var statement in body)
+            {
+                EmitStatement(statement);
+            }
+        }
+        finally
+        {
+            _currentReturnLowering = previousLowering;
+        }
+
+        AppendLine($"{exitLabel}:");
+        EmitPostconditionChecks(postconditions, resultIdentifier);
+        if (resultIdentifier != null)
+        {
+            EmitReturnRefinementGuard(
+                returnRefinementType,
+                resultIdentifier);
+            AppendLine($"return {resultIdentifier};");
+        }
+        else
+        {
+            AppendLine("return;");
+        }
+    }
+
+    private void EmitPostconditionChecks(
+        IReadOnlyList<PostconditionEmission> postconditions,
+        string? resultIdentifier)
+    {
+        var previousResultIdentifier = _postconditionResultIdentifier;
+        var previousPostconditionIndex = _currentPostconditionIndex;
+        _postconditionResultIdentifier = resultIdentifier;
+        _currentPostconditionIndex = 0;
+        try
+        {
+            foreach (var postcondition in postconditions)
+            {
+                if (postcondition.InheritedFrom != null)
+                {
+                    AppendLine(
+                        $"// Inherited from {postcondition.InheritedFrom}");
+                }
+
+                var check = Visit(postcondition.Contract);
+                if (!string.IsNullOrEmpty(check))
+                {
+                    AppendLine(check);
+                }
+            }
+        }
+        finally
+        {
+            _postconditionResultIdentifier = previousResultIdentifier;
+            _currentPostconditionIndex = previousPostconditionIndex;
+        }
     }
 
     private void ReportConstructorRefinementInitializerNotLowered(ConstructorNode node)
@@ -931,28 +1323,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
 
         var returnType = node.Output?.TypeName ?? "void";
-        var mappedReturnType = MapTypeName(returnType);
-        var mappedValueReturnType = mappedReturnType;
-        // Wrap in IEnumerable if body contains yield statements
         var isIterator = ContainsYieldStatements(node.Body);
-        if (isIterator)
-        {
-            mappedReturnType = WrapInIEnumerable(mappedReturnType);
-        }
-        // Wrap in Task if async
-        if (node.IsAsync)
-        {
-            mappedReturnType = WrapInTask(mappedReturnType);
-        }
-        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var returnShape = GetCallableReturnShape(
+            returnType,
+            node.IsAsync,
+            isIterator);
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
-        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
-        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
         var previousYieldRefinement = _currentYieldRefinement;
-        _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks && !isIterator
-                ? returnType
-                : null;
         _currentYieldRefinement = hasReturnRefinement && isIterator
             ? returnType
             : null;
@@ -1002,7 +1379,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var staticKeyword = "static "; // All module functions are static
         var asyncKeyword = node.IsAsync ? "async " : "";
 
-        AppendLine($"{visibility} {staticKeyword}{asyncKeyword}{mappedReturnType} {methodName}{typeParams}({parameters}){whereClause}");
+        AppendLine($"{visibility} {staticKeyword}{asyncKeyword}{returnShape.DeclarationType} {methodName}{typeParams}({parameters}){whereClause}");
         AppendLine("{");
         Indent();
 
@@ -1020,80 +1397,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         EmitRefinementParameterGuards(node.Parameters);
 
-        // If we have postconditions and a return value, we need special handling.
-        // W1 Slice 1 (T2): only when the body shape is one the lowering can
-        // instrument faithfully — otherwise emit the body untransformed and say so.
-        if ((node.Postconditions.Count > 0 || hasReturnRefinement)
-            && hasReturnValue
-            && !isIterator
-            && canLowerReturnChecks)
-        {
-            AppendLine($"{mappedValueReturnType} __result__ = default;");
-            AppendLine();
-
-            // Emit body statements, transforming return statements
-            foreach (var statement in node.Body)
-            {
-                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
-                {
-                    var mappedReturn = TryBeginLineMapping(statement);
-                    var expr = returnStmt.Expression.Accept(this);
-                    AppendLine($"__result__ = {expr};");
-                    EndLineMapping(mappedReturn);
-                }
-                else
-                {
-                    EmitStatement(statement);
-                }
-            }
-
-            AppendLine();
-            // Emit postconditions (ENSURES)
-            foreach (var ensures in node.Postconditions)
-            {
-                // Replace 'result' references with '__result__' (word-boundary)
-                var check = SubstituteResultIdentifier(Visit(ensures));
-                AppendLine(check);
-            }
-            EmitReturnRefinementGuard(returnType, "__result__");
-
-            AppendLine("return __result__;");
-        }
-        else
-        {
-            if (node.Postconditions.Count > 0 && hasReturnValue)
-            {
-                // Unlowerable postconditions are omitted loudly. Return refinements
-                // are still guarded directly at every return statement.
-                ReportPostconditionChecksNotLowered(node.Name, node.Span);
-            }
-
-            // No postconditions or void return - emit body normally
-            foreach (var statement in node.Body)
-            {
-                EmitStatement(statement);
-            }
-
-            // Emit postconditions for void functions (they can't reference 'result')
-            if (node.Postconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(node.Body))
-            {
-                // A void body with ANY return exits before the trailing checks —
-                // they were silently skippable; now they are loudly omitted (T2).
-                ReportPostconditionChecksNotLowered(node.Name, node.Span);
-            }
-            else if (!hasReturnValue)
-            {
-                foreach (var ensures in node.Postconditions)
-                {
-                    var check = Visit(ensures);
-                    AppendLine(check);
-                }
-            }
-        }
+        EmitCallableBody(
+            node.Body,
+            node.Parameters,
+            node.TypeParameters,
+            node.Postconditions
+                .Select(postcondition => new PostconditionEmission(postcondition))
+                .ToArray(),
+            node.Name,
+            node.Span,
+            returnShape,
+            returnType,
+            isIterator);
 
         Dedent();
         AppendLine("}");
-        _currentInlineReturnRefinement = previousInlineReturnRefinement;
         _currentYieldRefinement = previousYieldRefinement;
 
         return "";
@@ -1213,6 +1531,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ReturnStatementNode node)
     {
+        if (_currentReturnLowering is { } lowering)
+        {
+            if (node.Expression == null)
+            {
+                return $"goto {lowering.ExitLabel};";
+            }
+
+            var loweredExpression = node.Expression.Accept(this);
+            if (lowering.ResultIdentifier == null)
+            {
+                return $"return {loweredExpression};";
+            }
+
+            var continuationIndent = Environment.NewLine
+                + new string(' ', _indentLevel * 4);
+            return $"{lowering.ResultIdentifier} = {loweredExpression};"
+                + continuationIndent
+                + $"goto {lowering.ExitLabel};";
+        }
+
         if (node.Expression == null)
         {
             return "return;";
@@ -1542,8 +1880,36 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ConditionalExpressionNode node)
     {
         var condition = node.Condition.Accept(this);
-        var whenTrue = node.WhenTrue.Accept(this);
-        var whenFalse = node.WhenFalse.Accept(this);
+        var previousShadowDepth = _postconditionResultShadowDepth;
+        string whenTrue;
+        try
+        {
+            if (ExpressionBindsPatternName(node.Condition, "result"))
+            {
+                _postconditionResultShadowDepth++;
+            }
+            whenTrue = node.WhenTrue.Accept(this);
+        }
+        finally
+        {
+            _postconditionResultShadowDepth = previousShadowDepth;
+        }
+        string whenFalse;
+        try
+        {
+            if (ExpressionBindsPatternName(
+                    node.Condition,
+                    "result",
+                    whenTruth: false))
+            {
+                _postconditionResultShadowDepth++;
+            }
+            whenFalse = node.WhenFalse.Accept(this);
+        }
+        finally
+        {
+            _postconditionResultShadowDepth = previousShadowDepth;
+        }
         return $"({condition} ? {whenTrue} : {whenFalse})";
     }
 
@@ -1575,6 +1941,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
+        if (_postconditionResultIdentifier != null
+            && _postconditionResultShadowDepth == 0
+            && node.Name.Equals("result", StringComparison.Ordinal))
+        {
+            return _postconditionResultIdentifier;
+        }
+
         // Handle C# keywords that are used as literals (not identifiers)
         if (node.Name is "null" or "true" or "false")
         {
@@ -1882,7 +2255,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(BinaryOperationNode node)
     {
         var left = node.Left.Accept(this);
-        var right = node.Right.Accept(this);
+        var previousShadowDepth = _postconditionResultShadowDepth;
+        if (node.Operator is BinaryOperator.And or BinaryOperator.Or
+            && ExpressionBindsPatternName(
+                node.Left,
+                "result",
+                whenTruth: node.Operator == BinaryOperator.And))
+        {
+            _postconditionResultShadowDepth++;
+        }
+
+        string right;
+        try
+        {
+            right = node.Right.Accept(this);
+        }
+        finally
+        {
+            _postconditionResultShadowDepth = previousShadowDepth;
+        }
 
         // Special handling for Power operator (use Math.Pow)
         if (node.Operator == BinaryOperator.Power)
@@ -1996,7 +2387,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
         // Only parenthesize when operand is a binary expression (lower precedence than unary)
-        var needsParens = node.Operand is BinaryOperationNode;
+        var needsParens = node.Operand is BinaryOperationNode or IsPatternNode;
         if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
             return needsParens ? $"({operand}){op}" : $"{operand}{op}";
         return needsParens ? $"{op}({operand})" : $"{op}{operand}";
@@ -2259,26 +2650,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
 
         var returnType = method.Output?.TypeName ?? "void";
-        var mappedReturnType = MapTypeName(returnType);
-        var mappedValueReturnType = mappedReturnType;
         var isIterator = ContainsYieldStatements(method.Body);
-        if (isIterator)
-        {
-            mappedReturnType = WrapInIEnumerable(mappedReturnType);
-        }
-        if (method.IsAsync)
-        {
-            mappedReturnType = WrapInTask(mappedReturnType);
-        }
-        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var returnShape = GetCallableReturnShape(
+            returnType,
+            method.IsAsync,
+            isIterator);
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
-        var canLowerReturnChecks = CanLowerPostconditions(method.Body);
-        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
         var previousYieldRefinement = _currentYieldRefinement;
-        _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks && !isIterator
-                ? returnType
-                : null;
         _currentYieldRefinement = hasReturnRefinement && isIterator
             ? returnType
             : null;
@@ -2336,7 +2714,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var asyncKeyword = method.IsAsync ? "async " : "";
 
-        AppendLine($"{visibility} static {asyncKeyword}{mappedReturnType} {methodName}{typeParams}({paramString}){whereClause}");
+        AppendLine($"{visibility} static {asyncKeyword}{returnShape.DeclarationType} {methodName}{typeParams}({paramString}){whereClause}");
         AppendLine("{");
         Indent();
 
@@ -2348,68 +2726,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         EmitRefinementParameterGuards(method.Parameters);
 
-        if ((method.Postconditions.Count > 0 || hasReturnRefinement)
-            && hasReturnValue
-            && !isIterator
-            && canLowerReturnChecks)
-        {
-            AppendLine($"{mappedValueReturnType} __result__ = default;");
-            AppendLine();
-
-            foreach (var statement in method.Body)
-            {
-                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
-                {
-                    var mappedReturn = TryBeginLineMapping(statement);
-                    var expr = returnStmt.Expression.Accept(this);
-                    AppendLine($"__result__ = {expr};");
-                    EndLineMapping(mappedReturn);
-                }
-                else
-                {
-                    EmitStatement(statement);
-                }
-            }
-
-            AppendLine();
-            foreach (var ensures in method.Postconditions)
-            {
-                var check = SubstituteResultIdentifier(Visit(ensures));
-                AppendLine(check);
-            }
-
-            EmitReturnRefinementGuard(returnType, "__result__");
-            AppendLine("return __result__;");
-        }
-        else
-        {
-            if (method.Postconditions.Count > 0 && hasReturnValue)
-            {
-                ReportPostconditionChecksNotLowered(method.Name, method.Span);
-            }
-
-            foreach (var statement in method.Body)
-            {
-                EmitStatement(statement);
-            }
-
-            if (method.Postconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(method.Body))
-            {
-                ReportPostconditionChecksNotLowered(method.Name, method.Span);
-            }
-            else if (!hasReturnValue)
-            {
-                foreach (var ensures in method.Postconditions)
-                {
-                    var check = Visit(ensures);
-                    AppendLine(check);
-                }
-            }
-        }
+        EmitCallableBody(
+            method.Body,
+            method.Parameters,
+            method.TypeParameters,
+            method.Postconditions
+                .Select(postcondition => new PostconditionEmission(postcondition))
+                .ToArray(),
+            method.Name,
+            method.Span,
+            returnShape,
+            returnType,
+            isIterator);
 
         Dedent();
         AppendLine("}");
-        _currentInlineReturnRefinement = previousInlineReturnRefinement;
         _currentYieldRefinement = previousYieldRefinement;
     }
 
@@ -2472,23 +2803,35 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var matchCase = node.Cases[i];
             var pattern = EmitPattern(matchCase.Pattern);
-
-            // Emit guard clause if present
-            var guard = matchCase.Guard != null ? $" when {matchCase.Guard.Accept(this)}" : "";
-
-            // For expression match, the body should yield a value
-            // Take the last statement if it's a return, otherwise default
-            var body = "default";
-            if (matchCase.Body.Count > 0)
+            var previousShadowDepth = _postconditionResultShadowDepth;
+            if (PatternBindsName(matchCase.Pattern, "result"))
             {
-                var lastStmt = matchCase.Body[^1];
-                if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
-                {
-                    body = ret.Expression.Accept(this);
-                }
+                _postconditionResultShadowDepth++;
             }
-            sb.Append($"{pattern}{guard} => {body}");
-            if (i < node.Cases.Count - 1) sb.Append(", ");
+
+            try
+            {
+                // Emit guard clause if present
+                var guard = matchCase.Guard != null ? $" when {matchCase.Guard.Accept(this)}" : "";
+
+                // For expression match, the body should yield a value
+                // Take the last statement if it's a return, otherwise default
+                var body = "default";
+                if (matchCase.Body.Count > 0)
+                {
+                    var lastStmt = matchCase.Body[^1];
+                    if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
+                    {
+                        body = ret.Expression.Accept(this);
+                    }
+                }
+                sb.Append($"{pattern}{guard} => {body}");
+                if (i < node.Cases.Count - 1) sb.Append(", ");
+            }
+            finally
+            {
+                _postconditionResultShadowDepth = previousShadowDepth;
+            }
         }
 
         sb.Append(" }");
@@ -3455,20 +3798,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.IsSealed && node.IsOverride) modifiers.Add("sealed");
 
         var returnType = node.Output?.TypeName ?? "void";
-        var mappedReturnType = MapTypeName(returnType);
-        var mappedValueReturnType = mappedReturnType;
-        // Wrap in IEnumerable if body contains yield statements
         var isIterator = ContainsYieldStatements(node.Body);
-        if (isIterator)
-        {
-            mappedReturnType = WrapInIEnumerable(mappedReturnType);
-        }
-        // Wrap in Task if async
-        if (node.IsAsync)
-        {
-            mappedReturnType = WrapInTask(mappedReturnType);
-        }
-        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var returnShape = GetCallableReturnShape(
+            returnType,
+            node.IsAsync,
+            isIterator);
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var methodName = SanitizeIdentifier(node.Name);
 
@@ -3499,17 +3833,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Operator overload detection: op_ prefix methods emit C# operator syntax
         if (node.Name.StartsWith("op_"))
         {
-            return EmitOperatorMethod(node, modifiers, mappedReturnType, parameters);
+            return EmitOperatorMethod(
+                node,
+                modifiers,
+                returnShape,
+                parameters,
+                isIterator);
         }
 
         // Abstract methods, extern methods, and partial method stubs have no body
         if (node.IsAbstract || node.IsExtern || (node.IsPartial && node.Body.Count == 0))
         {
-            AppendLine($"{string.Join(" ", modifiers)} {mappedReturnType} {methodName}{typeParams}({parameters}){whereClause};");
+            AppendLine($"{string.Join(" ", modifiers)} {returnShape.DeclarationType} {methodName}{typeParams}({parameters}){whereClause};");
             return "";
         }
 
-        AppendLine($"{string.Join(" ", modifiers)} {mappedReturnType} {methodName}{typeParams}({parameters}){whereClause}");
+        AppendLine($"{string.Join(" ", modifiers)} {returnShape.DeclarationType} {methodName}{typeParams}({parameters}){whereClause}");
         AppendLine("{");
         Indent();
 
@@ -3538,110 +3877,40 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         // Calculate effective postconditions
+        var hasInheritedPostconditions = !node.HasContracts
+            && inheritedContracts != null
+            && inheritedContracts.Postconditions.Count > 0;
         var effectivePostconditions = node.Postconditions.Count > 0
             ? node.Postconditions
-            : (inheritedContracts?.Postconditions ?? Array.Empty<EnsuresNode>());
-        var hasInheritedPostconditions = !node.HasContracts && inheritedContracts != null && inheritedContracts.Postconditions.Count > 0;
-        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
-        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+            : hasInheritedPostconditions
+                ? inheritedContracts!.Postconditions
+                : Array.Empty<EnsuresNode>();
         var previousYieldRefinement = _currentYieldRefinement;
-        _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks && !isIterator
-                ? returnType
-                : null;
         _currentYieldRefinement = hasReturnRefinement && isIterator
             ? returnType
             : null;
         _inlineReturnGuardCounter = 0;
 
-        // Handle postconditions similar to FunctionNode
-        // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
-        if ((effectivePostconditions.Count > 0 || hasReturnRefinement)
-            && hasReturnValue
-            && !isIterator
-            && canLowerReturnChecks)
-        {
-            AppendLine($"{mappedValueReturnType} __result__ = default;");
-            AppendLine();
-
-            foreach (var statement in node.Body)
-            {
-                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
-                {
-                    var mappedReturn = TryBeginLineMapping(statement);
-                    var expr = returnStmt.Expression.Accept(this);
-                    AppendLine($"__result__ = {expr};");
-                    EndLineMapping(mappedReturn);
-                }
-                else
-                {
-                    EmitStatement(statement);
-                }
-            }
-
-            AppendLine();
-
-            // Emit explicit postconditions
-            foreach (var ensures in node.Postconditions)
-            {
-                var check = SubstituteResultIdentifier(Visit(ensures));
-                AppendLine(check);
-            }
-
-            // Emit inherited postconditions (only if method has no explicit contracts)
-            if (hasInheritedPostconditions)
-            {
-                foreach (var ensures in inheritedContracts!.Postconditions)
-                {
-                    AppendLine($"// Inherited from {inheritedContracts.SourceDisplayName}");
-                    var check = SubstituteResultIdentifier(Visit(ensures));
-                    AppendLine(check);
-                }
-            }
-            EmitReturnRefinementGuard(returnType, "__result__");
-
-            AppendLine("return __result__;");
-        }
-        else
-        {
-            if (effectivePostconditions.Count > 0 && hasReturnValue)
-            {
-                ReportPostconditionChecksNotLowered(node.Name, node.Span);
-            }
-
-            foreach (var statement in node.Body)
-            {
-                EmitStatement(statement);
-            }
-
-            if (effectivePostconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(node.Body))
-            {
-                ReportPostconditionChecksNotLowered(node.Name, node.Span);
-            }
-            else if (!hasReturnValue)
-            {
-                foreach (var ensures in node.Postconditions)
-                {
-                    var check = Visit(ensures);
-                    AppendLine(check);
-                }
-
-                // Emit inherited postconditions for void methods
-                if (hasInheritedPostconditions)
-                {
-                    foreach (var ensures in inheritedContracts!.Postconditions)
-                    {
-                        AppendLine($"// Inherited from {inheritedContracts.SourceDisplayName}");
-                        var check = Visit(ensures);
-                        AppendLine(check);
-                    }
-                }
-            }
-        }
+        var postconditions = effectivePostconditions
+            .Select(postcondition => new PostconditionEmission(
+                postcondition,
+                hasInheritedPostconditions
+                    ? inheritedContracts!.SourceDisplayName
+                    : null))
+            .ToArray();
+        EmitCallableBody(
+            node.Body,
+            node.Parameters,
+            node.TypeParameters,
+            postconditions,
+            node.Name,
+            node.Span,
+            returnShape,
+            returnType,
+            isIterator);
 
         Dedent();
         AppendLine("}");
-        _currentInlineReturnRefinement = previousInlineReturnRefinement;
         _currentYieldRefinement = previousYieldRefinement;
 
         return "";
@@ -3768,26 +4037,31 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         ["op_ExclusiveOr"] = "^",
     };
 
-    private string EmitOperatorMethod(MethodNode node, List<string> modifiers, string mappedReturnType, string parameters)
+    private string EmitOperatorMethod(
+        MethodNode node,
+        List<string> modifiers,
+        CallableReturnShape returnShape,
+        string parameters,
+        bool isIterator)
     {
         var modStr = string.Join(" ", modifiers);
 
         if (node.Name == "op_Implicit")
         {
-            AppendLine($"{modStr} implicit operator {mappedReturnType}({parameters})");
+            AppendLine($"{modStr} implicit operator {returnShape.DeclarationType}({parameters})");
         }
         else if (node.Name == "op_Explicit")
         {
-            AppendLine($"{modStr} explicit operator {mappedReturnType}({parameters})");
+            AppendLine($"{modStr} explicit operator {returnShape.DeclarationType}({parameters})");
         }
         else if (CilNameToOperator.TryGetValue(node.Name, out var op))
         {
-            AppendLine($"{modStr} {mappedReturnType} operator {op}({parameters})");
+            AppendLine($"{modStr} {returnShape.DeclarationType} operator {op}({parameters})");
         }
         else
         {
             // Unknown operator — fall back to regular method
-            AppendLine($"{modStr} {mappedReturnType} {SanitizeIdentifier(node.Name)}({parameters})");
+            AppendLine($"{modStr} {returnShape.DeclarationType} {SanitizeIdentifier(node.Name)}({parameters})");
         }
 
         AppendLine("{");
@@ -3802,78 +4076,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         EmitRefinementParameterGuards(node.Parameters);
 
         var returnType = node.Output?.TypeName ?? "void";
-        var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
-        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
-        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
-        _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks
-                ? returnType
-                : null;
+        var previousYieldRefinement = _currentYieldRefinement;
+        _currentYieldRefinement = hasReturnRefinement && isIterator
+            ? returnType
+            : null;
         _inlineReturnGuardCounter = 0;
 
-        if ((node.Postconditions.Count > 0 || hasReturnRefinement)
-            && hasReturnValue
-            && canLowerReturnChecks)
-        {
-            AppendLine($"{mappedReturnType} __result__ = default;");
-            AppendLine();
-
-            foreach (var statement in node.Body)
-            {
-                if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
-                {
-                    var mappedReturn = TryBeginLineMapping(statement);
-                    var expr = returnStmt.Expression.Accept(this);
-                    AppendLine($"__result__ = {expr};");
-                    EndLineMapping(mappedReturn);
-                }
-                else
-                {
-                    EmitStatement(statement);
-                }
-            }
-
-            AppendLine();
-
-            foreach (var ensures in node.Postconditions)
-            {
-                var check = SubstituteResultIdentifier(Visit(ensures));
-                AppendLine(check);
-            }
-
-            EmitReturnRefinementGuard(returnType, "__result__");
-            AppendLine("return __result__;");
-        }
-        else
-        {
-            if (node.Postconditions.Count > 0 && hasReturnValue)
-            {
-                ReportPostconditionChecksNotLowered(node.Name, node.Span);
-            }
-
-            foreach (var statement in node.Body)
-            {
-                EmitStatement(statement);
-            }
-
-            if (node.Postconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(node.Body))
-            {
-                ReportPostconditionChecksNotLowered(node.Name, node.Span);
-            }
-            else if (!hasReturnValue)
-            {
-                foreach (var ensures in node.Postconditions)
-                {
-                    var check = Visit(ensures);
-                    AppendLine(check);
-                }
-            }
-        }
+        EmitCallableBody(
+            node.Body,
+            node.Parameters,
+            node.TypeParameters,
+            node.Postconditions
+                .Select(postcondition => new PostconditionEmission(postcondition))
+                .ToArray(),
+            node.Name,
+            node.Span,
+            returnShape,
+            returnType,
+            isIterator);
 
         Dedent();
         AppendLine("}");
-        _currentInlineReturnRefinement = previousInlineReturnRefinement;
+        _currentYieldRefinement = previousYieldRefinement;
 
         return "";
     }
@@ -4303,28 +4528,28 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         EmitCSharpAttributes(node.CSharpAttributes);
 
         var returnTypeName = node.Output?.TypeName ?? "void";
-        var returnType = MapTypeName(returnTypeName);
-        var hasReturnValue =
-            !returnTypeName.Equals("void", StringComparison.OrdinalIgnoreCase);
+        var isIterator = ContainsYieldStatements(node.Body);
+        var returnShape = GetCallableReturnShape(
+            returnTypeName,
+            isAsync: false,
+            isIterator);
         var hasReturnRefinement =
             _refinementTypes.ContainsKey(returnTypeName);
-        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
-        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
-        _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks
-                ? returnTypeName
-                : null;
+        var previousYieldRefinement = _currentYieldRefinement;
+        _currentYieldRefinement = hasReturnRefinement && isIterator
+            ? returnTypeName
+            : null;
         _inlineReturnGuardCounter = 0;
         var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         if (node.IsConversion)
         {
             // implicit/explicit operator: public static implicit operator TargetType(SourceType value)
-            AppendLine($"public static {node.OperatorToken} operator {returnType}({parameters})");
+            AppendLine($"public static {node.OperatorToken} operator {returnShape.DeclarationType}({parameters})");
         }
         else
         {
-            AppendLine($"public static {returnType} operator {node.OperatorToken}({parameters})");
+            AppendLine($"public static {returnShape.DeclarationType} operator {node.OperatorToken}({parameters})");
         }
 
         AppendLine("{");
@@ -4336,69 +4561,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         EmitRefinementParameterGuards(node.Parameters);
 
-        if ((node.Postconditions.Count > 0 || hasReturnRefinement)
-            && hasReturnValue
-            && canLowerReturnChecks)
-        {
-            AppendLine($"{returnType} __result__ = default;");
-            AppendLine();
-            foreach (var statement in node.Body)
-            {
-                if (statement is ReturnStatementNode
-                    {
-                        Expression: not null
-                    } returnStmt)
-                {
-                    var mappedReturn = TryBeginLineMapping(statement);
-                    AppendLine($"__result__ = {returnStmt.Expression.Accept(this)};");
-                    EndLineMapping(mappedReturn);
-                }
-                else
-                {
-                    EmitStatement(statement);
-                }
-            }
-
-            AppendLine();
-            foreach (var post in node.Postconditions)
-            {
-                AppendLine(SubstituteResultIdentifier(Visit(post)));
-            }
-            EmitReturnRefinementGuard(returnTypeName, "__result__");
-            AppendLine("return __result__;");
-        }
-        else
-        {
-            if (node.Postconditions.Count > 0 && hasReturnValue)
-            {
-                ReportPostconditionChecksNotLowered($"operator {node.OperatorToken}", node.Span);
-            }
-
-            foreach (var statement in node.Body)
-            {
-                EmitStatement(statement);
-            }
-
-            if (node.Postconditions.Count > 0
-                && !hasReturnValue
-                && BodyContainsAnyReturn(node.Body))
-            {
-                ReportPostconditionChecksNotLowered(
-                    $"operator {node.OperatorToken}",
-                    node.Span);
-            }
-            else if (!hasReturnValue)
-            {
-                foreach (var post in node.Postconditions)
-                {
-                    AppendLine(Visit(post));
-                }
-            }
-        }
+        EmitCallableBody(
+            node.Body,
+            node.Parameters,
+            Array.Empty<TypeParameterNode>(),
+            node.Postconditions
+                .Select(postcondition => new PostconditionEmission(postcondition))
+                .ToArray(),
+            $"operator {node.OperatorToken}",
+            node.Span,
+            returnShape,
+            returnTypeName,
+            isIterator);
 
         Dedent();
         AppendLine("}");
-        _currentInlineReturnRefinement = previousInlineReturnRefinement;
+        _currentYieldRefinement = previousYieldRefinement;
 
         return "";
     }
@@ -4780,8 +4958,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
         var previousInlineReturnRefinement = _currentInlineReturnRefinement;
         var previousYieldRefinement = _currentYieldRefinement;
+        var previousReturnLowering = _currentReturnLowering;
+        var previousPostconditionResultShadowDepth =
+            _postconditionResultShadowDepth;
         _currentInlineReturnRefinement = null;
         _currentYieldRefinement = null;
+        _currentReturnLowering = null;
+        if (node.Parameters.Any(parameter =>
+                parameter.Name.Equals("result", StringComparison.Ordinal)))
+        {
+            _postconditionResultShadowDepth++;
+        }
 
         try
         {
@@ -4834,6 +5021,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             _currentInlineReturnRefinement = previousInlineReturnRefinement;
             _currentYieldRefinement = previousYieldRefinement;
+            _currentReturnLowering = previousReturnLowering;
+            _postconditionResultShadowDepth =
+                previousPostconditionResultShadowDepth;
         }
     }
 
@@ -5554,43 +5744,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// <summary>
     /// Checks whether a statement list contains any yield statements.
     /// </summary>
-    private static bool ContainsYieldStatements(IReadOnlyList<StatementNode> statements)
-    {
-        foreach (var stmt in statements)
-        {
-            if (stmt is YieldReturnStatementNode or YieldBreakStatementNode)
-                return true;
-            // Check nested blocks
-            if (stmt is IfStatementNode ifStmt)
-            {
-                if (ContainsYieldStatements(ifStmt.ThenBody)) return true;
-                if (ifStmt.ElseBody != null && ContainsYieldStatements(ifStmt.ElseBody)) return true;
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    if (ContainsYieldStatements(elseIf.Body)) return true;
-            }
-            else if (stmt is ForStatementNode forStmt)
-            {
-                if (ContainsYieldStatements(forStmt.Body)) return true;
-            }
-            else if (stmt is WhileStatementNode whileStmt)
-            {
-                if (ContainsYieldStatements(whileStmt.Body)) return true;
-            }
-            else if (stmt is ForeachStatementNode foreachStmt)
-            {
-                if (ContainsYieldStatements(foreachStmt.Body)) return true;
-            }
-            else if (stmt is DoWhileStatementNode doWhileStmt)
-            {
-                if (ContainsYieldStatements(doWhileStmt.Body)) return true;
-            }
-            else if (stmt is TryStatementNode tryStmt)
-            {
-                if (ContainsYieldStatements(tryStmt.TryBody)) return true;
-            }
-        }
-        return false;
-    }
+    private static bool ContainsYieldStatements(
+        IReadOnlyList<StatementNode> statements) =>
+        TraverseStatements(statements).Any(statement =>
+            statement is YieldReturnStatementNode or YieldBreakStatementNode);
 
     private static string SanitizeIdentifier(string name)
     {
@@ -5718,6 +5875,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ForallExpressionNode node)
     {
+        var previousShadowDepth = _postconditionResultShadowDepth;
+        if (node.BoundVariables.Any(variable =>
+                variable.Name.Equals("result", StringComparison.Ordinal)))
+        {
+            _postconditionResultShadowDepth++;
+        }
+
+        try
+        {
+            return EmitForallExpression(node);
+        }
+        finally
+        {
+            _postconditionResultShadowDepth = previousShadowDepth;
+        }
+    }
+
+    private string EmitForallExpression(ForallExpressionNode node)
+    {
         _usesSystemLinq = true;
         // Try to extract finite range from the pattern:
         // (forall ((i type)) (-> (&& (>= i 0) (< i n)) body))
@@ -5762,6 +5938,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ExistsExpressionNode node)
     {
+        var previousShadowDepth = _postconditionResultShadowDepth;
+        if (node.BoundVariables.Any(variable =>
+                variable.Name.Equals("result", StringComparison.Ordinal)))
+        {
+            _postconditionResultShadowDepth++;
+        }
+
+        try
+        {
+            return EmitExistsExpression(node);
+        }
+        finally
+        {
+            _postconditionResultShadowDepth = previousShadowDepth;
+        }
+    }
+
+    private string EmitExistsExpression(ExistsExpressionNode node)
+    {
         _usesSystemLinq = true;
         // Try to extract finite range from the pattern:
         // (exists ((i type)) (&& (>= i 0) (< i n) body))
@@ -5805,8 +6000,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // p -> q is equivalent to !p || q
         var ante = node.Antecedent.Accept(this);
-        var cons = node.Consequent.Accept(this);
-        return $"(!({ante}) || ({cons}))";
+        var previousShadowDepth = _postconditionResultShadowDepth;
+        if (ExpressionBindsPatternName(node.Antecedent, "result"))
+        {
+            _postconditionResultShadowDepth++;
+        }
+
+        try
+        {
+            var cons = node.Consequent.Accept(this);
+            return $"(!({ante}) || ({cons}))";
+        }
+        finally
+        {
+            _postconditionResultShadowDepth = previousShadowDepth;
+        }
     }
 
     // Native String Operations

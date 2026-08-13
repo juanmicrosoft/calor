@@ -358,7 +358,7 @@ public class ContractInheritanceTests
         // Should contain inherited contract comment
         Assert.Contains("// Inherited from IRepository.GetById", code);
         // Should contain the postcondition check
-        Assert.Contains("__result__ != null", code);
+        Assert.Contains("__calorPostconditionResult", code);
     }
 
     [Fact]

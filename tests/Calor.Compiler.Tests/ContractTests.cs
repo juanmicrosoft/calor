@@ -268,9 +268,9 @@ public class ContractTests
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
 
-        Assert.Contains("__result__", code);
+        Assert.Contains("__calorPostconditionResult", code);
         Assert.Contains("throw new Calor.Runtime.ContractViolationException", code);
-        Assert.Contains("return __result__", code);
+        Assert.Contains("return __calorPostconditionResult", code);
     }
 
     #endregion

@@ -26,9 +26,6 @@ public class EjectStoryTests
     // Fixtures — representative wedge-shaped modules
     // ------------------------------------------------------------------
 
-    // Single-return body: postcondition lowering refuses early/nested-return
-    // bodies (the #764 T2 stopgap emits Calor1001 and no §S check there) —
-    // that refusal is itself pinned in a test below.
     private const string ContractsModule = @"§M{m001:Pricing}
   §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32
     §Q (>= cap 0)
@@ -198,14 +195,12 @@ public class EjectStoryTests
     }
 
     [Fact]
-    public void Contracts_EarlyReturnBody_PostconditionRefusedLoudly_NotSilentlySkipped()
+    public void Contracts_EarlyReturnBody_RetainsPostcondition()
     {
-        // The #764 stopgap: a §S on an early-return body gets NO runtime
-        // check — the lowering refuses (Calor1001) instead of emitting a
-        // check that could be silently skipped. The §Q guard still emits.
         var csharp = Emit(EarlyReturnContractsModule, EmitContractMode.Debug);
         Assert.Contains("ContractKind.Requires", csharp);
-        Assert.DoesNotContain("ContractKind.Ensures", csharp);
+        Assert.Contains("ContractKind.Ensures", csharp);
+        Assert.Contains("goto __calorPostconditionExit", csharp);
     }
 
     [Fact]

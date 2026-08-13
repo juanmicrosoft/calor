@@ -142,7 +142,8 @@ are documented and covered by a dedicated test suite
 |---|---|
 | `§Q` precondition | Runtime check: `if (!(cond)) throw ContractViolationException(...)` — always retained (never elided, even when proven) |
 | `§S` postcondition | Runtime check on return, same exception shape. `calor convert` does not run verification, so ejected output retains every check — elision only ever happens inside verified SDK builds on a non-vacuous ∀-proof |
-| `§S` on a body with early/nested returns | NO runtime check — the lowering refuses loudly (`Calor1001`, the #764 stopgap) rather than emit a check that could be silently skipped; static verification is unaffected |
+| `§S` on a body with early/nested returns | Every structured return targets one generated exit, so the return expression is evaluated once and the check runs once after `finally`/`using` cleanup. Exceptional exits skip the check |
+| `§S` on an iterator | Rejected with `Calor1004` until deferred iterator-completion semantics are defined |
 | Contracts with `--contract-mode off` | Stripped entirely (the waiver you chose) |
 | `§E` effect declarations | No runtime footprint — effects were compile-time discipline; the enforcement disappears, the behavior does not change |
 | Refinement-type obligations | Comments / retained checks per obligation status (they were never runtime-enforced — #782) |

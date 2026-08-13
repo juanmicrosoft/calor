@@ -860,7 +860,7 @@ public sealed class ObligationTests
         var csharp = new CSharpEmitter().Emit(module);
 
         Assert.Contains("int Get()", csharp);
-        Assert.Contains("if (!(__result__ >= 0))", csharp);
+        Assert.Contains("if (!(__calorPostconditionResult", csharp);
         Assert.Contains("Return value violates refinement type 'Nat'", csharp);
     }
 

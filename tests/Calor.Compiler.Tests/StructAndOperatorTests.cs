@@ -732,9 +732,8 @@ public class StructAndOperatorTests
         // Should emit operator + syntax
         Assert.Contains("operator +", code);
 
-        // Should emit postcondition with __result__ pattern
-        Assert.Contains("__result__", code);
-        Assert.Contains("return __result__", code);
+        Assert.Contains("__calorPostconditionResult", code);
+        Assert.Contains("return __calorPostconditionResult", code);
         Assert.Contains("ContractViolationException", code);
     }
 
