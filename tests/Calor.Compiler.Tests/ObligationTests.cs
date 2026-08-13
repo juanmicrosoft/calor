@@ -972,6 +972,76 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void RefinementElision_RequiresAllConstraintsAndRuntimeAssumptions()
+    {
+        const string combinedSource = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Mutate:pub}
+                  §I{Positive:value} | (< # INT:10)
+                  §O{i32}
+                  §ASSIGN value INT:20
+                  §R value
+            """;
+        var combinedModule = Parse(combinedSource, out var combinedDiagnostics);
+        Assert.False(combinedDiagnostics.HasErrors);
+        var combinedTracker = new ObligationTracker();
+        new ObligationGenerator(combinedTracker).Generate(combinedModule);
+
+        var assignmentObligations = combinedTracker.Obligations
+            .Where(obligation =>
+                obligation.Kind == ObligationKind.Subtype
+                && obligation.Description.StartsWith(
+                    "Assignment to 'value'",
+                    StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.Equal(2, assignmentObligations.Length);
+        Assert.Contains(
+            assignmentObligations,
+            obligation => obligation.Description.Contains(
+                "inline refinement",
+                StringComparison.Ordinal));
+
+        const string contractOffSource = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Mutate:pub}
+                  §I{Positive:value}
+                  §I{i32:next}
+                  §O{i32}
+                  §Q (> next INT:0)
+                  §ASSIGN value next
+                  §R value
+            """;
+        var contractOffModule = Parse(
+            contractOffSource,
+            out var contractOffDiagnostics);
+        Assert.False(contractOffDiagnostics.HasErrors);
+        var contractOffTracker = new ObligationTracker();
+        new ObligationGenerator(contractOffTracker).Generate(contractOffModule);
+        foreach (var obligation in contractOffTracker.Obligations)
+            obligation.Status = ObligationStatus.Discharged;
+        var contractOffCSharp = new CSharpEmitter(
+            ContractMode.Off,
+            null,
+            null,
+            contractOffTracker)
+        {
+            ElideProvenGuards = true
+        }.Emit(contractOffModule);
+
+        var exception = InvokeGenerated(
+            contractOffCSharp,
+            "Mutate",
+            1,
+            -1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.DoesNotContain("Precondition failed", contractOffCSharp);
+    }
+
+    [Fact]
     public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""

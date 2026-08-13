@@ -366,6 +366,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Parsing.TextSpan? span = null,
         string? parameterName = null)
     {
+        if (_contractMode == EmitContractMode.Off)
+            return true;
         if (_obligationTracker is null || _currentFunctionId is null)
             return true;
 

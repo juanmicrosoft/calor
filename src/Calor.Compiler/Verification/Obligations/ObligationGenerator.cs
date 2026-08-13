@@ -179,7 +179,7 @@ public sealed class ObligationGenerator
         {
             if (_refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
                 refinementByVariable[parameter.Name] = refinementType;
-            else if (parameter.InlineRefinement?.Predicate is { } inlinePredicate)
+            if (parameter.InlineRefinement?.Predicate is { } inlinePredicate)
                 inlineRefinementByVariable[parameter.Name] = inlinePredicate;
         }
 
@@ -216,9 +216,13 @@ public sealed class ObligationGenerator
 
         foreach (var assignment in nodes.OfType<AssignmentStatementNode>())
         {
-            if (assignment.Target is ReferenceNode target
-                && !ambiguousVariables.Contains(target.Name)
-                && refinementByVariable.TryGetValue(target.Name, out var refinementType))
+            if (assignment.Target is not ReferenceNode target
+                || ambiguousVariables.Contains(target.Name))
+            {
+                continue;
+            }
+
+            if (refinementByVariable.TryGetValue(target.Name, out var refinementType))
             {
                 AddAssignmentSubtypeObligation(
                     functionId,
@@ -227,15 +231,13 @@ public sealed class ObligationGenerator
                     assignment.Value,
                     assignment.Span);
             }
-            else if (assignment.Target is ReferenceNode inlineTarget
-                && !ambiguousVariables.Contains(inlineTarget.Name)
-                && inlineRefinementByVariable.TryGetValue(
-                    inlineTarget.Name,
+            if (inlineRefinementByVariable.TryGetValue(
+                    target.Name,
                     out var inlinePredicate))
             {
                 AddAssignmentSubtypeObligation(
                     functionId,
-                    inlineTarget.Name,
+                    target.Name,
                     inlinePredicate,
                     "inline refinement",
                     assignment.Value,
@@ -246,9 +248,13 @@ public sealed class ObligationGenerator
         foreach (var assignment in nodes.OfType<CompoundAssignmentStatementNode>())
         {
             var assignedValue = BuildCompoundAssignmentValue(assignment);
-            if (assignment.Target is ReferenceNode target
-                && !ambiguousVariables.Contains(target.Name)
-                && refinementByVariable.TryGetValue(target.Name, out var refinementType))
+            if (assignment.Target is not ReferenceNode target
+                || ambiguousVariables.Contains(target.Name))
+            {
+                continue;
+            }
+
+            if (refinementByVariable.TryGetValue(target.Name, out var refinementType))
             {
                 AddAssignmentSubtypeObligation(
                     functionId,
@@ -257,15 +263,13 @@ public sealed class ObligationGenerator
                     assignedValue,
                     assignment.Span);
             }
-            else if (assignment.Target is ReferenceNode inlineTarget
-                && !ambiguousVariables.Contains(inlineTarget.Name)
-                && inlineRefinementByVariable.TryGetValue(
-                    inlineTarget.Name,
+            if (inlineRefinementByVariable.TryGetValue(
+                    target.Name,
                     out var inlinePredicate))
             {
                 AddAssignmentSubtypeObligation(
                     functionId,
-                    inlineTarget.Name,
+                    target.Name,
                     inlinePredicate,
                     "inline refinement",
                     assignedValue,
@@ -301,7 +305,7 @@ public sealed class ObligationGenerator
                     assignedValue,
                     unary.Span);
             }
-            else if (inlineRefinementByVariable.TryGetValue(
+            if (inlineRefinementByVariable.TryGetValue(
                 target.Name,
                 out var inlinePredicate))
             {
