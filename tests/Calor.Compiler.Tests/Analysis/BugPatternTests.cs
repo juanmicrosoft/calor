@@ -175,16 +175,10 @@ public class BugPatternTests
     }
 
     [SkippableFact]
-    public void DivisionByZero_UnsignedDivisor_Z3Refused_NoVerdict()
+    public void DivisionByZero_UnsignedDivisor_UsesUnsignedTypedRange()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Guarantees plan D-G2.3 (first installment): the checker's translator
-        // refuses unsigned types rather than half-modeling them with signed
-        // operators. Consequence, pinned deliberately: the previously-emitted
-        // (and in this shape CORRECT) unguarded-unsigned-divisor warning is
-        // gone — the old signed modeling could equally suppress true warnings
-        // via wrong path conditions, so honest no-verdict wins (CHANGELOG'd).
         var source = @"
 §M{m001:Test}
   §F{f001:Divide:pub}
@@ -200,10 +194,7 @@ public class BugPatternTests
         var checker = new DivisionByZeroChecker(Z3Options);
         checker.Check(func, diagnostics);
 
-        // No verdict = no warning/error. (An info-severity "inconclusive" note
-        // is emitted and acceptable — it is honest about why there's no verdict.)
-        Assert.DoesNotContain(diagnostics.Warnings, d => d.Code == DiagnosticCode.DivisionByZero);
-        Assert.DoesNotContain(diagnostics.Errors, d => d.Code == DiagnosticCode.DivisionByZero);
+        Assert.Contains(diagnostics.Warnings, d => d.Code == DiagnosticCode.DivisionByZero);
     }
 
     [SkippableFact]
@@ -319,9 +310,8 @@ public class BugPatternTests
         var checker = new OverflowChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // Without constraints, x + y can overflow
-        // The checker should report this - but may not always do so
-        Assert.NotNull(diagnostics);
+        Assert.Contains(diagnostics.Warnings, diagnostic =>
+            diagnostic.Code == DiagnosticCode.IntegerOverflow);
     }
 
     [Fact]
@@ -342,8 +332,8 @@ public class BugPatternTests
         var checker = new OverflowChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // Multiplication has high overflow potential - but checker may not always detect
-        Assert.NotNull(diagnostics);
+        Assert.Contains(diagnostics.Warnings, diagnostic =>
+            diagnostic.Code == DiagnosticCode.IntegerOverflow);
     }
 
     [SkippableFact]
@@ -368,9 +358,8 @@ public class BugPatternTests
         var checker = new OverflowChecker(Z3Options);
         checker.Check(func, diagnostics);
 
-        // With bounded inputs, Z3 should prove no overflow
-        // Note: checker may not use preconditions directly
-        Assert.NotNull(diagnostics);
+        Assert.Contains(diagnostics.Warnings, diagnostic =>
+            diagnostic.Code == DiagnosticCode.IntegerOverflow);
     }
 
     #endregion
@@ -623,9 +612,8 @@ public class BugPatternTests
         var checker = new OverflowChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // Adding INT_MAX to any positive x overflows
-        // Checker may or may not detect this without Z3
-        Assert.NotNull(diagnostics);
+        Assert.Contains(diagnostics.Warnings, diagnostic =>
+            diagnostic.Code == DiagnosticCode.IntegerOverflow);
     }
 
     [Fact]
@@ -667,8 +655,8 @@ public class BugPatternTests
         var checker = new OverflowChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // Subtraction can overflow, should be checked
-        Assert.NotNull(diagnostics);
+        Assert.Contains(diagnostics.Warnings, diagnostic =>
+            diagnostic.Code == DiagnosticCode.IntegerOverflow);
     }
 
     #endregion
@@ -798,8 +786,8 @@ public class BugPatternTests
         var checker = new DivisionByZeroChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // y < 0 also implies y != 0
-        Assert.NotNull(diagnostics);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.DivisionByZero);
     }
 
     #endregion
@@ -893,7 +881,7 @@ public class BugPatternTests
 
         Assert.Contains(diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.DivisionByZero
-            && diagnostic.Message.Contains("literal zero", StringComparison.Ordinal));
+            && diagnostic.Message.Contains("guaranteed", StringComparison.Ordinal));
     }
 
     #endregion

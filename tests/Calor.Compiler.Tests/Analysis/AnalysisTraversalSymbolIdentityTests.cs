@@ -41,6 +41,7 @@ public sealed class AnalysisTraversalSymbolIdentityTests
             "opt.unwrap",
             [],
             "INT",
+            resolvedMethodName: "unwrap",
             receiverSymbol: parameter);
         var taintSink = new BoundCallExpression(
             Span(40),

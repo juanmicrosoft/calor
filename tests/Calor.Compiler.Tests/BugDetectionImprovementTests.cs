@@ -389,7 +389,7 @@ public class BugDetectionImprovementTests
     #region OffByOneChecker
 
     [Fact]
-    public void ForLoop_ToEqualsLength_Warns()
+    public void ForLoop_WithoutRealBoundedAccess_DoesNotWarn()
     {
         var source = @"
 §M{m001:Test}
@@ -420,8 +420,7 @@ public class BugDetectionImprovementTests
         foreach (var func in bound.Functions)
             runner.CheckFunction(func);
 
-        // The loop iterates to 'n' (which could be a length-like variable) and uses 'i'
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.OffByOne);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.OffByOne);
     }
 
     [Fact]

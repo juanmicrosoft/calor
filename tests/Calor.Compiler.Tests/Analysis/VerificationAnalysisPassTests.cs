@@ -1,4 +1,5 @@
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.BugPatterns;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -460,6 +461,57 @@ public class VerificationAnalysisPassTests
 
         // Thorough mode enables k-induction
         Assert.NotNull(result);
+    }
+
+    [Theory]
+    [InlineData("(>= divisor INT:0)", true)]
+    [InlineData("(!= divisor INT:0)", false)]
+    [InlineData("(> divisor INT:0)", false)]
+    [InlineData("(< divisor INT:0)", false)]
+    public void PreconditionGuardMap_SeedsOnlyProvenNonZero(
+        string precondition,
+        bool expectedDivisionWarning)
+    {
+        var source = $@"
+§M{{m001:Test}}
+  §F{{f001:Divide:pub}}
+      §I{{i32:divisor}}
+      §O{{i32}}
+      §Q {precondition}
+      §R (/ INT:10 divisor)";
+
+        var module = Parse(source, out var parseDiagnostics);
+        Assert.False(
+            parseDiagnostics.HasErrors,
+            string.Join("\n", parseDiagnostics.Select(diagnostic => diagnostic.Message)));
+
+        var diagnostics = new DiagnosticBag();
+        var pass = new VerificationAnalysisPass(
+            diagnostics,
+            new VerificationAnalysisOptions
+            {
+                EnableDataflow = false,
+                EnableBugPatterns = true,
+                EnableTaintAnalysis = false,
+                UseZ3Verification = false,
+                BugPatternOptions = new BugPatternOptions
+                {
+                    CheckIndexOutOfBounds = false,
+                    CheckNullDereference = false,
+                    CheckOverflow = false,
+                    CheckOffByOne = false,
+                    CheckMissingPreconditions = false,
+                    ReportOnlyVerified = true,
+                    UseZ3Verification = false,
+                },
+            });
+
+        pass.Analyze(module);
+
+        Assert.Equal(
+            expectedDivisionWarning,
+            diagnostics.Any(diagnostic =>
+                diagnostic.Code == DiagnosticCode.DivisionByZero));
     }
 
     #endregion

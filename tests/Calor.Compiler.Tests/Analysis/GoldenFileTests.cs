@@ -823,12 +823,19 @@ public class GoldenFileTests
         Assert.False(parseDiag.HasErrors);
 
         var diagnostics = new DiagnosticBag();
-        var checker = new DivisionByZeroChecker(Z3BugOptions);
+        var checker = new DivisionByZeroChecker(new BugPatternOptions
+        {
+            UseZ3Verification = Z3ContextFactory.IsAvailable,
+            Z3TimeoutMs = 2000,
+            PreconditionGuardedParams = new Dictionary<string, HashSet<string>>
+            {
+                ["PrecondDiv"] = ["y"],
+            },
+        });
         checker.Check(func, diagnostics);
 
-        // With Z3 and precondition, should prove division is safe
-        // Note: Implementation may need to use preconditions
-        Assert.NotNull(diagnostics);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.DivisionByZero);
     }
 
     /// <summary>
