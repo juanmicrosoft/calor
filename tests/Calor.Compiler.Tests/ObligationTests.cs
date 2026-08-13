@@ -1610,6 +1610,23 @@ public sealed class ObligationTests
                 initializedOutArguments);
 
             Assert.Equal(2, initializedOutArguments[0]);
+
+            var establishingRebind = Emit("""
+                §M{m001:Test}
+                  §RTYPE{r1:Positive:i32} (> # INT:0)
+                  §F{f001:Mutate:pub}
+                      §O{i32}
+                      §B{~value:i32} INT:1
+                      §B{~value:Positive} INT:2
+                      §ASSIGN value INT:-1
+                      §R value
+                """);
+
+            var establishingException = InvokeGenerated(
+                establishingRebind,
+                "Mutate");
+
+            Assert.IsType<ArgumentOutOfRangeException>(establishingException);
     }
 
     [Fact]

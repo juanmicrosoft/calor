@@ -1752,6 +1752,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.IsMutable && IsVarDeclaredInScope(varName))
         {
             TryGetRefinementConstraint(node.Name, out var existingConstraint);
+            var hasExistingIndexedBound = TryGetIndexedBound(node.Name, out _);
             RefinementConstraint? reboundConstraint = null;
             if (node.TypeName != null
                 && _refinementTypes.TryGetValue(node.TypeName, out var reboundRefinement))
@@ -1761,10 +1762,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     $"refinement type '{reboundRefinement.Name}'",
                     reboundRefinement.BaseTypeName);
             }
+            var reboundIndexedBound = GetIndexedBoundForBinding(node);
             // Emit the initializer against the old variable contract. It may
             // itself mutate the target, so installing the rebound metadata
             // first would validate nested writes against the wrong invariant.
             var initExpr = node.Initializer?.Accept(this);
+            if (existingConstraint is null && reboundConstraint != null)
+            {
+                SetRefinementForExistingVariable(varName, reboundConstraint);
+            }
+            if (!hasExistingIndexedBound && reboundIndexedBound != null)
+            {
+                SetIndexedBoundForExistingVariable(varName, reboundIndexedBound);
+            }
 
             // Mutable rebind - emit assignment only
             if (initExpr != null)
