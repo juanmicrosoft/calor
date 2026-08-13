@@ -53,7 +53,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Calculator:pub}
         §MT{m002:Add:pub} (i32:x, i32:y) -> i32
-            §E{*}
+            §E{}
             §R (+ x y)
 ";
         var bound = Bind(source, out var diagnostics);
@@ -74,10 +74,10 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Converter:pub}
         §MT{m002:Convert:pub} (i32:x) -> str
-            §E{*}
+            §E{}
             §R (str x)
         §MT{m003:Convert:pub} (i32:x, str:format) -> str
-            §E{*}
+            §E{}
             §R (str x)
 ";
         var bound = Bind(source, out var diagnostics);
@@ -135,7 +135,7 @@ public class ClassMemberBindingTests
     §CL{c001:Widget:pub}
         §FLD{i32:_count:priv}
         §MT{m002:UseCount:pub}
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A _count §/C
 ";
         var bound = Bind(source, out var diagnostics);
@@ -360,7 +360,7 @@ public class ClassMemberBindingTests
     §CL{c001:Foo:pub}
         §FLD{i32:x:priv}
         §MT{m002:Set:pub} (i32:x)
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A x §/C
 ";
         var bound = Bind(source, out var diagnostics);
@@ -404,7 +404,7 @@ public class ClassMemberBindingTests
     §CL{c001:Counter:pub}
         §FLD{i32:_count:priv}
         §MT{m002:Increment:pub}
-            §E{*}
+            §E{}
             §ASSIGN _count (+ _count 1)
 ";
         var bound = Bind(source, out var diagnostics);
@@ -424,7 +424,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:MyClass:pub}
         §MT{m002:DoWork:pub}
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A ""hello"" §/C
 ";
         var bound = Bind(source, out var diagnostics);
@@ -460,7 +460,7 @@ public class ClassMemberBindingTests
     §CL{c001:MyClass:pub}
         §FLD{i32:_x:priv}
         §MT{m002:Foo:pub}
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A ""hello"" §/C
         §CTOR{ctor003:pub} (i32:x)
           §ASSIGN _x x
@@ -498,7 +498,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Math:pub}
         §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
-            §E{*}
+            §E{}
             §R (/ x y)
 ";
         var bound = Bind(source, out var diagnostics);
@@ -526,7 +526,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Good:pub}
         §MT{m002:WorkingMethod:pub}
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A ""ok"" §/C
 ";
         var bound = Bind(source, out var diagnostics);
@@ -570,7 +570,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Processor:pub}
         §MT{m002:Process:pub} (List<str>:items)
-            §E{*}
+            §E{}
             §EACH{each003:item:str} items
                 §C{Console.WriteLine} §A item §/C
 ";
@@ -588,7 +588,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Guard:pub}
         §MT{m002:Check:pub} (i32:x)
-            §E{*,throw}
+            §E{throw,alloc}
             §IF{if003} (< x 0)
                 §TH §NEW{ArgumentException} §A ""negative"" §/NEW
 ";
@@ -605,7 +605,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:FileHandler:pub}
         §MT{m002:ReadFile:pub} (str:path) -> str
-            §E{*}
+            §E{}
             §USE{use003:reader:StreamReader} §C{File.OpenText} §A path §/C
               §R §C{reader.ReadToEnd} §/C
             §/USE{use003}
@@ -712,7 +712,7 @@ public class ClassMemberBindingTests
     §CL{c001:Config:pub}
         §PROP{p002:Name:str:pub:get,set}
         §MT{m003:UseProperty:pub}
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A Name §/C
 ";
         var bound = Bind(source, out var diagnostics);
@@ -761,7 +761,7 @@ public class ClassMemberBindingTests
 §M{m001:Test}
     §CL{c001:Calculator:pub}
         §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
-            §E{*}
+            §E{}
             §R (/ x y)
 ";
         var module = Parse(source, out var parseDiags);
@@ -916,7 +916,7 @@ public class ClassMemberBindingTests
     §CL{c001:Utils:pub}
         §FLD{i32:_counter:priv}
         §MT{m002:StaticMethod:pub:stat}
-            §E{*}
+            §E{}
             §C{Console.WriteLine} §A §THIS §/C
 ";
         var bound = Bind(source, out var diagnostics);

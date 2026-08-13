@@ -8,7 +8,7 @@
     // EXPECTED: Calor0982 Command Injection
     §I{string:user_input}
     §O{i32}
-    §E{process:rw}
+    §E{proc}
     §B{cmd:string} (+ STR:"ls -la " user_input)
     §C shell cmd
     §R INT:0
@@ -18,7 +18,7 @@
     // EXPECTED: No warnings
     §I{i32:option}
     §O{i32}
-    §E{process:rw}
+    §E{proc}
     §IF (== option INT:1)
       §C exec STR:"ls"
       §EIF (== option INT:2)
@@ -32,7 +32,7 @@
     // EXPECTED: Calor0982 Command Injection
     §I{string:filename}
     §O{string}
-    §E{process:rw}
+    §E{proc}
     §B{cmd:string} (+ STR:"cat " filename)
     §B{result:string} (CALL popen cmd)
     §R result
@@ -42,7 +42,7 @@
     // EXPECTED: No warnings
     §I{string:user_input}
     §O{i32}
-    §E{process:rw}
+    §E{proc}
     §B{safe:string} (CALL shell_escape user_input)
     §B{cmd:string} (+ STR:"echo " safe)
     §C shell cmd
@@ -53,7 +53,7 @@
     // EXPECTED: Calor0982 Command Injection
     §I{string:query_param}
     §O{i32}
-    §E{process:rw}
+    §E{proc}
     §B{script:string} (+ STR:"python script.py --arg=" query_param)
     §C system script
     §R INT:0
@@ -63,8 +63,7 @@
     // EXPECTED: No warnings
     §I{string:arg}
     §O{i32}
-    §E{process:rw}
+    §E{proc}
     §B{safeArg:string} (CALL sanitize arg)
     §C exec_array STR:"ls" STR:"-la" safeArg
     §R INT:0
-

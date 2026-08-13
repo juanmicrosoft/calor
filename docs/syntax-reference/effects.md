@@ -79,7 +79,8 @@ Place the effect declaration after the output type:
 | `proc` | Process | Spawn or control processes | `Process.Start()` |
 | `mut` | Mutation | Writes to heap state (fields, collections) | `list.Add()`, field assignment |
 | `mut:col` | Collection mutation | Mutates a collection | `dict[key] = value` |
-| `alloc` | Allocation | Explicit memory allocation | `stackalloc`, unsafe buffers |
+| `alloc` | Allocation | Allocates an object or buffer | `new`, `stackalloc`, unsafe buffers |
+| `unsafe` | Unsafe memory | Uses unsafe memory operations | pointer/fixed operations |
 | `time` | Time | Reads the clock (nondeterministic) | `DateTime.Now` |
 | `rand` | Randomness | Random number generation (nondeterministic) | `Random.Next()` |
 | `throw` | Exception | Intentionally throws exceptions | `throw` statements |
@@ -289,12 +290,23 @@ Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
 
 - **Calor0410** — a function uses an effect it does not declare (with call chain).
 - **Calor0411** — an unknown external call; add the callee to a `.calor-effects.json` manifest. Unknown calls contribute worst-case effects, so under the default policy they fail loud rather than being assumed pure.
+- **Calor0403** — an unknown or misspelled source effect code. Source declarations and manifests use the same authoritative taxonomy; unknown codes are rejected.
 - **Calor0418** — invocation of a delegate/function-typed value (a parameter, binding, or field being called). Function-typed values carry no effect contract, so the call is an **error** under enforcement. There is no annotation escape hatch; wrap the call in `§CSHARP` interop (surfaced as an assumption via Calor0419) or compile with `--permissive-effects` (an explicit waiver that demotes the error to a warning).
 - **Calor0419** — the effects of a function are **assumed**, not verified: it contains raw C# interop (`§CSHARP`/`§CS`), an unrecognized construct, or calls a function whose effects are assumed. The assumption propagates to callers through the interprocedural pass. Warning by default; error under `--strict-effects`.
 - **Calor0420** — an override declares effects not covered by its base method's declared `§E` (override `§E` must be a subset of base `§E`). Broader override effects would launder through dynamic dispatch.
 - **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.
+- **Calor0422** — a constructor body performs effects beyond intrinsic initialization mutation/allocation (`mut`, `alloc`). Constructor syntax currently has no `§E` surface, so other effects fail closed; move effectful work to a declared method.
+- **Calor0423** — a custom property or event accessor body performs effects beyond intrinsic accessor mutation. Accessors currently have no `§E` surface, so such bodies fail closed.
 
 Calls through a receiver whose static type is an in-module interface or class charge the static type's *declared* `§E` — sound because Calor0420/Calor0421 pin every override and implementation to a subset of that declared set, **including implementations inherited from in-module base classes**. Overrides of **external C# base classes**, and interface implementations satisfied by members inherited from external bases, cannot be variance-checked and are surfaced through the Calor0419 assumption channel instead.
+
+Calls, constructors, object-initializer setters, event accessors, and disposal are
+resolved using receiver/constructed type plus inferred argument types. A manifest
+signature may therefore distinguish overloads. No production purity decision is
+made from a bare method name: unresolved receivers, extensions, constructors, or
+`Dispose` calls remain unknown under the strict policy. Every `§NEW` also charges
+`alloc`; object initializers and event subscriptions charge `mut` in addition to
+resolved accessor effects.
 
 ### Disabling Enforcement (Not Recommended)
 

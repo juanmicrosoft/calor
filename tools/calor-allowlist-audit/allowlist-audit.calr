@@ -48,7 +48,7 @@
     §P (+ "  " (+ entry (+ " — " problem)))
 
   §F{f006:Main:pub} () -> i32
-    §E{fs:r,cw,mut}
+    §E{fs:r,cw,mut,alloc}
     §B{file:str} ".calor-csharp-allowlist"
     §B{present:bool} §C{File.Exists} §A file §/C
     §IF{if7} (! present)

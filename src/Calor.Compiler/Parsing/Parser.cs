@@ -1210,7 +1210,12 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         // Interpret positional attributes
-        var effects = AttributeHelper.InterpretEffectsAttributes(attrs);
+        var effects = AttributeHelper.InterpretEffectsAttributes(
+            attrs,
+            code => _diagnostics.Report(
+                startToken.Span,
+                DiagnosticCode.UnknownEffectCode,
+                $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."));
 
         return new EffectsNode(startToken.Span, effects);
     }

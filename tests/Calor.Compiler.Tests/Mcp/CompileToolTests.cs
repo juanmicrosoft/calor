@@ -55,6 +55,22 @@ public class CompileToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_DefaultEffectPolicyMatchesSdkAndCli()
+    {
+        var args = JsonDocument.Parse("""
+            {
+                "source": "§M{m001:Test}\n§F{f001:Main:pub}\n§O{void}\n§P \"undeclared console write\"\n"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+        var text = result.Content[0].Text!;
+
+        Assert.Contains("Calor0410", text);
+        Assert.Contains("\"success\":false", text.Replace(" ", ""));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithInvalidSource_ReturnsErrors()
     {
         var args = JsonDocument.Parse("""

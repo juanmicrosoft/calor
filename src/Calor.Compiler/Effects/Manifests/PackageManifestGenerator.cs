@@ -350,12 +350,13 @@ public sealed class PackageManifestGenerator
 
     private static EffectResolution ResolveCurated(EffectResolver resolver, PublicMethod method)
     {
+        var parameterTypes = EffectResolver.ParseParameterSignature(method.Key.ParameterSig);
         return method.Kind switch
         {
             ImportMemberKind.Getter => resolver.ResolveGetter(method.Key.TypeName, method.DisplayMember),
             ImportMemberKind.Setter => resolver.ResolveSetter(method.Key.TypeName, method.DisplayMember),
-            ImportMemberKind.Constructor => resolver.ResolveConstructor(method.Key.TypeName),
-            _ => resolver.Resolve(method.Key.TypeName, method.DisplayMember)
+            ImportMemberKind.Constructor => resolver.ResolveConstructor(method.Key.TypeName, parameterTypes),
+            _ => resolver.Resolve(method.Key.TypeName, method.DisplayMember, parameterTypes)
         };
     }
 

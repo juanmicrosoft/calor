@@ -9685,12 +9685,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             case PrintStatementNode:
                 AddEffect(effects, "io", "console_write");
                 break;
-            case ThrowStatementNode:
+            case ThrowStatementNode throwStatement:
+                AddEffect(effects, "exception", "intentional");
+                if (throwStatement.Exception != null)
+                    InferEffectsFromExpression(throwStatement.Exception, effects);
+                break;
             case RethrowStatementNode:
                 AddEffect(effects, "exception", "intentional");
                 break;
             case CallStatementNode call:
-                InferEffectsFromCallTarget(call.Target, effects);
+                InferEffectsFromCallTarget(call.Target, call.Arguments, effects);
                 foreach (var arg in call.Arguments)
                     InferEffectsFromExpression(arg, effects);
                 break;
@@ -9746,9 +9750,69 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         switch (expr)
         {
             case CallExpressionNode callExpr:
-                InferEffectsFromCallTarget(callExpr.Target, effects);
+                InferEffectsFromCallTarget(callExpr.Target, callExpr.Arguments, effects);
                 foreach (var arg in callExpr.Arguments)
                     InferEffectsFromExpression(arg, effects);
+                break;
+            case NewExpressionNode creation:
+            {
+                AddEffect(effects, "memory", "allocation");
+                foreach (var argument in creation.Arguments)
+                    InferEffectsFromExpression(argument, effects);
+                var typeName = EffectEnforcementPass.MapShortTypeNameToFullName(creation.TypeName);
+                var argumentTypes = creation.Arguments.Select(InferMigrationExpressionType).ToArray();
+                AddResolvedEffects(
+                    _migrationResolver.Value.ResolveConstructor(typeName, argumentTypes),
+                    effects);
+                foreach (var initializer in creation.Initializers)
+                {
+                    InferEffectsFromExpression(initializer.Value, effects);
+                    AddEffect(effects, "mutation", "heap_write");
+                    AddResolvedEffects(
+                        _migrationResolver.Value.ResolveSetter(typeName, initializer.PropertyName),
+                        effects);
+                }
+                break;
+            }
+            case ArrayCreationNode array:
+                AddEffect(effects, "memory", "allocation");
+                if (array.Size != null)
+                    InferEffectsFromExpression(array.Size, effects);
+                foreach (var item in array.Initializer)
+                    InferEffectsFromExpression(item, effects);
+                break;
+            case MultiDimArrayCreationNode multiDim:
+                AddEffect(effects, "memory", "allocation");
+                foreach (var size in multiDim.DimensionSizes)
+                    InferEffectsFromExpression(size, effects);
+                foreach (var row in multiDim.Initializer)
+                foreach (var item in row)
+                    InferEffectsFromExpression(item, effects);
+                break;
+            case ListCreationNode list:
+                AddEffect(effects, "memory", "allocation");
+                foreach (var item in list.Elements)
+                    InferEffectsFromExpression(item, effects);
+                break;
+            case SetCreationNode set:
+                AddEffect(effects, "memory", "allocation");
+                foreach (var item in set.Elements)
+                    InferEffectsFromExpression(item, effects);
+                break;
+            case DictionaryCreationNode dictionary:
+                AddEffect(effects, "memory", "allocation");
+                foreach (var entry in dictionary.Entries)
+                {
+                    InferEffectsFromExpression(entry.Key, effects);
+                    InferEffectsFromExpression(entry.Value, effects);
+                }
+                break;
+            case StackAllocNode stackAlloc:
+                AddEffect(effects, "memory", "allocation");
+                if (stackAlloc.Size != null)
+                    InferEffectsFromExpression(stackAlloc.Size, effects);
+                foreach (var item in stackAlloc.Initializer)
+                    InferEffectsFromExpression(item, effects);
                 break;
             case BinaryOperationNode binOp:
                 InferEffectsFromExpression(binOp.Left, effects);
@@ -9776,7 +9840,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return resolver;
     });
 
-    private void InferEffectsFromCallTarget(string target, Dictionary<string, string> effects)
+    private void InferEffectsFromCallTarget(
+        string target,
+        IReadOnlyList<ExpressionNode> arguments,
+        Dictionary<string, string> effects)
     {
         // Parse the call target into type + method for manifest resolution
         var lastDot = target.LastIndexOf('.');
@@ -9785,6 +9852,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var methodName = target[(lastDot + 1)..];
         var typePart = target[..lastDot];
+        var instanceReceiver = false;
 
         // For chained calls like "response.Content.ReadAsStringAsync", take the first part
         var firstDot = typePart.IndexOf('.');
@@ -9803,6 +9871,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 // Variable name resolved to its declared type
                 typePart = resolvedType;
+                instanceReceiver = true;
             }
         }
         else if (_variableTypeMap.TryGetValue(receiverName, out var resolvedType))
@@ -9810,9 +9879,26 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Chained call: "response.Content.ReadAsStringAsync" — resolve "response" to its type
             // For now, use just the resolved type + final method name
             typePart = resolvedType;
+            instanceReceiver = true;
         }
 
-        var resolution = _migrationResolver.Value.Resolve(typePart, methodName);
+        var argumentTypes = arguments.Select(InferMigrationExpressionType).ToArray();
+        var resolution = _migrationResolver.Value.Resolve(typePart, methodName, argumentTypes);
+        if (resolution.Status == EffectResolutionStatus.Unknown && instanceReceiver)
+        {
+            resolution = _migrationResolver.Value.ResolveExtension(
+                typePart,
+                methodName,
+                argumentTypes);
+        }
+        AddResolvedEffects(resolution, effects);
+        // Don't add wildcard for unknown calls — let the enforcement pass handle them
+    }
+
+    private static void AddResolvedEffects(
+        EffectResolution resolution,
+        Dictionary<string, string> effects)
+    {
         if (resolution.Status != EffectResolutionStatus.Unknown)
         {
             foreach (var effect in resolution.Effects.Effects)
@@ -9829,7 +9915,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 AddEffect(effects, category, effect.Value);
             }
         }
-        // Don't add wildcard for unknown calls — let the enforcement pass handle them
+    }
+
+    private string InferMigrationExpressionType(ExpressionNode expression)
+    {
+        return expression switch
+        {
+            StringLiteralNode => "String",
+            IntLiteralNode => "Int32",
+            BoolLiteralNode => "Boolean",
+            FloatLiteralNode => "Double",
+            DecimalLiteralNode => "Decimal",
+            NewExpressionNode creation => EffectResolver.NormalizeParameterType(creation.TypeName),
+            ReferenceNode reference when _variableTypeMap.TryGetValue(reference.Name, out var type) =>
+                EffectResolver.NormalizeParameterType(type),
+            _ => "?"
+        };
     }
 
     // --- Unsafe/Low-Level conversions ---

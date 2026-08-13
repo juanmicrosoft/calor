@@ -24,7 +24,7 @@
     §R outp
 
   §F{f004:SplitRow:pub} (str:line) -> List<str>
-    §E{mut}
+    §E{mut,alloc}
     §LIST{fields:str}
     §/LIST{fields}
     §B{~cur:str} ""

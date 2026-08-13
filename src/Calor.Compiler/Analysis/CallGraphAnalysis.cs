@@ -306,6 +306,38 @@ public sealed class CallGraphAnalysis
         }
     }
 
+    public static IEnumerable<PropertyNode> EnumerateProperties(ClassDefinitionNode cls)
+    {
+        foreach (var property in cls.Properties)
+            yield return property;
+        foreach (var block in cls.PreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var property in branch.Properties)
+                    yield return property;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
+    public static IEnumerable<EventDefinitionNode> EnumerateEvents(ClassDefinitionNode cls)
+    {
+        foreach (var evt in cls.Events)
+            yield return evt;
+        foreach (var block in cls.PreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var evt in branch.Events)
+                    yield return evt;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
     /// <summary>
     /// Builds a call graph analysis from a module AST.
     /// </summary>
@@ -355,6 +387,37 @@ public sealed class CallGraphAnalysis
                 AddUniqueName(functionNameToId, ambiguousFunctionNames, wrapped.Name, wrapped.Id);
                 calleeToCallers[wrapped.Id] = new List<string>();
                 callerToCallees[wrapped.Id] = new List<(string, TextSpan)>();
+            }
+            foreach (var property in EnumerateProperties(cls))
+            {
+                foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }
+                    .Where(a => a != null))
+                {
+                    var wrapped = ToPropertyAccessorFunctionNode(property, accessor!, cls.Name);
+                    functions[wrapped.Id] = wrapped;
+                    AddUniqueName(functionNameToId, ambiguousFunctionNames, wrapped.Name, wrapped.Id);
+                    calleeToCallers[wrapped.Id] = new List<string>();
+                    callerToCallees[wrapped.Id] = new List<(string, TextSpan)>();
+                }
+            }
+            foreach (var evt in EnumerateEvents(cls))
+            {
+                if (evt.AddBody != null)
+                {
+                    var wrapped = ToEventAccessorFunctionNode(evt, isAdd: true, cls.Name);
+                    functions[wrapped.Id] = wrapped;
+                    AddUniqueName(functionNameToId, ambiguousFunctionNames, wrapped.Name, wrapped.Id);
+                    calleeToCallers[wrapped.Id] = new List<string>();
+                    callerToCallees[wrapped.Id] = new List<(string, TextSpan)>();
+                }
+                if (evt.RemoveBody != null)
+                {
+                    var wrapped = ToEventAccessorFunctionNode(evt, isAdd: false, cls.Name);
+                    functions[wrapped.Id] = wrapped;
+                    AddUniqueName(functionNameToId, ambiguousFunctionNames, wrapped.Name, wrapped.Id);
+                    calleeToCallers[wrapped.Id] = new List<string>();
+                    callerToCallees[wrapped.Id] = new List<(string, TextSpan)>();
+                }
             }
         }
 
@@ -439,10 +502,7 @@ public sealed class CallGraphAnalysis
             var legacyIds = boundModule.Functions
                 .Select(function => (
                     function.SymbolId,
-                    LegacyId: functions.Values
-                        .Where(candidate => candidate.Span == function.Symbol.DefinitionSpan)
-                        .Select(candidate => candidate.Id)
-                        .FirstOrDefault()))
+                    LegacyId: ResolveLegacyFunctionId(function, functions)))
                 .Where(item => item.LegacyId != null)
                 .ToDictionary(item => item.SymbolId, item => item.LegacyId!);
 
@@ -525,6 +585,20 @@ public sealed class CallGraphAnalysis
         return (resolved, boundCallSites, true);
     }
 
+    private static string? ResolveLegacyFunctionId(
+        BoundFunction boundFunction,
+        IReadOnlyDictionary<string, FunctionNode> functions)
+    {
+        var candidates = functions.Values
+            .Where(candidate => candidate.Span == boundFunction.Symbol.DefinitionSpan)
+            .ToArray();
+        var exactName = candidates.FirstOrDefault(candidate =>
+            candidate.Name.Equals(boundFunction.Symbol.Name, StringComparison.Ordinal));
+        if (exactName != null)
+            return exactName.Id;
+        return candidates.Length == 1 ? candidates[0].Id : null;
+    }
+
     private static void AddUniqueName(
         Dictionary<string, string> names,
         HashSet<string> ambiguousNames,
@@ -604,6 +678,10 @@ public sealed class CallGraphAnalysis
         TextSpan span) =>
         ResolveCallSiteIds(callerId, target, span);
 
+    public bool IsBinderResolvedCallSite(string callerId, string target, TextSpan span)
+        => _resolvedCallIds.ContainsKey(
+            new AstCallKey(callerId, target, span.Start, span.End));
+
     private IReadOnlyList<string> ResolveCallSiteIds(
         string callerId,
         string target,
@@ -626,9 +704,12 @@ public sealed class CallGraphAnalysis
             qualifiedId,
             method.Name,
             method.Visibility,
+            method.TypeParameters,
             method.Parameters,
             method.Output,
             method.Effects,
+            method.Preconditions,
+            method.Postconditions,
             method.Body,
             method.Attributes);
     }
@@ -646,6 +727,64 @@ public sealed class CallGraphAnalysis
             effects: null,
             ctor.Body,
             ctor.Attributes);
+    }
+
+    internal static string GetPropertyAccessorFunctionId(
+        string className,
+        PropertyNode property,
+        PropertyAccessorNode accessor)
+        => $"{className}.{property.Id}.{accessor.Kind.ToString().ToLowerInvariant()}";
+
+    internal static string GetEventAccessorFunctionId(
+        string className,
+        EventDefinitionNode evt,
+        bool isAdd)
+        => $"{className}.{evt.Id}.{(isAdd ? "add" : "remove")}";
+
+    private static FunctionNode ToPropertyAccessorFunctionNode(
+        PropertyNode property,
+        PropertyAccessorNode accessor,
+        string className)
+    {
+        var parameters = accessor.Kind == PropertyAccessorNode.AccessorKind.Get
+            ? Array.Empty<ParameterNode>()
+            : [new ParameterNode(
+                accessor.Span,
+                "value",
+                property.TypeName,
+                new AttributeCollection())];
+        return new FunctionNode(
+            accessor.Span,
+            GetPropertyAccessorFunctionId(className, property, accessor),
+            $"{className}.{property.Name}.{accessor.Kind.ToString().ToLowerInvariant()}",
+            accessor.Visibility ?? property.Visibility,
+            parameters,
+            output: null,
+            effects: null,
+            accessor.Body,
+            accessor.Attributes);
+    }
+
+    private static FunctionNode ToEventAccessorFunctionNode(
+        EventDefinitionNode evt,
+        bool isAdd,
+        string className)
+    {
+        var parameter = new ParameterNode(
+            evt.Span,
+            "value",
+            evt.DelegateType,
+            new AttributeCollection());
+        return new FunctionNode(
+            evt.Span,
+            GetEventAccessorFunctionId(className, evt, isAdd),
+            $"{className}.{evt.Name}.{(isAdd ? "add" : "remove")}",
+            evt.Visibility,
+            [parameter],
+            output: null,
+            effects: null,
+            isAdd ? evt.AddBody! : evt.RemoveBody!,
+            evt.Attributes);
     }
 
     private static List<(string Callee, TextSpan Span)> CollectCalls(FunctionNode function)

@@ -100,6 +100,7 @@ public static class EffectCodes
         new("mutation", "collection", "mut:col"),
         // Memory
         new("memory", "allocation", "alloc"),
+        new("memory", "unsafe", "unsafe"),
         // Nondeterminism
         new("nondeterminism", "time", "time"),
         new("nondeterminism", "random", "rand"),
@@ -108,7 +109,17 @@ public static class EffectCodes
     ];
 
     private static readonly Dictionary<(string Category, string Value), string> CompactByInternal =
-        Registry.ToDictionary(e => (e.Category, e.Value), e => e.Compact);
+        Registry.ToDictionary(
+            e => (e.Category.ToLowerInvariant(), e.Value.ToLowerInvariant()),
+            e => e.Compact);
+
+    private static readonly Dictionary<string, EffectCodeEntry> EntryByCompact =
+        Registry
+            .GroupBy(e => e.Compact, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(e => e.Legacy).First(),
+                StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// All compact surface codes the compiler knows, including legacy forms.
@@ -124,6 +135,60 @@ public static class EffectCodes
         Registry.Where(e => !e.Legacy).Select(e => e.Compact).Distinct(StringComparer.Ordinal).ToArray();
 
     /// <summary>
+    /// Compact-code prefixes whose colon is split by the general attribute parser.
+    /// Derived from the registry so codes such as <c>mut:col</c> cannot drift from
+    /// source parsing.
+    /// </summary>
+    public static readonly IReadOnlyCollection<string> ColonPrefixes =
+        Registry
+            .Select(e => e.Compact)
+            .Where(code => code.Contains(':'))
+            .Select(code => code[..code.IndexOf(':')])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    /// <summary>
+    /// Returns whether a compact effect code is recognized, including intentional
+    /// legacy aliases.
+    /// </summary>
+    public static bool IsKnownCompactCode(string? code)
+        => code != null && EntryByCompact.ContainsKey(code.Trim());
+
+    /// <summary>
+    /// Parses a compact effect code into the compiler's internal representation.
+    /// </summary>
+    public static bool TryParseCompact(
+        string? code,
+        out EffectKind kind,
+        out string category,
+        out string value)
+    {
+        if (code != null && EntryByCompact.TryGetValue(code.Trim(), out var entry))
+        {
+            category = entry.Category;
+            value = entry.Value;
+            kind = ParseKind(entry.Category);
+            return true;
+        }
+
+        kind = EffectKind.Unknown;
+        category = "unknown";
+        value = code?.Trim() ?? "";
+        return false;
+    }
+
+    /// <summary>
+    /// Parses a compact effect code or throws when it is not in the taxonomy.
+    /// </summary>
+    public static (EffectKind Kind, string Category, string Value) ParseCompact(string code)
+    {
+        if (TryParseCompact(code, out var kind, out var category, out var value))
+            return (kind, category, value);
+
+        throw new ArgumentException($"Unknown effect code '{code}'.", nameof(code));
+    }
+
+    /// <summary>
     /// Convert internal effect category/value to compact code.
     /// E.g., ("io", "console_write") → "cw", ("io", "filesystem_read") → "fs:r"
     /// </summary>
@@ -133,5 +198,47 @@ public static class EffectCodes
             (category.ToLowerInvariant(), value.ToLowerInvariant()), out var compact)
             ? compact
             : value; // Pass through unknown values
+    }
+
+    /// <summary>
+    /// Convert an internal effect tuple to its compact surface code.
+    /// </summary>
+    public static string ToCompact(EffectKind kind, string value)
+    {
+        if (kind == EffectKind.Unknown && value == "*")
+            return "unknown";
+
+        var category = ToCategory(kind);
+        return CompactByInternal.TryGetValue(
+            (category, value.ToLowerInvariant()),
+            out var compact)
+            ? compact
+            : $"{kind}:{value}";
+    }
+
+    public static EffectKind ParseKind(string category)
+    {
+        return category.ToLowerInvariant() switch
+        {
+            "io" => EffectKind.IO,
+            "mutation" => EffectKind.Mutation,
+            "memory" => EffectKind.Memory,
+            "exception" => EffectKind.Exception,
+            "nondeterminism" => EffectKind.Nondeterminism,
+            _ => EffectKind.Unknown
+        };
+    }
+
+    public static string ToCategory(EffectKind kind)
+    {
+        return kind switch
+        {
+            EffectKind.IO => "io",
+            EffectKind.Mutation => "mutation",
+            EffectKind.Memory => "memory",
+            EffectKind.Exception => "exception",
+            EffectKind.Nondeterminism => "nondeterminism",
+            _ => "unknown"
+        };
     }
 }

@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 6945,
+      "expectedTotal": 6948,
       "expectedSkipped": 2
     },
     {
@@ -19,7 +19,7 @@
       "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 309,
+      "expectedTotal": 337,
       "expectedSkipped": 0
     },
     {
@@ -82,7 +82,7 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 94,
+      "expectedTotal": 95,
       "expectedSkipped": 0
     },
     {

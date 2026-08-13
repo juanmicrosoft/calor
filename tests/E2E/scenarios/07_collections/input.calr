@@ -1,6 +1,6 @@
 §M{m001:Collections}
   §F{f001:Main:pub} () -> void
-    §E{cw,mut}
+    §E{cw,mut,alloc}
     §LIST{numbers:i32}
       1
       2
@@ -22,4 +22,3 @@
     §REM{fruits} "apple"
     §CLR{ages}
     §C{Console.WriteLine} §A "All collection tests passed!" §/C
-

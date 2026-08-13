@@ -3,12 +3,14 @@
 
   §CL{c001:CollectionHoistDemo:pub}
     §MT{m002:GetValues:pub} () -> Dict<str, i32>
+      §E{alloc}
       §DICT{dict003:str:i32}
         §KV "a" §C{Compute} §A 1 §/C
         §KV "b" §C{Compute} §A 2 §/C
       §R dict003
 
     §MT{m004:GetNames:pub} () -> Set<str>
+      §E{alloc}
       §HSET{set005:str}
         §C{Format} §A "x" §/C
         §C{Format} §A "y" §/C
@@ -19,5 +21,4 @@
 
     §MT{m007:Format:priv} (str:s) -> str
       §R (upper s)
-
 

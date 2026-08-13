@@ -1,6 +1,6 @@
 {
   "trackedFileCount": 877,
-  "successfulTransformationCount": 644,
+  "successfulTransformationCount": 645,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -127,7 +127,6 @@
       "bench/phase0-agent-native/pairs/W5C-003-session-index/calor/Session.calr",
       "benchmarks/arithmetic/overflow.calr",
       "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
-      "tests/Calor.Conversion.Tests/Snapshots/12-02.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr",
       "tests/Calor.Enforcement.Tests/Scenarios/Bypass/N1_unknown_external_pure.calr",
       "tests/Calor.Enforcement.Tests/Scenarios/Effects/E1_missing_effect.calr",
@@ -173,7 +172,8 @@
       "tests/TestData/LintScenarios/06_statements/try_multi_catch_finally.calr",
       "tests/TestData/QueryCorpus/project/app.calr",
       "tests/TestData/QueryCorpus/project/asks-across.calr",
-      "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr"
+      "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr",
+      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
     ],
     "generatedCSharpErrors": [
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m01.calr",
@@ -238,8 +238,7 @@
       "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.calr",
       "tests/TestData/Benchmarks/TokenEconomics/Power.calr",
       "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.calr",
-      "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr",
-      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
+      "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr"
     ]
   }
 }

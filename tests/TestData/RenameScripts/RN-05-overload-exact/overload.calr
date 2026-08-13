@@ -7,6 +7,6 @@
       §E{}
       §R INT:99
   §F{f001:Run:pub} () -> i32
-    §E{}
+    §E{alloc}
     §B{p:Picker} §NEW{Picker} §/NEW
     §R §C{p.Pick} §A INT:5 §/C

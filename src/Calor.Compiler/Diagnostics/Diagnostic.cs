@@ -286,6 +286,7 @@ public static class DiagnosticCode
     public const string UndeclaredEffect = "Calor0400";
     public const string UnusedEffectDeclaration = "Calor0401";
     public const string EffectMismatch = "Calor0402";
+    public const string UnknownEffectCode = "Calor0403";
 
     // Effect enforcement (Calor0410-0429)
     public const string ForbiddenEffect = "Calor0410";
@@ -333,6 +334,18 @@ public static class DiagnosticCode
     /// Interface dispatch launders effects identically to overrides.
     /// </summary>
     public const string InterfaceEffectVariance = "Calor0421";
+
+    /// <summary>
+    /// Error: a constructor body has effects other than intrinsic initialization
+    /// mutation, but constructor declarations have no §E surface.
+    /// </summary>
+    public const string ConstructorEffectContractUnavailable = "Calor0422";
+
+    /// <summary>
+    /// Error: a custom property or event accessor body has effects other than
+    /// intrinsic accessor mutation, but the accessor has no §E surface.
+    /// </summary>
+    public const string AccessorEffectContractUnavailable = "Calor0423";
 
     // Pattern matching errors (Calor0500-0599)
     public const string NonExhaustiveMatch = "Calor0500";

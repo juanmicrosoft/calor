@@ -326,6 +326,7 @@ public class GenericSyntaxTests
               §F{f001:Create:pub}<T>
                   §WHERE T : new
                   §O{T}
+                  §E{alloc}
                   §B{result} §NEW{T}
                   §R result
             """;

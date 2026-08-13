@@ -10,6 +10,50 @@ namespace Calor.Enforcement.Tests;
 public class EffectResolverTests
 {
     [Fact]
+    public void Resolve_SelectsSignatureSpecificMethodAndConstructorOverloads()
+    {
+        var json = """
+            {
+              "version": "1.0",
+              "mappings": [{
+                "type": "Example.Widget",
+                "methods": {
+                  "Transform(Int32)": ["cw"],
+                  "Transform(String)": ["fs:r"]
+                },
+                "constructors": {
+                  "(Int32)": ["net:w"],
+                  "(String)": ["db:r"]
+                }
+              }]
+            }
+            """;
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(json, "signature-test");
+        var resolver = new EffectResolver(loader);
+        resolver.Initialize();
+
+        Assert.True(resolver.Resolve("Example.Widget", "Transform", "i32")
+            .Effects.Contains(EffectKind.IO, "console_write"));
+        Assert.True(resolver.Resolve("Example.Widget", "Transform", "str")
+            .Effects.Contains(EffectKind.IO, "filesystem_read"));
+        Assert.Equal(EffectResolutionStatus.Unknown,
+            resolver.Resolve("Example.Widget", "Transform", "bool").Status);
+
+        Assert.True(resolver.ResolveConstructor("Example.Widget", "i32")
+            .Effects.Contains(EffectKind.IO, "network_write"));
+        Assert.True(resolver.ResolveConstructor("Example.Widget", "str")
+            .Effects.Contains(EffectKind.IO, "database_read"));
+        Assert.Equal(EffectResolutionStatus.Unknown,
+            resolver.ResolveConstructor("Example.Widget", "bool").Status);
+
+        Assert.Equal(
+            new[] { "System.String", "System.Collections.Generic.List`1<System.Int32>" },
+            EffectResolver.ParseParameterSignature(
+                "(System.String,System.Collections.Generic.List`1<System.Int32>)"));
+    }
+
+    [Fact]
     public void Resolve_ReturnsManifestEffects_ForKnownBclMethods()
     {
         var resolver = new EffectResolver();

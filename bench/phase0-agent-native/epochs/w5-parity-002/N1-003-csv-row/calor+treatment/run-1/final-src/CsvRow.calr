@@ -24,7 +24,7 @@
     §R result
 
   §F{f004:SplitRow:pub} (str:line) -> List<str>
-    §E{mut}
+    §E{mut,alloc}
     §LIST{result:str}
     §/LIST{result}
     §B{n:i32} (len line)

@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Parsing;
 
@@ -326,14 +327,17 @@ public static class AttributeHelper
     /// E.g., §E{fs:r} gets parsed as _pos0="fs", _pos1="r" instead of _pos0="fs:r"
     /// Also handles comma-separated effects like §E{cw,fs:w} which becomes _pos0="cw,fs", _pos1="w"
     /// </summary>
-    public static Dictionary<string, string> InterpretEffectsAttributes(AttributeCollection attrs)
+    public static Dictionary<string, string> InterpretEffectsAttributes(
+        AttributeCollection attrs,
+        Action<string>? reportUnknownCode = null)
     {
         var effects = new Dictionary<string, string>();
 
-        // Known effect prefixes that use colon-based modifiers
-        var effectPrefixes = new HashSet<string> { "fs", "net", "db", "env" };
-        var effectModifiers = new HashSet<string> { "r", "w", "rw" };
-
+        // Derive colon-bearing codes from the taxonomy. This keeps source parsing
+        // aligned with entries such as mut:col without another hand-maintained list.
+        var effectPrefixes = new HashSet<string>(
+            EffectCodes.ColonPrefixes,
+            StringComparer.OrdinalIgnoreCase);
         // First, reconstruct all effect codes from the split positional attributes
         var effectCodes = new List<string>();
 
@@ -360,7 +364,7 @@ public static class AttributeHelper
                     {
                         // Check if nextCode is a modifier or contains comma-separated values
                         var nextParts = nextCode.Split(',');
-                        if (effectModifiers.Contains(nextParts[0].ToLowerInvariant()))
+                        if (!string.IsNullOrWhiteSpace(nextParts[0]))
                         {
                             // Combine: "fs" + "w" -> "fs:w"
                             effectCodes.Add($"{lastPart}:{nextParts[0]}");
@@ -378,7 +382,7 @@ public static class AttributeHelper
                                     if (!string.IsNullOrEmpty(futureCode))
                                     {
                                         var futureParts = futureCode.Split(',');
-                                        if (effectModifiers.Contains(futureParts[0].ToLowerInvariant()))
+                                        if (!string.IsNullOrWhiteSpace(futureParts[0]))
                                         {
                                             effectCodes.Add($"{remainingPart}:{futureParts[0]}");
                                             for (int f = 1; f < futureParts.Length; f++)
@@ -424,7 +428,7 @@ public static class AttributeHelper
                 if (!string.IsNullOrEmpty(nextCode))
                 {
                     var nextParts = nextCode.Split(',');
-                    if (effectModifiers.Contains(nextParts[0].ToLowerInvariant()))
+                    if (!string.IsNullOrWhiteSpace(nextParts[0]))
                     {
                         // Combine the split effect code
                         effectCodes.Add($"{code}:{nextParts[0]}");
@@ -440,7 +444,7 @@ public static class AttributeHelper
                                 if (!string.IsNullOrEmpty(futureCode))
                                 {
                                     var futureParts = futureCode.Split(',');
-                                    if (effectModifiers.Contains(futureParts[0].ToLowerInvariant()))
+                                    if (!string.IsNullOrWhiteSpace(futureParts[0]))
                                     {
                                         effectCodes.Add($"{remainingPart}:{futureParts[0]}");
                                         for (int f = 1; f < futureParts.Length; f++)
@@ -482,7 +486,12 @@ public static class AttributeHelper
         // Now process all the reconstructed effect codes
         foreach (var code in effectCodes)
         {
-            var (category, value) = ExpandEffectCode(code);
+            if (!EffectCodes.TryParseCompact(code, out _, out var category, out var value))
+            {
+                reportUnknownCode?.Invoke(code);
+                continue;
+            }
+
             if (effects.ContainsKey(category))
             {
                 // Combine multiple effects in same category
@@ -716,49 +725,8 @@ public static class AttributeHelper
     /// </summary>
     public static (string Category, string Value) ExpandEffectCode(string code)
     {
-        return code.ToLowerInvariant() switch
-        {
-            // Console I/O
-            "cw" => ("io", "console_write"),
-            "cr" => ("io", "console_read"),
-
-            // Filesystem effects
-            "fs:r" => ("io", "filesystem_read"),
-            "fs:w" => ("io", "filesystem_write"),
-            "fs:rw" => ("io", "filesystem_readwrite"),
-
-            // Network effects
-            "net:r" => ("io", "network_read"),
-            "net:w" => ("io", "network_write"),
-            "net:rw" => ("io", "network_readwrite"),
-
-            // Database effects
-            "db:r" => ("io", "database_read"),
-            "db:w" => ("io", "database_write"),
-            "db:rw" => ("io", "database_readwrite"),
-
-            // Environment effects
-            "env:r" => ("io", "environment_read"),
-            "env:w" => ("io", "environment_write"),
-
-            // System
-            "proc" => ("io", "process"),
-
-            // Memory
-            "alloc" => ("memory", "allocation"),
-            "unsafe" => ("memory", "unsafe"),
-
-            // Non-determinism
-            "time" => ("nondeterminism", "time"),
-            "rand" => ("nondeterminism", "random"),
-
-            // Mutation/Exception
-            "mut" => ("mutation", "heap_write"),
-            "throw" => ("exception", "intentional"),
-
-            // Default: treat as io with the code as value
-            _ => ("io", code)
-        };
+        var parsed = EffectCodes.ParseCompact(code);
+        return (parsed.Category, parsed.Value);
     }
 
     /// <summary>

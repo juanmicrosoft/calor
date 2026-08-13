@@ -71,6 +71,12 @@ public sealed class TypeMapping
     public string Type { get; set; } = "";
 
     /// <summary>
+    /// Whether this type supplies extension methods. Extension resolution remains
+    /// manifest-authoritative: only explicitly marked providers are considered.
+    /// </summary>
+    public bool ExtensionProvider { get; set; }
+
+    /// <summary>
     /// Default effects for all methods on this type if not explicitly specified.
     /// Null means unknown/not declared.
     /// </summary>

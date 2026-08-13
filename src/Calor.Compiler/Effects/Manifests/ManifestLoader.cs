@@ -279,30 +279,7 @@ public sealed class ManifestLoader
     }
 
     private static bool IsValidEffectCode(string code)
-    {
-        // Known effect codes
-        var knownCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            // Console
-            "cw", "cr",
-            // Filesystem
-            "fs:r", "fs:w", "fs:rw",
-            // Network
-            "net:r", "net:w", "net:rw",
-            // Database
-            "db:r", "db:w", "db:rw",
-            // Environment
-            "env:r", "env:w",
-            // System
-            "proc", "alloc", "unsafe",
-            // Nondeterminism
-            "time", "rand",
-            // Mutation/Exception
-            "mut", "throw"
-        };
-
-        return knownCodes.Contains(code);
-    }
+        => EffectCodes.IsKnownCompactCode(code);
 
     /// <summary>
     /// Gets the user-level manifests directory (~/.calor/manifests/).

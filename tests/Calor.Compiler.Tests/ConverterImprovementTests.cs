@@ -689,6 +689,7 @@ public class ConverterImprovementTests
               §CL{c1:Service}
                 §MT{m2:Create:pub}
                     §O{string}
+                    §E{alloc}
                     §B{string:x} §NEW{StringBuilder} §A "hello" §/NEW
                     §R x
             """;
@@ -710,6 +711,7 @@ public class ConverterImprovementTests
               §CL{c1:Service}
                 §MT{m2:Create:pub}
                     §O{string}
+                    §E{alloc}
                     §B{List<i32>:items} §NEW{List<i32>} §/NEW
                     §R items
             """;
@@ -732,6 +734,7 @@ public class ConverterImprovementTests
               §CL{c1:Service}
                 §MT{m2:Create:pub}
                     §O{string}
+                    §E{alloc}
                     §B{string:x} §NEW{StringBuilder} §A "hello"
                     §R x
             """;
