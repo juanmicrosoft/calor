@@ -761,6 +761,14 @@ public static class DiagnosticCode
     /// </summary>
     public const string CodeGenCompilationError = "Calor1002";
 
+    /// <summary>
+    /// Error: a constructor with refinement entry guards delegates through an
+    /// explicit zero-argument initializer. C# executes that initializer before
+    /// the constructor body, and provides no argument expression in which to
+    /// enforce the refinements first.
+    /// </summary>
+    public const string ConstructorRefinementInitializerNotLowered = "Calor1003";
+
     // C# Interop diagnostics (Calor1010-1019)
 
     /// <summary>

@@ -1508,6 +1508,46 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_ZeroArgumentConstructorInitializerWithRefinement_FailsClosed()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
+              §CL{c001:AppException:pub}
+                §EXT{Exception}
+                §CTOR{ctor1:pub}
+                  §I{NonEmpty:message}
+                  §BASE
+            """;
+        var module = Parse(source, out var parseDiagnostics);
+        Assert.False(parseDiagnostics.HasErrors,
+            $"Errors: {string.Join(", ", parseDiagnostics.Select(d => d.Message))}");
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        var diagnostics = new DiagnosticBag();
+
+        _ = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker,
+            diagnostics).Emit(module);
+
+        var diagnostic = Assert.Single(
+            diagnostics,
+            item => item.Code
+                == DiagnosticCode.ConstructorRefinementInitializerNotLowered);
+        Assert.True(diagnostic.IsError);
+
+        Assert.Throws<InvalidOperationException>(
+            () => new CSharpEmitter(
+                ContractMode.Debug,
+                null,
+                null,
+                tracker).Emit(module));
+    }
+
+    [Fact]
     public void CSharpEmit_LambdaParameterShadowsOuterIndexedBound()
     {
         var source = """

@@ -513,6 +513,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             Diagnostics.DiagnosticSeverity.Warning));
     }
 
+    private void ReportConstructorRefinementInitializerNotLowered(ConstructorNode node)
+    {
+        const string message =
+            "A constructor has refinement entry guards and an explicit zero-argument initializer. C# executes the initializer before the constructor body and provides no initializer argument in which to enforce those guards. Add an initializer argument that can carry validation, remove the explicit initializer, or remove the parameter refinement.";
+        if (_diagnostics is null)
+        {
+            throw new InvalidOperationException(
+                $"Constructor '{node.Id}' cannot be emitted safely. {message}");
+        }
+
+        _diagnostics.Add(new Diagnostics.Diagnostic(
+            Diagnostics.DiagnosticCode.ConstructorRefinementInitializerNotLowered,
+            $"Constructor '{node.Id}' cannot be emitted safely. {message}",
+            node.Initializer?.Span ?? node.Span,
+            Diagnostics.DiagnosticSeverity.Error));
+    }
+
     private void EmitStatement(AstNode statement, bool skipEmptyLine = false)
     {
         var mapped = TryBeginLineMapping(statement);
@@ -4077,29 +4094,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 var initArgs = node.Initializer.Arguments
                     .Select(argument => argument.Accept(this))
                     .ToArray();
+                var entryChecks = node.Parameters
+                    .Where(parameter => parameter.Modifier != ParameterModifier.Out)
+                    .Select(parameter =>
+                    {
+                        if (!TryGetRefinementConstraint(
+                                parameter.Name,
+                                out var constraint)
+                            || !ShouldEmitObligationGuard(
+                                Verification.Obligations.ObligationKind.RefinementEntry,
+                                parameter.Span,
+                                parameter.Name))
+                        {
+                            return null;
+                        }
+
+                        return EmitRefinementCondition(
+                            constraint.Predicate,
+                            parameter.Name);
+                    })
+                    .Where(check => check is not null)
+                    .ToArray();
                 if (initArgs.Length > 0)
                 {
-                    var entryChecks = node.Parameters
-                        .Where(parameter => parameter.Modifier != ParameterModifier.Out)
-                        .Select(parameter =>
-                        {
-                            if (!TryGetRefinementConstraint(
-                                    parameter.Name,
-                                    out var constraint)
-                                || !ShouldEmitObligationGuard(
-                                    Verification.Obligations.ObligationKind.RefinementEntry,
-                                    parameter.Span,
-                                    parameter.Name))
-                            {
-                                return null;
-                            }
-
-                            return EmitRefinementCondition(
-                                constraint.Predicate,
-                                parameter.Name);
-                        })
-                        .Where(check => check is not null)
-                        .ToArray();
                     if (entryChecks.Length > 0)
                     {
                         initArgs[0] = $"({string.Join(" && ", entryChecks)}"
@@ -4108,6 +4125,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                             + "\"constructor parameter\", "
                             + "\"Constructor refinement violated\"))";
                     }
+                }
+                else if (entryChecks.Length > 0)
+                {
+                    ReportConstructorRefinementInitializerNotLowered(node);
                 }
                 var renderedInitArgs = string.Join(", ", initArgs);
                 initializerStr = node.Initializer.IsBaseCall
