@@ -306,6 +306,22 @@ public sealed class ObligationSolver : IDisposable
 
         foreach (var cls in module.Classes)
         {
+            foreach (var constructor in cls.Constructors)
+            {
+                var parameters = constructor.Parameters
+                    .Select(p => (p.Name, p.TypeName))
+                    .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromStatements(constructor.Body);
+                result[constructor.Id] = new FunctionInfo(
+                    parameters,
+                    constructor.Preconditions,
+                    null,
+                    factCollector.ScopedFacts,
+                    new List<(string, string)>(),
+                    refinementTypes);
+            }
+
             foreach (var method in cls.Methods)
             {
                 var parameters = method.Parameters

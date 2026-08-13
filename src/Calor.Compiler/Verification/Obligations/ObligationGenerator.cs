@@ -53,6 +53,10 @@ public sealed class ObligationGenerator
         // Generate for methods inside classes
         foreach (var cls in module.Classes)
         {
+            foreach (var constructor in cls.Constructors)
+            {
+                GenerateForConstructor(constructor);
+            }
             foreach (var method in cls.Methods)
             {
                 GenerateForMethod(method, cls);
@@ -89,6 +93,28 @@ public sealed class ObligationGenerator
         GenerateSubtypeObligations(method.Body, method.Parameters, method.Id);
 
         GenerateIndexBoundsForBody(method.Body, method.Parameters, method.Id, method.Visibility);
+    }
+
+    private void GenerateForConstructor(ConstructorNode constructor)
+    {
+        foreach (var parameter in constructor.Parameters)
+        {
+            GenerateParameterObligation(
+                parameter,
+                constructor.Id,
+                constructor.Visibility);
+        }
+
+        GenerateProofObligations(constructor.Body, constructor.Id);
+        GenerateSubtypeObligations(
+            constructor.Body,
+            constructor.Parameters,
+            constructor.Id);
+        GenerateIndexBoundsForBody(
+            constructor.Body,
+            constructor.Parameters,
+            constructor.Id,
+            constructor.Visibility);
     }
 
     private void GenerateReturnObligation(OutputNode? output, string functionId)

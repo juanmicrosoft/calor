@@ -58,6 +58,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentFilePath;
     private string _currentNamespace = "";
     private string? _currentInlineReturnRefinement;
+    private string? _currentYieldRefinement;
     private int _inlineReturnGuardCounter;
     private readonly EmitContractMode _contractMode;
     private readonly ModuleVerificationResult? _verificationResults;
@@ -79,12 +80,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // Starts with a base scope so isolated statement/expression emission (tests, or any
     // path not entered through a function/method ResetDeclScopes) always has a live scope.
     private readonly List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
-    private sealed record RefinementConstraint(ExpressionNode Predicate, string Description);
+    private sealed record RefinementConstraint(
+        ExpressionNode Predicate,
+        string Description,
+        string TypeName);
     private readonly List<Dictionary<string, RefinementConstraint?>> _refinementDeclScopes =
         new() { new(StringComparer.Ordinal) };
     private readonly List<Dictionary<string, string?>> _indexedBoundScopes =
         new() { new(StringComparer.Ordinal) };
     private int _indexGuardCounter;
+    private int _mutationGuardCounter;
 
     private void ResetDeclScopes(IReadOnlyList<ParameterNode>? parameters = null)
     {
@@ -96,6 +101,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _indexedBoundScopes.Clear();
         _indexedBoundScopes.Add(new Dictionary<string, string?>(StringComparer.Ordinal));
         _indexGuardCounter = 0;
+        _mutationGuardCounter = 0;
         if (parameters != null)
         {
             // Parameters live in the base scope so a mutable §B{~param} rebind is a
@@ -110,13 +116,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
                         inlinePredicate,
-                        $"inline refinement for parameter '{p.Name}'");
+                        $"inline refinement for parameter '{p.Name}'",
+                        p.TypeName);
                 }
                 else if (_refinementTypes.TryGetValue(p.TypeName, out var refinementType))
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
                         refinementType.Predicate,
-                        $"refinement type '{refinementType.Name}'");
+                        $"refinement type '{refinementType.Name}'",
+                        refinementType.BaseTypeName);
                 }
 
                 var indexedTypeName = p.TypeName;
@@ -559,29 +567,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         SanitizeIdentifier(compoundTarget.Name));
                 }
             }
-            else if (statement is ExpressionStatementNode
-                {
-                    Expression: UnaryOperationNode
-                    {
-                        Operator: UnaryOperator.PreIncrement
-                            or UnaryOperator.PreDecrement
-                            or UnaryOperator.PostIncrement
-                            or UnaryOperator.PostDecrement,
-                        Operand: ReferenceNode unaryTarget
-                    } unary
-                }
-                && TryGetRefinementConstraint(
-                    unaryTarget.Name,
-                    out var unaryConstraint)
-                && ShouldEmitObligationGuard(
-                    Verification.Obligations.ObligationKind.Subtype,
-                    unary.Span,
-                    unaryTarget.Name))
-            {
-                EmitRefinementValueGuard(
-                    unaryConstraint,
-                    SanitizeIdentifier(unaryTarget.Name));
-            }
         }
         EndLineMapping(mapped);
     }
@@ -951,8 +936,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var canLowerReturnChecks = CanLowerPostconditions(node.Body);
         var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        var previousYieldRefinement = _currentYieldRefinement;
         _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks ? returnType : null;
+            hasReturnRefinement && !canLowerReturnChecks && !isIterator
+                ? returnType
+                : null;
+        _currentYieldRefinement = hasReturnRefinement && isIterator
+            ? returnType
+            : null;
         _inlineReturnGuardCounter = 0;
 
         var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
@@ -1022,6 +1013,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // instrument faithfully — otherwise emit the body untransformed and say so.
         if ((node.Postconditions.Count > 0 || hasReturnRefinement)
             && hasReturnValue
+            && !isIterator
             && canLowerReturnChecks)
         {
             AppendLine($"{mappedValueReturnType} __result__ = default;");
@@ -1090,6 +1082,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Dedent();
         AppendLine("}");
         _currentInlineReturnRefinement = previousInlineReturnRefinement;
+        _currentYieldRefinement = previousYieldRefinement;
 
         return "";
     }
@@ -1772,7 +1765,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     varName,
                     new RefinementConstraint(
                         reboundRefinement.Predicate,
-                        $"refinement type '{reboundRefinement.Name}'"));
+                        $"refinement type '{reboundRefinement.Name}'",
+                        reboundRefinement.BaseTypeName));
             }
             var reboundIndexedBound = GetIndexedBoundForBinding(node);
             if (reboundIndexedBound != null)
@@ -1797,7 +1791,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 varName,
                 new RefinementConstraint(
                     refinementType.Predicate,
-                    $"refinement type '{refinementType.Name}'"));
+                    $"refinement type '{refinementType.Name}'",
+                    refinementType.BaseTypeName));
         }
         else
         {
@@ -1844,6 +1839,40 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(UnaryOperationNode node)
     {
+        if (node.Operator is UnaryOperator.PreIncrement
+                or UnaryOperator.PreDecrement
+                or UnaryOperator.PostIncrement
+                or UnaryOperator.PostDecrement
+            && node.Operand is ReferenceNode refinedTarget
+            && TryGetRefinementConstraint(
+                refinedTarget.Name,
+                out var refinementConstraint))
+        {
+            var valueName = SanitizeIdentifier(refinedTarget.Name);
+            var operation = node.Operator is UnaryOperator.PostIncrement
+                    or UnaryOperator.PostDecrement
+                ? $"{valueName}{node.Operator.ToCSharpOperator()}"
+                : $"{node.Operator.ToCSharpOperator()}{valueName}";
+            if (!ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.Subtype,
+                node.Span,
+                refinedTarget.Name))
+            {
+                return operation;
+            }
+
+            var resultName = $"__mutationResult{_mutationGuardCounter++}";
+            var resultType = MapTypeName(refinementConstraint.TypeName);
+            var condition = EmitRefinementCondition(
+                refinementConstraint.Predicate,
+                valueName);
+            return $"((Func<{resultType}>)(() => {{ "
+                + $"var {resultName} = {operation}; "
+                + $"if (!({condition})) throw new ArgumentOutOfRangeException("
+                + $"nameof({valueName}), \"Value violates {refinementConstraint.Description}\"); "
+                + $"return {resultName}; }}))()";
+        }
+
         if (node.Operator is UnaryOperator.PreIncrement
                 or UnaryOperator.PreDecrement
                 or UnaryOperator.PostIncrement
@@ -1953,6 +1982,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return "yield return;";
         }
         var expr = node.Expression.Accept(this);
+        if (_currentYieldRefinement != null
+            && _refinementTypes.TryGetValue(
+                _currentYieldRefinement,
+                out var refinementType)
+            && ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.RefinementReturn))
+        {
+            var resultName = $"__refinedYield{_inlineReturnGuardCounter++}";
+            var condition = EmitRefinementCondition(
+                refinementType.Predicate,
+                resultName);
+            var continuationIndent = Environment.NewLine
+                + new string(' ', _indentLevel * 4);
+            return $"var {resultName} = {expr};"
+                + continuationIndent
+                + $"if (!({condition})) throw new InvalidOperationException("
+                + $"\"Yielded value violates refinement type '{refinementType.Name}'\");"
+                + continuationIndent
+                + $"yield return {resultName};";
+        }
+
         return $"yield return {expr};";
     }
 
@@ -3302,7 +3352,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var mappedReturnType = MapTypeName(returnType);
         var mappedValueReturnType = mappedReturnType;
         // Wrap in IEnumerable if body contains yield statements
-        if (ContainsYieldStatements(node.Body))
+        var isIterator = ContainsYieldStatements(node.Body);
+        if (isIterator)
         {
             mappedReturnType = WrapInIEnumerable(mappedReturnType);
         }
@@ -3387,14 +3438,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var hasInheritedPostconditions = !node.HasContracts && inheritedContracts != null && inheritedContracts.Postconditions.Count > 0;
         var canLowerReturnChecks = CanLowerPostconditions(node.Body);
         var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        var previousYieldRefinement = _currentYieldRefinement;
         _currentInlineReturnRefinement =
-            hasReturnRefinement && !canLowerReturnChecks ? returnType : null;
+            hasReturnRefinement && !canLowerReturnChecks && !isIterator
+                ? returnType
+                : null;
+        _currentYieldRefinement = hasReturnRefinement && isIterator
+            ? returnType
+            : null;
         _inlineReturnGuardCounter = 0;
 
         // Handle postconditions similar to FunctionNode
         // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
         if ((effectivePostconditions.Count > 0 || hasReturnRefinement)
             && hasReturnValue
+            && !isIterator
             && canLowerReturnChecks)
         {
             AppendLine($"{mappedValueReturnType} __result__ = default;");
@@ -3478,6 +3536,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Dedent();
         AppendLine("}");
         _currentInlineReturnRefinement = previousInlineReturnRefinement;
+        _currentYieldRefinement = previousYieldRefinement;
 
         return "";
     }
@@ -4030,6 +4089,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             AppendLine(Visit(pre));
         }
+        EmitRefinementParameterGuards(node.Parameters);
 
         foreach (var stmt in node.Body)
         {
@@ -4481,7 +4541,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     name,
                     new RefinementConstraint(
                         refinementType.Predicate,
-                        $"refinement type '{refinementType.Name}'"));
+                        $"refinement type '{refinementType.Name}'",
+                        refinementType.BaseTypeName));
             }
 
             var indexedTypeName = parameter.TypeName;

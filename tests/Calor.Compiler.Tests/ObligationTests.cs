@@ -1399,6 +1399,69 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_NestedRefinedDecrement_RechecksInvariant()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Bad:pub}
+                  §O{i32}
+                  §B{~value:Positive} INT:1
+                  §B{old:i32} (post-dec value)
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "Bad");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedIterator_GuardsYieldedValues()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Get:pub}
+                  §O{Positive}
+                  §YIELD INT:-1
+            """);
+
+        var exception = InvokeGenerated(csharp, "Get");
+
+        Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains("Yielded value violates", exception.Message);
+    }
+
+    [Fact]
+    public void CSharpEmit_PublicRefinedConstructor_RejectsInvalidValue()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §CL{c001:Box:pub}
+                §CTOR{ctor1:pub} (Positive:value)
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        var csharp = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker).Emit(module);
+
+        var exception = InvokeGeneratedConstructor(csharp, -1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Contains(
+            tracker.Obligations,
+            obligation => obligation.Kind == ObligationKind.RefinementEntry);
+    }
+
+    [Fact]
     public void CSharpEmit_LambdaParameterShadowsOuterIndexedBound()
     {
         var source = """
@@ -1515,6 +1578,78 @@ public sealed class ObligationTests
         string methodName,
         params object?[] arguments)
     {
+        var assembly = CompileGenerated(csharp);
+        var type = Assert.Single(assembly.GetTypes(), candidate =>
+            candidate.GetMethod(
+                methodName,
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) is not null);
+        var method = type.GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+
+        try
+        {
+            var result = method.Invoke(null, arguments);
+            if (result is Task task)
+            {
+                try
+                {
+                    task.GetAwaiter().GetResult();
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
+            else if (result is System.Collections.IEnumerable enumerable)
+            {
+                try
+                {
+                    foreach (var _ in enumerable)
+                    {
+                    }
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
+        }
+        catch (System.Reflection.TargetInvocationException invocation)
+            when (invocation.InnerException is not null)
+        {
+            return invocation.InnerException;
+        }
+
+        throw new Xunit.Sdk.XunitException(
+            $"Generated method '{methodName}' did not throw.");
+    }
+
+    private static Exception InvokeGeneratedConstructor(
+        string csharp,
+        params object?[] arguments)
+    {
+        var assembly = CompileGenerated(csharp);
+        var type = Assert.Single(
+            assembly.GetTypes(),
+            candidate => candidate.GetConstructors().Any(
+                constructor => constructor.GetParameters().Length == arguments.Length));
+        try
+        {
+            Activator.CreateInstance(type, arguments);
+        }
+        catch (System.Reflection.TargetInvocationException invocation)
+            when (invocation.InnerException is not null)
+        {
+            return invocation.InnerException;
+        }
+
+        throw new Xunit.Sdk.XunitException(
+            $"Generated constructor for '{type.FullName}' did not throw.");
+    }
+
+    private static System.Reflection.Assembly CompileGenerated(string csharp)
+    {
         var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
             GeneratedCSharpCompiler.GlobalUsingsPreamble + csharp);
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
@@ -1533,36 +1668,6 @@ public sealed class ObligationTests
             emitResult.Success,
             string.Join(Environment.NewLine, emitResult.Diagnostics));
 
-        var assembly = System.Reflection.Assembly.Load(stream.ToArray());
-        var type = Assert.Single(assembly.GetTypes(), candidate =>
-            candidate.GetMethod(
-                methodName,
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) is not null);
-        var method = type.GetMethod(
-            methodName,
-            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
-        try
-        {
-            var result = method.Invoke(null, arguments);
-            if (result is Task task)
-            {
-                try
-                {
-                    task.GetAwaiter().GetResult();
-                }
-                catch (Exception exception)
-                {
-                    return exception;
-                }
-            }
-        }
-        catch (System.Reflection.TargetInvocationException invocation)
-            when (invocation.InnerException is not null)
-        {
-            return invocation.InnerException;
-        }
-
-        throw new Xunit.Sdk.XunitException(
-            $"Generated method '{methodName}' did not throw.");
+        return System.Reflection.Assembly.Load(stream.ToArray());
     }
 }
