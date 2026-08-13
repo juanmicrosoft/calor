@@ -274,7 +274,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (genericIndex > 0)
                 typeName = typeName[..genericIndex];
             if (_indexedTypes.TryGetValue(typeName, out var indexedType))
-                return indexedType.SizeParam;
+            {
+                return IsVarDeclaredInScope(indexedType.SizeParam)
+                    ? indexedType.SizeParam
+                    : $"missing:{indexedType.SizeParam}";
+            }
         }
 
         return node.Initializer is ReferenceNode reference
@@ -1817,6 +1821,44 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(UnaryOperationNode node)
     {
+        if (node.Operator is UnaryOperator.PreIncrement
+                or UnaryOperator.PreDecrement
+                or UnaryOperator.PostIncrement
+                or UnaryOperator.PostDecrement
+            && node.Operand is ArrayAccessNode indexedOperand
+            && indexedOperand.Array is ReferenceNode reference
+            && TryGetIndexedBound(reference.Name, out var logicalLength))
+        {
+            var array = indexedOperand.Array.Accept(this);
+            var index = indexedOperand.Index.Accept(this);
+            var indexedOp = node.Operator.ToCSharpOperator();
+            string Apply(string guardedIndex) =>
+                node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
+                    ? $"{array}[{guardedIndex}]{indexedOp}"
+                    : $"{indexedOp}{array}[{guardedIndex}]";
+
+            if (IsMissingIndexedWitness(logicalLength, out var missingWitness))
+            {
+                return $"(false ? {Apply(index)} : throw new InvalidOperationException("
+                    + $"\"Indexed-type size witness '{missingWitness}' is unavailable\"))";
+            }
+            if (!ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.IndexBounds,
+                indexedOperand.Span,
+                reference.Name))
+            {
+                return Apply(index);
+            }
+
+            var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
+            return $"(({index}) is var {guardedIndex}"
+                + $" && {guardedIndex} >= 0"
+                + $" && {guardedIndex} < {SanitizeIdentifier(logicalLength)}"
+                + $" ? {Apply(guardedIndex)}"
+                + " : throw new IndexOutOfRangeException("
+                + "\"Indexed-type bound violated\"))";
+        }
+
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
         // Only parenthesize when operand is a binary expression (lower precedence than unary)
@@ -5454,6 +5496,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ExpressionStatementNode node)
     {
         var expr = node.Expression.Accept(this);
+        if (node.Expression is UnaryOperationNode
+            {
+                Operator: UnaryOperator.PreIncrement
+                    or UnaryOperator.PreDecrement
+                    or UnaryOperator.PostIncrement
+                    or UnaryOperator.PostDecrement,
+                Operand: ArrayAccessNode
+            })
+        {
+            return $"_ = {expr};";
+        }
+
         AppendLine($"{expr};");
         return "";
     }

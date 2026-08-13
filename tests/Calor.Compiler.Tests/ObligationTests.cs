@@ -1321,6 +1321,49 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_LocalIndexedBindingWithoutWitness_FailsClosed()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Read:pub}
+                  §I{i32:index}
+                  §O{i32}
+                  §B{items:Sized} §ARR{i32} INT:3
+                  §R §IDX items index
+            """);
+
+        var exception = InvokeGenerated(csharp, "Read", 1);
+
+        Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains("size witness 'n' is unavailable", exception.Message);
+    }
+
+    [Fact]
+    public void CSharpEmit_IndexedIncrement_EnforcesLogicalBound()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Increment:pub}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{void}
+                  (inc §IDX items index)
+            """);
+
+        var exception = InvokeGenerated(
+            csharp,
+            "Increment",
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
+            5,
+            7);
+
+        Assert.IsType<IndexOutOfRangeException>(exception);
+    }
+
+    [Fact]
     public void CSharpEmit_StatementLambda_ContainsItsProofGuard()
     {
         var span = new TextSpan(0, 1, 1, 1);
