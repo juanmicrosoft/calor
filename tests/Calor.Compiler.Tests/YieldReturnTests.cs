@@ -133,15 +133,15 @@ public class YieldReturnTests
     }
 
     [Fact]
-    public void CSharpEmitter_YieldReturnNoExpression_EmitsCorrectly()
+    public void CSharpEmitter_YieldReturnNoExpression_RejectsInvalidAst()
     {
         var span = new TextSpan(0, 0, 0, 0);
         var node = new YieldReturnStatementNode(span, null);
 
         var emitter = new CSharpEmitter();
-        var output = node.Accept(emitter);
-
-        Assert.Equal("yield return;", output);
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => node.Accept(emitter));
+        Assert.Contains("§YBRK", exception.Message);
     }
 
     [Fact]

@@ -279,13 +279,12 @@ public static class AttributeHelper
     /// </summary>
     public static (string Id, string Var, string From, string To, string Step) InterpretForAttributes(AttributeCollection attrs)
     {
-        var step = attrs["_pos4"] ?? "";
-        if (string.IsNullOrEmpty(step))
-        {
-            step = "1";
-        }
-
-        return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "", attrs["_pos2"] ?? "", attrs["_pos3"] ?? "", step);
+        return (
+            attrs["_pos0"] ?? "",
+            attrs["_pos1"] ?? "",
+            attrs["_pos2"] ?? "",
+            attrs["_pos3"] ?? "",
+            attrs["_pos4"] ?? "");
     }
 
     /// <summary>

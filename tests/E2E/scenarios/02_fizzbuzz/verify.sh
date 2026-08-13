@@ -9,7 +9,9 @@ OUTPUT_FILE="$SCENARIO_DIR/output.g.cs"
 
 # Check for expected patterns
 grep -q "namespace FizzBuzz" "$OUTPUT_FILE" || { echo "Missing namespace"; exit 1; }
-grep -q "for.*var i = 1" "$OUTPUT_FILE" || { echo "Missing for loop"; exit 1; }
+grep -q "var __calorForFrom = 1" "$OUTPUT_FILE" || { echo "Missing evaluated loop start"; exit 1; }
+grep -q "while (true)" "$OUTPUT_FILE" || { echo "Missing overflow-safe loop"; exit 1; }
+grep -q "catch (OverflowException)" "$OUTPUT_FILE" || { echo "Missing overflow termination"; exit 1; }
 grep -q "i % 15" "$OUTPUT_FILE" || { echo "Missing modulo 15 check"; exit 1; }
 grep -q "i % 3" "$OUTPUT_FILE" || { echo "Missing modulo 3 check"; exit 1; }
 grep -q "i % 5" "$OUTPUT_FILE" || { echo "Missing modulo 5 check"; exit 1; }

@@ -27,6 +27,8 @@ grep -q "x > 0" "$OUTPUT_FILE" || { echo "Missing greater-than comparison"; exit
 grep -q "x == 0" "$OUTPUT_FILE" || { echo "Missing equality comparison"; exit 1; }
 
 # Check control flow
-grep -q "for.*var i = 1" "$OUTPUT_FILE" || { echo "Missing for loop"; exit 1; }
+grep -q "var __calorForFrom = 1" "$OUTPUT_FILE" || { echo "Missing evaluated loop start"; exit 1; }
+grep -q "while (true)" "$OUTPUT_FILE" || { echo "Missing overflow-safe loop"; exit 1; }
+grep -q "catch (OverflowException)" "$OUTPUT_FILE" || { echo "Missing overflow termination"; exit 1; }
 
 exit 0

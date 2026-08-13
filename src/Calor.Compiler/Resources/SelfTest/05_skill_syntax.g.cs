@@ -58,9 +58,37 @@ namespace SkillSyntax
         private static void TestControlFlow()
         {
             Console.WriteLine("Testing control flow...");
-            for (var i = 1; i <= 5; i++)
             {
-                Console.WriteLine(i);
+                var __calorForFrom = 1;
+                var __calorForTo = 5;
+                var __calorForStep = 1;
+                if (__calorForStep == 0) throw new ArgumentOutOfRangeException(nameof(__calorForStep), "Calor for-loop step must not be zero");
+                var __calorForAscending = __calorForStep > 0;
+                var __calorForFirst = true;
+                var i = __calorForFrom;
+                while (true)
+                {
+                    if (!__calorForFirst)
+                    {
+                        try
+                        {
+                            checked
+                            {
+                                i += __calorForStep;
+                            }
+                        }
+                        catch (OverflowException)
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        __calorForFirst = false;
+                    }
+                    if (!(__calorForAscending ? i <= __calorForTo : i >= __calorForTo)) break;
+                    Console.WriteLine(i);
+                }
             }
 
         }

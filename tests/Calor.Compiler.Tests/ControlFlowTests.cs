@@ -227,7 +227,12 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("for (var i = 1; i <= 10; i++)", result.GeneratedCode);
+        Assert.Contains("var __calorForFrom = 1;", result.GeneratedCode);
+        Assert.Contains("var __calorForTo = 10;", result.GeneratedCode);
+        Assert.Contains("var __calorForStep = 1;", result.GeneratedCode);
+        Assert.Contains("while (true)", result.GeneratedCode);
+        Assert.Contains("checked", result.GeneratedCode);
+        Assert.Contains("catch (OverflowException)", result.GeneratedCode);
         Assert.Contains("Console.WriteLine(i)", result.GeneratedCode);
     }
 
@@ -428,8 +433,9 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
-        // Should generate for loop with (n - 1) as the upper bound
-        Assert.Contains("for (var i = 0; i <= n - 1; i++)", result.GeneratedCode);
+        Assert.Contains("var __calorForFrom = 0;", result.GeneratedCode);
+        Assert.Contains("var __calorForTo = n - 1;", result.GeneratedCode);
+        Assert.Contains("var __calorForStep = 1;", result.GeneratedCode);
     }
 
     [Fact]
