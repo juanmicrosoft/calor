@@ -88,6 +88,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         new() { new(StringComparer.Ordinal) };
     private readonly List<Dictionary<string, string?>> _indexedBoundScopes =
         new() { new(StringComparer.Ordinal) };
+    private readonly HashSet<string> _outParameterNames = new(StringComparer.Ordinal);
     private int _indexGuardCounter;
     private int _mutationGuardCounter;
 
@@ -100,6 +101,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             new Dictionary<string, RefinementConstraint?>(StringComparer.Ordinal));
         _indexedBoundScopes.Clear();
         _indexedBoundScopes.Add(new Dictionary<string, string?>(StringComparer.Ordinal));
+        _outParameterNames.Clear();
         _indexGuardCounter = 0;
         _mutationGuardCounter = 0;
         if (parameters != null)
@@ -112,6 +114,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 var name = SanitizeIdentifier(p.Name);
                 _declScopes[0].Add(name);
+                if (p.Modifier.HasFlag(ParameterModifier.Out))
+                {
+                    _outParameterNames.Add(name);
+                }
                 if (p.InlineRefinement?.Predicate is { } inlinePredicate)
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
@@ -1745,6 +1751,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // scopes create new shadowing variables, while mutable binds reassign.
         if (node.IsMutable && IsVarDeclaredInScope(varName))
         {
+            TryGetRefinementConstraint(node.Name, out var existingConstraint);
             RefinementConstraint? reboundConstraint = null;
             if (node.TypeName != null
                 && _refinementTypes.TryGetValue(node.TypeName, out var reboundRefinement))
@@ -1754,37 +1761,38 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     $"refinement type '{reboundRefinement.Name}'",
                     reboundRefinement.BaseTypeName);
             }
-            var reboundIndexedBound = GetIndexedBoundForBinding(node);
-
             // Emit the initializer against the old variable contract. It may
             // itself mutate the target, so installing the rebound metadata
             // first would validate nested writes against the wrong invariant.
             var initExpr = node.Initializer?.Accept(this);
-            if (reboundConstraint != null)
-            {
-                SetRefinementForExistingVariable(varName, reboundConstraint);
-            }
-            if (reboundIndexedBound != null)
-            {
-                SetIndexedBoundForExistingVariable(varName, reboundIndexedBound);
-            }
 
             // Mutable rebind - emit assignment only
             if (initExpr != null)
             {
-                if (TryGetRefinementConstraint(
-                        node.Name,
-                        out var rebindConstraint)
-                    && ShouldEmitObligationGuard(
-                        Verification.Obligations.ObligationKind.Subtype,
-                        node.Span,
-                        node.Name))
+                var constraints = new[] { existingConstraint, reboundConstraint }
+                    .Where(constraint => constraint is not null)
+                    .Cast<RefinementConstraint>()
+                    .Distinct()
+                    .ToArray();
+                var changesEstablishedConstraint = existingConstraint != null
+                    && reboundConstraint != null
+                    && !ReferenceEquals(
+                        existingConstraint.Predicate,
+                        reboundConstraint.Predicate);
+                if (constraints.Length > 0
+                    && (changesEstablishedConstraint
+                        || ShouldEmitObligationGuard(
+                            Verification.Obligations.ObligationKind.Subtype,
+                            node.Span,
+                            node.Name)))
                 {
                     return EmitCheckedRefinedAssignment(
                         varName,
                         initExpr,
-                        rebindConstraint,
-                        restoreTargetOnFailure: true);
+                        constraints[0],
+                        restoreTargetOnFailure:
+                            !_outParameterNames.Contains(varName),
+                        additionalConstraints: constraints.Skip(1).ToArray());
                 }
                 return $"{varName} = {initExpr};";
             }
@@ -4348,7 +4356,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         string value,
         RefinementConstraint constraint,
         string? compoundOperator = null,
-        bool restoreTargetOnFailure = false)
+        bool restoreTargetOnFailure = false,
+        IReadOnlyList<RefinementConstraint>? additionalConstraints = null)
     {
         var candidateName = $"__refinementCandidate{_mutationGuardCounter++}";
         var continuationIndent = Environment.NewLine
@@ -4358,13 +4367,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             : $"var {candidateName} = {target};"
                 + continuationIndent
                 + $"{candidateName} {compoundOperator} {value};";
-        var condition = EmitRefinementCondition(
-            constraint.Predicate,
-            candidateName);
+        var constraints = new[] { constraint }
+            .Concat(additionalConstraints ?? [])
+            .Distinct()
+            .ToArray();
+        var condition = string.Join(
+            " && ",
+            constraints.Select(item =>
+                $"({EmitRefinementCondition(item.Predicate, candidateName)})"));
+        var description = string.Join(
+            " and ",
+            constraints.Select(item => item.Description));
         var checkedAssignment = initializeCandidate
             + continuationIndent
             + $"if (!({condition})) throw new ArgumentOutOfRangeException("
-            + $"nameof({target}), \"Value violates {constraint.Description}\");"
+            + $"nameof({target}), \"Value violates {description}\");"
             + continuationIndent
             + $"{target} = {candidateName};";
         if (!restoreTargetOnFailure)

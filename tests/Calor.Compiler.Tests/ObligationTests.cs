@@ -1536,6 +1536,47 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_TypedRebind_PreservesPriorContractAndSupportsOutInitialization()
+    {
+        var caughtRebind = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:NonNegative:i32} (>= # INT:0)
+              §RTYPE{r2:Negative:i32} (< # INT:0)
+              §F{f001:Mutate:pub}
+                  §I{NonNegative:value:ref}
+                  §O{void}
+                  §TR{t1}
+                    §B{~value:Negative} (post-dec value)
+                  §CA{Exception:ex}
+                    §ASSIGN value INT:-1
+            """);
+        object?[] caughtArguments = [1];
+
+        var caughtException = InvokeGenerated(
+            caughtRebind,
+            "Mutate",
+            caughtArguments);
+
+        Assert.IsType<ArgumentOutOfRangeException>(caughtException);
+        Assert.Equal(1, caughtArguments[0]);
+
+        var outInitialization = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Set:pub}
+                  §I{Positive:value:out}
+                  §O{void}
+                  §B{~value:Positive} INT:1
+            """);
+        var validation = GeneratedCSharpCompiler.Validate(outInitialization);
+
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join(Environment.NewLine, validation.CompilationErrors));
+        Assert.DoesNotContain("__refinementSnapshot", outInitialization);
+    }
+
+    [Fact]
     public void CSharpEmit_ConstructorInitializerChecksBeforeForwarding()
     {
         var source = """
