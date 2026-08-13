@@ -4705,51 +4705,63 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             1 when node.Parameters[0].TypeName == null => SanitizeIdentifier(node.Parameters[0].Name),
             _ => "(" + string.Join(", ", node.Parameters.Select(p => Visit(p))) + ")"
         };
+        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        var previousYieldRefinement = _currentYieldRefinement;
+        _currentInlineReturnRefinement = null;
+        _currentYieldRefinement = null;
 
-        if (node.IsExpressionLambda && node.ExpressionBody != null)
+        try
         {
-            PushDeclScope();
-            RegisterLambdaParameters(node.Parameters);
-            string body;
-            try
+            if (node.IsExpressionLambda && node.ExpressionBody != null)
             {
-                body = node.ExpressionBody.Accept(this);
-            }
-            finally
-            {
-                PopDeclScope();
-            }
-            return $"{staticMod}{async}{parameters} => {body}";
-        }
-        else if (node.StatementBody != null && node.StatementBody.Count > 0)
-        {
-            var builderStart = _builder.Length;
-            var previousIndent = _indentLevel;
-            PushDeclScope();
-            RegisterLambdaParameters(node.Parameters);
-
-            string body;
-            try
-            {
-                _indentLevel = 1;
-                foreach (var stmt in node.StatementBody)
+                PushDeclScope();
+                RegisterLambdaParameters(node.Parameters);
+                string body;
+                try
                 {
-                    EmitStatement(stmt);
+                    body = node.ExpressionBody.Accept(this);
                 }
-                body = _builder.ToString(builderStart, _builder.Length - builderStart)
-                    .TrimEnd();
+                finally
+                {
+                    PopDeclScope();
+                }
+                return $"{staticMod}{async}{parameters} => {body}";
             }
-            finally
+            else if (node.StatementBody != null && node.StatementBody.Count > 0)
             {
-                _builder.Length = builderStart;
-                _indentLevel = previousIndent;
-                PopDeclScope();
+                var builderStart = _builder.Length;
+                var previousIndent = _indentLevel;
+                PushDeclScope();
+                RegisterLambdaParameters(node.Parameters);
+
+                string body;
+                try
+                {
+                    _indentLevel = 1;
+                    foreach (var stmt in node.StatementBody)
+                    {
+                        EmitStatement(stmt);
+                    }
+                    body = _builder.ToString(builderStart, _builder.Length - builderStart)
+                        .TrimEnd();
+                }
+                finally
+                {
+                    _builder.Length = builderStart;
+                    _indentLevel = previousIndent;
+                    PopDeclScope();
+                }
+
+                return $"{staticMod}{async}{parameters} => {{\n{body}\n}}";
             }
 
-            return $"{staticMod}{async}{parameters} => {{\n{body}\n}}";
+            return $"{staticMod}{async}{parameters} => default";
         }
-
-        return $"{staticMod}{async}{parameters} => default";
+        finally
+        {
+            _currentInlineReturnRefinement = previousInlineReturnRefinement;
+            _currentYieldRefinement = previousYieldRefinement;
+        }
     }
 
     private void RegisterLambdaParameters(

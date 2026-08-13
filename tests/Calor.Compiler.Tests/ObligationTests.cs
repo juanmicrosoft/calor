@@ -1081,6 +1081,31 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void LambdaReturn_DoesNotInheritEnclosingRefinedReturnGuard()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Test:pub}
+                  §I{bool:early}
+                  §O{Positive}
+                  §B{f:Func<i32>} §LAM{l1} §R INT:-1 §/LAM{l1}
+                  §IF{i1} early
+                    §R INT:1
+                  §B{x:i32} §C{f} §/C
+                  §R INT:1
+            """);
+        var assembly = CompileGenerated(csharp);
+        var type = Assert.Single(
+            assembly.GetTypes(),
+            candidate => candidate.GetMethod("Test") is not null);
+
+        var result = type.GetMethod("Test")!.Invoke(null, [false]);
+
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
     public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
