@@ -1078,6 +1078,29 @@ public sealed class ObligationTests
                 [instance]));
 
         Assert.IsType<InvalidOperationException>(invocation.InnerException);
+
+        var legacyCSharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §CL{c001:LegacyType:pub}
+                §MT{m001:op_Implicit:pub:stat}
+                  §I{LegacyType:value}
+                  §O{Positive}
+                  §R INT:-1
+            """);
+        var legacyAssembly = CompileGenerated(legacyCSharp);
+        var legacyType = Assert.Single(
+            legacyAssembly.GetTypes(),
+            candidate => candidate.GetMethod("op_Implicit") is not null);
+        var legacyInstance = Activator.CreateInstance(legacyType);
+        var legacyInvocation =
+            Assert.Throws<System.Reflection.TargetInvocationException>(
+                () => legacyType.GetMethod("op_Implicit")!.Invoke(
+                    null,
+                    [legacyInstance]));
+
+        Assert.IsType<InvalidOperationException>(
+            legacyInvocation.InnerException);
     }
 
     [Fact]

@@ -3737,13 +3737,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var check = Visit(requires);
             AppendLine(check);
         }
+        EmitRefinementParameterGuards(node.Parameters);
 
         var returnType = node.Output?.TypeName ?? "void";
         var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
+        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
+        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        _currentInlineReturnRefinement =
+            hasReturnRefinement && !canLowerReturnChecks
+                ? returnType
+                : null;
+        _inlineReturnGuardCounter = 0;
 
-        // Handle postconditions
-        // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
-        if (node.Postconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(node.Body))
+        if ((node.Postconditions.Count > 0 || hasReturnRefinement)
+            && hasReturnValue
+            && canLowerReturnChecks)
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -3771,6 +3780,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 AppendLine(check);
             }
 
+            EmitReturnRefinementGuard(returnType, "__result__");
             AppendLine("return __result__;");
         }
         else
@@ -3801,6 +3811,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine("}");
+        _currentInlineReturnRefinement = previousInlineReturnRefinement;
 
         return "";
     }
