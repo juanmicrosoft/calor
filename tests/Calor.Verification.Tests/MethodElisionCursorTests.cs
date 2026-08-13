@@ -98,10 +98,16 @@ public class MethodElisionCursorTests
         Assert.False(
             result.HasErrors,
             string.Join("; ", result.Diagnostics.Errors.Select(error => error.Message)));
-        Assert.Contains("__result__ >= 100)) throw", result.GeneratedCode);
+        var generatedLines = result.GeneratedCode.Split('\n');
+        Assert.Contains(
+            generatedLines,
+            line => line.Contains("__calorPostconditionResult", StringComparison.Ordinal)
+                && line.Contains(">= 100", StringComparison.Ordinal)
+                && line.Contains("throw", StringComparison.Ordinal));
         Assert.DoesNotContain(
-            "// PROVEN: Postcondition statically verified: __result__ >= 100",
-            result.GeneratedCode);
+            generatedLines,
+            line => line.Contains("// PROVEN:", StringComparison.Ordinal)
+                && line.Contains(">= 100", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -153,8 +159,7 @@ public class MethodElisionCursorTests
 
         Assert.False(result.HasErrors);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
-        // The guard must be PRESENT — a regression through the not-lowered path (guard
-        // silently dropped, Calor1001 only warns) would otherwise pass this test.
+        // The guard must be PRESENT even though verification could not model the body.
         Assert.Contains("ContractViolationException", result.GeneratedCode);
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.ContractVerificationUnsupported);

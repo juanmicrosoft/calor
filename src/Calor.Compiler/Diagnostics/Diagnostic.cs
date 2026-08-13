@@ -753,11 +753,8 @@ public static class DiagnosticCode
     public const string CodeGenSyntaxError = "Calor1000";
 
     /// <summary>
-    /// Warning: postcondition runtime checks were not emitted for a declaration
-    /// whose body has an early, nested, or raw-C# return — the current lowering
-    /// rewrites only the single final top-level return, and instrumenting such a
-    /// body would silently skip the check or change execution order (W1 Slice 1
-    /// stopgap for #764; the structural lowering retires this diagnostic).
+    /// Error: postcondition runtime checks cannot be emitted for a declaration
+    /// whose body contains opaque raw C# with structurally invisible returns.
     /// </summary>
     public const string PostconditionCheckNotLowered = "Calor1001";
 
@@ -773,6 +770,12 @@ public static class DiagnosticCode
     /// enforce the refinements first.
     /// </summary>
     public const string ConstructorRefinementInitializerNotLowered = "Calor1003";
+
+    /// <summary>
+    /// Error: iterator postconditions are unsupported until their deferred
+    /// execution and completion semantics are defined.
+    /// </summary>
+    public const string IteratorPostconditionUnsupported = "Calor1004";
 
     // C# Interop diagnostics (Calor1010-1019)
 

@@ -22,12 +22,12 @@ namespace QuantifierDemo
         public static bool ExistsTarget(int target)
         {
             if (!(Enumerable.Range(0, 10 - 0).Any(i => (i == target)))) throw new Calor.Runtime.ContractViolationException("Precondition failed: Enumerable.Range(0, 10 - 0).Any(i => (i == target))", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 198, length: 63, sourceFile: null, line: 7, column: 5, condition: "Enumerable.Range(0, 10 - 0).Any(i => (i == target))");
-            bool __result__ = default;
-
-            __result__ = true;
-
-            if (!(__result__)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 266, length: 19, sourceFile: null, line: 8, column: 5, condition: "__result__");
-            return __result__;
+            bool __calorPostconditionResult0;
+            __calorPostconditionResult0 = true;
+            goto __calorPostconditionExit0;
+            __calorPostconditionExit0:
+            if (!(__calorPostconditionResult0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 266, length: 19, sourceFile: null, line: 8, column: 5, condition: "__calorPostconditionResult0");
+            return __calorPostconditionResult0;
         }
 
         public static bool ImplicationTest(int x)
