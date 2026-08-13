@@ -193,9 +193,13 @@ public sealed class ObligationGenerator
                 continue;
             }
 
-            if (refinementByVariable.ContainsKey(bind.Name) && !bind.IsMutable)
+            var hasEstablishedRefinement =
+                refinementByVariable.ContainsKey(bind.Name)
+                || inlineRefinementByVariable.ContainsKey(bind.Name);
+            if (hasEstablishedRefinement && !bind.IsMutable)
                 ambiguousVariables.Add(bind.Name);
-            refinementByVariable[bind.Name] = refinementType;
+            if (!bind.IsMutable || !hasEstablishedRefinement)
+                refinementByVariable[bind.Name] = refinementType;
 
             var condition = FactCollector.SubstituteSelfRefStatic(
                 refinementType.Predicate,

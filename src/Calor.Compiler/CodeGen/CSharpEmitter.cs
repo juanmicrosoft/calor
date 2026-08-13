@@ -1791,7 +1791,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         initExpr,
                         constraints[0],
                         restoreTargetOnFailure:
-                            !_outParameterNames.Contains(varName),
+                            !_outParameterNames.Contains(varName)
+                            || ExpressionReferencesName(
+                                node.Initializer!,
+                                node.Name),
                         additionalConstraints: constraints.Skip(1).ToArray());
                 }
                 return $"{varName} = {initExpr};";
@@ -1828,6 +1831,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             typeName = "int"; // Default to int
         }
         return $"{typeName} {varName} = default;";
+    }
+
+    private static bool ExpressionReferencesName(
+        ExpressionNode expression,
+        string name)
+    {
+        if (expression is ReferenceNode reference
+            && string.Equals(reference.Name, name, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return Calor.Compiler.Analysis.RecursiveAstWalker
+            .GetAllChildren(expression)
+            .OfType<ReferenceNode>()
+            .Any(reference =>
+                string.Equals(reference.Name, name, StringComparison.Ordinal));
     }
 
     public string Visit(BinaryOperationNode node)

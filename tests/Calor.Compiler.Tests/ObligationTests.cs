@@ -1538,7 +1538,7 @@ public sealed class ObligationTests
     [Fact]
     public void CSharpEmit_TypedRebind_PreservesPriorContractAndSupportsOutInitialization()
     {
-        var caughtRebind = Emit("""
+        const string caughtRebindSource = """
             §M{m001:Test}
               §RTYPE{r1:NonNegative:i32} (>= # INT:0)
               §RTYPE{r2:Negative:i32} (< # INT:0)
@@ -1549,7 +1549,8 @@ public sealed class ObligationTests
                     §B{~value:Negative} (post-dec value)
                   §CA{Exception:ex}
                     §ASSIGN value INT:-1
-            """);
+            """;
+        var caughtRebind = Emit(caughtRebindSource);
         object?[] caughtArguments = [1];
 
         var caughtException = InvokeGenerated(
@@ -1559,6 +1560,16 @@ public sealed class ObligationTests
 
         Assert.IsType<ArgumentOutOfRangeException>(caughtException);
         Assert.Equal(1, caughtArguments[0]);
+
+        var caughtModule = Parse(caughtRebindSource, out var caughtDiagnostics);
+        Assert.False(caughtDiagnostics.HasErrors);
+        var caughtTracker = new ObligationTracker();
+        new ObligationGenerator(caughtTracker).Generate(caughtModule);
+        Assert.Contains(
+            caughtTracker.Obligations,
+            obligation => obligation.Description.Contains(
+                "Assignment to 'value' must preserve refinement type 'NonNegative'",
+                StringComparison.Ordinal));
 
         var outInitialization = Emit("""
             §M{m001:Test}
@@ -1574,6 +1585,31 @@ public sealed class ObligationTests
             validation.CompilationSuccess,
             string.Join(Environment.NewLine, validation.CompilationErrors));
         Assert.DoesNotContain("__refinementSnapshot", outInitialization);
+
+        var initializedOut = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §RTYPE{r2:Negative:i32} (< # INT:0)
+              §F{f001:Set:pub}
+                  §I{Positive:value:out}
+                  §O{void}
+                  §B{~value:Positive} INT:2
+                  §TR{t1}
+                    §B{~value:Negative} (post-dec value)
+                  §CA{Exception:ex}
+                    §ASSIGN value INT:2
+            """);
+        object?[] initializedOutArguments = [null];
+
+            var initializedOutAssembly = CompileGenerated(initializedOut);
+            var initializedOutType = Assert.Single(
+                initializedOutAssembly.GetTypes(),
+                candidate => candidate.GetMethod("Set") is not null);
+            initializedOutType.GetMethod("Set")!.Invoke(
+                null,
+                initializedOutArguments);
+
+            Assert.Equal(2, initializedOutArguments[0]);
     }
 
     [Fact]
