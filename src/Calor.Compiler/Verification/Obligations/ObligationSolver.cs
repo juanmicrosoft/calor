@@ -304,6 +304,46 @@ public sealed class ObligationSolver : IDisposable
                 refinementTypes);
         }
 
+        foreach (var enumExtension in module.EnumExtensions)
+        {
+            foreach (var method in enumExtension.Methods)
+            {
+                var parameters = method.Parameters
+                    .Select(p => (p.Name, p.TypeName))
+                    .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromFunction(method);
+                var extraVars = new List<(string Name, string TypeName)>();
+                foreach (var param in method.Parameters)
+                {
+                    var baseTypeName = param.TypeName;
+                    var genericIdx = baseTypeName.IndexOf('<');
+                    if (genericIdx > 0)
+                        baseTypeName = baseTypeName[..genericIdx];
+
+                    if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
+                    {
+                        extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (indexedType.Constraint != null)
+                        {
+                            factCollector.AddFunctionWideFact(
+                                FactCollector.SubstituteSelfRefStatic(
+                                    indexedType.Constraint,
+                                    indexedType.SizeParam));
+                        }
+                    }
+                }
+
+                result[method.Id] = new FunctionInfo(
+                    parameters,
+                    method.Preconditions,
+                    method.Output?.TypeName,
+                    factCollector.ScopedFacts,
+                    extraVars,
+                    refinementTypes);
+            }
+        }
+
         foreach (var cls in module.Classes)
         {
             foreach (var constructor in cls.Constructors)

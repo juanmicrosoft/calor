@@ -1129,6 +1129,87 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void EnumExtension_EnforcesRefinedReturnBoundary()
+    {
+        const string source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §EN{e001:Color}
+                Red
+              §EEXT{x001:Color}
+                §F{f001:Bad:pub}
+                  §I{Color:self}
+                  §O{Positive}
+                  §R INT:-1
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        var csharp = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker).Emit(module);
+        var assembly = CompileGenerated(csharp);
+        var method = Assert.Single(
+            assembly.GetTypes()
+                .SelectMany(type => type.GetMethods())
+                .Where(candidate => candidate.Name == "Bad"));
+        var colorType = Assert.Single(
+            assembly.GetTypes(),
+            type => type.IsEnum && type.Name == "Color");
+        var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => method.Invoke(
+                null,
+                [Enum.ToObject(colorType, 0)]));
+
+        Assert.Contains(
+            tracker.Obligations,
+            obligation => obligation.FunctionId == "f001"
+                && obligation.Kind == ObligationKind.RefinementReturn);
+        Assert.IsType<InvalidOperationException>(invocation.InnerException);
+    }
+
+    [Fact]
+    public void SiblingRefinementBindings_DoNotElideLiveAssignmentGuard()
+    {
+        const string source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §RTYPE{r2:Negative:i32} (< # INT:0)
+              §F{f001:Bad:pub}
+                  §I{bool:flag}
+                  §O{i32}
+                  §IF{i1} flag
+                    §B{~x:Positive} INT:1
+                  §IF{i2} (== flag BOOL:false)
+                    §B{~x:Negative} INT:-1
+                    §ASSIGN x INT:1
+                    §R x
+                  §R INT:0
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        foreach (var obligation in tracker.Obligations)
+            obligation.Status = ObligationStatus.Discharged;
+        var csharp = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker)
+        {
+            ElideProvenGuards = true
+        }.Emit(module);
+
+        var exception = InvokeGenerated(csharp, "Bad", false);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
     public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""

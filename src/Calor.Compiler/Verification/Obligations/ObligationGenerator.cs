@@ -49,6 +49,13 @@ public sealed class ObligationGenerator
         {
             GenerateForFunction(func);
         }
+        foreach (var enumExtension in module.EnumExtensions)
+        {
+            foreach (var method in enumExtension.Methods)
+            {
+                GenerateForFunction(method);
+            }
+        }
 
         // Generate for methods inside classes
         foreach (var cls in module.Classes)
@@ -204,6 +211,20 @@ public sealed class ObligationGenerator
         var inlineRefinementByVariable = new Dictionary<string, ExpressionNode>(
             StringComparer.Ordinal);
         var ambiguousVariables = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var group in nodes
+                     .OfType<BindStatementNode>()
+                     .Where(bind => bind.TypeName != null
+                         && _refinementTypes.ContainsKey(bind.TypeName))
+                     .GroupBy(bind => bind.Name, StringComparer.Ordinal))
+        {
+            if (group.Select(bind => bind.TypeName)
+                .Distinct(StringComparer.Ordinal)
+                .Skip(1)
+                .Any())
+            {
+                ambiguousVariables.Add(group.Key);
+            }
+        }
 
         foreach (var parameter in parameters)
         {

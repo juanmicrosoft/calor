@@ -2236,6 +2236,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Track current function ID for contract emission
         _currentFunctionId = method.Id;
         _currentPostconditionIndex = 0;
+        ResetDeclScopes(method.Parameters);
 
         // Emit extended metadata as documentation comments
         foreach (var issue in method.Issues)
@@ -2259,11 +2260,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var returnType = method.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
+        var mappedValueReturnType = mappedReturnType;
+        var isIterator = ContainsYieldStatements(method.Body);
+        if (isIterator)
+        {
+            mappedReturnType = WrapInIEnumerable(mappedReturnType);
+        }
         if (method.IsAsync)
         {
             mappedReturnType = WrapInTask(mappedReturnType);
         }
         var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
+        var canLowerReturnChecks = CanLowerPostconditions(method.Body);
+        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        var previousYieldRefinement = _currentYieldRefinement;
+        _currentInlineReturnRefinement =
+            hasReturnRefinement && !canLowerReturnChecks && !isIterator
+                ? returnType
+                : null;
+        _currentYieldRefinement = hasReturnRefinement && isIterator
+            ? returnType
+            : null;
+        _inlineReturnGuardCounter = 0;
 
         // Find the 'self' parameter (the one with the enum type) and make it the 'this' parameter
         var selfParam = method.Parameters.FirstOrDefault(p =>
@@ -2327,12 +2346,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var check = Visit(requires);
             AppendLine(check);
         }
+        EmitRefinementParameterGuards(method.Parameters);
 
-        // If we have postconditions and a return value, we need special handling
-        // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
-        if (method.Postconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(method.Body))
+        if ((method.Postconditions.Count > 0 || hasReturnRefinement)
+            && hasReturnValue
+            && !isIterator
+            && canLowerReturnChecks)
         {
-            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine($"{mappedValueReturnType} __result__ = default;");
             AppendLine();
 
             foreach (var statement in method.Body)
@@ -2357,6 +2378,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 AppendLine(check);
             }
 
+            EmitReturnRefinementGuard(returnType, "__result__");
             AppendLine("return __result__;");
         }
         else
@@ -2387,6 +2409,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine("}");
+        _currentInlineReturnRefinement = previousInlineReturnRefinement;
+        _currentYieldRefinement = previousYieldRefinement;
     }
 
     public string Visit(RecordCreationNode node)
