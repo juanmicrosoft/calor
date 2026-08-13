@@ -61,6 +61,10 @@ public sealed class ObligationGenerator
             {
                 GenerateForMethod(method, cls);
             }
+            foreach (var operatorOverload in cls.OperatorOverloads)
+            {
+                GenerateForOperator(operatorOverload);
+            }
         }
     }
 
@@ -93,6 +97,32 @@ public sealed class ObligationGenerator
         GenerateSubtypeObligations(method.Body, method.Parameters, method.Id);
 
         GenerateIndexBoundsForBody(method.Body, method.Parameters, method.Id, method.Visibility);
+    }
+
+    private void GenerateForOperator(OperatorOverloadNode operatorOverload)
+    {
+        foreach (var param in operatorOverload.Parameters)
+        {
+            GenerateParameterObligation(
+                param,
+                operatorOverload.Id,
+                operatorOverload.Visibility);
+        }
+        GenerateReturnObligation(
+            operatorOverload.Output,
+            operatorOverload.Id);
+        GenerateProofObligations(
+            operatorOverload.Body,
+            operatorOverload.Id);
+        GenerateSubtypeObligations(
+            operatorOverload.Body,
+            operatorOverload.Parameters,
+            operatorOverload.Id);
+        GenerateIndexBoundsForBody(
+            operatorOverload.Body,
+            operatorOverload.Parameters,
+            operatorOverload.Id,
+            operatorOverload.Visibility);
     }
 
     private void GenerateForConstructor(ConstructorNode constructor)

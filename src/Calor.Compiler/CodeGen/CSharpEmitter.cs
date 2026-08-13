@@ -4222,11 +4222,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(OperatorOverloadNode node)
     {
-        // #879: operators are never verified, and they emit AFTER methods — without
-        // this, an operator inherits the last method's verified id, and a Proven result
-        // there deletes the operator's own, never-verified postcondition (the foreign-
-        // proof elision the issue described as latent; review of this fix reproduced it
-        // live). The operator's own id makes the lookup miss: guard kept, right id.
         _currentFunctionId = node.Id;
         _currentPostconditionIndex = 0;
 
@@ -4234,7 +4229,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
-        var returnType = node.Output != null ? MapTypeName(node.Output.TypeName) : "void";
+        var returnTypeName = node.Output?.TypeName ?? "void";
+        var returnType = MapTypeName(returnTypeName);
+        var hasReturnValue =
+            !returnTypeName.Equals("void", StringComparison.OrdinalIgnoreCase);
+        var hasReturnRefinement =
+            _refinementTypes.ContainsKey(returnTypeName);
+        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
+        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        _currentInlineReturnRefinement =
+            hasReturnRefinement && !canLowerReturnChecks
+                ? returnTypeName
+                : null;
+        _inlineReturnGuardCounter = 0;
         var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
         if (node.IsConversion)
@@ -4254,34 +4261,60 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             AppendLine(Visit(pre));
         }
+        EmitRefinementParameterGuards(node.Parameters);
 
-        // W1 Slice 1 T2 (review #833 M1): this fifth lowering site was ungated —
-        // nested returns silently bypassed the §S check and the check used the
-        // raw `result` identifier with no substitution.
-        if (node.Postconditions.Count > 0 && CanLowerPostconditions(node.Body))
+        if ((node.Postconditions.Count > 0 || hasReturnRefinement)
+            && hasReturnValue
+            && canLowerReturnChecks)
         {
-            // When postconditions exist, capture the result
-            // Emit body statements except for the last return
-            for (int i = 0; i < node.Body.Count; i++)
+            AppendLine($"{returnType} __result__ = default;");
+            AppendLine();
+            foreach (var statement in node.Body)
             {
-                var stmt = node.Body[i];
-                if (i == node.Body.Count - 1 && stmt is ReturnStatementNode returnStmt)
-                {
-                    var resultExpr = returnStmt.Expression?.Accept(this) ?? "default";
-                    AppendLine($"var __result__ = {resultExpr};");
-                    foreach (var post in node.Postconditions)
+                if (statement is ReturnStatementNode
                     {
-                        AppendLine(SubstituteResultIdentifier(Visit(post)));
-                    }
-                    AppendLine("return __result__;");
+                        Expression: not null
+                    } returnStmt)
+                {
+                    var mappedReturn = TryBeginLineMapping(statement);
+                    AppendLine($"__result__ = {returnStmt.Expression.Accept(this)};");
+                    EndLineMapping(mappedReturn);
                 }
                 else
                 {
-                    EmitStatement(stmt);
+                    EmitStatement(statement);
                 }
             }
 
-            if (node.Body.Count == 0 || node.Body[^1] is not ReturnStatementNode)
+            AppendLine();
+            foreach (var post in node.Postconditions)
+            {
+                AppendLine(SubstituteResultIdentifier(Visit(post)));
+            }
+            EmitReturnRefinementGuard(returnTypeName, "__result__");
+            AppendLine("return __result__;");
+        }
+        else
+        {
+            if (node.Postconditions.Count > 0 && hasReturnValue)
+            {
+                ReportPostconditionChecksNotLowered($"operator {node.OperatorToken}", node.Span);
+            }
+
+            foreach (var statement in node.Body)
+            {
+                EmitStatement(statement);
+            }
+
+            if (node.Postconditions.Count > 0
+                && !hasReturnValue
+                && BodyContainsAnyReturn(node.Body))
+            {
+                ReportPostconditionChecksNotLowered(
+                    $"operator {node.OperatorToken}",
+                    node.Span);
+            }
+            else if (!hasReturnValue)
             {
                 foreach (var post in node.Postconditions)
                 {
@@ -4289,21 +4322,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 }
             }
         }
-        else
-        {
-            if (node.Postconditions.Count > 0)
-            {
-                ReportPostconditionChecksNotLowered($"operator {node.OperatorToken}", node.Span);
-            }
-
-            foreach (var stmt in node.Body)
-            {
-                EmitStatement(stmt);
-            }
-        }
 
         Dedent();
         AppendLine("}");
+        _currentInlineReturnRefinement = previousInlineReturnRefinement;
 
         return "";
     }

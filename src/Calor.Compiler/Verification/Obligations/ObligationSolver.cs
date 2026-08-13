@@ -358,6 +358,43 @@ public sealed class ObligationSolver : IDisposable
                     extraVars,
                     refinementTypes);
             }
+
+            foreach (var operatorOverload in cls.OperatorOverloads)
+            {
+                var parameters = operatorOverload.Parameters
+                    .Select(p => (p.Name, p.TypeName))
+                    .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromStatements(operatorOverload.Body);
+                var extraVars = new List<(string Name, string TypeName)>();
+                foreach (var param in operatorOverload.Parameters)
+                {
+                    var baseTypeName = param.TypeName;
+                    var genericIdx = baseTypeName.IndexOf('<');
+                    if (genericIdx > 0)
+                        baseTypeName = baseTypeName[..genericIdx];
+
+                    if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
+                    {
+                        extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (indexedType.Constraint != null)
+                        {
+                            factCollector.AddFunctionWideFact(
+                                FactCollector.SubstituteSelfRefStatic(
+                                    indexedType.Constraint,
+                                    indexedType.SizeParam));
+                        }
+                    }
+                }
+
+                result[operatorOverload.Id] = new FunctionInfo(
+                    parameters,
+                    operatorOverload.Preconditions,
+                    operatorOverload.Output?.TypeName,
+                    factCollector.ScopedFacts,
+                    extraVars,
+                    refinementTypes);
+            }
         }
 
         return result;

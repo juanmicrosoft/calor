@@ -1042,6 +1042,45 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void OperatorOverload_EnforcesRefinedReturnBoundary()
+    {
+        const string source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §CL{c001:MyType:pub}
+                §OP{op001:implicit:pub}
+                  §I{MyType:value}
+                  §O{Positive}
+                  §R INT:-1
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        var csharp = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker).Emit(module);
+
+        Assert.Contains(
+            tracker.Obligations,
+            obligation => obligation.FunctionId == "op001"
+                && obligation.Kind == ObligationKind.RefinementReturn);
+        var assembly = CompileGenerated(csharp);
+        var type = Assert.Single(
+            assembly.GetTypes(),
+            candidate => candidate.GetMethod("op_Implicit") is not null);
+        var instance = Activator.CreateInstance(type);
+        var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => type.GetMethod("op_Implicit")!.Invoke(
+                null,
+                [instance]));
+
+        Assert.IsType<InvalidOperationException>(invocation.InnerException);
+    }
+
+    [Fact]
     public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
