@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.13.2</span>
+            <span className="font-semibold text-calor-cerulean">v0.13.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Control flow and dataflow are rebuilt on explicit semantics, and the build chain is now hermetic and supply-chain verified: Z3 binaries are pinned by hash and size, restores are locked, and every release carries an SBOM and provenance.</span>
+            <span className="text-foreground">The Trustworthy Project Model release: contracts, effects and bug patterns are checked across a whole project, and every answer says plainly when it is incomplete rather than guessing.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
