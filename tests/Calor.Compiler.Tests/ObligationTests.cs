@@ -1462,6 +1462,52 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_RefinedRefParameterMutation_CompilesAndThrows()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §F{f001:Mutate:pub}
+                  §I{i32:value:ref} | (> # INT:0)
+                  §O{void}
+                  (dec value)
+            """);
+
+        var exception = InvokeGenerated(csharp, "Mutate", 1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_ConstructorInitializerChecksBeforeForwarding()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
+              §CL{c001:AppException:pub}
+                §EXT{Exception}
+                §CTOR{ctor1:pub}
+                  §I{NonEmpty:message}
+                  §BASE
+                    §A message
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        var csharp = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker).Emit(module);
+
+        var exception = InvokeGeneratedConstructor(csharp, "");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Contains(" : base((message.Length > 0 ?", csharp);
+    }
+
+    [Fact]
     public void CSharpEmit_LambdaParameterShadowsOuterIndexedBound()
     {
         var source = """

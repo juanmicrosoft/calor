@@ -1862,15 +1862,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
 
             var resultName = $"__mutationResult{_mutationGuardCounter++}";
-            var resultType = MapTypeName(refinementConstraint.TypeName);
             var condition = EmitRefinementCondition(
                 refinementConstraint.Predicate,
                 valueName);
-            return $"((Func<{resultType}>)(() => {{ "
-                + $"var {resultName} = {operation}; "
-                + $"if (!({condition})) throw new ArgumentOutOfRangeException("
-                + $"nameof({valueName}), \"Value violates {refinementConstraint.Description}\"); "
-                + $"return {resultName}; }}))()";
+            return $"(({operation}) is var {resultName} && ({condition})"
+                + $" ? {resultName}"
+                + " : throw new ArgumentOutOfRangeException("
+                + $"nameof({valueName}), \"Value violates {refinementConstraint.Description}\"))";
         }
 
         if (node.Operator is UnaryOperator.PreIncrement
@@ -4076,8 +4074,45 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var initializerStr = "";
             if (node.Initializer != null)
             {
-                var initArgs = string.Join(", ", node.Initializer.Arguments.Select(a => a.Accept(this)));
-                initializerStr = node.Initializer.IsBaseCall ? $" : base({initArgs})" : $" : this({initArgs})";
+                var initArgs = node.Initializer.Arguments
+                    .Select(argument => argument.Accept(this))
+                    .ToArray();
+                if (initArgs.Length > 0)
+                {
+                    var entryChecks = node.Parameters
+                        .Where(parameter => parameter.Modifier != ParameterModifier.Out)
+                        .Select(parameter =>
+                        {
+                            if (!TryGetRefinementConstraint(
+                                    parameter.Name,
+                                    out var constraint)
+                                || !ShouldEmitObligationGuard(
+                                    Verification.Obligations.ObligationKind.RefinementEntry,
+                                    parameter.Span,
+                                    parameter.Name))
+                            {
+                                return null;
+                            }
+
+                            return EmitRefinementCondition(
+                                constraint.Predicate,
+                                parameter.Name);
+                        })
+                        .Where(check => check is not null)
+                        .ToArray();
+                    if (entryChecks.Length > 0)
+                    {
+                        initArgs[0] = $"({string.Join(" && ", entryChecks)}"
+                            + $" ? {initArgs[0]}"
+                            + " : throw new ArgumentOutOfRangeException("
+                            + "\"constructor parameter\", "
+                            + "\"Constructor refinement violated\"))";
+                    }
+                }
+                var renderedInitArgs = string.Join(", ", initArgs);
+                initializerStr = node.Initializer.IsBaseCall
+                    ? $" : base({renderedInitArgs})"
+                    : $" : this({renderedInitArgs})";
             }
 
             AppendLine($"{visibility} {ctorName}({parameters}){initializerStr}");
@@ -5626,8 +5661,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Operator: UnaryOperator.PreIncrement
                     or UnaryOperator.PreDecrement
                     or UnaryOperator.PostIncrement
-                    or UnaryOperator.PostDecrement,
-                Operand: ArrayAccessNode
+                    or UnaryOperator.PostDecrement
             })
         {
             return $"_ = {expr};";
