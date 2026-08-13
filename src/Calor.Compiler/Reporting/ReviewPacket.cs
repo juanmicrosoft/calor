@@ -24,9 +24,8 @@ public sealed class ReviewPacket
     public List<string> Waivers { get; init; } = [];
 
     /// <summary>
-    /// Standing honesty notes. Always includes the #782 line: refinement
-    /// types are NOT runtime-enforced — refinement obligations are
-    /// compile-time analysis only.
+    /// Standing honesty notes. Always includes the #782 refinement runtime
+    /// enforcement disclosure.
     /// </summary>
     public List<string> HonestyNotes { get; init; } = [];
 

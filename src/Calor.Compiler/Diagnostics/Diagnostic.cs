@@ -1086,10 +1086,8 @@ public static class DiagnosticCode
 
     /// <summary>
     /// Info (review-packet): the analyzed module(s) carry refinement-type
-    /// obligations, and refinement types are NOT runtime-enforced (#782):
-    /// refinement obligations are compile-time analysis only — no runtime
-    /// guard is emitted for them. Stated per the W1 kickoff honesty item
-    /// (wedge-w1-prereqs.md §1.1).
+    /// obligations whose incomplete proof outcomes remain runtime-enforced
+    /// at the relevant boundaries (#782).
     /// </summary>
     public const string ReviewPacketRefinementHonesty = "Calor1356";
 

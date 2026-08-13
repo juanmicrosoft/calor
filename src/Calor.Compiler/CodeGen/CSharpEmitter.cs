@@ -3965,6 +3965,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(AssignmentStatementNode node)
     {
+        if (node.Target is ArrayAccessNode indexedTarget
+            && TryEmitIndexedAssignment(
+                indexedTarget,
+                "=",
+                node.Value,
+                out var indexedAssignment))
+        {
+            return indexedAssignment;
+        }
+
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
         return $"{target} = {value};";
@@ -3972,8 +3982,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CompoundAssignmentStatementNode node)
     {
-        var target = node.Target.Accept(this);
-        var value = node.Value.Accept(this);
         var op = node.Operator switch
         {
             CompoundAssignmentOperator.Add => "+=",
@@ -3992,7 +4000,49 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => throw new ArgumentOutOfRangeException(nameof(node),
                 $"Unhandled compound assignment operator: {node.Operator}")
         };
+        if (node.Target is ArrayAccessNode indexedTarget
+            && TryEmitIndexedAssignment(
+                indexedTarget,
+                op,
+                node.Value,
+                out var indexedAssignment))
+        {
+            return indexedAssignment;
+        }
+
+        var target = node.Target.Accept(this);
+        var value = node.Value.Accept(this);
         return $"{target} {op} {value};";
+    }
+
+    private bool TryEmitIndexedAssignment(
+        ArrayAccessNode target,
+        string assignmentOperator,
+        ExpressionNode value,
+        out string code)
+    {
+        if (target.Array is not ReferenceNode reference
+            || !TryGetIndexedBound(reference.Name, out var logicalLength))
+        {
+            code = "";
+            return false;
+        }
+
+        var array = target.Array.Accept(this);
+        var index = target.Index.Accept(this);
+        var emittedValue = value.Accept(this);
+        var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
+        var continuationIndent = Environment.NewLine
+            + new string(' ', _indentLevel * 4);
+        code = $"var {guardedIndex} = {index};"
+            + continuationIndent
+            + $"if ({guardedIndex} < 0"
+            + $" || {guardedIndex} >= {SanitizeIdentifier(logicalLength)})"
+            + " throw new IndexOutOfRangeException("
+            + "\"Indexed-type bound violated\");"
+            + continuationIndent
+            + $"{array}[{guardedIndex}] {assignmentOperator} {emittedValue};";
+        return true;
     }
 
     public string Visit(UsingStatementNode node)

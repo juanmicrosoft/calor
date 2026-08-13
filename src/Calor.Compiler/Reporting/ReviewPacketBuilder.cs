@@ -17,10 +17,11 @@ namespace Calor.Compiler.Reporting;
 /// </summary>
 public sealed class ReviewPacketBuilder
 {
-    /// <summary>The #782 honesty line (W1 kickoff S honesty item).</summary>
+    /// <summary>The #782 refinement-enforcement disclosure.</summary>
     public const string RefinementHonestyNote =
-        "Refinement types are NOT runtime-enforced (#782): refinement obligations are "
-        + "compile-time analysis only — no runtime guard is emitted for them.";
+        "Refinement types are runtime-enforced (#782): executable guards cover "
+        + "entries, returns, assignments, and indexed boundaries; incomplete proof "
+        + "outcomes retain protection.";
 
     /// <summary>Builder options.</summary>
     public sealed record Options(
@@ -591,7 +592,7 @@ public sealed class ReviewPacketBuilder
             sb.AppendLine($"| {module.Module} | {module.File} | {module.InteropBlocks} | {module.TotalMembers} "
                 + $"| {module.InteropFraction:P1} | {(module.PermissiveEffects ? "YES (waiver)" : "no")} "
                 + $"| {(module.ContractChecksOff ? "YES (waiver)" : "no")} "
-                + $"| {(module.UsesRefinementTypes ? "yes (NOT runtime-enforced, #782)" : "no")} |");
+                + $"| {(module.UsesRefinementTypes ? "yes (runtime-enforced, #782)" : "no")} |");
         }
         sb.AppendLine();
 

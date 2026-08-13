@@ -62,7 +62,8 @@ public sealed class ObligationSolver : IDisposable
         // Declare all function parameters
         foreach (var (name, type) in info.Parameters)
         {
-            if (!translator.DeclareVariable(name, type))
+            var solverType = ResolveRefinementBaseType(type, info.RefinementTypes);
+            if (!translator.DeclareVariable(name, solverType))
             {
                 // For IndexBounds obligations, skip undeclarable parameters
                 // (e.g., indexed type names like SizedList that aren't Z3-translatable).
@@ -71,7 +72,7 @@ public sealed class ObligationSolver : IDisposable
                     continue;
 
                 obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
-                    ContractTranslator.DiagnoseUnsupportedType(type))));
+                    ContractTranslator.DiagnoseUnsupportedType(solverType))));
                 obligation.SolverDuration = sw.Elapsed;
                 return;
             }
@@ -101,7 +102,9 @@ public sealed class ObligationSolver : IDisposable
 
         // Refinement predicates use # for the constrained entry or return value.
         // so # in the predicate resolves to the parameter being checked
-        if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
+        if (obligation.Kind is ObligationKind.RefinementEntry
+                or ObligationKind.RefinementReturn
+                or ObligationKind.Subtype
             && obligation.ParameterName != null)
         {
             translator.PushSelfVariable(obligation.ParameterName);
@@ -117,7 +120,9 @@ public sealed class ObligationSolver : IDisposable
                 ?? "Obligation condition could not be translated to Z3")));
             obligation.SolverDuration = sw.Elapsed;
 
-            if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
+            if (obligation.Kind is ObligationKind.RefinementEntry
+                    or ObligationKind.RefinementReturn
+                    or ObligationKind.Subtype
                 && obligation.ParameterName != null)
                 translator.PopSelfVariable();
             return;

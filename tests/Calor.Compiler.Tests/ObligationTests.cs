@@ -1128,6 +1128,30 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_ArrayAccessAssignmentTarget_EnforcesLogicalBound()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Write:pub}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{void}
+                  §ASSIGN §IDX items index INT:42
+            """);
+
+        var exception = InvokeGenerated(
+            csharp,
+            "Write",
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
+            5,
+            7);
+
+        Assert.IsType<IndexOutOfRangeException>(exception);
+    }
+
+    [Fact]
     public void CSharpEmit_IndexedAlias_PreservesLogicalBoundAtRuntime()
     {
         var csharp = Emit("""
@@ -1150,6 +1174,99 @@ public sealed class ObligationTests
             7);
 
         Assert.IsType<IndexOutOfRangeException>(exception);
+    }
+
+    [SkippableFact]
+    public void NestedSelfSubtypeObligation_IsTranslatedRatherThanUnsupported()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
+              §F{f001:Assign:priv}
+                  §I{NonEmpty:value}
+                  §I{str:other}
+                  §O{void}
+                  §ASSIGN value other
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true,
+            ObligationPolicy = ObligationPolicy.Permissive
+        };
+        var result = Program.Compile(source, "test.calr", options);
+        Assert.False(result.HasErrors);
+
+        var subtype = Assert.Single(
+            options.ObligationResults!.Obligations,
+            obligation => obligation.Kind == ObligationKind.Subtype);
+        Assert.NotEqual(ObligationStatus.Unsupported, subtype.Status);
+    }
+
+    [Fact]
+    public void SiblingIndexedAliases_DoNotShareLogicalSizeFacts()
+    {
+        var source = """
+            §M{m001:Test}
+              §ITYPE{it1:SizedN:i32[]:n}
+              §ITYPE{it2:SizedM:i32[]:m}
+              §F{f001:Read:priv}
+                  §I{SizedN:left}
+                  §I{SizedM:right}
+                  §I{i32:n}
+                  §I{i32:m}
+                  §I{i32:index}
+                  §O{i32}
+                  §IF{i1} (> n INT:0)
+                    §B{alias:i32[]} left
+                    §B{x:i32} §IDX alias index
+                  §EL
+                    §B{alias:i32[]} right
+                    §B{y:i32} §IDX alias index
+                  §R INT:0
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var indexObligations = tracker.Obligations
+            .Where(obligation => obligation.Kind == ObligationKind.IndexBounds)
+            .ToArray();
+        Assert.Equal(2, indexObligations.Length);
+        Assert.All(
+            indexObligations,
+            obligation => Assert.Contains(
+                "runtime collection bounds",
+                obligation.Description));
+    }
+
+    [SkippableFact]
+    public void MethodNestedProof_UsesBranchFact()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Checker:pub}
+                §MT{m001:Check:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §IF{if1} (> x INT:0)
+                    §PROOF{p1} (> x INT:0)
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true,
+            ObligationPolicy = ObligationPolicy.Permissive
+        };
+        var result = Program.Compile(source, "test.calr", options);
+        Assert.False(result.HasErrors);
+
+        var proof = Assert.Single(
+            options.ObligationResults!.Obligations,
+            obligation => obligation.Kind == ObligationKind.ProofObligation);
+        Assert.Equal(ObligationStatus.Discharged, proof.Status);
     }
 
     private static string Emit(string source)

@@ -353,6 +353,7 @@ public sealed class ObligationGenerator
         // Propagate logical bounds through local aliases. Runtime emission uses
         // the same alias relationship so reads and writes preserve the modeled
         // indexed-type boundary instead of falling back to physical capacity.
+        var ambiguousAliases = new HashSet<string>(StringComparer.Ordinal);
         foreach (var bind in body
                      .SelectMany(DescendantsAndSelf)
                      .OfType<BindStatementNode>())
@@ -360,9 +361,18 @@ public sealed class ObligationGenerator
             if (bind.Initializer is ReferenceNode source
                 && indexedParams.TryGetValue(source.Name, out var indexedSource))
             {
-                indexedParams[bind.Name] = indexedSource;
+                if (indexedParams.ContainsKey(bind.Name))
+                {
+                    ambiguousAliases.Add(bind.Name);
+                }
+                else
+                {
+                    indexedParams[bind.Name] = indexedSource;
+                }
             }
         }
+        foreach (var alias in ambiguousAliases)
+            indexedParams.Remove(alias);
 
         foreach (var access in body
                      .SelectMany(DescendantsAndSelf)
