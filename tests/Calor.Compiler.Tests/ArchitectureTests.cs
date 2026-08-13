@@ -202,6 +202,17 @@ public class ArchitectureTests
             ["Analysis/Security/TaintAnalysis.cs:GetExpressionName"] =
                 ("Display-only classifier; unsupported expressions explicitly return null.",
                     "_ => null"),
+            ["Analysis/Security/TaintAnalysis.cs:EvaluateExpression"] =
+                ("Taint transfer dispatches exact call and access-path semantics; the default " +
+                    "arm universally traverses expression children.",
+                    "default:"),
+            ["Analysis/Security/TaintAnalysis.cs:TryGetAccessPath"] =
+                ("Access-path extractor; unsupported expressions explicitly report no trackable path.",
+                    "return false"),
+            ["Analysis/Security/TaintAnalysis.cs:GetResolvedCallees"] =
+                ("Universal DescendantsAndSelf traversal; the switch selects the two node kinds " +
+                    "that carry resolved function symbols, and unmatched nodes contribute no callees.",
+                    "Array.Empty<FunctionSymbol>()"),
             ["Analysis/BugPatterns/Patterns/OverflowChecker.cs:GetConstantValue"] =
                 ("Constant classifier; unsupported expressions explicitly return null.",
                     "_ => null"),

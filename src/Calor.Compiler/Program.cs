@@ -500,10 +500,10 @@ public class Program
                                 ReportOnlyVerified = !allFindings,
                                 Z3TimeoutMs = (uint)verificationTimeout
                             },
-                            TaintOptions = new Analysis.Security.TaintAnalysisOptions
-                            {
-                                MinTaintHops = allFindings ? 1 : 2
-                            }
+                            // Taint findings are exploitable regardless of propagation
+                            // distance. --all-findings controls other heuristic analyses,
+                            // not source-to-sink taint reporting.
+                            TaintOptions = new Analysis.Security.TaintAnalysisOptions()
                         } : null,
                         ExperimentalFlags = experimentalFlags != null && experimentalFlags.Length > 0
                             ? new ExperimentalFlags(experimentalFlags)
