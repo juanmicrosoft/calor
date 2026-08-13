@@ -143,6 +143,33 @@ public sealed class FactScopingTests
     }
 
     [Fact]
+    public void BranchGuard_Killed_WhenBodyMutatesVariableWithUnaryOperator()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Mutate:priv}
+                §I{i32:x}
+                §O{void}
+                §IF{if1} (> x INT:0)
+                  (dec x)
+                  §PROOF{p1} (> x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.DoesNotContain(
+            collector.ScopedFacts,
+            fact => fact.Fact is BinaryOperationNode
+            {
+                Operator: BinaryOperator.GreaterThan
+            });
+    }
+
+    [Fact]
     public void MethodBranchGuard_IsCollectedWithFunctionSemantics()
     {
         var source = """

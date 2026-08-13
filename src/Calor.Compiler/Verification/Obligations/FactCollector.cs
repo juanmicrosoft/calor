@@ -243,6 +243,16 @@ public sealed class FactCollector
                 case CompoundAssignmentStatementNode { Target: ReferenceNode compoundTarget }:
                     names.Add(compoundTarget.Name);
                     break;
+                case UnaryOperationNode
+                {
+                    Operator: UnaryOperator.PreIncrement
+                        or UnaryOperator.PreDecrement
+                        or UnaryOperator.PostIncrement
+                        or UnaryOperator.PostDecrement,
+                    Operand: ReferenceNode unaryTarget
+                }:
+                    names.Add(unaryTarget.Name);
+                    break;
                 case ForStatementNode forStmt:
                     names.Add(forStmt.VariableName);
                     break;
