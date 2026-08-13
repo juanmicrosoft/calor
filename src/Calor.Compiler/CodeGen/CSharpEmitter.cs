@@ -127,10 +127,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         new BinaryOperationNode(
                             p.Span,
                             BinaryOperator.And,
-                            refinementType!.Predicate,
+                            GetEffectiveRefinementPredicate(refinementType!),
                             inlinePredicate),
-                        $"refinement type '{refinementType.Name}' and inline refinement for parameter '{p.Name}'",
-                        refinementType.BaseTypeName);
+                        $"refinement type '{refinementType!.Name}' and inline refinement for parameter '{p.Name}'",
+                        ResolveRefinementBaseType(refinementType));
                 }
                 else if (p.InlineRefinement?.Predicate is { } inlineOnlyPredicate)
                 {
@@ -142,9 +142,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 else if (hasNamedRefinement)
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
-                        refinementType!.Predicate,
-                        $"refinement type '{refinementType.Name}'",
-                        refinementType.BaseTypeName);
+                        GetEffectiveRefinementPredicate(refinementType!),
+                        $"refinement type '{refinementType!.Name}'",
+                        ResolveRefinementBaseType(refinementType));
                 }
 
                 var indexedTypeName = p.TypeName;
@@ -1228,7 +1228,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var resultName = $"__refinedReturn{_inlineReturnGuardCounter++}";
             var condition = EmitRefinementCondition(
-                refinementType.Predicate,
+                GetEffectiveRefinementPredicate(refinementType),
                 resultName);
             var continuationIndent = Environment.NewLine
                 + new string(' ', _indentLevel * 4);
@@ -1777,9 +1777,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 && _refinementTypes.TryGetValue(node.TypeName, out var reboundRefinement))
             {
                 reboundConstraint = new RefinementConstraint(
-                    reboundRefinement.Predicate,
+                    GetEffectiveRefinementPredicate(reboundRefinement),
                     $"refinement type '{reboundRefinement.Name}'",
-                    reboundRefinement.BaseTypeName);
+                    ResolveRefinementBaseType(reboundRefinement));
             }
             var reboundIndexedBound = GetIndexedBoundForBinding(node);
             // Emit the initializer against the old variable contract. It may
@@ -1838,9 +1838,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             DeclareRefinementInScope(
                 varName,
                 new RefinementConstraint(
-                    refinementType.Predicate,
+                    GetEffectiveRefinementPredicate(refinementType),
                     $"refinement type '{refinementType.Name}'",
-                    refinementType.BaseTypeName));
+                    ResolveRefinementBaseType(refinementType)));
         }
         else
         {
@@ -2073,7 +2073,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             var resultName = $"__refinedYield{_inlineReturnGuardCounter++}";
             var condition = EmitRefinementCondition(
-                refinementType.Predicate,
+                GetEffectiveRefinementPredicate(refinementType),
                 resultName);
             var continuationIndent = Environment.NewLine
                 + new string(' ', _indentLevel * 4);
@@ -3686,7 +3686,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return;
         }
 
-        var condition = EmitRefinementCondition(refinementType.Predicate, resultName);
+        var condition = EmitRefinementCondition(
+            GetEffectiveRefinementPredicate(refinementType),
+            resultName);
         AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
             $"\"Return value violates refinement type '{refinementType.Name}'\");");
     }
@@ -3702,11 +3704,47 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private string EmitRefinementCondition(ExpressionNode predicate, string valueName)
     {
+        var sanitizedValueName = SanitizeIdentifier(valueName);
+        if (HasQuantifierBindingName(predicate, sanitizedValueName))
+            return "false";
+
         var condition = predicate.Accept(this);
+        if (condition.Contains("STATIC ONLY:", StringComparison.Ordinal))
+            return "false";
+
         return System.Text.RegularExpressions.Regex.Replace(
             condition,
             @"\b__self__\b",
-            SanitizeIdentifier(valueName));
+            sanitizedValueName);
+    }
+
+    private static bool HasQuantifierBindingName(
+        ExpressionNode predicate,
+        string valueName)
+    {
+        if (predicate is ForallExpressionNode forall
+            && forall.BoundVariables.Any(variable =>
+                string.Equals(
+                    SanitizeIdentifier(variable.Name),
+                    valueName,
+                    StringComparison.Ordinal)))
+        {
+            return true;
+        }
+        if (predicate is ExistsExpressionNode exists
+            && exists.BoundVariables.Any(variable =>
+                string.Equals(
+                    SanitizeIdentifier(variable.Name),
+                    valueName,
+                    StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return Calor.Compiler.Analysis.RecursiveAstWalker
+            .GetAllChildren(predicate)
+            .OfType<ExpressionNode>()
+            .Any(child => HasQuantifierBindingName(child, valueName));
     }
 
     private static readonly Dictionary<string, string> CilNameToOperator = new()
@@ -4821,9 +4859,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 DeclareRefinementInScope(
                     name,
                     new RefinementConstraint(
-                        refinementType.Predicate,
+                        GetEffectiveRefinementPredicate(refinementType),
                         $"refinement type '{refinementType.Name}'",
-                        refinementType.BaseTypeName));
+                        ResolveRefinementBaseType(refinementType)));
             }
 
             var indexedTypeName = parameter.TypeName;
@@ -5426,11 +5464,55 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else if (_refinementTypes.TryGetValue(lookupName, out var refinementType))
         {
-            baseTypeName = refinementType.BaseTypeName;
+            baseTypeName = ResolveRefinementBaseType(refinementType);
         }
 
         // Use the centralized TypeMapper for bidirectional type mapping
         return TypeMapper.CalorToCSharp(baseTypeName);
+    }
+
+    private string ResolveRefinementBaseType(RefinementTypeNode refinementType)
+    {
+        var baseTypeName = refinementType.BaseTypeName;
+        var visited = new HashSet<string>(StringComparer.Ordinal)
+        {
+            refinementType.Name
+        };
+        while (_refinementTypes.TryGetValue(baseTypeName, out var baseRefinement)
+               && visited.Add(baseRefinement.Name))
+        {
+            baseTypeName = baseRefinement.BaseTypeName;
+        }
+        return baseTypeName;
+    }
+
+    private ExpressionNode GetEffectiveRefinementPredicate(
+        RefinementTypeNode refinementType)
+    {
+        var predicates = new Stack<ExpressionNode>();
+        var current = refinementType;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (visited.Add(current.Name))
+        {
+            predicates.Push(current.Predicate);
+            if (!_refinementTypes.TryGetValue(
+                    current.BaseTypeName,
+                    out current))
+            {
+                break;
+            }
+        }
+
+        var effective = predicates.Pop();
+        while (predicates.Count > 0)
+        {
+            effective = new BinaryOperationNode(
+                refinementType.Span,
+                BinaryOperator.And,
+                effective,
+                predicates.Pop());
+        }
+        return effective;
     }
 
     /// <summary>

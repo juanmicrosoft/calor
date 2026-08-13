@@ -972,6 +972,135 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void NestedNamedRefinements_EraseAndEnforceAllInheritedPredicates()
+    {
+        const string source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §RTYPE{r2:Small:Positive} (< # INT:10)
+              §F{f001:Use:pub}
+                  §I{Small:value}
+                  §O{i32}
+                  §R value
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var entry = Assert.Single(
+            tracker.Obligations,
+            obligation => obligation.Kind == ObligationKind.RefinementEntry);
+        Assert.IsType<BinaryOperationNode>(entry.Condition);
+
+        var csharp = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker).Emit(module);
+        var exception = InvokeGenerated(csharp, "Use", -1);
+
+        Assert.Contains("int Use(int value)", csharp);
+        Assert.Contains("value > 0 && value < 10", csharp);
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [SkippableFact]
+    public void NestedNamedRefinements_ResolveToConcreteSolverType()
+    {
+        Skip.IfNot(
+            Verification.Z3.Z3ContextFactory.IsAvailable,
+            "Z3 not available");
+        const string source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §RTYPE{r2:Small:Positive} (< # INT:10)
+              §F{f001:Use:priv}
+                  §I{Small:value}
+                  §O{void}
+                  §Q (> value INT:0)
+                  §Q (< value INT:10)
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true
+        };
+
+        Program.Compile(source, "test.calr", options);
+
+        var entry = Assert.Single(
+            options.ObligationResults!.Obligations,
+            obligation => obligation.Kind == ObligationKind.RefinementEntry);
+        Assert.Equal(ObligationStatus.Discharged, entry.Status);
+    }
+
+    [Fact]
+    public void UnboundedInheritedQuantifier_FailsClosedAtRuntime()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:NonNegative:i32} (forall ((i i32)) (>= # INT:0))
+              §RTYPE{r2:Small:NonNegative} (< # INT:10)
+              §F{f001:Use:pub}
+                  §I{Small:value}
+                  §O{i32}
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "Use", -1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.DoesNotContain("true /* STATIC ONLY:", csharp);
+    }
+
+    [Fact]
+    public void SubstituteSelfRef_RecursesThroughConditionalExpressions()
+    {
+        var span = new TextSpan(0, 0, 1, 1);
+        var predicate = new ConditionalExpressionNode(
+            span,
+            new BoolLiteralNode(span, true),
+            new BinaryOperationNode(
+                span,
+                BinaryOperator.GreaterThan,
+                new SelfRefNode(span),
+                new IntLiteralNode(span, 0)),
+            new BoolLiteralNode(span, false));
+
+        var substituted = FactCollector.SubstituteSelfRefStatic(
+            predicate,
+            "value");
+
+        Assert.DoesNotContain(
+            Calor.Compiler.Analysis.RecursiveAstWalker
+                .GetAllChildren(substituted),
+            node => node is SelfRefNode);
+        var conditional = Assert.IsType<ConditionalExpressionNode>(substituted);
+        var comparison = Assert.IsType<BinaryOperationNode>(
+            conditional.WhenTrue);
+        Assert.Equal(
+            "value",
+            Assert.IsType<ReferenceNode>(comparison.Left).Name);
+
+        var unsupported = FactCollector.SubstituteSelfRefStatic(
+            new SomeExpressionNode(span, new SelfRefNode(span)),
+            "value");
+        Assert.False(Assert.IsType<BoolLiteralNode>(unsupported).Value);
+
+        var captured = FactCollector.SubstituteSelfRefStatic(
+            new ExistsExpressionNode(
+                span,
+                [new QuantifierVariableNode(span, "value", "i32")],
+                new BinaryOperationNode(
+                    span,
+                    BinaryOperator.Equal,
+                    new SelfRefNode(span),
+                    new ReferenceNode(span, "value"))),
+            "value");
+        Assert.False(Assert.IsType<BoolLiteralNode>(captured).Value);
+    }
+
+    [Fact]
     public void RefinementElision_RequiresAllConstraintsAndRuntimeAssumptions()
     {
         const string combinedSource = """

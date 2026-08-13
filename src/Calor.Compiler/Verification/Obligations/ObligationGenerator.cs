@@ -166,7 +166,7 @@ public sealed class ObligationGenerator
             ObligationKind.RefinementReturn,
             functionId,
             $"Return value must satisfy refinement type '{refinementType.Name}'",
-            refinementType.Predicate,
+            GetEffectiveRefinementPredicate(refinementType),
             output.Span);
         obligation.ParameterName = "result";
     }
@@ -253,7 +253,7 @@ public sealed class ObligationGenerator
                 refinementByVariable[bind.Name] = refinementType;
 
             var condition = FactCollector.SubstituteSelfRefStatic(
-                refinementType.Predicate,
+                GetEffectiveRefinementPredicate(refinementType),
                 bind.Initializer
                     ?? new ReferenceNode(bind.Span, bind.Name));
             var obligation = _tracker.Add(
@@ -380,7 +380,7 @@ public sealed class ObligationGenerator
         => AddAssignmentSubtypeObligation(
             functionId,
             variableName,
-            refinementType.Predicate,
+            GetEffectiveRefinementPredicate(refinementType),
             $"refinement type '{refinementType.Name}'",
             assignedValue,
             span);
@@ -475,8 +475,10 @@ public sealed class ObligationGenerator
                     ? $"Out parameter '{param.Name}' must satisfy refinement type '{rtype.Name}' on assignment"
                     : $"Parameter '{param.Name}' must satisfy refinement type '{rtype.Name}'",
                 isOut
-                    ? FactCollector.SubstituteSelfRefStatic(rtype.Predicate, param.Name)
-                    : rtype.Predicate,
+                    ? FactCollector.SubstituteSelfRefStatic(
+                        GetEffectiveRefinementPredicate(rtype),
+                        param.Name)
+                    : GetEffectiveRefinementPredicate(rtype),
                 param.Span);
             obl.ParameterName = param.Name;
 
@@ -486,6 +488,35 @@ public sealed class ObligationGenerator
                 obl.SuggestedFix = $"Add runtime guard for '{rtype.Name}' constraint on '{param.Name}'";
             }
         }
+    }
+
+    private ExpressionNode GetEffectiveRefinementPredicate(
+        RefinementTypeNode refinementType)
+    {
+        var predicates = new Stack<ExpressionNode>();
+        var current = refinementType;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (visited.Add(current.Name))
+        {
+            predicates.Push(current.Predicate);
+            if (!_refinementTypes.TryGetValue(
+                    current.BaseTypeName,
+                    out current))
+            {
+                break;
+            }
+        }
+
+        var effective = predicates.Pop();
+        while (predicates.Count > 0)
+        {
+            effective = new BinaryOperationNode(
+                refinementType.Span,
+                BinaryOperator.And,
+                effective,
+                predicates.Pop());
+        }
+        return effective;
     }
 
     /// <summary>

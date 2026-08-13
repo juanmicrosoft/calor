@@ -450,8 +450,19 @@ public sealed class ObligationSolver : IDisposable
 
     private static string ResolveRefinementBaseType(
         string typeName,
-        IReadOnlyDictionary<string, string> refinementTypes) =>
-        refinementTypes.TryGetValue(typeName, out var baseType) ? baseType : typeName;
+        IReadOnlyDictionary<string, string> refinementTypes)
+    {
+        var resolvedType = typeName;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (visited.Add(resolvedType)
+               && refinementTypes.TryGetValue(
+                   resolvedType,
+                   out var baseType))
+        {
+            resolvedType = baseType;
+        }
+        return resolvedType;
+    }
 
     public void Dispose()
     {

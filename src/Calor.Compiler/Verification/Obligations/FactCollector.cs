@@ -280,7 +280,9 @@ public sealed class FactCollector
     /// Returns a new expression tree with substitutions applied.
     /// </summary>
     public static ExpressionNode SubstituteSelfRefStatic(ExpressionNode expr, string variableName)
-        => SubstituteSelfRef(expr, new ReferenceNode(expr.Span, variableName));
+        => SubstituteSelfRefStatic(
+            expr,
+            new ReferenceNode(expr.Span, variableName));
 
     /// <summary>
     /// Substitutes SelfRefNode (#) with an arbitrary expression.
@@ -288,7 +290,12 @@ public sealed class FactCollector
     public static ExpressionNode SubstituteSelfRefStatic(
         ExpressionNode expr,
         ExpressionNode replacement)
-        => SubstituteSelfRef(expr, replacement);
+    {
+        var substituted = SubstituteSelfRef(expr, replacement);
+        return ContainsSelfRef(substituted)
+            ? new BoolLiteralNode(expr.Span, false)
+            : substituted;
+    }
 
     private static ExpressionNode SubstituteSelfRef(
         ExpressionNode expr,
@@ -316,6 +323,161 @@ public sealed class FactCollector
             return unOp;
         }
 
+        if (expr is ConditionalExpressionNode conditional)
+        {
+            var condition = SubstituteSelfRef(
+                conditional.Condition,
+                replacement);
+            var whenTrue = SubstituteSelfRef(
+                conditional.WhenTrue,
+                replacement);
+            var whenFalse = SubstituteSelfRef(
+                conditional.WhenFalse,
+                replacement);
+            return ReferenceEquals(condition, conditional.Condition)
+                    && ReferenceEquals(whenTrue, conditional.WhenTrue)
+                    && ReferenceEquals(whenFalse, conditional.WhenFalse)
+                ? conditional
+                : new ConditionalExpressionNode(
+                    conditional.Span,
+                    condition,
+                    whenTrue,
+                    whenFalse);
+        }
+
+        if (expr is ArrayAccessNode arrayAccess)
+        {
+            var array = SubstituteSelfRef(arrayAccess.Array, replacement);
+            var index = SubstituteSelfRef(arrayAccess.Index, replacement);
+            return ReferenceEquals(array, arrayAccess.Array)
+                    && ReferenceEquals(index, arrayAccess.Index)
+                ? arrayAccess
+                : new ArrayAccessNode(arrayAccess.Span, array, index);
+        }
+
+        if (expr is ArrayLengthNode arrayLength)
+        {
+            var array = SubstituteSelfRef(arrayLength.Array, replacement);
+            return ReferenceEquals(array, arrayLength.Array)
+                ? arrayLength
+                : new ArrayLengthNode(arrayLength.Span, array);
+        }
+
+        if (expr is FieldAccessNode fieldAccess)
+        {
+            var target = SubstituteSelfRef(fieldAccess.Target, replacement);
+            return ReferenceEquals(target, fieldAccess.Target)
+                ? fieldAccess
+                : new FieldAccessNode(
+                    fieldAccess.Span,
+                    target,
+                    fieldAccess.FieldName);
+        }
+
+        if (expr is StringOperationNode stringOperation)
+        {
+            var arguments = stringOperation.Arguments
+                .Select(argument => SubstituteSelfRef(argument, replacement))
+                .ToArray();
+            return arguments
+                .Zip(
+                    stringOperation.Arguments,
+                    ReferenceEquals)
+                .All(unchanged => unchanged)
+                ? stringOperation
+                : new StringOperationNode(
+                    stringOperation.Span,
+                    stringOperation.Operation,
+                    arguments,
+                    stringOperation.ComparisonMode);
+        }
+
+        if (expr is ImplicationExpressionNode implication)
+        {
+            var antecedent = SubstituteSelfRef(
+                implication.Antecedent,
+                replacement);
+            var consequent = SubstituteSelfRef(
+                implication.Consequent,
+                replacement);
+            return ReferenceEquals(antecedent, implication.Antecedent)
+                    && ReferenceEquals(consequent, implication.Consequent)
+                ? implication
+                : new ImplicationExpressionNode(
+                    implication.Span,
+                    antecedent,
+                    consequent);
+        }
+
+        if (expr is ForallExpressionNode forall)
+        {
+            if (ReplacementCouldBeCaptured(
+                    replacement,
+                    forall.BoundVariables))
+            {
+                return forall;
+            }
+            var body = SubstituteSelfRef(forall.Body, replacement);
+            return ReferenceEquals(body, forall.Body)
+                ? forall
+                : new ForallExpressionNode(
+                    forall.Span,
+                    forall.BoundVariables,
+                    body);
+        }
+
+        if (expr is ExistsExpressionNode exists)
+        {
+            if (ReplacementCouldBeCaptured(
+                    replacement,
+                    exists.BoundVariables))
+            {
+                return exists;
+            }
+            var body = SubstituteSelfRef(exists.Body, replacement);
+            return ReferenceEquals(body, exists.Body)
+                ? exists
+                : new ExistsExpressionNode(
+                    exists.Span,
+                    exists.BoundVariables,
+                    body);
+        }
+
         return expr;
+    }
+
+    private static bool ReplacementCouldBeCaptured(
+        ExpressionNode replacement,
+        IReadOnlyList<QuantifierVariableNode> boundVariables)
+    {
+        var boundNames = boundVariables
+            .Select(variable => variable.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        return EnumerateDescendantsAndSelf(replacement)
+            .OfType<ReferenceNode>()
+            .Any(reference => boundNames.Contains(reference.Name));
+    }
+
+    private static bool ContainsSelfRef(ExpressionNode expression)
+    {
+        if (expression is SelfRefNode)
+            return true;
+
+        return Calor.Compiler.Analysis.RecursiveAstWalker
+            .GetAllChildren(expression)
+            .OfType<ExpressionNode>()
+            .Any(ContainsSelfRef);
+    }
+
+    private static IEnumerable<AstNode> EnumerateDescendantsAndSelf(
+        AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker
+                     .GetAllChildren(node))
+        {
+            foreach (var descendant in EnumerateDescendantsAndSelf(child))
+                yield return descendant;
+        }
     }
 }
