@@ -79,15 +79,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // Starts with a base scope so isolated statement/expression emission (tests, or any
     // path not entered through a function/method ResetDeclScopes) always has a live scope.
     private readonly List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
-    private readonly List<Dictionary<string, string>> _refinementDeclScopes =
+    private sealed record RefinementConstraint(ExpressionNode Predicate, string Description);
+    private readonly List<Dictionary<string, RefinementConstraint?>> _refinementDeclScopes =
         new() { new(StringComparer.Ordinal) };
+    private readonly List<Dictionary<string, string?>> _indexedBoundScopes =
+        new() { new(StringComparer.Ordinal) };
+    private int _indexGuardCounter;
 
     private void ResetDeclScopes(IReadOnlyList<ParameterNode>? parameters = null)
     {
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         _refinementDeclScopes.Clear();
-        _refinementDeclScopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        _refinementDeclScopes.Add(
+            new Dictionary<string, RefinementConstraint?>(StringComparer.Ordinal));
+        _indexedBoundScopes.Clear();
+        _indexedBoundScopes.Add(new Dictionary<string, string?>(StringComparer.Ordinal));
+        _indexGuardCounter = 0;
         if (parameters != null)
         {
             // Parameters live in the base scope so a mutable §B{~param} rebind is a
@@ -98,9 +106,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 var name = SanitizeIdentifier(p.Name);
                 _declScopes[0].Add(name);
-                if (_refinementTypes.ContainsKey(p.TypeName))
+                if (p.InlineRefinement?.Predicate is { } inlinePredicate)
                 {
-                    _refinementDeclScopes[0][name] = p.TypeName;
+                    _refinementDeclScopes[0][name] = new RefinementConstraint(
+                        inlinePredicate,
+                        $"inline refinement for parameter '{p.Name}'");
+                }
+                else if (_refinementTypes.TryGetValue(p.TypeName, out var refinementType))
+                {
+                    _refinementDeclScopes[0][name] = new RefinementConstraint(
+                        refinementType.Predicate,
+                        $"refinement type '{refinementType.Name}'");
+                }
+
+                var indexedTypeName = p.TypeName;
+                var genericIndex = indexedTypeName.IndexOf('<');
+                if (genericIndex > 0)
+                    indexedTypeName = indexedTypeName[..genericIndex];
+                if (_indexedTypes.TryGetValue(indexedTypeName, out var indexedType))
+                {
+                    _indexedBoundScopes[0][name] = indexedType.SizeParam;
                 }
             }
         }
@@ -109,7 +134,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private void PushDeclScope()
     {
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
-        _refinementDeclScopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        _refinementDeclScopes.Add(
+            new Dictionary<string, RefinementConstraint?>(StringComparer.Ordinal));
+        _indexedBoundScopes.Add(new Dictionary<string, string?>(StringComparer.Ordinal));
     }
 
     private void PopDeclScope()
@@ -122,6 +149,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             _declScopes.RemoveAt(_declScopes.Count - 1);
             _refinementDeclScopes.RemoveAt(_refinementDeclScopes.Count - 1);
+            _indexedBoundScopes.RemoveAt(_indexedBoundScopes.Count - 1);
         }
     }
 
@@ -151,25 +179,101 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _declScopes[^1].Add(name);
     }
 
-    private void DeclareRefinementInScope(string name, string typeName)
+    private void DeclareRefinementInScope(string name, RefinementConstraint? constraint)
     {
         System.Diagnostics.Debug.Assert(
             _refinementDeclScopes.Count > 0,
             "DeclareRefinementInScope with no active scope");
-        _refinementDeclScopes[^1][SanitizeIdentifier(name)] = typeName;
+        _refinementDeclScopes[^1][SanitizeIdentifier(name)] = constraint;
     }
 
-    private bool TryGetRefinementType(string name, out string typeName)
+    private void SetRefinementForExistingVariable(
+        string name,
+        RefinementConstraint? constraint)
     {
         var sanitizedName = SanitizeIdentifier(name);
         for (var i = _refinementDeclScopes.Count - 1; i >= 0; i--)
         {
-            if (_refinementDeclScopes[i].TryGetValue(sanitizedName, out typeName!))
-                return true;
+            if (_declScopes[i].Contains(sanitizedName))
+            {
+                _refinementDeclScopes[i][sanitizedName] = constraint;
+                return;
+            }
         }
 
-        typeName = "";
+        DeclareRefinementInScope(sanitizedName, constraint);
+    }
+
+    private bool TryGetRefinementConstraint(
+        string name,
+        out RefinementConstraint constraint)
+    {
+        var sanitizedName = SanitizeIdentifier(name);
+        for (var i = _refinementDeclScopes.Count - 1; i >= 0; i--)
+        {
+            if (_refinementDeclScopes[i].TryGetValue(sanitizedName, out var candidate))
+            {
+                constraint = candidate!;
+                return candidate is not null;
+            }
+        }
+
+        constraint = null!;
         return false;
+    }
+
+    private void DeclareIndexedBoundInScope(string name, string? sizeParameter)
+        => _indexedBoundScopes[^1][SanitizeIdentifier(name)] = sizeParameter;
+
+    private void SetIndexedBoundForExistingVariable(
+        string name,
+        string? sizeParameter)
+    {
+        var sanitizedName = SanitizeIdentifier(name);
+        for (var i = _indexedBoundScopes.Count - 1; i >= 0; i--)
+        {
+            if (_declScopes[i].Contains(sanitizedName))
+            {
+                _indexedBoundScopes[i][sanitizedName] = sizeParameter;
+                return;
+            }
+        }
+
+        DeclareIndexedBoundInScope(sanitizedName, sizeParameter);
+    }
+
+    private bool TryGetIndexedBound(string name, out string sizeParameter)
+    {
+        var sanitizedName = SanitizeIdentifier(name);
+        for (var i = _indexedBoundScopes.Count - 1; i >= 0; i--)
+        {
+            if (_indexedBoundScopes[i].TryGetValue(sanitizedName, out var candidate))
+            {
+                sizeParameter = candidate!;
+                return candidate is not null;
+            }
+        }
+
+        sizeParameter = "";
+        return false;
+    }
+
+    private string? GetIndexedBoundForBinding(BindStatementNode node)
+    {
+        if (node.TypeName != null)
+        {
+            var typeName = node.TypeName;
+            var genericIndex = typeName.IndexOf('<');
+            if (genericIndex > 0)
+                typeName = typeName[..genericIndex];
+            if (_indexedTypes.TryGetValue(typeName, out var indexedType))
+                return indexedType.SizeParam;
+        }
+
+        return node.Initializer is ReferenceNode reference
+            && TryGetIndexedBound(reference.Name, out var aliasedBound)
+            ? aliasedBound
+            : null;
     }
 
 
@@ -180,6 +284,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     // Indexed type name → base type for erasure (populated during Visit(ModuleNode))
     private readonly Dictionary<string, string> _indexedTypeErasure = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IndexedTypeNode> _indexedTypes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RefinementTypeNode> _refinementTypes =
         new(StringComparer.Ordinal);
 
@@ -353,33 +458,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (!skipEmptyLine || !string.IsNullOrEmpty(code))
         {
             AppendLine(code);
-            if (statement is BindStatementNode
-                {
-                    TypeName: not null,
-                    Initializer: not null
-                } bind
-                && _refinementTypes.ContainsKey(bind.TypeName))
+            if (statement is BindStatementNode { Initializer: not null } bind
+                && TryGetRefinementConstraint(bind.Name, out var bindConstraint))
             {
-                EmitRefinementValueGuard(bind.TypeName, SanitizeIdentifier(bind.Name));
+                EmitRefinementValueGuard(
+                    bindConstraint,
+                    SanitizeIdentifier(bind.Name));
             }
             else if (statement is AssignmentStatementNode
                 {
                     Target: ReferenceNode target
                 }
-                && TryGetRefinementType(target.Name, out var assignmentRefinement))
+                && TryGetRefinementConstraint(target.Name, out var assignmentConstraint))
             {
                 EmitRefinementValueGuard(
-                    assignmentRefinement,
+                    assignmentConstraint,
                     SanitizeIdentifier(target.Name));
             }
             else if (statement is CompoundAssignmentStatementNode
                 {
                     Target: ReferenceNode compoundTarget
                 }
-                && TryGetRefinementType(compoundTarget.Name, out var compoundRefinement))
+                && TryGetRefinementConstraint(
+                    compoundTarget.Name,
+                    out var compoundConstraint))
             {
                 EmitRefinementValueGuard(
-                    compoundRefinement,
+                    compoundConstraint,
                     SanitizeIdentifier(compoundTarget.Name));
             }
         }
@@ -454,6 +559,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var itype in node.IndexedTypes)
         {
             _indexedTypeErasure[itype.Name] = itype.BaseTypeName;
+            _indexedTypes[itype.Name] = itype;
         }
         foreach (var refinementType in node.RefinementTypes)
         {
@@ -734,6 +840,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
+        var mappedValueReturnType = mappedReturnType;
         // Wrap in IEnumerable if body contains yield statements
         var isIterator = ContainsYieldStatements(node.Body);
         if (isIterator)
@@ -822,7 +929,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             && hasReturnValue
             && canLowerReturnChecks)
         {
-            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine($"{mappedValueReturnType} __result__ = default;");
             AppendLine();
 
             // Emit body statements, transforming return statements
@@ -1018,9 +1125,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 out var refinementType))
         {
             var resultName = $"__refinedReturn{_inlineReturnGuardCounter++}";
-            var substituted = Verification.Obligations.FactCollector
-                .SubstituteSelfRefStatic(refinementType.Predicate, resultName);
-            var condition = substituted.Accept(this);
+            var condition = EmitRefinementCondition(
+                refinementType.Predicate,
+                resultName);
             var continuationIndent = Environment.NewLine
                 + new string(' ', _indentLevel * 4);
             return $"var {resultName} = {expr};"
@@ -1561,9 +1668,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // scopes create new shadowing variables, while mutable binds reassign.
         if (node.IsMutable && IsVarDeclaredInScope(varName))
         {
-            if (node.TypeName != null && _refinementTypes.ContainsKey(node.TypeName))
+            if (node.TypeName != null
+                && _refinementTypes.TryGetValue(node.TypeName, out var reboundRefinement))
             {
-                DeclareRefinementInScope(varName, node.TypeName);
+                SetRefinementForExistingVariable(
+                    varName,
+                    new RefinementConstraint(
+                        reboundRefinement.Predicate,
+                        $"refinement type '{reboundRefinement.Name}'"));
+            }
+            var reboundIndexedBound = GetIndexedBoundForBinding(node);
+            if (reboundIndexedBound != null)
+            {
+                SetIndexedBoundForExistingVariable(varName, reboundIndexedBound);
             }
 
             // Mutable rebind - emit assignment only
@@ -1576,10 +1693,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         DeclareVarInScope(varName);
-        if (node.TypeName != null && _refinementTypes.ContainsKey(node.TypeName))
+        if (node.TypeName != null
+            && _refinementTypes.TryGetValue(node.TypeName, out var refinementType))
         {
-            DeclareRefinementInScope(varName, node.TypeName);
+            DeclareRefinementInScope(
+                varName,
+                new RefinementConstraint(
+                    refinementType.Predicate,
+                    $"refinement type '{refinementType.Name}'"));
         }
+        else
+        {
+            DeclareRefinementInScope(varName, null);
+        }
+        DeclareIndexedBoundInScope(varName, GetIndexedBoundForBinding(node));
 
         if (node.Initializer != null)
         {
@@ -2355,6 +2482,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var array = node.Array.Accept(this);
         var index = node.Index.Accept(this);
+        if (node.Array is ReferenceNode reference
+            && TryGetIndexedBound(reference.Name, out var logicalLength))
+        {
+            var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
+            return $"(({index}) is var {guardedIndex}"
+                + $" && {guardedIndex} >= 0"
+                + $" && {guardedIndex} < {SanitizeIdentifier(logicalLength)}"
+                + $" ? {array}[{guardedIndex}]"
+                + " : throw new IndexOutOfRangeException("
+                + "\"Indexed-type bound violated\"))";
+        }
+
         return $"{array}[{index}]";
     }
 
@@ -2507,6 +2646,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var collectionName = SanitizeIdentifier(node.CollectionName);
         var index = node.Index.Accept(this);
         var value = node.Value.Accept(this);
+        if (TryGetIndexedBound(collectionName, out var logicalLength))
+        {
+            var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
+            var continuationIndent = Environment.NewLine
+                + new string(' ', _indentLevel * 4);
+            return $"var {guardedIndex} = {index};"
+                + continuationIndent
+                + $"if ({guardedIndex} < 0"
+                + $" || {guardedIndex} >= {SanitizeIdentifier(logicalLength)})"
+                + " throw new IndexOutOfRangeException("
+                + "\"Indexed-type bound violated\");"
+                + continuationIndent
+                + $"{collectionName}[{guardedIndex}] = {value};";
+        }
+
         return $"{collectionName}[{index}] = {value};";
     }
 
@@ -2985,6 +3139,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var returnType = node.Output?.TypeName ?? "void";
         var mappedReturnType = MapTypeName(returnType);
+        var mappedValueReturnType = mappedReturnType;
         // Wrap in IEnumerable if body contains yield statements
         if (ContainsYieldStatements(node.Body))
         {
@@ -3081,7 +3236,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             && hasReturnValue
             && canLowerReturnChecks)
         {
-            AppendLine($"{mappedReturnType} __result__ = default;");
+            AppendLine($"{mappedValueReturnType} __result__ = default;");
             AppendLine();
 
             foreach (var statement in node.Body)
@@ -3170,6 +3325,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         foreach (var parameter in parameters)
         {
+            // An out parameter has no readable entry value. Its refinement is
+            // enforced after each assignment through refinement-scope tracking.
+            if (parameter.Modifier == ParameterModifier.Out)
+                continue;
+
             var predicate = parameter.InlineRefinement?.Predicate;
             var description = $"inline refinement for parameter '{parameter.Name}'";
             if (predicate is null
@@ -3182,9 +3342,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (predicate is null)
                 continue;
 
-            var substituted = Verification.Obligations.FactCollector
-                .SubstituteSelfRefStatic(predicate, parameter.Name);
-            var condition = substituted.Accept(this);
+            var condition = EmitRefinementCondition(predicate, parameter.Name);
             AppendLine($"if (!({condition})) throw new ArgumentOutOfRangeException(" +
                 $"nameof({SanitizeIdentifier(parameter.Name)}), \"Violation of {description}\");");
         }
@@ -3195,23 +3353,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (!_refinementTypes.TryGetValue(returnType, out var refinementType))
             return;
 
-        var substituted = Verification.Obligations.FactCollector
-            .SubstituteSelfRefStatic(refinementType.Predicate, resultName);
-        var condition = substituted.Accept(this);
+        var condition = EmitRefinementCondition(refinementType.Predicate, resultName);
         AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
             $"\"Return value violates refinement type '{refinementType.Name}'\");");
     }
 
-    private void EmitRefinementValueGuard(string refinementTypeName, string valueName)
+    private void EmitRefinementValueGuard(
+        RefinementConstraint constraint,
+        string valueName)
     {
-        if (!_refinementTypes.TryGetValue(refinementTypeName, out var refinementType))
-            return;
-
-        var substituted = Verification.Obligations.FactCollector
-            .SubstituteSelfRefStatic(refinementType.Predicate, valueName);
-        var condition = substituted.Accept(this);
+        var condition = EmitRefinementCondition(constraint.Predicate, valueName);
         AppendLine($"if (!({condition})) throw new ArgumentOutOfRangeException(" +
-            $"nameof({valueName}), \"Value violates refinement type '{refinementType.Name}'\");");
+            $"nameof({valueName}), \"Value violates {constraint.Description}\");");
+    }
+
+    private string EmitRefinementCondition(ExpressionNode predicate, string valueName)
+    {
+        var condition = predicate.Accept(this);
+        return System.Text.RegularExpressions.Regex.Replace(
+            condition,
+            @"\b__self__\b",
+            SanitizeIdentifier(valueName));
     }
 
     private static readonly Dictionary<string, string> CilNameToOperator = new()

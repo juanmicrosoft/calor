@@ -145,21 +145,34 @@ public sealed class ObligationGenerator
         var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
         var refinementByVariable = new Dictionary<string, RefinementTypeNode>(
             StringComparer.Ordinal);
+        var inlineRefinementByVariable = new Dictionary<string, ExpressionNode>(
+            StringComparer.Ordinal);
+        var ambiguousVariables = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var parameter in parameters)
         {
             if (_refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
                 refinementByVariable[parameter.Name] = refinementType;
+            else if (parameter.InlineRefinement?.Predicate is { } inlinePredicate)
+                inlineRefinementByVariable[parameter.Name] = inlinePredicate;
         }
 
         foreach (var bind in nodes.OfType<BindStatementNode>())
         {
             if (bind.TypeName is null
-                || bind.Initializer is null
                 || !_refinementTypes.TryGetValue(bind.TypeName, out var refinementType))
             {
+                if (!bind.IsMutable && refinementByVariable.ContainsKey(bind.Name))
+                    ambiguousVariables.Add(bind.Name);
                 continue;
             }
+
+            if (refinementByVariable.ContainsKey(bind.Name) && !bind.IsMutable)
+                ambiguousVariables.Add(bind.Name);
+            refinementByVariable[bind.Name] = refinementType;
+
+            if (bind.Initializer is null)
+                continue;
 
             var condition = FactCollector.SubstituteSelfRefStatic(
                 refinementType.Predicate,
@@ -171,12 +184,12 @@ public sealed class ObligationGenerator
                 condition,
                 bind.Span);
             obligation.ParameterName = bind.Name;
-            refinementByVariable[bind.Name] = refinementType;
         }
 
         foreach (var assignment in nodes.OfType<AssignmentStatementNode>())
         {
             if (assignment.Target is ReferenceNode target
+                && !ambiguousVariables.Contains(target.Name)
                 && refinementByVariable.TryGetValue(target.Name, out var refinementType))
             {
                 AddAssignmentSubtypeObligation(
@@ -185,17 +198,44 @@ public sealed class ObligationGenerator
                     refinementType,
                     assignment.Span);
             }
+            else if (assignment.Target is ReferenceNode inlineTarget
+                && !ambiguousVariables.Contains(inlineTarget.Name)
+                && inlineRefinementByVariable.TryGetValue(
+                    inlineTarget.Name,
+                    out var inlinePredicate))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    inlineTarget.Name,
+                    inlinePredicate,
+                    "inline refinement",
+                    assignment.Span);
+            }
         }
 
         foreach (var assignment in nodes.OfType<CompoundAssignmentStatementNode>())
         {
             if (assignment.Target is ReferenceNode target
+                && !ambiguousVariables.Contains(target.Name)
                 && refinementByVariable.TryGetValue(target.Name, out var refinementType))
             {
                 AddAssignmentSubtypeObligation(
                     functionId,
                     target.Name,
                     refinementType,
+                    assignment.Span);
+            }
+            else if (assignment.Target is ReferenceNode inlineTarget
+                && !ambiguousVariables.Contains(inlineTarget.Name)
+                && inlineRefinementByVariable.TryGetValue(
+                    inlineTarget.Name,
+                    out var inlinePredicate))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    inlineTarget.Name,
+                    inlinePredicate,
+                    "inline refinement",
                     assignment.Span);
             }
         }
@@ -206,14 +246,27 @@ public sealed class ObligationGenerator
         string variableName,
         RefinementTypeNode refinementType,
         TextSpan span)
+        => AddAssignmentSubtypeObligation(
+            functionId,
+            variableName,
+            refinementType.Predicate,
+            $"refinement type '{refinementType.Name}'",
+            span);
+
+    private void AddAssignmentSubtypeObligation(
+        string functionId,
+        string variableName,
+        ExpressionNode predicate,
+        string refinementDescription,
+        TextSpan span)
     {
         var condition = FactCollector.SubstituteSelfRefStatic(
-            refinementType.Predicate,
+            predicate,
             variableName);
         var obligation = _tracker.Add(
             ObligationKind.Subtype,
             functionId,
-            $"Assignment to '{variableName}' must preserve refinement type '{refinementType.Name}'",
+            $"Assignment to '{variableName}' must preserve {refinementDescription}",
             condition,
             span);
         obligation.ParameterName = variableName;
@@ -223,11 +276,18 @@ public sealed class ObligationGenerator
     {
         if (param.InlineRefinement != null)
         {
+            var isOut = param.Modifier == ParameterModifier.Out;
             var obl = _tracker.Add(
-                ObligationKind.RefinementEntry,
+                isOut ? ObligationKind.Subtype : ObligationKind.RefinementEntry,
                 functionId,
-                $"Parameter '{param.Name}' must satisfy inline refinement",
-                param.InlineRefinement.Predicate,
+                isOut
+                    ? $"Out parameter '{param.Name}' must satisfy inline refinement on assignment"
+                    : $"Parameter '{param.Name}' must satisfy inline refinement",
+                isOut
+                    ? FactCollector.SubstituteSelfRefStatic(
+                        param.InlineRefinement.Predicate,
+                        param.Name)
+                    : param.InlineRefinement.Predicate,
                 param.Span);
             obl.ParameterName = param.Name;
 
@@ -242,11 +302,16 @@ public sealed class ObligationGenerator
         // Check if parameter type name matches a known refinement type
         if (_refinementTypes.TryGetValue(param.TypeName, out var rtype))
         {
+            var isOut = param.Modifier == ParameterModifier.Out;
             var obl = _tracker.Add(
-                ObligationKind.RefinementEntry,
+                isOut ? ObligationKind.Subtype : ObligationKind.RefinementEntry,
                 functionId,
-                $"Parameter '{param.Name}' must satisfy refinement type '{rtype.Name}'",
-                rtype.Predicate,
+                isOut
+                    ? $"Out parameter '{param.Name}' must satisfy refinement type '{rtype.Name}' on assignment"
+                    : $"Parameter '{param.Name}' must satisfy refinement type '{rtype.Name}'",
+                isOut
+                    ? FactCollector.SubstituteSelfRefStatic(rtype.Predicate, param.Name)
+                    : rtype.Predicate,
                 param.Span);
             obl.ParameterName = param.Name;
 
@@ -285,11 +350,39 @@ public sealed class ObligationGenerator
             }
         }
 
+        // Propagate logical bounds through local aliases. Runtime emission uses
+        // the same alias relationship so reads and writes preserve the modeled
+        // indexed-type boundary instead of falling back to physical capacity.
+        foreach (var bind in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<BindStatementNode>())
+        {
+            if (bind.Initializer is ReferenceNode source
+                && indexedParams.TryGetValue(source.Name, out var indexedSource))
+            {
+                indexedParams[bind.Name] = indexedSource;
+            }
+        }
+
         foreach (var access in body
                      .SelectMany(DescendantsAndSelf)
                      .OfType<ArrayAccessNode>())
         {
             GenerateIndexBounds(access, indexedParams, functionId, visibility);
+        }
+
+        foreach (var write in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<CollectionSetIndexNode>())
+        {
+            GenerateIndexBounds(
+                new ArrayAccessNode(
+                    write.Span,
+                    new ReferenceNode(write.Span, write.CollectionName),
+                    write.Index),
+                indexedParams,
+                functionId,
+                visibility);
         }
     }
 

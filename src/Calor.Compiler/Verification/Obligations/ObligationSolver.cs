@@ -306,13 +306,35 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = method.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromMethod(method);
+                var extraVars = new List<(string Name, string TypeName)>();
+                foreach (var param in method.Parameters)
+                {
+                    var baseTypeName = param.TypeName;
+                    var genericIdx = baseTypeName.IndexOf('<');
+                    if (genericIdx > 0)
+                        baseTypeName = baseTypeName[..genericIdx];
+
+                    if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
+                    {
+                        extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (indexedType.Constraint != null)
+                        {
+                            factCollector.AddFunctionWideFact(
+                                FactCollector.SubstituteSelfRefStatic(
+                                    indexedType.Constraint,
+                                    indexedType.SizeParam));
+                        }
+                    }
+                }
 
                 result[method.Id] = new FunctionInfo(
                     parameters,
                     method.Preconditions,
                     method.Output?.TypeName,
-                    new List<ScopedFact>(),
-                    new List<(string, string)>(),
+                    factCollector.ScopedFacts,
+                    extraVars,
                     refinementTypes);
             }
         }

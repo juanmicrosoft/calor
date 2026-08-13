@@ -561,6 +561,36 @@ public sealed class ObligationTests
         Assert.DoesNotContain("// PROVEN:", csharp);
     }
 
+    [SkippableFact]
+    public void ReassignmentPreventsUnsoundProofGuardElision()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = """
+            §M{m001:Test}
+              §F{f001:Bad:pub}
+                  §O{void}
+                  §B{~x:i32} INT:1
+                  §IF{i1} (> x INT:0)
+                    §ASSIGN x INT:-1
+                    §PROOF{p1} (> x INT:0)
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true,
+            ElideProvenGuards = true,
+            ObligationPolicy = ObligationPolicy.Permissive
+        };
+
+        var result = Program.Compile(source, "test.calr", options);
+
+        var proof = Assert.Single(
+            options.ObligationResults!.Obligations,
+            obligation => obligation.Kind == ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+        Assert.Contains("Proof obligation [p1] violated", result.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN:", result.GeneratedCode);
+    }
+
     [Fact]
     public void CSharpEmit_DischargedObligation_DefaultKeepsGuard()
     {
@@ -965,6 +995,163 @@ public sealed class ObligationTests
         Assert.IsType<ArgumentOutOfRangeException>(exception);
     }
 
+    [Fact]
+    public void CSharpEmit_UnannotatedRefinedRebind_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:BadRebind:pub}
+                  §O{i32}
+                  §B{~value:Positive} INT:1
+                  §B{~value} INT:-1
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadRebind");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_InlineRefinedParameterAssignment_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §F{f001:BadParameterWrite:pub}
+                  §I{i32:value} | (> # INT:0)
+                  §O{i32}
+                  §ASSIGN value INT:-1
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadParameterWrite", 1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_NestedSelfReference_CompilesAndRejectsInvalidValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
+              §F{f001:Use:pub}
+                  §I{NonEmpty:value}
+                  §O{void}
+            """);
+
+        var exception = InvokeGenerated(csharp, "Use", "");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.DoesNotContain("__self__", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_AsyncRefinedReturn_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §AF{f001:BadAsyncReturn:pub}
+                  §O{Positive}
+                  §R INT:-1
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadAsyncReturn");
+
+        Assert.IsType<InvalidOperationException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedOutParameter_GuardsAfterAssignment()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §F{f001:SetBad:pub}
+                  §I{i32:value:out} | (> # INT:0)
+                  §O{void}
+                  §ASSIGN value INT:-1
+            """);
+
+        var exception = InvokeGenerated(csharp, "SetBad", (object?)null);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_IndexedRead_EnforcesLogicalBoundAtRuntime()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Read:pub}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{i32}
+                  §R §IDX items index
+            """);
+
+        var exception = InvokeGenerated(
+            csharp,
+            "Read",
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
+            5,
+            7);
+
+        Assert.IsType<IndexOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_IndexedWrite_EnforcesLogicalBoundAtRuntime()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Write:pub}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{void}
+                  §SETIDX{items} index INT:42
+            """);
+
+        var exception = InvokeGenerated(
+            csharp,
+            "Write",
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
+            5,
+            7);
+
+        Assert.IsType<IndexOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_IndexedAlias_PreservesLogicalBoundAtRuntime()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:ReadAlias:pub}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{i32}
+                  §B{alias:i32[]} items
+                  §R §IDX alias index
+            """);
+
+        var exception = InvokeGenerated(
+            csharp,
+            "ReadAlias",
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
+            5,
+            7);
+
+        Assert.IsType<IndexOutOfRangeException>(exception);
+    }
+
     private static string Emit(string source)
     {
         var module = Parse(source, out var diagnostics);
@@ -978,7 +1165,8 @@ public sealed class ObligationTests
         string methodName,
         params object?[] arguments)
     {
-        var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(csharp);
+        var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            GeneratedCSharpCompiler.GlobalUsingsPreamble + csharp);
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Select(path => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path));
@@ -1003,9 +1191,28 @@ public sealed class ObligationTests
         var method = type.GetMethod(
             methodName,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
-        var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(
-            () => method.Invoke(null, arguments));
+        try
+        {
+            var result = method.Invoke(null, arguments);
+            if (result is Task task)
+            {
+                try
+                {
+                    task.GetAwaiter().GetResult();
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
+        }
+        catch (System.Reflection.TargetInvocationException invocation)
+            when (invocation.InnerException is not null)
+        {
+            return invocation.InnerException;
+        }
 
-        return Assert.IsAssignableFrom<Exception>(invocation.InnerException);
+        throw new Xunit.Sdk.XunitException(
+            $"Generated method '{methodName}' did not throw.");
     }
 }

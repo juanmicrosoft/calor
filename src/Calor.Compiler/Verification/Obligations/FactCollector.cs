@@ -55,12 +55,23 @@ public sealed class FactCollector
     /// (e.g., IndexBounds can use parameter refinements as assumptions).
     /// </summary>
     public void CollectFromFunction(FunctionNode func)
+        => CollectFromCallable(func.Parameters, func.Body);
+
+    /// <summary>
+    /// Collects facts from a class method using the same rules as module functions.
+    /// </summary>
+    public void CollectFromMethod(MethodNode method)
+        => CollectFromCallable(method.Parameters, method.Body);
+
+    private void CollectFromCallable(
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<StatementNode> body)
     {
         // Parameter inline refinements hold on entry for the whole function —
         // unless the body rebinds the parameter name, in which case the
         // refinement may no longer describe the current value.
-        var bodyAssigned = CollectAssignedNames(func.Body);
-        foreach (var param in func.Parameters)
+        var bodyAssigned = CollectAssignedNames(body);
+        foreach (var param in parameters)
         {
             if (param.InlineRefinement != null && !bodyAssigned.Contains(param.Name))
             {
@@ -69,7 +80,7 @@ public sealed class FactCollector
             }
         }
 
-        CollectFromStatements(func.Body);
+        CollectFromStatements(body);
     }
 
     /// <summary>
@@ -217,45 +228,29 @@ public sealed class FactCollector
     private static HashSet<string> CollectAssignedNames(IReadOnlyList<StatementNode> statements)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
-        CollectAssignedNames(statements, names);
-        return names;
-    }
-
-    private static void CollectAssignedNames(IReadOnlyList<StatementNode> statements, HashSet<string> names)
-    {
-        foreach (var stmt in statements)
+        foreach (var node in statements.SelectMany(DescendantsAndSelf))
         {
-            switch (stmt)
+            switch (node)
             {
                 case BindStatementNode bind:
                     names.Add(bind.Name);
                     break;
+                case AssignmentStatementNode { Target: ReferenceNode target }:
+                    names.Add(target.Name);
+                    break;
+                case CompoundAssignmentStatementNode { Target: ReferenceNode compoundTarget }:
+                    names.Add(compoundTarget.Name);
+                    break;
                 case ForStatementNode forStmt:
                     names.Add(forStmt.VariableName);
-                    CollectAssignedNames(forStmt.Body, names);
                     break;
-                case WhileStatementNode whileStmt:
-                    CollectAssignedNames(whileStmt.Body, names);
-                    break;
-                case DoWhileStatementNode doWhile:
-                    CollectAssignedNames(doWhile.Body, names);
-                    break;
-                case IfStatementNode ifStmt:
-                    CollectAssignedNames(ifStmt.ThenBody, names);
-                    foreach (var elseIf in ifStmt.ElseIfClauses)
-                        CollectAssignedNames(elseIf.Body, names);
-                    if (ifStmt.ElseBody != null)
-                        CollectAssignedNames(ifStmt.ElseBody, names);
-                    break;
-                case ForeachStatementNode foreach_:
-                    names.Add(foreach_.VariableName);
-                    CollectAssignedNames(foreach_.Body, names);
-                    break;
-                case TryStatementNode tryStmt:
-                    CollectAssignedNames(tryStmt.TryBody, names);
+                case ForeachStatementNode foreachStmt:
+                    names.Add(foreachStmt.VariableName);
                     break;
             }
         }
+
+        return names;
     }
 
     /// <summary>
