@@ -1,6 +1,7 @@
 §M{m001:ContractZ3Test}
   §IFACE{i001:IService}
     §MT{m001:Process} (i32:value) -> i32
+      §Q (>= value 0)
 
   §CL{c001:ValidService:pub}
     §IMPL{IService}
@@ -18,5 +19,4 @@
       §Q (>= value 0)
       §S (>= result 10)
       §R (+ value 10)
-
 

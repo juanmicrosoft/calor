@@ -42,6 +42,22 @@ public class W1Slice1SimplificationPreservationTests
         Assert.False(ReferenceEquals(simplified, module));
         // …and nothing was dropped.
         Assert.Single(simplified.InteropBlocks);
+
+        var transformedProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(ModuleNode.Functions),
+            nameof(ModuleNode.Classes),
+            nameof(ModuleNode.Interfaces),
+            nameof(ModuleNode.Invariants)
+        };
+        foreach (var property in typeof(ModuleNode).GetProperties()
+                     .Where(property => property.GetIndexParameters().Length == 0)
+                     .Where(property => !transformedProperties.Contains(property.Name)))
+        {
+            Assert.Equal(
+                property.GetValue(module),
+                property.GetValue(simplified));
+        }
     }
 
     [Fact]

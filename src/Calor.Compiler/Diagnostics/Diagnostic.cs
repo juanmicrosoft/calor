@@ -513,7 +513,7 @@ public static class DiagnosticCode
     /// </summary>
     public const string ContractInheritanceValid = "Calor0814";
 
-    // Contract inheritance Z3 proving (Calor0815-0817)
+    // Contract inheritance Z3 proving (Calor0815-0818)
 
     /// <summary>
     /// Info: Contract implication proven by Z3 SMT solver.
@@ -529,6 +529,11 @@ public static class DiagnosticCode
     /// Info: Z3 SMT solver is unavailable, using heuristic checking only.
     /// </summary>
     public const string Z3UnavailableForInheritance = "Calor0817";
+
+    /// <summary>
+    /// Error: Inherited postconditions cannot all be satisfied.
+    /// </summary>
+    public const string IncompatibleInheritedContracts = "Calor0818";
 
     // Legacy structural-ID lint (Calor0820-0822) — Phase 1/2 v6 plan
     // (drop structural IDs, then introduce compact 12-char IDs).

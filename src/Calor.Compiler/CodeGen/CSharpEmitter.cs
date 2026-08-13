@@ -3515,7 +3515,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         // Check for inherited contracts
         var inheritedContracts = _currentClassName != null && _inheritanceResult != null
-            ? _inheritanceResult.GetInheritedContracts(_currentClassName, node.Name)
+            ? _inheritanceResult.GetInheritedContracts(_currentClassName, node)
             : null;
 
         // Emit explicit preconditions
@@ -3531,7 +3531,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             foreach (var requires in inheritedContracts.Preconditions)
             {
-                AppendLine($"// Inherited from {inheritedContracts.InterfaceName}.{inheritedContracts.MethodName}");
+                AppendLine($"// Inherited from {inheritedContracts.SourceDisplayName}");
                 var check = Visit(requires);
                 AppendLine(check);
             }
@@ -3593,7 +3593,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 foreach (var ensures in inheritedContracts!.Postconditions)
                 {
-                    AppendLine($"// Inherited from {inheritedContracts.InterfaceName}.{inheritedContracts.MethodName}");
+                    AppendLine($"// Inherited from {inheritedContracts.SourceDisplayName}");
                     var check = SubstituteResultIdentifier(Visit(ensures));
                     AppendLine(check);
                 }
@@ -3631,7 +3631,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     foreach (var ensures in inheritedContracts!.Postconditions)
                     {
-                        AppendLine($"// Inherited from {inheritedContracts.InterfaceName}.{inheritedContracts.MethodName}");
+                        AppendLine($"// Inherited from {inheritedContracts.SourceDisplayName}");
                         var check = Visit(ensures);
                         AppendLine(check);
                     }
