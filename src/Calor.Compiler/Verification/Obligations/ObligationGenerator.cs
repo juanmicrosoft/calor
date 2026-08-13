@@ -176,7 +176,7 @@ public sealed class ObligationGenerator
 
             var condition = FactCollector.SubstituteSelfRefStatic(
                 refinementType.Predicate,
-                bind.Name);
+                bind.Initializer);
             var obligation = _tracker.Add(
                 ObligationKind.Subtype,
                 functionId,
@@ -196,6 +196,7 @@ public sealed class ObligationGenerator
                     functionId,
                     target.Name,
                     refinementType,
+                    assignment.Value,
                     assignment.Span);
             }
             else if (assignment.Target is ReferenceNode inlineTarget
@@ -209,12 +210,14 @@ public sealed class ObligationGenerator
                     inlineTarget.Name,
                     inlinePredicate,
                     "inline refinement",
+                    assignment.Value,
                     assignment.Span);
             }
         }
 
         foreach (var assignment in nodes.OfType<CompoundAssignmentStatementNode>())
         {
+            var assignedValue = BuildCompoundAssignmentValue(assignment);
             if (assignment.Target is ReferenceNode target
                 && !ambiguousVariables.Contains(target.Name)
                 && refinementByVariable.TryGetValue(target.Name, out var refinementType))
@@ -223,6 +226,7 @@ public sealed class ObligationGenerator
                     functionId,
                     target.Name,
                     refinementType,
+                    assignedValue,
                     assignment.Span);
             }
             else if (assignment.Target is ReferenceNode inlineTarget
@@ -236,6 +240,7 @@ public sealed class ObligationGenerator
                     inlineTarget.Name,
                     inlinePredicate,
                     "inline refinement",
+                    assignedValue,
                     assignment.Span);
             }
         }
@@ -245,12 +250,14 @@ public sealed class ObligationGenerator
         string functionId,
         string variableName,
         RefinementTypeNode refinementType,
+        ExpressionNode assignedValue,
         TextSpan span)
         => AddAssignmentSubtypeObligation(
             functionId,
             variableName,
             refinementType.Predicate,
             $"refinement type '{refinementType.Name}'",
+            assignedValue,
             span);
 
     private void AddAssignmentSubtypeObligation(
@@ -258,11 +265,12 @@ public sealed class ObligationGenerator
         string variableName,
         ExpressionNode predicate,
         string refinementDescription,
+        ExpressionNode assignedValue,
         TextSpan span)
     {
         var condition = FactCollector.SubstituteSelfRefStatic(
             predicate,
-            variableName);
+            assignedValue);
         var obligation = _tracker.Add(
             ObligationKind.Subtype,
             functionId,
@@ -270,6 +278,38 @@ public sealed class ObligationGenerator
             condition,
             span);
         obligation.ParameterName = variableName;
+    }
+
+    private static ExpressionNode BuildCompoundAssignmentValue(
+        CompoundAssignmentStatementNode assignment)
+    {
+        if (assignment.Operator == CompoundAssignmentOperator.NullCoalesce)
+        {
+            return new NullCoalesceNode(
+                assignment.Span,
+                assignment.Target,
+                assignment.Value);
+        }
+
+        var binaryOperator = assignment.Operator switch
+        {
+            CompoundAssignmentOperator.Add => BinaryOperator.Add,
+            CompoundAssignmentOperator.Subtract => BinaryOperator.Subtract,
+            CompoundAssignmentOperator.Multiply => BinaryOperator.Multiply,
+            CompoundAssignmentOperator.Divide => BinaryOperator.Divide,
+            CompoundAssignmentOperator.Modulo => BinaryOperator.Modulo,
+            CompoundAssignmentOperator.BitwiseAnd => BinaryOperator.BitwiseAnd,
+            CompoundAssignmentOperator.BitwiseOr => BinaryOperator.BitwiseOr,
+            CompoundAssignmentOperator.BitwiseXor => BinaryOperator.BitwiseXor,
+            CompoundAssignmentOperator.LeftShift => BinaryOperator.LeftShift,
+            CompoundAssignmentOperator.RightShift => BinaryOperator.RightShift,
+            _ => throw new ArgumentOutOfRangeException(nameof(assignment))
+        };
+        return new BinaryOperationNode(
+            assignment.Span,
+            binaryOperator,
+            assignment.Target,
+            assignment.Value);
     }
 
     private void GenerateParameterObligation(ParameterNode param, string functionId, Visibility visibility)

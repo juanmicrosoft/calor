@@ -591,6 +591,34 @@ public sealed class ObligationTests
         Assert.DoesNotContain("// PROVEN:", result.GeneratedCode);
     }
 
+    [SkippableFact]
+    public void AssignmentSubtypeProof_UsesAssignedValue()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Assign:priv}
+                  §I{Positive:value}
+                  §O{i32}
+                  §Q (> value INT:0)
+                  §ASSIGN value INT:-1
+                  §R value
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyRefinements = true,
+            ObligationPolicy = ObligationPolicy.Permissive
+        };
+
+        Program.Compile(source, "test.calr", options);
+
+        var subtype = Assert.Single(
+            options.ObligationResults!.Obligations,
+            obligation => obligation.Kind == ObligationKind.Subtype);
+        Assert.NotEqual(ObligationStatus.Discharged, subtype.Status);
+    }
+
     [Fact]
     public void CSharpEmit_DischargedObligation_DefaultKeepsGuard()
     {
@@ -1267,6 +1295,101 @@ public sealed class ObligationTests
             options.ObligationResults!.Obligations,
             obligation => obligation.Kind == ObligationKind.ProofObligation);
         Assert.Equal(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void CSharpEmit_MissingIndexedSizeWitness_FailsClosed()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Read:pub}
+                  §I{Sized:items}
+                  §I{i32:index}
+                  §O{i32}
+                  §R §IDX items index
+            """);
+
+        var exception = InvokeGenerated(
+            csharp,
+            "Read",
+            new[] { 0, 1, 2 },
+            1);
+
+        Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains("size witness 'n' is unavailable", exception.Message);
+    }
+
+    [Fact]
+    public void CSharpEmit_StatementLambda_ContainsItsProofGuard()
+    {
+        var span = new TextSpan(0, 1, 1, 1);
+        var condition = new BinaryOperationNode(
+            span,
+            BinaryOperator.GreaterThan,
+            new ReferenceNode(span, "x"),
+            new IntLiteralNode(span, 0));
+        var lambda = new LambdaExpressionNode(
+            span,
+            "l1",
+            [new LambdaParameterNode(span, "x", "i32")],
+            effects: null,
+            isAsync: false,
+            expressionBody: null,
+            statementBody:
+            [
+                new ProofObligationNode(
+                    span,
+                    "p1",
+                    null,
+                    condition,
+                    new AttributeCollection())
+            ],
+            attributes: new AttributeCollection());
+
+        var csharp = new CSharpEmitter().Visit(lambda);
+
+        Assert.Contains("=>", csharp);
+        Assert.Contains("Proof obligation [p1] violated", csharp);
+        Assert.Contains("if (!(x > 0))", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_ElidesAllDischargedGuardKindsWhenOptedIn()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:All:priv}
+                  §I{Positive:value}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{Positive}
+                  §B{local:Positive} value
+                  §R §IDX items index
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        foreach (var obligation in tracker.Obligations)
+            obligation.Status = ObligationStatus.Discharged;
+        var emitter = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker)
+        {
+            ElideProvenGuards = true
+        };
+
+        var csharp = emitter.Emit(module);
+
+        Assert.DoesNotContain("ArgumentOutOfRangeException", csharp);
+        Assert.DoesNotContain("Return value violates", csharp);
+        Assert.DoesNotContain("Indexed-type bound violated", csharp);
     }
 
     private static string Emit(string source)

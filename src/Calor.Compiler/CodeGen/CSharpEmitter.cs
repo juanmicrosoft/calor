@@ -125,7 +125,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     indexedTypeName = indexedTypeName[..genericIndex];
                 if (_indexedTypes.TryGetValue(indexedTypeName, out var indexedType))
                 {
-                    _indexedBoundScopes[0][name] = indexedType.SizeParam;
+                    var hasRuntimeWitness = parameters.Any(candidate =>
+                        string.Equals(
+                            SanitizeIdentifier(candidate.Name),
+                            SanitizeIdentifier(indexedType.SizeParam),
+                            StringComparison.Ordinal));
+                    _indexedBoundScopes[0][name] = hasRuntimeWitness
+                        ? indexedType.SizeParam
+                        : $"missing:{indexedType.SizeParam}";
                 }
             }
         }
@@ -276,6 +283,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             : null;
     }
 
+    private static bool IsMissingIndexedWitness(
+        string bound,
+        out string witnessName)
+    {
+        const string prefix = "missing:";
+        if (bound.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            witnessName = bound[prefix.Length..];
+            return true;
+        }
+
+        witnessName = "";
+        return false;
+    }
+
 
     // AST-level namespace usage tracking for conditional using emission
     private bool _usesCalorRuntime;
@@ -306,6 +328,34 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// §2.1). Default false: verification verdicts are diagnostic; every guard stays.
     /// </summary>
     public bool ElideProvenGuards { get; set; }
+
+    private bool ShouldEmitObligationGuard(
+        Verification.Obligations.ObligationKind kind,
+        Parsing.TextSpan? span = null,
+        string? parameterName = null)
+    {
+        if (_obligationTracker is null || _currentFunctionId is null)
+            return true;
+
+        var matching = _obligationTracker.Obligations.FirstOrDefault(obligation =>
+            obligation.FunctionId == _currentFunctionId
+            && obligation.Kind == kind
+            && (parameterName is null
+                || string.Equals(
+                    obligation.ParameterName,
+                    parameterName,
+                    StringComparison.Ordinal))
+            && (span is null || obligation.Span.Start == span.Value.Start));
+        if (matching is null)
+            return true;
+
+        var action = _obligationPolicy.GetAction(matching.Status);
+        if (Verification.Obligations.ObligationPolicy.RequiresGuard(action))
+            return true;
+
+        return matching.Status != Verification.Obligations.ObligationStatus.Discharged
+            || !ElideProvenGuards;
+    }
 
     public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult,
         Verification.Obligations.ObligationTracker? obligationTracker = null,
@@ -461,9 +511,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (statement is BindStatementNode { Initializer: not null } bind
                 && TryGetRefinementConstraint(bind.Name, out var bindConstraint))
             {
-                EmitRefinementValueGuard(
-                    bindConstraint,
-                    SanitizeIdentifier(bind.Name));
+                if (ShouldEmitObligationGuard(
+                    Verification.Obligations.ObligationKind.Subtype,
+                    bind.Span,
+                    bind.Name))
+                {
+                    EmitRefinementValueGuard(
+                        bindConstraint,
+                        SanitizeIdentifier(bind.Name));
+                }
             }
             else if (statement is AssignmentStatementNode
                 {
@@ -471,9 +527,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 }
                 && TryGetRefinementConstraint(target.Name, out var assignmentConstraint))
             {
-                EmitRefinementValueGuard(
-                    assignmentConstraint,
-                    SanitizeIdentifier(target.Name));
+                if (ShouldEmitObligationGuard(
+                    Verification.Obligations.ObligationKind.Subtype,
+                    statement.Span,
+                    target.Name))
+                {
+                    EmitRefinementValueGuard(
+                        assignmentConstraint,
+                        SanitizeIdentifier(target.Name));
+                }
             }
             else if (statement is CompoundAssignmentStatementNode
                 {
@@ -483,9 +545,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     compoundTarget.Name,
                     out var compoundConstraint))
             {
-                EmitRefinementValueGuard(
-                    compoundConstraint,
-                    SanitizeIdentifier(compoundTarget.Name));
+                if (ShouldEmitObligationGuard(
+                    Verification.Obligations.ObligationKind.Subtype,
+                    statement.Span,
+                    compoundTarget.Name))
+                {
+                    EmitRefinementValueGuard(
+                        compoundConstraint,
+                        SanitizeIdentifier(compoundTarget.Name));
+                }
             }
         }
         EndLineMapping(mapped);
@@ -1122,7 +1190,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (_currentInlineReturnRefinement != null
             && _refinementTypes.TryGetValue(
                 _currentInlineReturnRefinement,
-                out var refinementType))
+                out var refinementType)
+            && ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.RefinementReturn))
         {
             var resultName = $"__refinedReturn{_inlineReturnGuardCounter++}";
             var condition = EmitRefinementCondition(
@@ -2485,6 +2555,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Array is ReferenceNode reference
             && TryGetIndexedBound(reference.Name, out var logicalLength))
         {
+            if (IsMissingIndexedWitness(logicalLength, out var missingWitness))
+            {
+                return $"(false ? {array}[{index}] : throw new InvalidOperationException("
+                    + $"\"Indexed-type size witness '{missingWitness}' is unavailable\"))";
+            }
+            if (!ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.IndexBounds,
+                node.Span,
+                reference.Name))
+            {
+                return $"{array}[{index}]";
+            }
+
             var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
             return $"(({index}) is var {guardedIndex}"
                 + $" && {guardedIndex} >= 0"
@@ -2648,6 +2731,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var value = node.Value.Accept(this);
         if (TryGetIndexedBound(collectionName, out var logicalLength))
         {
+            if (IsMissingIndexedWitness(logicalLength, out var missingWitness))
+            {
+                return "throw new InvalidOperationException("
+                    + $"\"Indexed-type size witness '{missingWitness}' is unavailable\");";
+            }
+            if (!ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.IndexBounds,
+                node.Span,
+                node.CollectionName))
+            {
+                return $"{collectionName}[{index}] = {value};";
+            }
+
             var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
             var continuationIndent = Environment.NewLine
                 + new string(' ', _indentLevel * 4);
@@ -3329,6 +3425,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // enforced after each assignment through refinement-scope tracking.
             if (parameter.Modifier == ParameterModifier.Out)
                 continue;
+            if (!ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.RefinementEntry,
+                parameter.Span,
+                parameter.Name))
+            {
+                continue;
+            }
 
             var predicate = parameter.InlineRefinement?.Predicate;
             var description = $"inline refinement for parameter '{parameter.Name}'";
@@ -3352,6 +3455,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         if (!_refinementTypes.TryGetValue(returnType, out var refinementType))
             return;
+        if (!ShouldEmitObligationGuard(
+            Verification.Obligations.ObligationKind.RefinementReturn))
+        {
+            return;
+        }
 
         var condition = EmitRefinementCondition(refinementType.Predicate, resultName);
         AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
@@ -4031,6 +4139,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var array = target.Array.Accept(this);
         var index = target.Index.Accept(this);
         var emittedValue = value.Accept(this);
+        if (IsMissingIndexedWitness(logicalLength, out var missingWitness))
+        {
+            code = "throw new InvalidOperationException("
+                + $"\"Indexed-type size witness '{missingWitness}' is unavailable\");";
+            return true;
+        }
+        if (!ShouldEmitObligationGuard(
+            Verification.Obligations.ObligationKind.IndexBounds,
+            target.Span,
+            reference.Name))
+        {
+            code = $"{array}[{index}] {assignmentOperator} {emittedValue};";
+            return true;
+        }
+
         var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
         var continuationIndent = Environment.NewLine
             + new string(' ', _indentLevel * 4);
@@ -4231,14 +4354,45 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
         {
-            var sb = new StringBuilder();
-            sb.Append($"{staticMod}{async}{parameters} => {{\n");
-            foreach (var stmt in node.StatementBody)
+            var builderStart = _builder.Length;
+            var previousIndent = _indentLevel;
+            PushDeclScope();
+            foreach (var parameter in node.Parameters)
             {
-                sb.Append($"    {stmt.Accept(this)}\n");
+                var name = SanitizeIdentifier(parameter.Name);
+                DeclareVarInScope(name);
+                if (parameter.TypeName != null
+                    && _refinementTypes.TryGetValue(
+                        parameter.TypeName,
+                        out var refinementType))
+                {
+                    DeclareRefinementInScope(
+                        name,
+                        new RefinementConstraint(
+                            refinementType.Predicate,
+                            $"refinement type '{refinementType.Name}'"));
+                }
             }
-            sb.Append("}");
-            return sb.ToString();
+
+            string body;
+            try
+            {
+                _indentLevel = 1;
+                foreach (var stmt in node.StatementBody)
+                {
+                    EmitStatement(stmt);
+                }
+                body = _builder.ToString(builderStart, _builder.Length - builderStart)
+                    .TrimEnd();
+            }
+            finally
+            {
+                _builder.Length = builderStart;
+                _indentLevel = previousIndent;
+                PopDeclScope();
+            }
+
+            return $"{staticMod}{async}{parameters} => {{\n{body}\n}}";
         }
 
         return $"{staticMod}{async}{parameters} => default";

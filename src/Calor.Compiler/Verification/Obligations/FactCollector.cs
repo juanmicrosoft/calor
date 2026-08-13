@@ -76,7 +76,9 @@ public sealed class FactCollector
             if (param.InlineRefinement != null && !bodyAssigned.Contains(param.Name))
             {
                 ScopedFacts.Add(ScopedFact.FunctionWide(
-                    SubstituteSelfRef(param.InlineRefinement.Predicate, param.Name)));
+                    SubstituteSelfRefStatic(
+                        param.InlineRefinement.Predicate,
+                        param.Name)));
             }
         }
 
@@ -258,19 +260,29 @@ public sealed class FactCollector
     /// Returns a new expression tree with substitutions applied.
     /// </summary>
     public static ExpressionNode SubstituteSelfRefStatic(ExpressionNode expr, string variableName)
-        => SubstituteSelfRef(expr, variableName);
+        => SubstituteSelfRef(expr, new ReferenceNode(expr.Span, variableName));
 
-    private static ExpressionNode SubstituteSelfRef(ExpressionNode expr, string variableName)
+    /// <summary>
+    /// Substitutes SelfRefNode (#) with an arbitrary expression.
+    /// </summary>
+    public static ExpressionNode SubstituteSelfRefStatic(
+        ExpressionNode expr,
+        ExpressionNode replacement)
+        => SubstituteSelfRef(expr, replacement);
+
+    private static ExpressionNode SubstituteSelfRef(
+        ExpressionNode expr,
+        ExpressionNode replacement)
     {
         if (expr is SelfRefNode)
         {
-            return new ReferenceNode(expr.Span, variableName);
+            return replacement;
         }
 
         if (expr is BinaryOperationNode binOp)
         {
-            var left = SubstituteSelfRef(binOp.Left, variableName);
-            var right = SubstituteSelfRef(binOp.Right, variableName);
+            var left = SubstituteSelfRef(binOp.Left, replacement);
+            var right = SubstituteSelfRef(binOp.Right, replacement);
             if (!ReferenceEquals(left, binOp.Left) || !ReferenceEquals(right, binOp.Right))
                 return new BinaryOperationNode(binOp.Span, binOp.Operator, left, right);
             return binOp;
@@ -278,7 +290,7 @@ public sealed class FactCollector
 
         if (expr is UnaryOperationNode unOp)
         {
-            var operand = SubstituteSelfRef(unOp.Operand, variableName);
+            var operand = SubstituteSelfRef(unOp.Operand, replacement);
             if (operand != unOp.Operand)
                 return new UnaryOperationNode(unOp.Span, unOp.Operator, operand);
             return unOp;
