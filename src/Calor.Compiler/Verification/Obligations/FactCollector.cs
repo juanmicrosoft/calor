@@ -147,9 +147,19 @@ public sealed class FactCollector
         var dummySpan = new TextSpan(0, 0, 1, 1);
         var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
 
+        var isPositiveStep = forStmt.Step is IntLiteralNode { Value: > 0 }
+            or UnaryOperationNode
+            {
+                Operator: UnaryOperator.Negate,
+                Operand: IntLiteralNode { Value: < 0 }
+            };
         var isNegativeStep = forStmt.Step is IntLiteralNode { Value: < 0 }
-            or UnaryOperationNode { Operator: UnaryOperator.Negate };
-        if (!isNegativeStep)
+            or UnaryOperationNode
+            {
+                Operator: UnaryOperator.Negate,
+                Operand: IntLiteralNode { Value: > 0 }
+            };
+        if (isPositiveStep)
         {
             AddGuardFact(
                 new BinaryOperationNode(
@@ -166,7 +176,7 @@ public sealed class FactCollector
                     forStmt.To),
                 forStmt.Body);
         }
-        else
+        else if (isNegativeStep)
         {
             AddGuardFact(
                 new BinaryOperationNode(

@@ -954,6 +954,24 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_NamedAndInlineParameterRefinements_AreConjoined()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Use:pub}
+                  §I{Positive:value} | (< # INT:10)
+                  §O{i32}
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "Use", -1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Contains("value > 0 && value < 10", csharp);
+    }
+
+    [Fact]
     public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""

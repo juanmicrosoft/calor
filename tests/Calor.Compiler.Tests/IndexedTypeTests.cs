@@ -442,7 +442,7 @@ public sealed class IndexedTypeTests
               §F{f001:Sum:priv}
                   §I{SizedList:items}
                   §O{i32}
-                  §L{l1:i:INT:0:n:INT:1}
+                  §L{l1:i:0:n:1}
                       §R §IDX items i
             """;
 

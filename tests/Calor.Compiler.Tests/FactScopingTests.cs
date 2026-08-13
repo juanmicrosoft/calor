@@ -205,7 +205,7 @@ public sealed class FactScopingTests
             §M{m001:Test}
               §F{f001:Descending:priv}
                 §O{i32}
-                §L{l1:i:INT:2:INT:0:INT:-1}
+                §L{l1:i:2:0:-1}
                   §P (>= i INT:0)
                 §R INT:0
             """;
@@ -213,7 +213,6 @@ public sealed class FactScopingTests
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
             $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-
         var collector = new FactCollector();
         collector.CollectFromFunction(Assert.Single(module.Functions));
 
@@ -223,6 +222,33 @@ public sealed class FactScopingTests
         Assert.Contains(
             collector.Facts,
             fact => fact is BinaryOperationNode { Operator: BinaryOperator.GreaterOrEqual });
+    }
+
+    [Fact]
+    public void DynamicStepForLoop_DoesNotAssumeDirection()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Dynamic:priv}
+                §I{i32:step}
+                §O{i32}
+                §L{l1:i:0:10:step}
+                  §PROOF{p1} (>= i INT:0)
+                §R INT:0
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.DoesNotContain(
+            collector.ScopedFacts,
+            fact => fact.Fact is BinaryOperationNode
+            {
+                Left: ReferenceNode { Name: "i" }
+            });
     }
 
     [SkippableFact]

@@ -118,17 +118,31 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     _outParameterNames.Add(name);
                 }
-                if (p.InlineRefinement?.Predicate is { } inlinePredicate)
+                var hasNamedRefinement =
+                    _refinementTypes.TryGetValue(p.TypeName, out var refinementType);
+                if (p.InlineRefinement?.Predicate is { } inlinePredicate
+                    && hasNamedRefinement)
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
-                        inlinePredicate,
+                        new BinaryOperationNode(
+                            p.Span,
+                            BinaryOperator.And,
+                            refinementType!.Predicate,
+                            inlinePredicate),
+                        $"refinement type '{refinementType.Name}' and inline refinement for parameter '{p.Name}'",
+                        refinementType.BaseTypeName);
+                }
+                else if (p.InlineRefinement?.Predicate is { } inlineOnlyPredicate)
+                {
+                    _refinementDeclScopes[0][name] = new RefinementConstraint(
+                        inlineOnlyPredicate,
                         $"inline refinement for parameter '{p.Name}'",
                         p.TypeName);
                 }
-                else if (_refinementTypes.TryGetValue(p.TypeName, out var refinementType))
+                else if (hasNamedRefinement)
                 {
                     _refinementDeclScopes[0][name] = new RefinementConstraint(
-                        refinementType.Predicate,
+                        refinementType!.Predicate,
                         $"refinement type '{refinementType.Name}'",
                         refinementType.BaseTypeName);
                 }
@@ -355,24 +369,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (_obligationTracker is null || _currentFunctionId is null)
             return true;
 
-        var matching = _obligationTracker.Obligations.FirstOrDefault(obligation =>
-            obligation.FunctionId == _currentFunctionId
-            && obligation.Kind == kind
-            && (parameterName is null
-                || string.Equals(
-                    obligation.ParameterName,
-                    parameterName,
-                    StringComparison.Ordinal))
-            && (span is null || obligation.Span.Start == span.Value.Start));
-        if (matching is null)
+        var matching = _obligationTracker.Obligations.Where(obligation =>
+                obligation.FunctionId == _currentFunctionId
+                && obligation.Kind == kind
+                && (parameterName is null
+                    || string.Equals(
+                        obligation.ParameterName,
+                        parameterName,
+                        StringComparison.Ordinal))
+                && (span is null || obligation.Span.Start == span.Value.Start))
+            .ToArray();
+        if (matching.Length == 0)
             return true;
 
-        var action = _obligationPolicy.GetAction(matching.Status);
-        if (Verification.Obligations.ObligationPolicy.RequiresGuard(action))
-            return true;
-
-        return matching.Status != Verification.Obligations.ObligationStatus.Discharged
-            || !ElideProvenGuards;
+        return matching.Any(obligation =>
+        {
+            var action = _obligationPolicy.GetAction(obligation.Status);
+            return Verification.Obligations.ObligationPolicy.RequiresGuard(action)
+                || obligation.Status
+                    != Verification.Obligations.ObligationStatus.Discharged
+                || !ElideProvenGuards;
+        });
     }
 
     public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult,
@@ -3620,21 +3637,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 continue;
             }
 
-            var predicate = parameter.InlineRefinement?.Predicate;
-            var description = $"inline refinement for parameter '{parameter.Name}'";
-            if (predicate is null
-                && _refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
-            {
-                predicate = refinementType.Predicate;
-                description = $"refinement type '{refinementType.Name}' for parameter '{parameter.Name}'";
-            }
-
-            if (predicate is null)
+            if (!TryGetRefinementConstraint(
+                    parameter.Name,
+                    out var constraint))
                 continue;
 
-            var condition = EmitRefinementCondition(predicate, parameter.Name);
+            var condition = EmitRefinementCondition(
+                constraint.Predicate,
+                parameter.Name);
             AppendLine($"if (!({condition})) throw new ArgumentOutOfRangeException(" +
-                $"nameof({SanitizeIdentifier(parameter.Name)}), \"Violation of {description}\");");
+                $"nameof({SanitizeIdentifier(parameter.Name)}), \"Violation of {constraint.Description}\");");
         }
     }
 
