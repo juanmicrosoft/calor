@@ -208,9 +208,10 @@ public sealed class TransitiveEffectPropagator
         // callees on instantiations carry "IEnumerable`1<System.String>" —
         // resolve on the bare name.
         var typeName = BareTypeName(method.TypeName);
+        var parameterTypes = EffectResolver.ParseParameterSignature(method.ParameterSig);
 
         // Try standard method resolution first
-        var result = _manifestResolver.Resolve(typeName, method.MethodName);
+        var result = _manifestResolver.Resolve(typeName, method.MethodName, parameterTypes);
         if (result.Status != EffectResolutionStatus.Unknown)
             return result;
 
@@ -235,7 +236,7 @@ public sealed class TransitiveEffectPropagator
         // Constructor: .ctor → ResolveConstructor(type)
         if (method.MethodName == ".ctor")
         {
-            result = _manifestResolver.ResolveConstructor(typeName);
+            result = _manifestResolver.ResolveConstructor(typeName, parameterTypes);
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }

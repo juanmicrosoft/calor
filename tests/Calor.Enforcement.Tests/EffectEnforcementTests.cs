@@ -158,6 +158,7 @@ public class EffectEnforcementTests
         var source = @"
 §M{m001:Test}
   §F{f001:SortItems:pub}
+      §I{List<i32>:items}
       §O{void}
       §C{items.OrderByDescending}
       §/C
@@ -216,6 +217,7 @@ public class EffectEnforcementTests
         var source = @"
 §M{m001:Test}
   §F{f001:FilterTypes:pub}
+      §I{List<object>:items}
       §O{void}
       §C{items.OfType}
       §/C
@@ -273,6 +275,7 @@ public class EffectEnforcementTests
 §M{m001:Test}
   §CL{c001:DataProcessor:pub}
       §MT{mt001:ProcessItems:pub}
+          §I{List<i32>:items}
           §O{void}
           §C{items.OrderByDescending}
           §/C
@@ -487,6 +490,7 @@ public class EffectEnforcementTests
           §O{i32}
           §R (+ a b)
   §F{f001:UseCalculator:pub}
+      §I{Calculator:_calc}
       §O{i32}
       §R §C{_calc.Add} §A INT:1 §A INT:2 §/C
 ";
@@ -510,6 +514,7 @@ public class EffectEnforcementTests
           §E{cw}
           §P message
   §F{f001:DoWork:pub}
+      §I{Logger:_logger}
       §O{void}
       §C{_logger.Log}
         §A STR:""hello""
@@ -537,6 +542,7 @@ public class EffectEnforcementTests
           §E{cw}
           §P message
   §F{f001:DoWork:pub}
+      §I{Logger:_logger}
       §O{void}
       §E{cw}
       §C{_logger.Log}
@@ -562,6 +568,7 @@ public class EffectEnforcementTests
           §E{cw}
           §P msg
   §CL{c002:App:pub}
+      §FLD{Printer:_printer:pri}
       §MT{mt002:Run:pub}
           §O{void}
           §E{cw}
@@ -588,6 +595,7 @@ public class EffectEnforcementTests
           §E{cw}
           §P msg
   §CL{c002:App:pub}
+      §FLD{Printer:_printer:pri}
       §MT{mt002:Run:pub}
           §O{void}
           §C{_printer.PrintMessage}
@@ -614,12 +622,14 @@ public class EffectEnforcementTests
           §E{cw}
           §P ""output""
   §CL{c002:ServiceB:pub}
+      §FLD{ServiceC:_c:pri}
       §MT{mt002:Process:pub}
           §O{void}
           §E{cw}
           §C{_c.WriteOutput}
           §/C
   §CL{c003:ServiceA:pub}
+      §FLD{ServiceB:_b:pri}
       §MT{mt003:Execute:pub}
           §O{void}
           §E{cw}
@@ -670,7 +680,7 @@ public class EffectEnforcementTests
         Assert.True(result.HasErrors,
             "Ambiguous cross-class call should NOT silently resolve to one candidate");
         Assert.Contains(result.Diagnostics.Errors,
-            d => d.Message.Contains("DoWork") && d.Message.Contains("Unknown"));
+            d => d.Message.Contains("DoWork") && d.Message.Contains("unknown"));
     }
 
     [Fact]
@@ -691,6 +701,7 @@ public class EffectEnforcementTests
           §O{str}
           §R s
   §F{f001:UseCalc:pub}
+      §I{Calculator:_calc}
       §O{i32}
       §R §C{_calc.Compute} §A INT:5 §/C
 ";

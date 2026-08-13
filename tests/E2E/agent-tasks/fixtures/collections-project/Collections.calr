@@ -2,6 +2,7 @@
 
   §F{f001:SumList:pub}
     §O{i32}
+    §E{alloc}
     §LIST{numbers:i32}
       10
       20

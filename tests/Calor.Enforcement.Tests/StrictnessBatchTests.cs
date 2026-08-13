@@ -14,7 +14,7 @@ namespace Calor.Enforcement.Tests;
 ///   D-W2.2 override / interface-implementation effect variance (Calor0420/0421)
 ///          + static-receiver call-site charging
 ///   D-W2.3 interop → effect-unknown propagating as an assumption (Calor0419)
-///   D-W2.4 KnownPureMethodNames mutator purge (fail-closed unknown-call path)
+///   D-W2.4 bare-name purity removal (fail-closed unknown-call path)
 ///   D-W2.6 unknown constructs are never silently pure (Calor0419)
 /// (D-W2.5, the CLI default flip, is pinned in Calor.Compiler.Tests where the
 /// CLI test harness lives.)
@@ -366,7 +366,7 @@ var x = 1;
     }
 
     // ========================================================================
-    // D-W2.4 — KnownPureMethodNames mutator purge
+    // D-W2.4 — bare-method-name purity removal
     // ========================================================================
 
     [Fact]
@@ -413,13 +413,36 @@ var x = 1;
     }
 
     [Fact]
-    public void KeptPureNames_LinqAndStringOps_StillPure()
+    public void UntypedReceiver_PureLookingMethodName_FailsClosed()
     {
-        // Names that survived the audit (genuinely pure across common BCL
-        // receivers) still resolve as pure through the name fallback.
         var source = @"
 §M{m001:Test}
   §F{f001:Query:pub}
+      §O{void}
+      §E{}
+      §C{items.Where}
+      §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.Contains(result.Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("items.Where"));
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("unknown"));
+    }
+
+    [Fact]
+    public void ResolvedImmutableApis_LinqAndStringOps_StillPure()
+    {
+        // Pure calls remain pure only through resolved receiver identities and
+        // authoritative manifest entries — never through a global name list.
+        var source = @"
+§M{m001:Test}
+  §F{f001:Query:pub}
+      §I{List<i32>:items}
+      §I{str:name}
       §O{void}
       §C{items.Where}
       §/C
@@ -616,9 +639,9 @@ var x = 1;
     [Fact]
     public void C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption()
     {
-        // Review C4 (value arm): a function-typed VALUE passed to a known-pure
-        // higher-order name (Select) is surfaced as a Calor0419 assumption —
-        // the BCL callee may invoke it invisibly.
+        // Review C4 (value arm): a function-typed VALUE passed to a
+        // manifest-resolved higher-order call (Select) is surfaced as a
+        // Calor0419 assumption — the BCL callee may invoke it invisibly.
         var source = @"
 §M{m001:HofVal}
   §F{f001:Go:pub}
@@ -688,7 +711,7 @@ var x = 1;
           §R INT:1
   §F{f001:Go:pub}
       §O{void}
-      §E{}
+      §E{alloc}
       §B{h:Helper} §NEW{Helper} §/NEW
       §C{h.Refresh}
       §/C

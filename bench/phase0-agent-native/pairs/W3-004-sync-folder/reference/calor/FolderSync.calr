@@ -147,7 +147,7 @@
     §C{WriteIndexEntry} §A tombstonePath §A name §A stamp §/C
 
   §F{f013:SyncTwoWay:pub} (str:sourcePath, str:targetPath, str:tombstonePath) -> i32
-    §E{fs:rw,mut}
+    §E{fs:rw,mut,alloc}
     §B{~actions:i32} 0
     §LIST{srcNames:str}
     §/LIST{srcNames}
@@ -196,7 +196,7 @@
     §R actions
 
   §F{f014:SyncWithPolicy:pub} (str:sourcePath, str:targetPath, str:tombstonePath, bool:twoWay) -> i32
-    §E{fs:rw,mut}
+    §E{fs:rw,mut,alloc}
     §IF{if28} twoWay
       §R §C{SyncTwoWay} §A sourcePath §A targetPath §A tombstonePath §/C
     §R §C{Sync} §A sourcePath §A targetPath §/C

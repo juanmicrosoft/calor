@@ -1,6 +1,6 @@
 §M{m001:Collections}
   §F{f001:Main:pub} () -> void
-    §E{cw,mut}
+    §E{cw,mut,alloc}
     §C{Console.WriteLine} "=== Calor Collections Demo ==="
     §C{Console.WriteLine} ""
     §C{Console.WriteLine} "--- List Operations ---"
@@ -37,4 +37,3 @@
     §C{Console.WriteLine} "After remove(urgent): {important, review}"
     §C{Console.WriteLine} ""
     §C{Console.WriteLine} "=== Demo Complete ==="
-

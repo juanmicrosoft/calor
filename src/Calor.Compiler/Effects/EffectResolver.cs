@@ -6,7 +6,7 @@ namespace Calor.Compiler.Effects;
 /// Resolves effects for .NET method calls using a layered approach.
 /// Resolution order:
 /// 1. Specific method signature in type mapping (from manifests)
-/// 2. Method name in type mapping
+/// 2. Method entry on the resolved declaring type
 /// 3. Wildcard "*" in type mapping
 /// 4. DefaultEffects on type
 /// 5. NamespaceDefaults matching namespace pattern
@@ -18,6 +18,7 @@ public sealed class EffectResolver
     private readonly IL.ILEffectAnalyzer? _ilAnalyzer;
     private readonly Dictionary<string, ResolvedTypeInfo> _typeCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EffectResolution> _methodCache = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _extensionProviders = new(StringComparer.Ordinal);
     private bool _initialized;
 
     public EffectResolver(ManifestLoader? manifestLoader = null, IL.ILEffectAnalyzer? ilAnalyzer = null)
@@ -47,6 +48,7 @@ public sealed class EffectResolver
     public EffectResolution Resolve(string fullyQualifiedType, string methodName, params string[] parameterTypes)
     {
         EnsureInitialized();
+        parameterTypes = parameterTypes.Select(NormalizeParameterType).ToArray();
 
         // Build cache key. The "m:" prefix keeps this entry point's cache
         // disjoint from ResolveSetter/ResolveGetter/ResolveConstructor —
@@ -61,6 +63,57 @@ public sealed class EffectResolver
         var resolution = ResolveInternal(fullyQualifiedType, methodName, parameterTypes, signature);
         _methodCache[signature] = resolution;
         return resolution;
+    }
+
+    /// <summary>
+    /// Resolves an extension-method call from manifest-declared extension providers.
+    /// The receiver type is included as the first signature parameter.
+    /// </summary>
+    public EffectResolution ResolveExtension(
+        string receiverType,
+        string methodName,
+        params string[] parameterTypes)
+    {
+        EnsureInitialized();
+
+        var allParameterTypes = new[] { receiverType }.Concat(parameterTypes).ToArray();
+        foreach (var provider in _extensionProviders.OrderBy(p => p, StringComparer.Ordinal))
+        {
+            if (!_typeCache.TryGetValue(provider, out var typeInfo))
+                continue;
+
+            var normalizedParameters = allParameterTypes
+                .Select(NormalizeParameterType)
+                .ToArray();
+            if (normalizedParameters.All(IsKnownParameterType))
+            {
+                var signature = $"{methodName}({string.Join(",", normalizedParameters)})";
+                if (typeInfo.Methods.TryGetValue(signature, out var signatureEffects))
+                    return CreateResolution(signatureEffects, typeInfo.Source);
+            }
+
+            if (IsCompatibleExtensionReceiver(provider, receiverType)
+                && typeInfo.Methods.TryGetValue(methodName, out var methodEffects))
+                return CreateResolution(methodEffects, typeInfo.Source);
+        }
+
+        return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+    }
+
+    private static bool IsCompatibleExtensionReceiver(string provider, string receiverType)
+    {
+        if (!provider.Equals("System.Linq.Enumerable", StringComparison.Ordinal))
+            return false;
+
+        var normalized = receiverType.Replace("global::", "", StringComparison.Ordinal);
+        return normalized.EndsWith("[]", StringComparison.Ordinal)
+            || normalized.StartsWith("System.Collections.", StringComparison.Ordinal)
+            || normalized.StartsWith("IEnumerable<", StringComparison.Ordinal)
+            || normalized.StartsWith("ICollection<", StringComparison.Ordinal)
+            || normalized.StartsWith("IList<", StringComparison.Ordinal)
+            || normalized.StartsWith("List<", StringComparison.Ordinal)
+            || normalized.StartsWith("HashSet<", StringComparison.Ordinal)
+            || normalized.StartsWith("Dictionary<", StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -101,6 +154,7 @@ public sealed class EffectResolver
     public EffectResolution ResolveConstructor(string fullyQualifiedType, params string[] parameterTypes)
     {
         EnsureInitialized();
+        parameterTypes = parameterTypes.Select(NormalizeParameterType).ToArray();
 
         var paramSig = $"({string.Join(",", parameterTypes)})";
         var signature = $"c:{fullyQualifiedType}::.ctor{paramSig}";
@@ -124,7 +178,7 @@ public sealed class EffectResolver
         if (_typeCache.TryGetValue(type, out var typeInfo))
         {
             // 2a. Try specific method with parameters
-            if (parameterTypes.Length > 0)
+            if (parameterTypes.All(IsKnownParameterType))
             {
                 var paramSig = $"{method}({string.Join(",", parameterTypes)})";
                 if (typeInfo.Methods.TryGetValue(paramSig, out var specificEffects))
@@ -237,12 +291,6 @@ public sealed class EffectResolver
                 return CreateResolution(ctorEffects, typeInfo.Source);
             }
 
-            // Try parameterless if no exact match
-            if (typeInfo.Constructors.TryGetValue("()", out var defaultCtorEffects))
-            {
-                return CreateResolution(defaultCtorEffects, typeInfo.Source);
-            }
-
             // Fall back to default effects
             if (typeInfo.DefaultEffects != null)
             {
@@ -313,6 +361,8 @@ public sealed class EffectResolver
             foreach (var mapping in manifest.Mappings)
             {
                 var typeInfo = new ResolvedTypeInfo(source.FilePath);
+                if (mapping.ExtensionProvider)
+                    _extensionProviders.Add(mapping.Type);
 
                 // Copy default effects
                 if (mapping.DefaultEffects != null)
@@ -325,7 +375,7 @@ public sealed class EffectResolver
                 {
                     foreach (var (method, effects) in mapping.Methods)
                     {
-                        typeInfo.Methods[method] = effects;
+                        typeInfo.Methods[NormalizeMethodManifestKey(method)] = effects;
                     }
                 }
 
@@ -352,7 +402,7 @@ public sealed class EffectResolver
                 {
                     foreach (var (sig, effects) in mapping.Constructors)
                     {
-                        typeInfo.Constructors[sig] = effects;
+                        typeInfo.Constructors[NormalizeConstructorManifestKey(sig)] = effects;
                     }
                 }
 
@@ -360,6 +410,28 @@ public sealed class EffectResolver
                 _typeCache[mapping.Type] = typeInfo;
             }
         }
+    }
+
+    private static string NormalizeMethodManifestKey(string method)
+    {
+        var open = method.IndexOf('(');
+        if (open <= 0 || !method.EndsWith(')'))
+            return method;
+
+        var name = method[..open];
+        var parameters = ParseParameterSignature(method[open..])
+            .Select(NormalizeParameterType);
+        return $"{name}({string.Join(",", parameters)})";
+    }
+
+    private static string NormalizeConstructorManifestKey(string signature)
+    {
+        if (!signature.StartsWith('(') || !signature.EndsWith(')'))
+            return signature;
+
+        var parameters = ParseParameterSignature(signature)
+            .Select(NormalizeParameterType);
+        return $"({string.Join(",", parameters)})";
     }
 
     private static EffectResolution CreateResolution(List<string> effectCodes, string source)
@@ -377,9 +449,111 @@ public sealed class EffectResolver
 
     private static string BuildSignature(string type, string method, string[] parameterTypes)
     {
-        var parameters = string.Join(",", parameterTypes);
+        var parameters = string.Join(",", parameterTypes.Select(NormalizeParameterType));
         return $"{type}::{method}({parameters})";
     }
+
+    /// <summary>
+    /// Normalizes Calor and CLR type spellings to the short signature form used by
+    /// effect manifests.
+    /// </summary>
+    public static string NormalizeParameterType(string typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName) || typeName == "?")
+            return "?";
+
+        var type = typeName.Trim().Replace("global::", "", StringComparison.Ordinal);
+        var nullable = type.EndsWith("?", StringComparison.Ordinal);
+        if (nullable)
+            type = type[..^1];
+
+        if (type.EndsWith("[]", StringComparison.Ordinal))
+            return $"{NormalizeParameterType(type[..^2])}[]";
+
+        type = type switch
+        {
+            "str" or "string" or "STRING" or "System.String" => "String",
+            "bool" or "BOOL" or "System.Boolean" => "Boolean",
+            "i8" or "sbyte" or "System.SByte" => "SByte",
+            "u8" or "byte" or "System.Byte" => "Byte",
+            "i16" or "short" or "System.Int16" => "Int16",
+            "u16" or "ushort" or "System.UInt16" => "UInt16",
+            "i32" or "int" or "INT" or "System.Int32" => "Int32",
+            "u32" or "uint" or "System.UInt32" => "UInt32",
+            "i64" or "long" or "System.Int64" => "Int64",
+            "u64" or "ulong" or "System.UInt64" => "UInt64",
+            "f32" or "float" or "System.Single" => "Single",
+            "f64" or "float" or "double" or "FLOAT" or "System.Double" => "Double",
+            "dec" or "decimal" or "DECIMAL" or "System.Decimal" => "Decimal",
+            "char" or "CHAR" or "System.Char" => "Char",
+            _ => type
+        };
+
+        var genericStart = type.IndexOf('<');
+        if (genericStart > 0)
+        {
+            var genericEnd = type.LastIndexOf('>');
+            if (genericEnd > genericStart)
+            {
+                var genericArguments = ParseParameterSignature(
+                        type[(genericStart + 1)..genericEnd])
+                    .Select(NormalizeParameterType)
+                    .ToArray();
+                var genericType = type[..genericStart];
+                if (genericType.StartsWith("System.Collections.Generic.", StringComparison.Ordinal))
+                    genericType = genericType["System.Collections.Generic.".Length..];
+                if (!genericType.Contains('`'))
+                    genericType = $"{genericType}`{genericArguments.Length}";
+                return $"{genericType}<{string.Join(",", genericArguments)}>";
+            }
+        }
+
+        var lastDot = type.LastIndexOf('.');
+        type = lastDot >= 0 ? type[(lastDot + 1)..] : type;
+        return type;
+    }
+
+    /// <summary>
+    /// Parses a serialized parameter signature such as
+    /// <c>(System.String,System.Collections.Generic.List`1&lt;System.Int32&gt;)</c>.
+    /// </summary>
+    public static string[] ParseParameterSignature(string parameterSignature)
+    {
+        if (string.IsNullOrWhiteSpace(parameterSignature)
+            || parameterSignature == "*"
+            || parameterSignature == "()")
+        {
+            return [];
+        }
+
+        var content = parameterSignature.Trim();
+        if (content.StartsWith('(') && content.EndsWith(')'))
+            content = content[1..^1];
+
+        var result = new List<string>();
+        var start = 0;
+        var depth = 0;
+        for (var i = 0; i < content.Length; i++)
+        {
+            depth += content[i] switch
+            {
+                '<' or '{' or '[' => 1,
+                '>' or '}' or ']' => -1,
+                _ => 0
+            };
+            if (content[i] == ',' && depth == 0)
+            {
+                result.Add(content[start..i].Trim());
+                start = i + 1;
+            }
+        }
+        if (start < content.Length)
+            result.Add(content[start..].Trim());
+        return result.ToArray();
+    }
+
+    private static bool IsKnownParameterType(string typeName)
+        => !string.IsNullOrWhiteSpace(typeName) && typeName != "?";
 
     private void EnsureInitialized()
     {

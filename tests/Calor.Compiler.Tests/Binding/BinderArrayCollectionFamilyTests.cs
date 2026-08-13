@@ -215,7 +215,7 @@ public class BinderArrayCollectionFamilyTests
         const string source = @"
 §M{m001:Test}
   §F{f001:Trap:pub} () -> void
-    §E{cw}
+    §E{cw,alloc}
     §LIST{xs:i32}
       (/ 10 0)
     §/LIST{xs}

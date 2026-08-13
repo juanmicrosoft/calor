@@ -31,7 +31,7 @@
     §R found
 
   §F{f005:CountKeys:pub} (str:path) -> i32
-    §E{fs:r,mut}
+    §E{fs:r,mut,alloc}
     §B{exists:bool} §C{File.Exists} §A path §/C
     §IF{if5} (! exists)
       §R 0
@@ -45,7 +45,7 @@
     §R §CNT{seen}
 
   §F{f006:Compact:pub} (str:path) -> void
-    §E{fs:rw,mut}
+    §E{fs:rw,mut,alloc}
     §B{exists:bool} §C{File.Exists} §A path §/C
     §IF{if7} (! exists)
       §R

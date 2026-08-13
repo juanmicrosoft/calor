@@ -3,6 +3,7 @@
 
   §CL{c001:MatchListDemo:pub}
     §MT{m002:GetItems:pub} (i32:category) -> List<str>
+      §E{alloc}
       §W{match003:expr} category
         §K 1
           §LIST{_listStr005:str}
@@ -18,5 +19,4 @@
           §R _listStr007
         §/K
         §K _ → §NEW{List<str>} §/NEW
-
 

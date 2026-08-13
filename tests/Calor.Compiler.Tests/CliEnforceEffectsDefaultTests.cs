@@ -1,4 +1,8 @@
 using Xunit;
+using System.CommandLine;
+using Calor.Compiler.Commands;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Tests;
 
@@ -56,5 +60,38 @@ public class CliEnforceEffectsDefaultTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.DoesNotContain("Calor0410", stdOut + stdErr);
+    }
+
+    [Fact]
+    public void SdkDefaults_MatchCliStrictEnforcementDefaults()
+    {
+        var options = new CompilationOptions();
+
+        Assert.True(options.EnforceEffects);
+        Assert.Equal(UnknownCallPolicy.Strict, options.UnknownCallPolicy);
+        Assert.False(options.StrictEffects);
+
+        var result = Program.Compile(
+            """
+            §M{m001:Test}
+              §F{f001:Main:pub}
+                §O{void}
+                §P "undeclared console write"
+            """,
+            "sdk-default.calr",
+            options);
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Fact]
+    public void WatchDefaults_MatchCliEnforcementDefault()
+    {
+        var command = WatchCommand.Create();
+        var option = Assert.IsType<System.CommandLine.Option<bool>>(Assert.Single(command.Options,
+            candidate => candidate.HasAlias("--enforce-effects")));
+        var parseResult = command.Parse(["."]);
+
+        Assert.True(parseResult.GetValueForOption(option));
     }
 }

@@ -5,10 +5,10 @@
     §WHERE TFixture : BaseClass<TFixture>.FixtureBase, new
 
     §MT{m002:Create:pub} () -> TFixture
+      §E{alloc}
       §R §NEW{TFixture} §/NEW
 
 
   §CL{c003:BaseClass<T>:pub}
     §CL{c004:FixtureBase:pub}
-
 

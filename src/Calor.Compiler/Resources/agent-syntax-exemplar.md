@@ -130,7 +130,7 @@ the type the surrounding surface declares.
 ```calor
 §M{m5:Collections}
   §F{f1:Tally:pub} (str:key) -> i32
-    §E{mut}
+    §E{mut,alloc}
     §DICT{counts:str:i32}
     §/DICT{counts}
     §PUT{counts} key 1

@@ -69,7 +69,7 @@ public sealed class LosslessFormattingTests : IDisposable
                 §MT{mt001:method001:pub} (Type001:arg001) -> str
                   §R field001
               §F{f001:call001:pub} () -> void
-                §E{cw}
+                §E{cw,alloc}
                 §B{user001:Type001} §NEW{Type001} §/NEW
                 §C{user001.method001} user001
                 §P "user001 Type001 field001 method001 ctor001"

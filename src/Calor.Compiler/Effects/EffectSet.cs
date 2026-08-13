@@ -186,125 +186,15 @@ public sealed class EffectSet : IEquatable<EffectSet>
     /// Converts internal representation to surface code for display.
     /// </summary>
     private static string ToSurfaceCode(EffectKind kind, string value)
-    {
-        return (kind, value) switch
-        {
-            // Console I/O
-            (EffectKind.IO, "console_write") => "cw",
-            (EffectKind.IO, "console_read") => "cr",
-
-            // Filesystem effects
-            (EffectKind.IO, "filesystem_read") => "fs:r",
-            (EffectKind.IO, "filesystem_write") => "fs:w",
-            (EffectKind.IO, "filesystem_readwrite") => "fs:rw",
-
-            // Network effects
-            (EffectKind.IO, "network_read") => "net:r",
-            (EffectKind.IO, "network_write") => "net:w",
-            (EffectKind.IO, "network_readwrite") => "net:rw",
-
-            // Database effects
-            (EffectKind.IO, "database_read") => "db:r",
-            (EffectKind.IO, "database_write") => "db:w",
-            (EffectKind.IO, "database_readwrite") => "db:rw",
-
-            // Environment effects
-            (EffectKind.IO, "environment_read") => "env:r",
-            (EffectKind.IO, "environment_write") => "env:w",
-            (EffectKind.IO, "environment_readwrite") => "env:rw",
-
-            // System
-            (EffectKind.IO, "process") => "proc",
-
-            // Memory effects
-            (EffectKind.Memory, "allocation") => "alloc",
-            (EffectKind.Memory, "unsafe") => "unsafe",
-
-            // Nondeterminism
-            (EffectKind.Nondeterminism, "time") => "time",
-            (EffectKind.Nondeterminism, "random") => "rand",
-
-            // Mutation/Exception
-            (EffectKind.Mutation, "heap_write") => "mut",
-            (EffectKind.Exception, "intentional") => "throw",
-
-            _ => $"{kind}:{value}"
-        };
-    }
+        => EffectCodes.ToCompact(kind, value);
 
     /// <summary>
     /// Parses a surface code to internal representation.
     /// </summary>
     private static (EffectKind Kind, string Value) ParseSurfaceCode(string code)
     {
-        return code.ToLowerInvariant() switch
-        {
-            // Console I/O
-            "cw" => (EffectKind.IO, "console_write"),
-            "cr" => (EffectKind.IO, "console_read"),
-
-            // Filesystem effects
-            "fs:r" => (EffectKind.IO, "filesystem_read"),
-            "fs:w" => (EffectKind.IO, "filesystem_write"),
-            "fs:rw" => (EffectKind.IO, "filesystem_readwrite"),
-
-            // Network effects
-            "net:r" => (EffectKind.IO, "network_read"),
-            "net:w" => (EffectKind.IO, "network_write"),
-            "net:rw" => (EffectKind.IO, "network_readwrite"),
-
-            // Database effects
-            "db:r" => (EffectKind.IO, "database_read"),
-            "db:w" => (EffectKind.IO, "database_write"),
-            "db:rw" => (EffectKind.IO, "database_readwrite"),
-
-            // Environment effects
-            "env:r" => (EffectKind.IO, "environment_read"),
-            "env:w" => (EffectKind.IO, "environment_write"),
-            "env:rw" => (EffectKind.IO, "environment_readwrite"),
-
-            // System
-            "proc" => (EffectKind.IO, "process"),
-
-            // Memory effects
-            "alloc" => (EffectKind.Memory, "allocation"),
-            "unsafe" => (EffectKind.Memory, "unsafe"),
-
-            // Nondeterminism
-            "time" => (EffectKind.Nondeterminism, "time"),
-            "rand" => (EffectKind.Nondeterminism, "random"),
-
-            // Mutation/Exception
-            "mut" => (EffectKind.Mutation, "heap_write"),
-            "throw" => (EffectKind.Exception, "intentional"),
-
-            _ => ParseLegacyCode(code)
-        };
-    }
-
-    /// <summary>
-    /// Parses legacy effect codes for backward compatibility.
-    /// </summary>
-    private static (EffectKind Kind, string Value) ParseLegacyCode(string code)
-    {
-        // Handle legacy format like "io:console_write"
-        var parts = code.Split(':');
-        if (parts.Length == 2)
-        {
-            var kind = parts[0].ToLowerInvariant() switch
-            {
-                "io" => EffectKind.IO,
-                "mutation" => EffectKind.Mutation,
-                "nondeterminism" => EffectKind.Nondeterminism,
-                "exception" => EffectKind.Exception,
-                "memory" => EffectKind.Memory,
-                _ => EffectKind.Unknown
-            };
-            return (kind, parts[1]);
-        }
-
-        // Unknown effect
-        return (EffectKind.Unknown, code);
+        var parsed = EffectCodes.ParseCompact(code);
+        return (parsed.Kind, parsed.Value);
     }
 
     private static EffectSet CreateUnknown()

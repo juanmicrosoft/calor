@@ -5,6 +5,6 @@
       §E{}
       §R (+ §THIS.count count)
   §F{f001:Run:pub} () -> i32
-    §E{}
+    §E{alloc}
     §B{box:Box} §NEW{Box} §/NEW
     §R §C{box.Add} §A INT:5 §/C

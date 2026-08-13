@@ -18,7 +18,7 @@
       §ASSIGN this._mappings name
 
     §MT{mt1:Transliterate:pub} (str:input) -> str
-      §E{cw,cr,mut}
+      §E{cw,cr,mut,alloc}
       §B{~dict} §NEW{Dictionary<char,str>} §/NEW
       §B{[char]:buf} §ARR{char:buf:256}
       §B{~sb} §NEW{StringBuilder} §/NEW
@@ -31,4 +31,3 @@
           §C{sb.Append} §A ch §/C
       §C{Console.WriteLine} §A "{0} {1}" §A §NEW{StringBuilder} §/NEW §A §NEW{StringBuilder} §/NEW §/C
       §R §C{sb.ToString} §/C
-

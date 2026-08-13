@@ -1,12 +1,11 @@
 §M{m001:StateService}
   §F{f001:IncrementCounter:pub} (i32:counter) -> i32
-    §E{st}
+    §E{mut}
     §R (+ counter 1)
 
   §F{f002:ResetCounter:pub} () -> i32
-    §E{st}
+    §E{mut}
     §R 0
 
   §F{f003:ReadCounter:pub} (i32:counter) -> i32
     §R counter
-

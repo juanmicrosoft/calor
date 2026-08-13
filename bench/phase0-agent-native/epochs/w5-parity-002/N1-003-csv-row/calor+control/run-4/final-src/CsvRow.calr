@@ -25,7 +25,7 @@
     §R result
 
   §F{f004:SplitRow:pub} (str:line) -> List<str>
-    §E{mut}
+    §E{mut,alloc}
     §B{result} §NEW{List<str>} §/NEW
     §B{~current} ""
     §B{~inQuotes} false

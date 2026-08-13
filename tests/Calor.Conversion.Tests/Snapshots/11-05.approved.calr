@@ -4,6 +4,7 @@
 
   §CL{c001:DictExample:pub}
     §MT{m002:GetScores:pub} () -> Dict<str, i32>
+      §E{alloc}
       §DICT{dict003:str:i32}
         §KV "Alice" 95
         §KV "Bob" 87
@@ -12,5 +13,4 @@
 
     §MT{m004:GetImmutableScores:pub} () -> ImmutableDictionary<str, i32>
       §R ImmutableDictionary<str, i32>.Empty
-
 
