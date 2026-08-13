@@ -1364,6 +1364,73 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_RefinedDecrement_RechecksInvariant()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Bad:pub}
+                  §O{i32}
+                  §B{~value:Positive} INT:1
+                  (dec value)
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "Bad");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_UninitializedRefinedBinding_RejectsInvalidDefault()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:Bad:pub}
+                  §O{i32}
+                  §B{value:Positive}
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "Bad");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_LambdaParameterShadowsOuterIndexedBound()
+    {
+        var source = """
+            §M{m001:Test}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f001:Shadow:pub}
+                  §I{Sized:items}
+                  §I{i32:n}
+                  §I{i32:index}
+                  §O{void}
+                  §B{read:Func<i32[], i32>} §LAM{l1:items:i32[]} §IDX items index §/LAM{l1}
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var csharp = new CSharpEmitter().Emit(module);
+        var validation = GeneratedCSharpCompiler.Validate(csharp);
+
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join(Environment.NewLine, validation.CompilationErrors));
+        Assert.DoesNotContain("Indexed-type bound violated", csharp);
+        var indexObligation = Assert.Single(
+            tracker.Obligations,
+            obligation => obligation.Kind == ObligationKind.IndexBounds);
+        Assert.Contains("runtime collection bounds", indexObligation.Description);
+    }
+
+    [Fact]
     public void CSharpEmit_StatementLambda_ContainsItsProofGuard()
     {
         var span = new TextSpan(0, 1, 1, 1);

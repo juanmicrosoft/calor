@@ -171,12 +171,10 @@ public sealed class ObligationGenerator
                 ambiguousVariables.Add(bind.Name);
             refinementByVariable[bind.Name] = refinementType;
 
-            if (bind.Initializer is null)
-                continue;
-
             var condition = FactCollector.SubstituteSelfRefStatic(
                 refinementType.Predicate,
-                bind.Initializer);
+                bind.Initializer
+                    ?? new ReferenceNode(bind.Span, bind.Name));
             var obligation = _tracker.Add(
                 ObligationKind.Subtype,
                 functionId,
@@ -242,6 +240,48 @@ public sealed class ObligationGenerator
                     "inline refinement",
                     assignedValue,
                     assignment.Span);
+            }
+        }
+
+        foreach (var unary in nodes.OfType<UnaryOperationNode>())
+        {
+            if (unary.Operator is not (UnaryOperator.PreIncrement
+                    or UnaryOperator.PreDecrement
+                    or UnaryOperator.PostIncrement
+                    or UnaryOperator.PostDecrement)
+                || unary.Operand is not ReferenceNode target
+                || ambiguousVariables.Contains(target.Name))
+            {
+                continue;
+            }
+
+            var assignedValue = new BinaryOperationNode(
+                unary.Span,
+                unary.Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+                    ? BinaryOperator.Add
+                    : BinaryOperator.Subtract,
+                target,
+                new IntLiteralNode(unary.Span, 1));
+            if (refinementByVariable.TryGetValue(target.Name, out var refinementType))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    refinementType,
+                    assignedValue,
+                    unary.Span);
+            }
+            else if (inlineRefinementByVariable.TryGetValue(
+                target.Name,
+                out var inlinePredicate))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    inlinePredicate,
+                    "inline refinement",
+                    assignedValue,
+                    unary.Span);
             }
         }
     }
@@ -413,6 +453,18 @@ public sealed class ObligationGenerator
         }
         foreach (var alias in ambiguousAliases)
             indexedParams.Remove(alias);
+        foreach (var lambdaParameterName in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<LambdaExpressionNode>()
+                     .SelectMany(lambda => lambda.Parameters)
+                     .Select(parameter => parameter.Name)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            // A lambda parameter shadows any outer indexed variable with the
+            // same name. The flat obligation walk cannot safely reuse the
+            // outer logical size, so fall back to runtime collection bounds.
+            indexedParams.Remove(lambdaParameterName);
+        }
 
         foreach (var access in body
                      .SelectMany(DescendantsAndSelf)

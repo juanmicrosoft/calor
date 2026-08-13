@@ -512,7 +512,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (!skipEmptyLine || !string.IsNullOrEmpty(code))
         {
             AppendLine(code);
-            if (statement is BindStatementNode { Initializer: not null } bind
+            if (statement is BindStatementNode bind
                 && TryGetRefinementConstraint(bind.Name, out var bindConstraint))
             {
                 if (ShouldEmitObligationGuard(
@@ -558,6 +558,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         compoundConstraint,
                         SanitizeIdentifier(compoundTarget.Name));
                 }
+            }
+            else if (statement is ExpressionStatementNode
+                {
+                    Expression: UnaryOperationNode
+                    {
+                        Operator: UnaryOperator.PreIncrement
+                            or UnaryOperator.PreDecrement
+                            or UnaryOperator.PostIncrement
+                            or UnaryOperator.PostDecrement,
+                        Operand: ReferenceNode unaryTarget
+                    } unary
+                }
+                && TryGetRefinementConstraint(
+                    unaryTarget.Name,
+                    out var unaryConstraint)
+                && ShouldEmitObligationGuard(
+                    Verification.Obligations.ObligationKind.Subtype,
+                    unary.Span,
+                    unaryTarget.Name))
+            {
+                EmitRefinementValueGuard(
+                    unaryConstraint,
+                    SanitizeIdentifier(unaryTarget.Name));
             }
         }
         EndLineMapping(mapped);
@@ -4391,7 +4414,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         if (node.IsExpressionLambda && node.ExpressionBody != null)
         {
-            var body = node.ExpressionBody.Accept(this);
+            PushDeclScope();
+            RegisterLambdaParameters(node.Parameters);
+            string body;
+            try
+            {
+                body = node.ExpressionBody.Accept(this);
+            }
+            finally
+            {
+                PopDeclScope();
+            }
             return $"{staticMod}{async}{parameters} => {body}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
@@ -4399,22 +4432,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var builderStart = _builder.Length;
             var previousIndent = _indentLevel;
             PushDeclScope();
-            foreach (var parameter in node.Parameters)
-            {
-                var name = SanitizeIdentifier(parameter.Name);
-                DeclareVarInScope(name);
-                if (parameter.TypeName != null
-                    && _refinementTypes.TryGetValue(
-                        parameter.TypeName,
-                        out var refinementType))
-                {
-                    DeclareRefinementInScope(
-                        name,
-                        new RefinementConstraint(
-                            refinementType.Predicate,
-                            $"refinement type '{refinementType.Name}'"));
-                }
-            }
+            RegisterLambdaParameters(node.Parameters);
 
             string body;
             try
@@ -4438,6 +4456,52 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         return $"{staticMod}{async}{parameters} => default";
+    }
+
+    private void RegisterLambdaParameters(
+        IReadOnlyList<LambdaParameterNode> parameters)
+    {
+        foreach (var parameter in parameters)
+        {
+            var name = SanitizeIdentifier(parameter.Name);
+            DeclareVarInScope(name);
+            DeclareRefinementInScope(name, null);
+            DeclareIndexedBoundInScope(name, null);
+        }
+
+        foreach (var parameter in parameters)
+        {
+            if (parameter.TypeName is null)
+                continue;
+
+            var name = SanitizeIdentifier(parameter.Name);
+            if (_refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
+            {
+                DeclareRefinementInScope(
+                    name,
+                    new RefinementConstraint(
+                        refinementType.Predicate,
+                        $"refinement type '{refinementType.Name}'"));
+            }
+
+            var indexedTypeName = parameter.TypeName;
+            var genericIndex = indexedTypeName.IndexOf('<');
+            if (genericIndex > 0)
+                indexedTypeName = indexedTypeName[..genericIndex];
+            if (_indexedTypes.TryGetValue(indexedTypeName, out var indexedType))
+            {
+                var hasWitness = parameters.Any(candidate =>
+                    string.Equals(
+                        SanitizeIdentifier(candidate.Name),
+                        SanitizeIdentifier(indexedType.SizeParam),
+                        StringComparison.Ordinal));
+                DeclareIndexedBoundInScope(
+                    name,
+                    hasWitness
+                        ? indexedType.SizeParam
+                        : $"missing:{indexedType.SizeParam}");
+            }
+        }
     }
 
     public string Visit(DelegateDefinitionNode node)
