@@ -299,7 +299,7 @@ public sealed class IndexedTypeTests
     }
 
     [Fact]
-    public void Generate_ArrayAccessOnNonIndexedType_NoIndexBoundsObligation()
+    public void Generate_ArrayAccessOnNonIndexedType_CreatesRuntimeBoundsObligation()
     {
         var source = """
             §M{m001:Test}
@@ -318,7 +318,10 @@ public sealed class IndexedTypeTests
         var generator = new ObligationGenerator(tracker);
         generator.Generate(module);
 
-        Assert.DoesNotContain(tracker.Obligations, o => o.Kind == ObligationKind.IndexBounds);
+        var obligation = Assert.Single(
+            tracker.Obligations,
+            o => o.Kind == ObligationKind.IndexBounds);
+        Assert.Contains("runtime collection bounds", obligation.Description);
     }
 
     [Fact]
@@ -439,7 +442,7 @@ public sealed class IndexedTypeTests
               §F{f001:Sum:priv}
                   §I{SizedList:items}
                   §O{i32}
-                  §L{l1:i:INT:0:n:INT:1}
+                  §L{l1:i:0:n:1}
                       §R §IDX items i
             """;
 
@@ -451,9 +454,12 @@ public sealed class IndexedTypeTests
         var collector = new FactCollector();
         collector.CollectFromFunction(func);
 
-        // Should have 2 facts: i >= 0 and i < n
+        // Emitted loops are inclusive: i >= 0 and i <= n.
         Assert.Equal(2, collector.Facts.Count);
         Assert.All(collector.Facts, f => Assert.IsType<BinaryOperationNode>(f));
+        Assert.Contains(
+            collector.Facts,
+            fact => fact is BinaryOperationNode { Operator: BinaryOperator.LessOrEqual });
     }
 
     // ───── MCP Tool ─────

@@ -49,13 +49,28 @@ public sealed class ObligationGenerator
         {
             GenerateForFunction(func);
         }
+        foreach (var enumExtension in module.EnumExtensions)
+        {
+            foreach (var method in enumExtension.Methods)
+            {
+                GenerateForFunction(method);
+            }
+        }
 
         // Generate for methods inside classes
         foreach (var cls in module.Classes)
         {
+            foreach (var constructor in cls.Constructors)
+            {
+                GenerateForConstructor(constructor);
+            }
             foreach (var method in cls.Methods)
             {
                 GenerateForMethod(method, cls);
+            }
+            foreach (var operatorOverload in cls.OperatorOverloads)
+            {
+                GenerateForOperator(operatorOverload);
             }
         }
     }
@@ -67,21 +82,11 @@ public sealed class ObligationGenerator
         {
             GenerateParameterObligation(param, func.Id, func.Visibility);
         }
+        GenerateReturnObligation(func.Output, func.Id);
 
-        // 2. Proof obligations from body
-        foreach (var stmt in func.Body)
-        {
-            if (stmt is ProofObligationNode proof)
-            {
-                var obl = _tracker.Add(
-                    ObligationKind.ProofObligation,
-                    func.Id,
-                    proof.Description ?? $"Proof obligation {proof.Id}",
-                    proof.Condition,
-                    proof.Span);
-                obl.SourceProofId = proof.Id;
-            }
-        }
+        // 2. Proof obligations from the complete nested body
+        GenerateProofObligations(func.Body, func.Id);
+        GenerateSubtypeObligations(func.Body, func.Parameters, func.Id);
 
         // 3. Index bounds obligations from body
         GenerateIndexBoundsForBody(func.Body, func.Parameters, func.Id, func.Visibility);
@@ -93,33 +98,361 @@ public sealed class ObligationGenerator
         {
             GenerateParameterObligation(param, method.Id, method.Visibility);
         }
+        GenerateReturnObligation(method.Output, method.Id);
 
-        foreach (var stmt in method.Body)
+        GenerateProofObligations(method.Body, method.Id);
+        GenerateSubtypeObligations(method.Body, method.Parameters, method.Id);
+
+        GenerateIndexBoundsForBody(method.Body, method.Parameters, method.Id, method.Visibility);
+    }
+
+    private void GenerateForOperator(OperatorOverloadNode operatorOverload)
+    {
+        foreach (var param in operatorOverload.Parameters)
         {
-            if (stmt is ProofObligationNode proof)
+            GenerateParameterObligation(
+                param,
+                operatorOverload.Id,
+                operatorOverload.Visibility);
+        }
+        GenerateReturnObligation(
+            operatorOverload.Output,
+            operatorOverload.Id);
+        GenerateProofObligations(
+            operatorOverload.Body,
+            operatorOverload.Id);
+        GenerateSubtypeObligations(
+            operatorOverload.Body,
+            operatorOverload.Parameters,
+            operatorOverload.Id);
+        GenerateIndexBoundsForBody(
+            operatorOverload.Body,
+            operatorOverload.Parameters,
+            operatorOverload.Id,
+            operatorOverload.Visibility);
+    }
+
+    private void GenerateForConstructor(ConstructorNode constructor)
+    {
+        foreach (var parameter in constructor.Parameters)
+        {
+            GenerateParameterObligation(
+                parameter,
+                constructor.Id,
+                constructor.Visibility);
+        }
+
+        GenerateProofObligations(constructor.Body, constructor.Id);
+        GenerateSubtypeObligations(
+            constructor.Body,
+            constructor.Parameters,
+            constructor.Id);
+        GenerateIndexBoundsForBody(
+            constructor.Body,
+            constructor.Parameters,
+            constructor.Id,
+            constructor.Visibility);
+    }
+
+    private void GenerateReturnObligation(OutputNode? output, string functionId)
+    {
+        if (output is null
+            || !_refinementTypes.TryGetValue(output.TypeName, out var refinementType))
+        {
+            return;
+        }
+
+        var obligation = _tracker.Add(
+            ObligationKind.RefinementReturn,
+            functionId,
+            $"Return value must satisfy refinement type '{refinementType.Name}'",
+            GetEffectiveRefinementPredicate(refinementType),
+            output.Span);
+        obligation.ParameterName = "result";
+    }
+
+    private void GenerateProofObligations(
+        IReadOnlyList<StatementNode> body,
+        string functionId)
+    {
+        foreach (var proof in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<ProofObligationNode>())
+        {
+            var obligation = _tracker.Add(
+                ObligationKind.ProofObligation,
+                functionId,
+                proof.Description ?? $"Proof obligation {proof.Id}",
+                proof.Condition,
+                proof.Span);
+            obligation.SourceProofId = proof.Id;
+        }
+    }
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+
+    }
+
+    private void GenerateSubtypeObligations(
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyList<ParameterNode> parameters,
+        string functionId)
+    {
+        var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
+        var refinementByVariable = new Dictionary<string, RefinementTypeNode>(
+            StringComparer.Ordinal);
+        var inlineRefinementByVariable = new Dictionary<string, ExpressionNode>(
+            StringComparer.Ordinal);
+        var ambiguousVariables = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var group in nodes
+                     .OfType<BindStatementNode>()
+                     .Where(bind => bind.TypeName != null
+                         && _refinementTypes.ContainsKey(bind.TypeName))
+                     .GroupBy(bind => bind.Name, StringComparer.Ordinal))
+        {
+            if (group.Select(bind => bind.TypeName)
+                .Distinct(StringComparer.Ordinal)
+                .Skip(1)
+                .Any())
             {
-                var obl = _tracker.Add(
-                    ObligationKind.ProofObligation,
-                    method.Id,
-                    proof.Description ?? $"Proof obligation {proof.Id}",
-                    proof.Condition,
-                    proof.Span);
-                obl.SourceProofId = proof.Id;
+                ambiguousVariables.Add(group.Key);
             }
         }
 
-        GenerateIndexBoundsForBody(method.Body, method.Parameters, method.Id, method.Visibility);
+        foreach (var parameter in parameters)
+        {
+            if (_refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
+                refinementByVariable[parameter.Name] = refinementType;
+            if (parameter.InlineRefinement?.Predicate is { } inlinePredicate)
+                inlineRefinementByVariable[parameter.Name] = inlinePredicate;
+        }
+
+        foreach (var bind in nodes.OfType<BindStatementNode>())
+        {
+            if (bind.TypeName is null
+                || !_refinementTypes.TryGetValue(bind.TypeName, out var refinementType))
+            {
+                if (!bind.IsMutable && refinementByVariable.ContainsKey(bind.Name))
+                    ambiguousVariables.Add(bind.Name);
+                continue;
+            }
+
+            var hasEstablishedRefinement =
+                refinementByVariable.ContainsKey(bind.Name)
+                || inlineRefinementByVariable.ContainsKey(bind.Name);
+            if (hasEstablishedRefinement && !bind.IsMutable)
+                ambiguousVariables.Add(bind.Name);
+            if (!bind.IsMutable || !hasEstablishedRefinement)
+                refinementByVariable[bind.Name] = refinementType;
+
+            var condition = FactCollector.SubstituteSelfRefStatic(
+                GetEffectiveRefinementPredicate(refinementType),
+                bind.Initializer
+                    ?? new ReferenceNode(bind.Span, bind.Name));
+            var obligation = _tracker.Add(
+                ObligationKind.Subtype,
+                functionId,
+                $"Value assigned to '{bind.Name}' must satisfy refinement type '{refinementType.Name}'",
+                condition,
+                bind.Span);
+            obligation.ParameterName = bind.Name;
+        }
+
+        foreach (var assignment in nodes.OfType<AssignmentStatementNode>())
+        {
+            if (assignment.Target is not ReferenceNode target
+                || ambiguousVariables.Contains(target.Name))
+            {
+                continue;
+            }
+
+            if (refinementByVariable.TryGetValue(target.Name, out var refinementType))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    refinementType,
+                    assignment.Value,
+                    assignment.Span);
+            }
+            if (inlineRefinementByVariable.TryGetValue(
+                    target.Name,
+                    out var inlinePredicate))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    inlinePredicate,
+                    "inline refinement",
+                    assignment.Value,
+                    assignment.Span);
+            }
+        }
+
+        foreach (var assignment in nodes.OfType<CompoundAssignmentStatementNode>())
+        {
+            var assignedValue = BuildCompoundAssignmentValue(assignment);
+            if (assignment.Target is not ReferenceNode target
+                || ambiguousVariables.Contains(target.Name))
+            {
+                continue;
+            }
+
+            if (refinementByVariable.TryGetValue(target.Name, out var refinementType))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    refinementType,
+                    assignedValue,
+                    assignment.Span);
+            }
+            if (inlineRefinementByVariable.TryGetValue(
+                    target.Name,
+                    out var inlinePredicate))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    inlinePredicate,
+                    "inline refinement",
+                    assignedValue,
+                    assignment.Span);
+            }
+        }
+
+        foreach (var unary in nodes.OfType<UnaryOperationNode>())
+        {
+            if (unary.Operator is not (UnaryOperator.PreIncrement
+                    or UnaryOperator.PreDecrement
+                    or UnaryOperator.PostIncrement
+                    or UnaryOperator.PostDecrement)
+                || unary.Operand is not ReferenceNode target
+                || ambiguousVariables.Contains(target.Name))
+            {
+                continue;
+            }
+
+            var assignedValue = new BinaryOperationNode(
+                unary.Span,
+                unary.Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+                    ? BinaryOperator.Add
+                    : BinaryOperator.Subtract,
+                target,
+                new IntLiteralNode(unary.Span, 1));
+            if (refinementByVariable.TryGetValue(target.Name, out var refinementType))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    refinementType,
+                    assignedValue,
+                    unary.Span);
+            }
+            if (inlineRefinementByVariable.TryGetValue(
+                target.Name,
+                out var inlinePredicate))
+            {
+                AddAssignmentSubtypeObligation(
+                    functionId,
+                    target.Name,
+                    inlinePredicate,
+                    "inline refinement",
+                    assignedValue,
+                    unary.Span);
+            }
+        }
+    }
+
+    private void AddAssignmentSubtypeObligation(
+        string functionId,
+        string variableName,
+        RefinementTypeNode refinementType,
+        ExpressionNode assignedValue,
+        TextSpan span)
+        => AddAssignmentSubtypeObligation(
+            functionId,
+            variableName,
+            GetEffectiveRefinementPredicate(refinementType),
+            $"refinement type '{refinementType.Name}'",
+            assignedValue,
+            span);
+
+    private void AddAssignmentSubtypeObligation(
+        string functionId,
+        string variableName,
+        ExpressionNode predicate,
+        string refinementDescription,
+        ExpressionNode assignedValue,
+        TextSpan span)
+    {
+        var condition = FactCollector.SubstituteSelfRefStatic(
+            predicate,
+            assignedValue);
+        var obligation = _tracker.Add(
+            ObligationKind.Subtype,
+            functionId,
+            $"Assignment to '{variableName}' must preserve {refinementDescription}",
+            condition,
+            span);
+        obligation.ParameterName = variableName;
+    }
+
+    private static ExpressionNode BuildCompoundAssignmentValue(
+        CompoundAssignmentStatementNode assignment)
+    {
+        if (assignment.Operator == CompoundAssignmentOperator.NullCoalesce)
+        {
+            return new NullCoalesceNode(
+                assignment.Span,
+                assignment.Target,
+                assignment.Value);
+        }
+
+        var binaryOperator = assignment.Operator switch
+        {
+            CompoundAssignmentOperator.Add => BinaryOperator.Add,
+            CompoundAssignmentOperator.Subtract => BinaryOperator.Subtract,
+            CompoundAssignmentOperator.Multiply => BinaryOperator.Multiply,
+            CompoundAssignmentOperator.Divide => BinaryOperator.Divide,
+            CompoundAssignmentOperator.Modulo => BinaryOperator.Modulo,
+            CompoundAssignmentOperator.BitwiseAnd => BinaryOperator.BitwiseAnd,
+            CompoundAssignmentOperator.BitwiseOr => BinaryOperator.BitwiseOr,
+            CompoundAssignmentOperator.BitwiseXor => BinaryOperator.BitwiseXor,
+            CompoundAssignmentOperator.LeftShift => BinaryOperator.LeftShift,
+            CompoundAssignmentOperator.RightShift => BinaryOperator.RightShift,
+            _ => throw new ArgumentOutOfRangeException(nameof(assignment))
+        };
+        return new BinaryOperationNode(
+            assignment.Span,
+            binaryOperator,
+            assignment.Target,
+            assignment.Value);
     }
 
     private void GenerateParameterObligation(ParameterNode param, string functionId, Visibility visibility)
     {
         if (param.InlineRefinement != null)
         {
+            var isOut = param.Modifier == ParameterModifier.Out;
             var obl = _tracker.Add(
-                ObligationKind.RefinementEntry,
+                isOut ? ObligationKind.Subtype : ObligationKind.RefinementEntry,
                 functionId,
-                $"Parameter '{param.Name}' must satisfy inline refinement",
-                param.InlineRefinement.Predicate,
+                isOut
+                    ? $"Out parameter '{param.Name}' must satisfy inline refinement on assignment"
+                    : $"Parameter '{param.Name}' must satisfy inline refinement",
+                isOut
+                    ? FactCollector.SubstituteSelfRefStatic(
+                        param.InlineRefinement.Predicate,
+                        param.Name)
+                    : param.InlineRefinement.Predicate,
                 param.Span);
             obl.ParameterName = param.Name;
 
@@ -134,11 +467,18 @@ public sealed class ObligationGenerator
         // Check if parameter type name matches a known refinement type
         if (_refinementTypes.TryGetValue(param.TypeName, out var rtype))
         {
+            var isOut = param.Modifier == ParameterModifier.Out;
             var obl = _tracker.Add(
-                ObligationKind.RefinementEntry,
+                isOut ? ObligationKind.Subtype : ObligationKind.RefinementEntry,
                 functionId,
-                $"Parameter '{param.Name}' must satisfy refinement type '{rtype.Name}'",
-                rtype.Predicate,
+                isOut
+                    ? $"Out parameter '{param.Name}' must satisfy refinement type '{rtype.Name}' on assignment"
+                    : $"Parameter '{param.Name}' must satisfy refinement type '{rtype.Name}'",
+                isOut
+                    ? FactCollector.SubstituteSelfRefStatic(
+                        GetEffectiveRefinementPredicate(rtype),
+                        param.Name)
+                    : GetEffectiveRefinementPredicate(rtype),
                 param.Span);
             obl.ParameterName = param.Name;
 
@@ -148,6 +488,35 @@ public sealed class ObligationGenerator
                 obl.SuggestedFix = $"Add runtime guard for '{rtype.Name}' constraint on '{param.Name}'";
             }
         }
+    }
+
+    private ExpressionNode GetEffectiveRefinementPredicate(
+        RefinementTypeNode refinementType)
+    {
+        var predicates = new Stack<ExpressionNode>();
+        var current = refinementType;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (visited.Add(current.Name))
+        {
+            predicates.Push(current.Predicate);
+            if (!_refinementTypes.TryGetValue(
+                    current.BaseTypeName,
+                    out current))
+            {
+                break;
+            }
+        }
+
+        var effective = predicates.Pop();
+        while (predicates.Count > 0)
+        {
+            effective = new BinaryOperationNode(
+                refinementType.Span,
+                BinaryOperator.And,
+                effective,
+                predicates.Pop());
+        }
+        return effective;
     }
 
     /// <summary>
@@ -160,8 +529,6 @@ public sealed class ObligationGenerator
         string functionId,
         Visibility visibility)
     {
-        if (_indexedTypes.Count == 0) return;
-
         // Build lookup: parameter name -> indexed type (if the parameter's type matches)
         var indexedParams = new Dictionary<string, (ParameterNode Param, IndexedTypeNode IType)>(StringComparer.Ordinal);
         foreach (var param in parameters)
@@ -179,182 +546,124 @@ public sealed class ObligationGenerator
             }
         }
 
-        if (indexedParams.Count == 0) return;
-
-        ScanStatementsForIndexBounds(body, indexedParams, functionId, visibility);
-    }
-
-    private void ScanStatementsForIndexBounds(
-        IReadOnlyList<StatementNode> statements,
-        Dictionary<string, (ParameterNode Param, IndexedTypeNode IType)> indexedParams,
-        string functionId,
-        Visibility visibility)
-    {
-        foreach (var stmt in statements)
+        // Propagate logical bounds through local aliases. Runtime emission uses
+        // the same alias relationship so reads and writes preserve the modeled
+        // indexed-type boundary instead of falling back to physical capacity.
+        var ambiguousAliases = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var bind in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<BindStatementNode>())
         {
-            ScanStatementForIndexBounds(stmt, indexedParams, functionId, visibility);
-        }
-    }
-
-    private void ScanStatementForIndexBounds(
-        StatementNode stmt,
-        Dictionary<string, (ParameterNode Param, IndexedTypeNode IType)> indexedParams,
-        string functionId,
-        Visibility visibility)
-    {
-        switch (stmt)
-        {
-            case ReturnStatementNode ret when ret.Expression != null:
-                ScanExpressionForIndexBounds(ret.Expression, indexedParams, functionId, visibility);
-                break;
-            case ForStatementNode forStmt:
-                ScanStatementsForIndexBounds(forStmt.Body, indexedParams, functionId, visibility);
-                break;
-            case WhileStatementNode whileStmt:
-                ScanStatementsForIndexBounds(whileStmt.Body, indexedParams, functionId, visibility);
-                break;
-            case DoWhileStatementNode doWhile:
-                ScanStatementsForIndexBounds(doWhile.Body, indexedParams, functionId, visibility);
-                break;
-            case ForeachStatementNode foreachStmt:
-                ScanStatementsForIndexBounds(foreachStmt.Body, indexedParams, functionId, visibility);
-                break;
-            case IfStatementNode ifStmt:
-                ScanStatementsForIndexBounds(ifStmt.ThenBody, indexedParams, functionId, visibility);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    ScanStatementsForIndexBounds(elseIf.Body, indexedParams, functionId, visibility);
-                if (ifStmt.ElseBody != null)
-                    ScanStatementsForIndexBounds(ifStmt.ElseBody, indexedParams, functionId, visibility);
-                break;
-            case BindStatementNode bind when bind.Initializer != null:
-                ScanExpressionForIndexBounds(bind.Initializer, indexedParams, functionId, visibility);
-                break;
-            case AssignmentStatementNode assign:
-                ScanExpressionForIndexBounds(assign.Value, indexedParams, functionId, visibility);
-                break;
-            case CompoundAssignmentStatementNode compAssign:
-                ScanExpressionForIndexBounds(compAssign.Value, indexedParams, functionId, visibility);
-                break;
-            case CallStatementNode call:
-                foreach (var arg in call.Arguments)
-                    ScanExpressionForIndexBounds(arg, indexedParams, functionId, visibility);
-                break;
-            case ExpressionStatementNode exprStmt:
-                ScanExpressionForIndexBounds(exprStmt.Expression, indexedParams, functionId, visibility);
-                break;
-            case PrintStatementNode print:
-                ScanExpressionForIndexBounds(print.Expression, indexedParams, functionId, visibility);
-                break;
-            case YieldReturnStatementNode yieldRet when yieldRet.Expression != null:
-                ScanExpressionForIndexBounds(yieldRet.Expression, indexedParams, functionId, visibility);
-                break;
-            case TryStatementNode tryStmt:
-                ScanStatementsForIndexBounds(tryStmt.TryBody, indexedParams, functionId, visibility);
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    ScanStatementsForIndexBounds(catchClause.Body, indexedParams, functionId, visibility);
-                if (tryStmt.FinallyBody != null)
-                    ScanStatementsForIndexBounds(tryStmt.FinallyBody, indexedParams, functionId, visibility);
-                break;
-            case MatchStatementNode matchStmt:
-                foreach (var matchCase in matchStmt.Cases)
-                    ScanStatementsForIndexBounds(matchCase.Body, indexedParams, functionId, visibility);
-                break;
-            case UsingStatementNode usingStmt:
-                ScanStatementsForIndexBounds(usingStmt.Body, indexedParams, functionId, visibility);
-                break;
-        }
-    }
-
-    private void ScanExpressionForIndexBounds(
-        ExpressionNode expr,
-        Dictionary<string, (ParameterNode Param, IndexedTypeNode IType)> indexedParams,
-        string functionId,
-        Visibility visibility)
-    {
-        if (expr is ArrayAccessNode access)
-        {
-            // Check if the array expression references an indexed-typed parameter
-            var arrayName = GetReferenceName(access.Array);
-            if (arrayName != null && indexedParams.TryGetValue(arrayName, out var info))
+            if (bind.Initializer is ReferenceNode source
+                && indexedParams.TryGetValue(source.Name, out var indexedSource))
             {
-                var dummySpan = new TextSpan(0, 0, 1, 1);
-
-                // Build obligation condition: (&& (>= index INT:0) (< index sizeParam))
-                var indexExpr = access.Index;
-                var zeroLit = new IntLiteralNode(dummySpan, 0);
-                var sizeRef = new ReferenceNode(dummySpan, info.IType.SizeParam);
-
-                var geZero = new BinaryOperationNode(dummySpan, BinaryOperator.GreaterOrEqual, indexExpr, zeroLit);
-                var ltSize = new BinaryOperationNode(dummySpan, BinaryOperator.LessThan, indexExpr, sizeRef);
-                var boundsCheck = new BinaryOperationNode(dummySpan, BinaryOperator.And, geZero, ltSize);
-
-                var obl = _tracker.Add(
-                    ObligationKind.IndexBounds,
-                    functionId,
-                    $"Index access on '{arrayName}' must be within bounds [0, {info.IType.SizeParam})",
-                    boundsCheck,
-                    access.Span);
-                obl.ParameterName = arrayName;
-
-                if (visibility == Visibility.Public)
+                if (indexedParams.ContainsKey(bind.Name))
                 {
-                    obl.Status = ObligationStatus.Boundary;
-                    obl.SuggestedFix = $"Add runtime bounds check before accessing '{arrayName}'";
+                    ambiguousAliases.Add(bind.Name);
+                }
+                else
+                {
+                    indexedParams[bind.Name] = indexedSource;
                 }
             }
+        }
+        foreach (var alias in ambiguousAliases)
+            indexedParams.Remove(alias);
+        foreach (var lambdaParameterName in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<LambdaExpressionNode>()
+                     .SelectMany(lambda => lambda.Parameters)
+                     .Select(parameter => parameter.Name)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            // A lambda parameter shadows any outer indexed variable with the
+            // same name. The flat obligation walk cannot safely reuse the
+            // outer logical size, so fall back to runtime collection bounds.
+            indexedParams.Remove(lambdaParameterName);
+        }
 
-            // Also scan the index expression itself (it could contain nested array accesses)
-            ScanExpressionForIndexBounds(access.Index, indexedParams, functionId, visibility);
-        }
-        else if (expr is BinaryOperationNode binOp)
+        foreach (var access in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<ArrayAccessNode>())
         {
-            ScanExpressionForIndexBounds(binOp.Left, indexedParams, functionId, visibility);
-            ScanExpressionForIndexBounds(binOp.Right, indexedParams, functionId, visibility);
+            GenerateIndexBounds(access, indexedParams, functionId, visibility);
         }
-        else if (expr is UnaryOperationNode unOp)
+
+        foreach (var write in body
+                     .SelectMany(DescendantsAndSelf)
+                     .OfType<CollectionSetIndexNode>())
         {
-            ScanExpressionForIndexBounds(unOp.Operand, indexedParams, functionId, visibility);
+            GenerateIndexBounds(
+                new ArrayAccessNode(
+                    write.Span,
+                    new ReferenceNode(write.Span, write.CollectionName),
+                    write.Index),
+                indexedParams,
+                functionId,
+                visibility);
         }
-        else if (expr is CallExpressionNode callExpr)
+    }
+
+    private void GenerateIndexBounds(
+        ArrayAccessNode access,
+        Dictionary<string, (ParameterNode Param, IndexedTypeNode IType)> indexedParams,
+        string functionId,
+        Visibility visibility)
+    {
+        // Check if the array expression references an indexed-typed parameter
+        var arrayName = GetReferenceName(access.Array);
+        if (arrayName != null && indexedParams.TryGetValue(arrayName, out var info))
         {
-            foreach (var arg in callExpr.Arguments)
-                ScanExpressionForIndexBounds(arg, indexedParams, functionId, visibility);
-        }
-        else if (expr is ConditionalExpressionNode cond)
-        {
-            ScanExpressionForIndexBounds(cond.Condition, indexedParams, functionId, visibility);
-            ScanExpressionForIndexBounds(cond.WhenTrue, indexedParams, functionId, visibility);
-            ScanExpressionForIndexBounds(cond.WhenFalse, indexedParams, functionId, visibility);
-        }
-        else if (expr is MatchExpressionNode matchExpr)
-        {
-            ScanExpressionForIndexBounds(matchExpr.Target, indexedParams, functionId, visibility);
-            foreach (var matchCase in matchExpr.Cases)
+            var dummySpan = new TextSpan(0, 0, 1, 1);
+
+            // Build obligation condition: (&& (>= index INT:0) (< index sizeParam))
+            var indexExpr = access.Index;
+            var zeroLit = new IntLiteralNode(dummySpan, 0);
+            var sizeRef = new ReferenceNode(dummySpan, info.IType.SizeParam);
+
+            var geZero = new BinaryOperationNode(dummySpan, BinaryOperator.GreaterOrEqual, indexExpr, zeroLit);
+            var ltSize = new BinaryOperationNode(dummySpan, BinaryOperator.LessThan, indexExpr, sizeRef);
+            var boundsCheck = new BinaryOperationNode(dummySpan, BinaryOperator.And, geZero, ltSize);
+
+            var obl = _tracker.Add(
+                ObligationKind.IndexBounds,
+                functionId,
+                $"Index access on '{arrayName}' must be within bounds [0, {info.IType.SizeParam})",
+                boundsCheck,
+                access.Span);
+            obl.ParameterName = arrayName;
+
+            if (visibility == Visibility.Public)
             {
-                if (matchCase.Body.Count > 0)
-                    ScanStatementsForIndexBounds(matchCase.Body, indexedParams, functionId, visibility);
+                obl.Status = ObligationStatus.Boundary;
+                obl.SuggestedFix = $"Add runtime bounds check before accessing '{arrayName}'";
             }
         }
-        else if (expr is SomeExpressionNode someExpr)
+        else
         {
-            ScanExpressionForIndexBounds(someExpr.Value, indexedParams, functionId, visibility);
-        }
-        else if (expr is OkExpressionNode okExpr)
-        {
-            ScanExpressionForIndexBounds(okExpr.Value, indexedParams, functionId, visibility);
-        }
-        else if (expr is ErrExpressionNode errExpr)
-        {
-            ScanExpressionForIndexBounds(errExpr.Error, indexedParams, functionId, visibility);
-        }
-        else if (expr is AwaitExpressionNode awaitExpr)
-        {
-            ScanExpressionForIndexBounds(awaitExpr.Awaited, indexedParams, functionId, visibility);
-        }
-        else if (expr is NullCoalesceNode nullCoalesce)
-        {
-            ScanExpressionForIndexBounds(nullCoalesce.Left, indexedParams, functionId, visibility);
-            ScanExpressionForIndexBounds(nullCoalesce.Right, indexedParams, functionId, visibility);
+            var dummySpan = new TextSpan(0, 0, 1, 1);
+            var zeroLit = new IntLiteralNode(dummySpan, 0);
+            var geZero = new BinaryOperationNode(
+                dummySpan,
+                BinaryOperator.GreaterOrEqual,
+                access.Index,
+                zeroLit);
+            var ltLength = new BinaryOperationNode(
+                dummySpan,
+                BinaryOperator.LessThan,
+                access.Index,
+                new ArrayLengthNode(dummySpan, access.Array));
+            var boundsCheck = new BinaryOperationNode(
+                dummySpan,
+                BinaryOperator.And,
+                geZero,
+                ltLength);
+            _tracker.Add(
+                ObligationKind.IndexBounds,
+                functionId,
+                "Index access must be within the runtime collection bounds",
+                boundsCheck,
+                access.Span);
         }
     }
 

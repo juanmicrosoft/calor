@@ -62,7 +62,8 @@ public sealed class ObligationSolver : IDisposable
         // Declare all function parameters
         foreach (var (name, type) in info.Parameters)
         {
-            if (!translator.DeclareVariable(name, type))
+            var solverType = ResolveRefinementBaseType(type, info.RefinementTypes);
+            if (!translator.DeclareVariable(name, solverType))
             {
                 // For IndexBounds obligations, skip undeclarable parameters
                 // (e.g., indexed type names like SizedList that aren't Z3-translatable).
@@ -71,7 +72,7 @@ public sealed class ObligationSolver : IDisposable
                     continue;
 
                 obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
-                    ContractTranslator.DiagnoseUnsupportedType(type))));
+                    ContractTranslator.DiagnoseUnsupportedType(solverType))));
                 obligation.SolverDuration = sw.Elapsed;
                 return;
             }
@@ -87,9 +88,24 @@ public sealed class ObligationSolver : IDisposable
             }
         }
 
-        // For RefinementEntry obligations, push the self-variable
+        if (obligation.Kind == ObligationKind.RefinementReturn
+            && info.OutputType is not null
+            && !translator.DeclareVariable(
+                "result",
+                ResolveRefinementBaseType(info.OutputType, info.RefinementTypes)))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                ContractTranslator.DiagnoseUnsupportedType(info.OutputType))));
+            obligation.SolverDuration = sw.Elapsed;
+            return;
+        }
+
+        // Refinement predicates use # for the constrained entry or return value.
         // so # in the predicate resolves to the parameter being checked
-        if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+        if (obligation.Kind is ObligationKind.RefinementEntry
+                or ObligationKind.RefinementReturn
+                or ObligationKind.Subtype
+            && obligation.ParameterName != null)
         {
             translator.PushSelfVariable(obligation.ParameterName);
         }
@@ -104,7 +120,10 @@ public sealed class ObligationSolver : IDisposable
                 ?? "Obligation condition could not be translated to Z3")));
             obligation.SolverDuration = sw.Elapsed;
 
-            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+            if (obligation.Kind is ObligationKind.RefinementEntry
+                    or ObligationKind.RefinementReturn
+                    or ObligationKind.Subtype
+                && obligation.ParameterName != null)
                 translator.PopSelfVariable();
             return;
         }
@@ -222,7 +241,8 @@ public sealed class ObligationSolver : IDisposable
         }
         finally
         {
-            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+            if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
+                && obligation.ParameterName != null)
                 translator.PopSelfVariable();
         }
     }
@@ -237,6 +257,10 @@ public sealed class ObligationSolver : IDisposable
         {
             indexedTypes[itype.Name] = itype;
         }
+        var refinementTypes = module.RefinementTypes.ToDictionary(
+            type => type.Name,
+            type => type.BaseTypeName,
+            StringComparer.Ordinal);
 
         foreach (var func in module.Functions)
         {
@@ -276,23 +300,140 @@ public sealed class ObligationSolver : IDisposable
                 func.Preconditions,
                 func.Output?.TypeName,
                 factCollector.ScopedFacts,
-                extraVars);
+                extraVars,
+                refinementTypes);
         }
 
-        foreach (var cls in module.Classes)
+        foreach (var enumExtension in module.EnumExtensions)
         {
-            foreach (var method in cls.Methods)
+            foreach (var method in enumExtension.Methods)
             {
                 var parameters = method.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromFunction(method);
+                var extraVars = new List<(string Name, string TypeName)>();
+                foreach (var param in method.Parameters)
+                {
+                    var baseTypeName = param.TypeName;
+                    var genericIdx = baseTypeName.IndexOf('<');
+                    if (genericIdx > 0)
+                        baseTypeName = baseTypeName[..genericIdx];
+
+                    if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
+                    {
+                        extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (indexedType.Constraint != null)
+                        {
+                            factCollector.AddFunctionWideFact(
+                                FactCollector.SubstituteSelfRefStatic(
+                                    indexedType.Constraint,
+                                    indexedType.SizeParam));
+                        }
+                    }
+                }
 
                 result[method.Id] = new FunctionInfo(
                     parameters,
                     method.Preconditions,
                     method.Output?.TypeName,
-                    new List<ScopedFact>(),
-                    new List<(string, string)>());
+                    factCollector.ScopedFacts,
+                    extraVars,
+                    refinementTypes);
+            }
+        }
+
+        foreach (var cls in module.Classes)
+        {
+            foreach (var constructor in cls.Constructors)
+            {
+                var parameters = constructor.Parameters
+                    .Select(p => (p.Name, p.TypeName))
+                    .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromStatements(constructor.Body);
+                result[constructor.Id] = new FunctionInfo(
+                    parameters,
+                    constructor.Preconditions,
+                    null,
+                    factCollector.ScopedFacts,
+                    new List<(string, string)>(),
+                    refinementTypes);
+            }
+
+            foreach (var method in cls.Methods)
+            {
+                var parameters = method.Parameters
+                    .Select(p => (p.Name, p.TypeName))
+                    .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromMethod(method);
+                var extraVars = new List<(string Name, string TypeName)>();
+                foreach (var param in method.Parameters)
+                {
+                    var baseTypeName = param.TypeName;
+                    var genericIdx = baseTypeName.IndexOf('<');
+                    if (genericIdx > 0)
+                        baseTypeName = baseTypeName[..genericIdx];
+
+                    if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
+                    {
+                        extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (indexedType.Constraint != null)
+                        {
+                            factCollector.AddFunctionWideFact(
+                                FactCollector.SubstituteSelfRefStatic(
+                                    indexedType.Constraint,
+                                    indexedType.SizeParam));
+                        }
+                    }
+                }
+
+                result[method.Id] = new FunctionInfo(
+                    parameters,
+                    method.Preconditions,
+                    method.Output?.TypeName,
+                    factCollector.ScopedFacts,
+                    extraVars,
+                    refinementTypes);
+            }
+
+            foreach (var operatorOverload in cls.OperatorOverloads)
+            {
+                var parameters = operatorOverload.Parameters
+                    .Select(p => (p.Name, p.TypeName))
+                    .ToList();
+                var factCollector = new FactCollector();
+                factCollector.CollectFromStatements(operatorOverload.Body);
+                var extraVars = new List<(string Name, string TypeName)>();
+                foreach (var param in operatorOverload.Parameters)
+                {
+                    var baseTypeName = param.TypeName;
+                    var genericIdx = baseTypeName.IndexOf('<');
+                    if (genericIdx > 0)
+                        baseTypeName = baseTypeName[..genericIdx];
+
+                    if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
+                    {
+                        extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (indexedType.Constraint != null)
+                        {
+                            factCollector.AddFunctionWideFact(
+                                FactCollector.SubstituteSelfRefStatic(
+                                    indexedType.Constraint,
+                                    indexedType.SizeParam));
+                        }
+                    }
+                }
+
+                result[operatorOverload.Id] = new FunctionInfo(
+                    parameters,
+                    operatorOverload.Preconditions,
+                    operatorOverload.Output?.TypeName,
+                    factCollector.ScopedFacts,
+                    extraVars,
+                    refinementTypes);
             }
         }
 
@@ -304,7 +445,24 @@ public sealed class ObligationSolver : IDisposable
         IReadOnlyList<RequiresNode> Preconditions,
         string? OutputType,
         List<ScopedFact> CollectedFacts,
-        List<(string Name, string TypeName)> ExtraVariables);
+        List<(string Name, string TypeName)> ExtraVariables,
+        IReadOnlyDictionary<string, string> RefinementTypes);
+
+    private static string ResolveRefinementBaseType(
+        string typeName,
+        IReadOnlyDictionary<string, string> refinementTypes)
+    {
+        var resolvedType = typeName;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (visited.Add(resolvedType)
+               && refinementTypes.TryGetValue(
+                   resolvedType,
+                   out var baseType))
+        {
+            resolvedType = baseType;
+        }
+        return resolvedType;
+    }
 
     public void Dispose()
     {

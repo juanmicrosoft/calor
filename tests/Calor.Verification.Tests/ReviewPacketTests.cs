@@ -175,7 +175,8 @@ public class ReviewPacketTests
         Assert.Contains(ReviewPacketBuilder.RefinementHonestyNote, result.Packet.HonestyNotes);
 
         var markdown = ReviewPacketBuilder.RenderMarkdown(result.Packet);
-        Assert.Contains("NOT runtime-enforced", markdown);
+        Assert.Contains("runtime-enforced", markdown);
+        Assert.DoesNotContain("NOT runtime-enforced", markdown);
         Assert.Contains("#782", markdown);
     }
 

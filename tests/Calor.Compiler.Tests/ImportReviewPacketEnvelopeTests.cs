@@ -239,6 +239,7 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.Contains("## Unproven remainder", stdOut);
-        Assert.Contains("NOT runtime-enforced", stdOut);
+        Assert.Contains("runtime-enforced", stdOut);
+        Assert.DoesNotContain("NOT runtime-enforced", stdOut);
     }
 }

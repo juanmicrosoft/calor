@@ -761,6 +761,14 @@ public static class DiagnosticCode
     /// </summary>
     public const string CodeGenCompilationError = "Calor1002";
 
+    /// <summary>
+    /// Error: a constructor with refinement entry guards delegates through an
+    /// explicit zero-argument initializer. C# executes that initializer before
+    /// the constructor body, and provides no argument expression in which to
+    /// enforce the refinements first.
+    /// </summary>
+    public const string ConstructorRefinementInitializerNotLowered = "Calor1003";
+
     // C# Interop diagnostics (Calor1010-1019)
 
     /// <summary>
@@ -1086,10 +1094,8 @@ public static class DiagnosticCode
 
     /// <summary>
     /// Info (review-packet): the analyzed module(s) carry refinement-type
-    /// obligations, and refinement types are NOT runtime-enforced (#782):
-    /// refinement obligations are compile-time analysis only — no runtime
-    /// guard is emitted for them. Stated per the W1 kickoff honesty item
-    /// (wedge-w1-prereqs.md §1.1).
+    /// obligations whose incomplete proof outcomes remain runtime-enforced
+    /// at the relevant boundaries (#782).
     /// </summary>
     public const string ReviewPacketRefinementHonesty = "Calor1356";
 

@@ -115,6 +115,142 @@ public sealed class FactScopingTests
             f.Fact is BinaryOperationNode { Operator: BinaryOperator.LessThan });
     }
 
+    [Fact]
+    public void BranchGuard_Killed_WhenBodyAssignsItsVariable()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Mutate:priv}
+                §I{i32:x}
+                §O{void}
+                §IF{if1} (> x INT:0)
+                  §ASSIGN x INT:-1
+                  §PROOF{p1} (> x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.DoesNotContain(
+            collector.ScopedFacts,
+            fact => fact.Fact is BinaryOperationNode
+            {
+                Operator: BinaryOperator.GreaterThan
+            });
+    }
+
+    [Fact]
+    public void BranchGuard_Killed_WhenBodyMutatesVariableWithUnaryOperator()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Mutate:priv}
+                §I{i32:x}
+                §O{void}
+                §IF{if1} (> x INT:0)
+                  (dec x)
+                  §PROOF{p1} (> x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.DoesNotContain(
+            collector.ScopedFacts,
+            fact => fact.Fact is BinaryOperationNode
+            {
+                Operator: BinaryOperator.GreaterThan
+            });
+    }
+
+    [Fact]
+    public void MethodBranchGuard_IsCollectedWithFunctionSemantics()
+    {
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Checker:pub}
+                §MT{m001:Check:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §IF{if1} (> x INT:0)
+                    §PROOF{p1} (> x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+
+        var method = Assert.Single(Assert.Single(module.Classes).Methods);
+        var collector = new FactCollector();
+        collector.CollectFromMethod(method);
+
+        Assert.Contains(
+            collector.ScopedFacts,
+            fact => fact.Fact is BinaryOperationNode
+            {
+                Operator: BinaryOperator.GreaterThan
+            });
+    }
+
+    [Fact]
+    public void NegativeStepForLoop_UsesInclusiveDescendingBounds()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Descending:priv}
+                §O{i32}
+                §L{l1:i:2:0:-1}
+                  §P (>= i INT:0)
+                §R INT:0
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.Contains(
+            collector.Facts,
+            fact => fact is BinaryOperationNode { Operator: BinaryOperator.LessOrEqual });
+        Assert.Contains(
+            collector.Facts,
+            fact => fact is BinaryOperationNode { Operator: BinaryOperator.GreaterOrEqual });
+    }
+
+    [Fact]
+    public void DynamicStepForLoop_DoesNotAssumeDirection()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Dynamic:priv}
+                §I{i32:step}
+                §O{i32}
+                §L{l1:i:0:10:step}
+                  §PROOF{p1} (>= i INT:0)
+                §R INT:0
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.DoesNotContain(
+            collector.ScopedFacts,
+            fact => fact.Fact is BinaryOperationNode
+            {
+                Left: ReferenceNode { Name: "i" }
+            });
+    }
+
     [SkippableFact]
     public void ContradictorySiblingGuards_DoNotVacuouslyDischargeObligations()
     {

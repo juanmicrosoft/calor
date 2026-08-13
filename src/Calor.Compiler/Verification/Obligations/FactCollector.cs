@@ -55,21 +55,34 @@ public sealed class FactCollector
     /// (e.g., IndexBounds can use parameter refinements as assumptions).
     /// </summary>
     public void CollectFromFunction(FunctionNode func)
+        => CollectFromCallable(func.Parameters, func.Body);
+
+    /// <summary>
+    /// Collects facts from a class method using the same rules as module functions.
+    /// </summary>
+    public void CollectFromMethod(MethodNode method)
+        => CollectFromCallable(method.Parameters, method.Body);
+
+    private void CollectFromCallable(
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<StatementNode> body)
     {
         // Parameter inline refinements hold on entry for the whole function —
         // unless the body rebinds the parameter name, in which case the
         // refinement may no longer describe the current value.
-        var bodyAssigned = CollectAssignedNames(func.Body);
-        foreach (var param in func.Parameters)
+        var bodyAssigned = CollectAssignedNames(body);
+        foreach (var param in parameters)
         {
             if (param.InlineRefinement != null && !bodyAssigned.Contains(param.Name))
             {
                 ScopedFacts.Add(ScopedFact.FunctionWide(
-                    SubstituteSelfRef(param.InlineRefinement.Predicate, param.Name)));
+                    SubstituteSelfRefStatic(
+                        param.InlineRefinement.Predicate,
+                        param.Name)));
             }
         }
 
-        CollectFromStatements(func.Body);
+        CollectFromStatements(body);
     }
 
     /// <summary>
@@ -127,18 +140,59 @@ public sealed class FactCollector
 
     /// <summary>
     /// Extracts loop bounds from a for-loop.
-    /// §L{id:i:from:to:step} yields facts: i >= from AND i < to, scoped to the body.
+    /// §L{id:i:from:to:step} uses inclusive bounds, matching C# emission.
     /// </summary>
     private void CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
         var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
 
-        var geFrom = new BinaryOperationNode(dummySpan, BinaryOperator.GreaterOrEqual, loopVar, forStmt.From);
-        AddGuardFact(geFrom, forStmt.Body);
-
-        var ltTo = new BinaryOperationNode(dummySpan, BinaryOperator.LessThan, loopVar, forStmt.To);
-        AddGuardFact(ltTo, forStmt.Body);
+        var isPositiveStep = forStmt.Step is IntLiteralNode { Value: > 0 }
+            or UnaryOperationNode
+            {
+                Operator: UnaryOperator.Negate,
+                Operand: IntLiteralNode { Value: < 0 }
+            };
+        var isNegativeStep = forStmt.Step is IntLiteralNode { Value: < 0 }
+            or UnaryOperationNode
+            {
+                Operator: UnaryOperator.Negate,
+                Operand: IntLiteralNode { Value: > 0 }
+            };
+        if (isPositiveStep)
+        {
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.GreaterOrEqual,
+                    loopVar,
+                    forStmt.From),
+                forStmt.Body);
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.LessOrEqual,
+                    loopVar,
+                    forStmt.To),
+                forStmt.Body);
+        }
+        else if (isNegativeStep)
+        {
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.LessOrEqual,
+                    loopVar,
+                    forStmt.From),
+                forStmt.Body);
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.GreaterOrEqual,
+                    loopVar,
+                    forStmt.To),
+                forStmt.Body);
+        }
 
         CollectFromStatements(forStmt.Body);
     }
@@ -186,45 +240,39 @@ public sealed class FactCollector
     private static HashSet<string> CollectAssignedNames(IReadOnlyList<StatementNode> statements)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
-        CollectAssignedNames(statements, names);
-        return names;
-    }
-
-    private static void CollectAssignedNames(IReadOnlyList<StatementNode> statements, HashSet<string> names)
-    {
-        foreach (var stmt in statements)
+        foreach (var node in statements.SelectMany(DescendantsAndSelf))
         {
-            switch (stmt)
+            switch (node)
             {
                 case BindStatementNode bind:
                     names.Add(bind.Name);
                     break;
+                case AssignmentStatementNode { Target: ReferenceNode target }:
+                    names.Add(target.Name);
+                    break;
+                case CompoundAssignmentStatementNode { Target: ReferenceNode compoundTarget }:
+                    names.Add(compoundTarget.Name);
+                    break;
+                case UnaryOperationNode
+                {
+                    Operator: UnaryOperator.PreIncrement
+                        or UnaryOperator.PreDecrement
+                        or UnaryOperator.PostIncrement
+                        or UnaryOperator.PostDecrement,
+                    Operand: ReferenceNode unaryTarget
+                }:
+                    names.Add(unaryTarget.Name);
+                    break;
                 case ForStatementNode forStmt:
                     names.Add(forStmt.VariableName);
-                    CollectAssignedNames(forStmt.Body, names);
                     break;
-                case WhileStatementNode whileStmt:
-                    CollectAssignedNames(whileStmt.Body, names);
-                    break;
-                case DoWhileStatementNode doWhile:
-                    CollectAssignedNames(doWhile.Body, names);
-                    break;
-                case IfStatementNode ifStmt:
-                    CollectAssignedNames(ifStmt.ThenBody, names);
-                    foreach (var elseIf in ifStmt.ElseIfClauses)
-                        CollectAssignedNames(elseIf.Body, names);
-                    if (ifStmt.ElseBody != null)
-                        CollectAssignedNames(ifStmt.ElseBody, names);
-                    break;
-                case ForeachStatementNode foreach_:
-                    names.Add(foreach_.VariableName);
-                    CollectAssignedNames(foreach_.Body, names);
-                    break;
-                case TryStatementNode tryStmt:
-                    CollectAssignedNames(tryStmt.TryBody, names);
+                case ForeachStatementNode foreachStmt:
+                    names.Add(foreachStmt.VariableName);
                     break;
             }
         }
+
+        return names;
     }
 
     /// <summary>
@@ -232,19 +280,36 @@ public sealed class FactCollector
     /// Returns a new expression tree with substitutions applied.
     /// </summary>
     public static ExpressionNode SubstituteSelfRefStatic(ExpressionNode expr, string variableName)
-        => SubstituteSelfRef(expr, variableName);
+        => SubstituteSelfRefStatic(
+            expr,
+            new ReferenceNode(expr.Span, variableName));
 
-    private static ExpressionNode SubstituteSelfRef(ExpressionNode expr, string variableName)
+    /// <summary>
+    /// Substitutes SelfRefNode (#) with an arbitrary expression.
+    /// </summary>
+    public static ExpressionNode SubstituteSelfRefStatic(
+        ExpressionNode expr,
+        ExpressionNode replacement)
+    {
+        var substituted = SubstituteSelfRef(expr, replacement);
+        return ContainsSelfRef(substituted)
+            ? new BoolLiteralNode(expr.Span, false)
+            : substituted;
+    }
+
+    private static ExpressionNode SubstituteSelfRef(
+        ExpressionNode expr,
+        ExpressionNode replacement)
     {
         if (expr is SelfRefNode)
         {
-            return new ReferenceNode(expr.Span, variableName);
+            return replacement;
         }
 
         if (expr is BinaryOperationNode binOp)
         {
-            var left = SubstituteSelfRef(binOp.Left, variableName);
-            var right = SubstituteSelfRef(binOp.Right, variableName);
+            var left = SubstituteSelfRef(binOp.Left, replacement);
+            var right = SubstituteSelfRef(binOp.Right, replacement);
             if (!ReferenceEquals(left, binOp.Left) || !ReferenceEquals(right, binOp.Right))
                 return new BinaryOperationNode(binOp.Span, binOp.Operator, left, right);
             return binOp;
@@ -252,12 +317,167 @@ public sealed class FactCollector
 
         if (expr is UnaryOperationNode unOp)
         {
-            var operand = SubstituteSelfRef(unOp.Operand, variableName);
+            var operand = SubstituteSelfRef(unOp.Operand, replacement);
             if (operand != unOp.Operand)
                 return new UnaryOperationNode(unOp.Span, unOp.Operator, operand);
             return unOp;
         }
 
+        if (expr is ConditionalExpressionNode conditional)
+        {
+            var condition = SubstituteSelfRef(
+                conditional.Condition,
+                replacement);
+            var whenTrue = SubstituteSelfRef(
+                conditional.WhenTrue,
+                replacement);
+            var whenFalse = SubstituteSelfRef(
+                conditional.WhenFalse,
+                replacement);
+            return ReferenceEquals(condition, conditional.Condition)
+                    && ReferenceEquals(whenTrue, conditional.WhenTrue)
+                    && ReferenceEquals(whenFalse, conditional.WhenFalse)
+                ? conditional
+                : new ConditionalExpressionNode(
+                    conditional.Span,
+                    condition,
+                    whenTrue,
+                    whenFalse);
+        }
+
+        if (expr is ArrayAccessNode arrayAccess)
+        {
+            var array = SubstituteSelfRef(arrayAccess.Array, replacement);
+            var index = SubstituteSelfRef(arrayAccess.Index, replacement);
+            return ReferenceEquals(array, arrayAccess.Array)
+                    && ReferenceEquals(index, arrayAccess.Index)
+                ? arrayAccess
+                : new ArrayAccessNode(arrayAccess.Span, array, index);
+        }
+
+        if (expr is ArrayLengthNode arrayLength)
+        {
+            var array = SubstituteSelfRef(arrayLength.Array, replacement);
+            return ReferenceEquals(array, arrayLength.Array)
+                ? arrayLength
+                : new ArrayLengthNode(arrayLength.Span, array);
+        }
+
+        if (expr is FieldAccessNode fieldAccess)
+        {
+            var target = SubstituteSelfRef(fieldAccess.Target, replacement);
+            return ReferenceEquals(target, fieldAccess.Target)
+                ? fieldAccess
+                : new FieldAccessNode(
+                    fieldAccess.Span,
+                    target,
+                    fieldAccess.FieldName);
+        }
+
+        if (expr is StringOperationNode stringOperation)
+        {
+            var arguments = stringOperation.Arguments
+                .Select(argument => SubstituteSelfRef(argument, replacement))
+                .ToArray();
+            return arguments
+                .Zip(
+                    stringOperation.Arguments,
+                    ReferenceEquals)
+                .All(unchanged => unchanged)
+                ? stringOperation
+                : new StringOperationNode(
+                    stringOperation.Span,
+                    stringOperation.Operation,
+                    arguments,
+                    stringOperation.ComparisonMode);
+        }
+
+        if (expr is ImplicationExpressionNode implication)
+        {
+            var antecedent = SubstituteSelfRef(
+                implication.Antecedent,
+                replacement);
+            var consequent = SubstituteSelfRef(
+                implication.Consequent,
+                replacement);
+            return ReferenceEquals(antecedent, implication.Antecedent)
+                    && ReferenceEquals(consequent, implication.Consequent)
+                ? implication
+                : new ImplicationExpressionNode(
+                    implication.Span,
+                    antecedent,
+                    consequent);
+        }
+
+        if (expr is ForallExpressionNode forall)
+        {
+            if (ReplacementCouldBeCaptured(
+                    replacement,
+                    forall.BoundVariables))
+            {
+                return forall;
+            }
+            var body = SubstituteSelfRef(forall.Body, replacement);
+            return ReferenceEquals(body, forall.Body)
+                ? forall
+                : new ForallExpressionNode(
+                    forall.Span,
+                    forall.BoundVariables,
+                    body);
+        }
+
+        if (expr is ExistsExpressionNode exists)
+        {
+            if (ReplacementCouldBeCaptured(
+                    replacement,
+                    exists.BoundVariables))
+            {
+                return exists;
+            }
+            var body = SubstituteSelfRef(exists.Body, replacement);
+            return ReferenceEquals(body, exists.Body)
+                ? exists
+                : new ExistsExpressionNode(
+                    exists.Span,
+                    exists.BoundVariables,
+                    body);
+        }
+
         return expr;
+    }
+
+    private static bool ReplacementCouldBeCaptured(
+        ExpressionNode replacement,
+        IReadOnlyList<QuantifierVariableNode> boundVariables)
+    {
+        var boundNames = boundVariables
+            .Select(variable => variable.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        return EnumerateDescendantsAndSelf(replacement)
+            .OfType<ReferenceNode>()
+            .Any(reference => boundNames.Contains(reference.Name));
+    }
+
+    private static bool ContainsSelfRef(ExpressionNode expression)
+    {
+        if (expression is SelfRefNode)
+            return true;
+
+        return Calor.Compiler.Analysis.RecursiveAstWalker
+            .GetAllChildren(expression)
+            .OfType<ExpressionNode>()
+            .Any(ContainsSelfRef);
+    }
+
+    private static IEnumerable<AstNode> EnumerateDescendantsAndSelf(
+        AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker
+                     .GetAllChildren(node))
+        {
+            foreach (var descendant in EnumerateDescendantsAndSelf(child))
+                yield return descendant;
+        }
     }
 }
