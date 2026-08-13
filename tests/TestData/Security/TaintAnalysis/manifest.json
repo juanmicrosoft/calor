@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "analysis": "symbol-access-path-cfg-may-taint",
+  "minimumPrecision": 1.0,
+  "minimumRecall": 1.0,
+  "cases": [
+    {
+      "id": "direct-source-sink",
+      "test": "DirectSourceToSink_ReportsEvenWhenLegacyHopThresholdIsTwo",
+      "expectedFinding": true
+    },
+    {
+      "id": "console-readline-return-source",
+      "test": "ConsoleReadLine_CallReturnSource_ReachesSink",
+      "expectedFinding": true
+    },
+    {
+      "id": "branch-join",
+      "test": "BranchJoin_PreservesTaintFromOneReachableBranch",
+      "expectedFinding": true
+    },
+    {
+      "id": "loop-backedge",
+      "test": "LoopFixedPoint_PropagatesTaintThroughBackEdge",
+      "expectedFinding": true
+    },
+    {
+      "id": "alias-field-collection",
+      "test": "AliasFieldAndCollectionAccessPaths_PreserveTaint",
+      "expectedFinding": true
+    },
+    {
+      "id": "desanitize-not-sanitizer",
+      "test": "ExactSanitizerIdentity_DoesNotTreatDesanitizeAsSanitizer",
+      "expectedFinding": true
+    },
+    {
+      "id": "recursive-sanitizer-summary",
+      "test": "RecursiveSanitizerSummary_ConvergesOverFiniteLattice",
+      "expectedFinding": true
+    },
+    {
+      "id": "interprocedural-summary",
+      "test": "InterproceduralReturnAndParameterSinkSummaries_PropagateExactResolvedCalls",
+      "expectedFinding": true
+    },
+    {
+      "id": "interprocedural-call-return-source",
+      "test": "InterproceduralCallReturnSourceSummary_PropagatesConsoleReadLine",
+      "expectedFinding": true
+    },
+    {
+      "id": "strict-unknown-external",
+      "test": "StrictUnknownExternal_ReturnsConservativeExternalApiSource",
+      "expectedFinding": true
+    },
+    {
+      "id": "verification-pass-module-summary",
+      "test": "VerificationAnalysisPass_UsesModuleTaintSummaries",
+      "expectedFinding": true
+    },
+    {
+      "id": "may-alias-field",
+      "test": "MayAliasJoin_WeakFieldWritesPreserveAllPossibleTargets",
+      "expectedFinding": true
+    },
+    {
+      "id": "may-alias-array",
+      "test": "MayAliasJoin_WeakArrayElementWritesPreserveAllPossibleTargets",
+      "expectedFinding": true
+    },
+    {
+      "id": "resolved-local-sql-escape",
+      "test": "ResolvedLocalNamedSqlEscape_IsNotTreatedAsBuiltInSanitizer",
+      "expectedFinding": true
+    },
+    {
+      "id": "resolved-custom-target-sanitizer",
+      "test": "ResolvedCustomTypeCannotMatchTargetOnlySanitizer",
+      "expectedFinding": true
+    },
+    {
+      "id": "interprocedural-alternatives",
+      "test": "InterproceduralAlternatives_UnionReturnAndParameterSinkSummaries",
+      "expectedFinding": true
+    },
+    {
+      "id": "alias-rebinding-field",
+      "test": "AliasRebinding_PreservesOldFieldObjectForAlias",
+      "expectedFinding": true
+    },
+    {
+      "id": "alias-rebinding-array",
+      "test": "AliasRebinding_PreservesOldArrayObjectForAlias",
+      "expectedFinding": true
+    },
+    {
+      "id": "field-reference-alias",
+      "test": "FieldReferenceAlias_PreservesStoredObjectAfterSourceRebinding",
+      "expectedFinding": true
+    },
+    {
+      "id": "array-reference-alias",
+      "test": "ArrayReferenceAlias_PreservesStoredObjectAfterSourceRebinding",
+      "expectedFinding": true
+    },
+    {
+      "id": "system-io-file-read",
+      "test": "ReadAllText_PathArgumentIsAFilePathSink",
+      "expectedFinding": true
+    },
+    {
+      "id": "system-io-file-move-destination",
+      "test": "Move_DestinationArgumentIsAFilePathSink",
+      "expectedFinding": true
+    },
+    {
+      "id": "system-io-file-write",
+      "test": "SystemIoFilePathSinks_UseExactResolvedSignatures(WriteAllText)",
+      "expectedFinding": true
+    },
+    {
+      "id": "system-io-file-delete",
+      "test": "SystemIoFilePathSinks_UseExactResolvedSignatures(Delete)",
+      "expectedFinding": true
+    },
+    {
+      "id": "system-io-file-open",
+      "test": "SystemIoFilePathSinks_UseExactResolvedSignatures(Open)",
+      "expectedFinding": true
+    },
+    {
+      "id": "process-start-signature",
+      "test": "ProcessStartStatement_UsesExactResolvedSignature",
+      "expectedFinding": true
+    },
+    {
+      "id": "provenance",
+      "test": "DirectSourceToSink_ReportsEvenWhenLegacyHopThresholdIsTwo",
+      "expectedFinding": true
+    },
+    {
+      "id": "safe-strong-overwrite",
+      "test": "SafeOverwrite_StronglyKillsEarlierTaint",
+      "expectedFinding": false
+    },
+    {
+      "id": "constants",
+      "test": "ConstantsOnly_DoNotProduceAFinding",
+      "expectedFinding": false
+    },
+    {
+      "id": "process-start-non-sink-signature",
+      "test": "ProcessStartStatement_NonMatchingResolvedSignatureIsNotASink",
+      "expectedFinding": false
+    },
+    {
+      "id": "system-io-file-write-content",
+      "test": "WriteAllText_ContentArgumentIsNotAFilePathSink",
+      "expectedFinding": false
+    }
+  ]
+}

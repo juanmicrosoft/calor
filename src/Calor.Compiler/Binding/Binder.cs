@@ -914,6 +914,10 @@ public sealed class Binder
             call.ArgumentNames,
             call.ArgumentModifiers,
             call.TypeArguments);
+        var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
+            call.Target,
+            receiverSymbol,
+            receiverTypeSymbol);
 
         return new BoundCallStatement(
             call.Span,
@@ -928,7 +932,13 @@ public sealed class Binder
             call.ReceiverSpan,
             resolution.Kind == OverloadResolutionKind.Inaccessible,
             call.TypeArguments,
-            receiverTypeSymbol);
+            receiverTypeSymbol,
+            resolvedTypeName,
+            resolvedMethodName,
+            (resolution.Function?.Parameters
+                .Select(parameter => parameter.TypeName)
+                ?? args.Select(argument => argument.TypeName))
+                .ToArray());
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -2142,23 +2152,10 @@ public sealed class Binder
             callExpr.TypeArguments);
         var returnType = resolution.ResolvedReturnType ?? "OBJECT";
 
-        // Populate structured type info for effect resolution
-        string? resolvedTypeName = null;
-        string? resolvedMethodName = null;
-        var lastDot = callExpr.Target.LastIndexOf('.');
-        if (lastDot > 0)
-        {
-            resolvedMethodName = callExpr.Target[(lastDot + 1)..];
-            var typePart = callExpr.Target[..lastDot];
-            resolvedTypeName = receiverSymbol != null
-                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
-                    GetNominalTypeName(receiverSymbol.TypeName))
-                : receiverTypeSymbol != null
-                    ? receiverTypeSymbol.QualifiedName
-                : !typePart.Contains('.')
-                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
-                : typePart;
-        }
+        var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
+            callExpr.Target,
+            receiverSymbol,
+            receiverTypeSymbol);
 
         return new BoundCallExpression(
             callExpr.Span,
@@ -2167,8 +2164,9 @@ public sealed class Binder
             returnType,
             resolvedTypeName,
             resolvedMethodName,
-            resolvedParameterTypes: resolution.Function?.Parameters
+            resolvedParameterTypes: (resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
+                ?? args.Select(argument => argument.TypeName))
                 .ToArray(),
             argumentNames: callExpr.ArgumentNames,
             argumentModifiers: callExpr.ArgumentModifiers,
@@ -2180,6 +2178,28 @@ public sealed class Binder
             receiverSpan: callExpr.ReceiverSpan,
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
             receiverTypeSymbol: receiverTypeSymbol);
+    }
+
+    private (string? TypeName, string? MethodName) GetResolvedCallIdentity(
+        string target,
+        VariableSymbol? receiverSymbol,
+        TypeSymbol? receiverTypeSymbol)
+    {
+        var lastDot = target.LastIndexOf('.');
+        if (lastDot <= 0)
+            return (null, null);
+
+        var typePart = target[..lastDot];
+        return (
+            receiverSymbol != null
+                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
+                    GetNominalTypeName(receiverSymbol.TypeName))
+                : receiverTypeSymbol != null
+                    ? receiverTypeSymbol.QualifiedName
+                    : !typePart.Contains('.')
+                        ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
+                        : typePart,
+            target[(lastDot + 1)..]);
     }
 
     private VariableSymbol? ResolveCallReceiver(

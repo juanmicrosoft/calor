@@ -404,6 +404,15 @@ public sealed class VerificationAnalysisPass
         var taintVulnerabilities = 0;
         var loopInvariants = 0;
 
+        if (_options.EnableTaintAnalysis)
+        {
+            var taintRunner = new TaintAnalysisRunner(
+                _diagnostics,
+                _options.TaintOptions ?? TaintAnalysisOptions.Default);
+            taintRunner.Analyze(module);
+            taintVulnerabilities = taintRunner.VulnerabilityCount;
+        }
+
         foreach (var function in module.Functions)
         {
             var incomplete = BoundNodeHelpers.GetAnalysisIncompleteNodes(function).FirstOrDefault();
@@ -431,15 +440,6 @@ public sealed class VerificationAnalysisPass
                 var beforeCount = _diagnostics.Count;
                 bugRunner.CheckFunction(function);
                 bugPatternsFound += _diagnostics.Count - beforeCount;
-            }
-
-            // Taint analysis
-            if (_options.EnableTaintAnalysis)
-            {
-                var taintOptions = _options.TaintOptions ?? TaintAnalysisOptions.Default;
-                var taintAnalysis = new TaintAnalysis(function, taintOptions, function.DeclaredEffects);
-                taintVulnerabilities += taintAnalysis.Vulnerabilities.Count;
-                taintAnalysis.ReportDiagnostics(_diagnostics);
             }
 
             // K-induction for loops

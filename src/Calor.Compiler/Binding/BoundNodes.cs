@@ -200,6 +200,12 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public IReadOnlyList<string>? TypeArguments { get; }
+    /// <summary>Fully-qualified receiver type retained for exact external-call analyses.</summary>
+    public string? ResolvedTypeName { get; }
+    /// <summary>Method name retained for exact external-call analyses.</summary>
+    public string? ResolvedMethodName { get; }
+    /// <summary>Resolved parameter types retained for overload-sensitive analyses.</summary>
+    public IReadOnlyList<string>? ResolvedParameterTypes { get; }
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
 
     public BoundCallStatement(
@@ -215,7 +221,10 @@ public sealed class BoundCallStatement : BoundStatement
         TextSpan? receiverSpan = null,
         bool isInaccessibleCall = false,
         IReadOnlyList<string>? typeArguments = null,
-        TypeSymbol? receiverTypeSymbol = null)
+        TypeSymbol? receiverTypeSymbol = null,
+        string? resolvedTypeName = null,
+        string? resolvedMethodName = null,
+        IReadOnlyList<string>? resolvedParameterTypes = null)
         : base(span)
     {
         Target = target;
@@ -231,6 +240,9 @@ public sealed class BoundCallStatement : BoundStatement
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
         IsInaccessibleCall = isInaccessibleCall;
+        ResolvedTypeName = resolvedTypeName;
+        ResolvedMethodName = resolvedMethodName;
+        ResolvedParameterTypes = resolvedParameterTypes;
     }
 }
 
