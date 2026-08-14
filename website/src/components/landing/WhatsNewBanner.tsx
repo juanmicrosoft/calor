@@ -17,7 +17,7 @@ export function WhatsNewBanner() {
           <p className="text-center">
             <span className="font-semibold text-calor-cerulean">v0.13.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The Trustworthy Project Model release: contracts, effects and bug patterns are checked across a whole project, and every answer says plainly when it is incomplete rather than guessing.</span>
+            <span className="text-foreground">The Trustworthy Project Model release: the binder dispatches every expression class through one authoritative path, and the verifier is pinned against real runtime execution so a proof and the running program cannot disagree.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
