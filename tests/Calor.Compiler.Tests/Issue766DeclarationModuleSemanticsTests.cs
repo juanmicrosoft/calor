@@ -999,6 +999,132 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
+    public void InterfaceGenericMethodConstraints_RoundTripWithImplementation()
+    {
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            ModuleName = "ConstraintRelationship",
+            AutoGenerateIds = true,
+            StripPreprocessor = false
+        }).Convert(
+            """
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            public interface IRequest
+            {
+                int Marker { get; }
+            }
+
+            public interface IRequest<TResponse>
+            {
+                TResponse Response { get; }
+            }
+
+            public interface INotification
+            {
+                int Marker { get; }
+            }
+
+            public interface ISender
+            {
+                Task Send<TRequest>(
+                    TRequest request,
+                    CancellationToken cancellationToken = default)
+                    where TRequest : IRequest;
+
+                Task<TResponse> Send<TRequest, TResponse>(
+                    TRequest request,
+                    CancellationToken cancellationToken = default)
+                    where TRequest : IRequest<TResponse>;
+            }
+
+            public interface IPublisher
+            {
+                Task Publish<TNotification>(
+                    TNotification notification,
+                    CancellationToken cancellationToken = default)
+                    where TNotification : INotification;
+            }
+
+            public abstract class Mediator : ISender, IPublisher
+            {
+                public abstract Task Send<TRequest>(
+                    TRequest request,
+                    CancellationToken cancellationToken = default)
+                    where TRequest : IRequest;
+
+                public abstract Task<TResponse> Send<TRequest, TResponse>(
+                    TRequest request,
+                    CancellationToken cancellationToken = default)
+                    where TRequest : IRequest<TResponse>;
+
+                public abstract Task Publish<TNotification>(
+                    TNotification notification,
+                    CancellationToken cancellationToken = default)
+                    where TNotification : INotification;
+            }
+            """);
+
+        Assert.True(
+            conversion.Success,
+            string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        var sender = Assert.Single(
+            conversion.Ast!.Interfaces.Where(type => type.Name == "ISender"));
+        Assert.Collection(
+            sender.Methods,
+            method => Assert.Equal(
+                "IRequest",
+                Assert.Single(method.TypeParameters[0].Constraints).TypeName),
+            method => Assert.Equal(
+                "IRequest<TResponse>",
+                Assert.Single(method.TypeParameters[0].Constraints).TypeName));
+        var publisher = Assert.Single(
+            conversion.Ast.Interfaces.Where(type => type.Name == "IPublisher"));
+        Assert.Equal(
+            "INotification",
+            Assert.Single(
+                Assert.Single(publisher.Methods)
+                    .TypeParameters[0]
+                    .Constraints).TypeName);
+
+        Assert.Contains("§WHERE TRequest : IRequest", conversion.CalorSource);
+        Assert.Contains(
+            "§WHERE TRequest : IRequest<TResponse>",
+            conversion.CalorSource);
+        Assert.Contains(
+            "§WHERE TNotification : INotification",
+            conversion.CalorSource);
+
+        var compiled = Program.Compile(
+            conversion.CalorSource!,
+            null,
+            new CompilationOptions
+            {
+                DeferGeneratedOutputValidation = true
+            });
+        Assert.False(
+            compiled.HasErrors,
+            string.Join("; ", compiled.Diagnostics.Select(diagnostic => diagnostic.Message)));
+        Assert.Contains(
+            "where TRequest : IRequest",
+            compiled.GeneratedCode);
+        Assert.Contains(
+            "where TRequest : IRequest<TResponse>",
+            compiled.GeneratedCode);
+        Assert.Contains(
+            "where TNotification : INotification",
+            compiled.GeneratedCode);
+        var validation = GeneratedCSharpCompiler.Validate(compiled.GeneratedCode);
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join(
+                Environment.NewLine,
+                validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
     public void AliasesInBaseAndInterfaceGenericPositions_UseCentralTypeMapping()
     {
         var result = Program.Compile(

@@ -355,6 +355,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitOutputLine(node.Output);
             Dedent();
         }
+        if (node.TypeParameters.Any(typeParameter =>
+                typeParameter.Constraints.Count > 0))
+        {
+            Indent();
+            EmitTypeParameterConstraints(node.TypeParameters);
+            Dedent();
+        }
         EmitBlockEnd($"§/MT{{{node.Id}}}");
 
         return "";
