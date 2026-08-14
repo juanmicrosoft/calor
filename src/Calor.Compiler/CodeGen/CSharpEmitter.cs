@@ -37,6 +37,12 @@ public enum EmitContractMode
 /// </summary>
 public sealed class CSharpEmitter : IAstVisitor<string>
 {
+    private readonly record struct UsingDirectiveKey(
+        string Namespace,
+        string? Alias,
+        bool IsStatic,
+        bool IsGlobal);
+
     private sealed class EmissionContext
     {
         public EmissionContext(int indentLevel = 0)
@@ -54,7 +60,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string _currentModuleName = "";
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
     private HashSet<string> _currentClassMemberNames = new(StringComparer.Ordinal);
-    private readonly Stack<(HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
+    private Stack<(HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
 
     /// <summary>
@@ -96,7 +102,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // out-of-scope local (CS0103). Push on entering a control-flow block, pop on leaving.
     // Starts with a base scope so isolated statement/expression emission (tests, or any
     // path not entered through a function/method ResetDeclScopes) always has a live scope.
-    private readonly List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
+    private List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
     private sealed record RefinementConstraint(
         ExpressionNode Predicate,
         string Description,
@@ -113,11 +119,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private sealed record ReturnLoweringContext(
         string ExitLabel,
         string? ResultIdentifier);
-    private readonly List<Dictionary<string, RefinementConstraint?>> _refinementDeclScopes =
+    private List<Dictionary<string, RefinementConstraint?>> _refinementDeclScopes =
         new() { new(StringComparer.Ordinal) };
-    private readonly List<Dictionary<string, string?>> _indexedBoundScopes =
+    private List<Dictionary<string, string?>> _indexedBoundScopes =
         new() { new(StringComparer.Ordinal) };
-    private readonly HashSet<string> _outParameterNames = new(StringComparer.Ordinal);
+    private HashSet<string> _outParameterNames = new(StringComparer.Ordinal);
     private int _indexGuardCounter;
     private int _mutationGuardCounter;
 
@@ -360,15 +366,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
 
-    // AST-level namespace usage tracking for conditional using emission
-    private bool _usesCalorRuntime;
-    private bool _usesSystemLinq;
-    private bool _usesCollectionsGeneric;
+    // AST/type-driven namespace dependency registry. Dependencies are registered
+    // by node visitors and the centralized type mapper, never inferred from text.
+    private HashSet<string> _requiredNamespaces = new(StringComparer.Ordinal);
 
     // Indexed type name → base type for erasure (populated during Visit(ModuleNode))
-    private readonly Dictionary<string, string> _indexedTypeErasure = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, IndexedTypeNode> _indexedTypes = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, RefinementTypeNode> _refinementTypes =
+    private Dictionary<string, string> _indexedTypeErasure = new(StringComparer.Ordinal);
+    private Dictionary<string, IndexedTypeNode> _indexedTypes = new(StringComparer.Ordinal);
+    private Dictionary<string, RefinementTypeNode> _refinementTypes =
         new(StringComparer.Ordinal);
 
     public CSharpEmitter() : this(EmitContractMode.Debug)
@@ -463,15 +468,56 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Emit(ModuleNode module, string? filePath = null)
     {
+        ResetModuleState(module, filePath);
+        return Visit(module);
+    }
+
+    private void ResetModuleState(ModuleNode module, string? filePath)
+    {
         _emissionContext = new EmissionContext();
         _reservedGeneratedIdentifiers = CollectReservedModuleIdentifiers(module);
+        _currentClassName = null;
+        _currentModuleName = "";
+        _currentModuleFunctionNames = new HashSet<string>(StringComparer.Ordinal);
+        _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
+        _classMemberScopes = new Stack<(HashSet<string> Members, bool Suppress)>();
+        _suppressCrossModuleQualification = false;
+        _currentFunctionId = null;
         _currentFilePath = filePath;
+        _currentNamespace = "";
+        _currentInlineReturnRefinement = null;
+        _currentYieldRefinement = null;
+        _inlineReturnGuardCounter = 0;
+        _currentReturnLowering = null;
+        _postconditionResultIdentifier = null;
+        _postconditionResultShadowDepth = 0;
+        _returnLoweringCounter = 0;
+        _currentPostconditionIndex = 0;
+        _declScopes = new List<HashSet<string>> { new(StringComparer.Ordinal) };
+        _refinementDeclScopes =
+            new List<Dictionary<string, RefinementConstraint?>>
+            {
+                new(StringComparer.Ordinal)
+            };
+        _indexedBoundScopes =
+            new List<Dictionary<string, string?>>
+            {
+                new(StringComparer.Ordinal)
+            };
+        _outParameterNames = new HashSet<string>(StringComparer.Ordinal);
+        _indexGuardCounter = 0;
+        _mutationGuardCounter = 0;
+        _requiredNamespaces = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "System"
+        };
+        _indexedTypeErasure = new Dictionary<string, string>(StringComparer.Ordinal);
+        _indexedTypes = new Dictionary<string, IndexedTypeNode>(StringComparer.Ordinal);
+        _refinementTypes =
+            new Dictionary<string, RefinementTypeNode>(StringComparer.Ordinal);
         _lineDirectiveFile = string.IsNullOrEmpty(LineDirectiveFilePath)
             ? null
             : EscapeString(LineDirectiveFilePath);
-
-        var result = Visit(module);
-        return result;
     }
 
     public string Emit(ModuleNode module)
@@ -804,6 +850,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var mappedType = MapTypeName(returnType);
         if (isIterator)
         {
+            RequireNamespace("System.Collections.Generic");
             return new CallableReturnShape(
                 WrapInIEnumerable(mappedType),
                 mappedType.Equals("void", StringComparison.OrdinalIgnoreCase)
@@ -820,6 +867,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     : mappedType);
         }
 
+        RequireNamespace("System.Threading.Tasks");
         if (TryUnwrapAsyncValueType(mappedType, out var asyncValueType))
         {
             return new CallableReturnShape(mappedType, asyncValueType);
@@ -1109,15 +1157,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine(usingPlaceholder);
         AppendLine();
 
-        // Collect user-defined usings for dedup
-        var userUsings = new List<string>();
-        foreach (var usingDirective in node.Usings)
-        {
-            var usingCode = Visit(usingDirective);
-            if (!string.IsNullOrEmpty(usingCode))
-                userUsings.Add(usingDirective.Namespace);
-        }
-
         // Register indexed type erasure mappings (name → base type)
         foreach (var itype in node.IndexedTypes)
         {
@@ -1127,6 +1166,28 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var refinementType in node.RefinementTypes)
         {
             _refinementTypes[refinementType.Name] = refinementType;
+        }
+
+        // Preserve complete using directive objects. Exact duplicates are
+        // removed by the full semantic tuple, so aliases/static/global forms
+        // that target the same namespace remain distinct.
+        var userUsings = new List<UsingDirectiveNode>();
+        var seenUserUsings = new HashSet<UsingDirectiveKey>();
+        foreach (var usingDirective in node.Usings)
+        {
+            var key = GetUsingDirectiveKey(usingDirective);
+            if (seenUserUsings.Add(key))
+            {
+                userUsings.Add(usingDirective);
+            }
+        }
+        foreach (var usingDirective in userUsings)
+        {
+            _ = Visit(usingDirective);
+        }
+        foreach (var block in node.TypePreprocessorBlocks)
+        {
+            RegisterConditionalUsingDependencies(block);
         }
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
@@ -1228,8 +1289,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Emit type-level preprocessor blocks
         foreach (var tpp in node.TypePreprocessorBlocks)
         {
-            Visit(tpp);
-            AppendLine();
+            if (ContainsConditionalTypes(tpp))
+            {
+                Visit(tpp);
+                AppendLine();
+            }
         }
 
         // Emit module-level functions in a static class
@@ -1260,50 +1324,38 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("}");
         }
 
-        // Replace using placeholder with only the namespaces actually referenced.
-        // Uses AST-level flags set during emission, with string-scanning fallback
-        // for raw C# passthrough (§CS{}, §RAW) that may reference these namespaces.
+        // Replace the placeholder from the structural dependency registry.
+        // No emitted-text scanning is permitted here: dependencies are registered
+        // by AST visitors and MapTypeName.
         var output = _emissionContext.Writer.ToString();
         var usingBlock = new StringBuilder();
-        var emittedUsings = new HashSet<string>(StringComparer.Ordinal);
+        var emittedUsings = new HashSet<UsingDirectiveKey>();
 
-        // System is always needed
-        usingBlock.AppendLine("using System;");
-        emittedUsings.Add("System");
+        // C# requires global usings to precede every non-global using.
+        foreach (var directive in userUsings.Where(u => u.IsGlobal))
+            AppendUsing(directive);
+        foreach (var block in node.TypePreprocessorBlocks)
+            AppendConditionalUsings(usingBlock, block, globalOnly: true);
 
-        // Calor.Runtime only if Option/Result/Contract types were emitted
-        if (_usesCalorRuntime || output.Contains("Calor.Runtime."))
+        foreach (var ns in OrderRequiredNamespaces(_requiredNamespaces))
         {
-            usingBlock.AppendLine("using Calor.Runtime;");
-            emittedUsings.Add("Calor.Runtime");
+            var directive = new UsingDirectiveNode(
+                TextSpan.Empty,
+                ns);
+            AppendUsing(directive);
         }
 
-        // System.Collections.Generic if collection creation nodes were emitted
-        if (_usesCollectionsGeneric || output.Contains("List<") || output.Contains("Dictionary<") || output.Contains("HashSet<"))
-        {
-            usingBlock.AppendLine("using System.Collections.Generic;");
-            emittedUsings.Add("System.Collections.Generic");
-        }
+        foreach (var directive in userUsings.Where(u => !u.IsGlobal))
+            AppendUsing(directive);
+        foreach (var block in node.TypePreprocessorBlocks)
+            AppendConditionalUsings(usingBlock, block, globalOnly: false);
 
-        // System.Linq only if quantifier nodes were emitted, or raw C# uses LINQ methods
-        if (_usesSystemLinq || output.Contains("Enumerable.")
-            || output.Contains(".Select(") || output.Contains(".Where(")
-            || output.Contains(".Any(") || output.Contains(".All(")
-            || output.Contains(".First(") || output.Contains(".OrderBy(")
-            || output.Contains(".GroupBy(") || output.Contains(".ToList(")
-            || output.Contains(".ToArray("))
+        void AppendUsing(UsingDirectiveNode directive)
         {
-            usingBlock.AppendLine("using System.Linq;");
-            emittedUsings.Add("System.Linq");
-        }
-
-        // Add user-defined usings
-        foreach (var ns in userUsings)
-        {
-            if (!emittedUsings.Contains(ns))
+            var key = GetUsingDirectiveKey(directive);
+            if (emittedUsings.Add(key))
             {
-                usingBlock.AppendLine($"using {ns};");
-                emittedUsings.Add(ns);
+                usingBlock.AppendLine(Visit(directive));
             }
         }
 
@@ -1314,19 +1366,97 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(UsingDirectiveNode node)
     {
+        var globalPrefix = node.IsGlobal ? "global " : "";
+        var target = node.IsStatic || node.Alias != null
+            ? MapTypeName(node.Namespace)
+            : node.Namespace.Contains("::", StringComparison.Ordinal)
+                ? SanitizeTypeName(node.Namespace)
+                : SanitizeNamespace(node.Namespace);
         if (node.IsStatic)
         {
-            return $"using static {node.Namespace};";
+            return $"{globalPrefix}using static {target};";
         }
         else if (node.Alias != null)
         {
-            return $"using {node.Alias} = {node.Namespace};";
+            return $"{globalPrefix}using {SanitizeSingleIdentifier(node.Alias)} = {target};";
         }
         else
         {
-            return $"using {node.Namespace};";
+            return $"{globalPrefix}using {target};";
         }
     }
+
+    private void RegisterConditionalUsingDependencies(TypePreprocessorBlockNode block)
+    {
+        foreach (var item in block.Items)
+        {
+            if (item is UsingDirectiveNode directive)
+                _ = Visit(directive);
+            else if (item is TypePreprocessorBlockNode nested)
+                RegisterConditionalUsingDependencies(nested);
+        }
+        if (block.ElseBranch != null)
+            RegisterConditionalUsingDependencies(block.ElseBranch);
+    }
+
+    private void AppendConditionalUsings(
+        StringBuilder builder,
+        TypePreprocessorBlockNode block,
+        bool globalOnly)
+    {
+        if (!ContainsConditionalUsing(block, globalOnly))
+            return;
+
+        AppendBranch(block, isFirst: true);
+        builder.AppendLine("#endif");
+
+        void AppendBranch(TypePreprocessorBlockNode branch, bool isFirst)
+        {
+            if (isFirst)
+                builder.AppendLine($"#if {branch.Condition}");
+            else if (!string.IsNullOrEmpty(branch.Condition))
+                builder.AppendLine($"#elif {branch.Condition}");
+            else
+                builder.AppendLine("#else");
+
+            var seen = new HashSet<UsingDirectiveKey>();
+            foreach (var item in branch.Items)
+            {
+                if (item is UsingDirectiveNode directive
+                    && directive.IsGlobal == globalOnly
+                    && seen.Add(GetUsingDirectiveKey(directive)))
+                {
+                    builder.AppendLine(Visit(directive));
+                }
+                else if (item is TypePreprocessorBlockNode nested)
+                {
+                    AppendConditionalUsings(builder, nested, globalOnly);
+                }
+            }
+
+            if (branch.ElseBranch != null)
+                AppendBranch(branch.ElseBranch, isFirst: false);
+        }
+    }
+
+    private static bool ContainsConditionalUsing(
+        TypePreprocessorBlockNode block,
+        bool isGlobal)
+        => block.Usings.Any(directive => directive.IsGlobal == isGlobal)
+            || block.NestedBlocks.Any(nested =>
+                ContainsConditionalUsing(nested, isGlobal))
+            || block.ElseBranch != null
+            && ContainsConditionalUsing(block.ElseBranch, isGlobal);
+
+    private static bool ContainsConditionalTypes(TypePreprocessorBlockNode block)
+        => block.Classes.Count > 0
+            || block.Interfaces.Count > 0
+            || block.Enums.Count > 0
+            || block.Delegates.Count > 0
+            || block.InteropBlocks.Count > 0
+            || block.NestedBlocks.Any(ContainsConditionalTypes)
+            || block.ElseBranch != null
+            && ContainsConditionalTypes(block.ElseBranch);
 
     public string Visit(FunctionNode node)
     {
@@ -1425,13 +1555,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             callableName = callableName[..genericStart];
         }
         var methodName = SanitizeIdentifier(callableName);
+        EnsureDefaultConstraintsLegal(
+            node.TypeParameters,
+            isLegal: false,
+            owner: "a function");
 
         // Build type parameters if present
         var typeParams = "";
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(
+                tp => EmitTypeParameter(tp, allowVariance: false, owner: "a function"))) + ">";
 
             // Build where clauses
             var whereClauses = new List<string>();
@@ -1440,7 +1575,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 if (tp.Constraints.Count > 0)
                 {
                     var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
-                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                    whereClauses.Add(
+                        $"where {SanitizeSingleIdentifier(tp.Name)} : {constraints}");
                 }
             }
             if (whereClauses.Count > 0)
@@ -1584,6 +1720,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(CallStatementNode node)
     {
         var target = QualifyCrossModuleTarget(node.Target);
+        RegisterQualifiedNameDependencies(target);
+        target = SanitizeQualifiedName(target);
         if (node.TypeArguments is { Count: > 0 })
         {
             var typeArgs = string.Join(", ", node.TypeArguments.Select(MapTypeName));
@@ -1599,7 +1737,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
             {
-                argStr = $"{node.ArgumentNames[i]}: {argStr}";
+                argStr = $"{SanitizeSingleIdentifier(node.ArgumentNames[i]!)}: {argStr}";
             }
             argStrings.Add(argStr);
         }
@@ -2013,14 +2151,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 : node.Name;
         }
 
-        // Handle member access like "args.Length" - preserve the dot notation
-        if (node.Name.Contains('.'))
-        {
-            var parts = node.Name.Split('.');
-            var sanitizedParts = parts.Select(SanitizeIdentifier);
-            return string.Join(".", sanitizedParts);
-        }
-        return SanitizeIdentifier(node.Name);
+        RegisterQualifiedNameDependencies(node.Name);
+        return SanitizeQualifiedName(node.Name);
     }
 
     // Phase 2: Control Flow
@@ -2808,13 +2940,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var paramString = string.Join(", ", parameters);
         var methodName = SanitizeIdentifier(method.Name);
+        EnsureDefaultConstraintsLegal(
+            method.TypeParameters,
+            isLegal: false,
+            owner: "an enum extension method");
 
         // Build type parameters if present
         var typeParams = "";
         var whereClause = "";
         if (method.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", method.TypeParameters.Select(tp => tp.Accept(this))) + ">";
+            typeParams = "<" + string.Join(", ", method.TypeParameters.Select(
+                tp => EmitTypeParameter(tp, allowVariance: false, owner: "a method"))) + ">";
 
             var whereClauses = new List<string>();
             foreach (var tp in method.TypeParameters)
@@ -2822,7 +2959,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 if (tp.Constraints.Count > 0)
                 {
                     var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
-                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                    whereClauses.Add(
+                        $"where {SanitizeSingleIdentifier(tp.Name)} : {constraints}");
                 }
             }
             if (whereClauses.Count > 0)
@@ -2866,11 +3004,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(RecordCreationNode node)
     {
         var typeName = MapTypeName(node.TypeName);
-        var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
+        var fields = string.Join(", ", node.Fields.Select(f =>
+            $"{SanitizeSingleIdentifier(f.FieldName)}: {f.Value.Accept(this)}"));
         return $"new {typeName}({fields})";
     }
 
-    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
+    public string Visit(FieldAssignmentNode node)
+        => $"{SanitizeSingleIdentifier(node.FieldName)}: {node.Value.Accept(this)}";
 
     public string Visit(FieldAccessNode node)
     {
@@ -2881,14 +3021,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(SomeExpressionNode node)
     {
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         var value = node.Value.Accept(this);
         return $"Calor.Runtime.Option.Some({value})";
     }
 
     public string Visit(NoneExpressionNode node)
     {
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         if (node.TypeName != null)
         {
             var typeName = MapTypeName(node.TypeName);
@@ -2899,14 +3039,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(OkExpressionNode node)
     {
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         var value = node.Value.Accept(this);
         return $"Calor.Runtime.Result.Ok<{GetInferredTypeName(node.Value)}, string>({value})";
     }
 
     public string Visit(ErrExpressionNode node)
     {
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         var error = node.Error.Accept(this);
         return $"Calor.Runtime.Result.Err<object, {GetInferredTypeName(node.Error)}>({error})";
     }
@@ -3064,8 +3204,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(TypePatternNode node)
         => node.BindingName is { } name
-            ? $"{node.TypeName} {SanitizeIdentifier(name)}"
-            : node.TypeName;
+            ? $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(name)}"
+            : MapTypeName(node.TypeName);
 
     public string Visit(OkPatternNode node)
         => $"{{ IsOk: true, Value: {node.InnerPattern.Accept(this)} }}";
@@ -3083,7 +3223,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return ""; // No check emitted
         }
 
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
@@ -3126,7 +3266,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return ""; // No check emitted
         }
 
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
@@ -3178,7 +3318,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return ""; // No check emitted
         }
 
-        _usesCalorRuntime = true;
+        RequireNamespace("Calor.Runtime");
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
@@ -3288,7 +3428,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ForeachStatementNode node)
     {
-        var varType = MapTypeName(node.VariableType);
+        var varType = node.VariableType == "var"
+            ? "var"
+            : MapTypeName(node.VariableType);
         var varName = SanitizeIdentifier(node.VariableName);
         var collection = node.Collection.Accept(this);
 
@@ -3343,7 +3485,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ListCreationNode node)
     {
-        _usesCollectionsGeneric = true;
+        RequireNamespace("System.Collections.Generic");
         var elementType = MapTypeName(node.ElementType);
 
         if (node.Elements.Count > 0)
@@ -3359,7 +3501,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(DictionaryCreationNode node)
     {
-        _usesCollectionsGeneric = true;
+        RequireNamespace("System.Collections.Generic");
         var keyType = MapTypeName(node.KeyType);
         var valueType = MapTypeName(node.ValueType);
 
@@ -3388,7 +3530,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(SetCreationNode node)
     {
-        _usesCollectionsGeneric = true;
+        RequireNamespace("System.Collections.Generic");
         var elementType = MapTypeName(node.ElementType);
 
         if (node.Elements.Count > 0)
@@ -3522,15 +3664,43 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // Phase 7: Generics
 
     public string Visit(TypeParameterNode node)
+        => EmitTypeParameter(node, allowVariance: true, owner: "an interface");
+
+    private static string EmitTypeParameter(
+        TypeParameterNode node,
+        bool allowVariance,
+        string owner)
     {
-        // Type parameters are handled in function/method signature emission
+        if (!allowVariance && node.Variance != VarianceKind.None)
+        {
+            throw new InvalidOperationException(
+                $"Type parameter variance is only legal on interfaces and delegates, not {owner}.");
+        }
+
         var variance = node.Variance switch
         {
             VarianceKind.In => "in ",
             VarianceKind.Out => "out ",
             _ => ""
         };
-        return $"{variance}{node.Name}";
+        return $"{variance}{SanitizeSingleIdentifier(node.Name)}";
+    }
+
+    private static void EnsureDefaultConstraintsLegal(
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        bool isLegal,
+        string owner)
+    {
+        if (isLegal
+            || !typeParameters.Any(typeParameter =>
+                typeParameter.Constraints.Any(constraint =>
+                    constraint.Kind == TypeConstraintKind.Default)))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The 'default' constraint is only legal on override methods or explicit interface implementations, not {owner}.");
     }
 
     public string Visit(TypeConstraintNode node)
@@ -3555,12 +3725,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return constraint.Kind switch
         {
             TypeConstraintKind.Class => "class",
+            TypeConstraintKind.ClassNullable => "class?",
             TypeConstraintKind.Struct => "struct",
+            TypeConstraintKind.Unmanaged => "unmanaged",
             TypeConstraintKind.New => "new()",
-            TypeConstraintKind.Interface => constraint.TypeName ?? "object",
-            TypeConstraintKind.BaseClass => constraint.TypeName ?? "object",
+            TypeConstraintKind.Interface => MapTypeName(constraint.TypeName ?? "object"),
+            TypeConstraintKind.BaseClass => MapTypeName(constraint.TypeName ?? "object"),
             TypeConstraintKind.TypeName => MapTypeName(constraint.TypeName ?? "object"),
             TypeConstraintKind.NotNull => "notnull",
+            TypeConstraintKind.Default => "default",
+            TypeConstraintKind.AllowsRefStruct => "allows ref struct",
             _ => "object"
         };
     }
@@ -3570,6 +3744,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(InterfaceDefinitionNode node)
     {
         EmitCSharpAttributes(node.CSharpAttributes);
+        EnsureDefaultConstraintsLegal(
+            node.TypeParameters,
+            isLegal: false,
+            owner: "an interface");
 
         var name = SanitizeIdentifier(node.Name);
 
@@ -3578,7 +3756,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(
+                tp => EmitTypeParameter(tp, allowVariance: true, owner: "an interface"))) + ">";
 
             // Build where clauses
             var whereClauses = new List<string>();
@@ -3587,7 +3766,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 if (tp.Constraints.Count > 0)
                 {
                     var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
-                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                    whereClauses.Add(
+                        $"where {SanitizeSingleIdentifier(tp.Name)} : {constraints}");
                 }
             }
             if (whereClauses.Count > 0)
@@ -3597,7 +3777,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var baseList = node.BaseInterfaces.Count > 0
-            ? " : " + string.Join(", ", node.BaseInterfaces)
+            ? " : " + string.Join(", ", node.BaseInterfaces.Select(MapTypeName))
             : "";
 
         AppendLine($"public interface {name}{typeParams}{baseList}{whereClause}");
@@ -3629,6 +3809,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MethodSignatureNode node)
     {
+        EnsureDefaultConstraintsLegal(
+            node.TypeParameters,
+            isLegal: false,
+            owner: "an interface method");
         // Emit XML comments for contracts
         if (node.HasContracts)
         {
@@ -3659,7 +3843,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(
+                tp => EmitTypeParameter(tp, allowVariance: false, owner: "a method"))) + ">";
 
             // Build where clauses
             var whereClauses = new List<string>();
@@ -3668,7 +3853,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 if (tp.Constraints.Count > 0)
                 {
                     var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
-                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                    whereClauses.Add(
+                        $"where {SanitizeSingleIdentifier(tp.Name)} : {constraints}");
                 }
             }
             if (whereClauses.Count > 0)
@@ -3687,6 +3873,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ClassDefinitionNode node)
     {
         EmitCSharpAttributes(node.CSharpAttributes);
+        EnsureDefaultConstraintsLegal(
+            node.TypeParameters,
+            isLegal: false,
+            owner: node.IsStruct ? "a struct" : "a class");
 
         var name = SanitizeIdentifier(node.Name);
 
@@ -3712,7 +3902,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(
+                tp => EmitTypeParameter(tp, allowVariance: false, owner: "a class"))) + ">";
 
             var whereClauses = new List<string>();
             foreach (var tp in node.TypeParameters)
@@ -3720,7 +3911,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 if (tp.Constraints.Count > 0)
                 {
                     var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
-                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                    whereClauses.Add(
+                        $"where {SanitizeSingleIdentifier(tp.Name)} : {constraints}");
                 }
             }
             if (whereClauses.Count > 0)
@@ -3733,9 +3925,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var baseList = new List<string>();
         if (!string.IsNullOrEmpty(node.BaseClass))
         {
-            baseList.Add(node.BaseClass);
+            baseList.Add(MapTypeName(node.BaseClass));
         }
-        baseList.AddRange(node.ImplementedInterfaces);
+        baseList.AddRange(node.ImplementedInterfaces.Select(MapTypeName));
         var inheritance = baseList.Count > 0 ? " : " + string.Join(", ", baseList) : "";
 
         AppendLine($"{modifiers} {keyword} {name}{typeParams}{inheritance}{whereClause}");
@@ -3912,6 +4104,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
+        var isExplicitInterfaceImplementation =
+            node.Name.Contains('.', StringComparison.Ordinal);
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
@@ -3922,7 +4116,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => "private"
         };
 
-        var modifiers = new List<string> { visibility };
+        var modifiers = isExplicitInterfaceImplementation
+            ? new List<string>()
+            : new List<string> { visibility };
         if (node.IsStatic) modifiers.Add("static");
         if (node.IsUnsafe) modifiers.Add("unsafe");
         if (node.IsExtern) modifiers.Add("extern");
@@ -3941,13 +4137,22 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             isIterator);
         var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var methodName = SanitizeIdentifier(node.Name);
+        EnsureDefaultConstraintsLegal(
+            node.TypeParameters,
+            node.IsOverride || isExplicitInterfaceImplementation,
+            node.IsOverride
+                ? "an override method"
+                : isExplicitInterfaceImplementation
+                    ? "an explicit interface implementation"
+                    : "an ordinary method");
 
         // Build type parameters
         var typeParams = "";
         var whereClause = "";
         if (node.TypeParameters.Count > 0)
         {
-            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(tp => tp.Accept(this))) + ">";
+            typeParams = "<" + string.Join(", ", node.TypeParameters.Select(
+                tp => EmitTypeParameter(tp, allowVariance: false, owner: "a method"))) + ">";
 
             var whereClauses = new List<string>();
             foreach (var tp in node.TypeParameters)
@@ -3955,7 +4160,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 if (tp.Constraints.Count > 0)
                 {
                     var constraints = string.Join(", ", tp.Constraints.Select(c => EmitConstraint(c)));
-                    whereClauses.Add($"where {tp.Name} : {constraints}");
+                    whereClauses.Add(
+                        $"where {SanitizeSingleIdentifier(tp.Name)} : {constraints}");
                 }
             }
             if (whereClauses.Count > 0)
@@ -4276,6 +4482,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             target = "this" + target;
         else
             target = QualifyCrossModuleTarget(target);
+        RegisterQualifiedNameDependencies(target);
+        target = SanitizeQualifiedName(target);
 
         // Append explicit generic type arguments: target<T1, T2>(args)
         if (node.TypeArguments is { Count: > 0 })
@@ -4294,7 +4502,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
             if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
             {
-                argStr = $"{node.ArgumentNames[i]}: {argStr}";
+                argStr = $"{SanitizeSingleIdentifier(node.ArgumentNames[i]!)}: {argStr}";
             }
             argStrings.Add(argStr);
         }
@@ -4916,7 +5124,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(UsingStatementNode node)
     {
-        var typePart = node.VariableType != null ? MapTypeName(node.VariableType) : "var";
+        var typePart = node.VariableType is null or "var"
+            ? "var"
+            : MapTypeName(node.VariableType);
         var namePart = node.VariableName != null ? SanitizeIdentifier(node.VariableName) : "_";
         var resource = node.Resource.Accept(this);
 
@@ -5827,6 +6037,128 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
+    private static UsingDirectiveKey GetUsingDirectiveKey(UsingDirectiveNode node)
+        => new(node.Namespace, node.Alias, node.IsStatic, node.IsGlobal);
+
+    private static IEnumerable<string> OrderRequiredNamespaces(
+        IEnumerable<string> namespaces)
+    {
+        string[] preferredOrder =
+        [
+            "System",
+            "Calor.Runtime",
+            "System.Collections.Generic",
+            "System.IO",
+            "System.Linq",
+            "System.Net.Http",
+            "System.Text",
+            "System.Threading",
+            "System.Threading.Tasks"
+        ];
+
+        return namespaces
+            .OrderBy(ns =>
+            {
+                var index = Array.IndexOf(preferredOrder, ns);
+                return index >= 0 ? index : preferredOrder.Length;
+            })
+            .ThenBy(ns => ns, StringComparer.Ordinal);
+    }
+
+    private void RequireNamespace(string @namespace)
+        => _requiredNamespaces.Add(@namespace);
+
+    private void RegisterTypeDependencies(string mappedType)
+    {
+        foreach (var identifier in EnumerateIdentifierTokens(mappedType))
+        {
+            switch (identifier)
+            {
+                case "List":
+                case "Dictionary":
+                case "HashSet":
+                case "IEnumerable":
+                case "IEnumerator":
+                case "IList":
+                case "IDictionary":
+                case "ICollection":
+                case "ISet":
+                case "IReadOnlyList":
+                case "IReadOnlyCollection":
+                case "IReadOnlyDictionary":
+                case "IReadOnlySet":
+                case "IAsyncEnumerable":
+                case "IAsyncEnumerator":
+                case "KeyValuePair":
+                    RequireNamespace("System.Collections.Generic");
+                    break;
+                case "Task":
+                case "ValueTask":
+                    RequireNamespace("System.Threading.Tasks");
+                    break;
+                case "CancellationToken":
+                    RequireNamespace("System.Threading");
+                    break;
+                case "File":
+                case "Directory":
+                case "Path":
+                case "Stream":
+                case "MemoryStream":
+                case "StreamReader":
+                case "StreamWriter":
+                case "FileInfo":
+                case "DirectoryInfo":
+                    RequireNamespace("System.IO");
+                    break;
+                case "HttpClient":
+                case "HttpRequestMessage":
+                case "HttpResponseMessage":
+                    RequireNamespace("System.Net.Http");
+                    break;
+                case "StringBuilder":
+                    RequireNamespace("System.Text");
+                    break;
+                case "Enumerable":
+                    RequireNamespace("System.Linq");
+                    break;
+                case "Option":
+                case "Result":
+                case "ContractViolationException":
+                    RequireNamespace("Calor.Runtime");
+                    break;
+            }
+        }
+    }
+
+    private void RegisterQualifiedNameDependencies(string name)
+    {
+        var identifiers = EnumerateIdentifierTokens(name).ToArray();
+        if (identifiers.Length == 0)
+            return;
+
+        RegisterTypeDependencies(name);
+
+        var finalIdentifier = identifiers[^1];
+        if (finalIdentifier is
+            "Select" or "Where" or "Any" or "All" or "First" or
+            "FirstOrDefault" or "OrderBy" or "OrderByDescending" or
+            "GroupBy" or "ToList" or "ToArray" or "Count" or "Single" or
+            "SingleOrDefault")
+        {
+            RequireNamespace("System.Linq");
+        }
+    }
+
+    private void RegisterOpaqueCSharpDependencies()
+    {
+        RequireNamespace("System.Collections.Generic");
+        RequireNamespace("System.IO");
+        RequireNamespace("System.Linq");
+        RequireNamespace("System.Net.Http");
+        RequireNamespace("System.Threading");
+        RequireNamespace("System.Threading.Tasks");
+    }
+
     private string MapTypeName(string calorType)
     {
         // Check indexed type erasure: SizedList → List, NonEmptyArr → int[], etc.
@@ -5845,8 +6177,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             baseTypeName = ResolveRefinementBaseType(refinementType);
         }
 
-        // Use the centralized TypeMapper for bidirectional type mapping
-        return TypeMapper.CalorToCSharp(baseTypeName);
+        // Use the centralized TypeMapper for every type-bearing position, then
+        // sanitize qualified identifiers without corrupting C# type syntax.
+        var mappedType = TypeMapper.CalorToCSharp(baseTypeName);
+        RegisterTypeDependencies(mappedType);
+        return SanitizeTypeName(mappedType);
     }
 
     private string ResolveRefinementBaseType(RefinementTypeNode refinementType)
@@ -5939,13 +6274,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static string SanitizeIdentifier(string name)
     {
-        // Handle qualified names (e.g., TimeUnit.Day) by sanitizing each part
-        if (name.Contains('.'))
-        {
-            var parts = name.Split('.');
-            return string.Join(".", parts.Select(SanitizeSingleIdentifier));
-        }
-        return SanitizeSingleIdentifier(name);
+        return name.Contains('.') || name.Contains("::", StringComparison.Ordinal)
+            ? SanitizeQualifiedName(name)
+            : SanitizeSingleIdentifier(name);
     }
 
     private static string SanitizeSingleIdentifier(string name)
@@ -5962,6 +6293,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var result = sb.ToString();
+        if (result.Length == 0)
+        {
+            return "_";
+        }
 
         // Ensure identifier doesn't start with a digit
         if (result.Length > 0 && char.IsDigit(result[0]))
@@ -5970,10 +6305,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         // Handle reserved words — prefix with @ to make valid C# identifiers.
-        // Covers C# reserved keywords (ECMA-334 §6.4.4), excluding type alias
-        // keywords (object, byte, char, etc.) since SanitizeIdentifier is also
-        // called on type names in some contexts (NewExpression, CatchClause, etc.).
-        // Exclude this/base/null/true/false — they have special meaning.
+        // Type syntax is handled separately by SanitizeTypeName, which preserves
+        // predefined type keywords. Exclude this/base/null/true/false here because
+        // expression visitors handle their special meaning before sanitization.
         return result switch
         {
             "abstract" or "as" or "bool" or "break" or
@@ -5999,24 +6333,124 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         };
     }
 
-    private static string SanitizeNamespace(string name)
-    {
-        var sb = new StringBuilder();
-        for (int i = 0; i < name.Length; i++)
-        {
-            var c = name[i];
-            if (char.IsLetterOrDigit(c) || c == '_' || c == '.')
+    private static readonly HashSet<string> PredefinedTypeKeywords =
+    [
+        "bool", "byte", "sbyte", "short", "ushort", "int", "uint", "long",
+        "ulong", "nint", "nuint", "char", "float", "double", "decimal",
+        "string", "object", "dynamic", "void"
+    ];
+
+    private static string SanitizeQualifiedName(string name)
+        => RewriteIdentifierTokens(
+            name,
+            (identifier, start, end) =>
             {
-                sb.Append(c);
+                if (identifier is "this" or "base" or "global")
+                    return identifier;
+
+                var next = end;
+                while (next < name.Length && char.IsWhiteSpace(name[next]))
+                    next++;
+                if (PredefinedTypeKeywords.Contains(identifier)
+                    && ((next < name.Length && name[next] == '.')
+                        || IsInsideGenericTypeArgument(name, start)))
+                {
+                    return identifier;
+                }
+
+                return SanitizeSingleIdentifier(identifier);
+            });
+
+    private static bool IsInsideGenericTypeArgument(string text, int offset)
+    {
+        var depth = 0;
+        for (var i = 0; i < offset; i++)
+        {
+            if (text[i] == '<')
+                depth++;
+            else if (text[i] == '>' && depth > 0)
+                depth--;
+        }
+        return depth > 0;
+    }
+
+    private static string SanitizeTypeName(string name)
+        => RewriteIdentifierTokens(
+            name,
+            (identifier, _, _) =>
+                identifier == "global" || PredefinedTypeKeywords.Contains(identifier)
+                    ? identifier
+                    : SanitizeSingleIdentifier(identifier));
+
+    private static string RewriteIdentifierTokens(
+        string text,
+        Func<string, int, int, string> rewrite)
+    {
+        var result = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length;)
+        {
+            var tokenStart = i;
+            if (text[i] == '@'
+                && i + 1 < text.Length
+                && IsIdentifierStart(text[i + 1]))
+            {
+                i++;
+                tokenStart = i;
             }
+
+            if (!IsIdentifierStart(text[i]))
+            {
+                result.Append(text[i]);
+                i++;
+                continue;
+            }
+
+            i++;
+            while (i < text.Length && IsIdentifierPart(text[i]))
+                i++;
+
+            var identifier = text[tokenStart..i];
+            result.Append(rewrite(identifier, tokenStart, i));
         }
 
-        var result = sb.ToString();
-        if (result.Length > 0 && char.IsDigit(result[0]))
+        return result.ToString();
+    }
+
+    private static IEnumerable<string> EnumerateIdentifierTokens(string text)
+    {
+        for (var i = 0; i < text.Length;)
         {
-            result = "_" + result;
+            if (text[i] == '@'
+                && i + 1 < text.Length
+                && IsIdentifierStart(text[i + 1]))
+            {
+                i++;
+            }
+
+            if (!IsIdentifierStart(text[i]))
+            {
+                i++;
+                continue;
+            }
+
+            var start = i++;
+            while (i < text.Length && IsIdentifierPart(text[i]))
+                i++;
+            yield return text[start..i];
         }
-        return result;
+    }
+
+    private static bool IsIdentifierStart(char value)
+        => value == '_' || char.IsLetter(value);
+
+    private static bool IsIdentifierPart(char value)
+        => value == '_' || char.IsLetterOrDigit(value);
+
+    private static string SanitizeNamespace(string name)
+    {
+        return string.Join(
+            ".",
+            name.Split('.').Select(SanitizeSingleIdentifier));
     }
 
     /// <summary>
@@ -6058,7 +6492,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(QuantifierVariableNode node)
     {
         // Variable nodes are handled internally by quantifier translation
-        return $"{node.Name}: {MapTypeName(node.TypeName)}";
+        return $"{SanitizeSingleIdentifier(node.Name)}: {MapTypeName(node.TypeName)}";
     }
 
     public string Visit(ForallExpressionNode node)
@@ -6082,7 +6516,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private string EmitForallExpression(ForallExpressionNode node)
     {
-        _usesSystemLinq = true;
+        RequireNamespace("System.Linq");
         // Try to extract finite range from the pattern:
         // (forall ((i type)) (-> (&& (>= i 0) (< i n)) body))
         var range = TryExtractFiniteRange(node);
@@ -6145,7 +6579,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private string EmitExistsExpression(ExistsExpressionNode node)
     {
-        _usesSystemLinq = true;
+        RequireNamespace("System.Linq");
         // Try to extract finite range from the pattern:
         // (exists ((i type)) (&& (>= i 0) (< i n) body))
         var range = TryExtractFiniteRangeForExists(node);
@@ -6338,7 +6772,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var operand = node.Operand.Accept(this);
         var csharpType = MapTypeName(node.TargetType);
         return node.VariableName != null
-            ? $"{operand} is {csharpType} {node.VariableName}"
+            ? $"{operand} is {csharpType} {SanitizeSingleIdentifier(node.VariableName)}"
             : $"{operand} is {csharpType}";
     }
 
@@ -6374,6 +6808,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(FallbackExpressionNode node)
     {
         // Emit the original C# code with a TODO comment
+        RegisterOpaqueCSharpDependencies();
         return $"/* TODO: {node.FeatureName} */ {node.OriginalCSharp}";
     }
 
@@ -6416,7 +6851,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(NameOfExpressionNode node)
     {
-        return $"nameof({node.Name})";
+        return $"nameof({SanitizeQualifiedName(node.Name)})";
     }
 
     public string Visit(ExpressionCallNode node)
@@ -6428,11 +6863,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(RawCSharpNode node)
     {
+        RegisterOpaqueCSharpDependencies();
         AppendRawCSharp(node.CSharpCode);
         return "";
     }
 
-    public string Visit(RawCSharpExpressionNode node) => node.CSharpCode;
+    public string Visit(RawCSharpExpressionNode node)
+    {
+        RegisterOpaqueCSharpDependencies();
+        return node.CSharpCode;
+    }
 
     public string Visit(PreprocessorDirectiveNode node)
     {
@@ -6462,36 +6902,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private void EmitMemberPreprocessorBlock(MemberPreprocessorBlockNode node, bool isFirst)
     {
         AppendLine(isFirst ? $"#if {node.Condition}" : $"#elif {node.Condition}");
-
-        foreach (var field in node.Fields)
-            Visit(field);
-        foreach (var prop in node.Properties)
-        {
-            Visit(prop);
-            AppendLine();
-        }
-        foreach (var indexer in node.Indexers)
-        {
-            Visit(indexer);
-            AppendLine();
-        }
-        foreach (var ctor in node.Constructors)
-        {
-            Visit(ctor);
-            AppendLine();
-        }
-        foreach (var method in node.Methods)
-        {
-            Visit(method);
-            AppendLine();
-        }
-        foreach (var op in node.OperatorOverloads)
-        {
-            Visit(op);
-            AppendLine();
-        }
-        foreach (var evt in node.Events)
-            Visit(evt);
+        EmitMemberPreprocessorItems(node);
 
         if (node.ElseBranch != null)
         {
@@ -6503,34 +6914,54 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             else
             {
                 AppendLine("#else");
-                foreach (var field in node.ElseBranch.Fields)
-                    Visit(field);
-                foreach (var prop in node.ElseBranch.Properties)
-                {
-                    Visit(prop);
-                    AppendLine();
-                }
-                foreach (var ctor in node.ElseBranch.Constructors)
-                {
-                    Visit(ctor);
-                    AppendLine();
-                }
-                foreach (var method in node.ElseBranch.Methods)
-                {
-                    Visit(method);
-                    AppendLine();
-                }
-                foreach (var op in node.ElseBranch.OperatorOverloads)
-                {
-                    Visit(op);
-                    AppendLine();
-                }
-                foreach (var evt in node.ElseBranch.Events)
-                    Visit(evt);
+                EmitMemberPreprocessorItems(node.ElseBranch);
             }
         }
 
         AppendLine("#endif");
+    }
+
+    private void EmitMemberPreprocessorItems(MemberPreprocessorBlockNode node)
+    {
+        foreach (var item in node.Items)
+        {
+            switch (item)
+            {
+                case ClassFieldNode field:
+                    Visit(field);
+                    break;
+                case PropertyNode property:
+                    Visit(property);
+                    AppendLine();
+                    break;
+                case IndexerNode indexer:
+                    Visit(indexer);
+                    AppendLine();
+                    break;
+                case ConstructorNode constructor:
+                    Visit(constructor);
+                    AppendLine();
+                    break;
+                case MethodNode method:
+                    Visit(method);
+                    AppendLine();
+                    break;
+                case OperatorOverloadNode op:
+                    Visit(op);
+                    AppendLine();
+                    break;
+                case EventDefinitionNode evt:
+                    Visit(evt);
+                    break;
+                case CSharpInteropBlockNode interop:
+                    Visit(interop);
+                    AppendLine();
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported member preprocessor item: {item.GetType().Name}");
+            }
+        }
     }
 
     public string Visit(TypePreprocessorBlockNode node)
@@ -6542,29 +6973,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private void EmitTypePreprocessorBlock(TypePreprocessorBlockNode node, bool isFirst)
     {
         AppendLine(isFirst ? $"#if {node.Condition}" : $"#elif {node.Condition}");
-
-        foreach (var u in node.Usings)
-            AppendLine(Visit(u));
-        foreach (var cls in node.Classes)
-        {
-            Visit(cls);
-            AppendLine();
-        }
-        foreach (var iface in node.Interfaces)
-        {
-            Visit(iface);
-            AppendLine();
-        }
-        foreach (var en in node.Enums)
-        {
-            Visit(en);
-            AppendLine();
-        }
-        foreach (var del in node.Delegates)
-        {
-            Visit(del);
-            AppendLine();
-        }
+        EmitTypePreprocessorDeclarations(node);
 
         if (node.ElseBranch != null)
         {
@@ -6576,36 +6985,55 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             else
             {
                 AppendLine("#else");
-                foreach (var u in node.ElseBranch.Usings)
-                    AppendLine(Visit(u));
-                foreach (var cls in node.ElseBranch.Classes)
-                {
-                    Visit(cls);
-                    AppendLine();
-                }
-                foreach (var iface in node.ElseBranch.Interfaces)
-                {
-                    Visit(iface);
-                    AppendLine();
-                }
-                foreach (var en in node.ElseBranch.Enums)
-                {
-                    Visit(en);
-                    AppendLine();
-                }
-                foreach (var del in node.ElseBranch.Delegates)
-                {
-                    Visit(del);
-                    AppendLine();
-                }
+                EmitTypePreprocessorDeclarations(node.ElseBranch);
             }
         }
 
         AppendLine("#endif");
     }
 
+    private void EmitTypePreprocessorDeclarations(TypePreprocessorBlockNode node)
+    {
+        foreach (var item in node.Items)
+        {
+            switch (item)
+            {
+                case UsingDirectiveNode:
+                    break;
+                case ClassDefinitionNode cls:
+                    Visit(cls);
+                    AppendLine();
+                    break;
+                case InterfaceDefinitionNode iface:
+                    Visit(iface);
+                    AppendLine();
+                    break;
+                case EnumDefinitionNode en:
+                    Visit(en);
+                    AppendLine();
+                    break;
+                case DelegateDefinitionNode del:
+                    Visit(del);
+                    AppendLine();
+                    break;
+                case TypePreprocessorBlockNode nested:
+                    Visit(nested);
+                    AppendLine();
+                    break;
+                case CSharpInteropBlockNode interop:
+                    Visit(interop);
+                    AppendLine();
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported type preprocessor item: {item.GetType().Name}");
+            }
+        }
+    }
+
     public string Visit(CSharpInteropBlockNode node)
     {
+        RegisterOpaqueCSharpDependencies();
         var code = node.CSharpCode;
 
         // Strip namespace declarations that match the current module namespace
@@ -7409,7 +7837,7 @@ public sealed record GeneratedCSharpCompilationContext
     public Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion { get; init; } =
         Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default;
     public IEnumerable<string>? PreprocessorSymbols { get; init; }
-    public bool IncludeImplicitGlobalUsings { get; init; } = true;
+    public bool IncludeImplicitGlobalUsings { get; init; }
     public IEnumerable<string>? AnalyzerPaths { get; init; }
     public IEnumerable<string>? AdditionalFilePaths { get; init; }
     public Microsoft.CodeAnalysis.NullableContextOptions NullableContextOptions { get; init; }
@@ -7421,12 +7849,11 @@ public sealed record GeneratedCSharpCompilationContext
 /// Shared Roslyn compilation helper for validating generated C# (#771/#761).
 ///
 /// <para>Resolves the full trusted-platform-assembly reference set plus
-/// <c>Calor.Runtime</c>, and supplies the implicit global usings the Calor SDK
-/// provides to generated code — the same environment the production self-check
-/// exemplar compile uses (<see cref="SelfCheck.ExemplarCompileChecker"/> delegates
-/// here). Test helpers must use this instead of hand-rolled minimal reference
-/// sets, whose failures are unassertable (missing-reference noise drowns real
-/// emitter defects).</para>
+/// <c>Calor.Runtime</c>. Generated C# is standalone by default, so implicit
+/// global usings are disabled unless the invoking project explicitly opts in.
+/// Test helpers must use this instead of hand-rolled minimal reference sets,
+/// whose failures are unassertable (missing-reference noise drowns real emitter
+/// defects).</para>
 /// </summary>
 public static class GeneratedCSharpCompiler
 {
@@ -7464,11 +7891,9 @@ public static class GeneratedCSharpCompiler
     }
 
     /// <summary>
-    /// The implicit global usings the Calor SDK provides to generated code —
-    /// mirrors Microsoft.NET.Sdk's ImplicitUsings set as of .NET 10. The emitter
-    /// relies on these (it emits <c>File.ReadAllLines(...)</c> with no
-    /// <c>using System.IO;</c>), so generated C# only compiles standalone when
-    /// they are supplied here too.
+    /// Optional compatibility preamble for callers validating in a project that
+    /// explicitly enables SDK implicit usings. Standalone validation does not
+    /// include this preamble.
     /// </summary>
     public const string GlobalUsingsPreamble =
         "global using System;\n" +

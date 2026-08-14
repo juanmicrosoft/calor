@@ -67,7 +67,15 @@ public enum TypeConstraintKind
     /// <summary>Type must be or derive from the specified type</summary>
     TypeName,
     /// <summary>Type must not be null (notnull constraint)</summary>
-    NotNull
+    NotNull,
+    /// <summary>Type must be an unmanaged value type</summary>
+    Unmanaged,
+    /// <summary>Nullable reference type constraint (<c>class?</c>)</summary>
+    ClassNullable,
+    /// <summary>Override/default constraint</summary>
+    Default,
+    /// <summary>Anti-constraint allowing ref struct type arguments</summary>
+    AllowsRefStruct
 }
 
 /// <summary>

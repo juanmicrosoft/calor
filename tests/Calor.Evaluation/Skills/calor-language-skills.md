@@ -199,7 +199,10 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
 §F{id:Name:vis} (type:name, ...) -> returnType
                       Function (pub|pri) with parameters and return type
 §E{effects}           Side effects: cw,cr,fs:r,fs:w,net:rw,db:rw
-§U{namespace}         Using directive
+§U{namespace}         Normal using directive
+§U{Alias:target}      Using alias
+§U{static:target}     Using static directive
+§U{global:target}     Global using (also supports global:Alias and global:static)
 Indentation delimits modules/functions; do not write structural close tags
 ```
 
@@ -935,10 +938,15 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 ```calor
 §WHERE T : class              // Reference type constraint
+§WHERE T : class?             // Nullable reference type constraint
 §WHERE T : struct             // Value type constraint
+§WHERE T : unmanaged          // Unmanaged value type
+§WHERE T : notnull            // Non-null type
 §WHERE T : new()              // Parameterless constructor
 §WHERE T : IComparable<T>     // Interface constraint
 §WHERE T : class, IDisposable // Multiple constraints
+§WHERE T : default            // Only override/explicit-interface methods (Calor0120 otherwise)
+§WHERE T : allows ref struct  // Ref-struct anti-constraint
 ```
 
 ### Template: Generic Repository

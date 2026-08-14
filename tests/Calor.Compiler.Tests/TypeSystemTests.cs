@@ -319,7 +319,7 @@ public class TypeSystemTests
         var emitter = new CSharpEmitter();
         var result = recordCreation.Accept(emitter);
 
-        Assert.Equal("new Person(\"Alice\", 30)", result);
+        Assert.Equal("new Person(Name: \"Alice\", Age: 30)", result);
     }
 
     [Fact]

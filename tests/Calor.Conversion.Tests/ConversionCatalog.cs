@@ -233,13 +233,20 @@ public static class ConversionCatalog
         """);
 
     public static readonly ConversionSnippet Variance = new(
-        "04-04", "Generics", "Covariant and contravariant interfaces",
+        "04-04", "Generics", "Usings, variance, aliases, and generic constraints",
         """
-        public interface IProducer<out T>
+        global using System;
+        global using Collections = System.Collections.Generic;
+        global using static System.Math;
+        using Text = System.String;
+
+        public interface IProducer<out T> : Collections.IEnumerable<T>
+            where T : class?
         {
             T Produce();
         }
         public interface IConsumer<in T>
+            where T : notnull
         {
             void Consume(T item);
         }

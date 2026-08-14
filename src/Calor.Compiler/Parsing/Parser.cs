@@ -433,7 +433,121 @@ public sealed class Parser
 
     public ModuleNode Parse()
     {
-        return ParseModule();
+        var module = ParseModule();
+        ValidateDefaultConstraintOwners(module);
+        return module;
+    }
+
+    private void ValidateDefaultConstraintOwners(ModuleNode module)
+    {
+        foreach (var function in module.Functions)
+            ValidateDefaultConstraints(
+                function.TypeParameters,
+                isLegal: false,
+                owner: "a function");
+        foreach (var extension in module.EnumExtensions)
+        {
+            foreach (var method in extension.Methods)
+                ValidateDefaultConstraints(
+                    method.TypeParameters,
+                    isLegal: false,
+                    owner: "an enum extension method");
+        }
+        foreach (var iface in module.Interfaces)
+            ValidateInterfaceDefaultConstraints(iface);
+        foreach (var type in module.Classes)
+            ValidateClassDefaultConstraints(type);
+        foreach (var block in module.TypePreprocessorBlocks)
+            ValidateTypePreprocessorDefaultConstraints(block);
+    }
+
+    private void ValidateInterfaceDefaultConstraints(InterfaceDefinitionNode node)
+    {
+        ValidateDefaultConstraints(
+            node.TypeParameters,
+            isLegal: false,
+            owner: "an interface");
+        foreach (var method in node.Methods)
+            ValidateDefaultConstraints(
+                method.TypeParameters,
+                isLegal: false,
+                owner: "an interface method");
+    }
+
+    private void ValidateClassDefaultConstraints(ClassDefinitionNode node)
+    {
+        ValidateDefaultConstraints(
+            node.TypeParameters,
+            isLegal: false,
+            owner: node.IsStruct ? "a struct" : "a class");
+        foreach (var method in node.Methods)
+        {
+            var isExplicitInterfaceImplementation =
+                method.Name.Contains('.', StringComparison.Ordinal);
+            ValidateDefaultConstraints(
+                method.TypeParameters,
+                method.IsOverride || isExplicitInterfaceImplementation,
+                method.IsOverride
+                    ? "an override method"
+                    : isExplicitInterfaceImplementation
+                        ? "an explicit interface implementation"
+                        : "an ordinary method");
+        }
+        foreach (var block in node.PreprocessorBlocks)
+            ValidateMemberPreprocessorDefaultConstraints(block);
+        foreach (var nested in node.NestedClasses)
+            ValidateClassDefaultConstraints(nested);
+        foreach (var nested in node.NestedInterfaces)
+            ValidateInterfaceDefaultConstraints(nested);
+    }
+
+    private void ValidateMemberPreprocessorDefaultConstraints(
+        MemberPreprocessorBlockNode block)
+    {
+        foreach (var method in block.Methods)
+        {
+            ValidateDefaultConstraints(
+                method.TypeParameters,
+                method.IsOverride
+                    || method.Name.Contains('.', StringComparison.Ordinal),
+                "a conditional method");
+        }
+        if (block.ElseBranch != null)
+            ValidateMemberPreprocessorDefaultConstraints(block.ElseBranch);
+    }
+
+    private void ValidateTypePreprocessorDefaultConstraints(
+        TypePreprocessorBlockNode block)
+    {
+        foreach (var iface in block.Interfaces)
+            ValidateInterfaceDefaultConstraints(iface);
+        foreach (var type in block.Classes)
+            ValidateClassDefaultConstraints(type);
+        foreach (var nested in block.NestedBlocks)
+            ValidateTypePreprocessorDefaultConstraints(nested);
+        if (block.ElseBranch != null)
+            ValidateTypePreprocessorDefaultConstraints(block.ElseBranch);
+    }
+
+    private void ValidateDefaultConstraints(
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        bool isLegal,
+        string owner)
+    {
+        if (isLegal)
+            return;
+
+        foreach (var typeParameter in typeParameters)
+        {
+            foreach (var constraint in typeParameter.Constraints.Where(
+                         constraint => constraint.Kind == TypeConstraintKind.Default))
+            {
+                _diagnostics.ReportError(
+                    constraint.Span,
+                    DiagnosticCode.InvalidDefaultConstraintOwner,
+                    $"The 'default' constraint on '{typeParameter.Name}' is only legal on override methods or explicit interface implementations, not {owner}.");
+            }
+        }
     }
 
     /// <summary>
@@ -685,6 +799,9 @@ public sealed class Parser
     /// §U[System.Collections.Generic]            // using System.Collections.Generic;
     /// §U[Gen:System.Collections.Generic]        // using Gen = System.Collections.Generic;
     /// §U[static:System.Math]                    // using static System.Math;
+    /// §U[global:System.Text]                    // global using System.Text;
+    /// §U[global:static:System.Math]              // global using static System.Math;
+    /// §U[global:Gen:System.Collections.Generic]  // global using Gen = System.Collections.Generic;
     /// </summary>
     private UsingDirectiveNode ParseUsingDirective()
     {
@@ -696,14 +813,39 @@ public sealed class Parser
         // [namespace]                   -> using namespace;
         // [alias:namespace]             -> using alias = namespace;
         // [static:namespace]            -> using static namespace;
+        // [global:namespace]            -> global using namespace;
+        // [global:static:namespace]     -> global using static namespace;
+        // [global:alias:namespace]      -> global using alias = namespace;
         var pos0 = attrs["_pos0"] ?? "";
         var pos1 = attrs["_pos1"];
+        var pos2 = attrs["_pos2"];
 
         string @namespace;
         string? alias = null;
         bool isStatic = false;
+        bool isGlobal = false;
 
-        if (pos1 != null)
+        if (pos0.Equals("global", StringComparison.OrdinalIgnoreCase))
+        {
+            isGlobal = true;
+            if (pos2 != null)
+            {
+                if (pos1!.Equals("static", StringComparison.OrdinalIgnoreCase))
+                {
+                    isStatic = true;
+                }
+                else
+                {
+                    alias = pos1;
+                }
+                @namespace = pos2;
+            }
+            else
+            {
+                @namespace = pos1 ?? "";
+            }
+        }
+        else if (pos1 != null)
         {
             // Two-part format: [prefix:namespace]
             if (pos0.Equals("static", StringComparison.OrdinalIgnoreCase))
@@ -729,7 +871,7 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "USING", "namespace");
         }
 
-        return new UsingDirectiveNode(startToken.Span, @namespace, alias, isStatic);
+        return new UsingDirectiveNode(startToken.Span, @namespace, alias, isStatic, isGlobal);
     }
 
     private FunctionNode ParseFunction()
@@ -7027,7 +7169,10 @@ public sealed class Parser
     /// &lt;T&gt; or &lt;T, U&gt; or &lt;TKey, TValue&gt;
     /// Returns an empty list if no type parameters are present.
     /// </summary>
-    private List<TypeParameterNode> ParseOptionalTypeParameterList(TextSpan defaultSpan)
+    private List<TypeParameterNode> ParseOptionalTypeParameterList(
+        TextSpan defaultSpan,
+        bool allowVariance = false,
+        string owner = "this declaration")
     {
         var typeParams = new List<TypeParameterNode>();
 
@@ -7045,6 +7190,13 @@ public sealed class Parser
             if (Check(TokenKind.Identifier) && Current.Text is "in" or "out")
             {
                 variance = Current.Text == "out" ? Ast.VarianceKind.Out : Ast.VarianceKind.In;
+                if (!allowVariance)
+                {
+                    _diagnostics.ReportError(
+                        Current.Span,
+                        DiagnosticCode.InvalidTypeParameterVariance,
+                        $"Type parameter variance is only legal on interfaces and delegates, not {owner}.");
+                }
                 Advance(); // consume in/out
             }
 
@@ -7153,9 +7305,13 @@ public sealed class Parser
             var (kind, typeName) = constraintText.ToLowerInvariant() switch
             {
                 "class" => (TypeConstraintKind.Class, (string?)null),
+                "class?" => (TypeConstraintKind.ClassNullable, (string?)null),
                 "struct" => (TypeConstraintKind.Struct, (string?)null),
                 "new" or "new()" => (TypeConstraintKind.New, (string?)null),
                 "notnull" => (TypeConstraintKind.NotNull, (string?)null),
+                "unmanaged" => (TypeConstraintKind.Unmanaged, (string?)null),
+                "default" => (TypeConstraintKind.Default, (string?)null),
+                "allows ref struct" => (TypeConstraintKind.AllowsRefStruct, (string?)null),
                 _ => (TypeConstraintKind.TypeName, constraintText)
             };
 
@@ -7165,7 +7321,11 @@ public sealed class Parser
 
         // Replace the type parameter with one that includes the new constraints
         var oldTypeParam = typeParameters[typeParamIndex];
-        typeParameters[typeParamIndex] = new TypeParameterNode(oldTypeParam.Span, oldTypeParam.Name, newConstraints);
+        typeParameters[typeParamIndex] = new TypeParameterNode(
+            oldTypeParam.Span,
+            oldTypeParam.Name,
+            newConstraints,
+            oldTypeParam.Variance);
     }
 
     /// <summary>
@@ -7198,10 +7358,30 @@ public sealed class Parser
         if (Check(TokenKind.Identifier))
         {
             var text = Current.Text.ToLowerInvariant();
-            if (text == "class" || text == "struct" || text == "notnull")
+            if (text == "class")
+            {
+                Advance();
+                if (Match(TokenKind.Question))
+                {
+                    return "class?";
+                }
+                return text;
+            }
+            if (text == "struct" || text == "notnull" || text == "unmanaged" || text == "default")
             {
                 Advance();
                 return text;
+            }
+            if (text == "allows"
+                && Peek(1).Kind == TokenKind.Identifier
+                && Peek(1).Text.Equals("ref", StringComparison.OrdinalIgnoreCase)
+                && Peek(2).Kind == TokenKind.Identifier
+                && Peek(2).Text.Equals("struct", StringComparison.OrdinalIgnoreCase))
+            {
+                Advance();
+                Advance();
+                Advance();
+                return "allows ref struct";
             }
             if (text == "new")
             {
@@ -7449,7 +7629,10 @@ public sealed class Parser
         }
 
         // NEW: Parse optional type parameters §IFACE{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            allowVariance: true,
+            owner: "an interface");
 
         // Legacy: Extract type parameters from name if present (e.g., IProducer<out T>)
         if (typeParameters.Count == 0)
@@ -7801,6 +7984,13 @@ public sealed class Parser
                             {
                                 variance = Ast.VarianceKind.In;
                                 trimmedName = trimmedName.Substring(3);
+                            }
+                            if (variance != Ast.VarianceKind.None)
+                            {
+                                _diagnostics.ReportError(
+                                    startToken.Span,
+                                    DiagnosticCode.InvalidTypeParameterVariance,
+                                    "Type parameter variance is only legal on interfaces and delegates, not a class.");
                             }
                             typeParameters.Add(new TypeParameterNode(startToken.Span, trimmedName, Array.Empty<TypeConstraintNode>(), variance));
                         }
@@ -10182,11 +10372,15 @@ public sealed class Parser
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
         var operatorOverloads = new List<OperatorOverloadNode>();
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+        var items = new List<AstNode>();
 
         // Parse members until §PPE or §/PP
         while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
         {
-            ParseMemberInPreprocessorBlock(fields, properties, constructors, methods, events, operatorOverloads);
+            ParseMemberInPreprocessorBlock(
+                fields, properties, constructors, methods, events,
+                operatorOverloads, interopBlocks: interopBlocks, items: items);
         }
 
         MemberPreprocessorBlockNode? elseBranch = null;
@@ -10206,14 +10400,23 @@ public sealed class Parser
                 var elseMethods = new List<MethodNode>();
                 var elseEvents = new List<EventDefinitionNode>();
                 var elseOperatorOverloads = new List<OperatorOverloadNode>();
+                var elseInteropBlocks = new List<CSharpInteropBlockNode>();
+                var elseItems = new List<AstNode>();
 
                 while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
                 {
-                    ParseMemberInPreprocessorBlock(elseFields, elseProperties, elseConstructors, elseMethods, elseEvents, elseOperatorOverloads);
+                    ParseMemberInPreprocessorBlock(
+                        elseFields, elseProperties, elseConstructors, elseMethods,
+                        elseEvents, elseOperatorOverloads,
+                        interopBlocks: elseInteropBlocks,
+                        items: elseItems);
                 }
 
                 elseBranch = new MemberPreprocessorBlockNode(startToken.Span, "",
-                    elseFields, elseProperties, elseConstructors, elseMethods, elseEvents, elseOperatorOverloads);
+                    elseFields, elseProperties, elseConstructors, elseMethods,
+                    elseEvents, elseOperatorOverloads,
+                    interopBlocks: elseInteropBlocks,
+                    items: elseItems);
             }
         }
 
@@ -10224,7 +10427,8 @@ public sealed class Parser
         }
 
         return new MemberPreprocessorBlockNode(startToken.Span, condition,
-            fields, properties, constructors, methods, events, operatorOverloads, elseBranch);
+            fields, properties, constructors, methods, events, operatorOverloads,
+            elseBranch, interopBlocks: interopBlocks, items: items);
     }
 
     /// <summary>
@@ -10241,12 +10445,26 @@ public sealed class Parser
         var interfaces = new List<InterfaceDefinitionNode>();
         var enums = new List<EnumDefinitionNode>();
         var delegates = new List<DelegateDefinitionNode>();
+        var nestedBlocks = new List<TypePreprocessorBlockNode>();
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+        var items = new List<AstNode>();
 
         // Parse type declarations until §PPE or §/PP
         while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
         {
-            ParseTypeInPreprocessorBlock(classes, interfaces, enums, delegates, usings);
+            ParseTypeInPreprocessorBlock(
+                classes,
+                interfaces,
+                enums,
+                delegates,
+                usings,
+                nestedBlocks,
+                items,
+                interopBlocks);
         }
+        ConsumeDedentBeforeChain(
+            TokenKind.PreprocessorElse,
+            TokenKind.EndPreprocessor);
 
         TypePreprocessorBlockNode? elseBranch = null;
         if (Match(TokenKind.PreprocessorElse))
@@ -10262,14 +10480,30 @@ public sealed class Parser
                 var elseInterfaces = new List<InterfaceDefinitionNode>();
                 var elseEnums = new List<EnumDefinitionNode>();
                 var elseDelegates = new List<DelegateDefinitionNode>();
+                var elseNestedBlocks = new List<TypePreprocessorBlockNode>();
+                var elseInteropBlocks = new List<CSharpInteropBlockNode>();
+                var elseItems = new List<AstNode>();
 
                 while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
                 {
-                    ParseTypeInPreprocessorBlock(elseClasses, elseInterfaces, elseEnums, elseDelegates, elseUsings);
+                    ParseTypeInPreprocessorBlock(
+                        elseClasses,
+                        elseInterfaces,
+                        elseEnums,
+                        elseDelegates,
+                        elseUsings,
+                        elseNestedBlocks,
+                        elseItems,
+                        elseInteropBlocks);
                 }
+                ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
 
                 elseBranch = new TypePreprocessorBlockNode(startToken.Span, "",
-                    elseClasses, elseInterfaces, elseEnums, elseDelegates, usings: elseUsings);
+                    elseClasses, elseInterfaces, elseEnums, elseDelegates,
+                    usings: elseUsings,
+                    nestedBlocks: elseNestedBlocks,
+                    items: elseItems,
+                    interopBlocks: elseInteropBlocks);
             }
         }
 
@@ -10279,7 +10513,8 @@ public sealed class Parser
         }
 
         return new TypePreprocessorBlockNode(startToken.Span, condition,
-            classes, interfaces, enums, delegates, elseBranch, usings);
+            classes, interfaces, enums, delegates, elseBranch, usings,
+            nestedBlocks, items, interopBlocks);
     }
 
     private void ParseTypeInPreprocessorBlock(
@@ -10287,31 +10522,56 @@ public sealed class Parser
         List<InterfaceDefinitionNode> interfaces,
         List<EnumDefinitionNode> enums,
         List<DelegateDefinitionNode> delegates,
-        List<UsingDirectiveNode>? usings = null)
+        List<UsingDirectiveNode>? usings = null,
+        List<TypePreprocessorBlockNode>? nestedBlocks = null,
+        List<AstNode>? items = null,
+        List<CSharpInteropBlockNode>? interopBlocks = null)
     {
         if (usings != null && Check(TokenKind.Using))
         {
-            usings.Add(ParseUsingDirective());
+            var node = ParseUsingDirective();
+            usings.Add(node);
+            items?.Add(node);
         }
         else if (Check(TokenKind.Class))
         {
-            classes.Add(ParseClassDefinition());
+            var node = ParseClassDefinition();
+            classes.Add(node);
+            items?.Add(node);
         }
         else if (Check(TokenKind.Interface))
         {
-            interfaces.Add(ParseInterfaceDefinition());
+            var node = ParseInterfaceDefinition();
+            interfaces.Add(node);
+            items?.Add(node);
         }
         else if (Check(TokenKind.Enum))
         {
-            enums.Add(ParseEnumDefinition());
+            var node = ParseEnumDefinition();
+            enums.Add(node);
+            items?.Add(node);
         }
         else if (Check(TokenKind.Delegate))
         {
-            delegates.Add(ParseDelegateDefinition());
+            var node = ParseDelegateDefinition();
+            delegates.Add(node);
+            items?.Add(node);
+        }
+        else if (nestedBlocks != null && Check(TokenKind.Preprocessor))
+        {
+            var node = ParseTypePreprocessorBlock();
+            nestedBlocks.Add(node);
+            items?.Add(node);
+        }
+        else if (interopBlocks != null && Check(TokenKind.CSharpInterop))
+        {
+            var node = ParseCSharpInteropBlock();
+            interopBlocks.Add(node);
+            items?.Add(node);
         }
         else
         {
-            _diagnostics.ReportUnexpectedToken(Current.Span, "U, CLASS, IFACE, EN, DEL, PPE, or END_PP", Current.Kind);
+            _diagnostics.ReportUnexpectedToken(Current.Span, "U, CLASS, IFACE, EN, DEL, PP, CSHARP, PPE, or END_PP", Current.Kind);
             Advance();
         }
     }
@@ -10323,27 +10583,67 @@ public sealed class Parser
         List<MethodNode> methods,
         List<EventDefinitionNode> events,
         List<OperatorOverloadNode> operatorOverloads,
-        List<IndexerNode>? indexers = null)
+        List<IndexerNode>? indexers = null,
+        List<CSharpInteropBlockNode>? interopBlocks = null,
+        List<AstNode>? items = null)
     {
         if (Check(TokenKind.FieldDef))
-            fields.Add(ParseClassField());
+        {
+            var node = ParseClassField();
+            fields.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.Property))
-            properties.Add(ParseProperty());
+        {
+            var node = ParseProperty();
+            properties.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.Indexer))
-            indexers?.Add(ParseIndexer());
+        {
+            var node = ParseIndexer();
+            indexers?.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.Constructor))
-            constructors.Add(ParseConstructor());
+        {
+            var node = ParseConstructor();
+            constructors.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.OperatorOverload))
-            operatorOverloads.Add(ParseOperatorOverload());
+        {
+            var node = ParseOperatorOverload();
+            operatorOverloads.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.Method))
-            methods.Add(ParseMethodDefinition());
+        {
+            var node = ParseMethodDefinition();
+            methods.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.AsyncMethod))
-            methods.Add(ParseAsyncMethodDefinition());
+        {
+            var node = ParseAsyncMethodDefinition();
+            methods.Add(node);
+            items?.Add(node);
+        }
         else if (Check(TokenKind.Event))
-            events.Add(ParseEventDefinition());
+        {
+            var node = ParseEventDefinition();
+            events.Add(node);
+            items?.Add(node);
+        }
+        else if (interopBlocks != null && Check(TokenKind.CSharpInterop))
+        {
+            var node = ParseCSharpInteropBlock();
+            interopBlocks.Add(node);
+            items?.Add(node);
+        }
         else
         {
-            _diagnostics.ReportUnexpectedToken(Current.Span, "FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, PPE, or END_PP", Current.Kind);
+            _diagnostics.ReportUnexpectedToken(Current.Span, "FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PPE, or END_PP", Current.Kind);
             Advance();
         }
     }

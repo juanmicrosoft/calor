@@ -24,8 +24,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
     private readonly List<CSharpInteropBlockNode> _moduleInteropBlocks = new();
+    private List<CSharpInteropBlockNode>? _conditionalModuleInteropSink;
     private readonly List<TypePreprocessorBlockNode> _typePreprocessorBlocks = new();
     private bool _insideTypePreprocessorConversion;
+    private bool _insideConditionalModuleRecovery;
 
     // #769 (WS-W4 D2): bare type names declared by top-level types in two or more
     // distinct namespaces within this file. Flattening every namespace into one
@@ -33,9 +35,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     // in this set is refused (escalated to §CSHARP interop) rather than merged.
     private readonly HashSet<string> _crossNamespaceCollisionNames = new(StringComparer.Ordinal);
     private HashSet<string> _reassignedVariables = new();
-    // Tracks active-branch conditional using groups across multiple VisitUsingDirective calls
-    private string? _activeConditionalUsingCondition;
-    private List<UsingDirectiveNode>? _activeConditionalUsings;
+    private readonly HashSet<int> _conditionalUsingDirectiveStarts = new();
+    private readonly HashSet<int> _conditionalTypeDeclarationStarts = new();
 
     /// <summary>
     /// Accumulates hoisted statements from expression-level chain decomposition.
@@ -98,9 +99,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _functions.Clear();
         _topLevelStatements.Clear();
         _moduleInteropBlocks.Clear();
+        _conditionalModuleInteropSink = null;
         _typePreprocessorBlocks.Clear();
-        _activeConditionalUsingCondition = null;
-        _activeConditionalUsings = null;
+        _conditionalUsingDirectiveStarts.Clear();
+        _conditionalTypeDeclarationStarts.Clear();
         _crossNamespaceCollisionNames.Clear();
         _reassignedVariables = CollectReassignedVariables(root);
 
@@ -110,16 +112,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         ScanCrossNamespaceCollisions(root);
         _cancellationToken.ThrowIfCancellationRequested();
 
-        // Scan for module-level #if blocks wrapping type declarations
-        // (disabled by preprocessor — Roslyn excludes them from the tree)
-        ScanModuleLevelPreprocessorBlocks(root);
+        // Recover complete module-level conditional groups before the ordinary
+        // Roslyn walk, including disabled branches and nested groups.
+        ScanConditionalModuleBlocks(root);
         _cancellationToken.ThrowIfCancellationRequested();
 
         // Visit all nodes
         Visit(root);
-
-        // Flush any remaining conditional usings
-        FlushActiveConditionalUsings();
 
         // Use a fixed module ID — each file produces exactly one module, and generating
         // the ID after Visit(root) would give inconsistent IDs like m044 due to the
@@ -170,97 +169,487 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitUsingDirective(UsingDirectiveSyntax node)
     {
-        if (node.Name != null)
+        if (!_conditionalUsingDirectiveStarts.Contains(node.SpanStart)
+            && TryConvertUsingDirective(node, GetTextSpan(node), out var usingNode))
         {
-            var namespaceName = node.Name.ToString().Replace("@", "");
-            var isStatic = node.StaticKeyword.IsKind(SyntaxKind.StaticKeyword);
-            var alias = node.Alias?.Name.ToString();
-
-            var usingNode = new UsingDirectiveNode(
-                GetTextSpan(node),
-                namespaceName,
-                alias,
-                isStatic);
-
-            // Check for #if start in leading trivia
-            var ifCondition = GetLeadingIfCondition(node);
-            if (ifCondition != null)
-            {
-                // Start a new conditional using group
-                FlushActiveConditionalUsings();
-                _activeConditionalUsingCondition = ifCondition;
-                _activeConditionalUsings = new List<UsingDirectiveNode> { usingNode };
-            }
-            else if (_activeConditionalUsings != null)
-            {
-                // Inside an active conditional group — add to it
-                _activeConditionalUsings.Add(usingNode);
-            }
-            else
-            {
-                _usings.Add(usingNode);
-            }
-
-            // Check for #endif in trailing trivia — closes the group
-            if (_activeConditionalUsings != null && HasTrailingEndif(node))
-            {
-                FlushActiveConditionalUsings();
-            }
+            _usings.Add(usingNode);
         }
 
         base.VisitUsingDirective(node);
     }
 
-    /// <summary>
-    /// Flushes any accumulated active-branch conditional usings into a TypePreprocessorBlockNode.
-    /// </summary>
-    private void FlushActiveConditionalUsings()
+    private static bool TryConvertUsingDirective(
+        UsingDirectiveSyntax node,
+        TextSpan span,
+        out UsingDirectiveNode usingNode)
     {
-        if (_activeConditionalUsings != null && _activeConditionalUsings.Count > 0 && _activeConditionalUsingCondition != null)
+        if (node.NamespaceOrType == null)
         {
-            _context.RecordFeatureUsage("conditional-using");
-            _context.RecordFeatureUsage("preprocessor-directive");
-            var ppNode = new TypePreprocessorBlockNode(
-                TextSpan.Empty,
-                _activeConditionalUsingCondition,
-                Array.Empty<ClassDefinitionNode>(),
-                Array.Empty<InterfaceDefinitionNode>(),
-                Array.Empty<EnumDefinitionNode>(),
-                Array.Empty<DelegateDefinitionNode>(),
-                usings: _activeConditionalUsings);
-            _typePreprocessorBlocks.Add(ppNode);
+            usingNode = null!;
+            return false;
         }
-        _activeConditionalUsingCondition = null;
-        _activeConditionalUsings = null;
+
+        usingNode = new UsingDirectiveNode(
+            span,
+            node.NamespaceOrType.ToString().Replace("@", ""),
+            node.Alias?.Name.ToString(),
+            node.StaticKeyword.IsKind(SyntaxKind.StaticKeyword),
+            node.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword));
+        return true;
     }
 
-    /// <summary>
-    /// Gets the #if condition from a node's leading trivia, if present.
-    /// </summary>
-    private static string? GetLeadingIfCondition(SyntaxNode node)
+    private void AddModuleInteropBlock(CSharpInteropBlockNode block)
     {
-        foreach (var trivia in node.GetLeadingTrivia())
+        if (_conditionalModuleInteropSink != null)
+            _conditionalModuleInteropSink.Add(block);
+        else
+            _moduleInteropBlocks.Add(block);
+    }
+
+    private sealed class ConditionalModuleSourceGroup
+    {
+        public int Start { get; set; }
+        public int End { get; set; }
+        public List<ConditionalModuleSourceBranch> Branches { get; } = new();
+    }
+
+    private sealed class ConditionalModuleSourceBranch
+    {
+        public string? Condition { get; set; }
+        public int ContentStart { get; set; }
+        public int ContentEnd { get; set; }
+        public List<ConditionalModuleSourceGroup> Children { get; } = new();
+    }
+
+    private sealed record ConditionalDirectiveFrame(
+        ConditionalModuleSourceGroup? Group);
+
+    private void ScanConditionalModuleBlocks(CompilationUnitSyntax root)
+    {
+        var source = root.SyntaxTree.GetText(_cancellationToken);
+        var roots = BuildConditionalModuleSourceTree(root, source);
+        var converted = new List<(ConditionalModuleSourceGroup Source, TypePreprocessorBlockNode Node)>();
+
+        foreach (var group in roots)
         {
-            if (trivia.IsKind(SyntaxKind.IfDirectiveTrivia) &&
-                trivia.GetStructure() is IfDirectiveTriviaSyntax ifDir)
+            var node = BuildConditionalModuleNode(group, source);
+            if (node != null)
+                converted.Add((group, node));
+        }
+
+        if (converted.Count == 0)
+            return;
+
+        foreach (var usingDirective in root.DescendantNodes().OfType<UsingDirectiveSyntax>())
+        {
+            if (converted.Any(item =>
+                    usingDirective.SpanStart >= item.Source.Start
+                    && usingDirective.Span.End <= item.Source.End))
             {
-                return ifDir.Condition.ToString();
+                _conditionalUsingDirectiveStarts.Add(usingDirective.SpanStart);
             }
         }
-        return null;
+        foreach (var declaration in root.DescendantNodes().Where(node =>
+                     node is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax))
+        {
+            if (converted.Any(item =>
+                    declaration.SpanStart >= item.Source.Start
+                    && declaration.Span.End <= item.Source.End))
+            {
+                _conditionalTypeDeclarationStarts.Add(declaration.SpanStart);
+            }
+        }
+
+        foreach (var (_, node) in converted.OrderBy(item => item.Source.Start))
+            _typePreprocessorBlocks.Add(node);
+
+        if (converted.Any(item => ContainsConditionalUsings(item.Node))
+            && !_context.UsedFeatures.Contains("conditional-using"))
+            _context.RecordFeatureUsage("conditional-using");
+        if (!_context.UsedFeatures.Contains("preprocessor-directive"))
+            _context.RecordFeatureUsage("preprocessor-directive");
     }
 
-    /// <summary>
-    /// Checks if a using directive has #endif in its trailing trivia.
-    /// </summary>
-    private static bool HasTrailingEndif(UsingDirectiveSyntax node)
+    private static List<ConditionalModuleSourceGroup> BuildConditionalModuleSourceTree(
+        CompilationUnitSyntax root,
+        Microsoft.CodeAnalysis.Text.SourceText source)
     {
-        // Check both the node's trailing trivia and the semicolon token's trailing trivia
-        if (node.GetTrailingTrivia().Any(t => t.IsKind(SyntaxKind.EndIfDirectiveTrivia)))
-            return true;
-        if (node.SemicolonToken.TrailingTrivia.Any(t => t.IsKind(SyntaxKind.EndIfDirectiveTrivia)))
-            return true;
-        return false;
+        var roots = new List<ConditionalModuleSourceGroup>();
+        var stack = new Stack<ConditionalDirectiveFrame>();
+        var directives = root
+            .DescendantTrivia(descendIntoTrivia: true)
+            .Where(trivia => trivia.HasStructure)
+            .Select(trivia => trivia.GetStructure())
+            .OfType<DirectiveTriviaSyntax>()
+            .Where(directive => directive is
+                IfDirectiveTriviaSyntax
+                or ElifDirectiveTriviaSyntax
+                or ElseDirectiveTriviaSyntax
+                or EndIfDirectiveTriviaSyntax)
+            .OrderBy(directive => directive.SpanStart);
+
+        foreach (var directive in directives)
+        {
+            var line = source.Lines.GetLineFromPosition(directive.SpanStart);
+            switch (directive)
+            {
+                case IfDirectiveTriviaSyntax ifDirective:
+                {
+                    ConditionalModuleSourceGroup? group = null;
+                    if (IsModuleScopeDirective(ifDirective))
+                    {
+                        group = new ConditionalModuleSourceGroup
+                        {
+                            Start = line.Start
+                        };
+                        group.Branches.Add(new ConditionalModuleSourceBranch
+                        {
+                            Condition = ifDirective.Condition.ToString(),
+                            ContentStart = line.EndIncludingLineBreak
+                        });
+
+                        var parent = stack.FirstOrDefault(frame => frame.Group != null)?.Group;
+                        if (parent != null)
+                            parent.Branches[^1].Children.Add(group);
+                        else
+                            roots.Add(group);
+                    }
+                    stack.Push(new ConditionalDirectiveFrame(group));
+                    break;
+                }
+                case ElifDirectiveTriviaSyntax elifDirective when stack.Count > 0:
+                {
+                    var group = stack.Peek().Group;
+                    if (group == null)
+                        break;
+                    group.Branches[^1].ContentEnd = line.Start;
+                    group.Branches.Add(new ConditionalModuleSourceBranch
+                    {
+                        Condition = elifDirective.Condition.ToString(),
+                        ContentStart = line.EndIncludingLineBreak
+                    });
+                    break;
+                }
+                case ElseDirectiveTriviaSyntax when stack.Count > 0:
+                {
+                    var group = stack.Peek().Group;
+                    if (group == null)
+                        break;
+                    group.Branches[^1].ContentEnd = line.Start;
+                    group.Branches.Add(new ConditionalModuleSourceBranch
+                    {
+                        Condition = null,
+                        ContentStart = line.EndIncludingLineBreak
+                    });
+                    break;
+                }
+                case EndIfDirectiveTriviaSyntax when stack.Count > 0:
+                {
+                    var group = stack.Pop().Group;
+                    if (group != null)
+                    {
+                        group.Branches[^1].ContentEnd = line.Start;
+                        group.End = line.EndIncludingLineBreak;
+                    }
+                    break;
+                }
+            }
+        }
+
+        while (stack.Count > 0)
+        {
+            var group = stack.Pop().Group;
+            if (group != null)
+            {
+                group.Branches[^1].ContentEnd = source.Length;
+                group.End = source.Length;
+            }
+        }
+
+        return roots;
+    }
+
+    private static bool IsModuleScopeDirective(DirectiveTriviaSyntax directive)
+    {
+        var position = directive.SpanStart;
+        for (var node = directive.ParentTrivia.Token.Parent;
+             node != null;
+             node = node.Parent)
+        {
+            if (position < node.SpanStart || position > node.Span.End)
+                continue;
+
+            if (node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+                return true;
+
+            if (node is BaseTypeDeclarationSyntax
+                or DelegateDeclarationSyntax
+                or BaseMethodDeclarationSyntax
+                or AccessorDeclarationSyntax
+                or LocalFunctionStatementSyntax
+                or AnonymousFunctionExpressionSyntax
+                or StatementSyntax)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private TypePreprocessorBlockNode? BuildConditionalModuleNode(
+        ConditionalModuleSourceGroup group,
+        Microsoft.CodeAnalysis.Text.SourceText source)
+    {
+        var branches = group.Branches
+            .Select(branch =>
+            {
+                var positionedItems = ParseDirectConditionalItems(branch, source);
+                var positionedNested = branch.Children
+                    .Select(child => (
+                        Position: child.Start,
+                        Node: BuildConditionalModuleNode(child, source)))
+                    .Where(item => item.Node != null)
+                    .Select(item => (item.Position, Node: item.Node!))
+                    .ToList();
+                return (
+                    branch.Condition,
+                    Usings: positionedItems
+                        .Where(item => item.Node is UsingDirectiveNode)
+                        .Select(item => (UsingDirectiveNode)item.Node)
+                        .ToList(),
+                    Classes: positionedItems
+                        .Where(item => item.Node is ClassDefinitionNode)
+                        .Select(item => (ClassDefinitionNode)item.Node)
+                        .ToList(),
+                    Interfaces: positionedItems
+                        .Where(item => item.Node is InterfaceDefinitionNode)
+                        .Select(item => (InterfaceDefinitionNode)item.Node)
+                        .ToList(),
+                    Enums: positionedItems
+                        .Where(item => item.Node is EnumDefinitionNode)
+                        .Select(item => (EnumDefinitionNode)item.Node)
+                        .ToList(),
+                    Delegates: positionedItems
+                        .Where(item => item.Node is DelegateDefinitionNode)
+                        .Select(item => (DelegateDefinitionNode)item.Node)
+                        .ToList(),
+                    InteropBlocks: positionedItems
+                        .Where(item => item.Node is CSharpInteropBlockNode)
+                        .Select(item => (CSharpInteropBlockNode)item.Node)
+                        .ToList(),
+                    Nested: positionedNested.Select(item => item.Node).ToList(),
+                    Items: positionedItems
+                        .Concat(positionedNested.Select(item =>
+                            (item.Position, Node: (AstNode)item.Node)))
+                        .OrderBy(item => item.Position)
+                        .Select(item => item.Node)
+                        .ToList());
+            })
+            .ToList();
+
+        if (!branches.Any(branch =>
+                branch.Items.Count > 0))
+        {
+            return null;
+        }
+
+        TypePreprocessorBlockNode? elseBranch = null;
+        for (var index = branches.Count - 1; index >= 1; index--)
+        {
+            var branch = branches[index];
+            elseBranch = new TypePreprocessorBlockNode(
+                TextSpan.Empty,
+                branch.Condition ?? "",
+                branch.Classes,
+                branch.Interfaces,
+                branch.Enums,
+                branch.Delegates,
+                elseBranch,
+                branch.Usings,
+                branch.Nested,
+                branch.Items,
+                branch.InteropBlocks);
+        }
+
+        var first = branches[0];
+        return new TypePreprocessorBlockNode(
+            TextSpan.Empty,
+            first.Condition ?? "IF",
+            first.Classes,
+            first.Interfaces,
+            first.Enums,
+            first.Delegates,
+            elseBranch,
+            first.Usings,
+            first.Nested,
+            first.Items,
+            first.InteropBlocks);
+    }
+
+    private List<(int Position, AstNode Node)> ParseDirectConditionalItems(
+        ConditionalModuleSourceBranch branch,
+        Microsoft.CodeAnalysis.Text.SourceText source)
+    {
+        if (branch.ContentEnd <= branch.ContentStart)
+            return new List<(int, AstNode)>();
+
+        var text = source.ToString(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+            branch.ContentStart,
+            branch.ContentEnd));
+        if (branch.Children.Count > 0)
+        {
+            var chars = text.ToCharArray();
+            foreach (var child in branch.Children)
+            {
+                var start = Math.Max(0, child.Start - branch.ContentStart);
+                var end = Math.Min(chars.Length, child.End - branch.ContentStart);
+                for (var index = start; index < end; index++)
+                {
+                    if (chars[index] is not '\r' and not '\n')
+                        chars[index] = ' ';
+                }
+            }
+            text = new string(chars);
+        }
+
+        var parsed = CSharpSyntaxTree.ParseText(
+            text,
+            new CSharpParseOptions(LanguageVersion.Preview))
+            .GetCompilationUnitRoot();
+        var result = new List<(int Position, AstNode Node)>();
+        foreach (var usingDirective in parsed.DescendantNodes().OfType<UsingDirectiveSyntax>())
+        {
+            if (TryConvertUsingDirective(
+                    usingDirective,
+                    TextSpan.Empty,
+                    out var usingNode))
+            {
+                result.Add((
+                    branch.ContentStart + usingDirective.SpanStart,
+                    usingNode));
+            }
+        }
+        foreach (var member in EnumerateConditionalTypeMembers(parsed))
+        {
+            _insideConditionalModuleRecovery = true;
+            (List<ClassDefinitionNode> classes,
+                List<InterfaceDefinitionNode> interfaces,
+                List<EnumDefinitionNode> enums,
+                List<DelegateDefinitionNode> delegates,
+                List<UsingDirectiveNode> usings) converted;
+            var branchInterop = new List<CSharpInteropBlockNode>();
+            var previousInteropSink = _conditionalModuleInteropSink;
+            _conditionalModuleInteropSink = branchInterop;
+            try
+            {
+                converted = ConvertDisabledTypeText(member.ToFullString());
+            }
+            finally
+            {
+                _conditionalModuleInteropSink = previousInteropSink;
+                _insideConditionalModuleRecovery = false;
+            }
+            foreach (var node in converted.classes.Cast<AstNode>()
+                         .Concat(converted.interfaces)
+                         .Concat(converted.enums)
+                         .Concat(converted.delegates)
+                         .Concat(branchInterop))
+            {
+                result.Add((
+                    branch.ContentStart + member.SpanStart,
+                    node));
+            }
+        }
+        return result.OrderBy(item => item.Position).ToList();
+    }
+
+    private static IEnumerable<MemberDeclarationSyntax> EnumerateConditionalTypeMembers(
+        CompilationUnitSyntax root)
+    {
+        foreach (var member in root.Members)
+        {
+            foreach (var result in Enumerate(member))
+                yield return result;
+        }
+
+        static IEnumerable<MemberDeclarationSyntax> Enumerate(
+            MemberDeclarationSyntax member)
+        {
+            if (member is BaseNamespaceDeclarationSyntax ns)
+            {
+                foreach (var nested in ns.Members)
+                {
+                    foreach (var result in Enumerate(nested))
+                        yield return result;
+                }
+                yield break;
+            }
+
+            if (member is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)
+                yield return member;
+        }
+    }
+
+    private static bool ContainsConditionalUsings(TypePreprocessorBlockNode block)
+        => block.Usings.Count > 0
+            || block.NestedBlocks.Any(ContainsConditionalUsings)
+            || block.ElseBranch != null
+            && ContainsConditionalUsings(block.ElseBranch);
+
+    private void RemoveUsingsFromScannedPreprocessorBlocks()
+    {
+        var stripped = _typePreprocessorBlocks
+            .Select(RemoveUsingsFromPreprocessorBlock)
+            .Where(block => block != null)
+            .Cast<TypePreprocessorBlockNode>()
+            .ToList();
+        _typePreprocessorBlocks.Clear();
+        _typePreprocessorBlocks.AddRange(stripped);
+    }
+
+    private static TypePreprocessorBlockNode? RemoveUsingsFromPreprocessorBlock(
+        TypePreprocessorBlockNode block)
+    {
+        var nestedMap = block.NestedBlocks.ToDictionary(
+            child => child,
+            RemoveUsingsFromPreprocessorBlock);
+        var nested = nestedMap.Values
+            .Where(child => child != null)
+            .Cast<TypePreprocessorBlockNode>()
+            .ToList();
+        var items = new List<AstNode>();
+        foreach (var item in block.Items)
+        {
+            if (item is UsingDirectiveNode)
+                continue;
+            if (item is TypePreprocessorBlockNode child)
+            {
+                if (nestedMap[child] is { } strippedChild)
+                    items.Add(strippedChild);
+                continue;
+            }
+            items.Add(item);
+        }
+        var elseBranch = block.ElseBranch == null
+            ? null
+            : RemoveUsingsFromPreprocessorBlock(block.ElseBranch);
+        var hasTypes = items.Count > 0;
+        if (!hasTypes && elseBranch == null)
+            return null;
+
+        return new TypePreprocessorBlockNode(
+            block.Span,
+            block.Condition,
+            block.Classes,
+            block.Interfaces,
+            block.Enums,
+            block.Delegates,
+            elseBranch,
+            usings: Array.Empty<UsingDirectiveNode>(),
+            nestedBlocks: nested,
+            items: items,
+            interopBlocks: block.InteropBlocks);
     }
 
     /// <summary>
@@ -487,6 +876,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
+
         // Check for #if wrapping entire type declaration
         if (!_insideTypePreprocessorConversion)
         {
@@ -514,7 +907,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "interface", InteropMemberKind.Class));
+            AddModuleInteropBlock(CreateInteropBlock(node, "interface", InteropMemberKind.Class));
         }
         finally
         {
@@ -579,6 +972,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
+
         if (!_insideTypePreprocessorConversion)
         {
             var ppCondition = GetTypePreprocessorCondition(node);
@@ -607,7 +1004,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             // Unconditional catch for class conversion — if any class member crashes,
             // wrap the entire class as an interop block instead of failing the file.
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "class", InteropMemberKind.Class));
+            AddModuleInteropBlock(CreateInteropBlock(node, "class", InteropMemberKind.Class));
         }
         finally
         {
@@ -617,6 +1014,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
+
         if (!_insideTypePreprocessorConversion)
         {
             var ppCondition = GetTypePreprocessorCondition(node);
@@ -634,7 +1035,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // properties and NO constructor — broken output). Counted as a loss.
         if (FeatureSupport.GetSupportLevel("record") != SupportLevel.Full)
         {
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "record", InteropMemberKind.Class));
+            AddModuleInteropBlock(CreateInteropBlock(node, "record", InteropMemberKind.Class));
             return;
         }
 
@@ -650,7 +1051,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "record", InteropMemberKind.Class));
+            AddModuleInteropBlock(CreateInteropBlock(node, "record", InteropMemberKind.Class));
         }
         finally
         {
@@ -660,6 +1061,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
+
         if (!_insideTypePreprocessorConversion)
         {
             var ppCondition = GetTypePreprocessorCondition(node);
@@ -686,7 +1091,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "struct", InteropMemberKind.Class));
+            AddModuleInteropBlock(CreateInteropBlock(node, "struct", InteropMemberKind.Class));
         }
         finally
         {
@@ -696,6 +1101,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
+
         if (!_insideTypePreprocessorConversion)
         {
             var ppCondition = GetTypePreprocessorCondition(node);
@@ -754,12 +1163,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "enum", InteropMemberKind.Other));
+            AddModuleInteropBlock(CreateInteropBlock(node, "enum", InteropMemberKind.Other));
         }
     }
 
     public override void VisitDelegateDeclaration(DelegateDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
+
         // #773: DelegateDefinitionNode carries no type parameters, so a generic
         // delegate would silently lose its <T> and emit non-compiling C#.
         // Preserve generic delegates verbatim as §CSHARP interop instead.
@@ -767,7 +1180,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             if (node.Parent is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
             {
-                _moduleInteropBlocks.Add(CreateInteropBlock(node, "generic-delegate", InteropMemberKind.Other));
+                AddModuleInteropBlock(CreateInteropBlock(node, "generic-delegate", InteropMemberKind.Other));
                 return;
             }
             // Nested: escalate so the enclosing type's member loop preserves it.
@@ -804,7 +1217,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
-            _moduleInteropBlocks.Add(CreateInteropBlock(node, "delegate", InteropMemberKind.Other));
+            AddModuleInteropBlock(CreateInteropBlock(node, "delegate", InteropMemberKind.Other));
         }
     }
 
@@ -972,29 +1385,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 // Convert active members
                 var ppFields = new List<ClassFieldNode>();
                 var ppProperties = new List<PropertyNode>();
+                var ppIndexers = new List<IndexerNode>();
                 var ppConstructors = new List<ConstructorNode>();
                 var ppMethods = new List<MethodNode>();
                 var ppEvents = new List<EventDefinitionNode>();
                 var ppOperatorOverloads = new List<OperatorOverloadNode>();
+                var ppInteropBlocks = new List<CSharpInteropBlockNode>();
+                var ppItems = new List<AstNode>();
 
                 for (int bi = ppRegion.ActiveStart; bi < ppRegion.ActiveEnd; bi++)
                 {
-                    try
-                    {
-                        ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
-                    }
-                    catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
-                    {
-                        // Member inside an active #if branch could not convert
-                        // natively. Preserve it as §CSHARP at class level (outside
-                        // the #if — noted in the recorded loss) rather than
-                        // dropping it silently.
-                        interopBlocks.Add(CreateInteropBlock(node.Members[bi], null, InteropMemberKind.Other));
-                    }
+                    ConvertClassMemberIntoPreprocessor(
+                        node.Members[bi], ppFields, ppProperties, ppIndexers, ppConstructors,
+                        ppMethods, ppEvents, ppOperatorOverloads,
+                        ppInteropBlocks, ppItems);
                 }
 
                 preprocessorBlocks.Add(BuildMemberPreprocessorNode(span, ppRegion.Branches,
-                    ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads));
+                    ppFields, ppProperties, ppConstructors, ppMethods, ppEvents,
+                    ppOperatorOverloads, ppInteropBlocks, ppItems, ppIndexers));
 
                 memberIndex = ppRegion.ActiveEnd - 1; // loop will increment
                 continue;
@@ -1477,28 +1886,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
                 var ppFields = new List<ClassFieldNode>();
                 var ppProperties = new List<PropertyNode>();
+                var ppIndexers = new List<IndexerNode>();
                 var ppConstructors = new List<ConstructorNode>();
                 var ppMethods = new List<MethodNode>();
                 var ppEvents = new List<EventDefinitionNode>();
                 var ppOperatorOverloads = new List<OperatorOverloadNode>();
+                var ppInteropBlocks = new List<CSharpInteropBlockNode>();
+                var ppItems = new List<AstNode>();
 
                 for (int bi = ppRegion.ActiveStart; bi < ppRegion.ActiveEnd; bi++)
                 {
-                    try
-                    {
-                        ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
-                    }
-                    catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
-                    {
-                        // Member inside an active #if branch could not convert
-                        // natively — preserve as §CSHARP at type level (outside
-                        // the #if — noted in the recorded loss), never drop.
-                        interopBlocks.Add(CreateInteropBlock(node.Members[bi], null, InteropMemberKind.Other));
-                    }
+                    ConvertClassMemberIntoPreprocessor(
+                        node.Members[bi], ppFields, ppProperties, ppIndexers, ppConstructors,
+                        ppMethods, ppEvents, ppOperatorOverloads,
+                        ppInteropBlocks, ppItems);
                 }
 
                 preprocessorBlocks.Add(BuildMemberPreprocessorNode(span, ppRegion.Branches,
-                    ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads));
+                    ppFields, ppProperties, ppConstructors, ppMethods, ppEvents,
+                    ppOperatorOverloads, ppInteropBlocks, ppItems, ppIndexers));
 
                 memberIndex = ppRegion.ActiveEnd - 1; // loop will increment
                 continue;
@@ -2446,7 +2852,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return false;
 
         _context.RecordFeatureUsage("namespace");
-        _moduleInteropBlocks.Add(CreateInteropBlock(node, "namespace-collision", kind));
+        AddModuleInteropBlock(CreateInteropBlock(node, "namespace-collision", kind));
         return true;
     }
 
@@ -3165,16 +3571,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// Parses disabled text (from an inactive preprocessor branch) as class members
     /// and converts them to typed member lists for MemberPreprocessorBlockNode.
     /// </summary>
-    private (List<ClassFieldNode> fields, List<PropertyNode> properties, List<ConstructorNode> constructors,
-             List<MethodNode> methods, List<EventDefinitionNode> events, List<OperatorOverloadNode> operatorOverloads)
+    private (List<ClassFieldNode> fields, List<PropertyNode> properties, List<IndexerNode> indexers,
+             List<ConstructorNode> constructors,
+             List<MethodNode> methods, List<EventDefinitionNode> events, List<OperatorOverloadNode> operatorOverloads,
+             List<CSharpInteropBlockNode> interopBlocks, List<AstNode> items)
         ConvertDisabledMemberText(string disabledText)
     {
         var fields = new List<ClassFieldNode>();
         var properties = new List<PropertyNode>();
+        var indexers = new List<IndexerNode>();
         var constructors = new List<ConstructorNode>();
         var methods = new List<MethodNode>();
         var events = new List<EventDefinitionNode>();
         var operatorOverloads = new List<OperatorOverloadNode>();
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+        var items = new List<AstNode>();
 
         var wrapper = $"class _PP {{ {disabledText} }}";
         try
@@ -3184,62 +3595,108 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var classDecl = root.DescendantNodes()
                 .OfType<ClassDeclarationSyntax>()
                 .FirstOrDefault();
-            if (classDecl == null) return (fields, properties, constructors, methods, events, operatorOverloads);
+            if (classDecl == null)
+                return (fields, properties, indexers, constructors, methods, events,
+                    operatorOverloads, interopBlocks, items);
 
             foreach (var member in classDecl.Members)
             {
-                try
-                {
-                    ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads);
-                }
-                catch
-                {
-                    // #836 M1: preserve the member VERBATIM (in all modes — the
-                    // disabled branch is never active C#, so a §RAW body is
-                    // safe) and record the loss; the old comment-stub silently
-                    // deleted the original API with zero ledger entries.
-                    var fallbackId = _context.GenerateId("m");
-                    var fallbackBody = new List<StatementNode>
-                    {
-                        new RawCSharpNode(TextSpan.Empty, member.ToString().Trim())
-                    };
-                    _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
-                        $"Member in disabled #if branch preserved as raw C# inside a fallback stub: {TruncateForMessage(member.ToString())}");
-                    _context.AddWarning(
-                        $"Member in disabled preprocessor branch could not be converted; preserved verbatim: {TruncateForMessage(member.ToString())}",
-                        feature: "preprocessor-disabled");
-                    methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
-                        Visibility.Private, MethodModifiers.None,
-                        Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
-                        null, null, Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
-                        fallbackBody, new AttributeCollection()));
-                }
+                ConvertClassMemberIntoPreprocessor(
+                    member, fields, properties, indexers, constructors, methods, events,
+                    operatorOverloads, interopBlocks, items,
+                    interopFeature: "preprocessor-disabled");
             }
         }
         catch
         {
-            // #836 M1: if the disabled text can't be parsed at all, preserve it
-            // VERBATIM (all modes) and record the loss — never a silent
-            // zero-ledger comment stub.
-            var fallbackId = _context.GenerateId("m");
-            var fallbackBody = new List<StatementNode>
-            {
-                new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
-            };
+            var interop = new CSharpInteropBlockNode(
+                TextSpan.Empty,
+                disabledText.Trim(),
+                "preprocessor-disabled",
+                "Disabled preprocessor member text preserved verbatim",
+                InteropMemberKind.Other);
             _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
-                $"Disabled #if branch text preserved as raw C# inside a fallback stub: {TruncateForMessage(disabledText.Trim())}");
+                $"Disabled #if branch text preserved as §CSHARP interop: {TruncateForMessage(disabledText.Trim())}");
             _context.AddWarning(
                 $"Disabled preprocessor text could not be parsed as class members; preserved verbatim: {TruncateForMessage(disabledText.Trim())}",
                 feature: "preprocessor-disabled");
-            methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
-                Visibility.Private, MethodModifiers.None,
-                Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
-                null, null, Array.Empty<RequiresNode>(), Array.Empty<EnsuresNode>(),
-                fallbackBody, new AttributeCollection()));
+            interopBlocks.Add(interop);
+            items.Add(interop);
         }
 
-        return (fields, properties, constructors, methods, events, operatorOverloads);
+        return (fields, properties, indexers, constructors, methods, events,
+            operatorOverloads, interopBlocks, items);
     }
+
+    private void ConvertClassMemberIntoPreprocessor(
+        MemberDeclarationSyntax member,
+        List<ClassFieldNode> fields,
+        List<PropertyNode> properties,
+        List<IndexerNode> indexers,
+        List<ConstructorNode> constructors,
+        List<MethodNode> methods,
+        List<EventDefinitionNode> events,
+        List<OperatorOverloadNode> operatorOverloads,
+        List<CSharpInteropBlockNode> interopBlocks,
+        List<AstNode> items,
+        string interopFeature = "preprocessor-member")
+    {
+        if (member is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)
+        {
+            var nestedInterop = CreateInteropBlock(
+                member,
+                interopFeature,
+                InteropMemberKind.Class);
+            interopBlocks.Add(nestedInterop);
+            items.Add(nestedInterop);
+            return;
+        }
+
+        var fieldCount = fields.Count;
+        var propertyCount = properties.Count;
+        var indexerCount = indexers.Count;
+        var constructorCount = constructors.Count;
+        var methodCount = methods.Count;
+        var eventCount = events.Count;
+        var operatorCount = operatorOverloads.Count;
+        try
+        {
+            ConvertClassMember(
+                member, fields, properties, constructors, methods, events,
+                operatorOverloads, indexers);
+            items.AddRange(fields.Skip(fieldCount));
+            items.AddRange(properties.Skip(propertyCount));
+            items.AddRange(indexers.Skip(indexerCount));
+            items.AddRange(constructors.Skip(constructorCount));
+            items.AddRange(methods.Skip(methodCount));
+            items.AddRange(events.Skip(eventCount));
+            items.AddRange(operatorOverloads.Skip(operatorCount));
+        }
+        catch
+        {
+            var interop = CreateInteropBlock(
+                member,
+                interopFeature,
+                GetInteropMemberKind(member));
+            interopBlocks.Add(interop);
+            items.Add(interop);
+        }
+    }
+
+    private static InteropMemberKind GetInteropMemberKind(
+        MemberDeclarationSyntax member)
+        => member switch
+        {
+            MethodDeclarationSyntax => InteropMemberKind.Method,
+            PropertyDeclarationSyntax or IndexerDeclarationSyntax =>
+                InteropMemberKind.Property,
+            FieldDeclarationSyntax => InteropMemberKind.Field,
+            ConstructorDeclarationSyntax => InteropMemberKind.Constructor,
+            EventFieldDeclarationSyntax or EventDeclarationSyntax =>
+                InteropMemberKind.Event,
+            BaseTypeDeclarationSyntax => InteropMemberKind.Class,
+            _ => InteropMemberKind.Other
+        };
 
     /// <summary>
     /// Builds a (potentially nested) MemberPreprocessorBlockNode from an ordered list of branches.
@@ -3253,38 +3710,63 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<ConstructorNode> activeConstructors,
         List<MethodNode> activeMethods,
         List<EventDefinitionNode> activeEvents,
-        List<OperatorOverloadNode> activeOperatorOverloads)
+        List<OperatorOverloadNode> activeOperatorOverloads,
+        List<CSharpInteropBlockNode>? activeInteropBlocks = null,
+        List<AstNode>? activeItems = null,
+        List<IndexerNode>? activeIndexers = null)
     {
+        activeInteropBlocks ??= new List<CSharpInteropBlockNode>();
+        activeIndexers ??= new List<IndexerNode>();
+        activeItems ??= activeFields.Cast<AstNode>()
+            .Concat(activeProperties)
+            .Concat(activeIndexers)
+            .Concat(activeConstructors)
+            .Concat(activeMethods)
+            .Concat(activeEvents)
+            .Concat(activeOperatorOverloads)
+            .Concat(activeInteropBlocks)
+            .ToList();
         if (branches.Count == 0)
         {
             return new MemberPreprocessorBlockNode(span, "UNKNOWN",
                 activeFields, activeProperties, activeConstructors,
-                activeMethods, activeEvents, activeOperatorOverloads);
+                activeMethods, activeEvents, activeOperatorOverloads,
+                indexers: activeIndexers,
+                interopBlocks: activeInteropBlocks,
+                items: activeItems);
         }
 
         // Convert each branch's body
         var convertedBodies = new List<(string? condition, List<ClassFieldNode> fields, List<PropertyNode> properties,
+            List<IndexerNode> indexers,
             List<ConstructorNode> constructors, List<MethodNode> methods,
-            List<EventDefinitionNode> events, List<OperatorOverloadNode> operatorOverloads)>();
+            List<EventDefinitionNode> events, List<OperatorOverloadNode> operatorOverloads,
+            List<CSharpInteropBlockNode> interopBlocks, List<AstNode> items)>();
 
         foreach (var branch in branches)
         {
             if (branch.IsActive)
             {
-                convertedBodies.Add((branch.Condition, activeFields, activeProperties,
-                    activeConstructors, activeMethods, activeEvents, activeOperatorOverloads));
+                convertedBodies.Add((branch.Condition, activeFields, activeProperties, activeIndexers,
+                    activeConstructors, activeMethods, activeEvents,
+                    activeOperatorOverloads, activeInteropBlocks, activeItems));
             }
             else if (branch.DisabledText != null)
             {
-                var (fields, properties, constructors, methods, events, operatorOverloads) =
+                var (fields, properties, indexers, constructors, methods, events,
+                    operatorOverloads, interopBlocks, items) =
                     ConvertDisabledMemberText(branch.DisabledText);
-                convertedBodies.Add((branch.Condition, fields, properties, constructors, methods, events, operatorOverloads));
+                convertedBodies.Add((branch.Condition, fields, properties, indexers,
+                    constructors, methods, events, operatorOverloads,
+                    interopBlocks, items));
             }
             else
             {
                 convertedBodies.Add((branch.Condition, new List<ClassFieldNode>(), new List<PropertyNode>(),
+                    new List<IndexerNode>(),
                     new List<ConstructorNode>(), new List<MethodNode>(),
-                    new List<EventDefinitionNode>(), new List<OperatorOverloadNode>()));
+                    new List<EventDefinitionNode>(), new List<OperatorOverloadNode>(),
+                    new List<CSharpInteropBlockNode>(), new List<AstNode>()));
             }
         }
 
@@ -3293,18 +3775,24 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         for (int idx = convertedBodies.Count - 1; idx >= 1; idx--)
         {
-            var (condition, fields, properties, constructors, methods, events, operatorOverloads) = convertedBodies[idx];
+            var (condition, fields, properties, indexers, constructors, methods, events,
+                operatorOverloads, interopBlocks, items) = convertedBodies[idx];
             if (condition == null)
             {
                 // #else branch — becomes the innermost else (empty condition)
                 currentElse = new MemberPreprocessorBlockNode(span, "",
-                    fields, properties, constructors, methods, events, operatorOverloads);
+                    fields, properties, constructors, methods, events,
+                    operatorOverloads, indexers: indexers,
+                    interopBlocks: interopBlocks, items: items);
             }
             else
             {
                 // #elif branch — wrap in a new MemberPreprocessorBlockNode
                 var elifNode = new MemberPreprocessorBlockNode(span, condition,
-                    fields, properties, constructors, methods, events, operatorOverloads, currentElse);
+                    fields, properties, constructors, methods, events,
+                    operatorOverloads, currentElse,
+                    indexers: indexers,
+                    interopBlocks: interopBlocks, items: items);
                 currentElse = elifNode;
             }
         }
@@ -3313,7 +3801,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var first = convertedBodies[0];
         return new MemberPreprocessorBlockNode(span, first.condition ?? "IF",
             first.fields, first.properties, first.constructors,
-            first.methods, first.events, first.operatorOverloads, currentElse);
+            first.methods, first.events, first.operatorOverloads, currentElse,
+            indexers: first.indexers,
+            interopBlocks: first.interopBlocks, items: first.items);
     }
 
     /// <summary>
@@ -3675,12 +4165,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Extract using directives
             foreach (var usingDir in root.Usings)
             {
-                if (usingDir.Name != null)
+                if (usingDir.NamespaceOrType != null)
                 {
-                    var namespaceName = usingDir.Name.ToString();
+                    var namespaceName = usingDir.NamespaceOrType.ToString();
                     var isStatic = usingDir.StaticKeyword.IsKind(SyntaxKind.StaticKeyword);
+                    var isGlobal = usingDir.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword);
                     var alias = usingDir.Alias?.Name.ToString();
-                    usings.Add(new UsingDirectiveNode(TextSpan.Empty, namespaceName, alias, isStatic));
+                    usings.Add(new UsingDirectiveNode(
+                        TextSpan.Empty,
+                        namespaceName,
+                        alias,
+                        isStatic,
+                        isGlobal));
                 }
             }
 
@@ -9544,6 +10040,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private TypeConstraintNode? ConvertTypeConstraint(TypeParameterConstraintSyntax constraint)
     {
         var span = GetTextSpan(constraint);
+        var text = System.Text.RegularExpressions.Regex.Replace(
+            constraint.ToString(),
+            @"\s+",
+            " ").Trim();
+
+        if (text == "class?")
+            return new TypeConstraintNode(span, TypeConstraintKind.ClassNullable);
+        if (text == "unmanaged")
+            return new TypeConstraintNode(span, TypeConstraintKind.Unmanaged);
+        if (text == "default")
+            return new TypeConstraintNode(span, TypeConstraintKind.Default);
+        if (text == "allows ref struct")
+            return new TypeConstraintNode(span, TypeConstraintKind.AllowsRefStruct);
 
         return constraint switch
         {
@@ -9566,8 +10075,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         typeConstraint.Type.ToString(), @"\s+", " ").Trim()),
 
             DefaultConstraintSyntax =>
-                // 'default' constraint (C# 9+) - no direct Calor equivalent, skip
-                null,
+                new TypeConstraintNode(span, TypeConstraintKind.Default),
 
             _ => null
         };

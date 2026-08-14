@@ -48,6 +48,7 @@ public static class RecursiveAstWalker
             yield break;
         }
 
+        var yielded = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
         foreach (var prop in GetChildProperties(node.GetType()))
         {
             object? value;
@@ -69,7 +70,7 @@ public static class RecursiveAstWalker
 
             if (value is AstNode single)
             {
-                if (single is not ExpressionNode)
+                if (single is not ExpressionNode && yielded.Add(single))
                 {
                     yield return single;
                 }
@@ -78,7 +79,9 @@ public static class RecursiveAstWalker
             {
                 foreach (var item in seq)
                 {
-                    if (item is AstNode child and not ExpressionNode)
+                    if (item is AstNode child
+                        && child is not ExpressionNode
+                        && yielded.Add(child))
                     {
                         yield return child;
                     }

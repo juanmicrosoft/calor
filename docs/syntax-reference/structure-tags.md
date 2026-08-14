@@ -66,10 +66,34 @@ Modules are like C# namespaces. They group related functions.
 ### Rules
 
 - `name` becomes the C# namespace
+- Each namespace segment is emitted as a valid C# identifier; keyword segments
+  are escaped independently (for example, `namespace.class` becomes
+  `@namespace.@class`)
 - The module block extends until the next line that dedents back to
   column 0 (or end of file)
 - Legacy `§/M` closers were removed in Phase 4d; an explicit closer now
   raises `Calor0830`. The module ends at the next dedent to column 0
+
+---
+
+## Using Directives
+
+Using directives retain their complete C# meaning. Exact duplicates are removed
+using the full `(target, alias, static, global)` tuple; directives that share a
+target but differ in alias or flags remain distinct.
+
+```calor
+§U{System.Collections.Generic}             // using System.Collections.Generic;
+§U{Gen:System.Collections.Generic}         // using Gen = System.Collections.Generic;
+§U{static:System.Math}                     // using static System.Math;
+§U{global:System.Text}                     // global using System.Text;
+§U{global:Gen:System.Collections.Generic}  // global using Gen = System.Collections.Generic;
+§U{global:static:System.Math}               // global using static System.Math;
+```
+
+Generated C# is standalone: namespace dependencies are registered from AST
+nodes and type references, and compilation does not require SDK implicit
+usings.
 
 ---
 
@@ -755,6 +779,16 @@ Type parameters are declared using `<T>` suffix syntax after the tag attributes.
 §MT{id:name:vis}<T>        // Generic method
 ```
 
+Variance is legal only on interface type parameters:
+
+```calor
+§IFACE{i001:IProducer}<out T>
+§IFACE{i002:IConsumer}<in T>
+```
+
+Using `in` or `out` on a class, function, or method type parameter is a
+`Calor0119` error.
+
 ### Constraints
 
 Type parameter constraints are declared using `§WHERE` clauses.
@@ -762,11 +796,21 @@ Type parameter constraints are declared using `§WHERE` clauses.
 **New syntax (recommended):**
 ```
 §WHERE T : class                    // T must be a reference type
+§WHERE T : class?                   // T may be a nullable reference type
 §WHERE T : struct                   // T must be a value type
+§WHERE T : unmanaged                // T must be unmanaged
+§WHERE T : notnull                  // T must be non-null
 §WHERE T : new()                    // T must have parameterless constructor
 §WHERE T : IComparable<T>           // T must implement interface
 §WHERE T : class, IComparable<T>    // Multiple constraints
+§WHERE T : default                  // Override or explicit-interface method only
+§WHERE T : allows ref struct        // Ref-struct anti-constraint
 ```
+
+Using `default` on an interface/class type parameter, interface method,
+ordinary class method, or module function is a `Calor0120` error. It is
+preserved only on C#-legal override methods and explicit interface
+implementations.
 
 **Legacy syntax (still supported):**
 ```

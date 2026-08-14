@@ -243,17 +243,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UsingDirectiveNode node)
     {
+        var globalPrefix = node.IsGlobal ? "global:" : "";
         if (node.IsStatic)
         {
-            AppendLine($"§U{{static:{node.Namespace}}}");
+            AppendLine($"§U{{{globalPrefix}static:{node.Namespace}}}");
         }
         else if (node.Alias != null)
         {
-            AppendLine($"§U{{{node.Alias}:{node.Namespace}}}");
+            AppendLine($"§U{{{globalPrefix}{node.Alias}:{node.Namespace}}}");
         }
         else
         {
-            AppendLine($"§U{{{node.Namespace}}}");
+            AppendLine(node.IsGlobal
+                ? $"§U{{global:{node.Namespace}}}"
+                : $"§U{{{node.Namespace}}}");
         }
         return "";
     }
@@ -342,11 +345,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}" : "";
-            AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}}}{attrs}{inlineParams}{inlineReturn}");
+            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§MT{{{node.Id}:{node.Name}{typeParams}}}{attrs}");
+            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}");
             Indent();
             EmitParameterLines(node.Parameters);
             EmitOutputLine(node.Output);
@@ -3264,11 +3267,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RecordCreationNode node)
     {
-        var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
-        return $"§NEW{{{node.TypeName}}} {fields}";
+        var fields = string.Join(
+            " ",
+            node.Fields.Select(f =>
+                $"§FL{{{f.FieldName}}} {f.Value.Accept(this)}"));
+        return fields.Length == 0
+            ? $"§D{{{node.TypeName}}}"
+            : $"§D{{{node.TypeName}}} {fields}";
     }
 
-    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
+    public string Visit(FieldAssignmentNode node)
+        => $"§FL{{{node.FieldName}}} {node.Value.Accept(this)}";
 
     // Generic type nodes
     public string Visit(TypeParameterNode node)
@@ -3293,6 +3302,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             TypeConstraintKind.BaseClass => node.TypeName ?? "",
             TypeConstraintKind.TypeName => node.TypeName ?? "",
             TypeConstraintKind.NotNull => "notnull",
+            TypeConstraintKind.Unmanaged => "unmanaged",
+            TypeConstraintKind.ClassNullable => "class?",
+            TypeConstraintKind.Default => "default",
+            TypeConstraintKind.AllowsRefStruct => "allows ref struct",
             _ => node.TypeName ?? ""
         };
     }
@@ -4066,22 +4079,53 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private void EmitMemberPreprocessorMembers(MemberPreprocessorBlockNode node)
     {
-        foreach (var field in node.Fields) Visit(field);
-        foreach (var prop in node.Properties) Visit(prop);
-        foreach (var indexer in node.Indexers) Visit(indexer);
-        foreach (var ctor in node.Constructors) Visit(ctor);
-        foreach (var method in node.Methods) { Visit(method); AppendLine(); }
-        foreach (var op in node.OperatorOverloads) { Visit(op); AppendLine(); }
-        foreach (var evt in node.Events) Visit(evt);
+        foreach (var item in node.Items)
+        {
+            switch (item)
+            {
+                case ClassFieldNode field:
+                    Visit(field);
+                    break;
+                case PropertyNode property:
+                    Visit(property);
+                    break;
+                case IndexerNode indexer:
+                    Visit(indexer);
+                    break;
+                case ConstructorNode constructor:
+                    Visit(constructor);
+                    break;
+                case MethodNode method:
+                    Visit(method);
+                    AppendLine();
+                    break;
+                case OperatorOverloadNode op:
+                    Visit(op);
+                    AppendLine();
+                    break;
+                case EventDefinitionNode evt:
+                    Visit(evt);
+                    break;
+                case CSharpInteropBlockNode interop:
+                    Visit(interop);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported member preprocessor item: {item.GetType().Name}");
+            }
+        }
     }
 
     public string Visit(TypePreprocessorBlockNode node)
     {
         AppendLine($"§PP{{{node.Condition}}}");
+        Indent();
         EmitTypePreprocessorTypes(node);
+        Dedent();
         if (node.ElseBranch != null)
         {
             AppendLine("§PPE");
+            Indent();
             if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
             {
                 Visit(node.ElseBranch);
@@ -4090,18 +4134,49 @@ public sealed class CalorEmitter : IAstVisitor<string>
             {
                 EmitTypePreprocessorTypes(node.ElseBranch);
             }
+            Dedent();
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
+        if (node.ElseBranch == null || string.IsNullOrEmpty(node.ElseBranch.Condition))
+            AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 
     private void EmitTypePreprocessorTypes(TypePreprocessorBlockNode node)
     {
-        foreach (var u in node.Usings) Visit(u);
-        foreach (var cls in node.Classes) { Visit(cls); AppendLine(); }
-        foreach (var iface in node.Interfaces) { Visit(iface); AppendLine(); }
-        foreach (var en in node.Enums) { Visit(en); AppendLine(); }
-        foreach (var del in node.Delegates) { Visit(del); AppendLine(); }
+        foreach (var item in node.Items)
+        {
+            switch (item)
+            {
+                case UsingDirectiveNode u:
+                    Visit(u);
+                    break;
+                case ClassDefinitionNode cls:
+                    Visit(cls);
+                    AppendLine();
+                    break;
+                case InterfaceDefinitionNode iface:
+                    Visit(iface);
+                    AppendLine();
+                    break;
+                case EnumDefinitionNode en:
+                    Visit(en);
+                    AppendLine();
+                    break;
+                case DelegateDefinitionNode del:
+                    Visit(del);
+                    AppendLine();
+                    break;
+                case TypePreprocessorBlockNode nested:
+                    Visit(nested);
+                    break;
+                case CSharpInteropBlockNode interop:
+                    Visit(interop);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported type preprocessor item: {item.GetType().Name}");
+            }
+        }
     }
 
     private void RecordEmitterFallback(AstNode node, string feature, string description)
