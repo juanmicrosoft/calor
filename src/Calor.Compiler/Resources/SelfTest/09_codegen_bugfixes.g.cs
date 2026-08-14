@@ -33,18 +33,46 @@ namespace Transliterator
             char[] buf = new char[256];
             var sb = new StringBuilder();
             ConsoleKeyInfo keyPressed = Console.ReadKey();
-            for (var i = 0; i <= input.Length; i++)
             {
-                char ch = input[i];
-                if (ch == 'Y')
+                var __calorForFrom = 0;
+                var __calorForTo = input.Length;
+                var __calorForStep = 1;
+                if (__calorForStep == 0) throw new ArgumentOutOfRangeException(nameof(__calorForStep), "Calor for-loop step must not be zero");
+                var __calorForAscending = __calorForStep > 0;
+                var __calorForFirst = true;
+                var i = __calorForFrom;
+                while (true)
                 {
-                    sb.Append("Y");
-                }
-                else
-                {
-                    sb.Append(ch);
-                }
+                    if (!__calorForFirst)
+                    {
+                        try
+                        {
+                            checked
+                            {
+                                i += __calorForStep;
+                            }
+                        }
+                        catch (OverflowException)
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        __calorForFirst = false;
+                    }
+                    if (!(__calorForAscending ? i <= __calorForTo : i >= __calorForTo)) break;
+                    char ch = input[i];
+                    if (ch == 'Y')
+                    {
+                        sb.Append("Y");
+                    }
+                    else
+                    {
+                        sb.Append(ch);
+                    }
 
+                }
             }
 
             Console.WriteLine("{0} {1}", new StringBuilder(), new StringBuilder());

@@ -141,6 +141,19 @@ public static class DiagnosticCode
     /// </summary>
     public const string NoMatchingOverload = "Calor0208";
 
+    /// <summary>
+    /// Error: a yield appears in a context that C# cannot lower as an iterator,
+    /// such as a lambda, constructor, async callable, catch/finally region, or
+    /// unsafe suspension point.
+    /// </summary>
+    public const string IllegalYield = "Calor0209";
+
+    /// <summary>
+    /// Error: <c>§YIELD</c> has no value. Calor rejects this form; use
+    /// <c>§YBRK</c> for <c>yield break</c>.
+    /// </summary>
+    public const string YieldRequiresValue = "Calor0210";
+
     // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
     /// <summary>

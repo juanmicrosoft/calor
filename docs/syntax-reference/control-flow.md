@@ -28,6 +28,17 @@ Calor provides loops and conditionals with explicit structure.
 | `to` | Ending value (inclusive) |
 | `step` | Increment per iteration |
 
+The `from`, `to`, and `step` expressions are each evaluated exactly once, before
+the loop starts. The evaluated sign of `step` selects ascending (`<=`) or
+descending (`>=`) comparison. A zero step throws
+`ArgumentOutOfRangeException` before the first iteration. Integral advancement
+is checked: reaching a numeric minimum or maximum endpoint terminates normally
+instead of wrapping around into an unbounded loop.
+
+When `step` is omitted, Calor advances with a checked increment of the evaluated
+induction value itself. This keeps the implicit `+1` in the loop variable's
+integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
+
 ### Examples
 
 **Count 1 to 10:**
@@ -320,6 +331,39 @@ Use conditionals with return for early exit:
   §IF{if1} (<= n 1) → §R 1
   §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
 ```
+
+---
+
+## Iterators and Yield
+
+Use `§YIELD expression` to produce the next iterator value and `§YBRK` to stop
+iteration:
+
+```
+§F{f001:Count:pub}
+  §O{i32}
+  §YIELD 1
+  §YIELD 2
+  §YBRK
+```
+
+`§YIELD` always requires an expression. A valueless `§YIELD` is rejected; it
+does not mean `yield break`. Use `§YBRK` explicitly.
+
+Yield detection is structural across nested statement containers such as
+matches, loops, `using`, and synchronization blocks. A yield inside a nested
+lambda belongs to the lambda and is rejected rather than turning the enclosing
+function into an iterator. Calor also rejects C#-illegal suspension points:
+value-yields in catch, unsafe, fixed, or try-with-catch regions; every yield in
+finally; and all yields in constructors, property/indexer accessors, event
+accessors, operators, and async callables. Property and indexer iterators are
+fail-closed until Calor defines their return-type and deferred-execution
+semantics.
+
+Iterator functions and methods may only use value parameters. Parameters marked
+`ref`, `in`, or `out` are rejected before C# emission. This applies equally to
+generic, static, and async callable shapes; yields inside nested lambdas or local
+functions do not turn the enclosing callable into an iterator.
 
 ---
 

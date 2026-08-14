@@ -1,11 +1,16 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Analysis;
 
 /// <summary>
-/// Always-on semantic pass that emits <c>Calor0205</c> when a value-returning
-/// <c>§R expr</c> appears in the body of an owner that returns no value:
+/// Always-on structural control-flow validation for returns and yields.
+/// It emits <c>Calor0205</c> when a value-returning <c>§R expr</c> appears in
+/// the body of an owner that returns no value, and validates that every yield
+/// can be represented by legal generated C#.
 ///
 /// <list type="bullet">
 ///   <item>a <c>void</c> function/method (no <c>§O</c> / no header return type);</item>
@@ -35,6 +40,30 @@ namespace Calor.Compiler.Analysis;
 /// </summary>
 public sealed class ReturnValidationPass
 {
+    private enum YieldOwner
+    {
+        None,
+        Callable,
+        AsyncCallable,
+        Unsupported,
+    }
+
+    private readonly record struct YieldContext(
+        YieldOwner Owner,
+        string OwnerDescription,
+        bool InLambda,
+        bool InExpressionContainer,
+        bool InCatch,
+        bool InFinally,
+        bool InUnsafe,
+        bool InFixed,
+        bool InTryWithCatch)
+    {
+        public static YieldContext None =>
+            new(YieldOwner.None, "module scope", false, false, false, false,
+                false, false, false);
+    }
+
     private readonly DiagnosticBag _diagnostics;
 
     public ReturnValidationPass(DiagnosticBag diagnostics)
@@ -50,6 +79,7 @@ public sealed class ReturnValidationPass
         }
 
         Walk(module, ReturnShape.Kind.None);
+        WalkYields(module, YieldContext.None);
     }
 
     private void Walk(AstNode node, ReturnShape.Kind context)
@@ -74,6 +104,290 @@ public sealed class ReturnValidationPass
         {
             Walk(child, childContext);
         }
+    }
+
+    private void WalkYields(AstNode node, YieldContext context)
+    {
+        switch (node)
+        {
+            case FunctionNode function:
+                CheckIteratorParameters(
+                    function.Parameters,
+                    function.Body,
+                    $"function '{function.Name}'");
+                break;
+            case MethodNode method:
+                CheckIteratorParameters(
+                    method.Parameters,
+                    method.Body,
+                    $"method '{method.Name}'");
+                break;
+            case RawCSharpNode raw:
+                CheckRawCSharpIteratorParameters(raw.CSharpCode, raw.Span);
+                break;
+            case CSharpInteropBlockNode interop:
+                CheckRawCSharpIteratorParameters(
+                    interop.CSharpCode,
+                    interop.Span);
+                break;
+        }
+
+        var childContext = EnterYieldOwner(node, context);
+        if (node is YieldReturnStatementNode yieldReturn)
+        {
+            CheckYieldReturn(yieldReturn, context);
+        }
+        else if (node is YieldBreakStatementNode yieldBreak)
+        {
+            CheckYieldBreak(yieldBreak, context);
+        }
+
+        foreach (var edge in RecursiveAstWalker.GetAllChildEdges(node))
+        {
+            var edgeContext = ContextForEdge(node, edge, childContext);
+            WalkYields(edge.Node, edgeContext);
+        }
+    }
+
+    private void CheckIteratorParameters(
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<StatementNode> body,
+        string ownerDescription)
+    {
+        if (!RecursiveAstWalker.EnumerateStatements(body).Any(statement =>
+                statement is YieldReturnStatementNode
+                    or YieldBreakStatementNode))
+        {
+            return;
+        }
+
+        foreach (var parameter in parameters)
+        {
+            var forbidden = parameter.Modifier
+                & (ParameterModifier.Ref
+                    | ParameterModifier.In
+                    | ParameterModifier.Out);
+            if (forbidden == ParameterModifier.None)
+                continue;
+
+            _diagnostics.ReportError(
+                parameter.IdentifierSpan,
+                DiagnosticCode.IllegalYield,
+                $"Iterator {ownerDescription} cannot declare parameter " +
+                $"'{parameter.Name}' with modifier '{FormatModifiers(forbidden)}'. " +
+                "Iterator parameters must be passed by value.");
+        }
+    }
+
+    private void CheckRawCSharpIteratorParameters(
+        string source,
+        Parsing.TextSpan span)
+    {
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        foreach (var callable in root.DescendantNodesAndSelf().Where(node =>
+                     node is MethodDeclarationSyntax
+                         or LocalFunctionStatementSyntax))
+        {
+            if (!ContainsOwnedYield(callable))
+                continue;
+
+            var (description, parameters) = callable switch
+            {
+                MethodDeclarationSyntax method =>
+                    ($"method '{method.Identifier.ValueText}'",
+                        method.ParameterList.Parameters),
+                LocalFunctionStatementSyntax local =>
+                    ($"local function '{local.Identifier.ValueText}'",
+                        local.ParameterList.Parameters),
+                _ => throw new InvalidOperationException(),
+            };
+
+            foreach (var parameter in parameters)
+            {
+                var modifiers = parameter.Modifiers
+                    .Where(token => token.IsKind(SyntaxKind.RefKeyword)
+                        || token.IsKind(SyntaxKind.InKeyword)
+                        || token.IsKind(SyntaxKind.OutKeyword))
+                    .Select(token => token.ValueText)
+                    .ToArray();
+                if (modifiers.Length == 0)
+                    continue;
+
+                _diagnostics.ReportError(
+                    span,
+                    DiagnosticCode.IllegalYield,
+                    $"Iterator {description} cannot declare parameter " +
+                    $"'{parameter.Identifier.ValueText}' with modifier " +
+                    $"'{string.Join(", ", modifiers)}'. Iterator parameters " +
+                    "must be passed by value.");
+            }
+        }
+    }
+
+    private static bool ContainsOwnedYield(SyntaxNode callable) =>
+        callable.DescendantNodes(descendIntoChildren: node =>
+                ReferenceEquals(node, callable)
+                || node is not AnonymousFunctionExpressionSyntax
+                    and not LocalFunctionStatementSyntax
+                    and not BaseMethodDeclarationSyntax)
+            .OfType<YieldStatementSyntax>()
+            .Any();
+
+    private static string FormatModifiers(ParameterModifier modifiers)
+    {
+        var names = new List<string>(3);
+        if (modifiers.HasFlag(ParameterModifier.Ref))
+            names.Add("ref");
+        if (modifiers.HasFlag(ParameterModifier.In))
+            names.Add("in");
+        if (modifiers.HasFlag(ParameterModifier.Out))
+            names.Add("out");
+        return string.Join(", ", names);
+    }
+
+    private static YieldContext EnterYieldOwner(
+        AstNode node,
+        YieldContext context) =>
+        node switch
+        {
+            FunctionNode function => ResetYieldContext(
+                function.IsAsync ? YieldOwner.AsyncCallable : YieldOwner.Callable,
+                $"function '{function.Name}'"),
+            MethodNode method => ResetYieldContext(
+                method.IsAsync ? YieldOwner.AsyncCallable : YieldOwner.Callable,
+                $"method '{method.Name}'"),
+            OperatorOverloadNode => ResetYieldContext(
+                YieldOwner.Unsupported,
+                "operator"),
+            ConstructorNode => ResetYieldContext(
+                YieldOwner.Unsupported,
+                "constructor"),
+            PropertyAccessorNode => ResetYieldContext(
+                YieldOwner.Unsupported,
+                "property/indexer accessor"),
+            EventDefinitionNode => ResetYieldContext(
+                YieldOwner.Unsupported,
+                "event accessor"),
+            LambdaExpressionNode => context with { InLambda = true },
+            MatchExpressionNode => context with { InExpressionContainer = true },
+            CatchClauseNode => context with { InCatch = true },
+            _ => context,
+        };
+
+    private static YieldContext ResetYieldContext(
+        YieldOwner owner,
+        string description) =>
+        new(
+            owner,
+            description,
+            InLambda: false,
+            InExpressionContainer: false,
+            InCatch: false,
+            InFinally: false,
+            InUnsafe: false,
+            InFixed: false,
+            InTryWithCatch: false);
+
+    private static YieldContext ContextForEdge(
+        AstNode parent,
+        RecursiveAstWalker.ChildEdge edge,
+        YieldContext context)
+    {
+        if (parent is TryStatementNode tryStatement)
+        {
+            if (edge.Property.Name == nameof(TryStatementNode.FinallyBody))
+            {
+                return context with { InFinally = true };
+            }
+            if (edge.Property.Name == nameof(TryStatementNode.TryBody)
+                && tryStatement.CatchClauses.Count > 0)
+            {
+                return context with { InTryWithCatch = true };
+            }
+        }
+
+        if (parent is UnsafeBlockNode
+            && edge.Property.Name == nameof(UnsafeBlockNode.Body))
+        {
+            return context with { InUnsafe = true };
+        }
+
+        if (parent is FixedStatementNode
+            && edge.Property.Name == nameof(FixedStatementNode.Body))
+        {
+            return context with { InFixed = true, InUnsafe = true };
+        }
+
+        return context;
+    }
+
+    private void CheckYieldReturn(
+        YieldReturnStatementNode yieldReturn,
+        YieldContext context)
+    {
+        if (yieldReturn.Expression is null)
+        {
+            _diagnostics.ReportError(
+                yieldReturn.Span,
+                DiagnosticCode.YieldRequiresValue,
+                "'§YIELD' requires a value. Use '§YBRK' for 'yield break'.");
+            return;
+        }
+
+        var reason = GetIllegalYieldReason(context, returnsValue: true);
+        if (reason != null)
+        {
+            _diagnostics.ReportError(
+                yieldReturn.Span,
+                DiagnosticCode.IllegalYield,
+                $"'§YIELD' is illegal {reason}.");
+        }
+    }
+
+    private void CheckYieldBreak(
+        YieldBreakStatementNode yieldBreak,
+        YieldContext context)
+    {
+        var reason = GetIllegalYieldReason(context, returnsValue: false);
+        if (reason != null)
+        {
+            _diagnostics.ReportError(
+                yieldBreak.Span,
+                DiagnosticCode.IllegalYield,
+                $"'§YBRK' is illegal {reason}.");
+        }
+    }
+
+    private static string? GetIllegalYieldReason(
+        YieldContext context,
+        bool returnsValue)
+    {
+        if (context.InLambda)
+            return "inside a lambda expression";
+        if (context.InExpressionContainer)
+            return "inside an expression-valued statement container";
+        if (context.Owner == YieldOwner.None)
+            return "outside a function or method";
+        if (context.Owner == YieldOwner.AsyncCallable)
+            return $"inside async {context.OwnerDescription}; async iterators are not supported";
+        if (context.Owner == YieldOwner.Unsupported)
+            return $"inside a {context.OwnerDescription}";
+        if (context.InFinally)
+            return "inside a finally block";
+
+        if (!returnsValue)
+            return null;
+
+        if (context.InCatch)
+            return "inside a catch block";
+        if (context.InFixed)
+            return "inside a fixed block";
+        if (context.InUnsafe)
+            return "inside an unsafe block";
+        if (context.InTryWithCatch)
+            return "inside a try block that has a catch clause";
+
+        return null;
     }
 
     private void CheckReturn(ReturnStatementNode ret, ReturnShape.Kind context)

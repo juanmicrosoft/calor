@@ -78,6 +78,7 @@ public class StructuralIdOptionalTests
         var loop = Assert.Single(fn.Body.OfType<ForStatementNode>());
         Assert.Equal("i", loop.VariableName);
         Assert.Contains("_auto", loop.Id);
+        Assert.Null(loop.Step);
     }
 
     [Fact]
@@ -100,6 +101,7 @@ public class StructuralIdOptionalTests
         var loop = Assert.Single(fn.Body.OfType<ForStatementNode>());
         Assert.Equal("l001", loop.Id);
         Assert.Equal("i", loop.VariableName);
+        Assert.Null(loop.Step);
     }
 
     [Theory]

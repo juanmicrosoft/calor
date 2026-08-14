@@ -4399,10 +4399,6 @@ public sealed class Parser
             fromStr = attrs["_pos1"] ?? "";
             toStr = attrs["_pos2"] ?? "";
             stepStr = attrs["_pos3"] ?? "";
-            if (string.IsNullOrEmpty(stepStr))
-            {
-                stepStr = "1";
-            }
             id = GenerateParserAutoId("l");
             variableKey = "_pos0";
         }

@@ -25,6 +25,14 @@ namespace Calor.Compiler.Analysis;
 /// </summary>
 public static class RecursiveAstWalker
 {
+    /// <summary>
+    /// A structural edge from a parent AST node to one child, retaining the
+    /// public property that owns the child. Consumers that enforce context-
+    /// sensitive rules (for example catch/finally yield legality) can therefore
+    /// stay exhaustive without hand-maintaining a container switch.
+    /// </summary>
+    public readonly record struct ChildEdge(AstNode Node, PropertyInfo Property);
+
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> NonExpressionCache = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> AllChildrenCache = new();
 
@@ -98,6 +106,13 @@ public static class RecursiveAstWalker
     /// calls or diagnostic seeds inside newly added expression wrappers.
     /// </summary>
     public static IEnumerable<AstNode> GetAllChildren(AstNode node)
+        => GetAllChildEdges(node).Select(edge => edge.Node);
+
+    /// <summary>
+    /// Enumerates every direct AST child, including expression subtrees, together
+    /// with the property that contains it.
+    /// </summary>
+    public static IEnumerable<ChildEdge> GetAllChildEdges(AstNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
         var yielded = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
@@ -117,7 +132,7 @@ public static class RecursiveAstWalker
             if (value is AstNode single)
             {
                 if (yielded.Add(single))
-                    yield return single;
+                    yield return new ChildEdge(single, prop);
                 continue;
             }
 
@@ -127,8 +142,46 @@ public static class RecursiveAstWalker
             foreach (var item in sequence)
             {
                 if (item is AstNode child && yielded.Add(child))
-                    yield return child;
+                    yield return new ChildEdge(child, prop);
             }
+        }
+    }
+
+    /// <summary>
+    /// Enumerates statement roots and every nested statement container while
+    /// deliberately not crossing expression boundaries such as lambdas. This is
+    /// the shared statement traversal surface for iterator classification,
+    /// structural return lowering preflights, legality checks, and future
+    /// statement transforms.
+    /// </summary>
+    public static IEnumerable<StatementNode> EnumerateStatements(
+        IEnumerable<StatementNode> roots)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+
+        foreach (var root in roots)
+        {
+            foreach (var node in DescendantsAndSelf(root))
+            {
+                if (node is StatementNode statement)
+                    yield return statement;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enumerates a node and all structural descendants without crossing into
+    /// expression subtrees.
+    /// </summary>
+    public static IEnumerable<AstNode> DescendantsAndSelf(AstNode root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        yield return root;
+        foreach (var child in GetChildren(root))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
         }
     }
 

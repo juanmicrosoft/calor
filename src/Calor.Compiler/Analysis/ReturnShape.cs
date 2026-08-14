@@ -118,9 +118,9 @@ public static class ReturnShape
     {
         if (accessor.Kind == PropertyAccessorNode.AccessorKind.Get)
         {
-            // A getter returns the property value, so a value §R is expected —
-            // unless the getter is itself an iterator.
-            return IsIterator(accessor) ? Kind.Iterator : Kind.Value;
+            // Accessor iterators are fail-closed by ReturnValidationPass until
+            // their deferred execution and return-type semantics are defined.
+            return Kind.Value;
         }
 
         // set / init accessors never return a value.
@@ -129,44 +129,11 @@ public static class ReturnShape
 
     private static bool IsIterator(AstNode owner)
     {
-        foreach (var child in RecursiveAstWalker.GetChildren(owner))
-        {
-            if (ContainsYield(child))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return RecursiveAstWalker.GetChildren(owner)
+            .SelectMany(RecursiveAstWalker.DescendantsAndSelf)
+            .OfType<StatementNode>()
+            .Any(statement =>
+                statement is YieldReturnStatementNode
+                    or YieldBreakStatementNode);
     }
-
-    private static bool ContainsYield(AstNode node)
-    {
-        if (node is YieldReturnStatementNode or YieldBreakStatementNode)
-        {
-            return true;
-        }
-
-        // Do not cross into a nested owner boundary (defensive — statement bodies
-        // do not currently contain nested owners, and lambdas are expressions
-        // that RecursiveAstWalker already skips).
-        if (IsOwner(node))
-        {
-            return false;
-        }
-
-        foreach (var child in RecursiveAstWalker.GetChildren(node))
-        {
-            if (ContainsYield(child))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsOwner(AstNode node) => node is
-        FunctionNode or MethodNode or OperatorOverloadNode or
-        ConstructorNode or PropertyAccessorNode or EventDefinitionNode;
 }

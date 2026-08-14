@@ -36,8 +36,19 @@ public enum EmitContractMode
 /// </summary>
 public sealed class CSharpEmitter : IAstVisitor<string>
 {
-    private readonly StringBuilder _builder = new();
-    private int _indentLevel;
+    private sealed class EmissionContext
+    {
+        public EmissionContext(int indentLevel = 0)
+        {
+            IndentLevel = indentLevel;
+        }
+
+        public StringBuilder Writer { get; } = new();
+        public int IndentLevel { get; set; }
+    }
+
+    private EmissionContext _emissionContext = new();
+    private HashSet<string> _reservedGeneratedIdentifiers = new(StringComparer.Ordinal);
     private string? _currentClassName;
     private string _currentModuleName = "";
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
@@ -451,8 +462,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Emit(ModuleNode module, string? filePath = null)
     {
-        _builder.Clear();
-        _indentLevel = 0;
+        _emissionContext = new EmissionContext();
+        _reservedGeneratedIdentifiers = CollectReservedModuleIdentifiers(module);
         _currentFilePath = filePath;
         _lineDirectiveFile = string.IsNullOrEmpty(LineDirectiveFilePath)
             ? null
@@ -467,23 +478,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return Emit(module, null);
     }
 
-    private static IEnumerable<AstNode> DescendantStatementNodesAndSelf(
-        AstNode node)
-    {
-        yield return node;
-        foreach (var child in Analysis.RecursiveAstWalker.GetChildren(node))
-        {
-            foreach (var descendant in DescendantStatementNodesAndSelf(child))
-            {
-                yield return descendant;
-            }
-        }
-    }
-
     private static IEnumerable<StatementNode> TraverseStatements(
         IReadOnlyList<StatementNode> body) =>
-        body.SelectMany(DescendantStatementNodesAndSelf)
-            .OfType<StatementNode>();
+        Analysis.RecursiveAstWalker.EnumerateStatements(body);
 
     private static bool ContainsOpaqueCSharp(IReadOnlyList<StatementNode> body) =>
         TraverseStatements(body).Any(statement => statement is RawCSharpNode);
@@ -514,39 +511,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var node in body.SelectMany(DescendantsAndSelf))
         {
-            string? name = node switch
-            {
-                BindStatementNode bind => bind.Name,
-                ForStatementNode loop => loop.VariableName,
-                ForeachStatementNode loop => loop.VariableName,
-                DictionaryForeachNode loop => loop.KeyName,
-                UsingStatementNode usingStatement => usingStatement.VariableName,
-                CatchClauseNode catchClause => catchClause.VariableName,
-                FixedStatementNode fixedStatement => fixedStatement.PointerName,
-                LabelStatementNode label => label.Label,
-                LambdaParameterNode parameter => parameter.Name,
-                QuantifierVariableNode variable => variable.Name,
-                IsPatternNode pattern => pattern.VariableName,
-                VariablePatternNode pattern => pattern.Name,
-                VarPatternNode pattern => pattern.Name,
-                TypePatternNode pattern => pattern.BindingName,
-                ReferenceNode reference when !reference.Name.Contains('.') =>
-                    reference.Name,
-                _ => null
-            };
-            if (!string.IsNullOrEmpty(name))
-            {
-                reserved.Add(SanitizeIdentifier(name));
-            }
-
-            if (node is ForeachStatementNode { IndexVariableName: { } indexName })
-            {
-                reserved.Add(SanitizeIdentifier(indexName));
-            }
-            else if (node is DictionaryForeachNode dictionaryLoop)
-            {
-                reserved.Add(SanitizeIdentifier(dictionaryLoop.ValueName));
-            }
+            AddReservedIdentifiers(reserved, node);
         }
 
         foreach (var node in postconditions
@@ -554,25 +519,124 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                          DescendantsAndSelf(
                              postcondition.Contract.Condition)))
         {
-            var name = node switch
-            {
-                LambdaParameterNode parameter => parameter.Name,
-                QuantifierVariableNode variable => variable.Name,
-                IsPatternNode pattern => pattern.VariableName,
-                VariablePatternNode pattern => pattern.Name,
-                VarPatternNode pattern => pattern.Name,
-                TypePatternNode pattern => pattern.BindingName,
-                ReferenceNode reference when !reference.Name.Contains('.') =>
-                    reference.Name,
-                _ => null
-            };
-            if (!string.IsNullOrEmpty(name))
-            {
-                reserved.Add(SanitizeIdentifier(name));
-            }
+            AddReservedIdentifiers(reserved, node);
         }
 
         return reserved;
+    }
+
+    private static HashSet<string> CollectReservedModuleIdentifiers(ModuleNode module)
+    {
+        var reserved = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in DescendantsAndSelf(module))
+        {
+            AddReservedIdentifiers(reserved, node);
+        }
+        return reserved;
+    }
+
+    private static void AddReservedIdentifiers(
+        HashSet<string> reserved,
+        AstNode node)
+    {
+        switch (node)
+        {
+            case RawCSharpNode raw:
+                AddRawCSharpIdentifiers(reserved, raw.CSharpCode);
+                break;
+            case RawCSharpExpressionNode raw:
+                AddRawCSharpIdentifiers(reserved, raw.CSharpCode);
+                break;
+            case CSharpInteropBlockNode interop:
+                AddRawCSharpIdentifiers(reserved, interop.CSharpCode);
+                break;
+        }
+
+        var name = node switch
+        {
+            BindStatementNode bind => bind.Name,
+            ForStatementNode loop => loop.VariableName,
+            ForeachStatementNode loop => loop.VariableName,
+            DictionaryForeachNode loop => loop.KeyName,
+            UsingStatementNode usingStatement => usingStatement.VariableName,
+            CatchClauseNode catchClause => catchClause.VariableName,
+            FixedStatementNode fixedStatement => fixedStatement.PointerName,
+            LabelStatementNode label => label.Label,
+            LambdaParameterNode parameter => parameter.Name,
+            ParameterNode parameter => parameter.Name,
+            TypeParameterNode parameter => parameter.Name,
+            QuantifierVariableNode variable => variable.Name,
+            IsPatternNode pattern => pattern.VariableName,
+            VariablePatternNode pattern => pattern.Name,
+            VarPatternNode pattern => pattern.Name,
+            TypePatternNode pattern => pattern.BindingName,
+            ReferenceNode reference when !reference.Name.Contains('.') =>
+                reference.Name,
+            _ => null
+        };
+        if (!string.IsNullOrEmpty(name))
+        {
+            reserved.Add(SanitizeIdentifier(name));
+        }
+
+        if (node is ForeachStatementNode { IndexVariableName: { } indexName })
+        {
+            reserved.Add(SanitizeIdentifier(indexName));
+        }
+        else if (node is DictionaryForeachNode dictionaryLoop)
+        {
+            reserved.Add(SanitizeIdentifier(dictionaryLoop.ValueName));
+        }
+    }
+
+    private static void AddRawCSharpIdentifiers(
+        HashSet<string> reserved,
+        string source)
+    {
+        var pending = new Stack<string>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        pending.Push(source);
+
+        while (pending.Count > 0)
+        {
+            var fragment = pending.Pop();
+            if (string.IsNullOrEmpty(fragment) || !visited.Add(fragment))
+                continue;
+
+            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree
+                .ParseText(fragment)
+                .GetRoot();
+            foreach (var token in root.DescendantTokens())
+            {
+                if (token.RawKind
+                    != (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken)
+                {
+                    continue;
+                }
+
+                var value = token.ValueText;
+                if (Microsoft.CodeAnalysis.CSharp.SyntaxFacts.GetKeywordKind(value)
+                        != Microsoft.CodeAnalysis.CSharp.SyntaxKind.None
+                    || Microsoft.CodeAnalysis.CSharp.SyntaxFacts
+                        .GetContextualKeywordKind(value)
+                        != Microsoft.CodeAnalysis.CSharp.SyntaxKind.None)
+                {
+                    continue;
+                }
+
+                reserved.Add(SanitizeIdentifier(value));
+            }
+
+            foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
+            {
+                if (trivia.RawKind
+                        is (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.DisabledTextTrivia
+                        or (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.SkippedTokensTrivia)
+                {
+                    pending.Push(trivia.ToFullString());
+                }
+            }
+        }
     }
 
     private static string ReserveUniqueIdentifier(
@@ -815,7 +879,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Diagnostics.DiagnosticCode.IteratorPostconditionUnsupported);
             foreach (var statement in body)
             {
-                EmitStatement(statement);
+                EmitStatement(statement, _emissionContext);
             }
             return;
         }
@@ -829,7 +893,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Diagnostics.DiagnosticCode.PostconditionCheckNotLowered);
             foreach (var statement in body)
             {
-                EmitStatement(statement);
+                EmitStatement(statement, _emissionContext);
             }
             return;
         }
@@ -842,7 +906,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 foreach (var statement in body)
                 {
-                    EmitStatement(statement);
+                    EmitStatement(statement, _emissionContext);
                 }
                 return;
             }
@@ -876,7 +940,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             foreach (var statement in body)
             {
-                EmitStatement(statement);
+                EmitStatement(statement, _emissionContext);
             }
         }
         finally
@@ -948,32 +1012,44 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             Diagnostics.DiagnosticSeverity.Error));
     }
 
-    private void EmitStatement(AstNode statement, bool skipEmptyLine = false)
+    private void EmitStatement(
+        StatementNode statement,
+        EmissionContext context,
+        bool skipEmptyLine = false)
     {
-        var mapped = TryBeginLineMapping(statement);
-        var isMutableRebind = statement is BindStatementNode bindStatement
-            && bindStatement.IsMutable
-            && IsVarDeclaredInScope(SanitizeIdentifier(bindStatement.Name));
-        var code = statement.Accept(this);
-        if (!skipEmptyLine || !string.IsNullOrEmpty(code))
+        var previousContext = _emissionContext;
+        _emissionContext = context;
+        try
         {
-            AppendLine(code);
-            if (statement is BindStatementNode bind
-                && !isMutableRebind
-                && TryGetRefinementConstraint(bind.Name, out var bindConstraint))
+            var mapped = TryBeginLineMapping(statement);
+            var isMutableRebind = statement is BindStatementNode bindStatement
+                && bindStatement.IsMutable
+                && IsVarDeclaredInScope(SanitizeIdentifier(bindStatement.Name));
+            var code = statement.Accept(this);
+            if (!skipEmptyLine || !string.IsNullOrEmpty(code))
             {
-                if (ShouldEmitObligationGuard(
-                    Verification.Obligations.ObligationKind.Subtype,
-                    bind.Span,
-                    bind.Name))
+                AppendLine(code);
+                if (statement is BindStatementNode bind
+                    && !isMutableRebind
+                    && TryGetRefinementConstraint(bind.Name, out var bindConstraint))
                 {
-                    EmitRefinementValueGuard(
-                        bindConstraint,
-                        SanitizeIdentifier(bind.Name));
+                    if (ShouldEmitObligationGuard(
+                        Verification.Obligations.ObligationKind.Subtype,
+                        bind.Span,
+                        bind.Name))
+                    {
+                        EmitRefinementValueGuard(
+                            bindConstraint,
+                            SanitizeIdentifier(bind.Name));
+                    }
                 }
             }
+            EndLineMapping(mapped);
         }
-        EndLineMapping(mapped);
+        finally
+        {
+            _emissionContext = previousContext;
+        }
     }
 
     /// <summary>
@@ -1004,17 +1080,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         if (string.IsNullOrEmpty(line))
         {
-            _builder.AppendLine();
+            _emissionContext.Writer.AppendLine();
         }
         else
         {
-            _builder.Append(new string(' ', _indentLevel * 4));
-            _builder.AppendLine(line);
+            _emissionContext.Writer.Append(
+                new string(' ', _emissionContext.IndentLevel * 4));
+            _emissionContext.Writer.AppendLine(line);
         }
     }
 
-    private void Indent() => _indentLevel++;
-    private void Dedent() => _indentLevel--;
+    private void Indent() => _emissionContext.IndentLevel++;
+    private void Dedent() => _emissionContext.IndentLevel--;
 
     public string Visit(ModuleNode node)
     {
@@ -1185,7 +1262,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Replace using placeholder with only the namespaces actually referenced.
         // Uses AST-level flags set during emission, with string-scanning fallback
         // for raw C# passthrough (§CS{}, §RAW) that may reference these namespaces.
-        var output = _builder.ToString();
+        var output = _emissionContext.Writer.ToString();
         var usingBlock = new StringBuilder();
         var emittedUsings = new HashSet<string>(StringComparer.Ordinal);
 
@@ -1546,7 +1623,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
 
             var continuationIndent = Environment.NewLine
-                + new string(' ', _indentLevel * 4);
+                + new string(' ', _emissionContext.IndentLevel * 4);
             return $"{lowering.ResultIdentifier} = {loweredExpression};"
                 + continuationIndent
                 + $"goto {lowering.ExitLabel};";
@@ -1570,7 +1647,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 GetEffectiveRefinementPredicate(refinementType),
                 resultName);
             var continuationIndent = Environment.NewLine
-                + new string(' ', _indentLevel * 4);
+                + new string(' ', _emissionContext.IndentLevel * 4);
             return $"var {resultName} = {expr};"
                 + continuationIndent
                 + $"if (!({condition})) throw new InvalidOperationException("
@@ -1980,26 +2057,92 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var varName = SanitizeIdentifier(node.VariableName);
         var from = node.From.Accept(this);
         var to = node.To.Accept(this);
-        var step = node.Step?.Accept(this) ?? "1";
+        var hasExplicitStep = node.Step != null;
+        var step = node.Step?.Accept(this);
+        var fromTemp = ReserveUniqueIdentifier(
+            _reservedGeneratedIdentifiers,
+            "__calorForFrom");
+        var toTemp = ReserveUniqueIdentifier(
+            _reservedGeneratedIdentifiers,
+            "__calorForTo");
+        var stepTemp = hasExplicitStep
+            ? ReserveUniqueIdentifier(
+                _reservedGeneratedIdentifiers,
+                "__calorForStep")
+            : null;
+        var ascendingTemp = hasExplicitStep
+            ? ReserveUniqueIdentifier(
+                _reservedGeneratedIdentifiers,
+                "__calorForAscending")
+            : null;
+        var firstTemp = ReserveUniqueIdentifier(
+            _reservedGeneratedIdentifiers,
+            "__calorForFirst");
 
-        var isPositiveStep = LoopStepSemantics.TryEvaluate(node.Step, out var stepValue)
-            ? stepValue.Sign >= 0
-            : !step.StartsWith("-");
-        var comparison = isPositiveStep ? "<=" : ">=";
-        var increment = step == "1" ? $"{varName}++" : $"{varName} += {step}";
-
-        AppendLine($"for (var {varName} = {from}; {varName} {comparison} {to}; {increment})");
         AppendLine("{");
         Indent();
+        AppendLine($"var {fromTemp} = {from};");
+        AppendLine($"var {toTemp} = {to};");
+        if (hasExplicitStep)
+        {
+            AppendLine($"var {stepTemp} = {step};");
+            AppendLine(
+                $"if ({stepTemp} == 0) throw new ArgumentOutOfRangeException(" +
+                $"nameof({stepTemp}), \"Calor for-loop step must not be zero\");");
+            AppendLine($"var {ascendingTemp} = {stepTemp} > 0;");
+        }
+        AppendLine($"var {firstTemp} = true;");
+        AppendLine($"var {varName} = {fromTemp};");
+        AppendLine("while (true)");
+        AppendLine("{");
+        Indent();
+
+        AppendLine($"if (!{firstTemp})");
+        AppendLine("{");
+        Indent();
+        AppendLine("try");
+        AppendLine("{");
+        Indent();
+        AppendLine("checked");
+        AppendLine("{");
+        Indent();
+        AppendLine(
+            hasExplicitStep
+                ? $"{varName} += {stepTemp};"
+                : $"{varName}++;");
+        Dedent();
+        AppendLine("}");
+        Dedent();
+        AppendLine("}");
+        AppendLine("catch (OverflowException)");
+        AppendLine("{");
+        Indent();
+        AppendLine("break;");
+        Dedent();
+        AppendLine("}");
+        Dedent();
+        AppendLine("}");
+        AppendLine("else");
+        AppendLine("{");
+        Indent();
+        AppendLine($"{firstTemp} = false;");
+        Dedent();
+        AppendLine("}");
+        AppendLine(hasExplicitStep
+            ? $"if (!({ascendingTemp} ? {varName} <= {toTemp} : " +
+                $"{varName} >= {toTemp})) break;"
+            : $"if (!({varName} <= {toTemp})) break;");
 
         PushDeclScope();
         DeclareVarInScope(varName); // the loop variable is in scope for the body (#732)
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
+        Dedent();
+        AppendLine("}");
         Dedent();
         AppendLine("}");
 
@@ -2017,7 +2160,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -2038,7 +2181,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -2059,7 +2202,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.ThenBody)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -2077,7 +2220,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             PushDeclScope();
             foreach (var stmt in elseIf.Body)
             {
-                EmitStatement(stmt);
+                EmitStatement(stmt, _emissionContext);
             }
             PopDeclScope();
 
@@ -2095,7 +2238,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             PushDeclScope();
             foreach (var stmt in node.ElseBody)
             {
-                EmitStatement(stmt);
+                EmitStatement(stmt, _emissionContext);
             }
             PopDeclScope();
 
@@ -2115,7 +2258,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
         Dedent();
@@ -2454,7 +2597,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         if (node.Expression == null)
         {
-            return "yield return;";
+            throw new InvalidOperationException(
+                "A valueless §YIELD is invalid. Use §YBRK to emit 'yield break;'.");
         }
         var expr = node.Expression.Accept(this);
         if (_currentYieldRefinement != null
@@ -2469,7 +2613,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 GetEffectiveRefinementPredicate(refinementType),
                 resultName);
             var continuationIndent = Environment.NewLine
-                + new string(' ', _indentLevel * 4);
+                + new string(' ', _emissionContext.IndentLevel * 4);
             return $"var {resultName} = {expr};"
                 + continuationIndent
                 + $"if (!({condition})) throw new InvalidOperationException("
@@ -2850,26 +2994,43 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var matchCase in node.Cases)
         {
-            if (matchCase.Pattern is WildcardPatternNode)
+            var previousShadowDepth = _postconditionResultShadowDepth;
+            if (PatternBindsName(matchCase.Pattern, "result"))
             {
-                AppendLine("default:");
+                _postconditionResultShadowDepth++;
             }
-            else
-            {
-                var pattern = EmitPattern(matchCase.Pattern);
-                AppendLine($"case {pattern}:");
-            }
-            Indent();
 
-            PushDeclScope();
-            foreach (var stmt in matchCase.Body)
+            try
             {
-                EmitStatement(stmt);
-            }
-            PopDeclScope();
+                var guard = matchCase.Guard != null
+                    ? $" when {matchCase.Guard.Accept(this)}"
+                    : "";
+                if (matchCase.Pattern is WildcardPatternNode
+                    && matchCase.Guard == null)
+                {
+                    AppendLine("default:");
+                }
+                else
+                {
+                    var pattern = EmitPattern(matchCase.Pattern);
+                    AppendLine($"case {pattern}{guard}:");
+                }
+                Indent();
 
-            AppendLine("break;");
-            Dedent();
+                PushDeclScope();
+                foreach (var stmt in matchCase.Body)
+                {
+                    EmitStatement(stmt, _emissionContext);
+                }
+                PopDeclScope();
+
+                AppendLine("break;");
+                Dedent();
+            }
+            finally
+            {
+                _postconditionResultShadowDepth = previousShadowDepth;
+            }
         }
 
         Dedent();
@@ -3177,7 +3338,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             DeclareVarInScope(indexName);
             foreach (var stmt in node.Body)
             {
-                EmitStatement(stmt);
+                EmitStatement(stmt, _emissionContext);
             }
             PopDeclScope();
 
@@ -3194,7 +3355,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             DeclareVarInScope(varName);
             foreach (var stmt in node.Body)
             {
-                EmitStatement(stmt);
+                EmitStatement(stmt, _emissionContext);
             }
             PopDeclScope();
 
@@ -3312,7 +3473,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
             var continuationIndent = Environment.NewLine
-                + new string(' ', _indentLevel * 4);
+                + new string(' ', _emissionContext.IndentLevel * 4);
             return $"var {guardedIndex} = {index};"
                 + continuationIndent
                 + $"if ({guardedIndex} < 0"
@@ -3369,7 +3530,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         DeclareVarInScope(valueName);
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -4406,7 +4567,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in node.Body)
             {
-                EmitStatement(stmt);
+                EmitStatement(stmt, _emissionContext);
             }
 
             Dedent();
@@ -4511,7 +4672,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
 
         Dedent();
@@ -4680,7 +4841,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var candidateName = $"__refinementCandidate{_mutationGuardCounter++}";
         var continuationIndent = Environment.NewLine
-            + new string(' ', _indentLevel * 4);
+            + new string(' ', _emissionContext.IndentLevel * 4);
         var initializeCandidate = compoundOperator is null
             ? $"{MapTypeName(constraint.TypeName)} {candidateName} = {value};"
             : $"var {candidateName} = {target};"
@@ -4768,7 +4929,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var guardedIndex = $"__calorIndex{_indexGuardCounter++}";
         var continuationIndent = Environment.NewLine
-            + new string(' ', _indentLevel * 4);
+            + new string(' ', _emissionContext.IndentLevel * 4);
         code = $"var {guardedIndex} = {index};"
             + continuationIndent
             + $"if ({guardedIndex} < 0"
@@ -4797,7 +4958,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -4818,7 +4979,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.TryBody)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -4839,7 +5000,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             PushDeclScope();
             foreach (var stmt in node.FinallyBody)
             {
-                EmitStatement(stmt);
+                EmitStatement(stmt, _emissionContext);
             }
             PopDeclScope();
 
@@ -4884,7 +5045,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
 
@@ -4991,26 +5152,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
             else if (node.StatementBody != null && node.StatementBody.Count > 0)
             {
-                var builderStart = _builder.Length;
-                var previousIndent = _indentLevel;
+                var lambdaContext = new EmissionContext(indentLevel: 1);
                 PushDeclScope();
                 RegisterLambdaParameters(node.Parameters);
 
                 string body;
                 try
                 {
-                    _indentLevel = 1;
                     foreach (var stmt in node.StatementBody)
                     {
-                        EmitStatement(stmt);
+                        EmitStatement(stmt, lambdaContext);
                     }
-                    body = _builder.ToString(builderStart, _builder.Length - builderStart)
-                        .TrimEnd();
+                    body = lambdaContext.Writer.ToString().TrimEnd();
                 }
                 finally
                 {
-                    _builder.Length = builderStart;
-                    _indentLevel = previousIndent;
                     PopDeclScope();
                 }
 
@@ -5116,7 +5272,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Indent();
                 foreach (var stmt in node.AddBody)
                 {
-                    EmitStatement(stmt);
+                    EmitStatement(stmt, _emissionContext);
                 }
                 Dedent();
                 AppendLine("}");
@@ -5130,7 +5286,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Indent();
                 foreach (var stmt in node.RemoveBody)
                 {
-                    EmitStatement(stmt);
+                    EmitStatement(stmt, _emissionContext);
                 }
                 Dedent();
                 AppendLine("}");
@@ -6246,7 +6402,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // since the raw content has its own formatting.
         foreach (var line in node.CSharpCode.Split('\n'))
         {
-            _builder.AppendLine(line.TrimEnd('\r'));
+            _emissionContext.Writer.AppendLine(line.TrimEnd('\r'));
         }
         return "";
     }
@@ -6258,14 +6414,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine($"#if {node.Condition}");
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt, skipEmptyLine: true);
+            EmitStatement(stmt, _emissionContext, skipEmptyLine: true);
         }
         if (node.ElseBody != null && node.ElseBody.Count > 0)
         {
             AppendLine("#else");
             foreach (var stmt in node.ElseBody)
             {
-                EmitStatement(stmt, skipEmptyLine: true);
+                EmitStatement(stmt, _emissionContext, skipEmptyLine: true);
             }
         }
         AppendLine("#endif");
@@ -6436,7 +6592,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var line in code.Split('\n'))
         {
-            _builder.AppendLine(line.TrimEnd('\r'));
+            _emissionContext.Writer.AppendLine(line.TrimEnd('\r'));
         }
         return "";
     }
@@ -6677,7 +6833,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
         Dedent();
@@ -6694,7 +6850,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         PushDeclScope();
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         PopDeclScope();
         Dedent();
@@ -6711,7 +6867,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
         foreach (var stmt in node.Body)
         {
-            EmitStatement(stmt);
+            EmitStatement(stmt, _emissionContext);
         }
         Dedent();
         AppendLine("}");
