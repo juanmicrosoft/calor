@@ -58,13 +58,34 @@ def main() -> int:
             "--verbosity",
             "quiet",
         ]
-        started = time.monotonic()
-        result = subprocess.run(command, text=True, capture_output=True, check=False)
-        elapsed = time.monotonic() - started
         kind = "warmup" if index < warmups else "measured"
         log = log_dir / f"{kind}-{index + 1}.log"
-        log.write_text(result.stdout + result.stderr, encoding="utf-8")
-        if result.returncode != 0:
+
+        # Stream the child's output to a file rather than capturing it through
+        # pipes.
+        #
+        # NO MECHANISM IS CLAIMED HERE. Runs of this gate were terminated on
+        # 2026-08-13 with SIGTERM ("The runner has received a shutdown signal",
+        # exit 143) at widely varying elapsed times — 24s, 26s, 52s, 79s, 26m —
+        # and the same unmodified code then passed on main on 2026-08-14. Root
+        # cause is NOT established; see #965.
+        #
+        # This form is preferred on its own merits, independent of that:
+        #   * output survives the job being killed, instead of dying with the
+        #     parent's in-memory buffer — which is why the failing runs produced
+        #     no gate output at all to diagnose;
+        #   * the log is written even if subprocess.run raises, which the old
+        #     write-after-return form could not do;
+        #   * stdout and stderr are interleaved chronologically, which is what a
+        #     debugger wants. Nothing downstream reads these logs, so merging the
+        #     streams costs nothing.
+        started = time.monotonic()
+        with log.open("w", encoding="utf-8") as sink:
+            completed = subprocess.run(
+                command, stdout=sink, stderr=subprocess.STDOUT, check=False
+            )
+        elapsed = time.monotonic() - started
+        if completed.returncode != 0:
             print(f"ERROR: performance test run failed; see {log}")
             return 1
         trx = results_dir / "results.trx"
