@@ -47,6 +47,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>TestData\Security\%(RecursiveDir)%(FileName)%(Extension)</Link>
     </None>
+    <None Include="..\TestData\LiteralRawSemantics\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>TestData\LiteralRawSemantics\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
 </Project>

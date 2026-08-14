@@ -342,7 +342,7 @@ public class StructuralControlFlowTests
                 §RAW
                 #if BROKEN
                 int __calorForFrom_1 = 1;
-                /* deliberately unterminated disabled fragment
+                /* disabled fragment comment */
                 #elif FOO
                 int __calorForFrom = 10;
                 int __calorForTo = 20;

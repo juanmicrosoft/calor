@@ -960,6 +960,18 @@ public static class ConversionCatalog
         """,
         RoundTripSupported: true);
 
+    public static readonly ConversionSnippet LiteralAndInterpolationSemantics = new(
+        "12-05", "GapClosures", "Literal bases, separators, and interpolation clauses",
+        """
+        public static class LiteralShapes
+        {
+            public static long NegativeHex() => -0x2AL;
+            public static uint Separated() => 4_294_967_295U;
+            public static string Format(int value) => $"{{literal}} {value,8:X4}";
+        }
+        """,
+        RoundTripSupported: true);
+
     /// <summary>
     /// All snippets that should successfully convert.
     /// </summary>
@@ -1009,6 +1021,7 @@ public static class ConversionCatalog
         RefOutParameters,
         OperatorOverloadWithModifiers,
         Utf8StringLiteral,
+        LiteralAndInterpolationSemantics,
         ListPatterns,
         WhereConstraintMultiline,
         VerbatimIdentifiers,

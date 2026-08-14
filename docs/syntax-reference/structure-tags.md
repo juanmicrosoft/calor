@@ -7,6 +7,29 @@ nav_order: 1
 
 # Structure Tags
 
+## Raw C# blocks
+
+`§RAW ... §/RAW`, `§CS{...}`, and `§CSHARP{...}§/CSHARP` preserve their C#
+payload exactly. Their scanners recognize ordinary, verbatim, raw, and
+interpolated strings, character literals, line comments, block comments, and
+nested braces. Closing sentinel text inside any of those lexical forms does not
+terminate the block. This also applies to line and block comments on
+`#if`/`#elif`/`#else`/`#endif` directive lines. Directive lines use the same
+lexical handling as other C#: ordinary, verbatim, raw, and interpolated strings
+and character literals can contain sentinel text. Block comments always extend
+through their actual `*/`; directive-looking text inside a block comment has no
+special meaning.
+
+`§RAW` tracks nested `#if`/`#elif`/`#else`/`#endif` state. In known disabled
+regions, valid strings, characters, and comments are still recognized, so
+directive-looking lines inside a valid verbatim/raw/interpolated string or
+block comment remain inert. Scanning is recoverable: if such a construct is
+unterminated, the lexer resumes at real directive boundaries instead of letting
+malformed disabled text hide a later active branch or the Calor delimiter.
+`true`, `false`, `#define`/`#undef` symbols, and common boolean condition forms
+are evaluated. Unknown conditions are treated conservatively as active, and an
+ambiguous or unclosed conditional fails closed rather than truncating payload.
+
 Structure tags define the organization of Calor code: modules, functions, and their boundaries.
 
 > **Indent-only block structure.** Calor uses Python-style significant

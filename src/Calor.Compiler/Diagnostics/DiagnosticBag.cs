@@ -90,6 +90,18 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         => ReportError(span, DiagnosticCode.InvalidEscapeSequence,
             $"Invalid escape sequence '\\{character}'");
 
+    public void ReportUnsignedNegativeLiteral(TextSpan span)
+        => ReportError(span, DiagnosticCode.UnsignedNegativeLiteral,
+            "Unsigned integer literals cannot be negative");
+
+    public void ReportInterpolatedUtf8Literal(TextSpan span)
+        => ReportError(span, DiagnosticCode.InterpolatedUtf8Literal,
+            "Interpolated UTF-8 string literals are not supported; use a non-interpolated u8 literal or encode the formatted string explicitly");
+
+    public void ReportSignedIntegerLiteralOverflow(TextSpan span)
+        => ReportError(span, DiagnosticCode.SignedIntegerLiteralOverflow,
+            "Explicit signed 64-bit integer literal is outside the Int64 range");
+
     // Parser diagnostics
     public void ReportUnexpectedToken(TextSpan span, TokenKind expected, TokenKind actual)
         => ReportError(span, DiagnosticCode.UnexpectedToken,

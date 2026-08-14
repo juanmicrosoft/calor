@@ -13,6 +13,8 @@ public sealed class InterpolatedStringNode : ExpressionNode
     /// The parts of the interpolated string (literals or expressions).
     /// </summary>
     public IReadOnlyList<InterpolatedStringPartNode> Parts { get; }
+    public bool IsMultiline { get; init; }
+    public bool IsUtf8 { get; init; }
 
     public InterpolatedStringNode(TextSpan span, IReadOnlyList<InterpolatedStringPartNode> parts)
         : base(span)
@@ -57,13 +59,23 @@ public sealed class InterpolatedStringExpressionNode : InterpolatedStringPartNod
     public ExpressionNode Expression { get; }
     public string? FormatSpecifier { get; }
     public string? AlignmentClause { get; }
+    public InterpolationPartIntent Intent { get; }
+    public string? SourceText { get; }
 
-    public InterpolatedStringExpressionNode(TextSpan span, ExpressionNode expression, string? formatSpecifier = null, string? alignmentClause = null)
+    public InterpolatedStringExpressionNode(
+        TextSpan span,
+        ExpressionNode expression,
+        string? formatSpecifier = null,
+        string? alignmentClause = null,
+        InterpolationPartIntent intent = InterpolationPartIntent.Expression,
+        string? sourceText = null)
         : base(span)
     {
         Expression = expression ?? throw new ArgumentNullException(nameof(expression));
         FormatSpecifier = formatSpecifier;
         AlignmentClause = alignmentClause;
+        Intent = intent;
+        SourceText = sourceText;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

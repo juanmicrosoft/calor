@@ -2,6 +2,7 @@ using System.Text;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 
@@ -1661,58 +1662,29 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
-        var sb = new System.Text.StringBuilder();
+        var digits = node.IsHex
+            ? $"0x{node.Magnitude:X}"
+            : node.Magnitude.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         if (node.IsUnsigned)
         {
-            if (node.IsHex)
-                sb.Append($"0x{node.UnsignedValue:X}");
-            else
-                sb.Append(node.UnsignedValue);
-
-            // #774: defer to the carried 64-bit marker; fall back to magnitude only
-            // when no explicit width was preserved. A `uint` (IsLong false) that fits
-            // 32 bits stays `U`, never silently promoted to `UL`.
-            if (node.IsLong || node.UnsignedValue > uint.MaxValue)
-                sb.Append("UL");
-            else
-                sb.Append("U");
+            return digits + (node.IsLong ? "UL" : "U");
         }
-        else
+
+        if (node.Sign == IntegerLiteralSign.Negative)
         {
-            if (node.IsHex)
-                sb.Append($"0x{node.Value:X}");
-            else
-                sb.Append(node.Value);
-
-            // #774: an explicit `long` (IsLong) keeps its `L` even when the value
-            // fits an int; otherwise the width is derived from magnitude as before.
-            if (node.IsLong || node.Value is > int.MaxValue or < int.MinValue)
-                sb.Append("L");
+            if (node.IsHex && node.Magnitude == 0x8000_0000UL && !node.IsLong)
+                return "unchecked((int)0x80000000U)";
+            if (node.IsHex && node.Magnitude == 0x8000_0000_0000_0000UL)
+                return "unchecked((long)0x8000000000000000UL)";
+            return $"-{digits}{(node.IsLong ? "L" : "")}";
         }
 
-        return sb.ToString();
+        return digits + (node.IsLong ? "L" : "");
     }
 
     public string Visit(StringLiteralNode node)
     {
-        // Check if this is an interpolated string (contains ${expr})
-        // Uses brace-depth matching to support complex expressions like ${arr[0]}, ${obj.Method()}, etc.
-        // Content starting with a digit (e.g., ${0}) is treated as a format placeholder, not interpolation
-        var (converted, hasInterpolation) = ConvertInlineInterpolation(node.Value);
-        if (hasInterpolation)
-        {
-            // Escape for C# string literal (but not the interpolation braces)
-            var escaped = converted
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace("\t", "\\t");
-
-            return $"$\"{escaped}\"";
-        }
-
         // Multiline strings (from triple-quote """ ... """) emit as C# verbatim strings
         if (node.IsMultiline && node.Value.Contains('\n'))
         {
@@ -1895,11 +1867,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 leftConverted = $"({leftConverted})";
         }
 
-        // Wrap right child if it was a prefix expression and has lower or equal precedence
+        // Equal-precedence right operands need parentheses for left-associative C#
+        // operators (subtraction, division, shifts, comparisons, and mixed peers).
         if (right.StartsWith('(') && right.EndsWith(')'))
         {
             var rightPrec = GetChildPrecedence(right);
-            if (rightPrec > 0 && rightPrec < parentPrec)
+            if (rightPrec > 0 && rightPrec <= parentPrec)
                 rightConverted = $"({rightConverted})";
         }
 
@@ -5337,23 +5310,70 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(InterpolatedStringNode node)
     {
+        if (node.IsUtf8)
+        {
+            throw new InvalidOperationException(
+                "Interpolated UTF-8 string literals are not supported");
+        }
+
+        if (node.Parts.Count > 0
+            && node.Parts.All(part =>
+                part is InterpolatedStringTextNode
+                || part is InterpolatedStringExpressionNode
+                {
+                    Intent: InterpolationPartIntent.LiteralPlaceholder
+                }))
+        {
+            var literal = new StringBuilder();
+            foreach (var part in node.Parts)
+            {
+                if (part is InterpolatedStringTextNode text)
+                    literal.Append(text.Text);
+                else if (part is InterpolatedStringExpressionNode expression)
+                    literal.Append("${").Append(GetInterpolationSource(expression)).Append('}');
+            }
+            return Visit(new StringLiteralNode(node.Span, literal.ToString())
+            {
+                IsMultiline = node.IsMultiline,
+                IsUtf8 = node.IsUtf8
+            });
+        }
+
         var sb = new StringBuilder();
-        sb.Append("$\"");
+        var useVerbatim = node.IsMultiline
+            && node.Parts.OfType<InterpolatedStringTextNode>().Any(part => part.Text.Contains('\n'));
+        sb.Append(useVerbatim ? "$@\"" : "$\"");
 
         foreach (var part in node.Parts)
         {
             if (part is InterpolatedStringTextNode textPart)
             {
-                // Escape quotes and braces in literal text
-                var escaped = textPart.Text
-                    .Replace("\\", "\\\\")
-                    .Replace("\"", "\\\"")
-                    .Replace("{", "{{")
-                    .Replace("}", "}}");
+                var escaped = useVerbatim
+                    ? textPart.Text
+                        .Replace("\"", "\"\"")
+                        .Replace("{", "{{")
+                        .Replace("}", "}}")
+                    : textPart.Text
+                        .Replace("\\", "\\\\")
+                        .Replace("\"", "\\\"")
+                        .Replace("\n", "\\n")
+                        .Replace("\r", "\\r")
+                        .Replace("\t", "\\t")
+                        .Replace("\0", "\\0")
+                        .Replace("{", "{{")
+                        .Replace("}", "}}");
                 sb.Append(escaped);
             }
             else if (part is InterpolatedStringExpressionNode exprPart)
             {
+                if (exprPart.Intent == InterpolationPartIntent.LiteralPlaceholder)
+                {
+                    sb.Append("${{");
+                    sb.Append(GetInterpolationSource(exprPart));
+                    sb.Append("}}");
+                    continue;
+                }
+
                 sb.Append("{");
                 sb.Append(exprPart.Expression.Accept(this));
                 if (!string.IsNullOrEmpty(exprPart.AlignmentClause))
@@ -5372,6 +5392,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         sb.Append("\"");
         return sb.ToString();
+    }
+
+    private string GetInterpolationSource(InterpolatedStringExpressionNode node)
+    {
+        if (!string.IsNullOrEmpty(node.SourceText))
+            return node.SourceText;
+
+        var alignment = !string.IsNullOrEmpty(node.AlignmentClause) ? $",{node.AlignmentClause}" : "";
+        var format = !string.IsNullOrEmpty(node.FormatSpecifier) ? $":{node.FormatSpecifier}" : "";
+        return $"{node.Expression.Accept(this)}{alignment}{format}";
     }
 
     public string Visit(InterpolatedStringTextNode node)
@@ -6398,12 +6428,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(RawCSharpNode node)
     {
-        // Emit raw C# content verbatim without applying scope indentation,
-        // since the raw content has its own formatting.
-        foreach (var line in node.CSharpCode.Split('\n'))
-        {
-            _emissionContext.Writer.AppendLine(line.TrimEnd('\r'));
-        }
+        AppendRawCSharp(node.CSharpCode);
         return "";
     }
 
@@ -6590,11 +6615,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             code = StripMatchingNamespace(code, _currentNamespace);
         }
 
-        foreach (var line in code.Split('\n'))
-        {
-            _emissionContext.Writer.AppendLine(line.TrimEnd('\r'));
-        }
+        AppendRawCSharp(code);
         return "";
+    }
+
+    private void AppendRawCSharp(string code)
+    {
+        _emissionContext.Writer.Append(code);
+        if (code.Length == 0 || code[^1] is not '\r' and not '\n')
+            _emissionContext.Writer.AppendLine();
     }
 
     private static string StripMatchingNamespace(string code, string namespaceName)

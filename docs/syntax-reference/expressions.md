@@ -7,6 +7,64 @@ nav_order: 3
 
 # Expressions
 
+## Integer literals
+
+Integer literals preserve sign, base, width, and signedness through compilation.
+Decimal and hexadecimal forms accept `_` separators:
+
+```calor
+INT:-0x8000_0000
+LONG:9_223_372_036_854_775_807
+UINT:4_294_967_295
+ULONG:18_446_744_073_709_551_615
+0xFFFF_FFFFU
+```
+
+`INT:` and unsuffixed literals infer 32- or 64-bit signed width from their
+value. `LONG:`, `UINT:`, and `ULONG:` request an explicit width/signedness.
+Negative `UINT:`/`ULONG:` literals and negative literals with a `U` suffix are
+rejected with `Calor0010`.
+
+Negative hexadecimal minimum values are supported and emitted without changing
+their runtime value.
+
+An explicit signed `L` suffix must remain signed. Values above
+`9223372036854775807L` (or below `-9223372036854775808L`) are rejected with
+`Calor0012`; they are never reinterpreted as `ulong`. The exact
+`-9223372036854775808L` boundary remains valid, and `UL` continues to request
+unsigned 64-bit semantics explicitly.
+
+## String literals and interpolation
+
+Ordinary and triple-quoted strings use `${expression}` interpolation. The
+lexer records literal and expression parts structurally; code generation does
+not reparse expression text from a decoded string.
+
+```calor
+"Value: ${value,-10:N2}"
+"""
+Name: ${name}
+Value: ${value:N2}
+"""
+```
+
+`\${` keeps interpolation literal. Escaped braces remain literal braces.
+Named and numeric interpolation expressions, alignment, and format clauses are
+preserved. Unknown escapes retain their backslash and character rather than
+silently dropping the backslash.
+
+Numeric placeholder syntax such as `${0}` is preserved as literal placeholder
+text. Its intent is recorded explicitly in the AST; `${-1}` is an expression
+and evaluates to `-1`, while `\${-1}` remains literal text.
+
+Interpolated UTF-8 literals are rejected with `Calor0011`. Use interpolation
+to produce a string and encode it explicitly; Calor never emits invalid
+interpolated C# such as `$"..."u8`.
+
+Binary expression emission preserves the AST evaluation tree. In particular,
+equal-precedence right operands in subtraction, division, shifts, and
+comparisons are parenthesized when required.
+
 Calor uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
 
 ---

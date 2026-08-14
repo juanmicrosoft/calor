@@ -1,5 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Parsing;
 
@@ -3638,10 +3640,13 @@ public sealed class Parser
         var token = Expect(TokenKind.IntLiteral);
         if (token.Value is IntLiteralInfo info)
         {
-            return new IntLiteralNode(token.Span, info.SignedValue, info.IsHex, info.IsUnsigned, info.UnsignedValue)
-            {
-                IsLong = info.IsLong
-            };
+            return new IntLiteralNode(
+                token.Span,
+                info.Magnitude,
+                info.Sign,
+                info.Base,
+                info.Width,
+                info.Signedness);
         }
         var value = token.Value switch
         {
@@ -3652,9 +3657,35 @@ public sealed class Parser
         return new IntLiteralNode(token.Span, value);
     }
 
-    private StringLiteralNode ParseStringLiteral()
+    private ExpressionNode ParseStringLiteral()
     {
         var token = Expect(TokenKind.StrLiteral);
+        if (token.Value is StringLiteralInfo interpolated)
+        {
+            var parts = new List<InterpolatedStringPartNode>(interpolated.Parts.Count);
+            foreach (var part in interpolated.Parts)
+            {
+                switch (part)
+                {
+                    case InterpolatedStringTextTokenPart text:
+                        parts.Add(new InterpolatedStringTextNode(token.Span, text.Text));
+                        break;
+                    case InterpolatedStringExpressionTokenPart expression:
+                        parts.Add(ParseInlineInterpolationPart(
+                            expression.ExpressionText,
+                            expression.Intent,
+                            token.Span));
+                        break;
+                }
+            }
+
+            return new InterpolatedStringNode(token.Span, parts)
+            {
+                IsMultiline = interpolated.IsMultiline,
+                IsUtf8 = interpolated.IsUtf8
+            };
+        }
+
         var value = token.Value as string ?? "";
         var isUtf8 = token.Text.EndsWith("u8");
         if (isUtf8 && value.EndsWith("u8"))
@@ -3667,6 +3698,84 @@ public sealed class Parser
             IsMultiline = token.Text.StartsWith("\"\"\""),
             IsUtf8 = isUtf8
         };
+    }
+
+    private InterpolatedStringExpressionNode ParseInlineInterpolationPart(
+        string source,
+        InterpolationPartIntent intent,
+        TextSpan fallbackSpan)
+    {
+        var lexer = new Lexer(source, _diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
+        var expression = parser.ParseExpression();
+
+        var suffixStart = parser.Current.Kind == TokenKind.Eof
+            ? source.Length
+            : Math.Clamp(parser.Current.Span.Start, 0, source.Length);
+        var suffix = source[suffixStart..].Trim();
+        string? alignment = null;
+        string? format = null;
+
+        if (suffix.Length > 0
+            && !suffix.StartsWith(",", StringComparison.Ordinal)
+            && !suffix.StartsWith(":", StringComparison.Ordinal))
+        {
+            return ParseRawCSharpInterpolationPart(source, fallbackSpan);
+        }
+
+        if (suffix.StartsWith(",", StringComparison.Ordinal))
+        {
+            var alignmentAndFormat = suffix[1..];
+            var colon = alignmentAndFormat.IndexOf(':');
+            if (colon >= 0)
+            {
+                alignment = alignmentAndFormat[..colon].Trim();
+                format = alignmentAndFormat[(colon + 1)..];
+            }
+            else
+            {
+                alignment = alignmentAndFormat.Trim();
+            }
+        }
+        else if (suffix.StartsWith(":", StringComparison.Ordinal))
+        {
+            format = suffix[1..];
+        }
+        else if (suffix.Length > 0)
+        {
+            _diagnostics.ReportError(
+                fallbackSpan,
+                DiagnosticCode.UnexpectedToken,
+                $"Unexpected interpolation suffix '{suffix}'");
+        }
+
+        return new InterpolatedStringExpressionNode(
+            fallbackSpan,
+            expression,
+            string.IsNullOrEmpty(format) ? null : format,
+            string.IsNullOrEmpty(alignment) ? null : alignment,
+            intent,
+            source);
+    }
+
+    private static InterpolatedStringExpressionNode ParseRawCSharpInterpolationPart(
+        string source,
+        TextSpan fallbackSpan)
+    {
+        var parsed = SyntaxFactory.ParseExpression($"$\"{{{source}}}\"");
+        if (parsed is InterpolatedStringExpressionSyntax interpolated
+            && interpolated.Contents.SingleOrDefault() is InterpolationSyntax interpolation)
+        {
+            return new InterpolatedStringExpressionNode(
+                fallbackSpan,
+                new RawCSharpExpressionNode(fallbackSpan, interpolation.Expression.ToString()),
+                interpolation.FormatClause?.FormatStringToken.Text,
+                interpolation.AlignmentClause?.Value.ToString());
+        }
+
+        return new InterpolatedStringExpressionNode(
+            fallbackSpan,
+            new RawCSharpExpressionNode(fallbackSpan, source));
     }
 
     private BoolLiteralNode ParseBoolLiteral()
@@ -5513,7 +5622,8 @@ public sealed class Parser
         }
         else if (Check(TokenKind.IntLiteral))
         {
-            sb.Append(Advance().Value?.ToString() ?? "");
+            var token = Advance();
+            sb.Append(token.Text);
         }
         else if (Check(TokenKind.BoolLiteral))
         {
@@ -5610,7 +5720,7 @@ public sealed class Parser
                 // Add space before integers if there's content before them (to separate from identifiers)
                 if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
                     sb.Append(' ');
-                sb.Append(Advance().Value?.ToString() ?? "");
+                sb.Append(Advance().Text);
             }
             else if (Check(TokenKind.FloatLiteral) || Check(TokenKind.DecimalLiteral))
             {
@@ -6040,7 +6150,16 @@ public sealed class Parser
         }
         if (Check(TokenKind.IntLiteral))
         {
-            return Advance().Value ?? 0;
+            var value = Advance().Value;
+            return value is IntLiteralInfo info
+                ? info.IsUnsigned
+                    ? info.Width == IntegerLiteralWidth.Bits32
+                        ? (object)(uint)info.UnsignedValue
+                        : info.UnsignedValue
+                    : info.Width == IntegerLiteralWidth.Bits32
+                        ? (object)checked((int)info.SignedValue)
+                        : info.SignedValue
+                : value ?? 0;
         }
         if (Check(TokenKind.FloatLiteral) || Check(TokenKind.DecimalLiteral))
         {

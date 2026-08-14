@@ -67,7 +67,12 @@ public class LexerTests
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        Assert.Equal(42, tokens[0].Value);
+        var info = Assert.IsType<IntLiteralInfo>(tokens[0].Value);
+        Assert.Equal(42UL, info.Magnitude);
+        Assert.Equal(IntegerLiteralSign.Positive, info.Sign);
+        Assert.Equal(IntegerLiteralBase.Decimal, info.Base);
+        Assert.Equal(IntegerLiteralWidth.Bits32, info.Width);
+        Assert.Equal(IntegerLiteralSignedness.Signed, info.Signedness);
     }
 
     [Fact]
@@ -77,7 +82,9 @@ public class LexerTests
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        Assert.Equal(-123, tokens[0].Value);
+        var info = Assert.IsType<IntLiteralInfo>(tokens[0].Value);
+        Assert.Equal(123UL, info.Magnitude);
+        Assert.Equal(IntegerLiteralSign.Negative, info.Sign);
     }
 
     [Fact]

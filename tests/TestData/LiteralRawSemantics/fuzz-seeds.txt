@@ -1,0 +1,4 @@
+# Deterministic seeds for literal lex → AST → C# → Roslyn → runtime fuzzing.
+768
+20260814
+373592855
