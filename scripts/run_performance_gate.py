@@ -58,13 +58,30 @@ def main() -> int:
             "--verbosity",
             "quiet",
         ]
-        started = time.monotonic()
-        result = subprocess.run(command, text=True, capture_output=True, check=False)
-        elapsed = time.monotonic() - started
         kind = "warmup" if index < warmups else "measured"
         log = log_dir / f"{kind}-{index + 1}.log"
-        log.write_text(result.stdout + result.stderr, encoding="utf-8")
-        if result.returncode != 0:
+
+        # Write the child's output straight to a file rather than capturing it
+        # through pipes.
+        #
+        # `capture_output=True` hands `dotnet test` a pipe that its grandchildren
+        # inherit — testhost, the MSBuild build-server nodes, VBCSCompiler.
+        # subprocess.run then waits for EOF, and EOF needs EVERY process holding
+        # the write end to exit. A build-server process outlives `dotnet test` by
+        # design, so the wrapper blocked forever after the tests had finished and
+        # the runner eventually terminated the job:
+        # "The runner has received a shutdown signal" / exit 143 (#965).
+        #
+        # It never reproduced locally, where those build-server processes are
+        # already running and shared, so nothing new was left holding the pipe.
+        # A file has no EOF dependency on the process tree.
+        started = time.monotonic()
+        with log.open("w", encoding="utf-8") as sink:
+            completed = subprocess.run(
+                command, text=True, stdout=sink, stderr=subprocess.STDOUT, check=False
+            )
+        elapsed = time.monotonic() - started
+        if completed.returncode != 0:
             print(f"ERROR: performance test run failed; see {log}")
             return 1
         trx = results_dir / "results.trx"
