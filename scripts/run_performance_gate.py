@@ -61,24 +61,28 @@ def main() -> int:
         kind = "warmup" if index < warmups else "measured"
         log = log_dir / f"{kind}-{index + 1}.log"
 
-        # Write the child's output straight to a file rather than capturing it
-        # through pipes.
+        # Stream the child's output to a file rather than capturing it through
+        # pipes.
         #
-        # `capture_output=True` hands `dotnet test` a pipe that its grandchildren
-        # inherit — testhost, the MSBuild build-server nodes, VBCSCompiler.
-        # subprocess.run then waits for EOF, and EOF needs EVERY process holding
-        # the write end to exit. A build-server process outlives `dotnet test` by
-        # design, so the wrapper blocked forever after the tests had finished and
-        # the runner eventually terminated the job:
-        # "The runner has received a shutdown signal" / exit 143 (#965).
+        # NO MECHANISM IS CLAIMED HERE. Runs of this gate were terminated on
+        # 2026-08-13 with SIGTERM ("The runner has received a shutdown signal",
+        # exit 143) at widely varying elapsed times — 24s, 26s, 52s, 79s, 26m —
+        # and the same unmodified code then passed on main on 2026-08-14. Root
+        # cause is NOT established; see #965.
         #
-        # It never reproduced locally, where those build-server processes are
-        # already running and shared, so nothing new was left holding the pipe.
-        # A file has no EOF dependency on the process tree.
+        # This form is preferred on its own merits, independent of that:
+        #   * output survives the job being killed, instead of dying with the
+        #     parent's in-memory buffer — which is why the failing runs produced
+        #     no gate output at all to diagnose;
+        #   * the log is written even if subprocess.run raises, which the old
+        #     write-after-return form could not do;
+        #   * stdout and stderr are interleaved chronologically, which is what a
+        #     debugger wants. Nothing downstream reads these logs, so merging the
+        #     streams costs nothing.
         started = time.monotonic()
         with log.open("w", encoding="utf-8") as sink:
             completed = subprocess.run(
-                command, text=True, stdout=sink, stderr=subprocess.STDOUT, check=False
+                command, stdout=sink, stderr=subprocess.STDOUT, check=False
             )
         elapsed = time.monotonic() - started
         if completed.returncode != 0:
