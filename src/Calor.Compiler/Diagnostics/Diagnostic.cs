@@ -91,6 +91,8 @@ public static class DiagnosticCode
     /// </summary>
     public const string MisalignedElseClause = "Calor0117";
     public const string ExpressionNestingTooDeep = "Calor0118";
+    public const string InvalidTypeParameterVariance = "Calor0119";
+    public const string InvalidDefaultConstraintOwner = "Calor0120";
 
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 

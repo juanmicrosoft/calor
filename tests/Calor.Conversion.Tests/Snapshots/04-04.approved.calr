@@ -1,7 +1,13 @@
 §M{m001:Test_04_04}
-  §IFACE{i001:IProducer<out T>}
+  §U{global:System}
+  §U{global:Collections:System.Collections.Generic}
+  §U{global:static:System.Math}
+  §U{Text:System.String}
+
+  §IFACE{i001:IProducer<out T>:Collections.IEnumerable<T>}
+    §WHERE T : class?
     §MT{m002:Produce} () -> T
 
   §IFACE{i003:IConsumer<in T>}
+    §WHERE T : notnull
     §MT{m004:Consume} (T:item)
-

@@ -237,6 +237,8 @@ public sealed class MemberPreprocessorBlockNode : AstNode
     public IReadOnlyList<MethodNode> Methods { get; }
     public IReadOnlyList<EventDefinitionNode> Events { get; }
     public IReadOnlyList<OperatorOverloadNode> OperatorOverloads { get; }
+    public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
+    public IReadOnlyList<AstNode> Items { get; }
     public MemberPreprocessorBlockNode? ElseBranch { get; }
 
     public MemberPreprocessorBlockNode(
@@ -249,7 +251,9 @@ public sealed class MemberPreprocessorBlockNode : AstNode
         IReadOnlyList<EventDefinitionNode> events,
         IReadOnlyList<OperatorOverloadNode> operatorOverloads,
         MemberPreprocessorBlockNode? elseBranch = null,
-        IReadOnlyList<IndexerNode>? indexers = null)
+        IReadOnlyList<IndexerNode>? indexers = null,
+        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
+        IReadOnlyList<AstNode>? items = null)
         : base(span)
     {
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
@@ -260,6 +264,17 @@ public sealed class MemberPreprocessorBlockNode : AstNode
         Methods = methods ?? Array.Empty<MethodNode>();
         Events = events ?? Array.Empty<EventDefinitionNode>();
         OperatorOverloads = operatorOverloads ?? Array.Empty<OperatorOverloadNode>();
+        InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
+        Items = items ?? Fields
+            .Cast<AstNode>()
+            .Concat(Properties)
+            .Concat(Indexers)
+            .Concat(Constructors)
+            .Concat(Methods)
+            .Concat(Events)
+            .Concat(OperatorOverloads)
+            .Concat(InteropBlocks)
+            .ToArray();
         ElseBranch = elseBranch;
     }
 
@@ -282,6 +297,9 @@ public sealed class TypePreprocessorBlockNode : AstNode
     public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; }
     public IReadOnlyList<EnumDefinitionNode> Enums { get; }
     public IReadOnlyList<DelegateDefinitionNode> Delegates { get; }
+    public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
+    public IReadOnlyList<TypePreprocessorBlockNode> NestedBlocks { get; }
+    public IReadOnlyList<AstNode> Items { get; }
     public TypePreprocessorBlockNode? ElseBranch { get; }
 
     public TypePreprocessorBlockNode(
@@ -292,7 +310,10 @@ public sealed class TypePreprocessorBlockNode : AstNode
         IReadOnlyList<EnumDefinitionNode> enums,
         IReadOnlyList<DelegateDefinitionNode> delegates,
         TypePreprocessorBlockNode? elseBranch = null,
-        IReadOnlyList<UsingDirectiveNode>? usings = null)
+        IReadOnlyList<UsingDirectiveNode>? usings = null,
+        IReadOnlyList<TypePreprocessorBlockNode>? nestedBlocks = null,
+        IReadOnlyList<AstNode>? items = null,
+        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null)
         : base(span)
     {
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
@@ -301,6 +322,17 @@ public sealed class TypePreprocessorBlockNode : AstNode
         Interfaces = interfaces ?? Array.Empty<InterfaceDefinitionNode>();
         Enums = enums ?? Array.Empty<EnumDefinitionNode>();
         Delegates = delegates ?? Array.Empty<DelegateDefinitionNode>();
+        InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
+        NestedBlocks = nestedBlocks ?? Array.Empty<TypePreprocessorBlockNode>();
+        Items = items ?? Usings
+            .Cast<AstNode>()
+            .Concat(Classes)
+            .Concat(Interfaces)
+            .Concat(Enums)
+            .Concat(Delegates)
+            .Concat(InteropBlocks)
+            .Concat(NestedBlocks)
+            .ToArray();
         ElseBranch = elseBranch;
     }
 

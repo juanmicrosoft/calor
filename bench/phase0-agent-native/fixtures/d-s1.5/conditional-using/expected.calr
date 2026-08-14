@@ -1,0 +1,17 @@
+§M{m001:Fixture}
+  §PP{FEATURE}
+    §U{Number:System.Int32}
+    §CL{c001:ConditionalValue:pub:stat}
+      §MT{m002:Get:pub:stat} () -> Number
+        §R 41
+
+
+  §PPE
+    §U{Number:System.Int32}
+    §CL{c003:ConditionalValue:pub:stat}
+      §MT{m004:Get:pub:stat} () -> Number
+        §R 42
+
+
+  §/PP{FEATURE}
+

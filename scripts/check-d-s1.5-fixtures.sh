@@ -153,7 +153,10 @@ check_maps() {
 
 self_test() {
   local tmp; tmp=$(mktemp -d)
-  trap 'rm -rf "$tmp"' RETURN
+  local registry_before="$REGISTRY"
+  REGISTRY="$tmp/registry"
+  mkdir -p "$REGISTRY"
+  trap 'REGISTRY="$registry_before"; rm -rf "$tmp"' RETURN
 
   cat > "$tmp/base.cs" <<'EOF'
         ["record"] = new FeatureInfo

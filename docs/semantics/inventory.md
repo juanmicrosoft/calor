@@ -225,10 +225,10 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 ### 7.2 Using Statements
 
-| Construct | Node Type | File Reference |
-|-----------|-----------|----------------|
-| Using Directive | `UsingDirectiveNode` | `UsingDirectiveNode.cs` |
-| Using Statement | `UsingStatementNode` | `StatementNodes.cs` |
+| Construct | Node Type | Syntax | File Reference |
+|-----------|-----------|--------|----------------|
+| Using Directive | `UsingDirectiveNode` | `§U{target}`, `§U{alias:target}`, `§U{static:target}`, or global variants | `UsingDirectiveNode.cs` |
+| Using Statement | `UsingStatementNode` | `§USE ...` | `StatementNodes.cs` |
 
 ---
 

@@ -273,7 +273,7 @@ public class InheritanceTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("IEquatable<Dictionary<TKey,List<TValue>>>", result);
+        Assert.Contains("IEquatable<Dictionary<TKey, List<TValue>>>", result);
     }
 
     [Fact]

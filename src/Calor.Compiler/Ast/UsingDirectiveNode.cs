@@ -7,6 +7,9 @@ namespace Calor.Compiler.Ast;
 /// §U[System.Collections.Generic]            // using System.Collections.Generic;
 /// §U[Gen:System.Collections.Generic]        // using Gen = System.Collections.Generic;
 /// §U[static:System.Math]                    // using static System.Math;
+/// §U[global:System.Text]                    // global using System.Text;
+/// §U[global:static:System.Math]              // global using static System.Math;
+/// §U[global:Gen:System.Collections.Generic]  // global using Gen = System.Collections.Generic;
 /// </summary>
 public sealed class UsingDirectiveNode : AstNode
 {
@@ -25,12 +28,23 @@ public sealed class UsingDirectiveNode : AstNode
     /// </summary>
     public bool IsStatic { get; }
 
-    public UsingDirectiveNode(TextSpan span, string @namespace, string? alias = null, bool isStatic = false)
+    /// <summary>
+    /// Whether this is a file-wide <c>global using</c> directive.
+    /// </summary>
+    public bool IsGlobal { get; }
+
+    public UsingDirectiveNode(
+        TextSpan span,
+        string @namespace,
+        string? alias = null,
+        bool isStatic = false,
+        bool isGlobal = false)
         : base(span)
     {
         Namespace = @namespace ?? throw new ArgumentNullException(nameof(@namespace));
         Alias = alias;
         IsStatic = isStatic;
+        IsGlobal = isGlobal;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
