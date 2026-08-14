@@ -628,8 +628,14 @@ public sealed class ContractInheritanceChecker : IDisposable
                                 replacements,
                                 typeReplacements),
                             expressionPart.FormatSpecifier,
-                            expressionPart.AlignmentClause)
-                        : part).ToArray());
+                            expressionPart.AlignmentClause,
+                            expressionPart.Intent,
+                            expressionPart.SourceText)
+                        : part).ToArray())
+            {
+                IsMultiline = interpolated.IsMultiline,
+                IsUtf8 = interpolated.IsUtf8
+            };
         }
         if (expression is TypeOfExpressionNode typeOf)
         {

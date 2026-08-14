@@ -1031,35 +1031,47 @@ public sealed class Lexer
     /// </summary>
     private Token ScanRawBlock()
     {
-        // Skip optional whitespace/newline after §RAW
-        if (Current == '\n') Advance();
-        else if (Current == '\r' && Lookahead == '\n') { Advance(); Advance(); }
+        if (Current == '\r' && Lookahead == '\n')
+        {
+            Advance();
+            Advance();
+        }
+        else if (Current == '\n')
+        {
+            Advance();
+        }
 
         var contentStart = _position;
         const string endMarker = "§/RAW";
+        var preprocessorStack = new List<RawPreprocessorFrame>();
+        var preprocessorSymbols = new Dictionary<string, bool>(StringComparer.Ordinal);
 
-        // Scan forward to find §/RAW
         while (!IsAtEnd)
         {
-            if (Current == '§' && _position + endMarker.Length <= _source.Length
-                && _source.Substring(_position, endMarker.Length) == endMarker)
+            var regionActive = IsRawPreprocessorRegionActive(preprocessorStack);
+            if (regionActive
+                && preprocessorStack.Count == 0
+                && MatchesAtCurrent(endMarker))
             {
-                // Found the end marker — capture content up to here
                 var rawContent = _source[contentStart.._position];
-
-                // Trim trailing newline from content if present
-                if (rawContent.EndsWith("\r\n"))
-                    rawContent = rawContent[..^2];
-                else if (rawContent.EndsWith("\n"))
-                    rawContent = rawContent[..^1];
-
-                // Advance past §/RAW
                 for (int i = 0; i < endMarker.Length; i++)
                     Advance();
-
                 return MakeToken(TokenKind.RawCSharp, rawContent);
             }
 
+            if (IsAtCSharpPreprocessorDirective())
+            {
+                ProcessRawPreprocessorDirective(preprocessorStack, preprocessorSymbols);
+                if (IsRawPreprocessorRegionActive(preprocessorStack))
+                    SkipCSharpPreprocessorDirective();
+                else
+                    SkipDisabledPreprocessorDirectiveLine();
+                continue;
+            }
+            if (regionActive && TrySkipCSharpLexicalConstruct())
+                continue;
+            if (!regionActive && TrySkipDisabledCSharpLexicalConstruct())
+                continue;
             Advance();
         }
 
@@ -1067,6 +1079,561 @@ public sealed class Lexer
         _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.UnterminatedRawBlock,
             "Unterminated §RAW block: expected §/RAW before end of file.");
         return MakeToken(TokenKind.Error);
+    }
+
+    private enum PreprocessorTruth
+    {
+        False,
+        True,
+        Unknown
+    }
+
+    private readonly record struct RawPreprocessorFrame(
+        bool ParentActive,
+        bool BranchTaken,
+        bool CurrentActive,
+        bool SeenElse);
+
+    private static bool IsRawPreprocessorRegionActive(
+        IReadOnlyList<RawPreprocessorFrame> stack)
+        => stack.Count == 0 || stack[^1].CurrentActive;
+
+    private void ProcessRawPreprocessorDirective(
+        List<RawPreprocessorFrame> stack,
+        Dictionary<string, bool> symbols)
+    {
+        var (keyword, argument) = ReadRawPreprocessorDirective();
+        var currentActive = IsRawPreprocessorRegionActive(stack);
+
+        switch (keyword)
+        {
+            case "if":
+            {
+                var selected = EvaluatePreprocessorCondition(argument, symbols)
+                    != PreprocessorTruth.False;
+                stack.Add(new RawPreprocessorFrame(
+                    currentActive,
+                    selected,
+                    currentActive && selected,
+                    SeenElse: false));
+                break;
+            }
+            case "elif" when stack.Count > 0:
+            {
+                var frame = stack[^1];
+                var selected = !frame.SeenElse
+                    && !frame.BranchTaken
+                    && EvaluatePreprocessorCondition(argument, symbols)
+                        != PreprocessorTruth.False;
+                stack[^1] = frame with
+                {
+                    BranchTaken = frame.BranchTaken || selected,
+                    CurrentActive = frame.ParentActive && selected
+                };
+                break;
+            }
+            case "else" when stack.Count > 0:
+            {
+                var frame = stack[^1];
+                var selected = !frame.SeenElse && !frame.BranchTaken;
+                stack[^1] = frame with
+                {
+                    BranchTaken = true,
+                    CurrentActive = frame.ParentActive && selected,
+                    SeenElse = true
+                };
+                break;
+            }
+            case "endif" when stack.Count > 0:
+                stack.RemoveAt(stack.Count - 1);
+                break;
+            case "define" when currentActive:
+            {
+                var symbol = ReadPreprocessorSymbol(argument);
+                if (symbol.Length > 0)
+                    symbols[symbol] = true;
+                break;
+            }
+            case "undef" when currentActive:
+            {
+                var symbol = ReadPreprocessorSymbol(argument);
+                if (symbol.Length > 0)
+                    symbols[symbol] = false;
+                break;
+            }
+        }
+    }
+
+    private (string Keyword, string Argument) ReadRawPreprocessorDirective()
+    {
+        var cursor = _position + 1;
+        while (cursor < _source.Length && _source[cursor] is ' ' or '\t')
+            cursor++;
+
+        var keywordStart = cursor;
+        while (cursor < _source.Length && char.IsLetter(_source[cursor]))
+            cursor++;
+        var keyword = _source[keywordStart..cursor];
+
+        while (cursor < _source.Length && _source[cursor] is ' ' or '\t')
+            cursor++;
+        var argumentStart = cursor;
+        while (cursor < _source.Length && _source[cursor] is not '\r' and not '\n')
+            cursor++;
+        return (keyword, _source[argumentStart..cursor]);
+    }
+
+    private static string ReadPreprocessorSymbol(string argument)
+    {
+        var text = argument.AsSpan().TrimStart();
+        var length = 0;
+        while (length < text.Length
+            && (char.IsLetterOrDigit(text[length]) || text[length] == '_'))
+        {
+            length++;
+        }
+        return text[..length].ToString();
+    }
+
+    private static PreprocessorTruth EvaluatePreprocessorCondition(
+        string condition,
+        IReadOnlyDictionary<string, bool> symbols)
+    {
+        var position = 0;
+        return ParsePreprocessorOr(condition, symbols, ref position);
+    }
+
+    private static PreprocessorTruth ParsePreprocessorOr(
+        string text,
+        IReadOnlyDictionary<string, bool> symbols,
+        ref int position)
+    {
+        var value = ParsePreprocessorAnd(text, symbols, ref position);
+        while (MatchPreprocessorToken(text, "||", ref position))
+        {
+            value = OrPreprocessorTruth(
+                value,
+                ParsePreprocessorAnd(text, symbols, ref position));
+        }
+        return value;
+    }
+
+    private static PreprocessorTruth ParsePreprocessorAnd(
+        string text,
+        IReadOnlyDictionary<string, bool> symbols,
+        ref int position)
+    {
+        var value = ParsePreprocessorEquality(text, symbols, ref position);
+        while (MatchPreprocessorToken(text, "&&", ref position))
+        {
+            value = AndPreprocessorTruth(
+                value,
+                ParsePreprocessorEquality(text, symbols, ref position));
+        }
+        return value;
+    }
+
+    private static PreprocessorTruth ParsePreprocessorEquality(
+        string text,
+        IReadOnlyDictionary<string, bool> symbols,
+        ref int position)
+    {
+        var value = ParsePreprocessorUnary(text, symbols, ref position);
+        while (true)
+        {
+            if (MatchPreprocessorToken(text, "==", ref position))
+            {
+                value = EqualPreprocessorTruth(
+                    value,
+                    ParsePreprocessorUnary(text, symbols, ref position),
+                    negate: false);
+            }
+            else if (MatchPreprocessorToken(text, "!=", ref position))
+            {
+                value = EqualPreprocessorTruth(
+                    value,
+                    ParsePreprocessorUnary(text, symbols, ref position),
+                    negate: true);
+            }
+            else
+            {
+                return value;
+            }
+        }
+    }
+
+    private static PreprocessorTruth ParsePreprocessorUnary(
+        string text,
+        IReadOnlyDictionary<string, bool> symbols,
+        ref int position)
+    {
+        SkipPreprocessorWhitespace(text, ref position);
+        if (MatchPreprocessorToken(text, "!", ref position))
+        {
+            return ParsePreprocessorUnary(text, symbols, ref position) switch
+            {
+                PreprocessorTruth.True => PreprocessorTruth.False,
+                PreprocessorTruth.False => PreprocessorTruth.True,
+                _ => PreprocessorTruth.Unknown
+            };
+        }
+
+        if (MatchPreprocessorToken(text, "(", ref position))
+        {
+            var parenthesized = ParsePreprocessorOr(text, symbols, ref position);
+            _ = MatchPreprocessorToken(text, ")", ref position);
+            return parenthesized;
+        }
+
+        var identifier = ReadPreprocessorIdentifier(text, ref position);
+        if (identifier is "true" or "1")
+            return PreprocessorTruth.True;
+        if (identifier is "false" or "0")
+            return PreprocessorTruth.False;
+        if (identifier == "defined")
+        {
+            _ = MatchPreprocessorToken(text, "(", ref position);
+            var symbol = ReadPreprocessorIdentifier(text, ref position);
+            _ = MatchPreprocessorToken(text, ")", ref position);
+            return symbols.TryGetValue(symbol, out var isDefined)
+                ? isDefined ? PreprocessorTruth.True : PreprocessorTruth.False
+                : PreprocessorTruth.Unknown;
+        }
+        if (identifier.Length == 0)
+            return PreprocessorTruth.Unknown;
+        return symbols.TryGetValue(identifier, out var value)
+            ? value ? PreprocessorTruth.True : PreprocessorTruth.False
+            : PreprocessorTruth.Unknown;
+    }
+
+    private static string ReadPreprocessorIdentifier(string text, ref int position)
+    {
+        SkipPreprocessorWhitespace(text, ref position);
+        var start = position;
+        while (position < text.Length
+            && (char.IsLetterOrDigit(text[position]) || text[position] == '_'))
+        {
+            position++;
+        }
+        return text[start..position];
+    }
+
+    private static bool MatchPreprocessorToken(
+        string text,
+        string token,
+        ref int position)
+    {
+        SkipPreprocessorWhitespace(text, ref position);
+        if (!text.AsSpan(position).StartsWith(token, StringComparison.Ordinal))
+            return false;
+        position += token.Length;
+        return true;
+    }
+
+    private static void SkipPreprocessorWhitespace(string text, ref int position)
+    {
+        while (position < text.Length && char.IsWhiteSpace(text[position]))
+            position++;
+    }
+
+    private static PreprocessorTruth AndPreprocessorTruth(
+        PreprocessorTruth left,
+        PreprocessorTruth right)
+    {
+        if (left == PreprocessorTruth.False || right == PreprocessorTruth.False)
+            return PreprocessorTruth.False;
+        return left == PreprocessorTruth.True && right == PreprocessorTruth.True
+            ? PreprocessorTruth.True
+            : PreprocessorTruth.Unknown;
+    }
+
+    private static PreprocessorTruth OrPreprocessorTruth(
+        PreprocessorTruth left,
+        PreprocessorTruth right)
+    {
+        if (left == PreprocessorTruth.True || right == PreprocessorTruth.True)
+            return PreprocessorTruth.True;
+        return left == PreprocessorTruth.False && right == PreprocessorTruth.False
+            ? PreprocessorTruth.False
+            : PreprocessorTruth.Unknown;
+    }
+
+    private static PreprocessorTruth EqualPreprocessorTruth(
+        PreprocessorTruth left,
+        PreprocessorTruth right,
+        bool negate)
+    {
+        if (left == PreprocessorTruth.Unknown || right == PreprocessorTruth.Unknown)
+            return PreprocessorTruth.Unknown;
+        var equal = left == right;
+        return equal != negate ? PreprocessorTruth.True : PreprocessorTruth.False;
+    }
+
+    private void SkipDisabledPreprocessorDirectiveLine()
+    {
+        while (!IsAtEnd && Current is not '\r' and not '\n')
+            Advance();
+    }
+
+    private bool TrySkipDisabledCSharpLexicalConstruct()
+    {
+        var cursor = _position;
+        if (!TryFindDisabledCSharpLexicalConstruct(ref cursor))
+            return false;
+
+        while (_position < cursor)
+            Advance();
+        return true;
+    }
+
+    private bool TryFindDisabledCSharpLexicalConstruct(ref int cursor)
+    {
+        if (cursor + 1 < _source.Length
+            && _source[cursor] == '/'
+            && _source[cursor + 1] == '/')
+        {
+            cursor += 2;
+            while (cursor < _source.Length
+                && _source[cursor] is not '\r' and not '\n')
+            {
+                cursor++;
+            }
+            return true;
+        }
+
+        if (cursor + 1 < _source.Length
+            && _source[cursor] == '/'
+            && _source[cursor + 1] == '*')
+        {
+            var end = _source.IndexOf("*/", cursor + 2, StringComparison.Ordinal);
+            if (end < 0)
+                return false;
+            cursor = end + 2;
+            return true;
+        }
+
+        if (_source[cursor] == '\'')
+            return TryFindDisabledCSharpCharEnd(ref cursor);
+
+        if (IsCSharpStringStartAt(cursor))
+            return TryFindDisabledCSharpStringEnd(ref cursor);
+
+        return false;
+    }
+
+    private bool TryFindDisabledCSharpCharEnd(ref int cursor)
+    {
+        cursor++;
+        while (cursor < _source.Length)
+        {
+            if (_source[cursor] is '\r' or '\n')
+                return false;
+            if (_source[cursor] == '\\')
+            {
+                cursor += Math.Min(2, _source.Length - cursor);
+                continue;
+            }
+            if (_source[cursor] == '\'')
+            {
+                cursor++;
+                return true;
+            }
+            cursor++;
+        }
+        return false;
+    }
+
+    private bool IsCSharpStringStartAt(int position)
+    {
+        var cursor = position;
+        while (cursor < _source.Length && _source[cursor] == '$')
+            cursor++;
+        if (cursor < _source.Length && _source[cursor] == '@')
+        {
+            cursor++;
+            if (cursor < _source.Length && _source[cursor] == '$')
+                cursor++;
+        }
+        return cursor < _source.Length && _source[cursor] == '"';
+    }
+
+    private bool TryFindDisabledCSharpStringEnd(ref int cursor)
+    {
+        var dollarCount = 0;
+        while (cursor < _source.Length && _source[cursor] == '$')
+        {
+            dollarCount++;
+            cursor++;
+        }
+
+        var verbatim = false;
+        if (cursor < _source.Length && _source[cursor] == '@')
+        {
+            verbatim = true;
+            cursor++;
+            if (dollarCount == 0
+                && cursor < _source.Length
+                && _source[cursor] == '$')
+            {
+                dollarCount = 1;
+                cursor++;
+            }
+        }
+
+        if (cursor >= _source.Length || _source[cursor] != '"')
+            return false;
+
+        var quoteCount = CountRunAt(cursor, '"');
+        if (quoteCount >= 3)
+        {
+            cursor += quoteCount;
+            return TryFindDisabledCSharpRawStringEnd(
+                ref cursor,
+                quoteCount,
+                dollarCount);
+        }
+
+        cursor++;
+        return TryFindDisabledCSharpOrdinaryStringEnd(
+            ref cursor,
+            verbatim,
+            dollarCount > 0);
+    }
+
+    private bool TryFindDisabledCSharpOrdinaryStringEnd(
+        ref int cursor,
+        bool verbatim,
+        bool interpolated)
+    {
+        while (cursor < _source.Length)
+        {
+            if (!verbatim && _source[cursor] is '\r' or '\n')
+                return false;
+            if (verbatim
+                && cursor + 1 < _source.Length
+                && _source[cursor] == '"'
+                && _source[cursor + 1] == '"')
+            {
+                cursor += 2;
+                continue;
+            }
+            if (!verbatim && _source[cursor] == '\\')
+            {
+                cursor += Math.Min(2, _source.Length - cursor);
+                continue;
+            }
+            if (_source[cursor] == '"')
+            {
+                cursor++;
+                return true;
+            }
+            if (interpolated && _source[cursor] == '{')
+            {
+                if (cursor + 1 < _source.Length && _source[cursor + 1] == '{')
+                {
+                    cursor += 2;
+                    continue;
+                }
+                cursor++;
+                if (!TryFindDisabledCSharpInterpolationEnd(ref cursor, 1))
+                    return false;
+                continue;
+            }
+            if (interpolated
+                && cursor + 1 < _source.Length
+                && _source[cursor] == '}'
+                && _source[cursor + 1] == '}')
+            {
+                cursor += 2;
+                continue;
+            }
+            cursor++;
+        }
+        return false;
+    }
+
+    private bool TryFindDisabledCSharpRawStringEnd(
+        ref int cursor,
+        int quoteCount,
+        int dollarCount)
+    {
+        while (cursor < _source.Length)
+        {
+            if (CountRunAt(cursor, '"') >= quoteCount)
+            {
+                cursor += quoteCount;
+                return true;
+            }
+            if (dollarCount > 0
+                && CountRunAt(cursor, '{') >= dollarCount)
+            {
+                cursor += dollarCount;
+                if (!TryFindDisabledCSharpInterpolationEnd(
+                    ref cursor,
+                    dollarCount))
+                {
+                    return false;
+                }
+                continue;
+            }
+            cursor++;
+        }
+        return false;
+    }
+
+    private bool TryFindDisabledCSharpInterpolationEnd(
+        ref int cursor,
+        int closingBraceCount)
+    {
+        var depth = 1;
+        while (cursor < _source.Length)
+        {
+            if (IsDisabledCSharpLexicalStartAt(cursor))
+            {
+                if (!TryFindDisabledCSharpLexicalConstruct(ref cursor))
+                    return false;
+                continue;
+            }
+
+            if (_source[cursor] == '{')
+            {
+                depth++;
+                cursor++;
+                continue;
+            }
+            if (_source[cursor] == '}')
+            {
+                if (depth == 1
+                    && CountRunAt(cursor, '}') >= closingBraceCount)
+                {
+                    cursor += closingBraceCount;
+                    return true;
+                }
+                depth--;
+                cursor++;
+                continue;
+            }
+            cursor++;
+        }
+        return false;
+    }
+
+    private bool IsDisabledCSharpLexicalStartAt(int position)
+        => _source[position] == '\''
+            || IsCSharpStringStartAt(position)
+            || position + 1 < _source.Length
+                && _source[position] == '/'
+                && _source[position + 1] is '/' or '*';
+
+    private int CountRunAt(int position, char character)
+    {
+        var count = 0;
+        while (position + count < _source.Length
+            && _source[position + count] == character)
+        {
+            count++;
+        }
+        return count;
     }
 
     /// <summary>
@@ -1084,35 +1651,26 @@ public sealed class Lexer
         }
         Advance(); // consume '{'
 
-        // Skip optional whitespace/newline after {
-        if (Current == '\n') Advance();
-        else if (Current == '\r' && Lookahead == '\n') { Advance(); Advance(); }
-
         var contentStart = _position;
         const string endMarker = "}§/CSHARP";
+        var depth = 1;
 
-        // Scan forward to find }§/CSHARP
         while (!IsAtEnd)
         {
-            if (Current == '}' && _position + endMarker.Length <= _source.Length
-                && _source.Substring(_position, endMarker.Length) == endMarker)
+            if (depth == 1 && MatchesAtCurrent(endMarker))
             {
-                // Found the end marker — capture content up to here
                 var rawContent = _source[contentStart.._position];
-
-                // Trim trailing newline from content if present
-                if (rawContent.EndsWith("\r\n"))
-                    rawContent = rawContent[..^2];
-                else if (rawContent.EndsWith("\n"))
-                    rawContent = rawContent[..^1];
-
-                // Advance past }§/CSHARP
                 for (int i = 0; i < endMarker.Length; i++)
                     Advance();
-
                 return MakeToken(TokenKind.CSharpInterop, rawContent);
             }
 
+            if (TrySkipCSharpLexicalConstruct())
+                continue;
+            if (Current == '{')
+                depth++;
+            else if (Current == '}')
+                depth--;
             Advance();
         }
 
@@ -1134,30 +1692,8 @@ public sealed class Lexer
 
         while (!IsAtEnd && depth > 0)
         {
-            // Skip braces inside string literals
-            if (Current == '"')
-            {
-                Advance(); // consume opening "
-                while (!IsAtEnd && Current != '"')
-                {
-                    if (Current == '\\') Advance(); // skip escape char
-                    Advance();
-                }
-                if (!IsAtEnd) Advance(); // consume closing "
+            if (TrySkipCSharpLexicalConstruct())
                 continue;
-            }
-            // Skip braces inside char literals
-            if (Current == '\'')
-            {
-                Advance(); // consume opening '
-                while (!IsAtEnd && Current != '\'')
-                {
-                    if (Current == '\\') Advance(); // skip escape char
-                    Advance();
-                }
-                if (!IsAtEnd) Advance(); // consume closing '
-                continue;
-            }
             if (Current == '{')
             {
                 depth++;
@@ -1181,6 +1717,263 @@ public sealed class Lexer
         var content = _source[contentStart.._position];
         Advance(); // consume closing '}'
         return MakeToken(TokenKind.RawCSharpExpression, content);
+    }
+
+    private bool MatchesAtCurrent(string text)
+        => _position + text.Length <= _source.Length
+            && _source.AsSpan(_position, text.Length).SequenceEqual(text);
+
+    private bool TrySkipCSharpLexicalConstruct()
+    {
+        if (Current == '/' && Lookahead == '/')
+        {
+            Advance();
+            Advance();
+            while (!IsAtEnd && Current is not '\r' and not '\n')
+                Advance();
+            return true;
+        }
+
+        if (Current == '/' && Lookahead == '*')
+        {
+            Advance();
+            Advance();
+            while (!IsAtEnd && !(Current == '*' && Lookahead == '/'))
+                Advance();
+            if (!IsAtEnd)
+            {
+                Advance();
+                Advance();
+            }
+            return true;
+        }
+
+        if (Current == '\'')
+        {
+            Advance();
+            while (!IsAtEnd)
+            {
+                if (Current == '\\')
+                {
+                    Advance();
+                    if (!IsAtEnd)
+                        Advance();
+                    continue;
+                }
+                var closes = Current == '\'';
+                Advance();
+                if (closes)
+                    break;
+            }
+            return true;
+        }
+
+        return TrySkipCSharpString();
+    }
+
+    private bool IsAtCSharpPreprocessorDirective()
+    {
+        if (Current != '#')
+            return false;
+
+        var cursor = _position - 1;
+        while (cursor >= 0 && _source[cursor] is ' ' or '\t')
+            cursor--;
+        return cursor < 0 || _source[cursor] is '\r' or '\n';
+    }
+
+    private void SkipCSharpPreprocessorDirective()
+    {
+        while (!IsAtEnd && Current is not '\r' and not '\n')
+        {
+            if (TrySkipCSharpLexicalConstruct())
+                continue;
+
+            if (Current == '§')
+                return;
+            Advance();
+        }
+    }
+
+    private bool TrySkipCSharpString()
+    {
+        var cursor = _position;
+        var dollarCount = 0;
+        var verbatim = false;
+
+        while (cursor < _source.Length && _source[cursor] == '$')
+        {
+            dollarCount++;
+            cursor++;
+        }
+
+        if (cursor < _source.Length && _source[cursor] == '@')
+        {
+            verbatim = true;
+            cursor++;
+            if (dollarCount == 0 && cursor < _source.Length && _source[cursor] == '$')
+            {
+                dollarCount = 1;
+                cursor++;
+            }
+        }
+
+        if (cursor >= _source.Length || _source[cursor] != '"')
+            return false;
+
+        while (_position < cursor)
+            Advance();
+
+        var quoteCount = CountRun('"');
+        if (quoteCount >= 3)
+        {
+            SkipCSharpRawString(quoteCount, dollarCount);
+            return true;
+        }
+
+        Advance();
+        SkipCSharpOrdinaryString(verbatim, dollarCount > 0);
+        return true;
+    }
+
+    private void SkipCSharpOrdinaryString(bool verbatim, bool interpolated)
+    {
+        var interpolationDepth = 0;
+        while (!IsAtEnd)
+        {
+            if (interpolationDepth > 0)
+            {
+                if (TrySkipCSharpLexicalConstruct())
+                    continue;
+                if (Current == '{')
+                {
+                    interpolationDepth++;
+                    Advance();
+                    continue;
+                }
+                if (Current == '}')
+                {
+                    interpolationDepth--;
+                    Advance();
+                    continue;
+                }
+                Advance();
+                continue;
+            }
+
+            if (verbatim && Current == '"' && Lookahead == '"')
+            {
+                Advance();
+                Advance();
+                continue;
+            }
+            if (!verbatim && Current == '\\')
+            {
+                Advance();
+                if (!IsAtEnd)
+                    Advance();
+                continue;
+            }
+            if (interpolated && Current == '{')
+            {
+                if (Lookahead == '{')
+                {
+                    Advance();
+                    Advance();
+                }
+                else
+                {
+                    interpolationDepth = 1;
+                    Advance();
+                }
+                continue;
+            }
+            if (interpolated && Current == '}' && Lookahead == '}')
+            {
+                Advance();
+                Advance();
+                continue;
+            }
+
+            var closes = Current == '"';
+            Advance();
+            if (closes)
+                return;
+        }
+    }
+
+    private void SkipCSharpRawString(int quoteCount, int dollarCount)
+    {
+        for (var i = 0; i < quoteCount; i++)
+            Advance();
+
+        if (dollarCount == 0)
+        {
+            while (!IsAtEnd)
+            {
+                if (CountRun('"') >= quoteCount)
+                {
+                    for (var i = 0; i < quoteCount; i++)
+                        Advance();
+                    return;
+                }
+                Advance();
+            }
+            return;
+        }
+
+        var interpolationDepth = 0;
+        while (!IsAtEnd)
+        {
+            if (interpolationDepth == 0)
+            {
+                if (CountRun('"') >= quoteCount)
+                {
+                    for (var i = 0; i < quoteCount; i++)
+                        Advance();
+                    return;
+                }
+                if (CountRun('{') >= dollarCount)
+                {
+                    for (var i = 0; i < dollarCount; i++)
+                        Advance();
+                    interpolationDepth = 1;
+                    continue;
+                }
+                Advance();
+                continue;
+            }
+
+            if (TrySkipCSharpLexicalConstruct())
+                continue;
+            if (Current == '{')
+            {
+                interpolationDepth++;
+                Advance();
+                continue;
+            }
+            if (Current == '}' && CountRun('}') >= dollarCount && interpolationDepth == 1)
+            {
+                for (var i = 0; i < dollarCount; i++)
+                    Advance();
+                interpolationDepth = 0;
+                continue;
+            }
+            if (Current == '}')
+                interpolationDepth--;
+            Advance();
+        }
+    }
+
+    private int CountRun(char character)
+    {
+        var count = 0;
+        while (_position + count < _source.Length
+            && _source[_position + count] == character)
+        {
+            count++;
+        }
+        return count;
     }
 
     /// <summary>
@@ -1357,11 +2150,11 @@ public sealed class Lexer
             {
                 return ScanTypedIntLiteral(isUnsigned: false, isLong: true);
             }
-            if (upperText == "UINT" && char.IsDigit(lookahead))
+            if (upperText == "UINT" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
                 return ScanTypedIntLiteral(isUnsigned: true, isLong: false);
             }
-            if (upperText == "ULONG" && char.IsDigit(lookahead))
+            if (upperText == "ULONG" && (char.IsDigit(lookahead) || lookahead == '-'))
             {
                 return ScanTypedIntLiteral(isUnsigned: true, isLong: true);
             }
@@ -1385,89 +2178,80 @@ public sealed class Lexer
     private Token ScanTypedIntLiteral(bool isUnsigned = false, bool isLong = false)
     {
         Advance(); // consume ':'
-        var valueStart = _position;
-
+        var sign = IntegerLiteralSign.Positive;
         if (Current == '-')
         {
+            sign = IntegerLiteralSign.Negative;
             Advance();
         }
 
-        // Check for hex prefix in typed literal: INT:0xFF
+        var literalBase = IntegerLiteralBase.Decimal;
         if (Current == '0' && Lookahead is 'x' or 'X')
         {
-            Advance(); // consume '0'
-            Advance(); // consume 'x'/'X'
-            while (IsHexDigit(Current))
-            {
-                Advance();
-            }
-
-            var hexValueText = _source[valueStart.._position];
-            var hexXIdx = hexValueText.IndexOf('x');
-            if (hexXIdx < 0) hexXIdx = hexValueText.IndexOf('X');
-            var hexPart = hexValueText.AsSpan(hexXIdx + 1);
-            if (!isUnsigned && long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
-                System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
-            {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(hexVal, IsHex: true, IsUnsigned: false, (ulong)hexVal) { IsLong = isLong });
-            }
-
-            // Try ulong for values > long.MaxValue (e.g., 0xcccccccccccccccd)
-            if (ulong.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
-                System.Globalization.CultureInfo.InvariantCulture, out var uhexVal))
-            {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(unchecked((long)uhexVal), IsHex: true, IsUnsigned: true, uhexVal) { IsLong = isLong });
-            }
-
-            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
-            return MakeToken(TokenKind.Error);
+            literalBase = IntegerLiteralBase.Hexadecimal;
+            Advance();
+            Advance();
         }
 
-        while (char.IsDigit(Current))
+        var digitsStart = _position;
+        while (literalBase == IntegerLiteralBase.Hexadecimal
+            ? IsHexDigit(Current) || Current == '_'
+            : char.IsDigit(Current) || Current == '_')
         {
             Advance();
         }
 
-        var valueText = _source[valueStart.._position];
+        if (!TryParseIntegerMagnitude(_source[digitsStart.._position], literalBase, out var magnitude))
+        {
+            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "integer");
+            return MakeToken(TokenKind.Error);
+        }
 
-        // #774: an explicit width/signedness (LONG:/UINT:/ULONG:) is preserved via
-        // IntLiteralInfo so it survives to the C# emitter, never re-derived from
-        // magnitude alone.
+        if (isUnsigned && sign == IntegerLiteralSign.Negative)
+        {
+            _diagnostics.ReportUnsignedNegativeLiteral(CurrentSpan());
+            return MakeToken(TokenKind.Error);
+        }
+
+        IntLiteralInfo? info;
         if (isUnsigned)
         {
-            if (ulong.TryParse(valueText, out var uval))
-            {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(unchecked((long)uval), IsHex: false, IsUnsigned: true, uval) { IsLong = isLong });
-            }
-            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
+            var maximum = isLong ? ulong.MaxValue : uint.MaxValue;
+            info = magnitude <= maximum
+                ? new IntLiteralInfo(
+                    magnitude,
+                    sign,
+                    literalBase,
+                    isLong ? IntegerLiteralWidth.Bits64 : IntegerLiteralWidth.Bits32,
+                    IntegerLiteralSignedness.Unsigned)
+                : null;
+        }
+        else if (isLong)
+        {
+            info = FitsSignedMagnitude(magnitude, sign, IntegerLiteralWidth.Bits64)
+                ? new IntLiteralInfo(
+                    magnitude,
+                    sign,
+                    literalBase,
+                    IntegerLiteralWidth.Bits64,
+                    IntegerLiteralSignedness.Signed)
+                : null;
+        }
+        else
+        {
+            info = InferTypedSignedInteger(magnitude, sign, literalBase);
+        }
+
+        if (info is { } validInfo)
+            return MakeToken(TokenKind.IntLiteral, validInfo);
+
+        if (isLong && !isUnsigned)
+        {
+            _diagnostics.ReportSignedIntegerLiteralOverflow(CurrentSpan());
             return MakeToken(TokenKind.Error);
         }
-        if (isLong)
-        {
-            if (long.TryParse(valueText, out var lval))
-            {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(lval, IsHex: false, IsUnsigned: false, unchecked((ulong)lval)) { IsLong = true });
-            }
-            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
-            return MakeToken(TokenKind.Error);
-        }
 
-        if (int.TryParse(valueText, out var value))
-        {
-            return MakeToken(TokenKind.IntLiteral, value);
-        }
-
-        // Fall back to long for values outside int range
-        if (long.TryParse(valueText, out var longValue))
-        {
-            return MakeToken(TokenKind.IntLiteral, longValue);
-        }
-
-        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "integer");
         return MakeToken(TokenKind.Error);
     }
 
@@ -1518,7 +2302,7 @@ public sealed class Lexer
             Advance();
         }
 
-        while (char.IsDigit(Current))
+        while (char.IsDigit(Current) || Current == '_')
         {
             Advance();
         }
@@ -1526,7 +2310,7 @@ public sealed class Lexer
         if (Current == '.')
         {
             Advance();
-            while (char.IsDigit(Current))
+            while (char.IsDigit(Current) || Current == '_')
             {
                 Advance();
             }
@@ -1540,13 +2324,13 @@ public sealed class Lexer
             {
                 Advance();
             }
-            while (char.IsDigit(Current))
+            while (char.IsDigit(Current) || Current == '_')
             {
                 Advance();
             }
         }
 
-        var valueText = _source[valueStart.._position];
+        var valueText = _source[valueStart.._position].Replace("_", "", StringComparison.Ordinal);
         if (double.TryParse(valueText, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var value))
         {
@@ -1571,7 +2355,7 @@ public sealed class Lexer
             Advance();
         }
 
-        while (char.IsDigit(Current))
+        while (char.IsDigit(Current) || Current == '_')
         {
             Advance();
         }
@@ -1579,7 +2363,7 @@ public sealed class Lexer
         if (Current == '.')
         {
             Advance();
-            while (char.IsDigit(Current))
+            while (char.IsDigit(Current) || Current == '_')
             {
                 Advance();
             }
@@ -1593,7 +2377,7 @@ public sealed class Lexer
             {
                 Advance();
             }
-            while (char.IsDigit(Current))
+            while (char.IsDigit(Current) || Current == '_')
             {
                 Advance();
             }
@@ -1605,7 +2389,9 @@ public sealed class Lexer
             Advance();
         }
 
-        var valueText = _source[valueStart.._position].TrimEnd('M', 'm');
+        var valueText = _source[valueStart.._position]
+            .TrimEnd('M', 'm')
+            .Replace("_", "", StringComparison.Ordinal);
         if (decimal.TryParse(valueText, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var value))
         {
@@ -1651,91 +2437,7 @@ public sealed class Lexer
 
     private Token ScanMultilineStringLiteral()
     {
-        Advance(); // consume first "
-        Advance(); // consume second "
-        Advance(); // consume third "
-
-        // Optionally skip a leading newline right after the opening triple-quote
-        if (!IsAtEnd && Current == '\r')
-            Advance();
-        if (!IsAtEnd && Current == '\n')
-            Advance();
-
-        var sb = new System.Text.StringBuilder();
-        while (!IsAtEnd)
-        {
-            // Check for closing triple-quote
-            if (Current == '"' && Lookahead == '"' && Peek(2) == '"')
-            {
-                Advance(); // consume first "
-                Advance(); // consume second "
-                Advance(); // consume third "
-
-                // Check for u8 suffix (UTF-8 string literal round-trip)
-                if (!IsAtEnd && Current == 'u' && Lookahead == '8')
-                {
-                    Advance(); // consume 'u'
-                    Advance(); // consume '8'
-                }
-
-                return MakeToken(TokenKind.StrLiteral, sb.ToString());
-            }
-
-            if (Current == '\\')
-            {
-                Advance();
-                if (Current == 'u')
-                {
-                    AppendUnicodeEscape(sb);
-                }
-                else if (Current == 'U')
-                {
-                    AppendLongUnicodeEscape(sb);
-                }
-                else
-                {
-                    var escaped = Current switch
-                    {
-                        'n' => '\n',
-                        'r' => '\r',
-                        't' => '\t',
-                        '0' => '\0',
-                        '\\' => '\\',
-                        '"' => '"',
-                        '$' => '$',
-                        '\'' => '\'',
-                        'a' => '\a',
-                        'b' => '\b',
-                        'f' => '\f',
-                        'v' => '\v',
-                        '/' => '/',
-                        '{' => '{',
-                        '}' => '}',
-                        _ => '\x01' // sentinel for invalid escape
-                    };
-
-                    if (escaped == '\x01')
-                    {
-                        // Tolerate unknown escape sequences in triple-quoted strings —
-                        // emit the literal character. Converted strings may contain \S, \N, etc.
-                        sb.Append(Current);
-                    }
-                    else
-                    {
-                        sb.Append(escaped);
-                    }
-                    Advance();
-                }
-            }
-            else
-            {
-                sb.Append(Current);
-                Advance();
-            }
-        }
-
-        _diagnostics.ReportUnterminatedString(CurrentSpan());
-        return MakeToken(TokenKind.Error);
+        return ScanStringLiteralCore(delimiterLength: 3);
     }
 
     /// <summary>
@@ -1805,189 +2507,297 @@ public sealed class Lexer
 
     private Token ScanStringLiteralValue()
     {
-        Advance(); // consume opening quote
+        return ScanStringLiteralCore(delimiterLength: 1);
+    }
 
-        var sb = new System.Text.StringBuilder();
-        while (!IsAtEnd && Current != '"')
+    private Token ScanStringLiteralCore(int delimiterLength)
+    {
+        for (var i = 0; i < delimiterLength; i++)
+            Advance();
+
+        var isMultiline = delimiterLength == 3;
+        if (isMultiline)
         {
+            if (!IsAtEnd && Current == '\r')
+                Advance();
+            if (!IsAtEnd && Current == '\n')
+                Advance();
+        }
+
+        var text = new System.Text.StringBuilder();
+        var parts = new List<InterpolatedStringTokenPart>();
+
+        void FlushText()
+        {
+            if (text.Length == 0)
+                return;
+            parts.Add(new InterpolatedStringTextTokenPart(text.ToString()));
+            text.Clear();
+        }
+
+        while (!IsAtEnd)
+        {
+            if (HasQuoteRun(delimiterLength))
+            {
+                for (var i = 0; i < delimiterLength; i++)
+                    Advance();
+
+                var isUtf8 = !IsAtEnd && Current == 'u' && Lookahead == '8';
+                if (isUtf8)
+                {
+                    Advance();
+                    Advance();
+                }
+
+                FlushText();
+                if (parts.Any(part => part is InterpolatedStringExpressionTokenPart))
+                {
+                    if (isUtf8)
+                    {
+                        _diagnostics.ReportInterpolatedUtf8Literal(CurrentSpan());
+                        return MakeToken(TokenKind.Error);
+                    }
+
+                    var value = string.Concat(parts.Select(part => part switch
+                    {
+                        InterpolatedStringTextTokenPart literal => literal.Text,
+                        InterpolatedStringExpressionTokenPart expression => $"${{{expression.ExpressionText}}}",
+                        _ => ""
+                    }));
+                    return MakeToken(
+                        TokenKind.StrLiteral,
+                        new StringLiteralInfo(value, parts, isMultiline, isUtf8));
+                }
+
+                var plainValue = parts.Count == 0
+                    ? ""
+                    : string.Concat(parts.Cast<InterpolatedStringTextTokenPart>().Select(part => part.Text));
+                return MakeToken(TokenKind.StrLiteral, plainValue);
+            }
+
             if (Current == '\\')
             {
                 Advance();
+                if (IsAtEnd)
+                {
+                    text.Append('\\');
+                    break;
+                }
+
                 if (Current == 'u')
                 {
-                    AppendUnicodeEscape(sb);
+                    AppendUnicodeEscape(text);
+                    continue;
                 }
-                else if (Current == 'U')
+                if (Current == 'U')
                 {
-                    AppendLongUnicodeEscape(sb);
+                    AppendLongUnicodeEscape(text);
+                    continue;
+                }
+
+                var escaped = Current switch
+                {
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    '0' => '\0',
+                    '\\' => '\\',
+                    '"' => '"',
+                    '$' => '$',
+                    '\'' => '\'',
+                    'a' => '\a',
+                    'b' => '\b',
+                    'f' => '\f',
+                    'v' => '\v',
+                    '/' => '/',
+                    '{' => '{',
+                    '}' => '}',
+                    _ => '\x01'
+                };
+
+                if (escaped == '\x01')
+                {
+                    text.Append('\\');
+                    text.Append(Current);
                 }
                 else
                 {
-                    var escaped = Current switch
-                    {
-                        'n' => '\n',
-                        'r' => '\r',
-                        't' => '\t',
-                        '0' => '\0',
-                        '\\' => '\\',
-                        '"' => '"',
-                        '$' => '$',
-                        '\'' => '\'',
-                        'a' => '\a',
-                        'b' => '\b',
-                        'f' => '\f',
-                        'v' => '\v',
-                        '/' => '/',
-                        '{' => '{',
-                        '}' => '}',
-                        _ => '\x01' // sentinel for invalid escape
-                    };
-
-                    if (escaped == '\x01')
-                    {
-                        // Tolerate unknown escape sequences — emit the literal character.
-                        // Converted strings may contain \S, \N, etc. from doc comments.
-                        sb.Append(Current);
-                    }
-                    else
-                    {
-                        sb.Append(escaped);
-                    }
-                    Advance();
+                    text.Append(escaped);
                 }
+                Advance();
+                continue;
             }
-            else if (Current == '$' && Lookahead == '{')
+
+            if (Current == '$' && Lookahead == '{')
             {
-                // Interpolation: ${...} — scan until matching } with brace-depth tracking
-                sb.Append(Current); // $
+                var interpolationStart = _position;
+                FlushText();
                 Advance();
-                sb.Append(Current); // {
                 Advance();
-
-                int depth = 1;
-                while (!IsAtEnd && depth > 0)
+                var expression = ScanInterpolationExpressionText();
+                if (expression == null)
                 {
-                    if (Current == '\\' && _position + 1 < _source.Length && _source[_position + 1] == '"')
-                    {
-                        // Escaped quote inside interpolation (e.g., ${name.TrimStart(\"x\")})
-                        // Treat \" as a literal escaped character, don't start a nested string
-                        sb.Append(Current); // backslash
-                        Advance();
-                        sb.Append(Current); // quote
-                        Advance();
-                        continue;
-                    }
-                    if (Current == '"')
-                    {
-                        // Potential string literal inside interpolation.
-                        // Save state and try scanning as nested string; if we can then
-                        // find the closing } of the interpolation, it was a nested string.
-                        // Otherwise, this " ends the outer string (unmatched ${).
-                        var savedPos = _position;
-                        var savedSbLen = sb.Length;
-                        sb.Append(Current); // opening "
-                        Advance();
-                        while (!IsAtEnd && Current != '"')
-                        {
-                            if (Current == '\\')
-                            {
-                                sb.Append(Current);
-                                Advance();
-                                if (!IsAtEnd) { sb.Append(Current); Advance(); }
-                            }
-                            else { sb.Append(Current); Advance(); }
-                        }
-                        if (!IsAtEnd && Current == '"')
-                        {
-                            sb.Append(Current); // closing "
-                            Advance();
-                            // Check if we can still find closing } — scan ahead without modifying state
-                            // by looking at remaining chars. If the interpolation can still close, keep it.
-                            var canClose = false;
-                            var tempDepth = depth;
-                            var tempPos = _position;
-                            var maxLookahead = Math.Min(_source.Length, _position + 10_000);
-                            while (tempPos < maxLookahead && tempDepth > 0)
-                            {
-                                var ch = _source[tempPos];
-                                if (ch == '"')
-                                {
-                                    // Skip nested strings in lookahead
-                                    tempPos++;
-                                    while (tempPos < _source.Length && _source[tempPos] != '"')
-                                    {
-                                        if (_source[tempPos] == '\\') tempPos++;
-                                        tempPos++;
-                                    }
-                                    if (tempPos < _source.Length) tempPos++; // closing "
-                                    continue;
-                                }
-                                if (ch == '{') tempDepth++;
-                                else if (ch == '}') tempDepth--;
-                                if (tempDepth == 0) { canClose = true; break; }
-                                tempPos++;
-                            }
-                            if (canClose)
-                                continue; // nested string was valid, keep scanning interpolation
-                        }
-                        // Backtrack — the " was not a nested string, it ends the outer string
-                        _position = savedPos;
-                        sb.Length = savedSbLen;
-                        break; // exit interpolation loop; " will be consumed as outer string close
-                    }
-
-                    if (Current == '{')
-                        depth++;
-                    else if (Current == '}')
-                        depth--;
-
-                    if (depth > 0)
-                    {
-                        sb.Append(Current);
-                        Advance();
-                    }
-                }
-
-                if (!IsAtEnd && Current == '}')
-                {
-                    sb.Append(Current); // closing }
-                    Advance();
-                }
-            }
-            else if (Current == '\n')
-            {
-                // Allow multi-line strings from converter output (collapsed to single line)
-                sb.Append(' ');
-                Advance();
-                // Skip leading whitespace on continuation line
-                while (!IsAtEnd && Current != '"' && (Current == ' ' || Current == '\t'))
-                    Advance();
-                if (IsAtEnd || Current == '"')
+                    _position = interpolationStart + 2;
+                    text.Append("${");
                     continue;
+                }
+                var intent = IsLiteralInterpolationPlaceholder(expression)
+                    ? InterpolationPartIntent.LiteralPlaceholder
+                    : InterpolationPartIntent.Expression;
+                parts.Add(new InterpolatedStringExpressionTokenPart(expression, intent));
+                continue;
             }
-            else
+
+            if (!isMultiline && Current == '\n')
             {
-                sb.Append(Current);
+                text.Append(' ');
                 Advance();
+                while (!IsAtEnd && Current != '"' && Current is ' ' or '\t')
+                    Advance();
+                continue;
             }
+
+            text.Append(Current);
+            Advance();
         }
 
-        if (IsAtEnd)
+        _diagnostics.ReportUnterminatedString(CurrentSpan());
+        return MakeToken(TokenKind.Error);
+    }
+
+    private static bool IsLiteralInterpolationPlaceholder(string source)
+    {
+        var text = source.AsSpan().Trim();
+        var position = 0;
+        while (position < text.Length && char.IsDigit(text[position]))
+            position++;
+        if (position == 0)
+            return false;
+
+        while (position < text.Length && char.IsWhiteSpace(text[position]))
+            position++;
+        if (position < text.Length && text[position] == ',')
         {
-            _diagnostics.ReportUnterminatedString(CurrentSpan());
-            return MakeToken(TokenKind.Error);
+            position++;
+            while (position < text.Length && char.IsWhiteSpace(text[position]))
+                position++;
+            if (position < text.Length && text[position] is '+' or '-')
+                position++;
+            var alignmentStart = position;
+            while (position < text.Length && char.IsDigit(text[position]))
+                position++;
+            if (position == alignmentStart)
+                return false;
+            while (position < text.Length && char.IsWhiteSpace(text[position]))
+                position++;
         }
 
-        Advance(); // consume closing quote
-
-        // Check for u8 suffix (UTF-8 string literal round-trip)
-        if (!IsAtEnd && Current == 'u' && Lookahead == '8')
+        if (position < text.Length && text[position] == ':')
         {
-            Advance(); // consume 'u'
-            Advance(); // consume '8'
+            position++;
+            return position < text.Length
+                && text[position..].IndexOfAny('{', '}') < 0;
         }
 
-        return MakeToken(TokenKind.StrLiteral, sb.ToString());
+        return position == text.Length;
+    }
+
+    private bool HasQuoteRun(int length)
+    {
+        for (var i = 0; i < length; i++)
+        {
+            if (Peek(i) != '"')
+                return false;
+        }
+        return true;
+    }
+
+    private string? ScanInterpolationExpressionText()
+    {
+        var start = _position;
+        var depth = 1;
+
+        while (!IsAtEnd)
+        {
+            if (Current == '"' || Current == '\'')
+            {
+                SkipQuotedCalorInterpolationLiteral(Current);
+                continue;
+            }
+
+            if (Current == '/' && Lookahead == '/')
+            {
+                Advance();
+                Advance();
+                while (!IsAtEnd && Current is not '\r' and not '\n')
+                    Advance();
+                continue;
+            }
+
+            if (Current == '/' && Lookahead == '*')
+            {
+                Advance();
+                Advance();
+                while (!IsAtEnd && !(Current == '*' && Lookahead == '/'))
+                    Advance();
+                if (!IsAtEnd)
+                {
+                    Advance();
+                    Advance();
+                }
+                continue;
+            }
+
+            if (Current == '{')
+            {
+                depth++;
+            }
+            else if (Current == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    var value = _source[start.._position];
+                    Advance();
+                    return value;
+                }
+            }
+
+            Advance();
+        }
+
+        return null;
+    }
+
+    private void SkipQuotedCalorInterpolationLiteral(char quote)
+    {
+        var quoteCount = quote == '"' && Lookahead == '"' && Peek(2) == '"' ? 3 : 1;
+        for (var i = 0; i < quoteCount; i++)
+            Advance();
+
+        while (!IsAtEnd)
+        {
+            if (quoteCount == 3 && HasQuoteRun(3))
+            {
+                Advance();
+                Advance();
+                Advance();
+                return;
+            }
+            if (quoteCount == 1 && Current == quote)
+            {
+                Advance();
+                return;
+            }
+            if (Current == '\\')
+            {
+                Advance();
+                if (!IsAtEnd)
+                    Advance();
+                continue;
+            }
+            Advance();
+        }
     }
 
     private static bool IsHexDigit(char c)
@@ -1995,8 +2805,10 @@ public sealed class Lexer
 
     private Token ScanNumber()
     {
+        var sign = IntegerLiteralSign.Positive;
         if (Current == '-')
         {
+            sign = IntegerLiteralSign.Negative;
             Advance();
         }
 
@@ -2005,46 +2817,56 @@ public sealed class Lexer
         {
             Advance(); // consume '0'
             Advance(); // consume 'x'/'X'
-            while (IsHexDigit(Current))
+            var digitsStart = _position;
+            while (IsHexDigit(Current) || Current == '_')
             {
                 Advance();
             }
 
             // Consume optional U/UL suffix on hex literals
             bool hexUnsigned = false;
+            bool hexLong = false;
             if (Current is 'U' or 'u')
             {
                 hexUnsigned = true;
                 Advance();
-                if (Current is 'L' or 'l') Advance();
+                if (Current is 'L' or 'l') { hexLong = true; Advance(); }
             }
             else if (Current is 'L' or 'l')
             {
+                hexLong = true;
                 Advance();
                 if (Current is 'U' or 'u') { hexUnsigned = true; Advance(); }
             }
 
-            var hexText = CurrentText();
-            var xIdx = hexText.IndexOf('x');
-            if (xIdx < 0) xIdx = hexText.IndexOf('X');
-            var hexPartStr = hexText.AsSpan(xIdx + 1);
-            // Trim any suffix characters from the hex part
-            hexPartStr = hexPartStr.TrimEnd("UuLl".AsSpan());
-            if (long.TryParse(hexPartStr,
-                System.Globalization.NumberStyles.HexNumber,
-                System.Globalization.CultureInfo.InvariantCulture, out var hexValue))
+            if (!TryParseIntegerMagnitude(
+                _source[digitsStart..(_position - GetIntegerSuffixLength(hexUnsigned, hexLong))],
+                IntegerLiteralBase.Hexadecimal,
+                out var magnitude))
             {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(hexValue, IsHex: true, hexUnsigned, (ulong)hexValue));
+                _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "hex number");
+                return MakeToken(TokenKind.Error);
             }
 
-            // Try ulong for values > long.MaxValue
-            if (ulong.TryParse(hexPartStr,
-                System.Globalization.NumberStyles.HexNumber,
-                System.Globalization.CultureInfo.InvariantCulture, out var uhexValue))
+            if (hexUnsigned && sign == IntegerLiteralSign.Negative)
             {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(unchecked((long)uhexValue), IsHex: true, IsUnsigned: true, uhexValue));
+                _diagnostics.ReportUnsignedNegativeLiteral(CurrentSpan());
+                return MakeToken(TokenKind.Error);
+            }
+
+            var info = InferSuffixedInteger(
+                magnitude,
+                sign,
+                IntegerLiteralBase.Hexadecimal,
+                hexUnsigned,
+                hexLong);
+            if (info is { } validInfo)
+                return MakeToken(TokenKind.IntLiteral, validInfo);
+
+            if (hexLong && !hexUnsigned)
+            {
+                _diagnostics.ReportSignedIntegerLiteralOverflow(CurrentSpan());
+                return MakeToken(TokenKind.Error);
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "hex number");
@@ -2064,7 +2886,7 @@ public sealed class Lexer
             {
                 Advance(); // consume sign
             }
-            while (char.IsDigit(Current))
+            while (char.IsDigit(Current) || Current == '_')
             {
                 Advance();
             }
@@ -2093,7 +2915,7 @@ public sealed class Lexer
                 {
                     Advance(); // consume sign
                 }
-                while (char.IsDigit(Current))
+                while (char.IsDigit(Current) || Current == '_')
                 {
                     Advance();
                 }
@@ -2147,48 +2969,216 @@ public sealed class Lexer
             if (Current is 'U' or 'u') { isUnsignedSuffix = true; Advance(); }
         }
 
-        var intText = CurrentText().Replace("_", "");
-        // Strip suffix characters for parsing
-        var numericText = intText.TrimEnd('U', 'u', 'L', 'l');
+        var intText = CurrentText();
+        var suffixLength = GetIntegerSuffixLength(isUnsignedSuffix, hasLongSuffix);
+        var numericText = intText.AsSpan(0, intText.Length - suffixLength);
+        if (sign == IntegerLiteralSign.Negative)
+            numericText = numericText[1..];
 
-        if (isUnsignedSuffix)
+        if (!TryParseIntegerMagnitude(numericText.ToString(), IntegerLiteralBase.Decimal, out var integerMagnitude))
         {
-            if (ulong.TryParse(numericText, out var ulVal))
-            {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(unchecked((long)ulVal), IsHex: false, IsUnsigned: true, ulVal));
-            }
+            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");
+            return MakeToken(TokenKind.Error);
         }
-        else if (hasLongSuffix)
+
+        if (isUnsignedSuffix && sign == IntegerLiteralSign.Negative)
         {
-            if (long.TryParse(numericText, out var lVal))
-            {
-                return MakeToken(TokenKind.IntLiteral, lVal);
-            }
+            _diagnostics.ReportUnsignedNegativeLiteral(CurrentSpan());
+            return MakeToken(TokenKind.Error);
         }
-        else
+
+        var integerInfo = InferSuffixedInteger(
+            integerMagnitude,
+            sign,
+            IntegerLiteralBase.Decimal,
+            isUnsignedSuffix,
+            hasLongSuffix);
+        if (integerInfo is { } validIntegerInfo)
+            return MakeToken(TokenKind.IntLiteral, validIntegerInfo);
+
+        if (hasLongSuffix && !isUnsignedSuffix)
         {
-            if (int.TryParse(numericText, out var intValue))
-            {
-                return MakeToken(TokenKind.IntLiteral, intValue);
-            }
-
-            // Fall back to long for values outside int range
-            if (long.TryParse(numericText, out var longValue))
-            {
-                return MakeToken(TokenKind.IntLiteral, longValue);
-            }
-
-            // Fall back to ulong for values outside long range (e.g., UInt64.MaxValue)
-            if (ulong.TryParse(numericText, out var ulongValue))
-            {
-                return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(unchecked((long)ulongValue), IsHex: false, IsUnsigned: true, ulongValue));
-            }
+            _diagnostics.ReportSignedIntegerLiteralOverflow(CurrentSpan());
+            return MakeToken(TokenKind.Error);
         }
 
         _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "number");
         return MakeToken(TokenKind.Error);
+    }
+
+    private static int GetIntegerSuffixLength(bool isUnsigned, bool isLong)
+        => (isUnsigned ? 1 : 0) + (isLong ? 1 : 0);
+
+    private static bool TryParseIntegerMagnitude(
+        string source,
+        IntegerLiteralBase literalBase,
+        out ulong magnitude)
+    {
+        magnitude = 0;
+        if (source.Length == 0
+            || source[0] == '_'
+            || source[^1] == '_')
+        {
+            return false;
+        }
+
+        var digits = source.Replace("_", "", StringComparison.Ordinal);
+        var style = literalBase == IntegerLiteralBase.Hexadecimal
+            ? System.Globalization.NumberStyles.AllowHexSpecifier
+            : System.Globalization.NumberStyles.None;
+        return ulong.TryParse(
+            digits,
+            style,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out magnitude);
+    }
+
+    private static bool FitsSignedMagnitude(
+        ulong magnitude,
+        IntegerLiteralSign sign,
+        IntegerLiteralWidth width)
+    {
+        var maximum = width == IntegerLiteralWidth.Bits32
+            ? sign == IntegerLiteralSign.Negative ? 0x8000_0000UL : int.MaxValue
+            : sign == IntegerLiteralSign.Negative ? 0x8000_0000_0000_0000UL : long.MaxValue;
+        return magnitude <= maximum;
+    }
+
+    private static IntLiteralInfo? InferUnsuffixedInteger(
+        ulong magnitude,
+        IntegerLiteralSign sign,
+        IntegerLiteralBase literalBase)
+    {
+        if (sign == IntegerLiteralSign.Negative)
+        {
+            if (FitsSignedMagnitude(magnitude, sign, IntegerLiteralWidth.Bits32))
+            {
+                return new IntLiteralInfo(
+                    magnitude,
+                    sign,
+                    literalBase,
+                    IntegerLiteralWidth.Bits32,
+                    IntegerLiteralSignedness.Signed);
+            }
+            if (FitsSignedMagnitude(magnitude, sign, IntegerLiteralWidth.Bits64))
+            {
+                return new IntLiteralInfo(
+                    magnitude,
+                    sign,
+                    literalBase,
+                    IntegerLiteralWidth.Bits64,
+                    IntegerLiteralSignedness.Signed);
+            }
+            return null;
+        }
+
+        if (magnitude <= int.MaxValue)
+        {
+            return new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits32,
+                IntegerLiteralSignedness.Signed);
+        }
+
+        if (literalBase == IntegerLiteralBase.Hexadecimal && magnitude <= uint.MaxValue)
+        {
+            return new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits32,
+                IntegerLiteralSignedness.Unsigned);
+        }
+
+        if (magnitude <= long.MaxValue)
+        {
+            return new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits64,
+                IntegerLiteralSignedness.Signed);
+        }
+
+        return new IntLiteralInfo(
+            magnitude,
+            sign,
+            literalBase,
+            IntegerLiteralWidth.Bits64,
+            IntegerLiteralSignedness.Unsigned);
+    }
+
+    private static IntLiteralInfo? InferTypedSignedInteger(
+        ulong magnitude,
+        IntegerLiteralSign sign,
+        IntegerLiteralBase literalBase)
+    {
+        if (FitsSignedMagnitude(magnitude, sign, IntegerLiteralWidth.Bits32))
+        {
+            return new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits32,
+                IntegerLiteralSignedness.Signed);
+        }
+
+        return FitsSignedMagnitude(magnitude, sign, IntegerLiteralWidth.Bits64)
+            ? new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits64,
+                IntegerLiteralSignedness.Signed)
+            : null;
+    }
+
+    private static IntLiteralInfo? InferSuffixedInteger(
+        ulong magnitude,
+        IntegerLiteralSign sign,
+        IntegerLiteralBase literalBase,
+        bool isUnsigned,
+        bool isLong)
+    {
+        if (!isUnsigned && !isLong)
+            return InferUnsuffixedInteger(magnitude, sign, literalBase);
+
+        if (isUnsigned)
+        {
+            if (sign == IntegerLiteralSign.Negative)
+                return null;
+            var width = isLong || magnitude > uint.MaxValue
+                ? IntegerLiteralWidth.Bits64
+                : IntegerLiteralWidth.Bits32;
+            return new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                width,
+                IntegerLiteralSignedness.Unsigned);
+        }
+
+        if (magnitude <= long.MaxValue)
+        {
+            return new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits64,
+                IntegerLiteralSignedness.Signed);
+        }
+
+        return sign == IntegerLiteralSign.Negative
+            && magnitude == 0x8000_0000_0000_0000UL
+            ? new IntLiteralInfo(
+                magnitude,
+                sign,
+                literalBase,
+                IntegerLiteralWidth.Bits64,
+                IntegerLiteralSignedness.Signed)
+            : null;
     }
 
     private Token ScanWhitespace()

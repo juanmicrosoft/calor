@@ -17,31 +17,64 @@ public abstract class ExpressionNode : AstNode
 public sealed class IntLiteralNode : ExpressionNode
 {
     public long Value { get; }
-    public bool IsHex { get; }
-    public bool IsUnsigned { get; }
-    public ulong UnsignedValue { get; }
-
-    /// <summary>
-    /// True when the literal carries an explicit 64-bit width (C# <c>L</c>/<c>UL</c>
-    /// suffix, or a <c>ulong</c>). #774: preserved so a <c>long</c>/<c>ulong</c>
-    /// literal that still fits in a smaller type is not silently narrowed and its
-    /// overload resolution is kept. When false, the emitter derives width from
-    /// magnitude as before.
-    /// </summary>
-    public bool IsLong { get; init; }
+    public ulong Magnitude { get; }
+    public IntegerLiteralSign Sign { get; }
+    public IntegerLiteralBase Base { get; }
+    public IntegerLiteralWidth Width { get; private init; }
+    public IntegerLiteralSignedness Signedness { get; }
+    public bool IsHex => Base == IntegerLiteralBase.Hexadecimal;
+    public bool IsUnsigned => Signedness == IntegerLiteralSignedness.Unsigned;
+    public ulong UnsignedValue => Magnitude;
+    public bool IsLong
+    {
+        get => Width == IntegerLiteralWidth.Bits64;
+        init => Width = value ? IntegerLiteralWidth.Bits64 : IntegerLiteralWidth.Bits32;
+    }
 
     public IntLiteralNode(TextSpan span, long value) : base(span)
     {
         Value = value;
-        UnsignedValue = (ulong)value;
+        Sign = value < 0 ? IntegerLiteralSign.Negative : IntegerLiteralSign.Positive;
+        Magnitude = value == long.MinValue ? 0x8000_0000_0000_0000UL : (ulong)Math.Abs(value);
+        Base = IntegerLiteralBase.Decimal;
+        Width = value is > int.MaxValue or < int.MinValue
+            ? IntegerLiteralWidth.Bits64
+            : IntegerLiteralWidth.Bits32;
+        Signedness = IntegerLiteralSignedness.Signed;
     }
 
-    public IntLiteralNode(TextSpan span, long value, bool isHex, bool isUnsigned, ulong unsignedValue) : base(span)
+    public IntLiteralNode(TextSpan span, long value, bool isHex, bool isUnsigned, ulong unsignedValue)
+        : this(
+            span,
+            isUnsigned ? unsignedValue : value == long.MinValue ? 0x8000_0000_0000_0000UL : (ulong)Math.Abs(value),
+            !isUnsigned && value < 0 ? IntegerLiteralSign.Negative : IntegerLiteralSign.Positive,
+            isHex ? IntegerLiteralBase.Hexadecimal : IntegerLiteralBase.Decimal,
+            isUnsigned
+                ? unsignedValue > uint.MaxValue ? IntegerLiteralWidth.Bits64 : IntegerLiteralWidth.Bits32
+                : value is > int.MaxValue or < int.MinValue ? IntegerLiteralWidth.Bits64 : IntegerLiteralWidth.Bits32,
+            isUnsigned ? IntegerLiteralSignedness.Unsigned : IntegerLiteralSignedness.Signed)
     {
-        Value = value;
-        IsHex = isHex;
-        IsUnsigned = isUnsigned;
-        UnsignedValue = unsignedValue;
+    }
+
+    public IntLiteralNode(
+        TextSpan span,
+        ulong magnitude,
+        IntegerLiteralSign sign,
+        IntegerLiteralBase literalBase,
+        IntegerLiteralWidth width,
+        IntegerLiteralSignedness signedness)
+        : base(span)
+    {
+        Magnitude = magnitude;
+        Sign = sign;
+        Base = literalBase;
+        Width = width;
+        Signedness = signedness;
+        Value = sign == IntegerLiteralSign.Negative
+            ? magnitude == 0x8000_0000_0000_0000UL
+                ? long.MinValue
+                : -checked((long)magnitude)
+            : unchecked((long)magnitude);
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

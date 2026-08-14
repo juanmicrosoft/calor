@@ -1,0 +1,11 @@
+§M{m001:Test_12_05}
+  §CL{c001:LiteralShapes:pub:stat}
+    §MT{m002:NegativeHex:pub:stat} () -> i64
+      §R (- LONG:0x2A)
+
+    §MT{m003:Separated:pub:stat} () -> u32
+      §R UINT:4294967295
+
+    §MT{m004:Format:pub:stat} (i32:value) -> str
+      §R "{literal} ${value,8:X4}"
+

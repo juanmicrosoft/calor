@@ -995,7 +995,13 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 if (!ReferenceEquals(simplified, exprPart.Expression))
                 {
                     partsChanged = true;
-                    newParts.Add(new InterpolatedStringExpressionNode(exprPart.Span, simplified));
+                    newParts.Add(new InterpolatedStringExpressionNode(
+                        exprPart.Span,
+                        simplified,
+                        exprPart.FormatSpecifier,
+                        exprPart.AlignmentClause,
+                        exprPart.Intent,
+                        exprPart.SourceText));
                 }
                 else
                 {
@@ -1009,6 +1015,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
         return partsChanged
             ? new InterpolatedStringNode(node.Span, newParts)
+            {
+                IsMultiline = node.IsMultiline,
+                IsUtf8 = node.IsUtf8
+            }
             : node;
     }
 

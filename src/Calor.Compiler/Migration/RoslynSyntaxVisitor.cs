@@ -9412,7 +9412,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             switch (content)
             {
                 case InterpolatedStringTextSyntax text:
-                    parts.Add(new InterpolatedStringTextNode(GetTextSpan(text), text.TextToken.Text));
+                    parts.Add(new InterpolatedStringTextNode(
+                        GetTextSpan(text),
+                        NormalizeInterpolatedText(
+                            text.TextToken.ValueText,
+                            interpolated.StringStartToken.Text)));
                     break;
 
                 case InterpolationSyntax interp:
@@ -9438,6 +9442,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new InterpolatedStringNode(GetTextSpan(interpolated), parts);
+    }
+
+    private static string NormalizeInterpolatedText(string text, string startToken)
+    {
+        if (startToken.Contains("\"\"\"", StringComparison.Ordinal))
+            return text;
+
+        return text
+            .Replace("{{", "{", StringComparison.Ordinal)
+            .Replace("}}", "}", StringComparison.Ordinal);
     }
 
     private NullConditionalNode ConvertConditionalAccess(ConditionalAccessExpressionSyntax condAccess)

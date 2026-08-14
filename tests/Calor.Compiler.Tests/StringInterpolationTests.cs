@@ -23,7 +23,7 @@ public class StringInterpolationTests
         var tokens = Tokenize("\"Hello, ${name}!\"", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(d => d.Message)));
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
-        Assert.Equal("Hello, ${name}!", tokens[0].Value);
+        Assert.Equal("Hello, ${name}!", Assert.IsType<StringLiteralInfo>(tokens[0].Value).Value);
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class StringInterpolationTests
         var tokens = Tokenize("\"${a} and ${b}\"", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(d => d.Message)));
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
-        Assert.Equal("${a} and ${b}", tokens[0].Value);
+        Assert.Equal("${a} and ${b}", Assert.IsType<StringLiteralInfo>(tokens[0].Value).Value);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public class StringInterpolationTests
         var tokens = Tokenize("\"${(+ a b)}\"", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(d => d.Message)));
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
-        Assert.Equal("${(+ a b)}", tokens[0].Value);
+        Assert.Equal("${(+ a b)}", Assert.IsType<StringLiteralInfo>(tokens[0].Value).Value);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class StringInterpolationTests
         var tokens = Tokenize("\"${value:F2}\"", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(d => d.Message)));
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
-        Assert.Equal("${value:F2}", tokens[0].Value);
+        Assert.Equal("${value:F2}", Assert.IsType<StringLiteralInfo>(tokens[0].Value).Value);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class StringInterpolationTests
         var tokens = Tokenize("\"Title: ${title}\\nBody: ${body}\"", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(d => d.Message)));
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
-        Assert.Equal("Title: ${title}\nBody: ${body}", tokens[0].Value);
+        Assert.Equal("Title: ${title}\nBody: ${body}", Assert.IsType<StringLiteralInfo>(tokens[0].Value).Value);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class StringInterpolationTests
         var tokens = Tokenize("\"${dict{key}}\"", out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(d => d.Message)));
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
-        Assert.Equal("${dict{key}}", tokens[0].Value);
+        Assert.Equal("${dict{key}}", Assert.IsType<StringLiteralInfo>(tokens[0].Value).Value);
     }
 
     [Fact]

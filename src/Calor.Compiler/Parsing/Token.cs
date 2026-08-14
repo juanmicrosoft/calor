@@ -400,15 +400,53 @@ public readonly struct Token : IEquatable<Token>
     public static bool operator !=(Token left, Token right) => !left.Equals(right);
 }
 
-/// <summary>
-/// Metadata for integer literal tokens that carry hex/unsigned/width information.
-/// Stored in <see cref="Token.Value"/> when the literal uses hex notation, unsigned
-/// types, or an explicit 64-bit (long/ulong) width (#774 faithful preservation).
-/// </summary>
-internal readonly record struct IntLiteralInfo(long SignedValue, bool IsHex, bool IsUnsigned, ulong UnsignedValue)
+public enum IntegerLiteralSign
 {
-    /// <summary>True when the literal carries an explicit 64-bit (L / UL) width.</summary>
-    public bool IsLong { get; init; }
+    Positive,
+    Negative
+}
+
+public enum IntegerLiteralBase
+{
+    Decimal,
+    Hexadecimal
+}
+
+public enum IntegerLiteralWidth
+{
+    Bits32,
+    Bits64
+}
+
+public enum IntegerLiteralSignedness
+{
+    Signed,
+    Unsigned
+}
+
+/// <summary>
+/// Lossless integer literal metadata. The magnitude is kept separate from sign
+/// so values such as <see cref="long.MinValue"/> and negative hexadecimal
+/// literals never lose their source semantics while crossing the lexer/parser
+/// boundary.
+/// </summary>
+internal readonly record struct IntLiteralInfo(
+    ulong Magnitude,
+    IntegerLiteralSign Sign,
+    IntegerLiteralBase Base,
+    IntegerLiteralWidth Width,
+    IntegerLiteralSignedness Signedness)
+{
+    public bool IsNegative => Sign == IntegerLiteralSign.Negative;
+    public bool IsHex => Base == IntegerLiteralBase.Hexadecimal;
+    public bool IsUnsigned => Signedness == IntegerLiteralSignedness.Unsigned;
+    public bool IsLong => Width == IntegerLiteralWidth.Bits64;
+    public ulong UnsignedValue => Magnitude;
+    public long SignedValue => IsNegative
+        ? Magnitude == 0x8000_0000_0000_0000UL
+            ? long.MinValue
+            : -checked((long)Magnitude)
+        : unchecked((long)Magnitude);
 }
 
 /// <summary>
@@ -416,3 +454,25 @@ internal readonly record struct IntLiteralInfo(long SignedValue, bool IsHex, boo
 /// (#774 faithful preservation). Stored in <see cref="Token.Value"/> for SINGLE: literals.
 /// </summary>
 internal readonly record struct FloatLiteralInfo(double Value, bool IsSingle);
+
+internal abstract record InterpolatedStringTokenPart;
+
+internal sealed record InterpolatedStringTextTokenPart(string Text)
+    : InterpolatedStringTokenPart;
+
+public enum InterpolationPartIntent
+{
+    Expression,
+    LiteralPlaceholder
+}
+
+internal sealed record InterpolatedStringExpressionTokenPart(
+    string ExpressionText,
+    InterpolationPartIntent Intent)
+    : InterpolatedStringTokenPart;
+
+internal sealed record StringLiteralInfo(
+    string Value,
+    IReadOnlyList<InterpolatedStringTokenPart> Parts,
+    bool IsMultiline,
+    bool IsUtf8);

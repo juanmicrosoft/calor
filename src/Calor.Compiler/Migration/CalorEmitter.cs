@@ -1,6 +1,7 @@
 using System.Text;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Migration;
 
@@ -2224,20 +2225,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IntLiteralNode node)
     {
-        // Always emit decimal — hex format (0xE0) breaks attribute parsing inside
-        // §ARR, §L, and other tag blocks where braces are balanced by the parser.
-        //
-        // #774: width/signedness must cross the Calor text boundary intact. A bare
-        // number re-parses as int (or long-by-magnitude), silently dropping an
-        // unsigned or explicit-long width. Emit a typed literal so `7u` stays uint,
-        // `5L` stays long, and `…UL` stays ulong through the round trip.
+        var sign = node.Sign == IntegerLiteralSign.Negative ? "-" : "";
+        var digits = node.IsHex
+            ? $"0x{node.Magnitude:X}"
+            : node.Magnitude.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var value = sign + digits;
+
         if (node.IsUnsigned)
             return node.IsLong
-                ? $"ULONG:{node.UnsignedValue}"
-                : $"UINT:{node.UnsignedValue}";
+                ? $"ULONG:{value}"
+                : $"UINT:{value}";
         if (node.IsLong)
-            return $"LONG:{node.Value}";
-        return node.Value.ToString();
+            return $"LONG:{value}";
+        return value;
     }
 
     public string Visit(FloatLiteralNode node)
@@ -2930,24 +2930,37 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(InterpolatedStringNode node)
     {
         var parts = new StringBuilder();
-        parts.Append("\"");
+        parts.Append(node.IsMultiline ? "\"\"\"\n" : "\"");
 
         foreach (var part in node.Parts)
         {
             if (part is InterpolatedStringTextNode textPart)
             {
-                // Escape special characters for Calor string syntax
-                var escaped = textPart.Text
-                    .Replace("\\", "\\\\")
-                    .Replace("\"", "\\\"")
-                    .Replace("\n", "\\n")
-                    .Replace("\r", "\\r")
-                    .Replace("\t", "\\t");
+                var escaped = node.IsMultiline
+                    ? textPart.Text
+                        .Replace("\\", "\\\\")
+                        .Replace("\"", "\\\"")
+                        .Replace("${", "\\${")
+                    : textPart.Text
+                        .Replace("\\", "\\\\")
+                        .Replace("\"", "\\\"")
+                        .Replace("\n", "\\n")
+                        .Replace("\r", "\\r")
+                        .Replace("\t", "\\t")
+                        .Replace("${", "\\${");
                 parts.Append(escaped);
             }
             else if (part is InterpolatedStringExpressionNode exprPart)
             {
                 parts.Append("${");
+                if (exprPart.Intent == InterpolationPartIntent.LiteralPlaceholder
+                    && !string.IsNullOrEmpty(exprPart.SourceText))
+                {
+                    parts.Append(exprPart.SourceText);
+                    parts.Append("}");
+                    continue;
+                }
+
                 var savedInterpolation = _inInterpolation;
                 _inInterpolation = true;
                 parts.Append(exprPart.Expression.Accept(this));
@@ -2966,7 +2979,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
         }
 
-        parts.Append("\"");
+        parts.Append(node.IsMultiline ? "\"\"\"" : "\"");
+        if (node.IsUtf8)
+            parts.Append("u8");
         return parts.ToString();
     }
 
@@ -3999,14 +4014,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RawCSharpNode node)
     {
-        // Statement-position raw C# MUST be appended: statement body loops call
-        // stmt.Accept(this) and discard the return value, so a returned string
-        // silently VANISHED from the output while the loss ledger claimed the
-        // statement was preserved (#836 C1). The lexer captures §RAW…§/RAW as
-        // one token and CSharpEmitter re-emits the content verbatim.
-        AppendLine("§RAW");
-        AppendLine(node.CSharpCode);
-        AppendLine("§/RAW");
+        FlushHoistedLines();
+        _builder.Append(new string(' ', _indentLevel * 2));
+        _builder.AppendLine("§RAW");
+        _builder.Append(node.CSharpCode);
+        _builder.AppendLine("§/RAW");
         return "";
     }
 
@@ -4103,7 +4115,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CSharpInteropBlockNode node)
     {
-        AppendLine($"§CSHARP{{{node.CSharpCode}}}§/CSHARP");
+        FlushHoistedLines();
+        _builder.Append(new string(' ', _indentLevel * 2));
+        _builder.Append("§CSHARP{");
+        _builder.Append(node.CSharpCode);
+        _builder.AppendLine("}§/CSHARP");
         return "";
     }
 

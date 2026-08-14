@@ -384,7 +384,7 @@ public class CompilerBugFixTests
 
         // Unknown escapes are now tolerated — the literal character is emitted
         Assert.False(diagnostics.HasErrors);
-        Assert.Equal("badxescape", tokens[0].Value);
+        Assert.Equal("bad\\xescape", tokens[0].Value);
     }
 
     [Fact]

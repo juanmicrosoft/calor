@@ -584,7 +584,7 @@ public class SyntaxTests
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        Assert.Equal(42, tokens[0].Value);
+        Assert.Equal(42, Assert.IsType<IntLiteralInfo>(tokens[0].Value).SignedValue);
     }
 
     [Fact]
@@ -594,7 +594,7 @@ public class SyntaxTests
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        Assert.Equal(-42, tokens[0].Value);
+        Assert.Equal(-42, Assert.IsType<IntLiteralInfo>(tokens[0].Value).SignedValue);
     }
 
     [Fact]

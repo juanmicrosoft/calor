@@ -25,6 +25,9 @@ public static class DiagnosticCode
     public const string UnterminatedRawBlock = "Calor0005";
     public const string UnknownSectionMarker = "Calor0006";
     public const string InvalidSectionOperator = "Calor0007";
+    public const string UnsignedNegativeLiteral = "Calor0010";
+    public const string InterpolatedUtf8Literal = "Calor0011";
+    public const string SignedIntegerLiteralOverflow = "Calor0012";
 
     /// <summary>
     /// Warning: leading whitespace uses tab characters. Calor indentation is
