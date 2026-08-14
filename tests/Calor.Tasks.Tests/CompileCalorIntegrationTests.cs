@@ -361,7 +361,7 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void GeneratedCSharpValidation_HonorsDisabledImplicitUsings()
+    public void GeneratedCSharpValidation_DisabledImplicitUsings_UsesStandaloneStructuralUsings()
     {
         var src = CreateSourceFile(
             "ImplicitUsings.calr",
@@ -373,10 +373,12 @@ public class CompileCalorIntegrationTests : IDisposable
         var task = CreateTask(src);
         task.ImplicitUsings = "disable";
 
-        Assert.False(task.Execute());
-        Assert.Contains(
-            ((TestBuildEngine)task.BuildEngine).Errors,
-            error => error.Contains("CS0103", StringComparison.Ordinal));
+        Assert.True(
+            task.Execute(),
+            string.Join("; ", ((TestBuildEngine)task.BuildEngine).Errors));
+        var generated = File.ReadAllText(task.GeneratedFiles.Single().ItemSpec);
+        Assert.Contains("using System.IO;", generated);
+        Assert.Contains("File.ReadAllText", generated);
     }
 
     [Fact]

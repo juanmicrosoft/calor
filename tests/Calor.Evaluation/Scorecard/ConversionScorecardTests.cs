@@ -14,20 +14,15 @@ namespace Calor.Evaluation.Scorecard;
 /// </summary>
 public class ConversionScorecardTests
 {
-    // Re-calibrated 2026-08-01 (W1 Slice 3, #771): FullyConverted now requires a
-    // FULL Roslyn semantic compilation of the generated C# (via the shared
-    // GeneratedCSharpCompiler helper), not merely a syntax parse. Under the old
-    // parse-only criterion the corpus scored 96/100; the honest compile-based
-    // number is 93/100 — the 7 partials are real emitter defects (local-function
-    // scoping, indexer emission, generic-method temp naming, pattern-matching
-    // type info, null-coalescing method group, generic array creation,
-    // deconstruction). The drop is the point of the change: syntax-valid but
-    // type-invalid output no longer counts as converted.
+    // Re-calibrated 2026-08-14 (#766): standalone generated C#, complete
+    // declaration/type mapping, and structural conditional imports raise the
+    // full semantic round-trip result to 96/100. The remaining 4 partials are
+    // pinned per fixture in baseline.json.
     // Baselines are exact (no slack): the corpus and converter are
     // deterministic, and per-fixture zero-regression is enforced against
     // baseline.json by NoRegressionsVsCommittedBaseline.
-    private const int BASELINE_FULLY_CONVERTED = 95;
-    private const int BASELINE_ROUNDTRIP = 95;
+    private const int BASELINE_FULLY_CONVERTED = 96;
+    private const int BASELINE_ROUNDTRIP = 96;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
     {

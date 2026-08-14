@@ -1,6 +1,9 @@
 using System.Text.Json;
 using Calor.Compiler;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Conversion.Tests;
@@ -81,6 +84,17 @@ public class DS15FixtureRegistryTests
         var featureKey = doc.RootElement.GetProperty("featureKey").GetString();
         Assert.False(string.IsNullOrWhiteSpace(featureKey), $"{name}: featureKey empty");
         Assert.Equal(SanitizeKey(featureKey!), name);
+        var certifiedAbsent = doc.RootElement
+            .GetProperty("lossKindCertifiedAbsent");
+        var runtimeEntryPoint = doc.RootElement
+            .GetProperty("runtimeEntryPoint")
+            .GetString();
+        Assert.False(
+            string.IsNullOrWhiteSpace(runtimeEntryPoint),
+            $"{name}: runtimeEntryPoint empty");
+        var runtimeExpectedInt = doc.RootElement
+            .GetProperty("runtimeExpectedInt")
+            .GetInt32();
 
         // 3. Conversion match: input.cs converts to exactly expected.calr.
         var converter = new CSharpToCalorConverter(new ConversionOptions
@@ -88,10 +102,25 @@ public class DS15FixtureRegistryTests
             Fidelity = ConversionFidelity.Lossy,
             ModuleName = "Fixture",
             GracefulFallback = true,
-            AutoGenerateIds = true
+            AutoGenerateIds = true,
+            StripPreprocessor = false
         });
         var converted = converter.Convert(File.ReadAllText(inputPath), $"{name}.cs");
+        Assert.True(
+            converted.Success,
+            $"{name}: conversion failed: "
+            + string.Join("; ", converted.Issues.Select(issue => issue.Message)));
         Assert.NotNull(converted.CalorSource);
+        if (certifiedAbsent.ValueKind != JsonValueKind.Null)
+        {
+            var lossName = certifiedAbsent.GetString();
+            Assert.True(
+                Enum.TryParse<ConversionLossKind>(lossName, out var lossKind),
+                $"{name}: unknown loss kind '{lossName}'");
+            Assert.DoesNotContain(
+                converted.Losses,
+                loss => loss.Kind == lossKind);
+        }
         Assert.Equal(
             Normalize(File.ReadAllText(expectedPath)),
             Normalize(converted.CalorSource!));
@@ -100,11 +129,56 @@ public class DS15FixtureRegistryTests
         foreach (var calr in new[] { expectedPath, testPath })
         {
             var result = Program.Compile(File.ReadAllText(calr),
-                Path.GetFileName(calr), new CompilationOptions());
+                Path.GetFileName(calr), new Calor.Compiler.CompilationOptions());
             Assert.False(result.HasErrors,
                 $"{name}/{Path.GetFileName(calr)} does not compile: " +
                 string.Join("; ", result.Diagnostics.Where(d => d.IsError).Select(d => d.Message)));
+            if (calr == testPath)
+                AssertValueTestPasses(
+                    name,
+                    result.GeneratedCode,
+                    runtimeEntryPoint!,
+                    runtimeExpectedInt);
         }
+    }
+
+    private static void AssertValueTestPasses(
+        string name,
+        string generatedCode,
+        string entryPoint,
+        int expected)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            generatedCode,
+            new CSharpParseOptions(LanguageVersion.Latest));
+        var compilation = CSharpCompilation.Create(
+            $"DS15_{name}_{Guid.NewGuid():N}",
+            [tree],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emit = compilation.Emit(stream);
+        Assert.True(
+            emit.Success,
+            $"{name}/test.calr generated C# failed: "
+            + string.Join("; ", emit.Diagnostics
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .Select(diagnostic => diagnostic.ToString())));
+
+        var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+        var methods = assembly.GetTypes()
+            .SelectMany(type => type.GetMethods(
+                System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.Static))
+            .Where(method =>
+                method.GetParameters().Length == 0
+                && !method.IsSpecialName)
+            .ToArray();
+        foreach (var method in methods)
+            _ = method.Invoke(null, null);
+        var entry = Assert.Single(methods.Where(method =>
+            method.Name == entryPoint && method.ReturnType == typeof(int)));
+        Assert.Equal(expected, Assert.IsType<int>(entry.Invoke(null, null)));
     }
 
     private static string Normalize(string s) =>

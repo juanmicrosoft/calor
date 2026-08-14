@@ -1,0 +1,6 @@
+{
+  "featureKey": "conditional-using",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "runtimeEntryPoint": "Get",
+  "runtimeExpectedInt": 42
+}

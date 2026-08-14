@@ -14,7 +14,9 @@ only mergeable when a fixture demonstrates the claimed fidelity on real values.
 ```
 d-s1.5/<sanitized-key>/
   fixture.json     { "featureKey": "<exact FeatureSupport key>",
-                     "lossKindCertifiedAbsent": "<ConversionLossKind name or null>" }
+                     "lossKindCertifiedAbsent": "<ConversionLossKind name or null>",
+                     "runtimeEntryPoint": "<public static parameterless method>",
+                     "runtimeExpectedInt": <expected integer result> }
   input.cs         the C# input exercising the feature
   expected.calr    the expected converted Calor (exact match against `calor migrate` output)
   test.calr        the value-asserting test: a Calor program using the converted construct
@@ -46,14 +48,15 @@ discriminating pin, executed continuously rather than demonstrated once.
 
 ## Initial contents
 
-Empty, per the registration: frozen by location, schema, and entry point — not by content. The
-first fixtures are expected from roadmap §3.2's nullable-idiom migration work, which is blocked
-on this gate being green (roadmap §3.2 sequencing constraint).
+`conditional-using` is the first complete fixture. It certifies that
+`ConversionLossKind.InteropPreserved` is absent for the native conditional
+using/declaration path and includes an executable integer value oracle.
 
 ## Disclosed limits (decisions on record, not omissions)
 
-- **Value-assertion execution of `test.calr`** (beyond compile validation) lands with the first
-  fixture.
+- **Value assertions execute by manifest:** every `test.calr` exposes the
+  parameterless public static method named by `runtimeEntryPoint`; the registry
+  invokes it and compares its integer result with `runtimeExpectedInt`.
 - **Fixture-to-feature linkage is nominal**: nothing yet asserts `input.cs` actually exercises
   the promoted feature (a converter-ledger-touch check is the registered follow-up). Until it
   lands, a review of the fixture's content is part of reviewing the promotion PR.

@@ -1,0 +1,14 @@
+§M{m001:FixtureTest}
+  §PP{FEATURE}
+    §U{Number:System.Int32}
+    §CL{c001:ConditionalValue:pub:stat}
+      §MT{m001:Get:pub:stat} () -> Number
+        §S (== result INT:41)
+        §R INT:41
+  §PPE
+    §U{Number:System.Int32}
+    §CL{c002:ConditionalValue:pub:stat}
+      §MT{m002:Get:pub:stat} () -> Number
+        §S (== result INT:42)
+        §R INT:42
+  §/PP{FEATURE}
