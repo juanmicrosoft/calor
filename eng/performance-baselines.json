@@ -1,12 +1,14 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "warmupRuns": 1,
   "measuredRuns": 3,
+  "calibrationRuns": 5,
+  "calibrationFilter": "FullyQualifiedName~Parsing_SmallModule_Under100ms",
   "expectedTestCount": 21,
   "metrics": {
-    "performance-suite-seconds": {
-      "maximumMedian": 21.0,
-      "noisePolicy": "One warmup is discarded; three isolated runs are measured; the median must remain at or below the ratcheted maximum. Raised 20.0 -> 21.0 on 2026-08-12 for the gate-8 index/query coverage (IndexPerformanceTests): the suite measured ~19.8s against a 20.0s ceiling, i.e. ~1% headroom, so any added coverage breached it. Observed run-to-run spread is ~0.5s, so the new ceiling sits ~0.9s above the measured median rather than hugging it. The added tests were first made cheaper — one shared index build via a class fixture instead of three — before the ceiling moved at all."
+    "performance-suite-ratio": {
+      "maximumMedian": 34.0,
+      "noisePolicy": "The gate measures the suite's cost RELATIVE to a calibration run on the same runner, not absolute wall-clock. An absolute ceiling could not work: 21.0s was calibrated on a dev machine at ~19.8s, while CI medians measured 20.618, 20.692, 21.209 and 22.391s with individual samples to 22.962s \u2014 a spread larger than the headroom, so the gate flapped and failed the release on runner speed rather than on any regression. Calibration runs the same test host filtered to ONE trivial test, so its duration is process start + assembly load + JIT: a probe of how fast THIS runner is, deliberately insensitive to the compiler analysis the suite measures. A slower runner scales both terms and leaves the ratio flat; a real regression moves the suite while calibration stays put. Absolute seconds are still recorded in the report for trend-watching, they are simply not the gate. Ceiling provisional at 34.0 pending a CI measurement: the local ratio is 26.0 (19.871s suite / 0.764s calibration). Calibration is the median of 5 because process-start jitter across 3 samples was ~20%, and a noisy denominator is a noisy gate."
     }
   }
 }
