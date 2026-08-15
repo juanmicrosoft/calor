@@ -264,6 +264,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string InstanceMemberInStaticContext = "Calor0261";
 
+    /// <summary>
+    /// Error: the workspace inheritance graph contains a direct or indirect cycle.
+    /// </summary>
+    public const string InheritanceCycle = "Calor0262";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

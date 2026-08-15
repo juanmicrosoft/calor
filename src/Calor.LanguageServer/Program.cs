@@ -10,8 +10,6 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        var workspace = new WorkspaceState();
-
         var server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(options =>
         {
             options
@@ -23,7 +21,8 @@ public static class Program
                 })
                 .WithServices(services =>
                 {
-                    services.AddSingleton(workspace);
+                    services.AddSingleton(provider => new WorkspaceState(
+                        logger: provider.GetRequiredService<ILogger<WorkspaceState>>()));
                 })
                 .WithHandler<DocumentSymbolHandler>()
                 .WithHandler<DefinitionHandler>()
@@ -36,18 +35,24 @@ public static class Program
                 .WithHandler<RenameHandler>()
                 .WithHandler<WorkspaceSymbolHandler>()
                 .WithHandler<SemanticTokensHandler>()
-                .OnInitialize((server, request, token) =>
+                .OnInitialize(async (server, request, token) =>
                 {
+                    var workspace =
+                        server.Services.GetRequiredService<WorkspaceState>();
                     var workspaceFolders = request.WorkspaceFolders?
                         .Select(folder => folder.Uri.ToUri())
                         .ToArray();
                     if (workspaceFolders is { Length: > 0 })
                     {
-                        workspace.ConfigureWorkspaceRoots(workspaceFolders);
+                        await workspace.ConfigureWorkspaceRootsAsync(
+                            workspaceFolders,
+                            token).ConfigureAwait(false);
                     }
                     else if (request.RootUri is { } rootUri)
                     {
-                        workspace.ConfigureWorkspaceRoot(rootUri.ToUri());
+                        await workspace.ConfigureWorkspaceRootAsync(
+                            rootUri.ToUri(),
+                            token).ConfigureAwait(false);
                     }
 
                     // Register TextDocumentSyncHandler which needs the server reference
@@ -55,7 +60,6 @@ public static class Program
                     {
                         opts.AddHandler(new TextDocumentSyncHandler(workspace, server));
                     });
-                    return Task.CompletedTask;
                 });
         }).ConfigureAwait(false);
 

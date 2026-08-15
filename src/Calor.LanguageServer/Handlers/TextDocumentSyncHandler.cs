@@ -12,6 +12,48 @@ using TextDocumentSelector = OmniSharp.Extensions.LanguageServer.Protocol.Models
 
 namespace Calor.LanguageServer.Handlers;
 
+internal sealed record DiagnosticPublication(
+    DocumentUri Uri,
+    Func<bool> Publish);
+
+internal sealed class DiagnosticPublicationCoordinator
+{
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Dictionary<DocumentUri, long> _publishedGenerations = [];
+
+    internal async Task PublishAsync(
+        Func<(long Generation, IReadOnlyList<DiagnosticPublication> Publications)>
+            createBatch,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(createBatch);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var batch = createBatch();
+            foreach (var publication in batch.Publications)
+            {
+                if (_publishedGenerations.TryGetValue(
+                        publication.Uri,
+                        out var publishedGeneration)
+                    && publishedGeneration >= batch.Generation)
+                {
+                    continue;
+                }
+
+                if (publication.Publish())
+                {
+                    _publishedGenerations[publication.Uri] = batch.Generation;
+                }
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+}
+
 /// <summary>
 /// Handles text document synchronization (open, change, close).
 /// </summary>
@@ -20,6 +62,7 @@ public sealed class TextDocumentSyncHandler :
 {
     private readonly WorkspaceState _workspace;
     private readonly ILanguageServerFacade _server;
+    private readonly DiagnosticPublicationCoordinator _publicationCoordinator = new();
 
     public TextDocumentSyncHandler(WorkspaceState workspace, ILanguageServerFacade server)
     {
@@ -32,54 +75,80 @@ public sealed class TextDocumentSyncHandler :
         return new TextDocumentAttributes(uri, "calor");
     }
 
-    public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(
+        DidOpenTextDocumentParams request,
+        CancellationToken cancellationToken)
     {
         var document = request.TextDocument;
-        var state = _workspace.GetOrCreate(document.Uri, document.Text, document.Version ?? 0);
+        var accepted = await _workspace.GetOrCreateAsync(
+            document.Uri,
+            document.Text,
+            document.Version ?? 0,
+            cancellationToken).ConfigureAwait(false);
+        if (accepted)
+        {
+            await PublishWorkspaceDiagnosticsAsync(
+                [],
+                cancellationToken).ConfigureAwait(false);
+        }
 
-        PublishDiagnostics(document.Uri, state);
-
-        return Unit.Task;
+        return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(
+        DidChangeTextDocumentParams request,
+        CancellationToken cancellationToken)
     {
         var document = request.TextDocument;
 
         // Get the full text from the changes (we use full sync)
         var text = request.ContentChanges.FirstOrDefault()?.Text ?? string.Empty;
 
-        var state = _workspace.Update(document.Uri, text, document.Version ?? 0);
-
-        PublishDiagnostics(document.Uri, state);
-
-        return Unit.Task;
-    }
-
-    public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
-    {
-        _workspace.Remove(request.TextDocument.Uri);
-
-        // Clear diagnostics for closed document
-        _server.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
+        var accepted = await _workspace.UpdateAsync(
+            document.Uri,
+            text,
+            document.Version ?? 0,
+            cancellationToken).ConfigureAwait(false);
+        if (accepted)
         {
-            Uri = request.TextDocument.Uri,
-            Diagnostics = new Container<Diagnostic>()
-        });
-
-        return Unit.Task;
-    }
-
-    public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
-    {
-        // Optionally re-analyze on save
-        var state = _workspace.Reanalyze(request.TextDocument.Uri);
-        if (state != null)
-        {
-            PublishDiagnostics(request.TextDocument.Uri, state);
+            await PublishWorkspaceDiagnosticsAsync(
+                [],
+                cancellationToken).ConfigureAwait(false);
         }
 
-        return Unit.Task;
+        return Unit.Value;
+    }
+
+    public override async Task<Unit> Handle(
+        DidCloseTextDocumentParams request,
+        CancellationToken cancellationToken)
+    {
+        await _workspace.RemoveAsync(
+            request.TextDocument.Uri,
+            cancellationToken).ConfigureAwait(false);
+
+        await PublishWorkspaceDiagnosticsAsync(
+            [request.TextDocument.Uri],
+            cancellationToken).ConfigureAwait(false);
+
+        return Unit.Value;
+    }
+
+    public override async Task<Unit> Handle(
+        DidSaveTextDocumentParams request,
+        CancellationToken cancellationToken)
+    {
+        var accepted = await _workspace.ReanalyzeAsync(
+            request.TextDocument.Uri,
+            cancellationToken).ConfigureAwait(false);
+        if (accepted)
+        {
+            await PublishWorkspaceDiagnosticsAsync(
+                [],
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return Unit.Value;
     }
 
     protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(
@@ -94,15 +163,58 @@ public sealed class TextDocumentSyncHandler :
         };
     }
 
-    private void PublishDiagnostics(DocumentUri uri, DocumentState state)
+    private Task PublishWorkspaceDiagnosticsAsync(
+        IReadOnlyCollection<DocumentUri> clearUris,
+        CancellationToken cancellationToken)
     {
-        var lspDiagnostics = DiagnosticConverter.ToLspDiagnostics(state.Diagnostics, state.Source);
+        return _publicationCoordinator.PublishAsync(
+            () =>
+            {
+                var workspace = _workspace.CaptureSnapshot();
+                var publications = new List<DiagnosticPublication>();
+                foreach (var uri in clearUris)
+                {
+                    if (_workspace.Contains(uri))
+                        continue;
+                    publications.Add(new DiagnosticPublication(
+                        uri,
+                        () => _workspace.TryPublishGeneration(
+                            workspace,
+                            () => _server.TextDocument.PublishDiagnostics(
+                                new PublishDiagnosticsParams
+                                {
+                                    Uri = uri,
+                                    Diagnostics = new Container<Diagnostic>(),
+                                }))));
+                }
 
-        _server.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
-        {
-            Uri = uri,
-            Version = state.Version,
-            Diagnostics = new Container<Diagnostic>(lspDiagnostics)
-        });
+                foreach (var document in workspace.Documents)
+                {
+                    var uri = DocumentUri.From(document.Document.Uri);
+                    if (!_workspace.Contains(uri))
+                        continue;
+
+                    var lspDiagnostics = DiagnosticConverter.ToLspDiagnostics(
+                            _workspace.GetDiagnostics(workspace, document),
+                            document.Analysis.Source)
+                        .ToArray();
+                    publications.Add(new DiagnosticPublication(
+                        uri,
+                        () => _workspace.TryPublishDiagnostics(
+                            workspace,
+                            document,
+                            () => _server.TextDocument.PublishDiagnostics(
+                                new PublishDiagnosticsParams
+                                {
+                                    Uri = uri,
+                                    Version = document.Analysis.Version,
+                                    Diagnostics =
+                                        new Container<Diagnostic>(lspDiagnostics),
+                                }))));
+                }
+
+                return (workspace.Generation, publications);
+            },
+            cancellationToken);
     }
 }

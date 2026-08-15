@@ -32,8 +32,8 @@ public sealed class CodeActionHandler : CodeActionHandlerBase
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken cancellationToken)
     {
-        var state = _workspace.Get(request.TextDocument.Uri);
-        if (state == null)
+        var snapshot = _workspace.Get(request.TextDocument.Uri)?.Snapshot;
+        if (snapshot == null)
         {
             return Task.FromResult<CommandOrCodeActionContainer?>(null);
         }
@@ -41,10 +41,10 @@ public sealed class CodeActionHandler : CodeActionHandlerBase
         var codeActions = new List<CommandOrCodeAction>();
 
         // Check if there are any diagnostics with fixes at the requested range
-        foreach (var diagnostic in state.DiagnosticsWithFixes)
+        foreach (var diagnostic in snapshot.DiagnosticsWithFixes)
         {
             // Check if the diagnostic overlaps with the requested range
-            var diagRange = PositionConverter.ToLspRange(diagnostic.Span, state.Source);
+            var diagRange = PositionConverter.ToLspRange(diagnostic.Span, snapshot.Source);
             if (!RangesOverlap(diagRange, request.Range))
                 continue;
 
@@ -78,7 +78,7 @@ public sealed class CodeActionHandler : CodeActionHandlerBase
                             diagnostic.Span,
                             diagnostic.Severity,
                             diagnostic.FilePath),
-                        state.Source)),
+                        snapshot.Source)),
                 Edit = workspaceEdit,
                 IsPreferred = true
             };
@@ -87,18 +87,20 @@ public sealed class CodeActionHandler : CodeActionHandlerBase
         }
 
         // Add source actions even without diagnostics
-        codeActions.AddRange(GetSourceActions(state, request));
+        codeActions.AddRange(GetSourceActions(snapshot, request));
 
         return Task.FromResult<CommandOrCodeActionContainer?>(
             codeActions.Count > 0 ? new CommandOrCodeActionContainer(codeActions) : null);
     }
 
-    private static IEnumerable<CommandOrCodeAction> GetSourceActions(DocumentState state, CodeActionParams request)
+    private static IEnumerable<CommandOrCodeAction> GetSourceActions(
+        DocumentSnapshot snapshot,
+        CodeActionParams request)
     {
         var actions = new List<CommandOrCodeAction>();
 
         // Add "Organize imports" action if there are using directives
-        if (state.Ast?.Usings.Count > 0)
+        if (snapshot.Ast?.Usings.Count > 0)
         {
             // Could add action to sort using directives
         }

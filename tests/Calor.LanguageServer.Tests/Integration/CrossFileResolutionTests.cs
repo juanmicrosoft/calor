@@ -2,6 +2,7 @@ using Calor.Compiler.Binding;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
 using Calor.LanguageServer.Utilities;
+using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using Xunit;
 
@@ -1036,6 +1037,818 @@ public class CrossFileResolutionTests
     }
 
     [Fact]
+    public async Task DirectCrossFileInheritanceCycle_IsDeterministicAndTraversalTerminatesAsync()
+    {
+        var workspace = new WorkspaceState();
+        var aUri = DocumentUri.From("file:///cycle-a.calr");
+        var bUri = DocumentUri.From("file:///cycle-b.calr");
+        workspace.GetOrCreate(aUri, """
+            §M{m001:CycleA}
+              §CL{c001:A}
+                §EXT{B}
+            """);
+        workspace.GetOrCreate(bUri, """
+            §M{m002:CycleB}
+              §CL{c002:B}
+                §EXT{A}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var aDiagnostic = Assert.Single(
+            workspace.GetDiagnostics(snapshot, snapshot.GetDocument(aUri)!)
+                .Where(diagnostic =>
+                    diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+        var bDiagnostic = Assert.Single(
+            workspace.GetDiagnostics(snapshot, snapshot.GetDocument(bUri)!)
+                .Where(diagnostic =>
+                    diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+
+        Assert.Equal("Inheritance cycle detected: A -> B -> A.", aDiagnostic.Message);
+        Assert.Equal(aDiagnostic.Message, bDiagnostic.Message);
+        var result = await Task.Run(() =>
+                workspace.FindMemberAcrossFiles("A", "missing"))
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Null(result.Doc);
+        Assert.Null(result.Node);
+    }
+
+    [Fact]
+    public async Task IndirectCrossFileInheritanceCycle_IsCanonicalAcrossAllFilesAsync()
+    {
+        var workspace = new WorkspaceState();
+        var aUri = DocumentUri.From("file:///indirect-a.calr");
+        var bUri = DocumentUri.From("file:///indirect-b.calr");
+        var cUri = DocumentUri.From("file:///indirect-c.calr");
+        workspace.GetOrCreate(aUri, """
+            §M{m001:CycleA}
+              §CL{c001:A}
+                §EXT{B}
+            """);
+        workspace.GetOrCreate(bUri, """
+            §M{m002:CycleB}
+              §CL{c002:B}
+                §EXT{C}
+            """);
+        workspace.GetOrCreate(cUri, """
+            §M{m003:CycleC}
+              §CL{c003:C}
+                §EXT{A}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var messages = new[] { aUri, bUri, cUri }
+            .Select(uri => Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(diagnostic =>
+                        diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle))
+                .Message)
+            .ToArray();
+
+        Assert.All(messages, message =>
+            Assert.Equal(
+                "Inheritance cycle detected: A -> B -> C -> A.",
+                message));
+        var result = await Task.Run(() =>
+                workspace.FindMemberAcrossFiles("B", "missing"))
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Null(result.Doc);
+        Assert.Null(result.Node);
+    }
+
+    [Fact]
+    public void QualifiedCrossFileInheritanceCycle_ResolvesModuleQualifiedBases()
+    {
+        var workspace = new WorkspaceState();
+        var aUri = DocumentUri.From("file:///qualified-cycle-a.calr");
+        var bUri = DocumentUri.From("file:///qualified-cycle-b.calr");
+        workspace.GetOrCreate(aUri, """
+            §M{m001:CycleA}
+              §CL{c001:A}
+                §EXT{CycleB.B}
+            """);
+        workspace.GetOrCreate(bUri, """
+            §M{m002:CycleB}
+              §CL{c002:B}
+                §EXT{CycleA.A}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var diagnostics = new[] { aUri, bUri }
+            .Select(uri => Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(diagnostic =>
+                        diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)))
+            .ToArray();
+
+        Assert.All(diagnostics, diagnostic =>
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message));
+    }
+
+    [Fact]
+    public void DistinctSameDisplayInheritanceCycles_AreNotDeduplicatedByMessage()
+    {
+        var workspace = new WorkspaceState();
+        var sources = new Dictionary<DocumentUri, string>
+        {
+            [DocumentUri.From("file:///left-a.calr")] = """
+                §M{m001:LeftA}
+                  §CL{c001:A}
+                    §EXT{LeftB.B}
+                """,
+            [DocumentUri.From("file:///left-b.calr")] = """
+                §M{m002:LeftB}
+                  §CL{c002:B}
+                    §EXT{LeftA.A}
+                """,
+            [DocumentUri.From("file:///right-a.calr")] = """
+                §M{m003:RightA}
+                  §CL{c003:A}
+                    §EXT{RightB.B}
+                """,
+            [DocumentUri.From("file:///right-b.calr")] = """
+                §M{m004:RightB}
+                  §CL{c004:B}
+                    §EXT{RightA.A}
+                """,
+        };
+        foreach (var (uri, source) in sources)
+            workspace.GetOrCreate(uri, source);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var diagnostics = sources.Keys
+            .Select(uri => Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(diagnostic =>
+                        diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)))
+            .ToArray();
+
+        Assert.Equal(4, diagnostics.Length);
+        Assert.All(diagnostics, diagnostic =>
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message));
+    }
+
+    [Fact]
+    public void DirectCrossFilePartialInheritanceCycle_DiagnosesEveryPart()
+    {
+        var workspace = new WorkspaceState();
+        var sources = new Dictionary<DocumentUri, string>
+        {
+            [DocumentUri.From("file:///partial-a-base.calr")] = """
+                §M{ma1:CycleA}
+                  §CL{a1:A:pub:partial}
+                    §EXT{CycleB.B}
+                """,
+            [DocumentUri.From("file:///partial-a-members.calr")] = """
+                §M{ma2:CycleA}
+                  §CL{a2:A:pub:partial}
+                    §FLD{i32:value}
+                """,
+            [DocumentUri.From("file:///partial-b-base.calr")] = """
+                §M{mb1:CycleB}
+                  §CL{b1:B:pub:partial}
+                    §EXT{CycleA.A}
+                """,
+            [DocumentUri.From("file:///partial-b-members.calr")] = """
+                §M{mb2:CycleB}
+                  §CL{b2:B:pub:partial}
+                    §FLD{i32:value}
+                """,
+        };
+        foreach (var (uri, source) in sources)
+            workspace.GetOrCreate(uri, source);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var diagnostics = sources.Keys
+            .Select(uri => Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(diagnostic =>
+                        diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)))
+            .ToArray();
+
+        Assert.Equal(4, diagnostics.Length);
+        Assert.All(diagnostics, diagnostic =>
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message));
+    }
+
+    [Fact]
+    public void IndirectCrossFilePartialInheritanceCycle_DiagnosesEveryPart()
+    {
+        var workspace = new WorkspaceState();
+        var sources = new Dictionary<DocumentUri, string>
+        {
+            [DocumentUri.From("file:///partial-indirect-a-base.calr")] = """
+                §M{ma1:CycleA}
+                  §CL{a1:A:pub:partial}
+                    §EXT{CycleB.B}
+                """,
+            [DocumentUri.From("file:///partial-indirect-a-part.calr")] = """
+                §M{ma2:CycleA}
+                  §CL{a2:A:pub:partial}
+                """,
+            [DocumentUri.From("file:///partial-indirect-b-base.calr")] = """
+                §M{mb1:CycleB}
+                  §CL{b1:B:pub:partial}
+                    §EXT{CycleC.C}
+                """,
+            [DocumentUri.From("file:///partial-indirect-b-part.calr")] = """
+                §M{mb2:CycleB}
+                  §CL{b2:B:pub:partial}
+                """,
+            [DocumentUri.From("file:///partial-indirect-c-base.calr")] = """
+                §M{mc1:CycleC}
+                  §CL{c1:C:pub:partial}
+                    §EXT{CycleA.A}
+                """,
+            [DocumentUri.From("file:///partial-indirect-c-part.calr")] = """
+                §M{mc2:CycleC}
+                  §CL{c2:C:pub:partial}
+                """,
+        };
+        foreach (var (uri, source) in sources)
+            workspace.GetOrCreate(uri, source);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var diagnostics = sources.Keys
+            .Select(uri => Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(diagnostic =>
+                        diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)))
+            .ToArray();
+
+        Assert.Equal(6, diagnostics.Length);
+        Assert.All(diagnostics, diagnostic =>
+            Assert.Equal(
+                "Inheritance cycle detected: A -> B -> C -> A.",
+                diagnostic.Message));
+    }
+
+    [Fact]
+    public void NonPartialDuplicateDeclarations_AreNotMergedIntoInheritanceGraph()
+    {
+        var workspace = new WorkspaceState();
+        var sources = new Dictionary<DocumentUri, string>
+        {
+            [DocumentUri.From("file:///duplicate-a-one.calr")] = """
+                §M{ma1:Duplicate}
+                  §CL{a1:A:pub}
+                    §EXT{Other.B}
+                """,
+            [DocumentUri.From("file:///duplicate-a-two.calr")] = """
+                §M{ma2:Duplicate}
+                  §CL{a2:A:pub}
+                """,
+            [DocumentUri.From("file:///duplicate-b.calr")] = """
+                §M{mb1:Other}
+                  §CL{b1:B:pub}
+                    §EXT{Duplicate.A}
+                """,
+        };
+        foreach (var (uri, source) in sources)
+            workspace.GetOrCreate(uri, source);
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.All(sources.Keys, uri =>
+            Assert.DoesNotContain(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!),
+                diagnostic =>
+                    diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+    }
+
+    [Fact]
+    public void GenericInheritanceCycles_ResolveMatchingArityOnly()
+    {
+        var workspace = new WorkspaceState();
+        var sources = new Dictionary<DocumentUri, string>
+        {
+            [DocumentUri.From("file:///generic-foo-one.calr")] = """
+                §M{m1:Generic}
+                  §CL{f1:Foo:pub}<T>
+                    §EXT{Generic.Bar<T>}
+                """,
+            [DocumentUri.From("file:///generic-bar-one.calr")] = """
+                §M{m2:Generic}
+                  §CL{b1:Bar:pub}<T>
+                    §EXT{Generic.Foo<T>}
+                """,
+            [DocumentUri.From("file:///generic-foo-two.calr")] = """
+                §M{m3:Generic}
+                  §CL{f2:Foo:pub}<T,U>
+                    §EXT{Generic.Bar<T,U>}
+                """,
+            [DocumentUri.From("file:///generic-bar-two.calr")] = """
+                §M{m4:Generic}
+                  §CL{b2:Bar:pub}<T,U>
+                    §EXT{Generic.Foo<T,U>}
+                """,
+        };
+        foreach (var (uri, source) in sources)
+            workspace.GetOrCreate(uri, source);
+
+        var snapshot = workspace.CaptureSnapshot();
+        foreach (var uri in sources.Keys)
+        {
+            var diagnostic = Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(item =>
+                        item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+            var expectedArity = uri.ToString().Contains("-one.", StringComparison.Ordinal)
+                ? "`1"
+                : "`2";
+            Assert.Contains(expectedArity, diagnostic.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                expectedArity == "`1" ? "`2" : "`1",
+                diagnostic.Message,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("i32[,]")]
+    [InlineData("Nested<A,B>")]
+    [InlineData("(A,B)")]
+    [InlineData("(Nested<A,B>[,],(C,D))")]
+    public void GenericArityParser_IgnoresNestedDelimiterCommas(
+        string typeArgument)
+    {
+        var workspace = new WorkspaceState();
+        var fooUri = DocumentUri.From(
+            $"file:///arity-foo-{typeArgument.Length}.calr");
+        var barUri = DocumentUri.From(
+            $"file:///arity-bar-{typeArgument.Length}.calr");
+        workspace.GetOrCreate(fooUri, $$"""
+            §M{m1:Generic}
+              §CL{f1:Foo:pub}<T>
+                §EXT{Generic.Bar<{{typeArgument}}>}
+            """);
+        workspace.GetOrCreate(barUri, $$"""
+            §M{m2:Generic}
+              §CL{b1:Bar:pub}<T>
+                §EXT{Generic.Foo<{{typeArgument}}>}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.All(new[] { fooUri, barUri }, uri =>
+        {
+            var diagnostic = Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(item =>
+                        item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+            Assert.Contains("`1", diagnostic.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("`2", diagnostic.Message, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void LexicalNestedTypeResolution_WinsOverAmbiguousGlobalSimpleName()
+    {
+        var workspace = new WorkspaceState();
+        var localUri = DocumentUri.From("file:///lexical-local.calr");
+        var globalUri = DocumentUri.From("file:///lexical-global.calr");
+        workspace.GetOrCreate(localUri, """
+            §M{m1:Local}
+              §CL{h1:Host:pub}
+                §CL{Parent:pub}
+                  §EXT{Child}
+                §CL{Child:pub}
+                  §EXT{Parent}
+            """);
+        workspace.GetOrCreate(globalUri, """
+            §M{m2:Other}
+              §CL{p1:Parent:pub}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+        var localAst = snapshot.GetDocument(localUri)!.Analysis.Ast!;
+        var host = Assert.Single(localAst.Classes);
+        Assert.Equal(2, host.NestedClasses.Count);
+        Assert.Equal(
+            new[] { "Parent", "Child" },
+            host.NestedClasses.Select(node => node.Name).ToArray());
+        Assert.Equal(
+            "Child",
+            host.NestedClasses.Single(node => node.Name == "Parent").BaseClass);
+        Assert.Equal(
+            "Parent",
+            host.NestedClasses.Single(node => node.Name == "Child").BaseClass);
+        var localDiagnostics = workspace.GetDiagnostics(
+                snapshot,
+                snapshot.GetDocument(localUri)!)
+            .Where(item =>
+                item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)
+            .ToArray();
+
+        Assert.Equal(2, localDiagnostics.Length);
+        Assert.DoesNotContain(
+            workspace.GetDiagnostics(snapshot, snapshot.GetDocument(globalUri)!),
+            item => item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle);
+    }
+
+    [Fact]
+    public void AmbiguousLocalTypeResolution_DoesNotFallThroughToImportedGlobal()
+    {
+        var workspace = new WorkspaceState();
+        var sources = new Dictionary<DocumentUri, string>
+        {
+            [DocumentUri.From("file:///ambiguous-base-one.calr")] = """
+                §M{m1:Local}
+                  §CL{b1:Base:pub}
+                """,
+            [DocumentUri.From("file:///ambiguous-base-two.calr")] = """
+                §M{m2:Local}
+                  §CL{b2:Base:pub}
+                """,
+            [DocumentUri.From("file:///ambiguous-derived.calr")] = """
+                §M{m3:Local}
+                  §U{Other}
+                  §CL{d1:Derived:pub}
+                    §EXT{Base}
+                """,
+            [DocumentUri.From("file:///ambiguous-import.calr")] = """
+                §M{m4:Other}
+                  §CL{b3:Base:pub}
+                    §EXT{Local.Derived}
+                """,
+        };
+        foreach (var (uri, source) in sources)
+            workspace.GetOrCreate(uri, source);
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.All(sources.Keys, uri =>
+            Assert.DoesNotContain(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!),
+                item => item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+    }
+
+    [Fact]
+    public void PartialGenericParameterNameMismatch_IsNotMergedIntoCycle()
+    {
+        AssertIncompatiblePartialGenericDoesNotCycle(
+            "§CL{f1:Foo:pub:partial}<T>\n    §EXT{Generic.Bar<T>}",
+            "§CL{f2:Foo:pub:partial}<U>");
+    }
+
+    [Fact]
+    public void PartialGenericConstraintMismatch_IsNotMergedIntoCycle()
+    {
+        AssertIncompatiblePartialGenericDoesNotCycle(
+            "§CL{f1:Foo:pub:partial}<T>\n    §WHERE T : class\n    §EXT{Generic.Bar<T>}",
+            "§CL{f2:Foo:pub:partial}<T>\n    §WHERE T : struct");
+    }
+
+    [Fact]
+    public void CompatiblePartialGenericDeclarations_MergeIntoCycle()
+    {
+        var workspace = new WorkspaceState();
+        var firstUri = DocumentUri.From("file:///compatible-partial-one.calr");
+        var secondUri = DocumentUri.From("file:///compatible-partial-two.calr");
+        var barUri = DocumentUri.From("file:///compatible-partial-bar.calr");
+        var firstState = workspace.GetOrCreate(firstUri, """
+            §M{m1:Generic}
+              §CL{f1:Foo:pub:partial}<T>
+                §WHERE T : class
+                §EXT{Generic.Bar<T>}
+            """);
+        var secondState = workspace.GetOrCreate(secondUri, """
+            §M{m2:Generic}
+              §CL{f2:Foo:pub:partial}<T>
+                §WHERE T : class
+            """);
+        workspace.GetOrCreate(barUri, """
+            §M{m3:Generic}
+              §CL{b1:Bar:pub}<T>
+                §EXT{Generic.Foo<T>}
+            """);
+
+        foreach (var node in new[]
+                 {
+                     Assert.Single(firstState.Snapshot.Ast!.Classes),
+                     Assert.Single(secondState.Snapshot.Ast!.Classes),
+                 })
+        {
+            Assert.True(node.IsPartial);
+            Assert.Equal("Foo", node.Name);
+            var parameter = Assert.Single(node.TypeParameters);
+            Assert.Equal("T", parameter.Name);
+            Assert.Equal(
+                Compiler.Ast.TypeConstraintKind.Class,
+                Assert.Single(parameter.Constraints).Kind);
+        }
+        Assert.Equal(
+            "Generic.Bar<T>",
+            Assert.Single(firstState.Snapshot.Ast!.Classes).BaseClass);
+        Assert.Equal(
+            "Generic.Foo<T>",
+            Assert.Single(workspace.Get(barUri)!.Snapshot.Ast!.Classes).BaseClass);
+        Assert.Equal(
+            "Bar",
+            Assert.Single(workspace.Get(barUri)!.Snapshot.Ast!.Classes).Name);
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.All(new[] { firstUri, secondUri, barUri }, uri =>
+            Assert.Single(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!)
+                    .Where(item =>
+                        item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)));
+    }
+
+    [Fact]
+    public void ModuleNestedTypeFlatteningCollision_IsAmbiguousWithoutThrowing()
+    {
+        var workspace = new WorkspaceState();
+        var nestedUri = DocumentUri.From("file:///structured-nested.calr");
+        var moduleUri = DocumentUri.From("file:///structured-module.calr");
+        workspace.GetOrCreate(nestedUri, """
+            §M{m1:A}
+              §CL{b1:B:pub}
+                §CL{C:pub}
+                  §EXT{A.B.C}
+            """);
+        workspace.GetOrCreate(moduleUri, """
+            §M{m2:A.B}
+              §CL{c2:C:pub}
+                §EXT{A.B.C}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+
+        Assert.Equal(2, snapshot.Documents.Length);
+        Assert.All(new[] { nestedUri, moduleUri }, uri =>
+            Assert.DoesNotContain(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!),
+                diagnostic =>
+                    diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+    }
+
+    private static void AssertIncompatiblePartialGenericDoesNotCycle(
+        string firstDeclaration,
+        string secondDeclaration)
+    {
+        var workspace = new WorkspaceState();
+        var firstUri = DocumentUri.From("file:///incompatible-partial-one.calr");
+        var secondUri = DocumentUri.From("file:///incompatible-partial-two.calr");
+        var barUri = DocumentUri.From("file:///incompatible-partial-bar.calr");
+        workspace.GetOrCreate(firstUri, $"§M{{m1:Generic}}\n  {firstDeclaration}\n");
+        workspace.GetOrCreate(secondUri, $"§M{{m2:Generic}}\n  {secondDeclaration}\n");
+        workspace.GetOrCreate(barUri, """
+            §M{m3:Generic}
+              §CL{b1:Bar:pub}<T>
+                §EXT{Generic.Foo<T>}
+            """);
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.All(new[] { firstUri, secondUri, barUri }, uri =>
+            Assert.DoesNotContain(
+                workspace.GetDiagnostics(snapshot, snapshot.GetDocument(uri)!),
+                item => item.Code == Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+    }
+
+    [Fact]
+    public async Task CapturedWorkspaceIndex_RemainsVersionCoherentAfterUpdateAsync()
+    {
+        const string original = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub} () -> i32
+                §R 42
+              §F{f002:Use:pub} () -> i32
+                §R §C{Compute} §/C
+            """;
+        const string updated = """
+            §M{m001:TestModule}
+              §F{f001:Calculate:pub} () -> i32
+                §R 42
+              §F{f002:Use:pub} () -> i32
+                §R §C{Calculate} §/C
+            """;
+        var workspace = new WorkspaceState();
+        var uri = DocumentUri.From("file:///workspace-snapshot.calr");
+        workspace.GetOrCreate(uri, original, version: 1);
+        var captured = workspace.CaptureSnapshot();
+        var capturedDocument = captured.GetDocument(uri)!;
+        var originalReference = original.LastIndexOf("Compute", StringComparison.Ordinal);
+        var capturedOccurrence = workspace.ResolveOccurrence(
+            captured,
+            uri,
+            originalReference);
+
+        var directUpdate = await workspace.Get(uri)!.UpdateAsync(
+            updated,
+            newVersion: 2);
+        Assert.True(directUpdate.Accepted);
+        var current = workspace.CaptureSnapshot();
+        var currentReference = updated.LastIndexOf("Calculate", StringComparison.Ordinal);
+        var currentOccurrence = workspace.ResolveOccurrence(
+            current,
+            uri,
+            currentReference);
+
+        Assert.NotNull(capturedOccurrence);
+        Assert.Equal(1, capturedDocument.Analysis.Version);
+        Assert.Contains("Compute", capturedDocument.Analysis.Source, StringComparison.Ordinal);
+        Assert.Equal(
+            "Compute",
+            capturedDocument.Analysis.Source.Substring(
+                capturedOccurrence.Span.Start,
+                capturedOccurrence.Span.Length));
+        Assert.Equal(2, current.GetDocument(uri)!.Analysis.Version);
+        Assert.NotNull(currentOccurrence);
+        Assert.Equal(
+            "Calculate",
+            current.GetDocument(uri)!.Analysis.Source.Substring(
+                currentOccurrence.Span.Start,
+                currentOccurrence.Span.Length));
+        Assert.Contains(
+            "Calculate",
+            current.GetDocument(uri)!.Analysis.Source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CancelledWorkspaceScan_IsBoundedAndDoesNotHoldIndexLockAsync()
+    {
+        var repositoryRoot = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(repositoryRoot, "Calor.sln")))
+        {
+            repositoryRoot = Directory.GetParent(repositoryRoot)?.FullName
+                ?? throw new InvalidOperationException("Repository root not found.");
+        }
+        var directory = Path.Combine(
+            repositoryRoot,
+            $"workspace-scan-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "blocked.calr"),
+            "§M{m001:Blocked}\n");
+        var readerStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var workspace = new WorkspaceState(
+            workspaceRootPath: null,
+            logger: null,
+            workspaceFileReader: async (_, cancellationToken) =>
+            {
+                readerStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return string.Empty;
+            });
+        using var cancellation = new CancellationTokenSource();
+
+        try
+        {
+            var scan = workspace.ConfigureWorkspaceRootAsync(
+                new UriBuilder(Uri.UriSchemeFile, string.Empty)
+                {
+                    Path = directory + Path.DirectorySeparatorChar,
+                }.Uri,
+                cancellation.Token);
+            await readerStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            var snapshot = await Task.Run(() => workspace.CaptureSnapshot())
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Empty(snapshot.Documents);
+
+            await cancellation.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => scan.WaitAsync(TimeSpan.FromSeconds(2)));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WorkspaceEnumerationFailure_IsLoggedAndDoesNotAbortInitializationAsync()
+    {
+        var repositoryRoot = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(repositoryRoot, "Calor.sln")))
+        {
+            repositoryRoot = Directory.GetParent(repositoryRoot)?.FullName
+                ?? throw new InvalidOperationException("Repository root not found.");
+        }
+        var directory = Path.Combine(
+            repositoryRoot,
+            $"workspace-enumeration-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var logger = new CapturingWorkspaceLogger();
+        var workspace = new WorkspaceState(
+            workspaceRootPath: null,
+            logger,
+            workspaceFileReader: File.ReadAllTextAsync,
+            workspaceFileEnumerator: _ => Enumerable.Range(0, 1)
+                .Select<int, string>(_ =>
+                    throw new IOException("injected enumeration failure")));
+
+        try
+        {
+            await workspace.ConfigureWorkspaceRootAsync(
+                    new UriBuilder(Uri.UriSchemeFile, string.Empty)
+                    {
+                        Path = directory + Path.DirectorySeparatorChar,
+                    }.Uri,
+                    CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(2));
+
+            Assert.Empty(workspace.CaptureSnapshot().Documents);
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.IsType<IOException>(entry.Exception);
+            Assert.Equal(
+                Path.GetFullPath(directory),
+                entry.Properties["WorkspaceRoot"]);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ReopenDuringWorkspaceScan_OpenDocumentWinsWithoutDuplicateRegistryEntryAsync()
+    {
+        var repositoryRoot = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(repositoryRoot, "Calor.sln")))
+        {
+            repositoryRoot = Directory.GetParent(repositoryRoot)?.FullName
+                ?? throw new InvalidOperationException("Repository root not found.");
+        }
+        var directory = Path.Combine(
+            repositoryRoot,
+            $"workspace-registry-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "race.calr");
+        const string diskSource = "§M{d001:Disk}\n";
+        const string openSource = "§M{o001:Open}\n";
+        const string reopenedSource = "§M{r001:Reopened}\n";
+        await File.WriteAllTextAsync(path, diskSource);
+        var uri = DocumentUri.FromFileSystemPath(path);
+        var scanReadyToApply = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowScanApply = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var applyCalls = 0;
+        var workspace = new WorkspaceState(
+            workspaceRootPath: null,
+            logger: null,
+            workspaceFileReader: File.ReadAllTextAsync,
+            workspaceFileEnumerator: null,
+            beforeWorkspaceScanApply: () =>
+            {
+                if (Interlocked.Increment(ref applyCalls) == 1)
+                {
+                    scanReadyToApply.TrySetResult();
+                    return allowScanApply.Task;
+                }
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            var scan = workspace.ConfigureWorkspaceRootAsync(
+                new UriBuilder(Uri.UriSchemeFile, string.Empty)
+                {
+                    Path = directory + Path.DirectorySeparatorChar,
+                }.Uri,
+                CancellationToken.None);
+            await scanReadyToApply.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.True(await workspace.GetOrCreateAsync(
+                uri,
+                openSource,
+                version: 7));
+            allowScanApply.TrySetResult();
+            await scan.WaitAsync(TimeSpan.FromSeconds(2));
+
+            var openSnapshot = workspace.CaptureSnapshot();
+            var openDocument = Assert.Single(openSnapshot.Documents);
+            Assert.Equal(uri, DocumentUri.From(openDocument.Document.Uri));
+            Assert.Equal(7, openDocument.Analysis.Version);
+            Assert.Equal(openSource, openDocument.Analysis.Source);
+            Assert.True(workspace.Contains(uri));
+
+            Assert.True(workspace.Remove(uri));
+            await workspace.RefreshClosedDocumentsAsync(CancellationToken.None);
+            var closedDocument = Assert.Single(
+                workspace.CaptureSnapshot().Documents);
+            Assert.Equal(diskSource, closedDocument.Analysis.Source);
+            Assert.False(workspace.Contains(uri));
+
+            Assert.True(await workspace.GetOrCreateAsync(
+                uri,
+                reopenedSource,
+                version: 8));
+            var reopened = Assert.Single(workspace.CaptureSnapshot().Documents);
+            Assert.Equal(8, reopened.Analysis.Version);
+            Assert.Equal(reopenedSource, reopened.Analysis.Source);
+
+            Assert.True(workspace.Remove(uri));
+            File.Delete(path);
+            await workspace.RefreshClosedDocumentsAsync(CancellationToken.None);
+            Assert.Empty(workspace.CaptureSnapshot().Documents);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FindMemberAcrossFiles_NonExistentMember_ReturnsNull()
     {
         var workspace = new WorkspaceState();
@@ -1147,6 +1960,45 @@ public class CrossFileResolutionTests
         Assert.NotNull(doc);
         Assert.NotNull(node);
     }
+
+    private sealed class CapturingWorkspaceLogger : ILogger<WorkspaceState>
+    {
+        public List<WorkspaceLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) =>
+            EmptyScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new WorkspaceLogEntry(
+                logLevel,
+                exception,
+                properties));
+        }
+
+        private sealed class EmptyScope : IDisposable
+        {
+            public static EmptyScope Instance { get; } = new();
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record WorkspaceLogEntry(
+        LogLevel Level,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
 
     #endregion
 }

@@ -20,24 +20,32 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
         _workspace = workspace;
     }
 
-    public override Task<LocationOrLocationLinks?> Handle(
+    public override async Task<LocationOrLocationLinks?> Handle(
         DefinitionParams request,
         CancellationToken cancellationToken)
     {
-        var state = _workspace.Get(request.TextDocument.Uri);
-        var snapshot = state?.Snapshot;
-        if (snapshot == null)
-            return Task.FromResult<LocationOrLocationLinks?>(null);
+        var workspace = await _workspace.CaptureSnapshotAsync(
+            refreshClosedDocuments: true,
+            cancellationToken).ConfigureAwait(false);
+        var document = workspace.GetDocument(request.TextDocument.Uri);
+        if (document == null)
+            return null;
 
-        _workspace.RefreshClosedDocuments();
-        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
-        var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
+        var offset = PositionConverter.ToOffset(
+            request.Position,
+            document.Analysis.Source);
+        var occurrence = _workspace.ResolveOccurrence(
+            workspace,
+            request.TextDocument.Uri,
+            offset);
         if (occurrence == null)
-            return Task.FromResult<LocationOrLocationLinks?>(null);
+            return null;
 
-        var definition = _workspace.FindSymbolDefinition(occurrence.SymbolId);
+        var definition = _workspace.FindSymbolDefinition(
+            workspace,
+            occurrence.SymbolId);
         if (definition == null)
-            return Task.FromResult<LocationOrLocationLinks?>(null);
+            return null;
 
         var location = new Location
         {
@@ -47,9 +55,8 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
                 definition.Span,
                 definition.Snapshot.Source),
         };
-        return Task.FromResult<LocationOrLocationLinks?>(
-            new LocationOrLocationLinks(
-                new[] { new LocationOrLocationLink(location) }));
+        return new LocationOrLocationLinks(
+            new[] { new LocationOrLocationLink(location) });
     }
 
     protected override DefinitionRegistrationOptions CreateRegistrationOptions(

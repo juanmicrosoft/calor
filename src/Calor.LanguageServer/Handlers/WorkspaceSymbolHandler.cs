@@ -25,9 +25,10 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
         var query = request.Query?.Trim() ?? "";
         var symbols = new List<WorkspaceSymbol>();
 
-        foreach (var doc in _workspace.GetAllDocuments())
+        var workspace = _workspace.CaptureSnapshot();
+        foreach (var doc in workspace.Documents)
         {
-            if (doc.Ast == null) continue;
+            if (doc.Analysis.Ast == null) continue;
 
             var docSymbols = CollectWorkspaceSymbols(doc, query);
             symbols.AddRange(docSymbols);
@@ -43,24 +44,28 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
         return Task.FromResult<Container<WorkspaceSymbol>?>(new Container<WorkspaceSymbol>(symbols));
     }
 
-    private IEnumerable<WorkspaceSymbol> CollectWorkspaceSymbols(DocumentState doc, string query)
+    private static IEnumerable<WorkspaceSymbol> CollectWorkspaceSymbols(
+        WorkspaceDocumentSnapshot doc,
+        string query)
     {
-        if (doc.Ast == null) yield break;
+        if (doc.Analysis.Ast == null) yield break;
 
-        var uri = DocumentUri.From(doc.Uri);
+        var uri = DocumentUri.From(doc.Document.Uri);
+        var ast = doc.Analysis.Ast;
+        var source = doc.Analysis.Source;
 
         // Functions
-        foreach (var func in doc.Ast.Functions)
+        foreach (var func in ast.Functions)
         {
             if (MatchesQuery(func.Name, query))
             {
-                var range = PositionConverter.ToLspRange(func.Span, doc.Source);
+                var range = PositionConverter.ToLspRange(func.Span, source);
                 yield return new WorkspaceSymbol
                 {
                     Name = func.Name,
                     Kind = SymbolKind.Function,
                     Location = new Location { Uri = uri, Range = range },
-                    ContainerName = doc.Ast.Name
+                    ContainerName = ast.Name
                 };
             }
 
@@ -71,13 +76,13 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
                 {
                     if (MatchesQuery(param.Name, query))
                     {
-                        var range = PositionConverter.ToLspRange(param.Span, doc.Source);
+                        var range = PositionConverter.ToLspRange(param.Span, source);
                         yield return new WorkspaceSymbol
                         {
                             Name = param.Name,
                             Kind = SymbolKind.Variable,
                             Location = new Location { Uri = uri, Range = range },
-                            ContainerName = $"{doc.Ast.Name}.{func.Name}"
+                            ContainerName = $"{ast.Name}.{func.Name}"
                         };
                     }
                 }
@@ -85,17 +90,17 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
         }
 
         // Classes
-        foreach (var cls in doc.Ast.Classes)
+        foreach (var cls in ast.Classes)
         {
             if (MatchesQuery(cls.Name, query))
             {
-                var range = PositionConverter.ToLspRange(cls.Span, doc.Source);
+                var range = PositionConverter.ToLspRange(cls.Span, source);
                 yield return new WorkspaceSymbol
                 {
                     Name = cls.Name,
                     Kind = SymbolKind.Class,
                     Location = new Location { Uri = uri, Range = range },
-                    ContainerName = doc.Ast.Name
+                    ContainerName = ast.Name
                 };
             }
 
@@ -104,13 +109,13 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
             {
                 if (MatchesQuery(field.Name, query))
                 {
-                    var range = PositionConverter.ToLspRange(field.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(field.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = field.Name,
                         Kind = SymbolKind.Field,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{cls.Name}"
+                        ContainerName = $"{ast.Name}.{cls.Name}"
                     };
                 }
             }
@@ -119,13 +124,13 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
             {
                 if (MatchesQuery(prop.Name, query))
                 {
-                    var range = PositionConverter.ToLspRange(prop.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(prop.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = prop.Name,
                         Kind = SymbolKind.Property,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{cls.Name}"
+                        ContainerName = $"{ast.Name}.{cls.Name}"
                     };
                 }
             }
@@ -134,13 +139,13 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
             {
                 if (MatchesQuery(method.Name, query))
                 {
-                    var range = PositionConverter.ToLspRange(method.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(method.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = method.Name,
                         Kind = SymbolKind.Method,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{cls.Name}"
+                        ContainerName = $"{ast.Name}.{cls.Name}"
                     };
                 }
             }
@@ -149,30 +154,30 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
             {
                 if (MatchesQuery(cls.Name, query) || MatchesQuery("constructor", query))
                 {
-                    var range = PositionConverter.ToLspRange(ctor.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(ctor.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = $"{cls.Name}()",
                         Kind = SymbolKind.Constructor,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{cls.Name}"
+                        ContainerName = $"{ast.Name}.{cls.Name}"
                     };
                 }
             }
         }
 
         // Interfaces
-        foreach (var iface in doc.Ast.Interfaces)
+        foreach (var iface in ast.Interfaces)
         {
             if (MatchesQuery(iface.Name, query))
             {
-                var range = PositionConverter.ToLspRange(iface.Span, doc.Source);
+                var range = PositionConverter.ToLspRange(iface.Span, source);
                 yield return new WorkspaceSymbol
                 {
                     Name = iface.Name,
                     Kind = SymbolKind.Interface,
                     Location = new Location { Uri = uri, Range = range },
-                    ContainerName = doc.Ast.Name
+                    ContainerName = ast.Name
                 };
             }
 
@@ -180,30 +185,30 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
             {
                 if (MatchesQuery(method.Name, query))
                 {
-                    var range = PositionConverter.ToLspRange(method.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(method.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = method.Name,
                         Kind = SymbolKind.Method,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{iface.Name}"
+                        ContainerName = $"{ast.Name}.{iface.Name}"
                     };
                 }
             }
         }
 
         // Enums
-        foreach (var enumDef in doc.Ast.Enums)
+        foreach (var enumDef in ast.Enums)
         {
             if (MatchesQuery(enumDef.Name, query))
             {
-                var range = PositionConverter.ToLspRange(enumDef.Span, doc.Source);
+                var range = PositionConverter.ToLspRange(enumDef.Span, source);
                 yield return new WorkspaceSymbol
                 {
                     Name = enumDef.Name,
                     Kind = SymbolKind.Enum,
                     Location = new Location { Uri = uri, Range = range },
-                    ContainerName = doc.Ast.Name
+                    ContainerName = ast.Name
                 };
             }
 
@@ -211,49 +216,49 @@ public sealed class WorkspaceSymbolHandler : WorkspaceSymbolsHandlerBase
             {
                 if (MatchesQuery(member.Name, query))
                 {
-                    var range = PositionConverter.ToLspRange(member.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(member.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = member.Name,
                         Kind = SymbolKind.EnumMember,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{enumDef.Name}"
+                        ContainerName = $"{ast.Name}.{enumDef.Name}"
                     };
                 }
             }
         }
 
         // Enum extensions
-        foreach (var enumExt in doc.Ast.EnumExtensions)
+        foreach (var enumExt in ast.EnumExtensions)
         {
             foreach (var method in enumExt.Methods)
             {
                 if (MatchesQuery(method.Name, query))
                 {
-                    var range = PositionConverter.ToLspRange(method.Span, doc.Source);
+                    var range = PositionConverter.ToLspRange(method.Span, source);
                     yield return new WorkspaceSymbol
                     {
                         Name = method.Name,
                         Kind = SymbolKind.Method,
                         Location = new Location { Uri = uri, Range = range },
-                        ContainerName = $"{doc.Ast.Name}.{enumExt.EnumName}Extensions"
+                        ContainerName = $"{ast.Name}.{enumExt.EnumName}Extensions"
                     };
                 }
             }
         }
 
         // Delegates
-        foreach (var del in doc.Ast.Delegates)
+        foreach (var del in ast.Delegates)
         {
             if (MatchesQuery(del.Name, query))
             {
-                var range = PositionConverter.ToLspRange(del.Span, doc.Source);
+                var range = PositionConverter.ToLspRange(del.Span, source);
                 yield return new WorkspaceSymbol
                 {
                     Name = del.Name,
                     Kind = SymbolKind.Function, // No delegate kind, use function
                     Location = new Location { Uri = uri, Range = range },
-                    ContainerName = doc.Ast.Name
+                    ContainerName = ast.Name
                 };
             }
         }

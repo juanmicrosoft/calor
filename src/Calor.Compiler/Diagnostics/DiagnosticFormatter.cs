@@ -412,6 +412,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.BindReassignsImmutable => "Cannot rebind immutable symbol",
         DiagnosticCode.AmbiguousOverload => "Ambiguous overload",
         DiagnosticCode.NoMatchingOverload => "No matching overload",
+        DiagnosticCode.InheritanceCycle => "Inheritance cycle",
         DiagnosticCode.NonExhaustiveMatch => "Non-exhaustive match expression",
         DiagnosticCode.UnreachablePattern => "Unreachable pattern",
         DiagnosticCode.DuplicatePattern => "Duplicate pattern",

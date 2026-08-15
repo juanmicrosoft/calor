@@ -52,12 +52,12 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
     }
 
     internal static TextEditContainer? FormatSnapshot(
-        DocumentAnalysisSnapshot snapshot,
+        DocumentSnapshot snapshot,
         Uri documentUri,
         DocumentUri requestedDocumentUri,
         ILogger<FormattingHandler> logger)
     {
-        if (snapshot.Ast == null || snapshot.Diagnostics.HasErrors)
+        if (snapshot.Ast == null || snapshot.HasErrors)
         {
             logger.LogWarning(
                 "Formatting returned no edits for {DocumentUri} because the document has compiler errors.",

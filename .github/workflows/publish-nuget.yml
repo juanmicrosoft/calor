@@ -248,11 +248,11 @@ jobs:
           done
           python3 scripts/check_coverage.py
 
-      - name: Run mutation, performance, and flake ratchets
+      - name: Run mutation, performance, and release flake ratchets
         run: |
           python3 scripts/run_mutation_gate.py
           python3 scripts/run_performance_gate.py
-          python3 scripts/run_flake_gate.py
+          python3 scripts/run_flake_gate.py --runs 100
 
       - name: Run blocking round-trip verification
         run: |

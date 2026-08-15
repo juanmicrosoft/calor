@@ -2,6 +2,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -132,17 +133,19 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
     {
-        var state = _workspace.Get(request.TextDocument.Uri);
-        if (state == null)
+        var workspace = _workspace.CaptureSnapshot();
+        var document = workspace.GetDocument(request.TextDocument.Uri);
+        if (document == null)
         {
             return Task.FromResult(new CompletionList());
         }
 
+        var snapshot = document.Analysis;
         var items = new List<CompletionItem>();
-        var offset = PositionConverter.ToOffset(request.Position, state.Source);
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
 
         // Determine context
-        var context = GetCompletionContext(state.Source, offset);
+        var context = GetCompletionContext(snapshot.Source, offset);
 
         switch (context)
         {
@@ -153,41 +156,46 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
             case CompletionContext.InType:
                 // In type position - suggest types
-                items.AddRange(GetTypeCompletions(state.Ast));
-                items.AddRange(GetCrossFileTypeCompletions(_workspace, state));
+                items.AddRange(GetTypeCompletions(snapshot.Ast));
+                items.AddRange(GetCrossFileTypeCompletions(workspace, document));
                 break;
 
             case CompletionContext.AfterDot:
                 // After a dot - suggest members
-                items.AddRange(GetMemberCompletions(state, offset, _workspace));
+                items.AddRange(GetMemberCompletionsFromSnapshot(
+                    document,
+                    offset,
+                    workspace));
                 break;
 
             case CompletionContext.InExpression:
                 // In expression - suggest variables and functions
-                items.AddRange(GetExpressionCompletions(state, offset));
-                items.AddRange(GetCrossFileSymbolCompletions(_workspace, state));
+                items.AddRange(GetExpressionCompletionsFromSnapshot(snapshot, offset));
+                items.AddRange(GetCrossFileSymbolCompletions(workspace, document));
                 break;
 
             default:
                 // General context - provide all completions
                 items.AddRange(GetTagCompletions());
-                items.AddRange(GetTypeCompletions(state.Ast));
-                items.AddRange(GetExpressionCompletions(state, offset));
-                items.AddRange(GetCrossFileSymbolCompletions(_workspace, state));
+                items.AddRange(GetTypeCompletions(snapshot.Ast));
+                items.AddRange(GetExpressionCompletionsFromSnapshot(snapshot, offset));
+                items.AddRange(GetCrossFileSymbolCompletions(workspace, document));
                 break;
         }
 
         return Task.FromResult(new CompletionList(items));
     }
 
-    private static IEnumerable<CompletionItem> GetCrossFileTypeCompletions(WorkspaceState workspace, DocumentState currentDoc)
+    private static IEnumerable<CompletionItem> GetCrossFileTypeCompletions(
+        WorkspaceIndexSnapshot workspace,
+        WorkspaceDocumentSnapshot currentDoc)
     {
         var items = new List<CompletionItem>();
 
-        foreach (var (doc, name, kind, type) in workspace.GetAllPublicSymbols())
+        foreach (var (doc, name, kind, type) in GetAllPublicSymbols(workspace))
         {
             // Skip symbols from the current document
-            if (doc.Uri == currentDoc.Uri) continue;
+            if (doc.Document.Uri == currentDoc.Document.Uri) continue;
 
             // Only include types (classes, interfaces, enums)
             if (kind is "class" or "interface" or "enum")
@@ -202,7 +210,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                         "enum" => CompletionItemKind.Enum,
                         _ => CompletionItemKind.TypeParameter
                     },
-                    Detail = $"[{GetFileName(doc.Uri)}] {kind} {name}",
+                    Detail = $"[{GetFileName(doc.Document.Uri)}] {kind} {name}",
                     InsertText = name,
                     SortText = "z" + name // Sort after local completions
                 });
@@ -212,14 +220,16 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return items;
     }
 
-    private static IEnumerable<CompletionItem> GetCrossFileSymbolCompletions(WorkspaceState workspace, DocumentState currentDoc)
+    private static IEnumerable<CompletionItem> GetCrossFileSymbolCompletions(
+        WorkspaceIndexSnapshot workspace,
+        WorkspaceDocumentSnapshot currentDoc)
     {
         var items = new List<CompletionItem>();
 
-        foreach (var (doc, name, kind, type) in workspace.GetAllPublicSymbols())
+        foreach (var (doc, name, kind, type) in GetAllPublicSymbols(workspace))
         {
             // Skip symbols from the current document
-            if (doc.Uri == currentDoc.Uri) continue;
+            if (doc.Document.Uri == currentDoc.Document.Uri) continue;
 
             items.Add(new CompletionItem
             {
@@ -233,7 +243,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
                     "delegate" => CompletionItemKind.Function,
                     _ => CompletionItemKind.Reference
                 },
-                Detail = $"[{GetFileName(doc.Uri)}] {kind}{(type != null ? ": " + type : "")}",
+                Detail = $"[{GetFileName(doc.Document.Uri)}] {kind}{(type != null ? ": " + type : "")}",
                 InsertText = name,
                 SortText = "z" + name // Sort after local completions
             });
@@ -245,6 +255,34 @@ public sealed class CompletionHandler : CompletionHandlerBase
     private static string GetFileName(Uri uri)
     {
         return System.IO.Path.GetFileName(uri.LocalPath);
+    }
+
+    private static IEnumerable<(
+        WorkspaceDocumentSnapshot Doc,
+        string Name,
+        string Kind,
+        string? Type)> GetAllPublicSymbols(WorkspaceIndexSnapshot workspace)
+    {
+        foreach (var doc in workspace.Documents)
+        {
+            var ast = doc.Analysis.Ast;
+            if (ast == null)
+                continue;
+
+            foreach (var func in ast.Functions)
+            {
+                if (func.Visibility != Visibility.Private)
+                    yield return (doc, func.Name, "function", func.Output?.TypeName ?? "void");
+            }
+            foreach (var cls in ast.Classes)
+                yield return (doc, cls.Name, "class", null);
+            foreach (var iface in ast.Interfaces)
+                yield return (doc, iface.Name, "interface", null);
+            foreach (var enumDef in ast.Enums)
+                yield return (doc, enumDef.Name, "enum", enumDef.UnderlyingType);
+            foreach (var del in ast.Delegates)
+                yield return (doc, del.Name, "delegate", del.Output?.TypeName ?? "void");
+        }
     }
 
     private static CompletionContext GetCompletionContext(string source, int offset)
@@ -337,9 +375,14 @@ public sealed class CompletionHandler : CompletionHandlerBase
     }
 
     private static IEnumerable<CompletionItem> GetExpressionCompletions(DocumentState state, int offset)
+        => GetExpressionCompletionsFromSnapshot(state.Snapshot, offset);
+
+    private static IEnumerable<CompletionItem> GetExpressionCompletionsFromSnapshot(
+        DocumentSnapshot snapshot,
+        int offset)
     {
         var items = new List<CompletionItem>();
-        var ast = state.Ast;
+        var ast = snapshot.Ast;
 
         if (ast == null)
             return items;
@@ -368,14 +411,27 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
     private static IEnumerable<CompletionItem> GetMemberCompletions(DocumentState state, int offset, WorkspaceState workspace)
     {
+        var workspaceSnapshot = workspace.CaptureSnapshot();
+        var document = workspaceSnapshot.GetDocument(DocumentUri.From(state.Uri));
+        return document == null
+            ? Enumerable.Empty<CompletionItem>()
+            : GetMemberCompletionsFromSnapshot(document, offset, workspaceSnapshot);
+    }
+
+    private static IEnumerable<CompletionItem> GetMemberCompletionsFromSnapshot(
+        WorkspaceDocumentSnapshot document,
+        int offset,
+        WorkspaceIndexSnapshot workspace)
+    {
         var items = new List<CompletionItem>();
-        var ast = state.Ast;
+        var snapshot = document.Analysis;
+        var ast = snapshot.Ast;
 
         if (ast == null)
             return items;
 
         // Find the expression before the dot
-        var source = state.Source;
+        var source = snapshot.Source;
         var exprBeforeDot = ExtractExpressionBeforeDot(source, offset);
 
         if (string.IsNullOrEmpty(exprBeforeDot))
@@ -391,7 +447,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         }
 
         // Find members for this type
-        items.AddRange(GetMembersForType(typeName, ast, workspace, state));
+        items.AddRange(GetMembersForType(typeName, ast, workspace, document));
 
         return items;
     }
@@ -460,7 +516,11 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return result.TrimStart('.');
     }
 
-    private static string? ResolveExpressionType(string expression, ModuleNode ast, int offset, WorkspaceState workspace)
+    private static string? ResolveExpressionType(
+        string expression,
+        ModuleNode ast,
+        int offset,
+        WorkspaceIndexSnapshot workspace)
     {
         // Handle chained expressions like "a.b.c"
         if (expression.Contains('.'))
@@ -481,7 +541,11 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return ResolveSingleIdentifierType(expression, ast, offset, workspace);
     }
 
-    private static string? ResolveSingleIdentifierType(string expression, ModuleNode ast, int offset, WorkspaceState workspace)
+    private static string? ResolveSingleIdentifierType(
+        string expression,
+        ModuleNode ast,
+        int offset,
+        WorkspaceIndexSnapshot workspace)
     {
         // Handle 'this' keyword
         if (expression == "this")
@@ -554,7 +618,11 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return null;
     }
 
-    private static string? ResolveChainedExpressionType(string expression, ModuleNode ast, int offset, WorkspaceState workspace)
+    private static string? ResolveChainedExpressionType(
+        string expression,
+        ModuleNode ast,
+        int offset,
+        WorkspaceIndexSnapshot workspace)
     {
         // Split into parts, handling potential method calls
         var parts = SplitChainedExpression(expression);
@@ -707,7 +775,12 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return null;
     }
 
-    private static string? ResolveMemberType(string typeName, string memberName, bool isMethodCall, ModuleNode ast, WorkspaceState workspace)
+    private static string? ResolveMemberType(
+        string typeName,
+        string memberName,
+        bool isMethodCall,
+        ModuleNode ast,
+        WorkspaceIndexSnapshot workspace)
     {
         // Handle generic types - extract base type name
         var (baseTypeName, typeArgs) = ParseGenericType(typeName);
@@ -757,55 +830,64 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return null;
     }
 
-    private static string? ResolveMemberTypeInClassHierarchy(ClassDefinitionNode cls, string memberName, bool isMethodCall, ModuleNode ast, WorkspaceState workspace)
+    private static string? ResolveMemberTypeInClassHierarchy(
+        ClassDefinitionNode cls,
+        string memberName,
+        bool isMethodCall,
+        ModuleNode ast,
+        WorkspaceIndexSnapshot workspace)
     {
-        // Check current class
-        if (isMethodCall)
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var current = cls;
+        while (visited.Add(current.Name))
         {
-            var method = cls.Methods.FirstOrDefault(m => m.Name == memberName);
-            if (method != null)
-                return method.Output?.TypeName;
-        }
-        else
-        {
-            var field = cls.Fields.FirstOrDefault(f => f.Name == memberName);
-            if (field != null)
-                return field.TypeName;
-
-            var prop = cls.Properties.FirstOrDefault(p => p.Name == memberName);
-            if (prop != null)
-                return prop.TypeName;
-        }
-
-        // Check base class if exists
-        if (!string.IsNullOrEmpty(cls.BaseClass))
-        {
-            var baseClass = FindClassByName(cls.BaseClass, ast, workspace);
-            if (baseClass != null)
+            if (isMethodCall)
             {
-                return ResolveMemberTypeInClassHierarchy(baseClass, memberName, isMethodCall, ast, workspace);
+                var method = current.Methods.FirstOrDefault(
+                    candidate => candidate.Name == memberName);
+                if (method != null)
+                    return method.Output?.TypeName;
             }
-        }
-
-        // Check implemented interfaces for method signatures
-        if (isMethodCall)
-        {
-            foreach (var ifaceName in cls.ImplementedInterfaces)
+            else
             {
-                var iface = FindInterfaceByName(ifaceName, ast, workspace);
-                if (iface != null)
+                var field = current.Fields.FirstOrDefault(
+                    candidate => candidate.Name == memberName);
+                if (field != null)
+                    return field.TypeName;
+
+                var prop = current.Properties.FirstOrDefault(
+                    candidate => candidate.Name == memberName);
+                if (prop != null)
+                    return prop.TypeName;
+            }
+
+            if (isMethodCall)
+            {
+                foreach (var ifaceName in current.ImplementedInterfaces)
                 {
-                    var method = iface.Methods.FirstOrDefault(m => m.Name == memberName);
+                    var iface = FindInterfaceByName(ifaceName, ast, workspace);
+                    var method = iface?.Methods.FirstOrDefault(
+                        candidate => candidate.Name == memberName);
                     if (method != null)
                         return method.Output?.TypeName;
                 }
             }
+
+            if (string.IsNullOrEmpty(current.BaseClass))
+                break;
+            var baseClass = FindClassByName(current.BaseClass, ast, workspace);
+            if (baseClass == null)
+                break;
+            current = baseClass;
         }
 
         return null;
     }
 
-    private static ClassDefinitionNode? FindClassByName(string name, ModuleNode ast, WorkspaceState workspace)
+    private static ClassDefinitionNode? FindClassByName(
+        string name,
+        ModuleNode ast,
+        WorkspaceIndexSnapshot workspace)
     {
         // Check local AST
         var cls = ast.Classes.FirstOrDefault(c => c.Name == name);
@@ -813,10 +895,10 @@ public sealed class CompletionHandler : CompletionHandlerBase
             return cls;
 
         // Check other documents
-        foreach (var doc in workspace.GetAllDocuments())
+        foreach (var doc in workspace.Documents)
         {
-            if (doc.Ast == null) continue;
-            cls = doc.Ast.Classes.FirstOrDefault(c => c.Name == name);
+            if (doc.Analysis.Ast == null) continue;
+            cls = doc.Analysis.Ast.Classes.FirstOrDefault(c => c.Name == name);
             if (cls != null)
                 return cls;
         }
@@ -824,7 +906,10 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return null;
     }
 
-    private static InterfaceDefinitionNode? FindInterfaceByName(string name, ModuleNode ast, WorkspaceState workspace)
+    private static InterfaceDefinitionNode? FindInterfaceByName(
+        string name,
+        ModuleNode ast,
+        WorkspaceIndexSnapshot workspace)
     {
         // Check local AST
         var iface = ast.Interfaces.FirstOrDefault(i => i.Name == name);
@@ -832,10 +917,10 @@ public sealed class CompletionHandler : CompletionHandlerBase
             return iface;
 
         // Check other documents
-        foreach (var doc in workspace.GetAllDocuments())
+        foreach (var doc in workspace.Documents)
         {
-            if (doc.Ast == null) continue;
-            iface = doc.Ast.Interfaces.FirstOrDefault(i => i.Name == name);
+            if (doc.Analysis.Ast == null) continue;
+            iface = doc.Analysis.Ast.Interfaces.FirstOrDefault(i => i.Name == name);
             if (iface != null)
                 return iface;
         }
@@ -984,7 +1069,12 @@ public sealed class CompletionHandler : CompletionHandlerBase
         };
     }
 
-    private static string? ResolveMethodReturnType(string methodName, ModuleNode ast, int offset, WorkspaceState workspace, string? containingType)
+    private static string? ResolveMethodReturnType(
+        string methodName,
+        ModuleNode ast,
+        int offset,
+        WorkspaceIndexSnapshot workspace,
+        string? containingType)
     {
         // If we have a containing type, search for methods on that type
         if (containingType != null)
@@ -1010,7 +1100,11 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return null;
     }
 
-    private static IEnumerable<CompletionItem> GetMembersForType(string typeName, ModuleNode ast, WorkspaceState workspace, DocumentState currentDoc)
+    private static IEnumerable<CompletionItem> GetMembersForType(
+        string typeName,
+        ModuleNode ast,
+        WorkspaceIndexSnapshot workspace,
+        WorkspaceDocumentSnapshot currentDoc)
     {
         var items = new List<CompletionItem>();
 
@@ -1049,18 +1143,23 @@ public sealed class CompletionHandler : CompletionHandlerBase
         }
 
         // Check other documents for enums
-        foreach (var doc in workspace.GetAllDocuments())
+        foreach (var doc in workspace.Documents)
         {
-            if (doc.Uri == currentDoc.Uri || doc.Ast == null) continue;
+            if (doc.Document.Uri == currentDoc.Document.Uri
+                || doc.Analysis.Ast == null)
+            {
+                continue;
+            }
 
-            var otherEnum = doc.Ast.Enums.FirstOrDefault(e => e.Name == baseTypeName);
+            var otherEnum = doc.Analysis.Ast.Enums.FirstOrDefault(
+                e => e.Name == baseTypeName);
             if (otherEnum != null)
             {
                 items.AddRange(GetEnumMembers(otherEnum).Select(i => new CompletionItem
                 {
                     Label = i.Label,
                     Kind = i.Kind,
-                    Detail = $"[{GetFileName(doc.Uri)}] {i.Detail}",
+                    Detail = $"[{GetFileName(doc.Document.Uri)}] {i.Detail}",
                     InsertText = i.InsertText
                 }));
                 return items;
@@ -1094,7 +1193,10 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return items;
     }
 
-    private static IEnumerable<CompletionItem> GetClassMembersWithInheritance(ClassDefinitionNode cls, ModuleNode ast, WorkspaceState workspace)
+    private static IEnumerable<CompletionItem> GetClassMembersWithInheritance(
+        ClassDefinitionNode cls,
+        ModuleNode ast,
+        WorkspaceIndexSnapshot workspace)
     {
         var items = new List<CompletionItem>();
         var visitedClasses = new HashSet<string>();
@@ -1104,7 +1206,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         return items;
     }
 
-    private static void CollectClassMembersRecursive(ClassDefinitionNode cls, ModuleNode ast, WorkspaceState workspace,
+    private static void CollectClassMembersRecursive(ClassDefinitionNode cls, ModuleNode ast, WorkspaceIndexSnapshot workspace,
         List<CompletionItem> items, HashSet<string> visitedClasses, bool isInherited)
     {
         if (visitedClasses.Contains(cls.Name))
