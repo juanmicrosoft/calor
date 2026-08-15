@@ -73,6 +73,16 @@ merged pull requests named in each line.
 
 ### Fixed
 
+- **`calor verify` states, on its default surface, that it did not verify anything.** When the Z3
+  native library is missing, every contract is reported `Skipped` and the run exits 0 — and the
+  reason, `Calor0710`, was `info` severity, which the text report never printed. It appeared only
+  under `--format json`; `--verbose` did not surface it either. A consumer whose solver failed to
+  load therefore saw a clean-looking report with a 0.0% proven rate and no stated cause: the
+  "installs successfully, silently loses verification" state that roadmap §2.5 gate 7 exists to
+  catch, found by building that gate's CLI leg. The text report now names it above the counts it
+  explains, and repeats it in the overall summary. Diagnostic severity, the JSON envelope, and the
+  exit code are unchanged.
+
 - **The CI performance ceiling is calibrated from CI, not from a developer machine (#978, #974,
   toward #965).** The 21.0s aggregate ceiling had been derived from a ~19.8s dev-machine
   measurement and sat *inside* the observed CI distribution (18 samples, 20.352-21.439s), so the
