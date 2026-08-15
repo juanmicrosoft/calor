@@ -126,6 +126,19 @@ def check_manifest(root: Path, manifest: dict) -> list[str]:
                 "publish job does not depend on release gates: "
                 + ", ".join(sorted(missing_needs))
             )
+        if "python3 scripts/run_flake_gate.py --runs 100" not in release_text:
+            errors.append(
+                "release workflow must run the live LSP flake gate with --runs 100"
+            )
+
+    pr_workflow = root / ".github/workflows/test.yml"
+    if pr_workflow.is_file():
+        pr_text = pr_workflow.read_text(encoding="utf-8")
+        if "python3 scripts/run_flake_gate.py --runs 10" not in pr_text:
+            errors.append(
+                "regular CI workflow must explicitly run the live LSP flake gate "
+                "with --runs 10"
+            )
     return errors
 
 

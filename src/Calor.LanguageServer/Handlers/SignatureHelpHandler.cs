@@ -24,9 +24,10 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
 
     public override Task<SignatureHelp?> Handle(SignatureHelpParams request, CancellationToken cancellationToken)
     {
-        var state = _workspace.Get(request.TextDocument.Uri);
-        var snapshot = state?.Snapshot;
-        if (state == null || snapshot?.Ast == null)
+        var workspace = _workspace.CaptureSnapshot();
+        var document = workspace.GetDocument(request.TextDocument.Uri);
+        var snapshot = document?.Analysis;
+        if (document == null || snapshot?.Ast == null)
         {
             return Task.FromResult<SignatureHelp?>(null);
         }
@@ -53,7 +54,10 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             snapshot.BoundModule,
             offset,
             callContext.FunctionName);
-        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
+        var projectCall = _workspace.ResolveProjectCall(
+            workspace,
+            document,
+            boundCall);
         if (projectCall.Symbol != null)
         {
             return Task.FromResult<SignatureHelp?>(

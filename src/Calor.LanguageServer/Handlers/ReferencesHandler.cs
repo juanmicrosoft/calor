@@ -20,22 +20,29 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
         _workspace = workspace;
     }
 
-    public override Task<LocationContainer?> Handle(
+    public override async Task<LocationContainer?> Handle(
         ReferenceParams request,
         CancellationToken cancellationToken)
     {
-        var state = _workspace.Get(request.TextDocument.Uri);
-        var snapshot = state?.Snapshot;
-        if (snapshot == null)
-            return Task.FromResult<LocationContainer?>(null);
+        var workspace = await _workspace.CaptureSnapshotAsync(
+            refreshClosedDocuments: true,
+            cancellationToken).ConfigureAwait(false);
+        var document = workspace.GetDocument(request.TextDocument.Uri);
+        if (document == null)
+            return null;
 
-        _workspace.RefreshClosedDocuments();
-        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
-        var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
+        var offset = PositionConverter.ToOffset(
+            request.Position,
+            document.Analysis.Source);
+        var occurrence = _workspace.ResolveOccurrence(
+            workspace,
+            request.TextDocument.Uri,
+            offset);
         if (occurrence == null)
-            return Task.FromResult<LocationContainer?>(null);
+            return null;
 
         var locations = _workspace.FindSymbolOccurrences(
+                workspace,
                 occurrence.SymbolId,
                 request.Context.IncludeDeclaration)
             .Select(reference => new Location
@@ -47,8 +54,7 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
                     reference.Snapshot.Source),
             })
             .ToArray();
-        return Task.FromResult<LocationContainer?>(
-            locations.Length == 0 ? null : new LocationContainer(locations));
+        return locations.Length == 0 ? null : new LocationContainer(locations);
     }
 
     protected override ReferenceRegistrationOptions CreateRegistrationOptions(

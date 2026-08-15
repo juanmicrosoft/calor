@@ -1,5 +1,8 @@
 using Calor.LanguageServer.State;
+using Calor.LanguageServer.Handlers;
 using Calor.LanguageServer.Tests.Helpers;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.State;
@@ -31,7 +34,7 @@ public class DocumentStateTests
         var state = LspTestHarness.CreateDocument(source);
 
         Assert.NotNull(state.Ast);
-        Assert.NotNull(state.Tokens);
+        Assert.NotEmpty(state.Tokens);
         Assert.False(state.Diagnostics.HasErrors);
     }
 
@@ -219,4 +222,454 @@ public class DocumentStateTests
         Assert.NotEmpty(undefinedFix.Fix.Edits);
         Assert.Equal("value", undefinedFix.Fix.Edits.First().NewText);
     }
+
+    [Fact]
+    public async Task ConcurrentUpdatesAndReads_PublishOnlyCoherentLatestSnapshotAsync()
+    {
+        var state = new DocumentState(
+            new Uri("file:///concurrent.calr"),
+            VersionedSource(0),
+            version: 0);
+        await state.ReanalyzeAsync();
+        using var stopReaders = new CancellationTokenSource();
+        var reader = Task.Run(() =>
+        {
+            while (!stopReaders.IsCancellationRequested)
+                AssertCoherent(state.Snapshot);
+        });
+
+        var updates = Enumerable.Range(1, 200)
+            .Select(version => state.UpdateAsync(
+                VersionedSource(version),
+                version))
+            .ToArray();
+        await Task.WhenAll(updates);
+        await stopReaders.CancelAsync();
+        await reader;
+
+        var latest = state.Snapshot;
+        Assert.Equal(200, latest.Version);
+        AssertCoherent(latest);
+        Assert.Equal("Version200", latest.Ast!.Functions.Single().Name);
+    }
+
+    [Fact]
+    public async Task CancellationRace_NewerVersionWinsAndCanceledAnalysisCannotPublishAsync()
+    {
+        using var firstBindingEntered = new ManualResetEventSlim();
+        using var releaseFirstBinding = new ManualResetEventSlim();
+        var bindingCalls = 0;
+        var state = new DocumentState(
+            new Uri("file:///cancellation.calr"),
+            VersionedSource(1),
+            version: 1,
+            sourceIdentity: null,
+            logger: new CapturingLogger(),
+            failureInjector: phase =>
+            {
+                if (phase == DocumentState.DocumentAnalysisPhase.Binding
+                    && Interlocked.Increment(ref bindingCalls) == 1)
+                {
+                    firstBindingEntered.Set();
+                    Assert.True(releaseFirstBinding.Wait(TimeSpan.FromSeconds(10)));
+                }
+                return null;
+            });
+
+        var canceledAnalysis = state.ReanalyzeAsync();
+        Assert.True(firstBindingEntered.Wait(TimeSpan.FromSeconds(10)));
+        var latest = await state.UpdateAsync(VersionedSource(2), newVersion: 2);
+        Assert.True(latest.Accepted);
+        releaseFirstBinding.Set();
+        await canceledAnalysis;
+
+        Assert.Equal(2, state.Snapshot.Version);
+        Assert.Equal("Version2", state.Snapshot.Ast!.Functions.Single().Name);
+        AssertCoherent(state.Snapshot);
+    }
+
+    [Fact]
+    public async Task DisposeDuringBlockedAnalysis_CancelsWithoutDisposingWorkerTokenAsync()
+    {
+        using var workerEntered = new ManualResetEventSlim();
+        using var releaseWorker = new ManualResetEventSlim();
+        var logger = new CapturingLogger();
+        var state = new DocumentState(
+            new Uri("file:///dispose-race.calr"),
+            VersionedSource(1),
+            version: 1,
+            sourceIdentity: null,
+            logger,
+            failureInjector: phase =>
+            {
+                if (phase == DocumentState.DocumentAnalysisPhase.Lexing)
+                {
+                    workerEntered.Set();
+                    Assert.True(releaseWorker.Wait(TimeSpan.FromSeconds(10)));
+                }
+                return null;
+            });
+
+        var analysis = state.ReanalyzeAsync();
+        Assert.True(workerEntered.Wait(TimeSpan.FromSeconds(10)));
+        state.Dispose();
+        releaseWorker.Set();
+        var snapshot = await analysis.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, snapshot.Version);
+        Assert.Empty(logger.Entries);
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => state.ReanalyzeAsync());
+    }
+
+    [Fact]
+    public async Task ReanalysisRegistrationRace_DidChangeVersionAlwaysWinsAsync()
+    {
+        var reanalysisCapturedOldContent = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowReanalysisRegistration = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var barrierCalls = 0;
+        var state = new DocumentState(
+            new Uri("file:///save-change-race.calr"),
+            VersionedSource(1),
+            version: 1,
+            sourceIdentity: null,
+            logger: new CapturingLogger(),
+            failureInjector: null,
+            reanalysisRegistrationBarrier: () =>
+            {
+                if (Interlocked.Increment(ref barrierCalls) == 2)
+                {
+                    reanalysisCapturedOldContent.TrySetResult();
+                    return allowReanalysisRegistration.Task;
+                }
+                return Task.CompletedTask;
+            });
+        await state.ReanalyzeAsync();
+
+        var save = state.ReanalyzeAsync();
+        await reanalysisCapturedOldContent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var change = await state.UpdateAsync(
+            VersionedSource(2),
+            newVersion: 2);
+        Assert.True(change.Accepted);
+        allowReanalysisRegistration.TrySetResult();
+        var saveSnapshot = await save.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(2, saveSnapshot.Version);
+        Assert.Equal(2, state.Snapshot.Version);
+        Assert.Equal(VersionedSource(2), state.Snapshot.Source);
+        Assert.Equal("Version2", state.Snapshot.Ast!.Functions.Single().Name);
+        AssertCoherent(state.Snapshot);
+    }
+
+    [Fact]
+    public async Task CancelledInitialOpen_IsUnacceptedAndAbsentAsync()
+    {
+        var workspace = new WorkspaceState();
+        var uri = DocumentUri.From("file:///cancelled-initial-open.calr");
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        var accepted = await workspace.GetOrCreateAsync(
+            uri,
+            VersionedSource(1),
+            version: 1,
+            cancellation.Token);
+
+        Assert.False(accepted);
+        Assert.False(workspace.Contains(uri));
+        Assert.Null(workspace.Get(uri));
+    }
+
+    [Fact]
+    public async Task CancelledUpdate_PreservesCompletedSnapshotAndSameVersionRetrySucceedsAsync()
+    {
+        using var updateEntered = new ManualResetEventSlim();
+        using var releaseUpdate = new ManualResetEventSlim();
+        var bindingCalls = 0;
+        var state = new DocumentState(
+            new Uri("file:///cancelled-retry.calr"),
+            VersionedSource(1),
+            version: 1,
+            sourceIdentity: null,
+            logger: new CapturingLogger(),
+            failureInjector: phase =>
+            {
+                if (phase == DocumentState.DocumentAnalysisPhase.Binding
+                    && Interlocked.Increment(ref bindingCalls) == 2)
+                {
+                    updateEntered.Set();
+                    Assert.True(releaseUpdate.Wait(TimeSpan.FromSeconds(10)));
+                }
+                return null;
+            });
+        await state.ReanalyzeAsync();
+        var completed = state.Snapshot;
+        using var cancellation = new CancellationTokenSource();
+
+        var canceledUpdate = state.UpdateAsync(
+            VersionedSource(2),
+            newVersion: 2,
+            cancellation.Token);
+        Assert.True(updateEntered.Wait(TimeSpan.FromSeconds(10)));
+        await cancellation.CancelAsync();
+        releaseUpdate.Set();
+        var canceled = await canceledUpdate;
+
+        Assert.False(canceled.Accepted);
+        Assert.Same(completed, state.Snapshot);
+        Assert.Equal(1, state.Snapshot.Version);
+
+        var retry = await state.UpdateAsync(
+            VersionedSource(2),
+            newVersion: 2);
+        Assert.True(retry.Accepted);
+        Assert.Equal(2, state.Snapshot.Version);
+        Assert.Equal(VersionedSource(2), state.Snapshot.Source);
+        AssertCoherent(state.Snapshot);
+    }
+
+    [Fact]
+    public async Task NewerPendingUpdateWinsAndOlderRetryRemainsRejectedAsync()
+    {
+        using var newerEntered = new ManualResetEventSlim();
+        using var releaseNewer = new ManualResetEventSlim();
+        var bindingCalls = 0;
+        var state = new DocumentState(
+            new Uri("file:///pending-order.calr"),
+            VersionedSource(1),
+            version: 1,
+            sourceIdentity: null,
+            logger: new CapturingLogger(),
+            failureInjector: phase =>
+            {
+                if (phase == DocumentState.DocumentAnalysisPhase.Binding
+                    && Interlocked.Increment(ref bindingCalls) == 2)
+                {
+                    newerEntered.Set();
+                    Assert.True(releaseNewer.Wait(TimeSpan.FromSeconds(10)));
+                }
+                return null;
+            });
+        await state.ReanalyzeAsync();
+
+        var newer = state.UpdateAsync(VersionedSource(3), newVersion: 3);
+        Assert.True(newerEntered.Wait(TimeSpan.FromSeconds(10)));
+        var older = await state.UpdateAsync(VersionedSource(2), newVersion: 2);
+        Assert.False(older.Accepted);
+        releaseNewer.Set();
+        Assert.True((await newer).Accepted);
+
+        Assert.Equal(3, state.Snapshot.Version);
+        Assert.Equal(VersionedSource(3), state.Snapshot.Source);
+        AssertCoherent(state.Snapshot);
+    }
+
+    [Fact]
+    public async Task DiagnosticPublicationRace_NeverRegressesGenerationForUnchangedUriAsync()
+    {
+        var coordinator = new DiagnosticPublicationCoordinator();
+        var uri = DocumentUri.From("file:///unchanged-b.calr");
+        var published = new List<long>();
+        var tasks = Enumerable.Range(1, 100)
+            .OrderByDescending(generation => generation % 7)
+            .Select(generation => Task.Run(() => coordinator.PublishAsync(
+                () => (
+                    generation,
+                    (IReadOnlyList<DiagnosticPublication>)
+                    [
+                        new DiagnosticPublication(
+                            uri,
+                            () =>
+                            {
+                                published.Add(generation);
+                                return true;
+                            }),
+                    ]),
+                CancellationToken.None)))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+        await coordinator.PublishAsync(
+            () => (
+                99L,
+                (IReadOnlyList<DiagnosticPublication>)
+                [
+                    new DiagnosticPublication(
+                        uri,
+                        () =>
+                        {
+                            published.Add(99);
+                            return true;
+                        }),
+                ]),
+            CancellationToken.None);
+
+        Assert.NotEmpty(published);
+        Assert.Equal(100, published[^1]);
+        Assert.True(published.Zip(published.Skip(1), (left, right) => left < right)
+            .All(increasing => increasing));
+    }
+
+    [Fact]
+    public async Task SupersededWorkspaceDiagnostics_CannotOverwriteUnchangedDocumentAsync()
+    {
+        var workspace = new WorkspaceState();
+        var aUri = DocumentUri.From("file:///publication-a.calr");
+        var bUri = DocumentUri.From("file:///publication-b.calr");
+        workspace.GetOrCreate(aUri, "§M{m001:A}\n", version: 1);
+        workspace.GetOrCreate(bUri, "§M{m002:B}\n", version: 1);
+        var older = workspace.CaptureSnapshot();
+        var olderB = older.GetDocument(bUri)!;
+
+        workspace.Update(aUri, "§M{m001:A2}\n", version: 2);
+        var newer = workspace.CaptureSnapshot();
+        var newerB = newer.GetDocument(bUri)!;
+        Assert.Same(olderB.Analysis, newerB.Analysis);
+        Assert.Equal(olderB.Analysis.Version, newerB.Analysis.Version);
+
+        var coordinator = new DiagnosticPublicationCoordinator();
+        var published = new List<string>();
+        await coordinator.PublishAsync(
+            () => (
+                newer.Generation,
+                (IReadOnlyList<DiagnosticPublication>)
+                [
+                    new DiagnosticPublication(
+                        bUri,
+                        () => workspace.TryPublishDiagnostics(
+                            newer,
+                            newerB,
+                            () => published.Add("newer"))),
+                ]),
+            CancellationToken.None);
+        await coordinator.PublishAsync(
+            () => (
+                older.Generation,
+                (IReadOnlyList<DiagnosticPublication>)
+                [
+                    new DiagnosticPublication(
+                        bUri,
+                        () => workspace.TryPublishDiagnostics(
+                            older,
+                            olderB,
+                            () => published.Add("older"))),
+                ]),
+            CancellationToken.None);
+
+        Assert.Equal(["newer"], published);
+    }
+
+    [Fact]
+    public async Task OutOfOrderAndEqualVersions_AreIgnoredAsync()
+    {
+        var state = new DocumentState(
+            new Uri("file:///ordering.calr"),
+            VersionedSource(5),
+            version: 5);
+        await state.ReanalyzeAsync();
+        var captured = state.Snapshot;
+
+        var older = await state.UpdateAsync(VersionedSource(4), newVersion: 4);
+        var equal = await state.UpdateAsync(VersionedSource(50), newVersion: 5);
+
+        Assert.False(older.Accepted);
+        Assert.False(equal.Accepted);
+        Assert.Same(captured, state.Snapshot);
+        Assert.Equal("Version5", state.Snapshot.Ast!.Functions.Single().Name);
+    }
+
+    [Theory]
+    [InlineData((int)DocumentState.DocumentAnalysisPhase.Binding)]
+    [InlineData((int)DocumentState.DocumentAnalysisPhase.BindValidation)]
+    [InlineData((int)DocumentState.DocumentAnalysisPhase.ReturnValidation)]
+    public async Task AnalysisFailure_IsObservableAsCalor9999AndStructuredLogAsync(
+        int phaseValue)
+    {
+        var phase = (DocumentState.DocumentAnalysisPhase)phaseValue;
+        var logger = new CapturingLogger();
+        var state = new DocumentState(
+            new Uri("file:///failure.calr"),
+            VersionedSource(7),
+            version: 7,
+            sourceIdentity: null,
+            logger: logger,
+            failureInjector: candidate => candidate == phase
+                ? new InvalidOperationException("injected")
+                : null);
+
+        var snapshot = await state.ReanalyzeAsync();
+
+        var diagnostic = Assert.Single(
+            snapshot.Diagnostics.Where(item => item.Code == "Calor9999"));
+        Assert.Contains("Internal", diagnostic.Message, StringComparison.Ordinal);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.IsType<InvalidOperationException>(entry.Exception);
+        Assert.Equal(phase, entry.Properties["AnalysisPhase"]);
+        Assert.Equal(state.Uri, entry.Properties["DocumentUri"]);
+        Assert.Equal(7, entry.Properties["DocumentVersion"]);
+    }
+
+    private static string VersionedSource(int version) => $$"""
+        §M{m001:Versioned}
+          §F{f001:Version{{version}}:pub} () -> i32
+            §R MissingVersion{{version}}
+        """;
+
+    private static void AssertCoherent(DocumentSnapshot snapshot)
+    {
+        var expectedName = $"Version{snapshot.Version}";
+        Assert.Contains(expectedName, snapshot.Source, StringComparison.Ordinal);
+        Assert.Contains(snapshot.Tokens, token =>
+            token.Text.Contains(expectedName, StringComparison.Ordinal));
+        Assert.Equal(expectedName, snapshot.Ast?.Functions.Single().Name);
+        Assert.Contains(snapshot.BoundModule?.Functions ?? [], function =>
+            function.Symbol.Name.EndsWith(expectedName, StringComparison.Ordinal));
+        Assert.Contains(snapshot.Diagnostics, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.UndefinedReference
+            && diagnostic.Message.Contains(
+                $"MissingVersion{snapshot.Version}",
+                StringComparison.Ordinal));
+        Assert.DoesNotContain(snapshot.Diagnostics, diagnostic =>
+            diagnostic.Code == "Calor9999");
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) =>
+            NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new LogEntry(logLevel, exception, properties));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static NullScope Instance { get; } = new();
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record LogEntry(
+        LogLevel Level,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
 }

@@ -28,20 +28,27 @@ public sealed class RenameHandler : RenameHandlerBase
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var state = _workspace.Get(request.TextDocument.Uri);
-        var snapshot = state?.Snapshot;
-        if (snapshot == null
+        var workspace = await _workspace.CaptureSnapshotAsync(
+            refreshClosedDocuments: true,
+            cancellationToken).ConfigureAwait(false);
+        var document = workspace.GetDocument(request.TextDocument.Uri);
+        if (document == null
             || string.IsNullOrWhiteSpace(request.NewName)
             || !IsValidIdentifier(request.NewName))
         {
             return null;
         }
 
-        _workspace.RefreshClosedDocuments();
         cancellationToken.ThrowIfCancellationRequested();
-        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
-        var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
-        if (occurrence == null || !_workspace.CanRenameSymbol(occurrence.SymbolId))
+        var offset = PositionConverter.ToOffset(
+            request.Position,
+            document.Analysis.Source);
+        var occurrence = _workspace.ResolveOccurrence(
+            workspace,
+            request.TextDocument.Uri,
+            offset);
+        if (occurrence == null
+            || !_workspace.CanRenameSymbol(workspace, occurrence.SymbolId))
             return null;
 
         var oldName = occurrence.Snapshot.Source.Substring(
@@ -51,6 +58,7 @@ public sealed class RenameHandler : RenameHandlerBase
             return null;
 
         var occurrences = _workspace.FindSymbolOccurrences(
+            workspace,
             occurrence.SymbolId,
             includeDeclaration: true);
         // Fail closed on declarations whose identity this index keys per file —
@@ -68,6 +76,7 @@ public sealed class RenameHandler : RenameHandlerBase
         }
 
         if (!await _workspace.ValidateRenameAsync(
+                workspace,
                 occurrences,
                 oldName,
                 request.NewName,

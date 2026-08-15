@@ -105,13 +105,14 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         CancellationToken cancellationToken)
     {
         var state = _workspace.Get(identifier.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (snapshot?.Ast == null)
         {
             return Task.CompletedTask;
         }
 
-        var visitor = new SemanticTokenVisitor(builder, state.Source);
-        visitor.Visit(state.Ast);
+        var visitor = new SemanticTokenVisitor(builder, snapshot.Source);
+        visitor.Visit(snapshot.Ast);
 
         return Task.CompletedTask;
     }

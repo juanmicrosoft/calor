@@ -24,6 +24,15 @@ the corresponding report and rationale in the pull request.
 
 ## Published reports
 
-CI retains test TRX, coverage, mutation, performance, migration/round-trip, and repeated
-live-LSP flake reports. The NuGet release job depends on the manifest-declared test,
+CI retains test TRX, coverage, mutation, performance, migration/round-trip, and live-LSP
+core-capability stress reports. Regular PR CI explicitly runs 10 repetitions; the NuGet
+release workflow explicitly runs 100. The process-level E2E test owns the exact `calor-lsp`
+process and asserts that exact PID exits after shutdown/disposal. The outer runner accepts
+only one Passed TRX result mapped by `testId` to that exact fully-qualified test method; substring
+matches, noncanonical/misnested TRX structures, duplicate containers or counters, inconsistent
+or missing standard counter fields, nonzero failure/nonterminal counters, skipped results, and
+missing definitions fail closed. The runner
+provides bounded root-process timeout handling and best-effort cleanup of observed children;
+it is not a kernel containment boundary and never certifies a timeout or supervision failure.
+The NuGet release job depends on the manifest-declared test,
 packaged-SDK consumer, and release-quality jobs.

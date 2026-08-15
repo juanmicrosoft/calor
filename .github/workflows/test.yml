@@ -274,7 +274,7 @@ jobs:
         run: python3 scripts/run_mutation_gate.py
 
       - name: Run live LSP flake gate
-        run: python3 scripts/run_flake_gate.py
+        run: python3 scripts/run_flake_gate.py --runs 10
 
       - name: Upload test, coverage, mutation, and flake reports
         if: always()

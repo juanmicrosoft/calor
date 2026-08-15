@@ -35,7 +35,7 @@ public sealed class HoverHandler : HoverHandlerBase
     }
 
     internal static Hover? BuildHover(
-        DocumentAnalysisSnapshot snapshot,
+        DocumentSnapshot snapshot,
         Position position)
     {
         var (line, column) = PositionConverter.ToCalorPosition(position);

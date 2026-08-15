@@ -70,7 +70,7 @@ public static class LspTestHarness
     /// <summary>
     /// Compiles source and returns diagnostics.
     /// </summary>
-    public static DiagnosticBag GetDiagnostics(string source)
+    public static ImmutableDiagnostics GetDiagnostics(string source)
     {
         var state = CreateDocument(source);
         return state.Diagnostics;
@@ -79,7 +79,7 @@ public static class LspTestHarness
     /// <summary>
     /// Compiles source and returns diagnostics with fixes.
     /// </summary>
-    public static List<DiagnosticWithFix> GetDiagnosticsWithFixes(string source)
+    public static IReadOnlyList<DiagnosticWithFix> GetDiagnosticsWithFixes(string source)
     {
         var state = CreateDocument(source);
         return state.DiagnosticsWithFixes;

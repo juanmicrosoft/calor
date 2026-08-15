@@ -25,15 +25,15 @@ public sealed class DocumentSymbolHandler : DocumentSymbolHandlerBase
         DocumentSymbolParams request,
         CancellationToken cancellationToken)
     {
-        var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = _workspace.Get(request.TextDocument.Uri)?.Snapshot;
+        if (snapshot?.Ast == null)
         {
             return Task.FromResult<SymbolInformationOrDocumentSymbolContainer?>(null);
         }
 
         var symbols = new List<SymbolInformationOrDocumentSymbol>();
-        var ast = state.Ast;
-        var source = state.Source;
+        var ast = snapshot.Ast;
+        var source = snapshot.Source;
 
         // Module symbol
         var moduleSymbol = new DocumentSymbol

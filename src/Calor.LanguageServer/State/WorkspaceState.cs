@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Calor.Compiler;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
@@ -8,27 +9,29 @@ using Calor.LanguageServer.Utilities;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace Calor.LanguageServer.State;
 
 public sealed record WorkspaceDocumentSnapshot(
     DocumentState Document,
-    DocumentAnalysisSnapshot Analysis);
+    DocumentSnapshot Analysis);
 
 public sealed record ProjectSymbolLocation(
     DocumentState? Doc,
-    DocumentAnalysisSnapshot? Snapshot,
+    DocumentSnapshot? Snapshot,
     Symbol? Symbol);
 
 public sealed record ProjectFunctionLocation(
     DocumentState? Doc,
-    DocumentAnalysisSnapshot? Snapshot,
+    DocumentSnapshot? Snapshot,
     FunctionSymbol? Symbol);
 
 public sealed record ProjectReferenceLocation(
     DocumentState Doc,
-    DocumentAnalysisSnapshot Snapshot,
+    DocumentSnapshot Snapshot,
     TextSpan Span);
 
 public enum SymbolOccurrenceKind
@@ -39,13 +42,23 @@ public enum SymbolOccurrenceKind
 
 public sealed record ProjectSymbolOccurrence(
     DocumentState Doc,
-    DocumentAnalysisSnapshot Snapshot,
+    DocumentSnapshot Snapshot,
     SymbolId SymbolId,
     TextSpan Span,
     SymbolOccurrenceKind Kind,
     bool IsOpen,
     bool IsAmbiguous,
     bool IsSplitDeclaration = false);
+
+internal sealed record WorkspaceIndexSnapshot(
+    long Generation,
+    ImmutableArray<WorkspaceDocumentSnapshot> Documents,
+    WorkspaceState.WorkspaceSymbolIndex Index)
+{
+    public WorkspaceDocumentSnapshot? GetDocument(DocumentUri uri) =>
+        Documents.FirstOrDefault(document =>
+            DocumentUri.From(document.Document.Uri) == uri);
+}
 
 /// <summary>
 /// Manages document state for the entire workspace.
@@ -56,6 +69,15 @@ public sealed class WorkspaceState
     private readonly record struct WorkspaceFileStamp(
         long Length,
         DateTime LastWriteTimeUtc);
+    private sealed record ScannedWorkspaceFile(
+        DocumentUri Uri,
+        WorkspaceFileStamp Stamp,
+        string Source,
+        DocumentState? Analysis);
+    private sealed record WorkspaceScanResult(
+        WorkspaceRoot[] Roots,
+        HashSet<DocumentUri> Seen,
+        IReadOnlyList<ScannedWorkspaceFile> Files);
     private readonly record struct CompilationError(
         string Id,
         string Path,
@@ -68,26 +90,76 @@ public sealed class WorkspaceState
         string Path,
         string Baseline,
         string Candidate);
-    private sealed record DocumentSymbolIndex(
-        IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol,
-        ProjectSymbolOccurrence[] Occurrences);
-    private sealed record WorkspaceSymbolIndex(
+    private readonly record struct WorkspaceTypeGraphKey(
+        string ModuleName,
+        string ContainingTypePath,
+        string SimpleName,
+        int Arity)
+    {
+        public string QualifiedName => string.IsNullOrEmpty(ContainingTypePath)
+            ? SimpleName
+            : $"{ContainingTypePath}.{SimpleName}";
+        public string DisplayName => Arity == 0
+            ? QualifiedName
+            : $"{QualifiedName}`{Arity}";
+    }
+    private readonly record struct WorkspaceTypeLookupKey(
+        string Name,
+        int Arity);
+    private readonly record struct WorkspaceTypeReference(
+        string Name,
+        string SimpleName,
+        int Arity);
+    private enum WorkspaceTypeResolutionKind
+    {
+        NotFound,
+        Found,
+        Ambiguous,
+    }
+    private readonly record struct WorkspaceTypeResolution(
+        WorkspaceTypeResolutionKind Kind,
+        WorkspaceTypeGraphNode? Node);
+    private sealed record WorkspaceTypeDeclarationPart(
+        SymbolId Identity,
+        WorkspaceTypeGraphKey Key,
+        WorkspaceDocumentSnapshot Document,
+        ClassDefinitionNode Node);
+    private sealed record WorkspaceTypeGraphNode(
+        WorkspaceTypeGraphKey Key,
+        WorkspaceTypeReference? BaseClass,
+        bool IsAmbiguous,
+        ImmutableArray<string> Imports,
+        ImmutableArray<WorkspaceTypeDeclarationPart> Parts);
+    internal sealed record DocumentSymbolIndex(
+        ImmutableDictionary<SymbolId, ImmutableArray<ProjectSymbolOccurrence>> BySymbol,
+        ImmutableArray<ProjectSymbolOccurrence> Occurrences);
+    internal sealed record WorkspaceSymbolIndex(
         long Generation,
-        IReadOnlyDictionary<DocumentUri, DocumentSymbolIndex> ByDocument,
-        IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol,
-        IReadOnlySet<SymbolId> AmbiguousSymbols,
-        IReadOnlySet<SymbolId> IncompleteTypeSymbols);
+        ImmutableDictionary<DocumentUri, DocumentSymbolIndex> ByDocument,
+        ImmutableDictionary<SymbolId, ImmutableArray<ProjectSymbolOccurrence>> BySymbol,
+        ImmutableHashSet<SymbolId> AmbiguousSymbols,
+        ImmutableHashSet<SymbolId> IncompleteTypeSymbols,
+        ImmutableDictionary<DocumentUri, DocumentSnapshot> DocumentSnapshots,
+        ImmutableDictionary<
+            DocumentUri,
+            ImmutableArray<Calor.Compiler.Diagnostics.Diagnostic>> InheritanceDiagnostics);
 
     private readonly ConcurrentDictionary<DocumentUri, DocumentState> _documents = new();
     private readonly ConcurrentDictionary<DocumentUri, DocumentState> _closedDocuments = new();
     private readonly ConcurrentDictionary<DocumentUri, WorkspaceFileStamp> _closedDocumentStamps = new();
     private readonly object _workspaceRootsGate = new();
     private readonly object _indexGate = new();
+    private readonly object _registryGate = new();
+    private readonly SemaphoreSlim _workspaceScanGate = new(1, 1);
     private WorkspaceRoot[] _workspaceRoots = [];
     private long _workspaceGeneration;
     private long _workspaceFileReadCount;
     private long _renameValidationCompilationCount;
     private WorkspaceSymbolIndex? _symbolIndex;
+    private readonly ILogger _logger;
+    private readonly Func<string, CancellationToken, Task<string>> _workspaceFileReader;
+    private readonly Func<string, IEnumerable<string>> _workspaceFileEnumerator;
+    private readonly Func<Task>? _beforeWorkspaceScanApply;
     private static readonly Lazy<IReadOnlyList<MetadataReference>> PlatformReferences =
         new(CreatePlatformReferences);
     // Validation is exhaustive through five relevant symbols (2^5 configurations).
@@ -99,8 +171,40 @@ public sealed class WorkspaceState
     internal long RenameValidationCompilationCount =>
         Interlocked.Read(ref _renameValidationCompilationCount);
 
-    public WorkspaceState(string? workspaceRootPath = null)
+    public WorkspaceState(
+        string? workspaceRootPath = null,
+        ILogger<WorkspaceState>? logger = null)
+        : this(
+            workspaceRootPath,
+            logger,
+            static (path, cancellationToken) =>
+                File.ReadAllTextAsync(path, cancellationToken),
+            workspaceFileEnumerator: null,
+            beforeWorkspaceScanApply: null)
     {
+    }
+
+    internal WorkspaceState(
+        string? workspaceRootPath,
+        ILogger<WorkspaceState>? logger,
+        Func<string, CancellationToken, Task<string>> workspaceFileReader,
+        Func<string, IEnumerable<string>>? workspaceFileEnumerator = null,
+        Func<Task>? beforeWorkspaceScanApply = null)
+    {
+        _logger = logger ?? NullLogger<WorkspaceState>.Instance;
+        _workspaceFileReader = workspaceFileReader
+            ?? throw new ArgumentNullException(nameof(workspaceFileReader));
+        _workspaceFileEnumerator = workspaceFileEnumerator
+            ?? (path => Directory.EnumerateFiles(
+                path,
+                "*.calr",
+                new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = FileAttributes.ReparsePoint,
+                }));
+        _beforeWorkspaceScanApply = beforeWorkspaceScanApply;
         ConfigureWorkspaceRoot(workspaceRootPath);
     }
 
@@ -135,6 +239,33 @@ public sealed class WorkspaceState
             ConfigureWorkspaceRoot(workspaceRoot.LocalPath);
     }
 
+    internal async Task ConfigureWorkspaceRootAsync(
+        Uri? workspaceRoot,
+        CancellationToken cancellationToken)
+    {
+        if (workspaceRoot?.IsFile != true)
+            return;
+
+        var normalized = NormalizeWorkspaceRoot(workspaceRoot.LocalPath);
+        lock (_workspaceRootsGate)
+        {
+            var current = Volatile.Read(ref _workspaceRoots);
+            if (current.Any(root =>
+                    string.Equals(root.Path, normalized, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            Volatile.Write(
+                ref _workspaceRoots,
+                current
+                    .Append(new WorkspaceRoot(normalized, $"root{current.Length}"))
+                    .ToArray());
+        }
+
+        await RefreshClosedDocumentsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public void ConfigureWorkspaceRoots(IEnumerable<Uri> workspaceRoots)
     {
         ArgumentNullException.ThrowIfNull(workspaceRoots);
@@ -153,25 +284,126 @@ public sealed class WorkspaceState
         RefreshWorkspaceIndex();
     }
 
+    internal async Task ConfigureWorkspaceRootsAsync(
+        IEnumerable<Uri> workspaceRoots,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceRoots);
+        var normalized = workspaceRoots
+            .Where(root => root.IsFile)
+            .Select(root => NormalizeWorkspaceRoot(root.LocalPath))
+            .Distinct(StringComparer.Ordinal)
+            .Select((path, index) => new WorkspaceRoot(path, $"root{index}"))
+            .ToArray();
+        if (normalized.Length == 0)
+            return;
+
+        lock (_workspaceRootsGate)
+            Volatile.Write(ref _workspaceRoots, normalized);
+
+        await RefreshClosedDocumentsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Get or create a document state for the given URI.
     /// </summary>
     public DocumentState GetOrCreate(DocumentUri uri, string source, int version = 0)
+#pragma warning disable VSTHRD002 // Compatibility wrapper for synchronous handler tests.
     {
-        _closedDocuments.TryRemove(uri, out _);
-        _closedDocumentStamps.TryRemove(uri, out _);
-        if (_documents.TryGetValue(uri, out var existing))
+        GetOrCreateAsync(uri, source, version).GetAwaiter().GetResult();
+        return Get(uri)
+            ?? throw new InvalidOperationException(
+                $"Document '{uri}' was removed during creation.");
+    }
+#pragma warning restore VSTHRD002
+
+    internal async Task<bool> GetOrCreateAsync(
+        DocumentUri uri,
+        string source,
+        int version = 0,
+        CancellationToken cancellationToken = default)
+    {
+        DocumentState? existing;
+        DocumentState? staleClosed = null;
+        lock (_registryGate)
         {
-            var before = existing.Snapshot;
-            existing.Update(source, version);
-            if (!ReferenceEquals(before, existing.Snapshot))
+            _documents.TryGetValue(uri, out existing);
+            if (existing != null)
+            {
+                _closedDocuments.TryRemove(uri, out staleClosed);
+                _closedDocumentStamps.TryRemove(uri, out _);
+            }
+        }
+        staleClosed?.Dispose();
+        if (existing != null)
+        {
+            var update = await existing.UpdateAsync(
+                source,
+                version,
+                cancellationToken).ConfigureAwait(false);
+            if (update.Accepted)
                 InvalidateSymbolIndex();
-            return existing;
+            return update.Accepted;
         }
 
-        var state = _documents.GetOrAdd(uri, _ => CreateAndAnalyze(uri, source, version));
+        var candidate = CreateDocumentState(uri, source, version);
+        DocumentSnapshot candidateSnapshot;
+        try
+        {
+            candidateSnapshot = await candidate.ReanalyzeAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            candidate.Dispose();
+            return false;
+        }
+        if (cancellationToken.IsCancellationRequested)
+        {
+            candidate.Dispose();
+            return false;
+        }
+        if (!candidate.IsCurrent(candidateSnapshot)
+            || !string.Equals(
+                candidateSnapshot.Source,
+                source,
+                StringComparison.Ordinal))
+        {
+            candidate.Dispose();
+            return false;
+        }
+
+        DocumentState state;
+        staleClosed = null;
+        lock (_registryGate)
+        {
+            _closedDocuments.TryRemove(uri, out staleClosed);
+            _closedDocumentStamps.TryRemove(uri, out _);
+            if (_documents.TryGetValue(uri, out var open))
+            {
+                state = open;
+            }
+            else
+            {
+                _documents[uri] = candidate;
+                state = candidate;
+            }
+        }
+        staleClosed?.Dispose();
+        if (!ReferenceEquals(state, candidate))
+        {
+            candidate.Dispose();
+            var update = await state.UpdateAsync(
+                source,
+                version,
+                cancellationToken).ConfigureAwait(false);
+            if (update.Accepted)
+                InvalidateSymbolIndex();
+            return update.Accepted;
+        }
+
         InvalidateSymbolIndex();
-        return state;
+        return true;
     }
 
     /// <summary>
@@ -179,20 +411,46 @@ public sealed class WorkspaceState
     /// </summary>
     public DocumentState? Get(DocumentUri uri)
     {
-        return _documents.TryGetValue(uri, out var state) ? state : null;
+        lock (_registryGate)
+            return _documents.TryGetValue(uri, out var state) ? state : null;
     }
 
     /// <summary>
     /// Update a document's content.
     /// </summary>
     public DocumentState Update(DocumentUri uri, string source, int version)
+#pragma warning disable VSTHRD002 // Compatibility wrapper for synchronous handler tests.
     {
-        var state = _documents.GetOrAdd(uri, _ => CreateAndAnalyze(uri, source, version));
-        var before = state.Snapshot;
-        state.Update(source, version);
-        if (!ReferenceEquals(before, state.Snapshot))
+        UpdateAsync(uri, source, version).GetAwaiter().GetResult();
+        return Get(uri)
+            ?? throw new InvalidOperationException(
+                $"Document '{uri}' was removed during update.");
+    }
+#pragma warning restore VSTHRD002
+
+    internal async Task<bool> UpdateAsync(
+        DocumentUri uri,
+        string source,
+        int version,
+        CancellationToken cancellationToken = default)
+    {
+        DocumentState? state;
+        lock (_registryGate)
+            _documents.TryGetValue(uri, out state);
+        if (state == null)
+            return await GetOrCreateAsync(
+                uri,
+                source,
+                version,
+                cancellationToken).ConfigureAwait(false);
+
+        var update = await state.UpdateAsync(
+            source,
+            version,
+            cancellationToken).ConfigureAwait(false);
+        if (update.Accepted)
             InvalidateSymbolIndex();
-        return state;
+        return update.Accepted;
     }
 
     /// <summary>
@@ -200,23 +458,55 @@ public sealed class WorkspaceState
     /// </summary>
     public bool Remove(DocumentUri uri)
     {
-        var removed = _documents.TryRemove(uri, out _);
+        bool removed;
+        DocumentState? state;
+        lock (_registryGate)
+            removed = _documents.TryRemove(uri, out state);
         if (removed)
         {
+            state!.Dispose();
             InvalidateSymbolIndex();
-            RefreshWorkspaceIndex();
+        }
+        return removed;
+    }
+
+    internal async Task<bool> RemoveAsync(
+        DocumentUri uri,
+        CancellationToken cancellationToken)
+    {
+        var removed = Remove(uri);
+        if (removed)
+        {
+            await RefreshClosedDocumentsAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
         return removed;
     }
 
     public DocumentState? Reanalyze(DocumentUri uri)
+#pragma warning disable VSTHRD002 // Compatibility wrapper for synchronous handler tests.
     {
-        if (!_documents.TryGetValue(uri, out var state))
-            return null;
+        return ReanalyzeAsync(uri).GetAwaiter().GetResult()
+            ? Get(uri)
+            : null;
+    }
+#pragma warning restore VSTHRD002
 
-        state.Reanalyze();
-        InvalidateSymbolIndex();
-        return state;
+    internal async Task<bool> ReanalyzeAsync(
+        DocumentUri uri,
+        CancellationToken cancellationToken = default)
+    {
+        DocumentState? state;
+        lock (_registryGate)
+            _documents.TryGetValue(uri, out state);
+        if (state == null)
+            return false;
+
+        var before = state.Snapshot;
+        var snapshot = await state.ReanalyzeAsync(cancellationToken).ConfigureAwait(false);
+        if (!ReferenceEquals(before, snapshot))
+            InvalidateSymbolIndex();
+        return state.IsCurrent(snapshot);
     }
 
     /// <summary>
@@ -224,7 +514,8 @@ public sealed class WorkspaceState
     /// </summary>
     public IEnumerable<DocumentState> GetAllDocuments()
     {
-        return _documents.Values;
+        lock (_registryGate)
+            return _documents.Values.ToArray();
     }
 
     /// <summary>
@@ -232,12 +523,19 @@ public sealed class WorkspaceState
     /// </summary>
     public bool Contains(DocumentUri uri)
     {
-        return _documents.ContainsKey(uri);
+        lock (_registryGate)
+            return _documents.ContainsKey(uri);
     }
 
     public ProjectSymbolOccurrence? ResolveOccurrence(DocumentUri uri, int offset)
+        => ResolveOccurrence(CaptureSnapshot(), uri, offset);
+
+    internal ProjectSymbolOccurrence? ResolveOccurrence(
+        WorkspaceIndexSnapshot snapshot,
+        DocumentUri uri,
+        int offset)
     {
-        var index = GetSymbolIndex();
+        var index = GetIndex(snapshot);
         if (!index.ByDocument.TryGetValue(uri, out var documentIndex))
             return null;
 
@@ -263,11 +561,16 @@ public sealed class WorkspaceState
     }
 
     public ProjectSymbolOccurrence? FindSymbolDefinition(SymbolId symbolId)
+        => FindSymbolDefinition(CaptureSnapshot(), symbolId);
+
+    internal ProjectSymbolOccurrence? FindSymbolDefinition(
+        WorkspaceIndexSnapshot snapshot,
+        SymbolId symbolId)
     {
         if (symbolId.IsNone)
             return null;
 
-        var index = GetSymbolIndex();
+        var index = GetIndex(snapshot);
         if (index.AmbiguousSymbols.Contains(symbolId))
             return null;
 
@@ -278,11 +581,16 @@ public sealed class WorkspaceState
     }
 
     public bool CanRenameSymbol(SymbolId symbolId)
+        => CanRenameSymbol(CaptureSnapshot(), symbolId);
+
+    internal bool CanRenameSymbol(
+        WorkspaceIndexSnapshot snapshot,
+        SymbolId symbolId)
     {
         if (symbolId.IsNone)
             return false;
 
-        var index = GetSymbolIndex();
+        var index = GetIndex(snapshot);
         return !index.AmbiguousSymbols.Contains(symbolId)
             && !index.IncompleteTypeSymbols.Contains(symbolId)
             && index.BySymbol.TryGetValue(symbolId, out var occurrences)
@@ -294,9 +602,15 @@ public sealed class WorkspaceState
     public IReadOnlyList<ProjectSymbolOccurrence> FindSymbolOccurrences(
         SymbolId symbolId,
         bool includeDeclaration)
+        => FindSymbolOccurrences(CaptureSnapshot(), symbolId, includeDeclaration);
+
+    internal IReadOnlyList<ProjectSymbolOccurrence> FindSymbolOccurrences(
+        WorkspaceIndexSnapshot snapshot,
+        SymbolId symbolId,
+        bool includeDeclaration)
     {
         if (symbolId.IsNone
-            || !GetSymbolIndex().BySymbol.TryGetValue(symbolId, out var occurrences))
+            || !GetIndex(snapshot).BySymbol.TryGetValue(symbolId, out var occurrences))
         {
             return Array.Empty<ProjectSymbolOccurrence>();
         }
@@ -370,6 +684,19 @@ public sealed class WorkspaceState
         string oldName,
         string newName,
         CancellationToken cancellationToken)
+        => ValidateRenameAsync(
+            CaptureSnapshot(),
+            occurrences,
+            oldName,
+            newName,
+            cancellationToken);
+
+    internal Task<bool> ValidateRenameAsync(
+        WorkspaceIndexSnapshot workspaceSnapshot,
+        IReadOnlyList<ProjectSymbolOccurrence> occurrences,
+        string oldName,
+        string newName,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(occurrences);
         ArgumentException.ThrowIfNullOrWhiteSpace(oldName);
@@ -377,13 +704,8 @@ public sealed class WorkspaceState
         if (occurrences.Count == 0)
             return Task.FromResult(false);
 
-        WorkspaceDocumentSnapshot[] documents;
-        long generation;
-        lock (_indexGate)
-        {
-            documents = CaptureDocumentsCore();
-            generation = _workspaceGeneration;
-        }
+        var documents = workspaceSnapshot.Documents;
+        var generation = workspaceSnapshot.Generation;
         return Task.Run(
             () =>
             {
@@ -403,8 +725,13 @@ public sealed class WorkspaceState
                 {
                     throw;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    _logger.LogError(
+                        ex,
+                        "LSP rename validation failed for symbol {SymbolName} in workspace generation {WorkspaceGeneration}.",
+                        oldName,
+                        generation);
                     return false;
                 }
             },
@@ -470,13 +797,15 @@ public sealed class WorkspaceState
                 document.Document.Uri,
                 source,
                 document.Analysis.Version,
-                GetCanonicalSourceIdentity(document.Document.Uri));
+                GetCanonicalSourceIdentity(document.Document.Uri),
+                _logger,
+                failureInjector: null);
             candidate.Reanalyze();
             if (HasNewErrors(
                     GetAnalysisErrors(document.Analysis, document.Document.Uri),
                     GetAnalysisErrors(candidate.Snapshot, candidate.Uri))
-                || candidate.Ast == null
-                || candidate.BoundModule == null)
+                || candidate.Snapshot.Ast == null
+                || candidate.Snapshot.BoundModule == null)
             {
                 return false;
             }
@@ -694,7 +1023,7 @@ public sealed class WorkspaceState
 
     public ProjectFunctionLocation ResolveProjectCall(
         DocumentState caller,
-        DocumentAnalysisSnapshot callerSnapshot,
+        DocumentSnapshot callerSnapshot,
         BoundNode? call)
     {
         return ResolveProjectCall(CaptureDocuments(), caller, callerSnapshot, call);
@@ -705,10 +1034,20 @@ public sealed class WorkspaceState
         return ResolveProjectCall(CaptureDocuments(), null, null, call);
     }
 
+    internal ProjectFunctionLocation ResolveProjectCall(
+        WorkspaceIndexSnapshot workspace,
+        WorkspaceDocumentSnapshot caller,
+        BoundNode? call) =>
+        ResolveProjectCall(
+            workspace.Documents,
+            caller.Document,
+            caller.Analysis,
+            call);
+
     private static ProjectFunctionLocation ResolveProjectCall(
         IReadOnlyList<WorkspaceDocumentSnapshot> documents,
         DocumentState? caller,
-        DocumentAnalysisSnapshot? callerSnapshot,
+        DocumentSnapshot? callerSnapshot,
         BoundNode? call)
     {
         if (call == null)
@@ -807,7 +1146,7 @@ public sealed class WorkspaceState
 
     public ProjectSymbolLocation ResolveProjectType(
         DocumentState caller,
-        DocumentAnalysisSnapshot callerSnapshot,
+        DocumentSnapshot callerSnapshot,
         BoundNewExpression creation)
     {
         var documents = CaptureDocuments();
@@ -1073,7 +1412,7 @@ public sealed class WorkspaceState
     }
 
     private static string? FindCallerContainingType(
-        DocumentAnalysisSnapshot? callerSnapshot,
+        DocumentSnapshot? callerSnapshot,
         BoundNode call)
     {
         return callerSnapshot?.BoundModule?.Functions
@@ -1155,16 +1494,99 @@ public sealed class WorkspaceState
     }
 
     private WorkspaceSymbolIndex GetSymbolIndex()
+        => GetIndex(CaptureSnapshot());
+
+    internal WorkspaceIndexSnapshot CaptureSnapshot(
+        bool refreshClosedDocuments = false)
+    {
+        if (refreshClosedDocuments)
+            RefreshClosedDocuments();
+
+        lock (_indexGate)
+        {
+            var documents = CaptureDocumentsCore();
+            if (_symbolIndex?.Generation == _workspaceGeneration
+                && IndexMatchesDocuments(_symbolIndex, documents))
+            {
+                return new WorkspaceIndexSnapshot(
+                    _workspaceGeneration,
+                    documents.ToImmutableArray(),
+                    _symbolIndex);
+            }
+
+            if (_symbolIndex?.Generation == _workspaceGeneration)
+                _workspaceGeneration++;
+            _symbolIndex = BuildSymbolIndex(
+                documents,
+                _workspaceGeneration);
+            return new WorkspaceIndexSnapshot(
+                _workspaceGeneration,
+                documents.ToImmutableArray(),
+                _symbolIndex);
+        }
+    }
+
+    internal async Task<WorkspaceIndexSnapshot> CaptureSnapshotAsync(
+        bool refreshClosedDocuments,
+        CancellationToken cancellationToken)
+    {
+        if (refreshClosedDocuments)
+        {
+            await RefreshClosedDocumentsAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return CaptureSnapshot(refreshClosedDocuments: false);
+    }
+
+    private static WorkspaceSymbolIndex GetIndex(WorkspaceIndexSnapshot snapshot) =>
+        snapshot.Index;
+
+    internal IReadOnlyList<Calor.Compiler.Diagnostics.Diagnostic> GetDiagnostics(
+        WorkspaceIndexSnapshot workspace,
+        WorkspaceDocumentSnapshot document)
+    {
+        var index = GetIndex(workspace);
+        var uri = DocumentUri.From(document.Document.Uri);
+        return index.InheritanceDiagnostics.TryGetValue(uri, out var inheritance)
+            ? document.Analysis.Diagnostics.Concat(inheritance).ToArray()
+            : document.Analysis.Diagnostics;
+    }
+
+    internal bool TryPublishDiagnostics(
+        WorkspaceIndexSnapshot workspace,
+        WorkspaceDocumentSnapshot document,
+        Action publish)
     {
         lock (_indexGate)
         {
-            if (_symbolIndex?.Generation == _workspaceGeneration)
-                return _symbolIndex;
+            if (_workspaceGeneration != workspace.Generation
+                || !ReferenceEquals(_symbolIndex, workspace.Index))
+            {
+                return false;
+            }
 
-            _symbolIndex = BuildSymbolIndex(
-                CaptureDocumentsCore(),
-                _workspaceGeneration);
-            return _symbolIndex;
+            return document.Document.TryUseCurrentSnapshot(
+                document.Analysis,
+                publish);
+        }
+    }
+
+    internal bool TryPublishGeneration(
+        WorkspaceIndexSnapshot workspace,
+        Action publish)
+    {
+        lock (_indexGate)
+        {
+            if (_workspaceGeneration != workspace.Generation
+                || !ReferenceEquals(_symbolIndex, workspace.Index))
+            {
+                return false;
+            }
+
+            publish();
+            return true;
         }
     }
 
@@ -1344,7 +1766,7 @@ public sealed class WorkspaceState
 
         return new WorkspaceSymbolIndex(
             generation,
-            byDocument.ToDictionary(
+            byDocument.ToImmutableDictionary(
                 pair => pair.Key,
                 pair =>
                 {
@@ -1354,24 +1776,28 @@ public sealed class WorkspaceState
                         .ThenBy(
                             occurrence => occurrence.SymbolId.Value,
                             StringComparer.Ordinal)
-                        .ToArray();
+                        .ToImmutableArray();
                     return new DocumentSymbolIndex(
                         occurrences
                             .GroupBy(occurrence => occurrence.SymbolId)
-                            .ToDictionary(
+                            .ToImmutableDictionary(
                                 group => group.Key,
-                                group => group.ToArray()),
+                                group => group.ToImmutableArray()),
                         occurrences);
                 }),
-            bySymbol.ToDictionary(
+            bySymbol.ToImmutableDictionary(
                 pair => pair.Key,
                 pair => pair.Value
                     .OrderBy(occurrence => occurrence.Doc.Uri.ToString(), StringComparer.Ordinal)
                     .ThenBy(occurrence => occurrence.Span.Start)
                     .ThenBy(occurrence => occurrence.Kind)
-                    .ToArray()),
-            ambiguousSymbols,
-            incompleteTypeSymbols);
+                    .ToImmutableArray()),
+            ambiguousSymbols.ToImmutableHashSet(),
+            incompleteTypeSymbols.ToImmutableHashSet(),
+            documents.ToImmutableDictionary(
+                document => DocumentUri.From(document.Document.Uri),
+                document => document.Analysis),
+            BuildInheritanceDiagnostics(documents));
 
         void AddCallOccurrences(
             WorkspaceDocumentSnapshot document,
@@ -1488,6 +1914,531 @@ public sealed class WorkspaceState
             }
             symbolOccurrences.Add(occurrence);
         }
+    }
+
+    private static ImmutableDictionary<
+        DocumentUri,
+        ImmutableArray<Calor.Compiler.Diagnostics.Diagnostic>> BuildInheritanceDiagnostics(
+        IReadOnlyList<WorkspaceDocumentSnapshot> documents)
+    {
+        var declarationParts = documents
+            .SelectMany(GetTypeDeclarations)
+            .OrderBy(item => item.Identity.Value, StringComparer.Ordinal)
+            .ToArray();
+        var nodes = declarationParts
+            .GroupBy(part => part.Key)
+            .Select(group => CreateGraphNode(group.ToArray()))
+            .OrderBy(node => node.Key.ModuleName, StringComparer.Ordinal)
+            .ThenBy(node => node.Key.ContainingTypePath, StringComparer.Ordinal)
+            .ThenBy(node => node.Key.SimpleName, StringComparer.Ordinal)
+            .ThenBy(node => node.Key.Arity)
+            .ToArray();
+        var byKey = nodes.ToDictionary(
+            node => node.Key);
+        var byModuleQualifiedName = nodes
+            .GroupBy(node => new WorkspaceTypeLookupKey(
+                $"{node.Key.ModuleName}.{node.Key.QualifiedName}",
+                node.Key.Arity))
+            .ToDictionary(
+                group => group.Key,
+                CreateResolution);
+        var byUnqualifiedName = nodes
+            .GroupBy(node => new WorkspaceTypeLookupKey(
+                node.Key.QualifiedName,
+                node.Key.Arity))
+            .ToDictionary(
+                group => group.Key,
+                CreateResolution);
+        var bySimpleName = nodes
+            .GroupBy(node => new WorkspaceTypeLookupKey(
+                node.Key.SimpleName,
+                node.Key.Arity))
+            .ToDictionary(
+                group => group.Key,
+                CreateResolution);
+        var edges = new Dictionary<
+            WorkspaceTypeGraphKey,
+            WorkspaceTypeGraphKey>();
+        foreach (var node in nodes.Where(item => !item.IsAmbiguous))
+        {
+            if (node.BaseClass is not { } reference)
+                continue;
+
+            var resolution = ResolveBaseType(node, reference);
+            if (resolution.Kind == WorkspaceTypeResolutionKind.Found)
+                edges[node.Key] = resolution.Node!.Key;
+        }
+
+        var state = new Dictionary<WorkspaceTypeGraphKey, int>();
+        var stack = new List<WorkspaceTypeGraphKey>();
+        var diagnostics = new Dictionary<
+            DocumentUri,
+            List<Calor.Compiler.Diagnostics.Diagnostic>>();
+        foreach (var node in nodes.Where(item => !item.IsAmbiguous))
+            Visit(node.Key);
+
+        return diagnostics.ToImmutableDictionary(
+            pair => pair.Key,
+            pair => pair.Value
+                .OrderBy(diagnostic => diagnostic.Span.Start)
+                .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
+                .ToImmutableArray());
+
+        WorkspaceTypeResolution ResolveBaseType(
+            WorkspaceTypeGraphNode source,
+            WorkspaceTypeReference reference)
+        {
+            var containingPath = source.Key.ContainingTypePath;
+            while (true)
+            {
+                var lexicalName = string.IsNullOrEmpty(containingPath)
+                    ? reference.Name
+                    : $"{containingPath}.{reference.Name}";
+                var lexical = ResolveKey(CreateGraphKey(
+                    source.Key.ModuleName,
+                    lexicalName,
+                    reference.Arity));
+                if (lexical.Kind != WorkspaceTypeResolutionKind.NotFound)
+                    return lexical;
+                if (string.IsNullOrEmpty(containingPath))
+                    break;
+                var separator = containingPath.LastIndexOf('.');
+                containingPath = separator < 0
+                    ? string.Empty
+                    : containingPath[..separator];
+            }
+
+            var imported = ResolveImports(source, reference);
+            if (imported.Kind != WorkspaceTypeResolutionKind.NotFound)
+                return imported;
+
+            var lookup = new WorkspaceTypeLookupKey(
+                reference.Name,
+                reference.Arity);
+            var moduleQualified = ResolveLookup(
+                byModuleQualifiedName,
+                lookup);
+            if (moduleQualified.Kind != WorkspaceTypeResolutionKind.NotFound)
+                return moduleQualified;
+
+            var qualified = ResolveLookup(byUnqualifiedName, lookup);
+            if (qualified.Kind != WorkspaceTypeResolutionKind.NotFound)
+                return qualified;
+
+            return reference.Name.Contains('.', StringComparison.Ordinal)
+                ? new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.NotFound,
+                    null)
+                : ResolveLookup(
+                    bySimpleName,
+                    new WorkspaceTypeLookupKey(
+                        reference.SimpleName,
+                        reference.Arity));
+        }
+
+        WorkspaceTypeResolution ResolveImports(
+            WorkspaceTypeGraphNode source,
+            WorkspaceTypeReference reference)
+        {
+            var found = new Dictionary<
+                WorkspaceTypeGraphKey,
+                WorkspaceTypeGraphNode>();
+            foreach (var import in source.Imports)
+            {
+                var resolution = ResolveLookup(
+                    byModuleQualifiedName,
+                    new WorkspaceTypeLookupKey(
+                        $"{import}.{reference.Name}",
+                        reference.Arity));
+                if (resolution.Kind == WorkspaceTypeResolutionKind.Ambiguous)
+                    return resolution;
+                if (resolution.Kind == WorkspaceTypeResolutionKind.Found)
+                    found.TryAdd(resolution.Node!.Key, resolution.Node);
+            }
+
+            return found.Count switch
+            {
+                0 => new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.NotFound,
+                    null),
+                1 => new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.Found,
+                    found.Values.Single()),
+                _ => new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.Ambiguous,
+                    null),
+            };
+        }
+
+        WorkspaceTypeResolution ResolveKey(WorkspaceTypeGraphKey key)
+        {
+            if (!byKey.TryGetValue(key, out var node))
+            {
+                return new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.NotFound,
+                    null);
+            }
+            return node.IsAmbiguous
+                ? new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.Ambiguous,
+                    null)
+                : new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.Found,
+                    node);
+        }
+
+        static WorkspaceTypeResolution ResolveLookup(
+            IReadOnlyDictionary<
+                WorkspaceTypeLookupKey,
+                WorkspaceTypeResolution> lookup,
+            WorkspaceTypeLookupKey key) =>
+            lookup.TryGetValue(key, out var resolution)
+                ? resolution
+                : new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.NotFound,
+                    null);
+
+        static WorkspaceTypeResolution CreateResolution(
+            IGrouping<WorkspaceTypeLookupKey, WorkspaceTypeGraphNode> group)
+        {
+            var candidates = group.ToArray();
+            return candidates.Length == 1 && !candidates[0].IsAmbiguous
+                ? new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.Found,
+                    candidates[0])
+                : new WorkspaceTypeResolution(
+                    WorkspaceTypeResolutionKind.Ambiguous,
+                    null);
+        }
+
+        void Visit(WorkspaceTypeGraphKey key)
+        {
+            if (state.GetValueOrDefault(key) == 2)
+                return;
+            if (state.GetValueOrDefault(key) == 1)
+                return;
+
+            state[key] = 1;
+            stack.Add(key);
+            if (edges.TryGetValue(key, out var next))
+            {
+                if (state.GetValueOrDefault(next) == 0)
+                {
+                    Visit(next);
+                }
+                else if (state.GetValueOrDefault(next) == 1)
+                {
+                    var start = stack.FindIndex(item =>
+                        item == next);
+                    if (start >= 0)
+                        ReportCycle(stack.Skip(start).ToArray());
+                }
+            }
+            stack.RemoveAt(stack.Count - 1);
+            state[key] = 2;
+        }
+
+        void ReportCycle(IReadOnlyList<WorkspaceTypeGraphKey> cycleKeys)
+        {
+            if (cycleKeys.Count == 0)
+                return;
+
+            var cycle = cycleKeys
+                .Select(key => byKey[key])
+                .ToArray();
+            var start = Enumerable.Range(0, cycle.Length)
+                .OrderBy(
+                    index => cycle[index].Key.DisplayName,
+                    StringComparer.Ordinal)
+                .ThenBy(
+                    index => cycle[index].Key.ModuleName,
+                    StringComparer.Ordinal)
+                .First();
+            var ordered = Enumerable.Range(0, cycle.Length)
+                .Select(offset => cycle[(start + offset) % cycle.Length])
+                .ToArray();
+            var description = string.Join(
+                " -> ",
+                ordered.Select(item => item.Key.DisplayName)
+                    .Append(ordered[0].Key.DisplayName));
+
+            var message = $"Inheritance cycle detected: {description}.";
+            foreach (var node in ordered)
+            {
+                foreach (var part in node.Parts
+                             .OrderBy(
+                                 item => item.Document.Document.Uri.ToString(),
+                                 StringComparer.Ordinal)
+                             .ThenBy(item => item.Node.Span.Start))
+                {
+                    var uri = DocumentUri.From(part.Document.Document.Uri);
+                    if (!diagnostics.TryGetValue(uri, out var documentDiagnostics))
+                    {
+                        documentDiagnostics = [];
+                        diagnostics.Add(uri, documentDiagnostics);
+                    }
+
+                    documentDiagnostics.Add(new Calor.Compiler.Diagnostics.Diagnostic(
+                        Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle,
+                        message,
+                        part.Node.BaseClassSpan ?? part.Node.IdentifierSpan,
+                        Calor.Compiler.Diagnostics.DiagnosticSeverity.Error,
+                        part.Document.Document.Uri.IsFile
+                            ? part.Document.Document.Uri.LocalPath
+                            : part.Document.Document.Uri.ToString()));
+                }
+            }
+        }
+
+        static WorkspaceTypeGraphNode CreateGraphNode(
+            IReadOnlyList<WorkspaceTypeDeclarationPart> parts)
+        {
+            var first = parts[0];
+            var compatible = parts.Count == 1
+                || ArePartialDeclarationsCompatible(parts);
+            var baseClasses = parts
+                .Select(part => part.Node.BaseClass)
+                .Where(baseClass => !string.IsNullOrWhiteSpace(baseClass))
+                .Select(baseClass => ParseTypeReference(baseClass!))
+                .Distinct()
+                .ToArray();
+            return new WorkspaceTypeGraphNode(
+                first.Key,
+                compatible && baseClasses.Length == 1
+                    ? baseClasses[0]
+                    : null,
+                IsAmbiguous: !compatible || baseClasses.Length > 1,
+                parts
+                    .SelectMany(part =>
+                        part.Document.Analysis.Ast?.Usings
+                            .Select(directive => directive.Namespace)
+                        ?? Enumerable.Empty<string>())
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(import => import, StringComparer.Ordinal)
+                    .ToImmutableArray(),
+                parts
+                    .OrderBy(
+                        part => part.Document.Document.Uri.ToString(),
+                        StringComparer.Ordinal)
+                    .ThenBy(part => part.Node.Span.Start)
+                    .ToImmutableArray());
+        }
+
+        static bool ArePartialDeclarationsCompatible(
+            IReadOnlyList<WorkspaceTypeDeclarationPart> parts)
+        {
+            if (parts.Any(part => !part.Node.IsPartial))
+                return false;
+
+            var first = parts[0].Node;
+            return parts.Skip(1).All(part =>
+            {
+                var node = part.Node;
+                return node.IsStruct == first.IsStruct
+                    && node.IsStatic == first.IsStatic
+                    && node.IsReadOnly == first.IsReadOnly
+                    && node.Visibility == first.Visibility
+                    && TypeParametersMatch(
+                        first.TypeParameters,
+                        node.TypeParameters);
+            });
+
+            static bool TypeParametersMatch(
+                IReadOnlyList<TypeParameterNode> left,
+                IReadOnlyList<TypeParameterNode> right)
+            {
+                if (left.Count != right.Count)
+                    return false;
+                for (var index = 0; index < left.Count; index++)
+                {
+                    if (!string.Equals(
+                            left[index].Name,
+                            right[index].Name,
+                            StringComparison.Ordinal)
+                        || left[index].Variance != right[index].Variance
+                        || !ConstraintsMatch(
+                            left[index].Constraints,
+                            right[index].Constraints))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            static bool ConstraintsMatch(
+                IReadOnlyList<TypeConstraintNode> left,
+                IReadOnlyList<TypeConstraintNode> right)
+            {
+                if (left.Count != right.Count)
+                    return false;
+                for (var index = 0; index < left.Count; index++)
+                {
+                    if (left[index].Kind != right[index].Kind
+                        || !string.Equals(
+                            left[index].TypeName?.Trim(),
+                            right[index].TypeName?.Trim(),
+                            StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        static IEnumerable<WorkspaceTypeDeclarationPart> GetTypeDeclarations(
+            WorkspaceDocumentSnapshot document)
+        {
+            var ast = document.Analysis.Ast;
+            if (ast == null)
+                yield break;
+
+            var symbols = document.Analysis.BoundModule?.SymbolsById.Values
+                .OfType<TypeSymbol>()
+                .ToArray() ?? [];
+            foreach (var item in EnumerateClasses(
+                         ast.Classes,
+                         containingType: null))
+            {
+                var symbol = symbols.SingleOrDefault(candidate =>
+                    candidate.DeclarationSpan == item.Node.IdentifierSpan
+                    && string.Equals(
+                        candidate.QualifiedName,
+                        item.QualifiedName,
+                        StringComparison.Ordinal));
+                var identity = symbol?.Id ?? SymbolId.Create(
+                    "lsp-inheritance",
+                    SymbolSourceIdentity.Canonicalize(
+                        document.Document.Uri.ToString()),
+                    ast.Id,
+                    item.Node.Id,
+                    item.QualifiedName);
+                var lastSeparator = item.QualifiedName.LastIndexOf('.');
+                var containingTypePath = lastSeparator < 0
+                    ? string.Empty
+                    : item.QualifiedName[..lastSeparator];
+                yield return new WorkspaceTypeDeclarationPart(
+                    identity,
+                    new WorkspaceTypeGraphKey(
+                        ast.Name,
+                        containingTypePath,
+                        item.Node.Name,
+                        item.Node.TypeParameters.Count),
+                    document,
+                    item.Node);
+            }
+        }
+
+        static WorkspaceTypeGraphKey CreateGraphKey(
+            string moduleName,
+            string qualifiedName,
+            int arity)
+        {
+            var lastSeparator = qualifiedName.LastIndexOf('.');
+            return new WorkspaceTypeGraphKey(
+                moduleName,
+                lastSeparator < 0
+                    ? string.Empty
+                    : qualifiedName[..lastSeparator],
+                lastSeparator < 0
+                    ? qualifiedName
+                    : qualifiedName[(lastSeparator + 1)..],
+                arity);
+        }
+
+        static WorkspaceTypeReference ParseTypeReference(string typeName)
+        {
+            var type = typeName.Trim().TrimStart('?');
+            var genericStart = type.IndexOf('<');
+            if (genericStart < 0)
+            {
+                var nominal = GetNominalTypeName(type);
+                var separator = nominal.LastIndexOf('.');
+                return new WorkspaceTypeReference(
+                    nominal,
+                    separator < 0 ? nominal : nominal[(separator + 1)..],
+                    Arity: 0);
+            }
+
+            var name = type[..genericStart].Trim();
+            var genericEnd = type.LastIndexOf('>');
+            if (genericEnd <= genericStart)
+            {
+                var separator = name.LastIndexOf('.');
+                return new WorkspaceTypeReference(
+                    name,
+                    separator < 0 ? name : name[(separator + 1)..],
+                    Arity: 0);
+            }
+
+            var arity = 1;
+            var angleDepth = 0;
+            var parenthesisDepth = 0;
+            var bracketDepth = 0;
+            var braceDepth = 0;
+            for (var index = genericStart + 1; index < genericEnd; index++)
+            {
+                switch (type[index])
+                {
+                    case '<':
+                        angleDepth++;
+                        break;
+                    case '>':
+                        angleDepth--;
+                        break;
+                    case '(':
+                        parenthesisDepth++;
+                        break;
+                    case ')':
+                        parenthesisDepth--;
+                        break;
+                    case '[':
+                        bracketDepth++;
+                        break;
+                    case ']':
+                        bracketDepth--;
+                        break;
+                    case '{':
+                        braceDepth++;
+                        break;
+                    case '}':
+                        braceDepth--;
+                        break;
+                    case ',' when angleDepth == 0
+                        && parenthesisDepth == 0
+                        && bracketDepth == 0
+                        && braceDepth == 0:
+                        arity++;
+                        break;
+                }
+            }
+            var lastSeparator = name.LastIndexOf('.');
+            return new WorkspaceTypeReference(
+                name,
+                lastSeparator < 0 ? name : name[(lastSeparator + 1)..],
+                arity);
+        }
+    }
+
+    private static bool IndexMatchesDocuments(
+        WorkspaceSymbolIndex index,
+        IReadOnlyList<WorkspaceDocumentSnapshot> documents)
+    {
+        if (index.DocumentSnapshots.Count != documents.Count)
+            return false;
+
+        foreach (var document in documents)
+        {
+            var uri = DocumentUri.From(document.Document.Uri);
+            if (!index.DocumentSnapshots.TryGetValue(uri, out var indexed)
+                || !ReferenceEquals(indexed, document.Analysis))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static IReadOnlyList<VariableSymbol> ResolveProjectFields(
@@ -1620,137 +2571,281 @@ public sealed class WorkspaceState
 
     private WorkspaceDocumentSnapshot[] CaptureDocumentsCore()
     {
-        return _documents.Values
-            .Concat(_closedDocuments
-                .Where(pair => !_documents.ContainsKey(pair.Key))
-                .Select(pair => pair.Value))
-            .Select(document => new WorkspaceDocumentSnapshot(document, document.Snapshot))
-            .ToArray();
+        List<DocumentState> staleClosed = [];
+        WorkspaceDocumentSnapshot[] documents;
+        lock (_registryGate)
+        {
+            foreach (var uri in _documents.Keys)
+            {
+                if (_closedDocuments.TryRemove(uri, out var stale))
+                {
+                    staleClosed.Add(stale);
+                    _closedDocumentStamps.TryRemove(uri, out _);
+                }
+            }
+
+            documents = _documents
+                .Select(pair => new WorkspaceDocumentSnapshot(
+                    pair.Value,
+                    pair.Value.Snapshot))
+                .Concat(_closedDocuments.Select(pair =>
+                    new WorkspaceDocumentSnapshot(
+                        pair.Value,
+                        pair.Value.Snapshot)))
+                .GroupBy(document => DocumentUri.From(document.Document.Uri))
+                .Select(group => group.First())
+                .ToArray();
+        }
+        foreach (var stale in staleClosed)
+            stale.Dispose();
+        return documents;
     }
 
     public void RefreshClosedDocuments()
     {
-        lock (_indexGate)
-            RefreshWorkspaceIndexCore();
+#pragma warning disable VSTHRD002 // Compatibility wrapper; scanning runs off-thread.
+        RefreshClosedDocumentsAsync(CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+#pragma warning restore VSTHRD002
     }
 
     private void RefreshWorkspaceIndex() => RefreshClosedDocuments();
 
-    private void RefreshWorkspaceIndexCore()
+    internal async Task RefreshClosedDocumentsAsync(
+        CancellationToken cancellationToken)
     {
-        var roots = Volatile.Read(ref _workspaceRoots);
-        if (roots.Length == 0)
-            return;
+        await _workspaceScanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        WorkspaceScanResult? scan = null;
+        try
+        {
+            var roots = Volatile.Read(ref _workspaceRoots);
+            if (roots.Length == 0)
+                return;
 
+            scan = await Task.Run(
+                    () => ScanWorkspaceAsync(roots, cancellationToken),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(roots, Volatile.Read(ref _workspaceRoots)))
+                return;
+            if (_beforeWorkspaceScanApply != null)
+            {
+                await _beforeWorkspaceScanApply()
+                    .WaitAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            ApplyWorkspaceScan(scan);
+            scan = null;
+        }
+        finally
+        {
+            if (scan != null)
+                DisposeScannedAnalyses(scan.Files);
+            _workspaceScanGate.Release();
+        }
+    }
+
+    private async Task<WorkspaceScanResult> ScanWorkspaceAsync(
+        WorkspaceRoot[] roots,
+        CancellationToken cancellationToken)
+    {
         var seen = new HashSet<DocumentUri>();
-        var changed = false;
-        foreach (var root in roots)
+        var files = new List<ScannedWorkspaceFile>();
+        try
         {
-            if (!Directory.Exists(root.Path))
-                continue;
-
-            IEnumerable<string> paths;
-            try
+            foreach (var root in roots)
             {
-                paths = Directory.EnumerateFiles(
-                    root.Path,
-                    "*.calr",
-                    new EnumerationOptions
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!Directory.Exists(root.Path))
+                    continue;
+
+                string[] paths;
+                try
+                {
+                    paths = _workspaceFileEnumerator(root.Path)
+                        .Where(ShouldIndexPath)
+                        .ToArray();
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Workspace scan skipped {WorkspaceRoot} because file enumeration failed.",
+                        root.Path);
+                    continue;
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Workspace scan skipped {WorkspaceRoot} because file enumeration was denied.",
+                        root.Path);
+                    continue;
+                }
+
+                foreach (var path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var fullPath = Path.GetFullPath(path);
+                    var uri = DocumentUri.FromFileSystemPath(fullPath);
+                    if (!seen.Add(uri) || _documents.ContainsKey(uri))
+                        continue;
+
+                    WorkspaceFileStamp stamp;
+                    try
                     {
-                        RecurseSubdirectories = true,
-                        IgnoreInaccessible = true,
-                        AttributesToSkip = FileAttributes.ReparsePoint,
-                    })
-                    .Where(ShouldIndexPath)
-                    .ToArray();
+                        var info = new FileInfo(fullPath);
+                        stamp = new WorkspaceFileStamp(
+                            info.Length,
+                            info.LastWriteTimeUtc);
+                    }
+                    catch (IOException)
+                    {
+                        continue;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        continue;
+                    }
+
+                    if (_closedDocuments.ContainsKey(uri)
+                        && _closedDocumentStamps.TryGetValue(
+                            uri,
+                            out var existingStamp)
+                        && existingStamp == stamp)
+                    {
+                        continue;
+                    }
+
+                    string source;
+                    try
+                    {
+                        Interlocked.Increment(ref _workspaceFileReadCount);
+                        source = await _workspaceFileReader(
+                                fullPath,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch (IOException)
+                    {
+                        continue;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        continue;
+                    }
+
+                    if (_closedDocuments.TryGetValue(uri, out var existing)
+                        && string.Equals(
+                            existing.Source,
+                            source,
+                            StringComparison.Ordinal))
+                    {
+                        files.Add(new ScannedWorkspaceFile(
+                            uri,
+                            stamp,
+                            source,
+                            Analysis: null));
+                        continue;
+                    }
+
+                    var analysis = CreateDocumentState(uri, source, version: 0);
+                    try
+                    {
+                        await analysis.ReanalyzeAsync(cancellationToken)
+                            .ConfigureAwait(false);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        files.Add(new ScannedWorkspaceFile(
+                            uri,
+                            stamp,
+                            source,
+                            analysis));
+                    }
+                    catch
+                    {
+                        analysis.Dispose();
+                        throw;
+                    }
+                }
             }
-            catch (IOException)
-            {
-                continue;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
 
-            foreach (var path in paths)
-            {
-                var fullPath = Path.GetFullPath(path);
-                var uri = DocumentUri.FromFileSystemPath(fullPath);
-                seen.Add(uri);
-                if (_documents.ContainsKey(uri))
-                {
-                    changed |= _closedDocuments.TryRemove(uri, out _);
-                    _closedDocumentStamps.TryRemove(uri, out _);
-                    continue;
-                }
-
-                WorkspaceFileStamp stamp;
-                try
-                {
-                    var info = new FileInfo(fullPath);
-                    stamp = new WorkspaceFileStamp(
-                        info.Length,
-                        info.LastWriteTimeUtc);
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    continue;
-                }
-
-                if (_closedDocuments.ContainsKey(uri)
-                    && _closedDocumentStamps.TryGetValue(uri, out var existingStamp)
-                    && existingStamp == stamp)
-                {
-                    continue;
-                }
-
-                string source;
-                try
-                {
-                    Interlocked.Increment(ref _workspaceFileReadCount);
-                    source = File.ReadAllText(fullPath);
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    continue;
-                }
-
-                if (_closedDocuments.TryGetValue(uri, out var existing)
-                    && string.Equals(existing.Source, source, StringComparison.Ordinal))
-                {
-                    _closedDocumentStamps[uri] = stamp;
-                    continue;
-                }
-
-                _closedDocuments[uri] = CreateAndAnalyze(uri, source, version: 0);
-                _closedDocumentStamps[uri] = stamp;
-                changed = true;
-            }
+            return new WorkspaceScanResult(roots, seen, files);
         }
-
-        foreach (var uri in _closedDocuments.Keys)
+        catch
         {
-            if (!seen.Contains(uri) && _closedDocuments.TryRemove(uri, out _))
+            DisposeScannedAnalyses(files);
+            throw;
+        }
+    }
+
+    private void ApplyWorkspaceScan(WorkspaceScanResult scan)
+    {
+        var changed = false;
+        lock (_indexGate)
+        {
+            lock (_registryGate)
             {
-                _closedDocumentStamps.TryRemove(uri, out _);
-                changed = true;
+                foreach (var file in scan.Files)
+                {
+                    if (_documents.ContainsKey(file.Uri))
+                    {
+                        file.Analysis?.Dispose();
+                        changed |= _closedDocuments.TryRemove(
+                            file.Uri,
+                            out var replacedOpen);
+                        replacedOpen?.Dispose();
+                        _closedDocumentStamps.TryRemove(file.Uri, out _);
+                        continue;
+                    }
+
+                    if (file.Analysis == null)
+                    {
+                        if (_closedDocuments.TryGetValue(file.Uri, out var existing)
+                            && string.Equals(
+                                existing.Snapshot.Source,
+                                file.Source,
+                                StringComparison.Ordinal))
+                        {
+                            _closedDocumentStamps[file.Uri] = file.Stamp;
+                        }
+                        continue;
+                    }
+
+                    if (_closedDocuments.TryGetValue(file.Uri, out var replaced))
+                        replaced.Dispose();
+                    _closedDocuments[file.Uri] = file.Analysis;
+                    _closedDocumentStamps[file.Uri] = file.Stamp;
+                    changed = true;
+                }
+
+                foreach (var uri in _closedDocuments.Keys)
+                {
+                    if (!scan.Seen.Contains(uri)
+                        && _closedDocuments.TryRemove(uri, out var removed))
+                    {
+                        removed.Dispose();
+                        _closedDocumentStamps.TryRemove(uri, out _);
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                {
+                    _workspaceGeneration++;
+                    _symbolIndex = null;
+                }
             }
         }
+    }
 
-        if (changed)
-        {
-            _workspaceGeneration++;
-            _symbolIndex = null;
-        }
+    private static void DisposeScannedAnalyses(
+        IEnumerable<ScannedWorkspaceFile> files)
+    {
+        foreach (var file in files)
+            file.Analysis?.Dispose();
     }
 
     private static IEnumerable<string> ExtractPreprocessorSymbols(string source)
@@ -1839,7 +2934,7 @@ public sealed class WorkspaceState
     }
 
     private static IReadOnlyList<CompilationError> GetAnalysisErrors(
-        DocumentAnalysisSnapshot analysis,
+        DocumentSnapshot analysis,
         Uri uri)
     {
         var path = uri.IsFile ? uri.LocalPath : uri.ToString();
@@ -2172,14 +3267,22 @@ public sealed class WorkspaceState
 
     private DocumentState CreateAndAnalyze(DocumentUri uri, string source, int version)
     {
-        var state = new DocumentState(
-            uri.ToUri(),
-            source,
-            version,
-            GetCanonicalSourceIdentity(uri.ToUri()));
+        var state = CreateDocumentState(uri, source, version);
         state.Reanalyze();
         return state;
     }
+
+    private DocumentState CreateDocumentState(
+        DocumentUri uri,
+        string source,
+        int version) =>
+        new(
+            uri.ToUri(),
+            source,
+            version,
+            GetCanonicalSourceIdentity(uri.ToUri()),
+            _logger,
+            failureInjector: null);
 
     private string GetCanonicalSourceIdentity(Uri uri)
     {
@@ -2210,29 +3313,30 @@ public sealed class WorkspaceState
     /// </summary>
     public (DocumentState? Doc, Calor.Compiler.Ast.AstNode? Node) FindDefinitionAcrossFiles(string name)
     {
-        foreach (var doc in _documents.Values)
+        foreach (var doc in CaptureSnapshot().Documents)
         {
-            if (doc.Ast == null) continue;
+            var ast = doc.Analysis.Ast;
+            if (ast == null) continue;
 
             // Check functions
-            var func = doc.Ast.Functions.FirstOrDefault(f => f.Name == name);
-            if (func != null) return (doc, func);
+            var func = ast.Functions.FirstOrDefault(f => f.Name == name);
+            if (func != null) return (doc.Document, func);
 
             // Check classes
-            var cls = doc.Ast.Classes.FirstOrDefault(c => c.Name == name);
-            if (cls != null) return (doc, cls);
+            var cls = ast.Classes.FirstOrDefault(c => c.Name == name);
+            if (cls != null) return (doc.Document, cls);
 
             // Check interfaces
-            var iface = doc.Ast.Interfaces.FirstOrDefault(i => i.Name == name);
-            if (iface != null) return (doc, iface);
+            var iface = ast.Interfaces.FirstOrDefault(i => i.Name == name);
+            if (iface != null) return (doc.Document, iface);
 
             // Check enums
-            var enumDef = doc.Ast.Enums.FirstOrDefault(e => e.Name == name);
-            if (enumDef != null) return (doc, enumDef);
+            var enumDef = ast.Enums.FirstOrDefault(e => e.Name == name);
+            if (enumDef != null) return (doc.Document, enumDef);
 
             // Check delegates
-            var del = doc.Ast.Delegates.FirstOrDefault(d => d.Name == name);
-            if (del != null) return (doc, del);
+            var del = ast.Delegates.FirstOrDefault(d => d.Name == name);
+            if (del != null) return (doc.Document, del);
         }
 
         return (null, null);
@@ -2243,56 +3347,81 @@ public sealed class WorkspaceState
     /// </summary>
     public (DocumentState? Doc, Calor.Compiler.Ast.AstNode? Node) FindMemberAcrossFiles(string typeName, string memberName)
     {
-        foreach (var doc in _documents.Values)
+        var workspace = CaptureSnapshot();
+        return FindMemberAcrossFiles(
+            workspace.Documents,
+            typeName,
+            memberName,
+            new HashSet<string>(StringComparer.Ordinal));
+    }
+
+    private static (DocumentState? Doc, Calor.Compiler.Ast.AstNode? Node)
+        FindMemberAcrossFiles(
+            IReadOnlyList<WorkspaceDocumentSnapshot> documents,
+            string typeName,
+            string memberName,
+            HashSet<string> visitedTypes)
+    {
+        var nominalType = GetNominalTypeName(typeName);
+        if (!visitedTypes.Add(nominalType))
+            return (null, null);
+
+        foreach (var doc in documents)
         {
-            if (doc.Ast == null) continue;
+            var ast = doc.Analysis.Ast;
+            if (ast == null) continue;
 
             // Check classes
-            var cls = doc.Ast.Classes.FirstOrDefault(c => c.Name == typeName);
+            var cls = ast.Classes.FirstOrDefault(c => c.Name == nominalType);
             if (cls != null)
             {
                 // Check fields
                 var field = cls.Fields.FirstOrDefault(f => f.Name == memberName);
-                if (field != null) return (doc, field);
+                if (field != null) return (doc.Document, field);
 
                 // Check properties
                 var prop = cls.Properties.FirstOrDefault(p => p.Name == memberName);
-                if (prop != null) return (doc, prop);
+                if (prop != null) return (doc.Document, prop);
 
                 // Check methods
                 var method = cls.Methods.FirstOrDefault(m => m.Name == memberName);
-                if (method != null) return (doc, method);
+                if (method != null) return (doc.Document, method);
 
                 // Check base class (recursively)
                 if (!string.IsNullOrEmpty(cls.BaseClass))
                 {
-                    var baseResult = FindMemberAcrossFiles(cls.BaseClass, memberName);
+                    var baseResult = FindMemberAcrossFiles(
+                        documents,
+                        cls.BaseClass,
+                        memberName,
+                        visitedTypes);
                     if (baseResult.Node != null) return baseResult;
                 }
             }
 
             // Check interfaces
-            var iface = doc.Ast.Interfaces.FirstOrDefault(i => i.Name == typeName);
+            var iface = ast.Interfaces.FirstOrDefault(i => i.Name == nominalType);
             if (iface != null)
             {
                 var method = iface.Methods.FirstOrDefault(m => m.Name == memberName);
-                if (method != null) return (doc, method);
+                if (method != null) return (doc.Document, method);
             }
 
             // Check enums for enum members
-            var enumDef = doc.Ast.Enums.FirstOrDefault(e => e.Name == typeName);
+            var enumDef = ast.Enums.FirstOrDefault(e => e.Name == nominalType);
             if (enumDef != null)
             {
                 var member = enumDef.Members.FirstOrDefault(m => m.Name == memberName);
-                if (member != null) return (doc, member);
+                if (member != null) return (doc.Document, member);
             }
 
             // Check enum extensions
-            var enumExt = doc.Ast.EnumExtensions.FirstOrDefault(e => e.EnumName == typeName);
+            var enumExt = ast.EnumExtensions.FirstOrDefault(
+                e => e.EnumName == nominalType);
             if (enumExt != null)
             {
                 var method = enumExt.Methods.FirstOrDefault(m => m.Name == memberName);
-                if (method != null) return (doc, method);
+                if (method != null) return (doc.Document, method);
             }
         }
 
@@ -2304,41 +3433,42 @@ public sealed class WorkspaceState
     /// </summary>
     public IEnumerable<(DocumentState Doc, string Name, string Kind, string? Type)> GetAllPublicSymbols()
     {
-        foreach (var doc in _documents.Values)
+        foreach (var doc in CaptureSnapshot().Documents)
         {
-            if (doc.Ast == null) continue;
+            var ast = doc.Analysis.Ast;
+            if (ast == null) continue;
 
             // Functions (public by default unless marked private)
-            foreach (var func in doc.Ast.Functions)
+            foreach (var func in ast.Functions)
             {
                 if (func.Visibility != Calor.Compiler.Ast.Visibility.Private)
                 {
-                    yield return (doc, func.Name, "function", func.Output?.TypeName ?? "void");
+                    yield return (doc.Document, func.Name, "function", func.Output?.TypeName ?? "void");
                 }
             }
 
             // Classes
-            foreach (var cls in doc.Ast.Classes)
+            foreach (var cls in ast.Classes)
             {
-                yield return (doc, cls.Name, "class", null);
+                yield return (doc.Document, cls.Name, "class", null);
             }
 
             // Interfaces
-            foreach (var iface in doc.Ast.Interfaces)
+            foreach (var iface in ast.Interfaces)
             {
-                yield return (doc, iface.Name, "interface", null);
+                yield return (doc.Document, iface.Name, "interface", null);
             }
 
             // Enums
-            foreach (var enumDef in doc.Ast.Enums)
+            foreach (var enumDef in ast.Enums)
             {
-                yield return (doc, enumDef.Name, "enum", enumDef.UnderlyingType);
+                yield return (doc.Document, enumDef.Name, "enum", enumDef.UnderlyingType);
             }
 
             // Delegates
-            foreach (var del in doc.Ast.Delegates)
+            foreach (var del in ast.Delegates)
             {
-                yield return (doc, del.Name, "delegate", del.Output?.TypeName ?? "void");
+                yield return (doc.Document, del.Name, "delegate", del.Output?.TypeName ?? "void");
             }
         }
     }
