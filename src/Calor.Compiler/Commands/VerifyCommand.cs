@@ -427,6 +427,21 @@ public static class VerifyCommand
         foreach (var file in results)
         {
             sb.AppendLine($"File: {file.FileName}");
+
+            // Calor0710 is info-severity, and the text report prints only errors and
+            // warnings — so without this a consumer whose Z3 native is missing saw every
+            // contract "Skipped", exit 0, and no stated reason anywhere outside
+            // `--format json`. That is the state roadmap §2.5 gate 7 exists to catch
+            // ("installs successfully, silently loses verification"), so the reason is
+            // stated on the default surface, above the counts it explains.
+            var z3Unavailable = file.Diagnostics
+                .FirstOrDefault(d => d.Code == DiagnosticCode.Z3Unavailable);
+            if (z3Unavailable != null)
+            {
+                sb.AppendLine("  !! NOT VERIFIED: the Z3 solver is unavailable, so nothing below was proved.");
+                sb.AppendLine($"     {DiagnosticCode.Z3Unavailable}: {z3Unavailable.Message}");
+            }
+
             sb.AppendLine($"  Proven:      {file.Summary.Proven}");
             // `Assumed` collapses into the legacy `Unproven` bucket (ProofOutcome.ToContractStatus),
             // so without this line a demoted proof reads as an outright failure to prove — visually
@@ -517,6 +532,20 @@ public static class VerifyCommand
         {
             var provenRate = (double)totalProven / total * 100;
             sb.AppendLine($"  Proven Rate: {provenRate:F1}%");
+        }
+
+        // Repeated at the bottom because on a multi-file run the per-file notice
+        // scrolls away, and "Proven Rate: 0.0%" alone does not distinguish "nothing
+        // proved" from "nothing attempted".
+        var filesWithoutSolver = results
+            .Count(r => r.Diagnostics.Any(d => d.Code == DiagnosticCode.Z3Unavailable));
+        if (filesWithoutSolver > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"  !! {filesWithoutSolver} of {results.Count} file(s) were NOT verified: "
+                + $"the Z3 solver is unavailable ({DiagnosticCode.Z3Unavailable}).");
+            sb.AppendLine("     Their contracts are Skipped, not proved. Install the Z3 native library "
+                + "for static verification.");
         }
 
         return sb.ToString();
