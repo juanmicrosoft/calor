@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.13.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.13.2</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The Trustworthy Project Model release: the binder dispatches every expression class through one authoritative path, and the verifier is pinned against real runtime execution so a proof and the running program cannot disagree.</span>
+            <span className="text-foreground">Control flow and dataflow are rebuilt on explicit semantics, Z3 translation matches executable C# numeric rules, and the build chain is hermetic and supply-chain verified with hash- and size-pinned Z3 binaries.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
