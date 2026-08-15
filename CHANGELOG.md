@@ -4,6 +4,83 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+Ten changes have landed on `main` since the v0.13.2 tag. Eight of them close issues this repo's own
+roadmap scheduled for **0.14 or 0.15** — #763, #766, #768, #781, #782, #784, #785, #786 — so the
+staircase in `docs/plans/roadmap-v0.13-v0.15.md` is ahead of its own schedule in the analysis and
+emission layers, and behind it nowhere. Several are behaviour changes that can newly *reject* or
+newly *diagnose* code that v0.13.2 accepted; those are marked below. Entries are derived from the
+merged pull requests named in each line.
+
+### Changed
+
+- **Effect enforcement is symbol-resolved, exhaustive, and fail-closed (#968, closes #785).** Calls,
+  constructors, accessors, overloads, delegates and inherited members resolve by symbol and
+  signature instead of bare-name purity heuristics, and allocation, initialization, disposal, event,
+  getter, setter and constructor effects are charged. **Behaviour change:** an operation that cannot
+  be resolved now fails closed rather than being assumed pure, so programs that passed enforcement
+  under the name-matching heuristic may now be rejected. The source, manifest and emitter effect
+  taxonomies are unified, drifted or misspelled effect codes are rejected, and CLI, MCP, MSBuild and
+  SDK enforcement defaults are equivalent.
+- **Bug-pattern analyzers rebuilt on typed CFG/SSA semantics (#970, closes #786).** Heuristic checks
+  are replaced by typed control-flow and dataflow analysis modelling strong updates, path
+  conditions, evaluation order, numeric promotions, casts, bounds, `Option`/`Result` state and loop
+  semantics. **Behaviour change:** findings are now separated into verified findings, heuristic
+  hints, and explicit incomplete-analysis results, so both the set of findings and their
+  presentation move.
+- **Taint analysis rebuilt on control-flow graphs (#969, closes #784).** Linear name-based tracking
+  is replaced by symbol- and access-path-keyed may-taint analysis over the CFG, with source, sink,
+  sanitizer, alias, collection and interprocedural summary semantics, and ordered provenance paths.
+  **Behaviour change:** direct-injection findings are reported by default, so existing code can
+  produce new diagnostics without any source edit.
+- **Control-flow emission is structural and reentrant (#972, closes #763).** Emission runs in
+  isolated contexts over an exhaustive structural traversal; guarded match selection and
+  statement-lambda block structure are preserved; loops lower with exact-once bounds, typed dynamic
+  steps, zero checks and overflow-safe termination. Iterator/`yield` legality is enforced across
+  nested control-flow containers.
+- **Contract inheritance is sound (#966, closes #781).** Liskov pre/post rules are proved over whole
+  contract conjunctions rather than clause-by-clause, inherited contracts are keyed by full method
+  identity, and interface and base sources combine deterministically across overloads, explicit
+  implementations, and generic interface/base/method substitutions. **Behaviour change:** inherited
+  guarantees that are incompatible with an override are now diagnosed. Contract simplification
+  preserves every unrelated `ModuleNode` field, enforced by reflection coverage.
+- **Postcondition returns are structurally lowered (#967, closes #764).** One shared lowering path
+  replaces the duplicated direct-return rewriting across functions, methods, enum extensions and
+  operators; nested and early returns keep their control flow, values are evaluated once, and
+  postconditions run exactly once on normal exits. The `result` pseudo-variable binds structurally
+  under quantifier, pattern and lambda scope with hygienic synthesized names. **Behaviour change:**
+  postconditions on iterators are rejected explicitly, and opaque raw-C# returns fail closed.
+- **Proof and refinement guards use program state (#964, closes #782).** Nested proof,
+  refinement-return, subtype-transition and runtime index-bound obligations are generated, and
+  fail-closed guards are emitted for refined parameters, returns, bindings, assignments and explicit
+  proof sites. Guards are retained for incomplete proof outcomes, and obligation policy is wired
+  into guard elision.
+- **Literal, interpolation and raw-C# semantics are preserved through emission (#975, closes
+  #768).** Integer sign, base, width, signedness, suffix and separator semantics survive; string
+  interpolation is represented structurally with placeholder and escape intent preserved; emitted
+  expressions are precedence- and associativity-safe; raw C# is scanned with lexical and
+  preprocessor awareness and its bytes preserved exactly.
+- **Declaration, type and module semantics are preserved through emission (#977, closes #766).**
+  Using directives, conditional branches and source ordering are preserved; named record
+  construction is validated and reordered; generic variance and constraints are validated; type
+  mapping, namespace dependencies and qualified-name sanitization are centralized; per-module
+  emitter state is isolated so an emitter can be reused deterministically. **Behaviour change:**
+  generated C# is standalone, with implicit usings disabled.
+- **LSP analysis is immutable and cycle-safe (#980, closes #767).** Document and workspace snapshots
+  are published as immutable versioned values with cancellation-safe atomic updates; stale versions
+  are rejected; internal failures and inheritance cycles surface as deterministic diagnostics; and
+  handlers consume coherent snapshots with cancellable workspace scans. Live end-to-end LSP stress
+  gates run 10 iterations per PR and 100 per release, with exact process teardown verified.
+
+### Fixed
+
+- **The CI performance ceiling is calibrated from CI, not from a developer machine (#978, #974,
+  toward #965).** The 21.0s aggregate ceiling had been derived from a ~19.8s dev-machine
+  measurement and sat *inside* the observed CI distribution (18 samples, 20.352-21.439s), so the
+  gate fired on runner assignment rather than on any regression; it is raised to 24.0s with the
+  evidence recorded, and the gate's output is streamed for diagnosis. **#965 remains open and is not
+  root-caused** — the exit-143 runner terminations behind the v0.13.1/v0.13.2 publish failures are
+  still unexplained, and a green pipeline is not evidence that they are understood.
+
 ## [0.13.2] - 2026-08-12
 
 ### Benchmark Results (Statistical: 30 runs)
