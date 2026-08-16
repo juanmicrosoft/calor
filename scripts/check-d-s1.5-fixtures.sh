@@ -133,8 +133,8 @@ check_maps() {
     [ -n "$key" ] || continue
     if ! fixture_has_key "$key"; then
       echo "FAIL: SupportLevel promotion for '$key' has no registered fixture" \
-           "(no $REGISTRY/*/fixture.json with featureKey '$key'). PP-S4: a promotion" \
-           "toward Full must be demonstrated on values, not declared." >&2
+           "(no $REGISTRY/*/fixture.json with featureKey '$key'). PP-S4: every" \
+           "support increase must be demonstrated on values, not declared." >&2
       fail=1
     fi
   done < <(find_promotions "$base_map" "$head_map")
