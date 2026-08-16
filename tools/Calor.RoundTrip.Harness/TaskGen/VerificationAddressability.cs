@@ -62,7 +62,26 @@ public sealed class VerificationAddressability
     public VerificationAddressability(RoundTripPipeline? pipeline = null) => _pipeline = pipeline ?? new RoundTripPipeline();
 
     /// <summary>Probe whether <paramref name="expectedCheck"/> is INTRODUCED by the mutation (differential).</summary>
-    public Result Probe(string expectedCheck, string mutatedSource, string cleanSource, string filePath)
+    public Result Probe(
+        string expectedCheck,
+        string mutatedSource,
+        string cleanSource,
+        string filePath)
+        => Probe(
+            expectedCheck,
+            mutatedSource,
+            cleanSource,
+            filePath,
+            config: null,
+            parseContext: null);
+
+    internal Result Probe(
+        string expectedCheck,
+        string mutatedSource,
+        string cleanSource,
+        string filePath,
+        RoundTripConfig? config,
+        ProjectFileParseContext? parseContext)
     {
         var isEffect = EffectCheckCodes.Contains(expectedCheck);
         var isBugPattern = BugPatternCheckCodes.Contains(expectedCheck);
@@ -97,8 +116,28 @@ public sealed class VerificationAddressability
 
         var relevant = isEffect ? EffectCheckCodes : BugPatternCheckCodes;
 
-        var mutated = CodesFor(mutatedSource, filePath, isEffect, relevant);
-        var clean = CodesFor(cleanSource, filePath, isEffect, relevant);
+        var effectiveConfig = config ?? new RoundTripConfig
+        {
+            ProjectName = "Addressability",
+            OriginalProjectPath = ".",
+            LibrarySourceRelativePath = ".",
+            SolutionOrProjectFile = "none.csproj",
+            LooseDirectoryMode = true,
+        };
+        var mutated = CodesFor(
+            mutatedSource,
+            filePath,
+            isEffect,
+            relevant,
+            effectiveConfig,
+            parseContext);
+        var clean = CodesFor(
+            cleanSource,
+            filePath,
+            isEffect,
+            relevant,
+            effectiveConfig,
+            parseContext);
 
         if (mutated == null || clean == null)
         {
@@ -140,15 +179,18 @@ public sealed class VerificationAddressability
     /// set of relevant Calor diagnostic codes present (any severity). Returns null if the source
     /// cannot be converted+compiled far enough for the probe to be meaningful.
     /// </summary>
-    private IReadOnlyCollection<string>? CodesFor(string source, string filePath, bool effectFamily, HashSet<string> relevant)
+    private IReadOnlyCollection<string>? CodesFor(
+        string source,
+        string filePath,
+        bool effectFamily,
+        HashSet<string> relevant,
+        RoundTripConfig config,
+        ProjectFileParseContext? parseContext)
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions
-        {
-            Fidelity = ConversionFidelity.Lossy,
-            GracefulFallback = true,
-            PreserveComments = true,
-            AutoGenerateIds = true,
-        });
+        var converter = new CSharpToCalorConverter(
+            RoundTripPipeline.CreateHarnessConversionOptions(
+                config,
+                parseContext));
         Compiler.ContractMode contractOff = Compiler.ContractMode.Off;
 
         Compiler.CompilationResult compileResult;

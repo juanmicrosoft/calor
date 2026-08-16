@@ -299,6 +299,7 @@ public enum TokenKind
     RawCSharp,          // §RAW ... §/RAW - Raw C# content emitted verbatim
     RawCSharpExpression,  // §CS{...} - Inline C# expression
     CSharpInterop,      // §CSHARP{...}§/CSHARP - C# interop block (member-level)
+    CompilerDirective,  // §CDIR{base64} - exact nonconditional C# directive
 
     // Preprocessor Directives
     Preprocessor,       // §PP{CONDITION} - preprocessor conditional start

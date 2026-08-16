@@ -257,6 +257,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 Visit(node);
                 AppendLine();
                 break;
+            case CompilerDirectiveNode node:
+                Visit(node);
+                break;
             case TypePreprocessorBlockNode node:
                 Visit(node);
                 AppendLine();
@@ -326,6 +329,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                         break;
                     case CSharpInteropBlockNode interop:
                         Visit(interop);
+                        break;
+                    case CompilerDirectiveNode directive:
+                        Visit(directive);
                         break;
                     case MemberPreprocessorBlockNode preprocessor:
                         Visit(preprocessor);
@@ -571,6 +577,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             case CSharpInteropBlockNode node:
                 Visit(node);
                 AppendLine();
+                break;
+            case CompilerDirectiveNode node:
+                Visit(node);
                 break;
             case MemberPreprocessorBlockNode node:
                 Visit(node);
@@ -4145,6 +4154,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(CompilerDirectiveNode node)
+    {
+        var encoded = Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes(node.Code))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        AppendLine($"§CDIR{{{node.Feature}:{encoded}}}");
+        return "";
+    }
+
     public string Visit(RawCSharpExpressionNode node)
     {
         return $"§CS{{{node.CSharpCode}}}";
@@ -4222,6 +4242,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 case CSharpInteropBlockNode interop:
                     Visit(interop);
                     break;
+                case CompilerDirectiveNode directive:
+                    Visit(directive);
+                    break;
                 case MemberPreprocessorBlockNode nested:
                     Visit(nested);
                     break;
@@ -4298,6 +4321,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     break;
                 case CSharpInteropBlockNode interop:
                     Visit(interop);
+                    break;
+                case CompilerDirectiveNode directive:
+                    Visit(directive);
                     break;
                 default:
                     throw new InvalidOperationException(

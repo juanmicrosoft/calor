@@ -66,6 +66,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private Stack<(string? ClassName, HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
     private readonly HashSet<int> _preambleDirectiveStarts = new();
+    private readonly HashSet<int> _compilationUnitDirectiveStarts = new();
+    private readonly HashSet<UsingDirectiveNode> _compilationUnitUsings =
+        new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<int> _compilationUnitInteropStarts = new();
 
     /// <summary>
@@ -489,6 +492,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             new Stack<(string? ClassName, HashSet<string> Members, bool Suppress)>();
         _suppressCrossModuleQualification = false;
         _preambleDirectiveStarts.Clear();
+        _compilationUnitDirectiveStarts.Clear();
+        _compilationUnitUsings.Clear();
         _compilationUnitInteropStarts.Clear();
         _currentFunctionId = null;
         _currentFilePath = filePath;
@@ -1190,19 +1195,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _refinementTypes[refinementType.Name] = refinementType;
         }
 
-        // Preserve complete using directive objects. Exact duplicates are
-        // removed by the full semantic tuple, so aliases/static/global forms
-        // that target the same namespace remain distinct.
-        var userUsings = new List<UsingDirectiveNode>();
-        var seenUserUsings = new HashSet<UsingDirectiveKey>();
-        foreach (var usingDirective in node.Usings)
-        {
-            var key = GetUsingDirectiveKey(usingDirective);
-            if (seenUserUsings.Add(key))
-            {
-                userUsings.Add(usingDirective);
-            }
-        }
+        var userUsings = node.Usings.ToList();
         foreach (var usingDirective in userUsings)
         {
             _ = Visit(usingDirective);
@@ -1211,6 +1204,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             RegisterConditionalUsingDependencies(block);
         }
+        var sourceOrderedUsingBlock = new StringBuilder();
+        var sourceUsingKeys = new HashSet<UsingDirectiveKey>();
+        AppendSourceOrderedCompilationUnitPreamble(
+            sourceOrderedUsingBlock,
+            node,
+            sourceUsingKeys);
+        var sourceImportCoverage =
+            CollectSourceImportCoverage(node);
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
         var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
@@ -1354,32 +1355,52 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // No emitted-text scanning is permitted here: dependencies are registered
         // by AST visitors and MapTypeName.
         var output = _emissionContext.Writer.ToString();
-        var usingBlock = new StringBuilder();
-        var emittedUsings = new HashSet<UsingDirectiveKey>();
-
-        // C# requires global usings to precede every non-global using.
-        foreach (var directive in userUsings.Where(u => u.IsGlobal))
-            AppendUsing(directive);
-        foreach (var block in node.TypePreprocessorBlocks)
-            AppendConditionalUsings(usingBlock, block, globalOnly: true);
+        var usingBlock = new StringBuilder(
+            sourceOrderedUsingBlock.ToString());
+        if (node.Items.Count == 0)
+        {
+            foreach (var directive in userUsings)
+            {
+                usingBlock.AppendLine(Visit(directive));
+                sourceUsingKeys.Add(GetUsingDirectiveKey(directive));
+            }
+        }
+        var emittedUsings = new HashSet<UsingDirectiveKey>(
+            sourceUsingKeys);
 
         foreach (var ns in OrderRequiredNamespaces(_requiredNamespaces))
         {
             var directive = new UsingDirectiveNode(
                 TextSpan.Empty,
                 ns);
-            AppendUsing(directive);
+            AppendGeneratedUsing(directive);
         }
 
-        foreach (var directive in userUsings.Where(u => !u.IsGlobal))
-            AppendUsing(directive);
-        foreach (var block in node.TypePreprocessorBlocks)
-            AppendConditionalUsings(usingBlock, block, globalOnly: false);
-
-        void AppendUsing(UsingDirectiveNode directive)
+        void AppendGeneratedUsing(UsingDirectiveNode directive)
         {
+            var importedNamespace =
+                NormalizeImportedNamespace(directive.Namespace);
+            if (sourceImportCoverage.Unconditional.Contains(
+                    importedNamespace))
+            {
+                return;
+            }
             var key = GetUsingDirectiveKey(directive);
-            if (emittedUsings.Add(key))
+            if (!emittedUsings.Add(key))
+                return;
+            if (sourceImportCoverage.Conditional.TryGetValue(
+                    importedNamespace,
+                    out var conditions)
+                && conditions.Count > 0)
+            {
+                var covered = string.Join(
+                    " || ",
+                    conditions.Select(condition => $"({condition})"));
+                usingBlock.AppendLine($"#if !({covered})");
+                usingBlock.AppendLine(Visit(directive));
+                usingBlock.AppendLine("#endif");
+            }
+            else
             {
                 usingBlock.AppendLine(Visit(directive));
             }
@@ -1420,6 +1441,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     AppendRawCSharp(interop.CSharpCode);
                     _preambleDirectiveStarts.Add(interop.Span.Start);
                     break;
+                case CompilerDirectiveNode directive
+                    when directive.Span.Start < firstTokenPosition:
+                    AppendRawCSharp(directive.Code);
+                    _preambleDirectiveStarts.Add(directive.Span.Start);
+                    break;
                 case TypePreprocessorBlockNode block:
                     AppendConditionalPreambleDirectives(
                         block,
@@ -1444,6 +1470,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             CSharpInteropBlockNode interop
                 when IsCompilerDirective(interop.CSharpCode) => int.MaxValue,
+            CompilerDirectiveNode => int.MaxValue,
             TypePreprocessorBlockNode block => FindFirstModuleTokenPosition(
                 block.Items.Concat(
                     block.ElseBranch == null
@@ -1456,7 +1483,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         switch (item)
         {
-            case UsingDirectiveNode:
+            case UsingDirectiveNode directive:
+                if (!_compilationUnitUsings.Contains(directive))
+                {
+                    throw new InvalidOperationException(
+                        "A source using directive appears after compilation-unit declarations; preserve the compilation unit verbatim.");
+                }
+                break;
             case FunctionNode:
             case RefinementTypeNode:
             case IndexedTypeNode:
@@ -1488,6 +1521,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     Visit(node);
                     AppendLine();
                 }
+                break;
+            case CompilerDirectiveNode node:
+                if (!_preambleDirectiveStarts.Contains(node.Span.Start)
+                    && !_compilationUnitDirectiveStarts.Contains(
+                        node.Span.Start))
+                    Visit(node);
                 break;
             case TypePreprocessorBlockNode node when ContainsConditionalTypes(node):
                 Visit(node);
@@ -1549,60 +1588,276 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             RegisterConditionalUsingDependencies(block.ElseBranch);
     }
 
-    private void AppendConditionalUsings(
+    private void AppendSourceOrderedCompilationUnitPreamble(
         StringBuilder builder,
-        TypePreprocessorBlockNode block,
-        bool globalOnly)
+        ModuleNode module,
+        HashSet<UsingDirectiveKey> emittedUsings)
     {
-        if (!ContainsConditionalUsing(block, globalOnly))
-            return;
+        var items = module.Items.Count > 0
+            ? module.Items
+            : module.Usings.Cast<AstNode>()
+                .OrderBy(item => item.Span.Start)
+                .ToList();
+        foreach (var item in items)
+        {
+            switch (item)
+            {
+                case UsingDirectiveNode directive:
+                    builder.AppendLine(Visit(directive));
+                    emittedUsings.Add(GetUsingDirectiveKey(directive));
+                    _compilationUnitUsings.Add(directive);
+                    break;
+                case CompilerDirectiveNode directive:
+                    AppendCompilationUnitDirective(builder, directive);
+                    break;
+                case CSharpInteropBlockNode interop
+                    when IsCompilerDirective(interop.CSharpCode):
+                    AppendCompilationUnitDirective(builder, interop);
+                    break;
+                case TypePreprocessorBlockNode block:
+                    AppendConditionalCompilationUnitPrefix(builder, block);
+                    if (!ContainsOnlyCompilationUnitPrefix(block))
+                        return;
+                    break;
+                default:
+                    return;
+            }
+        }
+    }
 
+    private void AppendConditionalCompilationUnitPrefix(
+        StringBuilder builder,
+        TypePreprocessorBlockNode block)
+    {
+        if (!HasCompilationUnitPrefix(block))
+            return;
         AppendBranch(block, isFirst: true);
         builder.AppendLine("#endif");
 
         void AppendBranch(TypePreprocessorBlockNode branch, bool isFirst)
         {
-            if (isFirst)
-                builder.AppendLine($"#if {branch.Condition}");
-            else if (!string.IsNullOrEmpty(branch.Condition))
-                builder.AppendLine($"#elif {branch.Condition}");
-            else
-                builder.AppendLine("#else");
-
-            var seen = new HashSet<UsingDirectiveKey>();
-            foreach (var item in branch.Items)
+            builder.AppendLine(isFirst
+                ? $"#if {branch.Condition}"
+                : string.IsNullOrEmpty(branch.Condition)
+                    ? "#else"
+                    : $"#elif {branch.Condition}");
+            foreach (var item in GetCompilationUnitPrefixItems(branch.Items))
             {
-                if (item is UsingDirectiveNode directive
-                    && directive.IsGlobal == globalOnly
-                    && seen.Add(GetUsingDirectiveKey(directive)))
+                switch (item)
                 {
-                    builder.AppendLine(Visit(directive));
-                }
-                else if (item is TypePreprocessorBlockNode nested)
-                {
-                    AppendConditionalUsings(builder, nested, globalOnly);
+                    case UsingDirectiveNode directive:
+                        builder.AppendLine(Visit(directive));
+                        _compilationUnitUsings.Add(directive);
+                        break;
+                    case CompilerDirectiveNode directive:
+                        AppendCompilationUnitDirective(builder, directive);
+                        break;
+                    case CSharpInteropBlockNode interop
+                        when IsCompilerDirective(interop.CSharpCode):
+                        AppendCompilationUnitDirective(builder, interop);
+                        break;
+                    case TypePreprocessorBlockNode nested:
+                        AppendConditionalCompilationUnitPrefix(
+                            builder,
+                            nested);
+                        break;
                 }
             }
-
             if (branch.ElseBranch != null)
                 AppendBranch(branch.ElseBranch, isFirst: false);
         }
     }
 
-    private static bool ContainsConditionalUsing(
-        TypePreprocessorBlockNode block,
-        bool isGlobal)
-        => block.Usings.Any(directive => directive.IsGlobal == isGlobal)
-            || block.NestedBlocks.Any(nested =>
-                ContainsConditionalUsing(nested, isGlobal))
+    private void AppendCompilationUnitDirective(
+        StringBuilder builder,
+        CompilerDirectiveNode directive)
+    {
+        if (_preambleDirectiveStarts.Contains(directive.Span.Start))
+            return;
+        builder.AppendLine(directive.Code);
+        _compilationUnitDirectiveStarts.Add(directive.Span.Start);
+    }
+
+    private void AppendCompilationUnitDirective(
+        StringBuilder builder,
+        CSharpInteropBlockNode interop)
+    {
+        if (_preambleDirectiveStarts.Contains(interop.Span.Start))
+            return;
+        builder.AppendLine(interop.CSharpCode.TrimEnd('\r', '\n'));
+        _compilationUnitInteropStarts.Add(interop.Span.Start);
+    }
+
+    private static IEnumerable<AstNode> GetCompilationUnitPrefixItems(
+        IReadOnlyList<AstNode> items)
+    {
+        foreach (var item in items)
+        {
+            if (item is UsingDirectiveNode
+                or CompilerDirectiveNode
+                || item is TypePreprocessorBlockNode nested
+                    && ContainsOnlyCompilationUnitPrefix(nested)
+                || item is CSharpInteropBlockNode interop
+                && IsCompilerDirective(interop.CSharpCode))
+            {
+                yield return item;
+                continue;
+            }
+            yield break;
+        }
+    }
+
+    private static bool HasCompilationUnitPrefix(
+        TypePreprocessorBlockNode block)
+        => GetCompilationUnitPrefixItems(block.Items).Any()
             || block.ElseBranch != null
-            && ContainsConditionalUsing(block.ElseBranch, isGlobal);
+            && HasCompilationUnitPrefix(block.ElseBranch);
+
+    private static bool ContainsOnlyCompilationUnitPrefix(
+        TypePreprocessorBlockNode block)
+        => block.Items.All(item =>
+                item is UsingDirectiveNode
+                    or CompilerDirectiveNode
+                || item is TypePreprocessorBlockNode nested
+                    && ContainsOnlyCompilationUnitPrefix(nested)
+                || item is CSharpInteropBlockNode interop
+                    && IsCompilerDirective(interop.CSharpCode))
+            && (block.ElseBranch == null
+                || ContainsOnlyCompilationUnitPrefix(block.ElseBranch));
+
+    private sealed record SourceImportCoverage(
+        HashSet<string> Unconditional,
+        Dictionary<string, List<string>> Conditional);
+
+    private static SourceImportCoverage CollectSourceImportCoverage(
+        ModuleNode module)
+    {
+        var unconditional = new HashSet<string>(StringComparer.Ordinal);
+        var conditional = new Dictionary<string, List<string>>(
+            StringComparer.Ordinal);
+        foreach (var directive in module.Usings)
+            AddUsing(directive, condition: null);
+        foreach (var interop in module.InteropBlocks)
+            AddInterop(interoperabilityBlock: interop, condition: null);
+        foreach (var block in module.TypePreprocessorBlocks)
+            AddBlock(block, parentCondition: null);
+        return new SourceImportCoverage(unconditional, conditional);
+
+        void AddBlock(
+            TypePreprocessorBlockNode block,
+            string? parentCondition)
+        {
+            var priorConditions = new List<string>();
+            TypePreprocessorBlockNode? branch = block;
+            var first = true;
+            while (branch != null)
+            {
+                string branchCondition;
+                if (first)
+                {
+                    branchCondition = Parenthesize(branch.Condition);
+                }
+                else if (string.IsNullOrEmpty(branch.Condition))
+                {
+                    branchCondition = NegateAny(priorConditions);
+                }
+                else
+                {
+                    branchCondition =
+                        $"{NegateAny(priorConditions)}"
+                        + $" && {Parenthesize(branch.Condition)}";
+                }
+                var effectiveCondition = string.IsNullOrEmpty(
+                    parentCondition)
+                    ? branchCondition
+                    : $"{Parenthesize(parentCondition)}"
+                        + $" && {Parenthesize(branchCondition)}";
+                foreach (var directive in branch.Usings)
+                    AddUsing(directive, effectiveCondition);
+                foreach (var interop in branch.InteropBlocks)
+                    AddInterop(interop, effectiveCondition);
+                foreach (var nested in branch.NestedBlocks)
+                    AddBlock(nested, effectiveCondition);
+                if (!string.IsNullOrEmpty(branch.Condition))
+                    priorConditions.Add(branch.Condition);
+                branch = branch.ElseBranch;
+                first = false;
+            }
+        }
+
+        void AddUsing(
+            UsingDirectiveNode directive,
+            string? condition)
+        {
+            if (directive.Alias != null || directive.IsStatic)
+                return;
+            var importedNamespace =
+                NormalizeImportedNamespace(directive.Namespace);
+            if (string.IsNullOrEmpty(condition))
+                unconditional.Add(importedNamespace);
+            else if (!conditional.TryGetValue(
+                         importedNamespace,
+                         out var conditions))
+                conditional[importedNamespace] = [condition];
+            else if (!conditions.Contains(
+                         condition,
+                         StringComparer.Ordinal))
+                conditions.Add(condition);
+        }
+
+        void AddInterop(
+            CSharpInteropBlockNode interoperabilityBlock,
+            string? condition)
+        {
+            var root = CSharpSyntaxTree.ParseText(
+                    interoperabilityBlock.CSharpCode)
+                .GetCompilationUnitRoot();
+            foreach (var usingDirective in root.Usings)
+            {
+                var namespaceOrType = usingDirective.NamespaceOrType;
+                if (usingDirective.Alias != null
+                    || usingDirective.StaticKeyword.RawKind != 0
+                    || namespaceOrType == null)
+                {
+                    continue;
+                }
+                AddUsing(
+                    new UsingDirectiveNode(
+                        TextSpan.Empty,
+                        namespaceOrType.ToString(),
+                        isGlobal:
+                            usingDirective.GlobalKeyword.RawKind != 0),
+                    condition);
+            }
+        }
+
+        static string Parenthesize(string condition)
+            => $"({condition})";
+
+        static string NegateAny(IReadOnlyList<string> conditions)
+            => conditions.Count == 0
+                ? "true"
+                : $"!({string.Join(
+                    " || ",
+                    conditions.Select(Parenthesize))})";
+    }
+
+    private static string NormalizeImportedNamespace(string namespaceName)
+        => namespaceName.StartsWith(
+                "global::",
+                StringComparison.Ordinal)
+            ? namespaceName["global::".Length..]
+            : namespaceName;
 
     private bool ContainsConditionalTypes(TypePreprocessorBlockNode block)
         => block.Classes.Count > 0
             || block.Interfaces.Count > 0
             || block.Enums.Count > 0
             || block.Delegates.Count > 0
+            || block.Items.OfType<CompilerDirectiveNode>().Any(directive =>
+                !_preambleDirectiveStarts.Contains(directive.Span.Start)
+                && !_compilationUnitDirectiveStarts.Contains(
+                    directive.Span.Start))
             || block.InteropBlocks.Any(interop =>
                 !_preambleDirectiveStarts.Contains(interop.Span.Start)
                 && !_compilationUnitInteropStarts.Contains(interop.Span.Start))
@@ -1638,6 +1893,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     AppendRawCSharp(interop.CSharpCode);
                     _preambleDirectiveStarts.Add(interop.Span.Start);
                 }
+                else if (item is CompilerDirectiveNode directive
+                    && directive.Span.Start < firstTokenPosition)
+                {
+                    AppendRawCSharp(directive.Code);
+                    _preambleDirectiveStarts.Add(directive.Span.Start);
+                }
                 else if (item is TypePreprocessorBlockNode nested)
                 {
                     AppendConditionalPreambleDirectives(
@@ -1656,6 +1917,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         => block.InteropBlocks.Any(interop =>
                interop.Span.Start < firstTokenPosition
                && IsCompilerDirective(interop.CSharpCode))
+            || block.Items.OfType<CompilerDirectiveNode>().Any(directive =>
+                directive.Span.Start < firstTokenPosition)
             || block.NestedBlocks.Any(nested =>
                 ContainsConditionalPreambleDirective(
                     nested,
@@ -1762,6 +2025,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 CSharpInteropBlockNode interop => interop.CSharpCode,
                 RawCSharpNode raw => raw.CSharpCode,
+                CompilerDirectiveNode directive => directive.Code,
                 _ => null
             };
             if (code != null && code
@@ -4130,6 +4394,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                             Visit(interop);
                         AppendLine();
                         break;
+                    case CompilerDirectiveNode directive:
+                        Visit(directive);
+                        break;
                     case MemberPreprocessorBlockNode preprocessor:
                         Visit(preprocessor);
                         break;
@@ -4432,6 +4699,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             case CSharpInteropBlockNode node:
                 Visit(node);
                 AppendLine();
+                break;
+            case CompilerDirectiveNode node:
+                Visit(node);
                 break;
             case MemberPreprocessorBlockNode node:
                 Visit(node);
@@ -7279,6 +7549,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(CompilerDirectiveNode node)
+    {
+        AppendRawCSharp(node.Code);
+        return "";
+    }
+
     public string Visit(RawCSharpExpressionNode node)
     {
         RegisterOpaqueCSharpDependencies();
@@ -7376,6 +7652,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                         AppendLine();
                     }
                     break;
+                case CompilerDirectiveNode directive:
+                    Visit(directive);
+                    break;
                 case MemberPreprocessorBlockNode nested:
                     Visit(nested);
                     break;
@@ -7465,6 +7744,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     {
                         Visit(interop);
                         AppendLine();
+                    }
+                    break;
+                case CompilerDirectiveNode directive:
+                    if (!_preambleDirectiveStarts.Contains(
+                            directive.Span.Start)
+                        && !_compilationUnitDirectiveStarts.Contains(
+                            directive.Span.Start))
+                    {
+                        Visit(directive);
                     }
                     break;
                 default:

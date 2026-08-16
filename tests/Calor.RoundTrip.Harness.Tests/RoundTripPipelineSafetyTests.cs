@@ -7,6 +7,422 @@ namespace Calor.RoundTrip.Harness.Tests;
 public sealed class RoundTripPipelineSafetyTests
 {
     [Fact]
+    public async Task HarnessConversion_UsesExplicitSelectedModeAndEvaluatedSymbols()
+    {
+        var root = CreateProject(
+            """
+            #if FEATURE
+            public static class Selected
+            {
+                public static int Read() => 1;
+            }
+            #else
+            public record Fallback(int Value);
+            #endif
+            """);
+        try
+        {
+            var project = Path.Combine(root, "Safety.csproj");
+            await File.WriteAllTextAsync(
+                project,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="Lib/Lib.csproj" />
+                  </ItemGroup>
+                </Project>
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Lib", "Lib.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
+                    <DefineConstants>FEATURE</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup><Compile Include="**/*.cs" /></ItemGroup>
+                </Project>
+                """);
+            var sourcePath = Path.Combine(root, "Lib", "Invalid.cs");
+            var config = new RoundTripConfig
+            {
+                ProjectName = "SelectedMode",
+                OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib",
+                SolutionOrProjectFile = "Safety.csproj",
+                TargetFramework = "net10.0",
+                Configuration = "Release",
+            };
+            var restore = await ProcessRunner.RunAsync(
+                config.DotnetPath,
+                "restore \"Safety.csproj\" --verbosity quiet",
+                root,
+                config.BuildTimeout);
+            Assert.Equal(0, restore.ExitCode);
+            var contexts = await ProjectParseContextResolver.ResolveAsync(
+                root,
+                config,
+                [sourcePath],
+                CancellationToken.None);
+            Assert.Single(contexts);
+            var context = contexts[
+                ProjectParseContextResolver.Canonicalize(sourcePath)];
+            Assert.Equal("net6.0", context.TargetFramework);
+            Assert.Equal(
+                "net471",
+                ProjectParseContextResolver.SelectCompatibleTargetFramework(
+                    ["net471", "netstandard2.0"],
+                    "net48"));
+            Assert.Contains(
+                "FEATURE",
+                context.ParseOptions.PreprocessorSymbolNames);
+            var options = RoundTripPipeline.CreateHarnessConversionOptions(
+                config,
+                context);
+
+            Assert.Equal(
+                ConversionFidelity.Lossy,
+                options.Fidelity);
+            Assert.Equal(
+                PreprocessorConversionMode.SelectActiveBranchLossy,
+                options.PreprocessorMode);
+            var selected = new CSharpToCalorConverter(options)
+                .Convert(
+                    await File.ReadAllTextAsync(sourcePath),
+                    sourcePath);
+            Assert.True(selected.Success);
+            Assert.Contains("Selected", selected.CalorSource);
+            Assert.DoesNotContain("Fallback", selected.CalorSource);
+            Assert.Equal(
+                PreprocessorConversionMode.SelectActiveBranchLossy,
+                selected.Metadata.PreprocessorMode);
+            Assert.Equal("Release", selected.Metadata.Configuration);
+            Assert.Equal("net6.0", selected.Metadata.TargetFramework);
+            Assert.Contains("FEATURE", selected.Metadata.DefinedSymbols);
+            Assert.Contains(
+                selected.Losses,
+                loss => loss.Kind
+                    == ConversionLossKind.PreprocessorStripped);
+            var measured = new FileConversionResult
+            {
+                FilePath = "Lib/Invalid.cs",
+                Status = FileStatus.Replaced,
+                PreprocessorMode =
+                    selected.Metadata.PreprocessorMode.ToString()
+            };
+            measured.ApplyLossLedger(
+                [
+                    .. selected.Losses,
+                    new ConversionLoss
+                    {
+                        Kind = ConversionLossKind.InteropPreserved,
+                        Feature = "pragma",
+                        Description = "active pragma retained"
+                    },
+                    new ConversionLoss
+                    {
+                        Kind = ConversionLossKind.DirectiveRemoved,
+                        Feature = "nullable-directive",
+                        Description = "inactive directive removed"
+                    }
+                ]);
+            Assert.False(measured.ConvertedNative);
+            Assert.Equal(
+                "Release",
+                Calor.RoundTrip.Harness.TaskGen.TaskGenerator.Clone(
+                    config,
+                    workDir: null).Configuration);
+
+            var preserved = new CSharpToCalorConverter()
+                .Convert(
+                    await File.ReadAllTextAsync(sourcePath),
+                    sourcePath);
+            Assert.True(preserved.Success);
+            Assert.Equal(
+                PreprocessorConversionMode.PreserveAllBranches,
+                preserved.Metadata.PreprocessorMode);
+            Assert.Contains("§PP{FEATURE}", preserved.CalorSource);
+            Assert.Contains("Selected", preserved.CalorSource);
+            Assert.Contains("Fallback", preserved.CalorSource);
+
+            var report = new RoundTripReport
+            {
+                ProjectName = "SelectedMode"
+            };
+            var pipelineResults =
+                await new RoundTripPipeline().ConvertAndReplaceAsync(
+                    root,
+                    config,
+                    report);
+            var pipelineFile = Assert.Single(pipelineResults);
+            Assert.Equal(
+                "SelectActiveBranchLossy",
+                pipelineFile.PreprocessorMode);
+            Assert.Equal("Release", pipelineFile.Configuration);
+            Assert.Equal("net6.0", pipelineFile.TargetFramework);
+            Assert.Contains("FEATURE", pipelineFile.DefinedSymbols);
+            Assert.Single(report.EvaluatedParseContexts);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ParseContextResolver_RejectsUnavailableConfiguredRootFramework()
+    {
+        var root = CreateProject("public class RootType { }");
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Safety.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Compile Include="Lib/**/*.cs" />
+                  </ItemGroup>
+                </Project>
+                """);
+            var config = new RoundTripConfig
+            {
+                ProjectName = "UnavailableFramework",
+                OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib",
+                SolutionOrProjectFile = "Safety.csproj",
+                TargetFramework = "net10.0",
+                Configuration = "Release",
+            };
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ProjectParseContextResolver.ResolveAsync(
+                    root,
+                    config,
+                    [Path.Combine(root, "Lib", "Invalid.cs")],
+                    CancellationToken.None));
+
+            Assert.Contains(
+                "is not declared by root project",
+                error.Message,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ParseContextResolver_RejectsMissingConfiguredProject()
+    {
+        var root = CreateProject("public class MissingProjectContext { }");
+        try
+        {
+            var config = new RoundTripConfig
+            {
+                ProjectName = "MissingProject",
+                OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib",
+                SolutionOrProjectFile = "Missing.csproj",
+                TargetFramework = "net10.0",
+                Configuration = "Release",
+            };
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ProjectParseContextResolver.ResolveAsync(
+                    root,
+                    config,
+                    [Path.Combine(root, "Lib", "Invalid.cs")],
+                    CancellationToken.None));
+
+            Assert.Contains(
+                "does not exist",
+                error.Message,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ParseContextResolver_UsesEffectiveProjectReferenceGlobalProperties()
+    {
+        var root = CreateProject(
+            """
+            #if !CHILD_SPECIAL
+            #error child-configuration-not-applied
+            #endif
+            #if !PLATFORM_EDGE
+            #error child-platform-not-applied
+            #endif
+            #if !EDGE_ON
+            #error child-additional-properties-not-applied
+            #endif
+            #if !ROOT_REMOVED
+            #error child-global-property-not-removed
+            #endif
+            #if !EDGE_ESCAPED
+            #error child-escaped-property-not-applied
+            #endif
+            #if !ROOT_QUOTED
+            #error quoted-root-property-not-applied
+            #endif
+            public static class SelectedChildBranch
+            {
+                public static int Read() => 42;
+            }
+            """);
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Root.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                    <CurrentSolutionConfigurationContents><![CDATA[
+                      <SolutionConfiguration>
+                        <ProjectConfiguration
+                          Project="{11111111-1111-1111-1111-111111111111}"
+                          AbsolutePath="$(MSBuildThisFileDirectory)Lib/Lib.csproj"
+                          BuildProjectInSolution="True">
+                          ChildSpecial|EdgePlatform
+                        </ProjectConfiguration>
+                      </SolutionConfiguration>
+                    ]]></CurrentSolutionConfigurationContents>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="Lib/Lib.csproj">
+                      <AdditionalProperties>EdgeSymbol=EDGE_ON;Flavor=alpha%3Bbeta</AdditionalProperties>
+                      <GlobalPropertiesToRemove>RootOnly</GlobalPropertiesToRemove>
+                      <UndefineProperties>RootOnly</UndefineProperties>
+                    </ProjectReference>
+                  </ItemGroup>
+                </Project>
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Lib", "Lib.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <ProjectGuid>{11111111-1111-1111-1111-111111111111}</ProjectGuid>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Configuration)' == 'ChildSpecial'">
+                    <DefineConstants>$(DefineConstants);CHILD_SPECIAL</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Platform)' == 'EdgePlatform'">
+                    <DefineConstants>$(DefineConstants);PLATFORM_EDGE</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(EdgeSymbol)' == 'EDGE_ON'">
+                    <DefineConstants>$(DefineConstants);EDGE_ON</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(RootOnly)' == ''">
+                    <DefineConstants>$(DefineConstants);ROOT_REMOVED</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(Flavor)' == 'alpha;beta'">
+                    <DefineConstants>$(DefineConstants);EDGE_ESCAPED</DefineConstants>
+                  </PropertyGroup>
+                  <PropertyGroup Condition="'$(RootFlavor)' == 'A B'">
+                    <DefineConstants>$(DefineConstants);ROOT_QUOTED</DefineConstants>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Compile Include="Invalid.cs" />
+                  </ItemGroup>
+                </Project>
+                """);
+            var config = new RoundTripConfig
+            {
+                ProjectName = "ReferenceProperties",
+                OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib",
+                SolutionOrProjectFile = "Root.csproj",
+                TargetFramework = "net10.0",
+                Configuration = "Release",
+                ExtraBuildProperties =
+                    "-p:RootOnly=1 -p:\"RootFlavor=A B\"",
+            };
+            var restore = await ProcessRunner.RunAsync(
+                config.DotnetPath,
+                "restore \"Root.csproj\" --verbosity quiet "
+                + "-p:RootOnly=1 -p:\"RootFlavor=A B\"",
+                root,
+                config.BuildTimeout);
+            Assert.Equal(0, restore.ExitCode);
+            var build = await ProcessRunner.RunAsync(
+                config.DotnetPath,
+                "build \"Root.csproj\" --no-restore --verbosity quiet "
+                + "-p:RootOnly=1 -p:\"RootFlavor=A B\"",
+                root,
+                config.BuildTimeout);
+            Assert.True(
+                build.ExitCode == 0,
+                string.Join("\n", build.Stdout, build.Stderr));
+
+            var sourcePath = Path.Combine(root, "Lib", "Invalid.cs");
+            var contexts = await ProjectParseContextResolver.ResolveAsync(
+                root,
+                config,
+                [sourcePath],
+                CancellationToken.None);
+            var context = Assert.Single(contexts).Value;
+            Assert.Equal("ChildSpecial", context.Configuration);
+            Assert.Equal("net10.0", context.TargetFramework);
+            Assert.Contains(
+                "CHILD_SPECIAL",
+                context.ParseOptions.PreprocessorSymbolNames);
+            Assert.Contains(
+                "PLATFORM_EDGE",
+                context.ParseOptions.PreprocessorSymbolNames);
+            Assert.Contains(
+                "EDGE_ON",
+                context.ParseOptions.PreprocessorSymbolNames);
+            Assert.Contains(
+                "ROOT_REMOVED",
+                context.ParseOptions.PreprocessorSymbolNames);
+            Assert.Contains(
+                "EDGE_ESCAPED",
+                context.ParseOptions.PreprocessorSymbolNames);
+            Assert.Contains(
+                "ROOT_QUOTED",
+                context.ParseOptions.PreprocessorSymbolNames);
+
+            var conversion = new CSharpToCalorConverter(
+                    RoundTripPipeline.CreateHarnessConversionOptions(
+                        config,
+                        context))
+                .Convert(
+                    await File.ReadAllTextAsync(sourcePath),
+                    sourcePath);
+            Assert.True(conversion.Success);
+            Assert.Contains(
+                "SelectedChildBranch",
+                conversion.CalorSource);
+            Assert.DoesNotContain(
+                "child-configuration-not-applied",
+                conversion.CalorSource);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TypeInvalidGeneratedOutput_IsNotWritten()
     {
         var root = CreateProject(
@@ -457,6 +873,7 @@ public sealed class RoundTripPipelineSafetyTests
                 OriginalProjectPath = baseConfig.OriginalProjectPath,
                 LibrarySourceRelativePath = baseConfig.LibrarySourceRelativePath,
                 SolutionOrProjectFile = baseConfig.SolutionOrProjectFile,
+                LooseDirectoryMode = baseConfig.LooseDirectoryMode,
                 FileConversionStarted = _ => started.TrySetResult(),
             };
             using var cancellation = new CancellationTokenSource();
@@ -490,6 +907,7 @@ public sealed class RoundTripPipelineSafetyTests
         OriginalProjectPath = root,
         LibrarySourceRelativePath = "Lib",
         SolutionOrProjectFile = "unused.csproj",
+        LooseDirectoryMode = true,
     };
 
     private static string CreateProject(string source)

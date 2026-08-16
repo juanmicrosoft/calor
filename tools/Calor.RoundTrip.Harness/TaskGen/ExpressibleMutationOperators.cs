@@ -41,13 +41,18 @@ public static class ExpressibleMutationOperators
     private const string TaintSink = "__calorSink";
 
     /// <summary>Enumerate all expressible-stratum candidates for a C# file, in document order.</summary>
-    public static IReadOnlyList<MutationCandidate> Enumerate(string source, string fileRelPath)
+    public static IReadOnlyList<MutationCandidate> Enumerate(
+        string source,
+        string fileRelPath,
+        CSharpParseOptions? parseOptions = null)
     {
         var results = new List<MutationCandidate>();
         SyntaxNode root;
         try
         {
-            root = CSharpSyntaxTree.ParseText(source).GetRoot();
+            root = CSharpSyntaxTree.ParseText(
+                source,
+                parseOptions).GetRoot();
         }
         catch
         {

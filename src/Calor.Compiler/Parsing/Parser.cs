@@ -762,6 +762,10 @@ public sealed class Parser
                 interopBlocks.Add(node);
                 moduleItems.Add(node);
             }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                moduleItems.Add(ParseCompilerDirective());
+            }
             else if (Check(TokenKind.RefinedType))
             {
                 var node = ParseRefinementType();
@@ -1747,6 +1751,10 @@ public sealed class Parser
         else if (Check(TokenKind.RawCSharp))
         {
             return ParseRawCSharpStatement();
+        }
+        else if (Check(TokenKind.CompilerDirective))
+        {
+            return ParseCompilerDirective();
         }
         // Preprocessor conditional block
         else if (Check(TokenKind.Preprocessor))
@@ -7763,6 +7771,10 @@ public sealed class Parser
                 interopBlocks.Add(node);
                 interfaceItems.Add(node);
             }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                interfaceItems.Add(ParseCompilerDirective());
+            }
             else if (Check(TokenKind.Preprocessor))
             {
                 var node = ParseMemberPreprocessorBlock();
@@ -8153,6 +8165,10 @@ public sealed class Parser
                 var node = ParseCSharpInteropBlock();
                 interopBlocks.Add(node);
                 classItems.Add(node);
+            }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                classItems.Add(ParseCompilerDirective());
             }
             else if (Check(TokenKind.Preprocessor))
             {
@@ -10410,6 +10426,40 @@ public sealed class Parser
         return new RawCSharpNode(token.Span, content);
     }
 
+    private CompilerDirectiveNode ParseCompilerDirective()
+    {
+        var token = Expect(TokenKind.CompilerDirective);
+        var attrs = ParseAttributes();
+        var feature = attrs["_pos0"] ?? "compiler-directive";
+        var encoded = attrs["_pos1"] ?? "";
+        try
+        {
+            var padded = encoded
+                .Replace('-', '+')
+                .Replace('_', '/');
+            padded = padded.PadRight(
+                padded.Length + (4 - padded.Length % 4) % 4,
+                '=');
+            var code = System.Text.Encoding.UTF8.GetString(
+                Convert.FromBase64String(padded));
+            return new CompilerDirectiveNode(
+                token.Span,
+                code,
+                feature);
+        }
+        catch (FormatException)
+        {
+            _diagnostics.ReportError(
+                token.Span,
+                DiagnosticCode.InvalidModifier,
+                "Invalid §CDIR base64 payload.");
+            return new CompilerDirectiveNode(
+                token.Span,
+                "",
+                feature);
+        }
+    }
+
     /// <summary>
     /// Parses an inline raw C# expression.
     /// §CS{expr} (content already captured by lexer as single token)
@@ -10686,6 +10736,10 @@ public sealed class Parser
             interopBlocks.Add(node);
             items?.Add(node);
         }
+        else if (Check(TokenKind.CompilerDirective))
+        {
+            items?.Add(ParseCompilerDirective());
+        }
         else if (Check(TokenKind.Preprocessor))
         {
             items?.Add(ParseMemberPreprocessorBlock());
@@ -10777,6 +10831,10 @@ public sealed class Parser
             var node = ParseCSharpInteropBlock();
             interopBlocks.Add(node);
             items?.Add(node);
+        }
+        else if (Check(TokenKind.CompilerDirective))
+        {
+            items?.Add(ParseCompilerDirective());
         }
         else if (Check(TokenKind.Preprocessor))
         {

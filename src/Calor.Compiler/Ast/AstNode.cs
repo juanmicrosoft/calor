@@ -226,6 +226,7 @@ public interface IAstVisitor
     void Visit(YieldBreakStatementNode node);
     // Raw C# passthrough
     void Visit(RawCSharpNode node);
+    void Visit(CompilerDirectiveNode node);
     // C# interop blocks (member-level raw C#)
     void Visit(CSharpInteropBlockNode node);
     // Unsafe/low-level nodes
@@ -458,6 +459,7 @@ public interface IAstVisitor<T>
     T Visit(YieldBreakStatementNode node);
     // Raw C# passthrough
     T Visit(RawCSharpNode node);
+    T Visit(CompilerDirectiveNode node);
     // C# interop blocks (member-level raw C#)
     T Visit(CSharpInteropBlockNode node);
     // Unsafe/low-level nodes

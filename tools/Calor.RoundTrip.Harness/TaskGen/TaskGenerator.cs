@@ -36,12 +36,32 @@ public sealed class TaskGenerator
             await _pipeline.RecoverBuildAsync(nativeDir, project, nativeResults);
         var coverage = ConversionCoverage.Compute(nativeResults, probeReport.ExcludedFileCount);
         var nativeFiles = nativeResults.Where(f => f.ConvertedNative).Select(f => f.FilePath).ToList();
+        var nativeParseContexts =
+            probeReport.EvaluatedParseContexts;
         Console.WriteLine($"[{project.ProjectName}]   NativeFraction {coverage.NativeFraction:P1} " +
             $"({coverage.ConvertedNative} native of {coverage.TotalConvertibleFiles}); siting mutations in {nativeFiles.Count} native file(s)");
 
         // --- Enumerate candidates from the selected source(s), sited in native regions ONLY. ---
         var nativeSet = nativeFiles.ToHashSet(StringComparer.Ordinal);
         var enumerated = new List<MutationCandidate>();
+        Microsoft.CodeAnalysis.CSharp.CSharpParseOptions? ParseOptionsFor(
+            string relPath)
+            => nativeParseContexts.TryGetValue(
+                ProjectParseContextResolver.Canonicalize(
+                    Path.Combine(nativeDir, relPath)),
+                out var context)
+                ? context.ParseOptions
+                : throw new InvalidOperationException(
+                    $"Native candidate '{relPath}' has no evaluated parse context.");
+
+        ProjectFileParseContext ContextFor(string relPath)
+            => nativeParseContexts.TryGetValue(
+                ProjectParseContextResolver.Canonicalize(
+                    Path.Combine(nativeDir, relPath)),
+                out var context)
+                ? context
+                : throw new InvalidOperationException(
+                    $"Native candidate '{relPath}' has no evaluated parse context.");
 
         // LOGIC stratum — injected mutations (supplement): standard operators over native files.
         if (options.Strata.HasFlag(StratumSelection.Logic) && options.Sources.HasFlag(TaskSourceSelection.Injected))
@@ -54,7 +74,10 @@ public sealed class TaskGenerator
                 // NegateCondition always compiles, but inverts a whole branch (all-or-nothing coverage),
                 // so it is dropped from the DEFAULT bounded set to keep the demo focused on point mutations;
                 // the operator itself remains available in InjectedMutationOperators and unit-tested.
-                enumerated.AddRange(InjectedMutationOperators.Enumerate(source, relPath)
+                enumerated.AddRange(InjectedMutationOperators.Enumerate(
+                        source,
+                        relPath,
+                        ParseOptionsFor(relPath))
                     .Where(c => c.Operator != MutationOperatorKind.NegateCondition));
             }
         }
@@ -69,8 +92,12 @@ public sealed class TaskGenerator
                 var absOriginal = Path.Combine(project.OriginalProjectPath, relPath);
                 if (!File.Exists(absOriginal)) continue;
                 var source = await File.ReadAllTextAsync(absOriginal);
-                enumerated.AddRange(ExpressibleMutationOperators.Enumerate(source, relPath));
+                enumerated.AddRange(ExpressibleMutationOperators.Enumerate(
+                    source,
+                    relPath,
+                    ParseOptionsFor(relPath)));
             }
+
         }
 
         // Revert-upstream-bugfix (gold standard): mine fix commits, reintroduce the defect via a
@@ -132,7 +159,15 @@ public sealed class TaskGenerator
                 break;
             }
             Console.WriteLine($"[{project.ProjectName}]   candidate {idx}/{candidates.Count}: {candidate.FileRelPath} [{candidate.OperatorDescription}] L{candidate.Line}");
-            var (verdict, bundle, addressability) = await EvaluateCandidateAsync(project, options, candidate, baseline, coverage.NativeFraction, workRoot, idx);
+            var (verdict, bundle, addressability) = await EvaluateCandidateAsync(
+                project,
+                options,
+                candidate,
+                baseline,
+                coverage.NativeFraction,
+                workRoot,
+                idx,
+                ContextFor(candidate.FileRelPath));
             accounting.Record(new CandidateDisposition
             {
                 ProjectName = project.ProjectName,
@@ -170,7 +205,8 @@ public sealed class TaskGenerator
 
     private async Task<(EligibilityVerdict, TaskBundle?, VerificationAddressability.Result?)> EvaluateCandidateAsync(
         RoundTripConfig project, TaskGenOptions options, MutationCandidate candidate,
-        TestRunResult baseline, double nativeFraction, string workRoot, int idx)
+        TestRunResult baseline, double nativeFraction, string workRoot, int idx,
+        ProjectFileParseContext parseContext)
     {
         var stem = $"cand{idx}-{candidate.Operator}";
 
@@ -185,7 +221,13 @@ public sealed class TaskGenerator
             var cleanAbs = Path.Combine(project.OriginalProjectPath, candidate.FileRelPath);
             var cleanSource = File.Exists(cleanAbs) ? await File.ReadAllTextAsync(cleanAbs) : "";
             addressability = new VerificationAddressability(_pipeline)
-                .Probe(candidate.ExpectedCheck, candidate.MutatedSource, cleanSource, candidate.FileRelPath);
+                .Probe(
+                    candidate.ExpectedCheck,
+                    candidate.MutatedSource,
+                    cleanSource,
+                    candidate.FileRelPath,
+                    project,
+                    parseContext);
         }
 
         // ===== C# arm: idiomatic original + mutation, no conversion. =====
@@ -276,8 +318,29 @@ public sealed class TaskGenerator
         if (calorOutcome == "Failed")
         {
             var originalUnmutated = await File.ReadAllTextAsync(Path.Combine(project.OriginalProjectPath, candidate.FileRelPath));
+            var attributionPath = Path.Combine(
+                calorDir,
+                candidate.FileRelPath);
+            var contexts = await ProjectParseContextResolver.ResolveAsync(
+                calorDir,
+                project,
+                [attributionPath],
+                CancellationToken.None);
+            if (!contexts.TryGetValue(
+                    ProjectParseContextResolver.Canonicalize(attributionPath),
+                    out var attributionContext))
+            {
+                return (Excluded(
+                    ExclusionReason.ConverterAttributed,
+                    "the clean attribution conversion has no evaluated project parse context"),
+                    null,
+                    addressability);
+            }
             var unmutatedConverted = _pipeline.ConvertSourceToRoundTripCSharp(
-                originalUnmutated, Path.Combine(calorDir, candidate.FileRelPath));
+                originalUnmutated,
+                attributionPath,
+                project,
+                attributionContext);
             if (unmutatedConverted == null)
             {
                 // The clean file does not convert-and-recompile here (it should, since the prefilter said
@@ -470,7 +533,7 @@ public sealed class TaskGenerator
         return (maxPerProject > 0 ? ordered.Take(maxPerProject) : ordered).ToList();
     }
 
-    private static RoundTripConfig Clone(RoundTripConfig c, string? workDir, string? testFilter = null) => new()
+    internal static RoundTripConfig Clone(RoundTripConfig c, string? workDir, string? testFilter = null) => new()
     {
         ProjectName = c.ProjectName,
         OriginalProjectPath = c.OriginalProjectPath,
@@ -480,7 +543,9 @@ public sealed class TaskGenerator
         ExcludePatterns = c.ExcludePatterns,
         DotnetPath = c.DotnetPath,
         TargetFramework = c.TargetFramework,
+        Configuration = c.Configuration,
         ExtraBuildProperties = c.ExtraBuildProperties,
+        LooseDirectoryMode = c.LooseDirectoryMode,
         TestTimeout = c.TestTimeout,
         BuildTimeout = c.BuildTimeout,
         TestFilter = testFilter,

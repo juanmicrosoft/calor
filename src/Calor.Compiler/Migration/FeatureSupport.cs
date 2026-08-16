@@ -609,6 +609,20 @@ public static class FeatureSupport
             Description = "A compilation unit containing conditional top-level statements is preserved verbatim as global C# interop",
             Workaround = "Keep the compilation unit as C# interop until top-level conditional statements are modeled natively"
         },
+        ["top-level-directive-ordering"] = new FeatureInfo
+        {
+            Name = "top-level-directive-ordering",
+            Support = SupportLevel.NotSupported,
+            Description = "Compiler directives interleaved with top-level statements preserve the complete compilation unit verbatim",
+            Workaround = "Keep the compilation unit as C# interop until directives can be represented inside synthetic Main without changing scope"
+        },
+        ["compilation-unit-using-ordering"] = new FeatureInfo
+        {
+            Name = "compilation-unit-using-ordering",
+            Support = SupportLevel.NotSupported,
+            Description = "A using directive after a declaration or completed conditional region preserves the complete compilation unit verbatim",
+            Workaround = "Keep the source as C# interop so configuration-specific using legality and diagnostics remain unchanged"
+        },
         ["conditional-namespace"] = new FeatureInfo
         {
             Name = "conditional-namespace",
@@ -993,8 +1007,8 @@ public static class FeatureSupport
         {
             Name = "pragma",
             Support = SupportLevel.Partial,
-            Description = "#pragma directives, including warning disable/restore scopes, are preserved verbatim in source order",
-            Workaround = "Pragmas are explicit raw interop rather than native Calor semantics"
+            Description = "#pragma directives, including warning disable/restore and checksum, use an explicit source-ordered directive node",
+            Workaround = "Embedded placements that cannot be structurally owned preserve their enclosing C# boundary"
         },
         ["conditional-using"] = new FeatureInfo
         {
@@ -1006,22 +1020,22 @@ public static class FeatureSupport
         {
             Name = "nullable-directive",
             Support = SupportLevel.NotSupported,
-            Description = "#nullable directives are preserved verbatim in source order",
-            Workaround = "Nullable directives are explicit raw interop rather than native Calor semantics"
+            Description = "#nullable directives use an explicit source-ordered directive node when their boundary is modeled",
+            Workaround = "Unmodeled embedded placement preserves the enclosing C# boundary"
         },
         ["warning-directive"] = new FeatureInfo
         {
             Name = "warning-directive",
             Support = SupportLevel.NotSupported,
-            Description = "#warning directives are preserved verbatim and retain compiler warning behavior",
-            Workaround = "Keep the directive as exact C# interop at its source boundary"
+            Description = "#warning directives use an explicit source-ordered directive node and retain compiler warning behavior",
+            Workaround = "Unmodeled embedded placement preserves the enclosing C# boundary"
         },
         ["error-directive"] = new FeatureInfo
         {
             Name = "error-directive",
             Support = SupportLevel.NotSupported,
-            Description = "#error directives are preserved verbatim; conversion output is returned with an honest compilation failure",
-            Workaround = "Keep the directive as exact C# interop and resolve the compiler error in C#"
+            Description = "#error directives use an explicit source-ordered directive node; active errors remain honest compilation failures",
+            Workaround = "Resolve active compiler errors in the selected configuration"
         },
         ["line-directive"] = new FeatureInfo
         {

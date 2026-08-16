@@ -54,6 +54,9 @@ public sealed class RoundTripConfig
     /// <summary>Target framework to use for dotnet test (e.g., "net10.0").</summary>
     public string? TargetFramework { get; init; }
 
+    /// <summary>Concrete MSBuild configuration evaluated by the harness.</summary>
+    public string Configuration { get; init; } = "Debug";
+
     /// <summary>
     /// Extra MSBuild properties appended to every restore/build/test invocation for
     /// this project (e.g. <c>-p:NuGetAudit=false -p:TreatWarningsAsErrors=false</c>).
@@ -65,6 +68,12 @@ public sealed class RoundTripConfig
     /// Calor's own Synthetic project.
     /// </summary>
     public string ExtraBuildProperties { get; init; } = "";
+
+    /// <summary>
+    /// Explicitly allows conversion without an evaluated project. Selected-branch
+    /// project runs must leave this false so missing project context fails closed.
+    /// </summary>
+    public bool LooseDirectoryMode { get; init; }
 
     /// <summary>Path to dotnet executable.</summary>
     public string DotnetPath { get; init; } = "dotnet";

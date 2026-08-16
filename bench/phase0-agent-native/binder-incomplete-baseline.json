@@ -16,10 +16,10 @@
   },
   "PreserveCoverage": {
     "FilesSeen": 364,
-    "OpaqueBoundaries": 177,
+    "OpaqueBoundaries": 102,
     "OpaqueExpressions": 41964,
     "OpaqueUnmapped": 0,
-    "OpaqueIdentityCount": 177,
+    "OpaqueIdentityCount": 102,
     "UnconvertedFiles": 17,
     "UnconvertedIdentityCount": 17,
     "ConvertExceptions": 0,

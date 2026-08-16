@@ -8,6 +8,10 @@ namespace Calor.RoundTrip.Harness;
 /// </summary>
 public sealed class RoundTripReport
 {
+    [JsonIgnore]
+    internal IReadOnlyDictionary<string, ProjectFileParseContext>
+        EvaluatedParseContexts { get; set; } =
+            new Dictionary<string, ProjectFileParseContext>();
     public required string ProjectName { get; init; }
     public string CalorVersion { get; set; } = "";
     public DateTimeOffset StartedAt { get; set; }
@@ -55,6 +59,11 @@ public sealed class FileConversionResult
     public FileStatus Status { get; set; }
     public bool ConversionSuccess { get; set; }
     public double ConversionRate { get; set; }
+    public string? PreprocessorMode { get; set; }
+    public string? Configuration { get; set; }
+    public string? TargetFramework { get; set; }
+    public string? LanguageVersion { get; set; }
+    public List<string> DefinedSymbols { get; set; } = [];
 
     /// <summary>Total structured losses recorded by the conversion loss ledger (#770) for this file.</summary>
     public int LossCount { get; set; }
@@ -91,7 +100,7 @@ public sealed class FileConversionResult
     [JsonIgnore]
     public bool ConvertedAndKept => Status == FileStatus.Replaced;
 
-    /// <summary>True when the file was converted, kept, and the ledger recorded zero losses.</summary>
+    /// <summary>True when the file was converted, kept, and recorded zero losses.</summary>
     [JsonIgnore]
     public bool ConvertedNative => ConvertedAndKept && LossCount == 0;
 
@@ -316,7 +325,8 @@ public sealed class ConversionCoverage
     {
         var counted = files.Where(f => f.Status != FileStatus.Excluded).ToList();
         var native = counted.Count(f => f.ConvertedNative);
-        var withLosses = counted.Count(f => f.ConvertedAndKept && f.LossCount > 0);
+        var withLosses = counted.Count(f =>
+            f.ConvertedAndKept && f.LossCount > 0);
         var reverted = counted.Count(f => f.Status == FileStatus.Reverted);
         var excluded = excludedFileCount + files.Count(f => f.Status == FileStatus.Excluded);
         var total = counted.Count + excluded;

@@ -284,6 +284,7 @@ public sealed class Lexer
         ["/ARR2D"] = TokenKind.EndArray2D,          // §/ARR2D
         ["IDX2D"] = TokenKind.Index2D,              // §IDX2D
         ["ROW"] = TokenKind.Row,                    // §ROW
+        ["CDIR"] = TokenKind.CompilerDirective,      // §CDIR{base64}
 
         // Dependent Types: Refinement Types and Proof Obligations
         ["RTYPE"] = TokenKind.RefinedType,           // §RTYPE

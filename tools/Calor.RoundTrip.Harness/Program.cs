@@ -127,7 +127,9 @@ async Task<int> RunCommand(string[] runArgs)
             SolutionOrProjectFile = config.SolutionOrProjectFile,
             DotnetPath = config.DotnetPath,
             TargetFramework = config.TargetFramework,
+            Configuration = config.Configuration,
             ExtraBuildProperties = config.ExtraBuildProperties,
+            LooseDirectoryMode = config.LooseDirectoryMode,
             EnableBisect = enableBisect,
             ExcludePatterns = config.ExcludePatterns,
             TestTimeout = config.TestTimeout,
@@ -603,21 +605,11 @@ string SubmoduleSha(string dir)
     catch { return "unknown"; }
 }
 
-RoundTripConfig CloneForScreen(RoundTripConfig c, string workDir, string? testFilter) => new()
-{
-    ProjectName = c.ProjectName,
-    OriginalProjectPath = c.OriginalProjectPath,
-    LibrarySourceRelativePath = c.LibrarySourceRelativePath,
-    SolutionOrProjectFile = c.SolutionOrProjectFile,
-    WorkingDirectory = workDir,
-    ExcludePatterns = c.ExcludePatterns,
-    DotnetPath = c.DotnetPath,
-    TargetFramework = c.TargetFramework,
-    ExtraBuildProperties = c.ExtraBuildProperties,
-    TestTimeout = c.TestTimeout,
-    BuildTimeout = c.BuildTimeout,
-    TestFilter = testFilter,
-};
+RoundTripConfig CloneForScreen(
+    RoundTripConfig c,
+    string workDir,
+    string? testFilter) =>
+    TaskGenerator.Clone(c, workDir, testFilter);
 
 // v0.12 S1 pre-pass (kickoff D-1/D-5): expressible-stratum SUPPLY per project, conversion-only.
 // No builds, no tests, no recovery, no bundles — and, critically, NO ELIGIBILITY EVALUATION, which
@@ -695,6 +687,10 @@ async Task<int> EnumerateSupplyCommand(string[] args)
     Directory.CreateDirectory(outputDir);
 
     SupplyEnumeration.Result result;
+    var supplyParseOptions = new Dictionary<
+        string,
+        Dictionary<string, Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>(
+        StringComparer.Ordinal);
     try
     {
         result = await SupplyEnumeration.RunAsync(
@@ -705,13 +701,35 @@ async Task<int> EnumerateSupplyCommand(string[] args)
                 var dir = pipeline.PrepareWorkingCopy(CloneForSupply(project, Path.Combine(workRoot, project.ProjectName)));
                 var report = new RoundTripReport { ProjectName = project.ProjectName };
                 var files = await pipeline.ConvertAndReplaceAsync(dir, project, report);
+                supplyParseOptions[project.ProjectName] = files
+                    .Select(file => (
+                        file.FilePath,
+                        Contexts: report.EvaluatedParseContexts.TryGetValue(
+                            ProjectParseContextResolver.Canonicalize(
+                                Path.Combine(dir, file.FilePath)),
+                            out var context)
+                            ? context.ParseOptions
+                            : null))
+                    .Where(entry => entry.Contexts != null)
+                    .ToDictionary(
+                        entry => entry.FilePath,
+                        entry => entry.Contexts!,
+                        StringComparer.Ordinal);
                 return files;
             },
             async (project, rel) =>
             {
                 var abs = Path.Combine(project.OriginalProjectPath, rel);
                 return File.Exists(abs) ? await File.ReadAllTextAsync(abs) : null;
-            });
+            },
+            (project, rel) =>
+                supplyParseOptions.TryGetValue(
+                    project.ProjectName,
+                    out var contexts)
+                && contexts.TryGetValue(rel, out var options)
+                    ? options
+                    : throw new InvalidOperationException(
+                        $"Supply candidate '{rel}' has no evaluated parse context."));
     }
     finally
     {
@@ -748,6 +766,7 @@ RoundTripConfig CloneForSupply(RoundTripConfig c, string workDir) => new()
     DotnetPath = c.DotnetPath,
     TargetFramework = c.TargetFramework,
     ExtraBuildProperties = c.ExtraBuildProperties,
+    LooseDirectoryMode = c.LooseDirectoryMode,
     TestTimeout = c.TestTimeout,
     BuildTimeout = c.BuildTimeout,
 };

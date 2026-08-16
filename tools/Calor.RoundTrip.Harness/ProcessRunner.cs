@@ -38,6 +38,18 @@ public static class ProcessRunner
                 process.StartInfo.EnvironmentVariables[key] = value;
             }
         }
+        if (!process.StartInfo.EnvironmentVariables.ContainsKey(
+                "MSBUILDDISABLENODEREUSE"))
+        {
+            process.StartInfo.EnvironmentVariables[
+                "MSBUILDDISABLENODEREUSE"] = "1";
+        }
+        if (!process.StartInfo.EnvironmentVariables.ContainsKey(
+                "DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER"))
+        {
+            process.StartInfo.EnvironmentVariables[
+                "DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER"] = "1";
+        }
 
         // Ensure .NET root is set for SDK resolution (see ResolveDotnetRoot). If we
         // cannot resolve a real path — including the common `--dotnet dotnet` bare-name

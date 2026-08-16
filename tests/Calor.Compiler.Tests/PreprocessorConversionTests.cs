@@ -1094,21 +1094,38 @@ public class Test
     }
 
     [Theory]
-    [InlineData("#nullable disable")]
-    [InlineData("#warning preserved-warning")]
-    [InlineData("#line 200 \"mapped.cs\"")]
-    public void Converter_NonconditionalDirective_IsPreservedVerbatim(string directive)
+    [InlineData("#nullable disable", false)]
+    [InlineData("#warning preserved-warning", false)]
+    [InlineData("#pragma warning disable CS0168", false)]
+    [InlineData("#pragma checksum \"file.cs\" \"{406EA660-64CF-4C82-B6F0-42D48172A799}\" \"0123456789abcdef\"", false)]
+    [InlineData("#line 200 \"mapped.cs\"", true)]
+    public void Converter_NonconditionalDirective_IsPreservedVerbatim(
+        string directive,
+        bool requiresInterop)
     {
         var result = new CSharpToCalorConverter().Convert(
             $"{directive}\npublic class DirectiveHost {{ }}",
             "Directive.cs");
 
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains(directive, result.CalorSource);
         Assert.Contains(directive, CompileCalorToCSharp(result.CalorSource!));
-        Assert.Contains(
-            result.Losses,
-            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        if (requiresInterop)
+        {
+            Assert.Contains(
+                result.Losses,
+                loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        }
+        else
+        {
+            Assert.Contains(
+                result.Ast!.Items,
+                item => item is CompilerDirectiveNode node
+                    && node.Code == directive);
+            Assert.DoesNotContain(
+                result.Losses,
+                loss => loss.Kind == ConversionLossKind.InteropPreserved);
+            Assert.Contains("§CDIR{", result.CalorSource);
+        }
     }
 
     [Fact]
@@ -1120,10 +1137,851 @@ public class Test
             "ErrorDirective.cs");
 
         Assert.False(result.Success);
-        Assert.Contains(directive, result.CalorSource);
+        Assert.Contains("§CDIR{", result.CalorSource);
+        Assert.Contains(
+            result.Ast!.Items,
+            item => item is CompilerDirectiveNode node
+                && node.Code == directive);
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
         Assert.Contains(
             result.Issues,
             issue => issue.Feature == "active-error-directive");
+    }
+
+    [Fact]
+    public void CompilerDirectiveNode_RoundTripsExactMemberPositionWithoutInteropLoss()
+    {
+        const string csharp = """
+            public class DirectiveOrder
+            {
+                public int Before() => 1;
+            #pragma warning disable CS0168
+                public int After() => 2;
+            #pragma warning restore CS0168
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "DirectiveOrder.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        var before = generated.IndexOf("Before()", StringComparison.Ordinal);
+        var disable = generated.IndexOf(
+            "#pragma warning disable CS0168",
+            StringComparison.Ordinal);
+        var after = generated.IndexOf("After()", StringComparison.Ordinal);
+        var restore = generated.IndexOf(
+            "#pragma warning restore CS0168",
+            StringComparison.Ordinal);
+        Assert.True(
+            before < disable && disable < after && after < restore,
+            generated);
+        Assert.True(
+            GeneratedCSharpCompiler.Validate(generated)
+                .CompilationSuccess);
+    }
+
+    [Fact]
+    public void CompilationUnitUsingsAndDirectives_RoundTripInExactSourceOrder()
+    {
+        const string csharp = """
+            global using TextAlias = System.Text;
+            #nullable disable
+            using System;
+            #pragma warning disable CS0618
+            using LegacyAlias = Demo.Legacy;
+            #pragma warning restore CS0618
+            #nullable restore
+
+            namespace Demo
+            {
+                [Obsolete("legacy")]
+                public class Legacy { }
+
+                public class Host
+                {
+                    public TextAlias.StringBuilder Create() => new();
+                }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "CompilationUnitDirectiveOrder.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        var globalUsing = generated.IndexOf(
+            "global using TextAlias = System.Text;",
+            StringComparison.Ordinal);
+        var nullableDisable = generated.IndexOf(
+            "#nullable disable",
+            StringComparison.Ordinal);
+        var systemUsing = generated.IndexOf(
+            "using System;",
+            StringComparison.Ordinal);
+        var pragmaDisable = generated.IndexOf(
+            "#pragma warning disable CS0618",
+            StringComparison.Ordinal);
+        var aliasUsing = generated.IndexOf(
+            "using LegacyAlias = Demo.Legacy;",
+            StringComparison.Ordinal);
+        var pragmaRestore = generated.IndexOf(
+            "#pragma warning restore CS0618",
+            StringComparison.Ordinal);
+        var nullableRestore = generated.IndexOf(
+            "#nullable restore",
+            StringComparison.Ordinal);
+        var declaration = generated.IndexOf(
+            "class Legacy",
+            StringComparison.Ordinal);
+        Assert.True(
+            globalUsing < nullableDisable
+            && nullableDisable < systemUsing
+            && systemUsing < pragmaDisable
+            && pragmaDisable < aliasUsing
+            && aliasUsing < pragmaRestore
+            && pragmaRestore < nullableRestore
+            && nullableRestore < declaration,
+            generated);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "#pragma warning disable CS0618",
+                StringSplitOptions.None).Length - 1);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "#pragma warning restore CS0618",
+                StringSplitOptions.None).Length - 1);
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "CompilationUnitDirectiveOrder.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                TreatWarningsAsErrors = true
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void GlobalUsing_SatisfiesGeneratedNamespaceDependencyWithoutDuplicate()
+    {
+        const string csharp = """
+            global using System;
+
+            public class GlobalImportHost
+            {
+                public DateTime Value { get; }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "GlobalImport.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "using System;",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains("global using System;", generated);
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "GlobalImport.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                TreatWarningsAsErrors = true
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void InvalidLateGlobalUsing_IsNotSilentlyReorderedAsZeroLoss()
+    {
+        const string csharp = """
+            using System;
+            global using System.Text;
+
+            public class InvalidGlobalUsingOrder { }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "InvalidGlobalUsingOrder.cs");
+
+        Assert.False(result.Success);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.True(
+            generated.IndexOf(
+                "using System;",
+                StringComparison.Ordinal)
+            < generated.IndexOf(
+                "global using System.Text;",
+                StringComparison.Ordinal),
+            generated);
+        var validation = GeneratedCSharpCompiler.Validate(generated);
+        Assert.False(validation.CompilationSuccess);
+        Assert.Contains(
+            validation.CompilationErrors,
+            diagnostic => diagnostic.Id == "CS8915");
+    }
+
+    [Fact]
+    public void UsingAfterConditionalDeclaration_UsesWholeUnitPassthrough()
+    {
+        const string csharp = """
+            #if FEATURE
+            public class BeforeUsing { }
+            #endif
+            global using System;
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalLateUsing.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature
+                    == "compilation-unit-using-ordering");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            csharp.Replace("\r\n", "\n", StringComparison.Ordinal),
+            generated.Replace("\r\n", "\n", StringComparison.Ordinal));
+        var invalid = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "ConditionalLateUsing.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["FEATURE"]
+            });
+        Assert.False(invalid.CompilationSuccess);
+        Assert.Contains(
+            invalid.CompilationErrors,
+            diagnostic => diagnostic.Id == "CS8915"
+                || diagnostic.Id == "CS1529");
+    }
+
+    [Fact]
+    public void NestedConditionalDeclarationBeforeConditionalUsing_PreservesAllConfigurations()
+    {
+        const string csharp = """
+            #if OUTER
+            #if INNER
+            public class NestedBeforeUsing { }
+            #endif
+            #if USE_IMPORT
+            using System;
+            #endif
+            #endif
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "NestedConditionalLateUsing.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature
+                    == "compilation-unit-using-ordering");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            csharp.Replace("\r\n", "\n", StringComparison.Ordinal),
+            generated.Replace("\r\n", "\n", StringComparison.Ordinal));
+
+        var valid = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "NestedConditionalLateUsing.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["OUTER", "USE_IMPORT"]
+            });
+        Assert.True(
+            valid.CompilationSuccess,
+            string.Join("\n", valid.FormattedCompilationErrors));
+
+        var invalid = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "NestedConditionalLateUsing.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols =
+                    ["OUTER", "INNER", "USE_IMPORT"]
+            });
+        Assert.False(invalid.CompilationSuccess);
+        Assert.Contains(
+            invalid.CompilationErrors,
+            diagnostic => diagnostic.Id == "CS1529");
+    }
+
+    [Fact]
+    public void ManyConditionalSymbols_CannotHideLateUsingConfiguration()
+    {
+        const string csharp = """
+            #if A
+            public class BeforeManySymbolUsing { }
+            #endif
+            #if A
+            using
+            System;
+            #endif
+            #if B || C || D || E || F || G || H || I
+            #warning unrelated-symbols
+            #endif
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ManySymbolLateUsing.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature
+                    == "compilation-unit-using-ordering");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            csharp.Replace("\r\n", "\n", StringComparison.Ordinal),
+            generated.Replace("\r\n", "\n", StringComparison.Ordinal));
+        var invalid = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "ManySymbolLateUsing.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["A"]
+            });
+        Assert.False(invalid.CompilationSuccess);
+        Assert.Contains(
+            invalid.CompilationErrors,
+            diagnostic => diagnostic.Id == "CS1529");
+    }
+
+    [Fact]
+    public void ConditionalUsing_GeneratesDependencyOnlyForUncoveredConfigurations()
+    {
+        const string csharp = """
+            #if FEATURE
+            using System;
+            #endif
+
+            public class ConditionalImportHost
+            {
+                public System.DateTime Value { get; }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalImport.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            2,
+            generated.Split(
+                "using System;",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains("#if !(", generated);
+        foreach (var symbols in new[]
+                 {
+                     Array.Empty<string>(),
+                     new[] { "FEATURE" }
+                 })
+        {
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(
+                    generated,
+                    "ConditionalImport.g.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    PreprocessorSymbols = symbols,
+                    TreatWarningsAsErrors = true
+                });
+            Assert.True(
+                validation.CompilationSuccess,
+                string.Join("\n", validation.FormattedCompilationErrors));
+        }
+    }
+
+    [Fact]
+    public void ConditionalInteropUsing_GeneratesDependencyOnlyForUncoveredConfigurations()
+    {
+        const string csharp = """
+            #if FEATURE
+            using System;
+            namespace ConditionalInterop
+            {
+                public class PreservedNamespace { }
+            }
+            #endif
+
+            public class ConditionalInteropImportHost
+            {
+                public System.DateTime Value { get; }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalInteropImport.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature
+                    == "preprocessor-unparsed-remainder");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            2,
+            generated.Split(
+                "using System;",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains("#if !(", generated);
+        foreach (var symbols in new[]
+                 {
+                     Array.Empty<string>(),
+                     new[] { "FEATURE" }
+                 })
+        {
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(
+                    generated,
+                    "ConditionalInteropImport.g.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    PreprocessorSymbols = symbols,
+                    TreatWarningsAsErrors = true
+                });
+            Assert.True(
+                validation.CompilationSuccess,
+                string.Join("\n", validation.FormattedCompilationErrors));
+        }
+    }
+
+    [Fact]
+    public void NestedConditionalDeclaration_DoesNotHoistFollowingNullableDirective()
+    {
+        const string csharp = """
+            #nullable enable
+            #if OUTER
+            #if INNER
+            public class BeforeNullableDisable
+            {
+                public string Value = null;
+            }
+            #endif
+            #endif
+            #nullable disable
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "NestedConditionalNullable.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.True(
+            generated.IndexOf(
+                "class BeforeNullableDisable",
+                StringComparison.Ordinal)
+            < generated.LastIndexOf(
+                "#nullable disable",
+                StringComparison.Ordinal),
+            generated);
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "NestedConditionalNullable.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["OUTER", "INNER"],
+                TreatWarningsAsErrors = true
+            });
+        Assert.False(validation.CompilationSuccess);
+        Assert.Contains(
+            validation.CompilationErrors,
+            diagnostic => diagnostic.Id == "CS8625");
+    }
+
+    [Fact]
+    public void CompilerDirectivesInterleavedWithTopLevelStatements_UseWholeUnitPassthrough()
+    {
+        const string csharp = """
+            using System;
+            Console.WriteLine("before");
+            #nullable disable
+            #pragma warning disable CS0168
+            try
+            {
+            }
+            catch (Exception unused)
+            {
+                Console.WriteLine("caught");
+            }
+            #pragma warning restore CS0168
+            Console.WriteLine("after");
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "TopLevelDirectiveOrder.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature == "top-level-directive-ordering");
+        Assert.Contains(
+            result.Ast!.InteropBlocks,
+            interop => interop.IsCompilationUnitPassthrough);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            csharp.Replace("\r\n", "\n", StringComparison.Ordinal),
+            generated.Replace("\r\n", "\n", StringComparison.Ordinal));
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "TopLevelDirectiveOrder.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                OutputKind = OutputKind.ConsoleApplication,
+                TreatWarningsAsErrors = true
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void CompilerDirectivesSurroundingTopLevelStatements_UseWholeUnitPassthrough()
+    {
+        const string csharp = """
+            #pragma warning disable CS0618
+            _ = new Legacy();
+            _ = new Legacy();
+            #pragma warning restore CS0618
+
+            [System.Obsolete("legacy")]
+            public sealed class Legacy { }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "TopLevelDirectiveScope.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature == "top-level-directive-ordering");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            csharp.Replace("\r\n", "\n", StringComparison.Ordinal),
+            generated.Replace("\r\n", "\n", StringComparison.Ordinal));
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "TopLevelDirectiveScope.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                OutputKind = OutputKind.ConsoleApplication,
+                TreatWarningsAsErrors = true
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void CompilerDirectiveNode_ConditionalDirectiveOnlyBranch_IsNotDropped()
+    {
+        const string csharp = """
+            public class DirectiveHost { }
+            #if FEATURE
+            #warning MUST_SURVIVE
+            #else
+            #pragma warning disable CS0168
+            #endif
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalDirectiveOnly.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Contains("#if FEATURE", generated);
+        Assert.Contains("#warning MUST_SURVIVE", generated);
+        Assert.Contains("#else", generated);
+        Assert.Contains("#pragma warning disable CS0168", generated);
+        Assert.Contains("#endif", generated);
+    }
+
+    [Fact]
+    public void ConditionalPreambleDirective_IsNotEmittedTwice()
+    {
+        const string csharp = """
+            #if FEATURE
+            #pragma warning disable CS0169
+            public class ConditionalWarning
+            {
+                private int _unused;
+            }
+            #pragma warning restore CS0169
+            #endif
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalPreambleDirective.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.True(
+            generated.Split(
+                "#pragma warning disable CS0169",
+                StringSplitOptions.None).Length - 1 == 1,
+            generated);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "#pragma warning restore CS0169",
+                StringSplitOptions.None).Length - 1);
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "ConditionalPreambleDirective.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["FEATURE"],
+                TreatWarningsAsErrors = true
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void CompilerDirectiveInsideSwitchSection_PreservesOwningStatementAsInterop()
+    {
+        const string csharp = """
+            public static class SwitchDirective
+            {
+                [System.Obsolete("old")]
+                private static void Old() { }
+
+                public static int Read(int value)
+                {
+                    switch (value)
+                    {
+                        case 0:
+            #pragma warning disable CS0618
+                            Old();
+            #pragma warning restore CS0618
+                            return 1;
+                        default:
+                            return 2;
+                    }
+                }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "SwitchDirective.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature == "compiler-directive-placement");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "#pragma warning disable CS0618",
+                StringSplitOptions.None).Length - 1);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "#pragma warning restore CS0618",
+                StringSplitOptions.None).Length - 1);
+        var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(
+                    generated,
+                    "SwitchDirective.g.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    TreatWarningsAsErrors = true
+                });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void CompilerDirectiveInsideEnum_PreservesOwningTypeAsInterop()
+    {
+        const string csharp = """
+            public enum DirectiveEnum
+            {
+                Before,
+            #pragma warning disable CS1591
+                After
+            #pragma warning restore CS1591
+            }
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "DirectiveEnum.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Contains("#pragma warning disable CS1591", generated);
+        Assert.Contains("#pragma warning restore CS1591", generated);
+        Assert.Contains("enum DirectiveEnum", generated);
+    }
+
+    [Fact]
+    public void CompilerDirectivesInConditionalNestedScopes_PreserveWholeDeclarations()
+    {
+        const string csharp = """
+            #if FEATURE
+            public static class ConditionalSwitchDirective
+            {
+                [System.Obsolete("old")]
+                private static void Old() { }
+
+                public static int Read(int value)
+                {
+                    switch (value)
+                    {
+                        case 0:
+            #pragma warning disable CS0618
+                            Old();
+            #pragma warning restore CS0618
+                            return 1;
+                        default:
+                            return 2;
+                    }
+                }
+            }
+
+            public enum ConditionalDirectiveEnum
+            {
+                Before,
+            #pragma warning disable CS1591
+                After
+            #pragma warning restore CS1591
+            }
+            #endif
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalNestedDirectives.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Equal(
+            2,
+            result.Losses.Count(loss =>
+                loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature == "compiler-directive-placement"));
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "class ConditionalSwitchDirective",
+                StringSplitOptions.None).Length - 1);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "enum ConditionalDirectiveEnum",
+                StringSplitOptions.None).Length - 1);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "#pragma warning disable CS0618",
+                StringSplitOptions.None).Length - 1);
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "ConditionalNestedDirectives.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["FEATURE"],
+                TreatWarningsAsErrors = true
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void CompilerDirectiveInConditionalDeclarationHeader_DoesNotDuplicateType()
+    {
+        const string csharp = """
+            #if FEATURE
+            [System.Obsolete]
+            #pragma warning disable CS0618
+            public class HeaderDirective { }
+            #pragma warning restore CS0618
+            #endif
+            """;
+
+        var result = new CSharpToCalorConverter()
+            .Convert(csharp, "ConditionalHeaderDirective.cs");
+
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.Contains(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Feature == "compiler-directive-placement");
+        var generated = CompileCalorToCSharp(result.CalorSource!);
+        Assert.Equal(
+            1,
+            generated.Split(
+                "class HeaderDirective",
+                StringSplitOptions.None).Length - 1);
+        var validation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(
+                generated,
+                "ConditionalHeaderDirective.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                PreprocessorSymbols = ["FEATURE"]
+            });
+        Assert.True(
+            validation.CompilationSuccess,
+            string.Join("\n", validation.FormattedCompilationErrors));
     }
 
     [Fact]
@@ -1256,13 +2114,13 @@ public class Test
         var merged = new PartialClassMerger().Merge([first.Ast!, second.Ast!]);
         var target = merged[0];
         var disableIndex = target.Items.ToList().FindIndex(item =>
-            item is CSharpInteropBlockNode interop
-            && interop.CSharpCode.Contains("disable CS0169", StringComparison.Ordinal));
+            item is CompilerDirectiveNode directive
+            && directive.Code.Contains("disable CS0169", StringComparison.Ordinal));
         var classIndex = target.Items.ToList().FindIndex(item =>
             item is ClassDefinitionNode);
         var restoreIndex = target.Items.ToList().FindIndex(item =>
-            item is CSharpInteropBlockNode interop
-            && interop.CSharpCode.Contains("restore CS0169", StringComparison.Ordinal));
+            item is CompilerDirectiveNode directive
+            && directive.Code.Contains("restore CS0169", StringComparison.Ordinal));
 
         Assert.True(disableIndex >= 0 && disableIndex < classIndex);
         Assert.True(classIndex < restoreIndex);

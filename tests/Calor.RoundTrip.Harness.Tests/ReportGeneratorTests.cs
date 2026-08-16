@@ -112,6 +112,12 @@ public class ReportGeneratorTests
                 Description = "overflow semantics dropped"
             },
         ]);
+        report.FileResults[0].PreprocessorMode =
+            nameof(PreprocessorConversionMode.SelectActiveBranchLossy);
+        report.FileResults[0].Configuration = "Debug";
+        report.FileResults[0].TargetFramework = "net8.0";
+        report.FileResults[0].LanguageVersion = "CSharp14";
+        report.FileResults[0].DefinedSymbols = ["FEATURE"];
         report.Fidelity = ProjectFidelity.Compute(report);
         var json = ReportGenerator.GenerateJson(report);
 
@@ -140,6 +146,17 @@ public class ReportGeneratorTests
         var detail = doc.RootElement.GetProperty("file_detail");
         var reverted = detail.EnumerateArray().Single(e => e.GetProperty("status").GetString() == "Reverted");
         Assert.Equal("build-recovery round 1", reverted.GetProperty("revert_reason").GetString());
+        var first = detail.EnumerateArray().Single(e =>
+            e.GetProperty("path").GetString() == "Lib/Foo.cs");
+        Assert.Equal(
+            "SelectActiveBranchLossy",
+            first.GetProperty("preprocessor_mode").GetString());
+        Assert.Equal("Debug", first.GetProperty("configuration").GetString());
+        Assert.Equal("net8.0", first.GetProperty("target_framework").GetString());
+        Assert.Equal("FEATURE", first.GetProperty("defined_symbols")[0].GetString());
+        Assert.Contains(
+            first.GetProperty("losses").EnumerateArray(),
+            loss => loss.GetProperty("Feature").GetString() == "record");
     }
 
     [Fact]

@@ -196,6 +196,29 @@ public sealed class RawCSharpNode : StatementNode
 }
 
 /// <summary>
+/// A nonconditional C# compiler directive preserved exactly at its source
+/// position. The Calor surface stores the UTF-8 bytes as base64 in §CDIR.
+/// </summary>
+public sealed class CompilerDirectiveNode : StatementNode
+{
+    public string Code { get; }
+    public string Feature { get; }
+
+    public CompilerDirectiveNode(
+        TextSpan span,
+        string code,
+        string feature)
+        : base(span)
+    {
+        Code = code ?? throw new ArgumentNullException(nameof(code));
+        Feature = feature ?? throw new ArgumentNullException(nameof(feature));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a preprocessor conditional block.
 /// §PP{CONDITION}
 ///   ... body ...

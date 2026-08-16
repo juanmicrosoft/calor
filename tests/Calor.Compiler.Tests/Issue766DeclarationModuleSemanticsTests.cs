@@ -15,28 +15,24 @@ public class Issue766DeclarationModuleSemanticsTests
     private static readonly TextSpan Span = TextSpan.Empty;
 
     [Fact]
-    public void UsingDirectives_PreserveCompleteObjectsAndDedupeBySemanticTuple()
+    public void UsingDirectives_PreserveCompleteObjectsAndSourceDuplicates()
     {
         var module = Parse(
             """
             §M{m001:UsingCases}
+              §U{global:System.Threading}
+              §U{global:Tasks:System.Threading.Tasks}
+              §U{global:static:System.Math}
               §U{System.Text}
               §U{System.Text}
               §U{Alias:System.Collections.Generic}
               §U{static:System.Math}
-              §U{global:System.Threading}
-              §U{global:Tasks:System.Threading.Tasks}
-              §U{global:static:System.Math}
               §F{f001:Value:pub} () -> i32
                 §R INT:1
             """);
 
         Assert.Collection(
             module.Usings,
-            u => AssertUsing(u, "System.Text"),
-            u => AssertUsing(u, "System.Text"),
-            u => AssertUsing(u, "System.Collections.Generic", alias: "Alias"),
-            u => AssertUsing(u, "System.Math", isStatic: true),
             u => AssertUsing(u, "System.Threading", isGlobal: true),
             u => AssertUsing(
                 u,
@@ -47,11 +43,15 @@ public class Issue766DeclarationModuleSemanticsTests
                 u,
                 "System.Math",
                 isStatic: true,
-                isGlobal: true));
+                isGlobal: true),
+            u => AssertUsing(u, "System.Text"),
+            u => AssertUsing(u, "System.Text"),
+            u => AssertUsing(u, "System.Collections.Generic", alias: "Alias"),
+            u => AssertUsing(u, "System.Math", isStatic: true));
 
         var generated = new CSharpEmitter().Emit(module);
 
-        Assert.Equal(1, CountOccurrences(generated, "using System.Text;"));
+        Assert.Equal(2, CountOccurrences(generated, "using System.Text;"));
         Assert.Contains("using Alias = System.Collections.Generic;", generated);
         Assert.Contains("using static System.Math;", generated);
         Assert.Contains("global using System.Threading;", generated);
@@ -61,6 +61,16 @@ public class Issue766DeclarationModuleSemanticsTests
             generated.IndexOf("global using", StringComparison.Ordinal)
             < generated.IndexOf("using System;", StringComparison.Ordinal));
         Assert.True(GeneratedCSharpCompiler.Validate(generated).CompilationSuccess);
+        var duplicateValidation = GeneratedCSharpCompiler.Validate(
+            [new GeneratedCSharpSource(generated, "duplicate-usings.g.cs")],
+            new GeneratedCSharpCompilationContext
+            {
+                TreatWarningsAsErrors = true
+            });
+        Assert.False(duplicateValidation.CompilationSuccess);
+        Assert.Contains(
+            duplicateValidation.CompilationErrors,
+            diagnostic => diagnostic.Id == "CS0105");
         Assert.Equal(
             "using Pair = (int Left, int Right);",
             new UsingDirectiveNode(

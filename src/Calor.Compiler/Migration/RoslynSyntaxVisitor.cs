@@ -25,6 +25,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<FunctionNode> _functions = new();
     private readonly List<StatementNode> _topLevelStatements = new();
     private readonly List<CSharpInteropBlockNode> _moduleInteropBlocks = new();
+    private readonly List<CompilerDirectiveNode> _moduleCompilerDirectives = new();
     private readonly List<AstNode> _moduleItems = new();
     private List<CSharpInteropBlockNode>? _conditionalModuleInteropSink;
     private readonly List<TypePreprocessorBlockNode> _typePreprocessorBlocks = new();
@@ -44,6 +45,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly HashSet<int> _conditionalInteropMemberStarts = new();
     private readonly HashSet<int> _conditionalInteropTypeStarts = new();
     private readonly HashSet<int> _conditionalInteropStatementStarts = new();
+    private readonly HashSet<int> _compilerDirectiveInteropStatementStarts = new();
     private bool _preserveWholeCompilationUnitForConditionalTopLevel;
     private string? _wholeCompilationUnitFeature;
     private string? _wholeCompilationUnitReason;
@@ -109,6 +111,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _functions.Clear();
         _topLevelStatements.Clear();
         _moduleInteropBlocks.Clear();
+        _moduleCompilerDirectives.Clear();
         _moduleItems.Clear();
         _conditionalModuleInteropSink = null;
         _typePreprocessorBlocks.Clear();
@@ -118,6 +121,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _conditionalInteropMemberStarts.Clear();
         _conditionalInteropTypeStarts.Clear();
         _conditionalInteropStatementStarts.Clear();
+        _compilerDirectiveInteropStatementStarts.Clear();
         _preserveWholeCompilationUnitForConditionalTopLevel = false;
         _wholeCompilationUnitFeature = null;
         _wholeCompilationUnitReason = null;
@@ -156,6 +160,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 : "extern-alias";
             _wholeCompilationUnitReason =
                 "Compilation-unit attributes and extern aliases are preserved through whole-unit passthrough";
+        }
+        else if (HasUsingAfterCompilationUnitContent(root))
+        {
+            _wholeCompilationUnitFeature =
+                "compilation-unit-using-ordering";
+            _wholeCompilationUnitReason =
+                "Compilation unit preserved because a using directive follows a declaration or completed conditional region";
+        }
+        else if (HasInterleavedTopLevelCompilerDirective(root))
+        {
+            _wholeCompilationUnitFeature =
+                "top-level-directive-ordering";
+            _wholeCompilationUnitReason =
+                "Compilation unit preserved because compiler directives interleaved with top-level statements cannot be moved into synthetic Main";
         }
         else if (_preserveWholeCompilationUnitForConditionalTopLevel)
         {
@@ -491,6 +509,141 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         => statement.GetLeadingTrivia().Any(trivia =>
             trivia.GetStructure()?.SpanStart == directive.SpanStart);
 
+    private static bool HasInterleavedTopLevelCompilerDirective(
+        CompilationUnitSyntax root)
+    {
+        var statements = root.Members
+            .OfType<GlobalStatementSyntax>()
+            .OrderBy(statement => statement.SpanStart)
+            .ToList();
+        if (statements.Count == 0)
+            return false;
+        var firstStatementStart = statements[0].SpanStart;
+        return root.DescendantTrivia(descendIntoTrivia: true)
+            .Where(trivia => trivia.HasStructure)
+            .Select(trivia => trivia.GetStructure())
+            .OfType<DirectiveTriviaSyntax>()
+            .Where(IsPreservedCompilerDirective)
+            .Any(directive =>
+                directive.SpanStart > firstStatementStart);
+    }
+
+    private static bool HasUsingAfterCompilationUnitContent(
+        CompilationUnitSyntax root)
+    {
+        var options = (CSharpParseOptions)root.SyntaxTree.Options;
+        var source = root.SyntaxTree.GetText().ToString();
+        var conditionSymbols = root
+            .DescendantTrivia(descendIntoTrivia: true)
+            .Where(trivia => trivia.HasStructure)
+            .Select(trivia => trivia.GetStructure())
+            .OfType<DirectiveTriviaSyntax>()
+            .Select(directive => directive switch
+            {
+                IfDirectiveTriviaSyntax ifDirective =>
+                    ifDirective.Condition,
+                ElifDirectiveTriviaSyntax elifDirective =>
+                    elifDirective.Condition,
+                _ => null
+            })
+            .Where(condition => condition != null)
+            .SelectMany(condition => condition!
+                .DescendantNodesAndSelf()
+                .OfType<IdentifierNameSyntax>())
+            .Select(identifier => identifier.Identifier.ValueText)
+            .Where(identifier => identifier is not "true" and not "false")
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(identifier => identifier, StringComparer.Ordinal)
+            .ToList();
+        const int exhaustiveSymbolLimit = 8;
+        if (conditionSymbols.Count > exhaustiveSymbolLimit)
+        {
+            return HasPotentialLateUsingLexically(root);
+        }
+
+        var fixedSymbols = options.PreprocessorSymbolNames
+            .Except(conditionSymbols, StringComparer.Ordinal)
+            .ToList();
+        var combinations = 1 << conditionSymbols.Count;
+        for (var mask = 0; mask < combinations; mask++)
+        {
+            var symbols = fixedSymbols.Concat(conditionSymbols.Where(
+                (_, index) => (mask & (1 << index)) != 0));
+            var parsed = CSharpSyntaxTree.ParseText(
+                    source,
+                    options.WithPreprocessorSymbols(symbols))
+                .GetCompilationUnitRoot();
+            if (parsed.GetDiagnostics().Any(diagnostic =>
+                    diagnostic.Id is "CS1529" or "CS8915"))
+            {
+                return true;
+            }
+            if (parsed.Usings.Any(usingDirective =>
+                    parsed.Members.Any(member =>
+                        member.SpanStart < usingDirective.SpanStart)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool HasPotentialLateUsingLexically(
+        CompilationUnitSyntax root)
+    {
+        var source = root.SyntaxTree.GetText();
+        var options = (CSharpParseOptions)root.SyntaxTree.Options;
+        var groups = BuildConditionalModuleSourceTree(root, source);
+        var declarationPositions = new List<int>();
+        var usingPositions = new List<int>();
+        var invalidOrdering = false;
+
+        var outside = source.ToString().ToCharArray();
+        foreach (var group in groups)
+        {
+            for (var index = group.Start;
+                 index < group.End && index < outside.Length;
+                 index++)
+            {
+                if (outside[index] is not '\r' and not '\n')
+                    outside[index] = ' ';
+            }
+        }
+        CollectText(new string(outside), offset: 0);
+        foreach (var group in groups)
+            CollectGroup(group);
+        return invalidOrdering
+            || declarationPositions.Any(declaration =>
+                usingPositions.Any(usingPosition =>
+                    declaration < usingPosition));
+
+        void CollectGroup(ConditionalModuleSourceGroup group)
+        {
+            foreach (var branch in group.Branches)
+            {
+                var text = source.ToString(
+                    Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                        branch.ContentStart,
+                        branch.ContentEnd));
+                CollectText(text, branch.ContentStart);
+                foreach (var child in branch.Children)
+                    CollectGroup(child);
+            }
+        }
+
+        void CollectText(string text, int offset)
+        {
+            var parsed = CSharpSyntaxTree.ParseText(text, options)
+                .GetCompilationUnitRoot();
+            invalidOrdering |= parsed.GetDiagnostics().Any(diagnostic =>
+                diagnostic.Id is "CS1529" or "CS8915");
+            declarationPositions.AddRange(parsed.Members.Select(member =>
+                offset + member.SpanStart));
+            usingPositions.AddRange(parsed.Usings.Select(usingDirective =>
+                offset + usingDirective.SpanStart));
+        }
+    }
+
     private void AnalyzeUnsupportedCompilerDirectivePlacements(
         CompilationUnitSyntax root)
     {
@@ -520,15 +673,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var ancestors = directive.ParentTrivia.Token.Parent?
                 .AncestorsAndSelf()
                 .ToList() ?? [];
-            var statement = ancestors.OfType<StatementSyntax>()
-                .FirstOrDefault();
-            var nearestBlock = ancestors.OfType<BlockSyntax>()
-                .FirstOrDefault();
-            if (statement != null && nearestBlock != null)
+            if (GetDirectiveScope(directive) != null)
+                continue;
+
+            var owningStatement = ancestors
+                .OfType<BlockSyntax>()
+                .Select(block => block.Statements.FirstOrDefault(statement =>
+                    statement.FullSpan.Contains(directive.SpanStart)))
+                .FirstOrDefault(statement => statement != null);
+            if (owningStatement != null)
             {
-                if (IsDirectiveInLeadingTrivia(directive, statement))
-                    continue;
-                _conditionalInteropStatementStarts.Add(statement.SpanStart);
+                _compilerDirectiveInteropStatementStarts.Add(
+                    owningStatement.SpanStart);
                 continue;
             }
 
@@ -539,7 +695,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (directive.SpanStart > member.SpanStart
                 && directive.SpanStart < member.Span.End)
             {
-                if (member is BaseTypeDeclarationSyntax
+                if (member is EnumMemberDeclarationSyntax)
+                {
+                    var containingEnum = ancestors
+                        .OfType<EnumDeclarationSyntax>()
+                        .FirstOrDefault();
+                    if (containingEnum != null)
+                        _conditionalInteropTypeStarts.Add(
+                            containingEnum.SpanStart);
+                }
+                else if (member is BaseTypeDeclarationSyntax
                     or DelegateDeclarationSyntax)
                 {
                     _conditionalInteropTypeStarts.Add(member.SpanStart);
@@ -1005,15 +1170,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         foreach (var directive in GetDirectCompilerDirectives(parsed))
         {
             var code = directive.ToFullString().TrimEnd('\r', '\n');
-            var interop = new CSharpInteropBlockNode(
+            var interop = new CompilerDirectiveNode(
                 GetAbsoluteTextSpan(
                     source,
                     branch.ContentStart + directive.SpanStart,
                     directive.Span.Length),
                 code,
-                GetCompilerDirectiveFeature(directive),
-                "Compiler directive preserved verbatim",
-                InteropMemberKind.Other);
+                GetCompilerDirectiveFeature(directive));
             RecordCompilerDirectivePreservation(
                 directive,
                 code,
@@ -1026,6 +1189,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         foreach (var member in EnumerateConditionalTypeMembers(parsed))
         {
+            if (HasUnsupportedCompilerDirectivePlacement(member))
+            {
+                var raw = member.ToFullString();
+                var absoluteStart =
+                    branch.ContentStart + member.FullSpan.Start;
+                var interop = new CSharpInteropBlockNode(
+                    GetAbsoluteTextSpan(
+                        source,
+                        absoluteStart,
+                        member.FullSpan.Length),
+                    raw,
+                    "compiler-directive-placement",
+                    "Conditional declaration preserved verbatim because a compiler directive occurs in an unmodeled nested scope",
+                    GetInteropMemberKind(member));
+                _context.RecordLoss(
+                    ConversionLossKind.InteropPreserved,
+                    "compiler-directive-placement",
+                    $"Conditional declaration preserved verbatim because a compiler directive occurs in an unmodeled nested scope: {TruncateForMessage(raw.Trim())}",
+                    source.Lines.GetLineFromPosition(absoluteStart)
+                        .LineNumber + 1);
+                result.Add((absoluteStart, interop));
+                covered.Add(member.FullSpan);
+                continue;
+            }
+
             _insideConditionalModuleRecovery = true;
             (List<ClassDefinitionNode> classes,
                 List<InterfaceDefinitionNode> interfaces,
@@ -1093,6 +1281,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             result.Add((absoluteStart, interop));
         }
     }
+
+    private static bool HasUnsupportedCompilerDirectivePlacement(
+        SyntaxNode node)
+        => node.DescendantTrivia(descendIntoTrivia: true)
+            .Where(trivia => trivia.HasStructure)
+            .Select(trivia => trivia.GetStructure())
+            .OfType<DirectiveTriviaSyntax>()
+            .Where(IsPreservedCompilerDirective)
+            .Any(directive => GetDirectiveScope(directive) == null);
 
     private static IReadOnlyList<Microsoft.CodeAnalysis.Text.TextSpan>
         GetUncoveredSpans(
@@ -1228,7 +1425,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (directives.Count == 0)
             return;
 
-        _moduleInteropBlocks.AddRange(directives.Select(item => item.Node));
+        _moduleCompilerDirectives.AddRange(directives.Select(item => item.Node));
         RebuildModuleItems();
     }
 
@@ -1241,6 +1438,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Concat(_delegates)
             .Concat(_functions)
             .Concat(_moduleInteropBlocks)
+            .Concat(_moduleCompilerDirectives)
             .Concat(_typePreprocessorBlocks)
             .Select(node => (Position: node.Span.Start, Node: node))
             .OrderBy(item => item.Position)
@@ -1309,33 +1507,66 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
              node != null;
              node = node.Parent)
         {
-            if (node is CompilationUnitSyntax)
-                return node;
-            if (node is BlockSyntax or TypeDeclarationSyntax)
+            if (node is BlockSyntax block
+                && (block.Statements.Any(statement =>
+                        IsDirectiveInLeadingTrivia(directive, statement))
+                    || block.CloseBraceToken.LeadingTrivia.Any(trivia =>
+                        trivia.GetStructure()?.SpanStart
+                            == directive.SpanStart)))
             {
-                if (directive.SpanStart >= node.SpanStart
-                    && directive.SpanStart <= node.Span.End)
-                {
-                    return node;
-                }
+                return block;
+            }
+            if (node is TypeDeclarationSyntax type
+                && (type.Members.Any(member =>
+                        IsDirectiveInLeadingTrivia(directive, member))
+                    || type.CloseBraceToken.LeadingTrivia.Any(trivia =>
+                        trivia.GetStructure()?.SpanStart
+                            == directive.SpanStart)))
+            {
+                return type;
+            }
+            if (node is BaseNamespaceDeclarationSyntax namespaceDeclaration
+                && (namespaceDeclaration.Usings.Any(usingDirective =>
+                        usingDirective.GetLeadingTrivia().Any(trivia =>
+                            trivia.GetStructure()?.SpanStart
+                                == directive.SpanStart))
+                    || namespaceDeclaration.Members.Any(member =>
+                        IsDirectiveInLeadingTrivia(directive, member))
+                    || namespaceDeclaration is NamespaceDeclarationSyntax blockNamespace
+                    && blockNamespace.CloseBraceToken.LeadingTrivia.Any(trivia =>
+                        trivia.GetStructure()?.SpanStart
+                            == directive.SpanStart)))
+            {
+                return node.SyntaxTree.GetCompilationUnitRoot();
+            }
+            if (node is CompilationUnitSyntax compilationUnit
+                && (compilationUnit.Usings.Any(usingDirective =>
+                        usingDirective.GetLeadingTrivia().Any(trivia =>
+                            trivia.GetStructure()?.SpanStart
+                                == directive.SpanStart))
+                    || compilationUnit.Members.Any(member =>
+                        IsDirectiveInLeadingTrivia(directive, member))
+                    || compilationUnit.EndOfFileToken.LeadingTrivia.Any(trivia =>
+                        trivia.GetStructure()?.SpanStart
+                            == directive.SpanStart)))
+            {
+                return compilationUnit;
             }
         }
 
         return null;
     }
 
-    private CSharpInteropBlockNode CreateCompilerDirectiveInterop(
+    private CompilerDirectiveNode CreateCompilerDirectiveInterop(
         DirectiveTriviaSyntax directive)
     {
         var feature = GetCompilerDirectiveFeature(directive);
         var code = directive.ToFullString().TrimEnd('\r', '\n');
         RecordCompilerDirectivePreservation(directive, code);
-        return new CSharpInteropBlockNode(
+        return new CompilerDirectiveNode(
             GetTextSpan(directive),
             code,
-            feature,
-            "Compiler directive preserved verbatim",
-            InteropMemberKind.Other);
+            feature);
     }
 
     private static string GetCompilerDirectiveFeature(
@@ -1372,11 +1603,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage(feature);
         }
-        _context.RecordLoss(
-            ConversionLossKind.InteropPreserved,
-            feature,
-            $"Compiler directive preserved verbatim: {code}",
-            line);
     }
 
     private static IEnumerable<MemberDeclarationSyntax> EnumerateConditionalTypeMembers(
@@ -1691,6 +1917,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitInterfaceDeclaration(InterfaceDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
         if (_conditionalInteropTypeStarts.Contains(node.SpanStart))
         {
             AddModuleInteropBlock(CreateInteropBlock(
@@ -1699,9 +1928,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 InteropMemberKind.Class));
             return;
         }
-        if (!_insideConditionalModuleRecovery
-            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
-            return;
 
         // Check for #if wrapping entire type declaration
         if (!_insideTypePreprocessorConversion)
@@ -1776,7 +2002,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var activeDirectives = compilerDirectives
                 .Where(directive => directive.IsActive
-                    && IsDirectiveInRegion(directive, region))
+                    && IsDirectiveInRegion(directive, region)
+                    && ReferenceEquals(GetDirectiveScope(directive), node))
                 .Select(CreateCompilerDirectiveInterop)
                 .Cast<AstNode>()
                 .ToList();
@@ -1810,7 +2037,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 activeItems.AddRange(compilerDirectives
                     .Where(directive => directive.IsActive
-                        && IsDirectiveInRegion(directive, region))
+                        && IsDirectiveInRegion(directive, region)
+                        && ReferenceEquals(GetDirectiveScope(directive), node))
                     .Select(CreateCompilerDirectiveInterop));
                 activeItems = activeItems
                     .OrderBy(item => item.Span.Start)
@@ -1854,9 +2082,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                      !regions.Any(region =>
                          IsDirectiveInRegion(directive, region))))
         {
-            var interop = CreateCompilerDirectiveInterop(directive);
-            interopBlocks.Add(interop);
-            items.Add(interop);
+            items.Add(CreateCompilerDirectiveInterop(directive));
         }
         items = items
             .Select((item, index) => (item, index))
@@ -2064,6 +2290,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
         if (_conditionalInteropTypeStarts.Contains(node.SpanStart))
         {
             AddModuleInteropBlock(CreateInteropBlock(
@@ -2072,9 +2301,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 InteropMemberKind.Class));
             return;
         }
-        if (!_insideConditionalModuleRecovery
-            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
-            return;
 
         if (!_insideTypePreprocessorConversion)
         {
@@ -2114,6 +2340,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
         if (_conditionalInteropTypeStarts.Contains(node.SpanStart))
         {
             AddModuleInteropBlock(CreateInteropBlock(
@@ -2122,9 +2351,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 InteropMemberKind.Class));
             return;
         }
-        if (!_insideConditionalModuleRecovery
-            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
-            return;
 
         if (!_insideTypePreprocessorConversion)
         {
@@ -2169,6 +2395,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
         if (_conditionalInteropTypeStarts.Contains(node.SpanStart))
         {
             AddModuleInteropBlock(CreateInteropBlock(
@@ -2177,9 +2406,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 InteropMemberKind.Class));
             return;
         }
-        if (!_insideConditionalModuleRecovery
-            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
-            return;
 
         if (!_insideTypePreprocessorConversion)
         {
@@ -2217,6 +2443,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
         if (_conditionalInteropTypeStarts.Contains(node.SpanStart))
         {
             AddModuleInteropBlock(CreateInteropBlock(
@@ -2225,9 +2454,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 InteropMemberKind.Other));
             return;
         }
-        if (!_insideConditionalModuleRecovery
-            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
-            return;
 
         if (!_insideTypePreprocessorConversion)
         {
@@ -2304,6 +2530,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitDelegateDeclaration(DelegateDeclarationSyntax node)
     {
+        if (!_insideConditionalModuleRecovery
+            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
+            return;
         if (_conditionalInteropTypeStarts.Contains(node.SpanStart))
         {
             AddModuleInteropBlock(CreateInteropBlock(
@@ -2312,9 +2541,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 InteropMemberKind.Other));
             return;
         }
-        if (!_insideConditionalModuleRecovery
-            && _conditionalTypeDeclarationStarts.Contains(node.SpanStart))
-            return;
 
         // DelegateDefinitionNode emits a public, non-generic, un-attributed
         // delegate with no modifiers. Preserve every declaration outside that
@@ -2531,9 +2757,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         foreach (var emptyRegion in ppRegions.Where(r => r.ActiveStart == r.ActiveEnd))
         {
             _context.RecordFeatureUsage("preprocessor-directive");
-            var activeInterop = compilerDirectives
+            var activeDirectives = compilerDirectives
                 .Where(directive => directive.IsActive
-                    && IsDirectiveInRegion(directive, emptyRegion))
+                    && IsDirectiveInRegion(directive, emptyRegion)
+                    && ReferenceEquals(GetDirectiveScope(directive), node))
                 .Select(CreateCompilerDirectiveInterop)
                 .ToList();
             preprocessorBlocks.Add(BuildMemberPreprocessorNode(
@@ -2541,8 +2768,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 emptyRegion.Branches,
                 new List<ClassFieldNode>(), new List<PropertyNode>(), new List<ConstructorNode>(),
                 new List<MethodNode>(), new List<EventDefinitionNode>(), new List<OperatorOverloadNode>(),
-                activeInterop,
-                activeInterop.Cast<AstNode>().ToList()));
+                new List<CSharpInteropBlockNode>(),
+                activeDirectives.Cast<AstNode>().ToList()));
         }
 
         for (int memberIndex = 0; memberIndex < node.Members.Count; memberIndex++)
@@ -2581,11 +2808,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 foreach (var directive in compilerDirectives.Where(directive =>
                              directive.IsActive
-                             && IsDirectiveInRegion(directive, ppRegion)))
+                             && IsDirectiveInRegion(directive, ppRegion)
+                             && ReferenceEquals(
+                                 GetDirectiveScope(directive),
+                                 node)))
                 {
-                    var interop = CreateCompilerDirectiveInterop(directive);
-                    ppInteropBlocks.Add(interop);
-                    ppItems.Add(interop);
+                    ppItems.Add(CreateCompilerDirectiveInterop(directive));
                 }
                 ppItems = ppItems.OrderBy(item => item.Span.Start).ToList();
 
@@ -3094,9 +3322,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         foreach (var emptyRegion in ppRegions.Where(r => r.ActiveStart == r.ActiveEnd))
         {
             _context.RecordFeatureUsage("preprocessor-directive");
-            var activeInterop = compilerDirectives
+            var activeDirectives = compilerDirectives
                 .Where(directive => directive.IsActive
-                    && IsDirectiveInRegion(directive, emptyRegion))
+                    && IsDirectiveInRegion(directive, emptyRegion)
+                    && ReferenceEquals(GetDirectiveScope(directive), node))
                 .Select(CreateCompilerDirectiveInterop)
                 .ToList();
             preprocessorBlocks.Add(BuildMemberPreprocessorNode(
@@ -3104,8 +3333,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 emptyRegion.Branches,
                 new List<ClassFieldNode>(), new List<PropertyNode>(), new List<ConstructorNode>(),
                 new List<MethodNode>(), new List<EventDefinitionNode>(), new List<OperatorOverloadNode>(),
-                activeInterop,
-                activeInterop.Cast<AstNode>().ToList()));
+                new List<CSharpInteropBlockNode>(),
+                activeDirectives.Cast<AstNode>().ToList()));
         }
 
         for (int memberIndex = 0; memberIndex < node.Members.Count; memberIndex++)
@@ -3142,11 +3371,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 foreach (var directive in compilerDirectives.Where(directive =>
                              directive.IsActive
-                             && IsDirectiveInRegion(directive, ppRegion)))
+                             && IsDirectiveInRegion(directive, ppRegion)
+                             && ReferenceEquals(
+                                 GetDirectiveScope(directive),
+                                 node)))
                 {
-                    var interop = CreateCompilerDirectiveInterop(directive);
-                    ppInteropBlocks.Add(interop);
-                    ppItems.Add(interop);
+                    ppItems.Add(CreateCompilerDirectiveInterop(directive));
                 }
                 ppItems = ppItems.OrderBy(item => item.Span.Start).ToList();
 
@@ -3389,9 +3619,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             converted.IsStruct,
             converted.IsReadOnly,
             converted.Visibility,
-            interopBlocks: converted.InteropBlocks
-                .Concat(directives.Select(item => item.Node))
-                .ToList(),
+            interopBlocks: converted.InteropBlocks,
             preprocessorBlocks: converted.PreprocessorBlocks,
             nestedClasses: converted.NestedClasses,
             nestedInterfaces: converted.NestedInterfaces,
@@ -5761,7 +5989,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         try
         {
-            var tree = CSharpSyntaxTree.ParseText(disabledText);
+            var tree = CSharpSyntaxTree.ParseText(
+                disabledText,
+                _parseOptions);
             var root = tree.GetCompilationUnitRoot();
 
             // Extract using directives
@@ -6013,14 +6243,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 activeStatements.AddRange(directCompilerDirectives
                     .Where(directive => directive.IsActive
-                        && IsDirectiveInRegion(directive, ppRegion))
-                    .Select(directive =>
-                    {
-                        var preserved = CreateCompilerDirectiveInterop(directive);
-                        return new RawCSharpNode(
-                            preserved.Span,
-                            preserved.CSharpCode);
-                    }));
+                        && IsDirectiveInRegion(directive, ppRegion)
+                        && ReferenceEquals(GetDirectiveScope(directive), block))
+                    .Select(CreateCompilerDirectiveInterop));
                 activeStatements = activeStatements
                     .OrderBy(statement => statement.Span.Start)
                     .ToList();
@@ -6037,7 +6262,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
 
             var statement = block.Statements[stmtIndex];
-            if (_conditionalInteropStatementStarts.Contains(
+            if (_conditionalInteropStatementStarts.Contains(statement.SpanStart)
+                || _compilerDirectiveInteropStatementStarts.Contains(
                     statement.SpanStart))
             {
                 statements.Add(ConvertStatement(statement)!);
@@ -6206,14 +6432,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.RecordFeatureUsage("preprocessor-directive");
             var activeDirectives = directCompilerDirectives
                 .Where(directive => directive.IsActive
-                    && IsDirectiveInRegion(directive, trailingPP))
+                    && IsDirectiveInRegion(directive, trailingPP)
+                    && ReferenceEquals(GetDirectiveScope(directive), block))
                 .Select(directive =>
-                {
-                    var preserved = CreateCompilerDirectiveInterop(directive);
-                    return (StatementNode)new RawCSharpNode(
-                        preserved.Span,
-                        preserved.CSharpCode);
-                })
+                    (StatementNode)CreateCompilerDirectiveInterop(directive))
                 .ToList();
             statements.Add(BuildPreprocessorNode(
                 GetTextSpanAt(block.SyntaxTree, trailingPP.SourceStart),
@@ -6224,11 +6446,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var compilerDirectives = directCompilerDirectives
             .Where(directive => !ppRegions.Any(region =>
                 IsDirectiveInRegion(directive, region)))
-            .Select(directive =>
-            {
-                var preserved = CreateCompilerDirectiveInterop(directive);
-                return new RawCSharpNode(preserved.Span, preserved.CSharpCode);
-            })
+            .Select(CreateCompilerDirectiveInterop)
             .ToList();
         if (compilerDirectives.Count == 0)
             return statements;
@@ -6262,12 +6480,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode? ConvertStatement(StatementSyntax statement)
     {
-        if (_conditionalInteropStatementStarts.Contains(statement.SpanStart))
+        var conditionalFragment =
+            _conditionalInteropStatementStarts.Contains(statement.SpanStart);
+        var compilerDirectivePlacement =
+            _compilerDirectiveInteropStatementStarts.Contains(
+                statement.SpanStart);
+        if (conditionalFragment || compilerDirectivePlacement)
         {
             _context.RecordLoss(
                 ConversionLossKind.InteropPreserved,
-                "conditional-expression-fragment",
-                $"Statement preserved verbatim because conditional directives occur inside its expression: {TruncateForMessage(statement.ToFullString().Trim())}",
+                conditionalFragment
+                    ? "conditional-expression-fragment"
+                    : "compiler-directive-placement",
+                conditionalFragment
+                    ? $"Statement preserved verbatim because conditional directives occur inside its expression: {TruncateForMessage(statement.ToFullString().Trim())}"
+                    : $"Statement preserved verbatim because a compiler directive occurs in an unmodeled nested statement scope: {TruncateForMessage(statement.ToFullString().Trim())}",
                 statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
             return new RawCSharpNode(
                 GetTextSpan(statement),
