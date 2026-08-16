@@ -1,0 +1,4 @@
+§M{m001:ConditionalDeclarationFixture}
+  §CL{c001:FixtureOracle:pub:stat}
+    §MT{m001:Get:pub:stat} () -> i32
+      §R 127

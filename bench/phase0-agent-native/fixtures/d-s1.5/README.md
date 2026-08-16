@@ -14,9 +14,16 @@ only mergeable when a fixture demonstrates the claimed fidelity on real values.
 ```
 d-s1.5/<sanitized-key>/
   fixture.json     { "featureKey": "<exact FeatureSupport key>",
+                     "supportLevel": "<Full or Partial>",
                      "lossKindCertifiedAbsent": "<ConversionLossKind name or null>",
+                     "expectedLossKinds": ["<required loss for Partial>"],
+                     "allowedLossKinds": ["<complete allowed loss set>"],
                      "runtimeEntryPoint": "<public static parameterless method>",
-                     "runtimeExpectedInt": <expected integer result> }
+                     "runtimeExpectedInt": <expected integer result>,
+                     "convertedRuntimeEntryPoint": "<optional converted method>",
+                     "convertedExpectedUndefinedInt": <optional result>,
+                     "convertedExpectedDefinedInt": <optional result>,
+                     "definedSymbols": ["<optional symbol>"] }
   input.cs         the C# input exercising the feature
   expected.calr    the expected converted Calor (exact match against `calor migrate` output)
   test.calr        the value-asserting test: a Calor program using the converted construct
@@ -33,8 +40,8 @@ matches on — never the directory name.
 
 `scripts/check-d-s1.5-fixtures.sh` runs on every PR and asserts, for the diff under test:
 
-1. **Every `SupportLevel` promotion toward `Full`** in `Migration/FeatureSupport.cs` (including
-   a new entry born above `NotSupported` — the same maneuver in one step) has a registry
+1. **Every `SupportLevel` promotion** in `Migration/FeatureSupport.cs` (including
+   a new entry born above `NotSupported`) has a registry
    directory whose `fixture.json` names that feature key.
 2. **Every net loss-kind removal** (a `ConversionLossKind.<Kind>` reference removed from
    `Migration/` sources) has a registry fixture naming that kind as certified-absent.
@@ -57,6 +64,9 @@ using/declaration path and includes an executable integer value oracle.
 - **Value assertions execute by manifest:** every `test.calr` exposes the
   parameterless public static method named by `runtimeEntryPoint`; the registry
   invokes it and compares its integer result with `runtimeExpectedInt`.
+- **Full means zero loss; Partial declares its losses:** Full fixtures permit no
+  conversion losses. Partial fixtures must list every expected and allowed loss
+  kind, execute the converted output, and reject drops or undeclared loss.
 - **Fixture-to-feature linkage is nominal**: nothing yet asserts `input.cs` actually exercises
   the promoted feature (a converter-ledger-touch check is the registered follow-up). Until it
   lands, a review of the fixture's content is part of reviewing the promotion PR.

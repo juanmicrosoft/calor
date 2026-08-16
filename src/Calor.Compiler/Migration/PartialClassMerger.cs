@@ -144,6 +144,9 @@ public sealed class PartialClassMerger
         var nestedClasses = partials.SelectMany(p => p.NestedClasses).ToList();
         var nestedInterfaces = partials.SelectMany(p => p.NestedInterfaces).ToList();
         var nestedEnums = partials.SelectMany(p => p.NestedEnums).ToList();
+        var nestedDelegates = partials.SelectMany(p => p.NestedDelegates).ToList();
+        var indexers = partials.SelectMany(p => p.Indexers).ToList();
+        var items = partials.SelectMany(CanonicalClassItems).ToList();
 
         // Attribute multiplicity and arguments are semantically significant.
         var csharpAttributes = partials.SelectMany(p => p.CSharpAttributes).ToList();
@@ -191,7 +194,10 @@ public sealed class PartialClassMerger
             preprocessorBlocks: preprocessorBlocks.Count > 0 ? preprocessorBlocks : null,
             nestedClasses: nestedClasses.Count > 0 ? nestedClasses : null,
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
-            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null);
+            nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
+            indexers: indexers.Count > 0 ? indexers : null,
+            nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
+            items: items.Count > 0 ? items : null);
 
         // Tag with source files
         if (sourceFiles.Count > 0)
@@ -214,6 +220,33 @@ public sealed class PartialClassMerger
 
     private static ModuleNode RebuildModule(ModuleNode original, List<ClassDefinitionNode> newClasses)
     {
+        var replacements = newClasses
+            .Where(cls => !original.Classes.Contains(cls))
+            .GroupBy(ClassIdentity)
+            .ToDictionary(
+                group => group.Key,
+                group => new Queue<ClassDefinitionNode>(group));
+        var items = new List<AstNode>();
+        foreach (var item in CanonicalModuleItems(original))
+        {
+            if (item is not ClassDefinitionNode cls)
+            {
+                items.Add(item);
+                continue;
+            }
+            if (newClasses.Contains(cls))
+            {
+                items.Add(cls);
+            }
+            else if (replacements.TryGetValue(
+                         ClassIdentity(cls),
+                         out var matching)
+                     && matching.Count > 0)
+            {
+                items.Add(matching.Dequeue());
+            }
+        }
+        items.AddRange(replacements.Values.SelectMany(queue => queue));
         return new ModuleNode(
             original.Span,
             original.Id,
@@ -234,6 +267,59 @@ public sealed class PartialClassMerger
             interopBlocks: original.InteropBlocks.Count > 0 ? original.InteropBlocks : null,
             refinementTypes: original.RefinementTypes.Count > 0 ? original.RefinementTypes : null,
             indexedTypes: original.IndexedTypes.Count > 0 ? original.IndexedTypes : null,
-            typePreprocessorBlocks: original.TypePreprocessorBlocks.Count > 0 ? original.TypePreprocessorBlocks : null);
+            typePreprocessorBlocks: original.TypePreprocessorBlocks.Count > 0 ? original.TypePreprocessorBlocks : null,
+            items: items.Count > 0 ? items : null);
     }
+
+    private static IReadOnlyList<AstNode> CanonicalClassItems(
+        ClassDefinitionNode cls)
+        => Canonicalize(
+            cls.Items,
+            cls.Fields.Cast<AstNode>()
+                .Concat(cls.Properties)
+                .Concat(cls.Indexers)
+                .Concat(cls.Constructors)
+                .Concat(cls.Methods)
+                .Concat(cls.Events)
+                .Concat(cls.OperatorOverloads)
+                .Concat(cls.InteropBlocks)
+                .Concat(cls.PreprocessorBlocks)
+                .Concat(cls.NestedClasses)
+                .Concat(cls.NestedInterfaces)
+                .Concat(cls.NestedEnums)
+                .Concat(cls.NestedDelegates));
+
+    private static IReadOnlyList<AstNode> CanonicalModuleItems(
+        ModuleNode module)
+        => Canonicalize(
+            module.Items,
+            module.Usings.Cast<AstNode>()
+                .Concat(module.Interfaces)
+                .Concat(module.Classes)
+                .Concat(module.Enums)
+                .Concat(module.EnumExtensions)
+                .Concat(module.Delegates)
+                .Concat(module.Functions)
+                .Concat(module.InteropBlocks)
+                .Concat(module.RefinementTypes)
+                .Concat(module.IndexedTypes)
+                .Concat(module.TypePreprocessorBlocks));
+
+    private static IReadOnlyList<AstNode> Canonicalize(
+        IReadOnlyList<AstNode> explicitItems,
+        IEnumerable<AstNode> legacyItems)
+    {
+        var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        return explicitItems
+            .Concat(legacyItems)
+            .Where(seen.Add)
+            .Select((item, index) => (item, index))
+            .OrderBy(entry => entry.item.Span.Start)
+            .ThenBy(entry => entry.index)
+            .Select(entry => entry.item)
+            .ToList();
+    }
+
+    private static string ClassIdentity(ClassDefinitionNode cls)
+        => $"{cls.Name}`{cls.TypeParameters.Count}";
 }

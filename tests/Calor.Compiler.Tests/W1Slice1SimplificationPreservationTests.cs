@@ -48,7 +48,8 @@ public class W1Slice1SimplificationPreservationTests
             nameof(ModuleNode.Functions),
             nameof(ModuleNode.Classes),
             nameof(ModuleNode.Interfaces),
-            nameof(ModuleNode.Invariants)
+            nameof(ModuleNode.Invariants),
+            nameof(ModuleNode.Items)
         };
         foreach (var property in typeof(ModuleNode).GetProperties()
                      .Where(property => property.GetIndexParameters().Length == 0)

@@ -75,12 +75,9 @@ public class Issue766DeclarationModuleSemanticsTests
                 §U{global:System.Text}
                 §U{Buffers:System.Buffers}
             """));
-        Assert.True(
-            conditional.IndexOf("global using System.Text;", StringComparison.Ordinal)
-            < conditional.IndexOf("namespace ConditionalUsing", StringComparison.Ordinal));
-        Assert.True(
-            conditional.IndexOf("using Buffers = System.Buffers;", StringComparison.Ordinal)
-            < conditional.IndexOf("namespace ConditionalUsing", StringComparison.Ordinal));
+        Assert.Contains("global using System.Text;", conditional);
+        Assert.Contains("using Buffers = System.Buffers;", conditional);
+        Assert.DoesNotContain("namespace ConditionalUsing", conditional);
         var conditionalValidation = GeneratedCSharpCompiler.Validate(
             [new GeneratedCSharpSource(conditional, "conditional.g.cs")],
             new GeneratedCSharpCompilationContext
@@ -499,22 +496,21 @@ public class Issue766DeclarationModuleSemanticsTests
             type => type.Name == "Inner");
         Assert.Empty(container.InteropBlocks);
         var block = Assert.Single(container.PreprocessorBlocks);
-        Assert.Collection(
-            block.Items,
-            item => Assert.Equal("Before", Assert.IsType<ClassFieldNode>(item).Name),
-            item => Assert.IsType<CSharpInteropBlockNode>(item),
-            item => Assert.Equal("After", Assert.IsType<ClassFieldNode>(item).Name));
-        Assert.Contains(
-            "record Inner",
-            Assert.Single(block.InteropBlocks).CSharpCode);
+        var featureRaw = Assert.Single(block.InteropBlocks).CSharpCode;
+        Assert.Contains("Before", featureRaw);
+        Assert.Contains("record Inner", featureRaw);
+        Assert.Contains("After", featureRaw);
         Assert.Collection(
             block.ElseBranch!.Items,
-            item => Assert.Equal("BeforeElse", Assert.IsType<ClassFieldNode>(item).Name),
-            item => Assert.IsType<CSharpInteropBlockNode>(item),
-            item => Assert.Equal("AfterElse", Assert.IsType<ClassFieldNode>(item).Name));
-        Assert.Contains(
-            "struct Inner",
-            Assert.Single(block.ElseBranch!.InteropBlocks).CSharpCode);
+            item => Assert.Equal(
+                "BeforeElse",
+                Assert.IsType<ClassFieldNode>(item).Name),
+            item => Assert.Contains(
+                "struct Inner",
+                Assert.IsType<CSharpInteropBlockNode>(item).CSharpCode),
+            item => Assert.Equal(
+                "AfterElse",
+                Assert.IsType<ClassFieldNode>(item).Name));
 
         var featureInner = CompileAssembly(
                 CompileConvertedCalor(conversion),
@@ -537,6 +533,76 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.NotNull(fallbackInner.GetField("Value"));
         Assert.NotNull(fallbackInner.DeclaringType!.GetField("BeforeElse"));
         Assert.NotNull(fallbackInner.DeclaringType.GetField("AfterElse"));
+    }
+
+    [Fact]
+    public void InterfaceDefaultPrivateAndStaticMethods_PreserveBodiesAndRuntime()
+    {
+        var conversion = new CSharpToCalorConverter().Convert(
+            """
+            public interface IDefaults
+            {
+                int Value() => 42;
+                private int Hidden() => 1;
+                static int StaticValue() => 3;
+            }
+            public sealed class Defaults : IDefaults { }
+            public static class InterfaceHarness
+            {
+                public static int Run() => ((IDefaults)new Defaults()).Value();
+            }
+            """,
+            "InterfaceDefaults.cs");
+        Assert.True(
+            conversion.Success,
+            string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        var iface = Assert.Single(conversion.Ast!.Interfaces);
+        Assert.Empty(iface.Methods);
+        Assert.Equal(3, iface.InteropBlocks.Count);
+        var generated = CompileConvertedCalor(conversion);
+        var assembly = CompileAssembly(generated);
+        Assert.Equal(
+            42,
+            InvokeStaticInt(assembly, "InterfaceHarness", "Run"));
+        Assert.Contains("private int Hidden() => 1;", generated);
+        Assert.Contains("static int StaticValue() => 3;", generated);
+    }
+
+    [Fact]
+    public void DelegateVisibilityAttributesAndModifiers_PreserveExactApi()
+    {
+        var conversion = new CSharpToCalorConverter().Convert(
+            """
+            [System.Obsolete("legacy")]
+            internal delegate int HiddenHandler(int value);
+            public static class DelegateHarness
+            {
+                public static int Run()
+                {
+                    HiddenHandler handler = value => value + 1;
+                    return handler(41);
+                }
+            }
+            """,
+            "DelegateSemantics.cs");
+        Assert.True(
+            conversion.Success,
+            string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Empty(conversion.Ast!.Delegates);
+        Assert.Contains(
+            conversion.Ast.InteropBlocks,
+            interop => interop.CSharpCode.Contains(
+                "internal delegate int HiddenHandler",
+                StringComparison.Ordinal));
+        var assembly = CompileAssembly(CompileConvertedCalor(conversion));
+        var delegateType = assembly.GetType(
+            "DelegateSemantics.HiddenHandler")
+            ?? throw new InvalidOperationException("HiddenHandler missing");
+        Assert.True(delegateType.IsNotPublic);
+        Assert.NotNull(delegateType.GetCustomAttribute<ObsoleteAttribute>());
+        Assert.Equal(
+            42,
+            InvokeStaticInt(assembly, "DelegateHarness", "Run"));
     }
 
     [Fact]
@@ -1005,8 +1071,7 @@ public class Issue766DeclarationModuleSemanticsTests
         {
             Fidelity = ConversionFidelity.Lossy,
             ModuleName = "ConstraintRelationship",
-            AutoGenerateIds = true,
-            StripPreprocessor = false
+            AutoGenerateIds = true
         }).Convert(
             """
             using System.Threading;
@@ -1369,7 +1434,6 @@ public class Issue766DeclarationModuleSemanticsTests
             Fidelity = ConversionFidelity.Lossy,
             ModuleName = "Issue766Conditional",
             AutoGenerateIds = true,
-            StripPreprocessor = false,
             ValidateRoundTripCSharp = false
         }).Convert(source);
         Assert.True(

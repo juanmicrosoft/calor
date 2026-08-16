@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Calor.Compiler.Incremental;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpExtensions = Microsoft.CodeAnalysis.CSharpExtensions;
 
@@ -26,22 +27,68 @@ public sealed class ProjectDiscovery
 
         // Determine if projectPath is a .csproj file or directory
         string searchPath;
+        string? projectFilePath = null;
+        IEnumerable<string> csFiles;
         if (File.Exists(projectPath) && projectPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
-            searchPath = Path.GetDirectoryName(projectPath) ?? projectPath;
+            projectFilePath = Path.GetFullPath(projectPath);
+            searchPath = Path.GetDirectoryName(
+                projectFilePath) ?? projectPath;
+            var inputs = await ProjectMigrator
+                .ResolveProjectCompilationInputsAsync(
+                    projectFilePath,
+                    _options.Configuration,
+                    _options.TargetFramework,
+                    CancellationToken.None);
+            csFiles = inputs
+                .SelectMany(input => input.SourcePaths)
+                .Where(path =>
+                    Path.GetExtension(path).Equals(
+                        ".cs",
+                        StringComparison.OrdinalIgnoreCase)
+                    || Path.GetExtension(path).Equals(
+                        ".csx",
+                        StringComparison.OrdinalIgnoreCase))
+                .Distinct(
+                    BuildStateCache.GetPathComparer());
         }
         else if (Directory.Exists(projectPath))
         {
             searchPath = projectPath;
+            csFiles = Directory.EnumerateFiles(
+                    searchPath,
+                    "*.cs",
+                    SearchOption.AllDirectories)
+                .Concat(Directory.EnumerateFiles(
+                    searchPath,
+                    "*.csx",
+                    SearchOption.AllDirectories));
+            var nestedProjectDirectories =
+                Directory.EnumerateFiles(
+                        searchPath,
+                        "*.csproj",
+                        SearchOption.AllDirectories)
+                    .Select(path =>
+                        Path.GetDirectoryName(
+                            Path.GetFullPath(path))!)
+                    .Where(directory =>
+                        !BuildStateCache.GetPathComparer()
+                            .Equals(
+                                directory,
+                                Path.GetFullPath(searchPath)))
+                    .Distinct(
+                        BuildStateCache.GetPathComparer())
+                    .ToArray();
+            csFiles = csFiles.Where(path =>
+                !nestedProjectDirectories.Any(directory =>
+                    IsUnderDirectory(path, directory)));
         }
         else
         {
             throw new DirectoryNotFoundException($"Project path not found: {projectPath}");
         }
 
-        // Find all C# files
-        var csFiles = Directory.EnumerateFiles(searchPath, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !ShouldExclude(f));
+        csFiles = csFiles.Where(f => !ShouldExclude(f));
 
         // Apply directory filter if specified (e.g., "src/**")
         if (!string.IsNullOrEmpty(_options.DirectoryFilter))
@@ -78,6 +125,7 @@ public sealed class ProjectDiscovery
         return new MigrationPlan
         {
             ProjectPath = projectPath,
+            ProjectFilePath = projectFilePath,
             Direction = direction,
             Entries = entries,
             Options = _options
@@ -152,6 +200,20 @@ public sealed class ProjectDiscovery
         return false;
     }
 
+    private static bool IsUnderDirectory(
+        string path,
+        string directory)
+    {
+        var relative = Path.GetRelativePath(
+            directory,
+            path);
+        return relative != ".."
+            && !relative.StartsWith(
+                $"..{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal)
+            && !Path.IsPathRooted(relative);
+    }
+
     private static bool MatchesPattern(string fileName, string pattern)
     {
         // Simple wildcard matching
@@ -180,7 +242,16 @@ public sealed class ProjectDiscovery
         try
         {
             // Parse the file to detect features
-            var syntaxTree = CSharpSyntaxTree.ParseText(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(
+                    LanguageVersion.Preview,
+                    kind: Path.GetExtension(filePath).Equals(
+                        ".csx",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? SourceCodeKind.Script
+                        : SourceCodeKind.Regular),
+                filePath);
             var root = syntaxTree.GetCompilationUnitRoot();
 
             // Check for parse errors
@@ -190,8 +261,10 @@ public sealed class ProjectDiscovery
 
             if (errors.Count > 0)
             {
-                convertibility = FileConvertibility.Skip;
-                skipReason = $"Parse errors: {errors.Count}";
+                convertibility = FileConvertibility.Partial;
+                potentialIssues.Add(
+                    $"Preliminary parse diagnostics: {errors.Count}; "
+                    + "effective project parse options are applied during migration");
                 estimatedIssues = errors.Count;
             }
             else

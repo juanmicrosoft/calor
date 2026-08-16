@@ -136,6 +136,9 @@ public enum ConversionLossKind
     /// <summary>A preprocessor directive/branch was stripped before conversion (branch content or condition lost).</summary>
     PreprocessorStripped,
 
+    /// <summary>An inactive nonconditional compiler directive was removed by selected-branch mode.</summary>
+    DirectiveRemoved,
+
     /// <summary>
     /// A raw C# fallback (§CS{…}/§RAW/§CSHARP) found in the emitted Calor with no
     /// matching ledger entry — produced by the Calor emitter's internal fallback
@@ -160,7 +163,8 @@ public sealed class ConversionLoss
     public string? File { get; init; }
     public bool IsSemanticLoss => Kind is ConversionLossKind.FallbackTodo
         or ConversionLossKind.Dropped
-        or ConversionLossKind.PreprocessorStripped;
+        or ConversionLossKind.PreprocessorStripped
+        or ConversionLossKind.DirectiveRemoved;
 
     public override string ToString()
     {
@@ -224,6 +228,30 @@ public sealed class ConversionStats
 }
 
 /// <summary>
+/// Records the C# parse and conditional-compilation configuration used for a conversion.
+/// </summary>
+public sealed record ConversionMetadata
+{
+    public PreprocessorConversionMode PreprocessorMode { get; init; } =
+        PreprocessorConversionMode.PreserveAllBranches;
+    public string? Configuration { get; init; }
+    public string? TargetFramework { get; init; }
+    public string LanguageVersion { get; init; } = "";
+    public string DocumentationMode { get; init; } = "";
+    public string SourceCodeKind { get; init; } = "";
+    public string OutputKind { get; init; } = "";
+    public IReadOnlyList<string> DefinedSymbols { get; init; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, string> Features { get; init; } =
+        new Dictionary<string, string>();
+    public IReadOnlyList<ConversionReference> References { get; init; } =
+        Array.Empty<ConversionReference>();
+}
+
+public sealed record ConversionReference(
+    string Path,
+    IReadOnlyList<string> Aliases);
+
+/// <summary>
 /// Shared context for tracking state during C# to Calor conversion.
 /// </summary>
 public sealed class ConversionContext
@@ -269,6 +297,9 @@ public sealed class ConversionContext
 
     /// <summary>The fidelity contract applied to this conversion.</summary>
     public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
+
+    /// <summary>The parse and conditional-compilation configuration used for this conversion.</summary>
+    public ConversionMetadata Metadata { get; set; } = new();
 
     /// <summary>
     /// The module name to use (derived from file name if not set).

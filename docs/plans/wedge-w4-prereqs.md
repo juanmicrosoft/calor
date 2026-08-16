@@ -69,7 +69,7 @@ needs only containment/registry-honesty, not a predicate-blocking fix.
 | # | Class | Decision | Scope of the W4 fix |
 |---|-------|----------|---------------------|
 | **#774** P1 | **SILENT** (keystone) | **FIX-NOW** (in flight) | Full de-silencing: exhaustive operator/pattern `SyntaxKind` switches, dedicated char literal, distinct compound-assignments incl. `>>>=`, typed/type-only pattern nodes, no wildcard/add/negate fallbacks, interop escalation for the rest. |
-| **#772** P0 | **SILENT** (first-`#if`-branch swap) | **FIX-NOW, minimal (SILENT→LOUD)** | Make the converter **refuse** (whole-member/whole-file interop, or a diagnostic) on any `#if` whose condition it cannot evaluate, instead of silently keeping the first branch. Full conditional-compilation preservation is **deferred** (not needed — refusal → exclusion). Fix the registry false-green claim. |
+| **#772** P0 | **RESOLVED** | **IMPLEMENTED beyond the original minimal scope** | Default conversion preserves all branches as explicit `§PP`; any active-branch selection is named `SelectActiveBranchLossy`, uses Roslyn symbols/parse options, and records every removal. Nonconditional compiler directives are preserved verbatim and the registry remains granular where interop is used. |
 | **#769** P0 | **SILENT** (same-name type merge) | **FIX-NOW, minimal (SILENT→LOUD)** | Make recovery **refuse to merge** two types that share a bare name across different namespaces (escalate to interop or emit a diagnostic). Full namespace-topology preservation **deferred**. Flattening that does *not* risk identity merge may remain, but must not be claimed as faithful in the registry. |
 | **#775** P0 | **MIXED, leans LOUD** | **CONTAINMENT** | The positional-record ctor mismatch is already a build break (excluded). Owed: registry honesty — downgrade the "records fully supported" claim; escalate records whose behaviour is exercised through dropped `Equals`/`with`/`Deconstruct` to whole-member interop so those are non-native, not silently degraded. |
 | **#777** P0 | **MIXED, leans LOUD** | **CONTAINMENT** | Unresolved captured locals already build-break (excluded). Owed: whole-member interop for local functions with type params or captures (the residual silent case = a hoisted non-capturing generic local fn that compiles but loses generic identity); registry honesty. |
@@ -77,7 +77,7 @@ needs only containment/registry-honesty, not a predicate-blocking fix.
 
 **Committed scope for W4 Slice A (the conversion-honesty prerequisite)** — note
 "committed scope," not the tranche-2 measurement-*freeze* sense of the word
-(§8.1): `#774` (full), `#772` (loud-refusal), `#769` (loud-refusal, no-merge),
+(§8.1): `#774` (full), `#772` (now full branch preservation), `#769` (loud-refusal, no-merge),
 `#775`/`#777` (containment + registry honesty). `#751` requires nothing.
 **Definition of done
 for Slice A:** a corpus-wide sweep proves that on the pinned corpus, no file
@@ -248,7 +248,7 @@ the threshold, task count N, or corpus before the freeze — never after.
 ## §6 — W4 slice plan
 
 - **Slice A — conversion honesty (predicate trust).** `#774` (full, in flight)
-  + `#772`/`#769` loud-refusal + `#775`/`#777` containment & registry honesty.
+  + `#772` branch preservation / `#769` loud-refusal + `#775`/`#777` containment & registry honesty.
   DoD: no file converts natively while carrying a silent substitution
   (audit test + differential runtime-equivalence on native regions).
 - **Slice B — corpus vendoring (D-W4.2).** Vendor + pin the 3 OSS projects;

@@ -924,7 +924,6 @@ public sealed class Lexer
             {
                 return ScanPreprocessorCondition(TokenKind.EndPreprocessor);
             }
-
             // Unknown closing tag - provide helpful suggestions
             ReportUnknownSectionMarker(keyword);
             return MakeToken(TokenKind.Error);
@@ -1657,7 +1656,13 @@ public sealed class Lexer
 
         while (!IsAtEnd)
         {
-            if (depth == 1 && MatchesAtCurrent(endMarker))
+            if (TrySkipCSharpLexicalConstruct())
+                continue;
+            // The explicit marker is authoritative. Conditional C# branches can
+            // contain mutually exclusive brace shapes, so counting braces across
+            // every branch is not a valid way to decide whether the marker is at
+            // the outer level.
+            if (MatchesAtCurrent(endMarker))
             {
                 var rawContent = _source[contentStart.._position];
                 for (int i = 0; i < endMarker.Length; i++)
@@ -1665,8 +1670,6 @@ public sealed class Lexer
                 return MakeToken(TokenKind.CSharpInterop, rawContent);
             }
 
-            if (TrySkipCSharpLexicalConstruct())
-                continue;
             if (Current == '{')
                 depth++;
             else if (Current == '}')

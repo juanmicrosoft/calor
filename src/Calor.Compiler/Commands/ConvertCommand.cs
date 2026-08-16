@@ -51,6 +51,47 @@ public static class ConvertCommand
             aliases: new[] { "--lossy" },
             description: "Explicitly allow reported semantic substitutions or drops. The default is lossless conversion.");
 
+        var selectBranchOption = new Option<bool>(
+            aliases: new[] { "--select-active-preprocessor-branch-lossy" },
+            description: "Explicitly lossy: evaluate conditional compilation with Roslyn and keep only the active branch.");
+        var defineOption = new Option<string[]>(
+            aliases: new[] { "--define" },
+            description: "Conditional-compilation symbol. Repeat for multiple symbols.")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+        var referenceOption = new Option<string[]>(
+            aliases: new[] { "--reference" },
+            description: "Metadata reference path optionally followed by =alias1,alias2.")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+        var configurationOption = new Option<string?>(
+            aliases: new[] { "--configuration" },
+            description: "Configuration name recorded in conversion metadata.");
+        var targetFrameworkOption = new Option<string?>(
+            aliases: new[] { "--framework" },
+            description: "Target framework recorded in conversion metadata.");
+        var languageVersionOption = new Option<string?>(
+            aliases: new[] { "--language-version" },
+            description: "C# language version used by Roslyn (for example preview or 13).");
+        var documentationModeOption = new Option<string>(
+            aliases: new[] { "--documentation-mode" },
+            getDefaultValue: () => "parse",
+            description: "Roslyn documentation mode: none, parse, or diagnose.");
+        documentationModeOption.FromAmong("none", "parse", "diagnose");
+        var sourceKindOption = new Option<string>(
+            aliases: new[] { "--source-kind" },
+            getDefaultValue: () => "regular",
+            description: "Roslyn source kind: regular or script.");
+        sourceKindOption.FromAmong("regular", "script");
+        var featureOption = new Option<string[]>(
+            aliases: new[] { "--feature" },
+            description: "Roslyn parse feature key=value. Repeat for multiple features.")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+
         var timeoutOption = new Option<int>(
             aliases: new[] { "--timeout", "-t" },
             description: "Timeout in seconds for the conversion (0 = no timeout)",
@@ -78,6 +119,15 @@ public static class ConvertCommand
             validateOption,
             passthroughOption,
             lossyOption,
+            selectBranchOption,
+            defineOption,
+            configurationOption,
+            targetFrameworkOption,
+            languageVersionOption,
+            documentationModeOption,
+            sourceKindOption,
+            featureOption,
+            referenceOption,
             timeoutOption,
             explicitCallClosersOption,
             formatOption
@@ -94,18 +144,40 @@ public static class ConvertCommand
             var validate = ctx.ParseResult.GetValueForOption(validateOption);
             var passthrough = ctx.ParseResult.GetValueForOption(passthroughOption);
             var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
+            var selectBranch = ctx.ParseResult.GetValueForOption(selectBranchOption);
+            var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
+            var configuration = ctx.ParseResult.GetValueForOption(configurationOption);
+            var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
+            var languageVersion = ctx.ParseResult.GetValueForOption(languageVersionOption);
+            var documentationMode = ctx.ParseResult.GetValueForOption(documentationModeOption) ?? "parse";
+            var sourceKind = ctx.ParseResult.GetValueForOption(sourceKindOption) ?? "regular";
+            var features = ctx.ParseResult.GetValueForOption(featureOption) ?? [];
+            var references = ctx.ParseResult.GetValueForOption(referenceOption) ?? [];
             var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
             // Exit code returned through ctx.ExitCode: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-            ctx.ExitCode = await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, passthrough, lossy, timeoutSeconds, explicitCallClosers, format);
+            ctx.ExitCode = await ExecuteAsync(
+                input, output, benchmark, verbose, explain, noFallback, validate,
+                passthrough, lossy, selectBranch, definedSymbols, configuration,
+                targetFramework, languageVersion, timeoutSeconds,
+                documentationMode, sourceKind, features,
+                references, explicitCallClosers, format);
         });
 
         return command;
     }
 
-    private static async Task<int> ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, bool lossy, int timeoutSeconds, bool explicitCallClosers, string format)
+    private static async Task<int> ExecuteAsync(
+        FileInfo input, FileInfo? output, bool benchmark, bool verbose,
+        bool explain, bool noFallback, bool validate, bool passthrough,
+        bool lossy, bool selectBranch, IReadOnlyCollection<string> definedSymbols,
+        string? configuration, string? targetFramework, string? languageVersion,
+        int timeoutSeconds, string documentationMode, string sourceKind,
+        IReadOnlyCollection<string> features,
+        IReadOnlyCollection<string> references,
+        bool explicitCallClosers, string format)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -136,8 +208,8 @@ public static class ConvertCommand
 
         if (direction == ConversionDirection.Unknown)
         {
-            envelope?.AddCommandError("Unknown file type. Expected .cs or .calr extension.", input.FullName);
-            Console.Error.WriteLine($"Error: Unknown file type. Expected .cs or .calr extension.");
+            envelope?.AddCommandError("Unknown file type. Expected .cs, .csx, or .calr extension.", input.FullName);
+            Console.Error.WriteLine($"Error: Unknown file type. Expected .cs, .csx, or .calr extension.");
             envelope?.Emit();
             return 1;
         }
@@ -158,7 +230,13 @@ public static class ConvertCommand
             ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, passthrough, lossy, timeoutSeconds, explicitCallClosers, envelope);
+                (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(
+                    input.FullName, outputPath, benchmark, verbose, explain,
+                    noFallback, validate, passthrough, lossy, selectBranch,
+                    definedSymbols, configuration, targetFramework,
+                    languageVersion, documentationMode, sourceKind,
+                    features, references, timeoutSeconds, explicitCallClosers,
+                    envelope);
             }
             else
             {
@@ -239,9 +317,32 @@ public static class ConvertCommand
     /// </summary>
     internal static ConversionOptions BuildCSharpToCalorOptions(
         bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough, bool explicitCallClosers,
-        bool lossy = false) => new()
+        bool lossy = false,
+        bool selectActivePreprocessorBranchLossy = false,
+        IReadOnlyCollection<string>? definedSymbols = null,
+        string? configuration = null,
+        string? targetFramework = null,
+        string? languageVersion = null,
+        string documentationMode = "parse",
+        string sourceKind = "regular",
+        IReadOnlyCollection<string>? features = null,
+        IReadOnlyCollection<string>? references = null) => new()
     {
-        Fidelity = lossy ? ConversionFidelity.Lossy : ConversionFidelity.Lossless,
+        Fidelity = lossy || selectActivePreprocessorBranchLossy
+            ? ConversionFidelity.Lossy
+            : ConversionFidelity.Lossless,
+        PreprocessorMode = selectActivePreprocessorBranchLossy
+            ? PreprocessorConversionMode.SelectActiveBranchLossy
+            : PreprocessorConversionMode.PreserveAllBranches,
+        DefinedSymbols = definedSymbols?.ToArray() ?? [],
+        Configuration = configuration,
+        TargetFramework = targetFramework,
+        ParseOptions = ParseOptions(
+            languageVersion,
+            documentationMode,
+            sourceKind,
+            features),
+        References = ParseReferences(references),
         Verbose = verbose,
         IncludeBenchmark = benchmark,
         Explain = explain,
@@ -253,12 +354,105 @@ public static class ConvertCommand
         UseImplicitCallCloser = !explicitCallClosers
     };
 
-    private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, bool lossy, int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
+    private static Microsoft.CodeAnalysis.CSharp.CSharpParseOptions
+        ParseOptions(
+            string? languageVersion,
+            string documentationMode,
+            string sourceKind,
+            IReadOnlyCollection<string>? features)
+    {
+        var parsedLanguage = string.IsNullOrWhiteSpace(languageVersion)
+            ? Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview
+            : Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
+                languageVersion,
+                out var parsed)
+                ? parsed
+                : throw new ArgumentException(
+                    $"Unknown C# language version '{languageVersion}'.",
+                    nameof(languageVersion));
+        if (!Enum.TryParse<Microsoft.CodeAnalysis.DocumentationMode>(
+                documentationMode,
+                ignoreCase: true,
+                out var parsedDocumentation))
+        {
+            throw new ArgumentException(
+                $"Unknown documentation mode '{documentationMode}'.",
+                nameof(documentationMode));
+        }
+        if (!Enum.TryParse<Microsoft.CodeAnalysis.SourceCodeKind>(
+                sourceKind,
+                ignoreCase: true,
+                out var parsedKind))
+        {
+            throw new ArgumentException(
+                $"Unknown source kind '{sourceKind}'.",
+                nameof(sourceKind));
+        }
+        var options = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            parsedLanguage,
+            parsedDocumentation,
+            parsedKind);
+        return options.WithFeatures(ParseFeatures(features));
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseFeatures(
+        IReadOnlyCollection<string>? features)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var feature in features ?? [])
+        {
+            var separator = feature.IndexOf('=');
+            if (separator <= 0)
+            {
+                throw new ArgumentException(
+                    $"Parse feature '{feature}' must use key=value syntax.",
+                    nameof(features));
+            }
+            result[feature[..separator]] = feature[(separator + 1)..];
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<ConversionReference> ParseReferences(
+        IReadOnlyCollection<string>? references)
+        => (references ?? [])
+            .Select(reference =>
+            {
+                var separator = reference.IndexOf('=');
+                var path = separator < 0
+                    ? reference
+                    : reference[..separator];
+                var aliases = separator < 0
+                    ? Array.Empty<string>()
+                    : reference[(separator + 1)..].Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries
+                        | StringSplitOptions.TrimEntries);
+                return new ConversionReference(
+                    Path.GetFullPath(path),
+                    aliases);
+            })
+            .ToArray();
+
+    private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(
+        string inputPath, string outputPath, bool benchmark, bool verbose,
+        bool explain, bool noFallback, bool validate, bool passthrough,
+        bool lossy, bool selectBranch,
+        IReadOnlyCollection<string> definedSymbols,
+        string? configuration, string? targetFramework, string? languageVersion,
+        string documentationMode, string sourceKind,
+        IReadOnlyCollection<string> features,
+        IReadOnlyCollection<string> references,
+        int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
         var converter = new CSharpToCalorConverter(
-            BuildCSharpToCalorOptions(benchmark, verbose, explain, noFallback, passthrough, explicitCallClosers, lossy));
+            BuildCSharpToCalorOptions(
+                benchmark, verbose, explain, noFallback, passthrough,
+                explicitCallClosers, lossy, selectBranch, definedSymbols,
+                configuration, targetFramework, languageVersion,
+                documentationMode, sourceKind, features, references));
 
         using var timeoutCts = timeoutSeconds > 0
             ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds))
@@ -293,7 +487,15 @@ public static class ConvertCommand
         {
             envelope.AddConversionIssues(result.Issues, inputPath);
             envelope.Data.Success = result.Success;
-            envelope.Data.Fidelity = lossy ? "lossy" : "lossless";
+            envelope.Data.Fidelity = result.Context.Fidelity
+                .ToString().ToLowerInvariant();
+            envelope.Data.Configuration = result.Metadata.Configuration;
+            envelope.Data.TargetFramework = result.Metadata.TargetFramework;
+            envelope.Data.LanguageVersion = result.Metadata.LanguageVersion;
+            envelope.Data.DocumentationMode = result.Metadata.DocumentationMode;
+            envelope.Data.SourceCodeKind = result.Metadata.SourceCodeKind;
+            envelope.Data.Features = result.Metadata.Features;
+            envelope.Data.DefinedSymbols = result.Metadata.DefinedSymbols;
             var explanation = result.Context.GetExplanation();
             envelope.Data.UnsupportedFeatureCount = explanation.TotalUnsupportedCount;
             var featureCounts = explanation.GetFeatureCounts();
@@ -665,6 +867,13 @@ public static class ConvertCommand
         public string? OutputPath { get; set; }
         public bool Success { get; set; }
         public string? Fidelity { get; set; }
+        public string? Configuration { get; set; }
+        public string? TargetFramework { get; set; }
+        public string? LanguageVersion { get; set; }
+        public string? DocumentationMode { get; set; }
+        public string? SourceCodeKind { get; set; }
+        public IReadOnlyDictionary<string, string>? Features { get; set; }
+        public IReadOnlyList<string>? DefinedSymbols { get; set; }
 
         /// <summary>C# → Calor only: total unsupported feature instances.</summary>
         public int? UnsupportedFeatureCount { get; set; }

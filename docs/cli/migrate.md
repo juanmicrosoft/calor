@@ -54,6 +54,17 @@ calor migrate ./src --direction calor-to-cs
 |:---------|:---------|:------------|
 | `path` | Yes | Project directory or `.csproj` file to migrate |
 
+Passing a `.csproj` uses its evaluated MSBuild `Compile` items, configuration,
+target framework, symbols, references, aliases, and parse options. `Compile
+Remove` entries are excluded, while explicitly evaluated linked `Compile`
+items remain included even when their physical path is under another project.
+Passing a directory instead selects loose-directory mode: files are discovered
+recursively without adopting a nearby project, and nested project directories
+are excluded. Output-path collisions (for
+example, `Foo.cs` and `Foo.csx` both mapping to `Foo.calr`) fail before writes.
+For project mode, generated C# is validated once with its converted siblings
+and the effective project references/options before any output is written.
+
 ---
 
 ## Options
@@ -66,6 +77,14 @@ calor migrate ./src --direction calor-to-cs
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--lossy` | — | `false` | Allow explicitly reported semantic loss. |
+| `--select-active-preprocessor-branch-lossy` | — | `false` | Select Roslyn's active conditional branch. Implies lossy fidelity and requires an unambiguous project configuration/target framework. |
+| `--define` | — | — | Add a conditional-compilation symbol. |
+| `--configuration` | — | `Debug` | MSBuild configuration used to resolve parse options and symbols. |
+| `--framework` | — | — | Select one target framework. Required whenever a file belongs to multiple target frameworks with different language versions or symbol sets; symbols are never unioned. |
+| `--language-version` | — | Project value | Override the C# language version. |
+| `--documentation-mode` | — | `parse` | Roslyn documentation mode: `none`, `parse`, or `diagnose`. |
+| `--feature` | — | — | Roslyn parse feature in `key=value` form. |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
 
 ### Direction Values

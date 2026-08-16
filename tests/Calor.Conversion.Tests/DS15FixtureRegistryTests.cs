@@ -95,6 +95,21 @@ public class DS15FixtureRegistryTests
         var runtimeExpectedInt = doc.RootElement
             .GetProperty("runtimeExpectedInt")
             .GetInt32();
+        var support = FeatureSupport.GetSupportLevel(featureKey!);
+        var declaredSupport = doc.RootElement.TryGetProperty(
+                "supportLevel",
+                out var supportElement)
+            ? Enum.Parse<SupportLevel>(
+                supportElement.GetString()!,
+                ignoreCase: true)
+            : support;
+        Assert.Equal(support, declaredSupport);
+        var expectedLosses = ReadLossKinds(
+            doc.RootElement,
+            "expectedLossKinds");
+        var allowedLosses = ReadLossKinds(
+            doc.RootElement,
+            "allowedLossKinds");
 
         // 3. Conversion match: input.cs converts to exactly expected.calr.
         var converter = new CSharpToCalorConverter(new ConversionOptions
@@ -103,7 +118,8 @@ public class DS15FixtureRegistryTests
             ModuleName = "Fixture",
             GracefulFallback = true,
             AutoGenerateIds = true,
-            StripPreprocessor = false
+            PreprocessorMode =
+                PreprocessorConversionMode.PreserveAllBranches
         });
         var converted = converter.Convert(File.ReadAllText(inputPath), $"{name}.cs");
         Assert.True(
@@ -121,15 +137,93 @@ public class DS15FixtureRegistryTests
                 converted.Losses,
                 loss => loss.Kind == lossKind);
         }
+        var actualLosses = converted.Losses
+            .Select(loss => loss.Kind)
+            .Distinct()
+            .ToHashSet();
+        if (support == SupportLevel.Full)
+        {
+            Assert.Empty(
+                converted.Losses);
+        }
+        else
+        {
+            Assert.NotEmpty(
+                expectedLosses);
+            Assert.NotEmpty(
+                allowedLosses);
+            Assert.Subset(
+                allowedLosses,
+                actualLosses);
+            Assert.Subset(
+                actualLosses,
+                expectedLosses);
+            Assert.DoesNotContain(
+                converted.Losses,
+                loss => loss.Kind is
+                    ConversionLossKind.Dropped
+                    or ConversionLossKind.FallbackTodo
+                    or ConversionLossKind.PreprocessorStripped
+                    or ConversionLossKind.DirectiveRemoved);
+        }
         Assert.Equal(
             Normalize(File.ReadAllText(expectedPath)),
             Normalize(converted.CalorSource!));
+        if (doc.RootElement.TryGetProperty(
+                "convertedRuntimeEntryPoint",
+                out var convertedEntry)
+            && doc.RootElement.TryGetProperty(
+                "convertedExpectedUndefinedInt",
+                out var undefinedExpected)
+            && doc.RootElement.TryGetProperty(
+                "convertedExpectedDefinedInt",
+                out var definedExpected))
+        {
+            var compilation = Program.Compile(
+                converted.CalorSource!,
+                $"{name}.calr",
+                new Calor.Compiler.CompilationOptions
+                {
+                    DeferGeneratedOutputValidation = true,
+                    EnforceEffects = false
+                });
+            Assert.False(
+                compilation.HasErrors,
+                string.Join("; ", compilation.Diagnostics
+                    .Where(diagnostic => diagnostic.IsError)
+                    .Select(diagnostic => diagnostic.Message)));
+            var symbols = doc.RootElement.TryGetProperty(
+                    "definedSymbols",
+                    out var symbolArray)
+                ? symbolArray.EnumerateArray()
+                    .Select(symbol => symbol.GetString()!)
+                    .ToArray()
+                : Array.Empty<string>();
+            AssertValueTestPasses(
+                name,
+                compilation.GeneratedCode,
+                convertedEntry.GetString()!,
+                undefinedExpected.GetInt32(),
+                []);
+            AssertValueTestPasses(
+                name,
+                compilation.GeneratedCode,
+                convertedEntry.GetString()!,
+                definedExpected.GetInt32(),
+                symbols);
+        }
 
         // 4. Both Calor files compile with zero errors (indeterminate = failing).
         foreach (var calr in new[] { expectedPath, testPath })
         {
             var result = Program.Compile(File.ReadAllText(calr),
-                Path.GetFileName(calr), new Calor.Compiler.CompilationOptions());
+                Path.GetFileName(calr),
+                new Calor.Compiler.CompilationOptions
+                {
+                    EnforceEffects = false,
+                    UnknownCallPolicy =
+                        Calor.Compiler.Effects.UnknownCallPolicy.Permissive
+                });
             Assert.False(result.HasErrors,
                 $"{name}/{Path.GetFileName(calr)} does not compile: " +
                 string.Join("; ", result.Diagnostics.Where(d => d.IsError).Select(d => d.Message)));
@@ -146,11 +240,14 @@ public class DS15FixtureRegistryTests
         string name,
         string generatedCode,
         string entryPoint,
-        int expected)
+        int expected,
+        IReadOnlyList<string>? symbols = null)
     {
         var tree = CSharpSyntaxTree.ParseText(
             generatedCode,
-            new CSharpParseOptions(LanguageVersion.Latest));
+            new CSharpParseOptions(
+                LanguageVersion.Latest,
+                preprocessorSymbols: symbols ?? []));
         var compilation = CSharpCompilation.Create(
             $"DS15_{name}_{Guid.NewGuid():N}",
             [tree],
@@ -179,6 +276,28 @@ public class DS15FixtureRegistryTests
         var entry = Assert.Single(methods.Where(method =>
             method.Name == entryPoint && method.ReturnType == typeof(int)));
         Assert.Equal(expected, Assert.IsType<int>(entry.Invoke(null, null)));
+    }
+
+    private static HashSet<ConversionLossKind> ReadLossKinds(
+        JsonElement manifest,
+        string property)
+    {
+        if (!manifest.TryGetProperty(
+                property,
+                out var values))
+            return [];
+        return values.EnumerateArray()
+            .Select(value =>
+            {
+                Assert.True(
+                    Enum.TryParse<ConversionLossKind>(
+                        value.GetString(),
+                        out var parsed),
+                    $"Unknown conversion loss kind "
+                    + $"'{value.GetString()}'.");
+                return parsed;
+            })
+            .ToHashSet();
     }
 
     private static string Normalize(string s) =>

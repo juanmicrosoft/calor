@@ -70,6 +70,36 @@ public static class MigrateCommand
         var lossyOption = new Option<bool>(
             aliases: new[] { "--lossy" },
             description: "Explicitly allow reported semantic substitutions or drops. The default is lossless migration.");
+        var selectBranchOption = new Option<bool>(
+            aliases: new[] { "--select-active-preprocessor-branch-lossy" },
+            description: "Explicitly lossy: select Roslyn's active conditional-compilation branch.");
+        var defineOption = new Option<string[]>(
+            aliases: new[] { "--define" },
+            description: "Additional conditional-compilation symbol. Repeat for multiple symbols.")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+        var configurationOption = new Option<string>(
+            aliases: new[] { "--configuration" },
+            getDefaultValue: () => "Debug",
+            description: "MSBuild configuration used to resolve project parse options.");
+        var targetFrameworkOption = new Option<string?>(
+            aliases: new[] { "--framework" },
+            description: "Target framework to select for configuration-sensitive conversion.");
+        var languageVersionOption = new Option<string?>(
+            aliases: new[] { "--language-version" },
+            description: "Override the project C# language version.");
+        var documentationModeOption = new Option<string>(
+            aliases: new[] { "--documentation-mode" },
+            getDefaultValue: () => "parse",
+            description: "Roslyn documentation mode: none, parse, or diagnose.");
+        documentationModeOption.FromAmong("none", "parse", "diagnose");
+        var featureOption = new Option<string[]>(
+            aliases: new[] { "--feature" },
+            description: "Roslyn parse feature key=value. Repeat for multiple features.")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
 
         var command = new Command("migrate", "Migrate an entire project between C# and Calor")
         {
@@ -84,7 +114,14 @@ public static class MigrateCommand
             skipVerifyOption,
             verificationTimeoutOption,
             explicitCallClosersOption,
-            lossyOption
+            lossyOption,
+            selectBranchOption,
+            defineOption,
+            configurationOption,
+            targetFrameworkOption,
+            languageVersionOption,
+            documentationModeOption,
+            featureOption
         };
 
         command.SetHandler(async (InvocationContext ctx) =>
@@ -101,12 +138,21 @@ public static class MigrateCommand
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
+            var selectBranch = ctx.ParseResult.GetValueForOption(selectBranchOption);
+            var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
+            var configuration = ctx.ParseResult.GetValueForOption(configurationOption) ?? "Debug";
+            var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
+            var languageVersion = ctx.ParseResult.GetValueForOption(languageVersionOption);
+            var documentationMode = ctx.ParseResult.GetValueForOption(documentationModeOption) ?? "parse";
+            var parseFeatures = ctx.ParseResult.GetValueForOption(featureOption) ?? [];
 
             // Exit code returned through ctx.ExitCode: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
             ctx.ExitCode = await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
-                explicitCallClosers, lossy);
+                explicitCallClosers, lossy, selectBranch, definedSymbols,
+                configuration, targetFramework, languageVersion,
+                documentationMode, parseFeatures);
         });
 
         return command;
@@ -124,7 +170,14 @@ public static class MigrateCommand
         bool skipVerify,
         uint verificationTimeout,
         bool explicitCallClosers,
-        bool lossy)
+        bool lossy,
+        bool selectBranch,
+        IReadOnlyCollection<string> definedSymbols,
+        string configuration,
+        string? targetFramework,
+        string? languageVersion,
+        string documentationMode,
+        IReadOnlyCollection<string> parseFeatures)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
@@ -156,7 +209,21 @@ public static class MigrateCommand
             SkipAnalyze = skipAnalyze,
             SkipVerify = skipVerify,
             VerificationTimeoutMs = verificationTimeout,
-            Fidelity = lossy ? ConversionFidelity.Lossy : ConversionFidelity.Lossless,
+            Fidelity = lossy || selectBranch
+                ? ConversionFidelity.Lossy
+                : ConversionFidelity.Lossless,
+            PreprocessorMode = selectBranch
+                ? PreprocessorConversionMode.SelectActiveBranchLossy
+                : PreprocessorConversionMode.PreserveAllBranches,
+            Configuration = configuration,
+            TargetFramework = targetFramework,
+            DefinedSymbols = definedSymbols.ToList(),
+            LanguageVersion = ParseLanguageVersion(languageVersion),
+            DocumentationMode = Enum.Parse<
+                Microsoft.CodeAnalysis.DocumentationMode>(
+                    documentationMode,
+                    ignoreCase: true),
+            ParseFeatures = ParseFeatures(parseFeatures),
             UseImplicitCallCloser = !explicitCallClosers
         };
 
@@ -454,6 +521,40 @@ public static class MigrateCommand
         }
 
         return exitCode;
+    }
+
+    private static Microsoft.CodeAnalysis.CSharp.LanguageVersion?
+        ParseLanguageVersion(string? languageVersion)
+    {
+        if (string.IsNullOrWhiteSpace(languageVersion))
+            return null;
+        if (!Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
+                languageVersion,
+                out var parsed))
+        {
+            throw new ArgumentException(
+                $"Unknown C# language version '{languageVersion}'.",
+                nameof(languageVersion));
+        }
+        return parsed;
+    }
+
+    private static Dictionary<string, string> ParseFeatures(
+        IReadOnlyCollection<string> features)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var feature in features)
+        {
+            var separator = feature.IndexOf('=');
+            if (separator <= 0)
+            {
+                throw new ArgumentException(
+                    $"Parse feature '{feature}' must use key=value syntax.",
+                    nameof(features));
+            }
+            result[feature[..separator]] = feature[(separator + 1)..];
+        }
+        return result;
     }
 
     /// <summary>

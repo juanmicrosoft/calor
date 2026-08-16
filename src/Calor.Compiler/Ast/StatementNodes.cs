@@ -362,6 +362,8 @@ public enum InteropMemberKind
 /// </summary>
 public sealed class CSharpInteropBlockNode : AstNode
 {
+    public const string CompilationUnitPassthroughMarker =
+        "/*__CALOR_COMPILATION_UNIT_PASSTHROUGH__*/";
     /// <summary>
     /// The raw C# source code preserved verbatim.
     /// </summary>
@@ -381,16 +383,20 @@ public sealed class CSharpInteropBlockNode : AstNode
     /// The kind of C# member this block represents.
     /// </summary>
     public InteropMemberKind MemberKind { get; }
+    public bool IsCompilationUnitPassthrough { get; }
 
     public CSharpInteropBlockNode(TextSpan span, string csharpCode,
         string? featureName = null, string? reason = null,
-        InteropMemberKind memberKind = InteropMemberKind.Other)
+        InteropMemberKind memberKind = InteropMemberKind.Other,
+        bool isCompilationUnitPassthrough = false)
         : base(span)
     {
         CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
         FeatureName = featureName;
         Reason = reason;
         MemberKind = memberKind;
+        IsCompilationUnitPassthrough =
+            isCompilationUnitPassthrough;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

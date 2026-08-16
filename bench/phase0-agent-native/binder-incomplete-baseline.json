@@ -3,13 +3,27 @@
   "ParsedFiles": 507,
   "ParseFailures": 9,
   "ExpressionsBound": 4715,
-  "Scope": "both F-2 legs; conversion leg skips when corpus submodules are absent",
+  "Scope": "in-repo F-2 plus selected-active native conversion and preserve-all opaque coverage; Roslyn-selected conversion uses genuinely empty default symbols with C# Preview/regular/parse options; legacy source-order 18005 is informational",
   "Conversion": {
     "Incomplete": 0,
-    "ExpressionsBound": 18005,
+    "LegacySourceOrderAttempted": 18005,
+    "RoslynSelectedAttempted": 17498,
+    "FilesSeen": 364,
     "ConvertedAndBound": 305,
     "ConvertExceptions": 0,
     "EmptyOutput": 0,
     "OutputParseFailures": 59
+  },
+  "PreserveCoverage": {
+    "FilesSeen": 364,
+    "OpaqueBoundaries": 177,
+    "OpaqueExpressions": 41964,
+    "OpaqueUnmapped": 0,
+    "OpaqueIdentityCount": 177,
+    "UnconvertedFiles": 17,
+    "UnconvertedIdentityCount": 17,
+    "ConvertExceptions": 0,
+    "EmptyOutput": 0,
+    "OutputParseFailures": 15
   }
 }

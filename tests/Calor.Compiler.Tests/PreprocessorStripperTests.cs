@@ -1,4 +1,5 @@
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -6,96 +7,100 @@ namespace Calor.Compiler.Tests;
 public class PreprocessorStripperTests
 {
     [Fact]
-    public void Strip_SimpleIfElse_KeepsFirstBranch()
+    public void SelectActiveBranchLossy_FalseConditionKeepsElse()
     {
-        var source = """
-            using System;
-            #if NET6_0_OR_GREATER
-            using System.Collections.Generic;
+        const string source = """
+            #if false
+            class Dead { }
             #else
-            using System.Collections;
-            #endif
-            class Foo { }
-            """;
-        var result = PreprocessorStripper.Strip(source);
-        Assert.Contains("using System.Collections.Generic;", result);
-        Assert.DoesNotContain("using System.Collections;", result);
-        Assert.DoesNotContain("#if", result);
-    }
-
-    [Fact]
-    public void Strip_NestedIf_HandlesCorrectly()
-    {
-        var source = """
-            #if FEATURE_A
-            #if FEATURE_B
-            int x = 1;
-            #else
-            int x = 2;
-            #endif
-            int y = 3;
-            #else
-            int z = 4;
+            class Live { }
             #endif
             """;
-        var result = PreprocessorStripper.Strip(source);
-        Assert.Contains("int x = 1;", result);
-        Assert.Contains("int y = 3;", result);
-        Assert.DoesNotContain("int x = 2;", result);
-        Assert.DoesNotContain("int z = 4;", result);
+
+        var result = Select(source);
+
+        Assert.DoesNotContain("class Dead", result.Source);
+        Assert.Contains("class Live", result.Source);
+        Assert.DoesNotContain("#if", result.Source);
+        Assert.Equal(3, result.RemovedConditionalDirectives.Count);
     }
 
     [Fact]
-    public void Strip_Region_Removed()
+    public void SelectActiveBranchLossy_UsesProvidedSymbols()
     {
-        var source = "#region Methods\nvoid Foo() {}\n#endregion";
-        var result = PreprocessorStripper.Strip(source);
-        Assert.Contains("void Foo()", result);
-        Assert.DoesNotContain("#region", result);
+        const string source = """
+            #if FEATURE
+            class Enabled { }
+            #else
+            class Disabled { }
+            #endif
+            """;
+
+        var enabled = Select(source, "FEATURE");
+        var disabled = Select(source);
+
+        Assert.Contains("class Enabled", enabled.Source);
+        Assert.DoesNotContain("class Disabled", enabled.Source);
+        Assert.DoesNotContain("class Enabled", disabled.Source);
+        Assert.Contains("class Disabled", disabled.Source);
     }
 
     [Fact]
-    public void Strip_NullableDirective_Removed()
+    public void SelectActiveBranchLossy_NestedIfElifElseUsesRoslynSemantics()
     {
-        var source = "#nullable enable\nclass Foo {}\n#nullable restore";
-        var result = PreprocessorStripper.Strip(source);
-        Assert.DoesNotContain("#nullable", result);
-        Assert.Contains("class Foo {}", result);
+        const string source = """
+            #if OUTER
+            #if FIRST
+            class First { }
+            #elif SECOND
+            class Second { }
+            #else
+            class Fallback { }
+            #endif
+            #else
+            class OuterFallback { }
+            #endif
+            """;
+
+        var result = Select(source, "OUTER", "SECOND");
+
+        Assert.Contains("class Second", result.Source);
+        Assert.DoesNotContain("class First", result.Source);
+        Assert.DoesNotContain("class Fallback", result.Source);
+        Assert.DoesNotContain("class OuterFallback", result.Source);
+    }
+
+    [Theory]
+    [InlineData("#nullable enable")]
+    [InlineData("#pragma warning disable CS0618")]
+    [InlineData("#warning preserved")]
+    [InlineData("#error preserved")]
+    [InlineData("#line 100 \"source.cs\"")]
+    public void SelectActiveBranchLossy_PreservesNonconditionalDirectives(string directive)
+    {
+        var result = Select($"{directive}\nclass C {{ }}");
+
+        Assert.Contains(directive, result.Source);
+        Assert.Empty(result.RemovedConditionalDirectives);
     }
 
     [Fact]
-    public void Strip_PragmaDirective_Removed()
+    public void LegacyStripApi_RemainsSourceCompatibleAndUsesRoslyn()
     {
-        var source = "#pragma warning disable CS0618\nint x = 1;\n#pragma warning restore CS0618";
-        var result = PreprocessorStripper.Strip(source);
-        Assert.DoesNotContain("#pragma", result);
-        Assert.Contains("int x = 1;", result);
+#pragma warning disable CS0618
+        var result = PreprocessorStripper.StripWithReport(
+            "#if false\nclass Dead { }\n#else\nclass Live { }\n#endif");
+#pragma warning restore CS0618
+
+        Assert.Contains("class Live", result.Source);
+        Assert.DoesNotContain("class Dead", result.Source);
+        Assert.Equal(3, result.ConditionalDirectives.Count);
     }
 
-    [Fact]
-    public void Strip_NoDirectives_PreservesSource()
-    {
-        var source = "using System;\nclass Foo\n{\n    int x = 1;\n}";
-        var result = PreprocessorStripper.Strip(source);
-        Assert.Equal(source, result);
-    }
-
-    [Fact]
-    public void Strip_ElifBranch_Skipped()
-    {
-        var source = "#if A\nint a = 1;\n#elif B\nint b = 2;\n#else\nint c = 3;\n#endif";
-        var result = PreprocessorStripper.Strip(source);
-        Assert.Contains("int a = 1;", result);
-        Assert.DoesNotContain("int b = 2;", result);
-        Assert.DoesNotContain("int c = 3;", result);
-    }
-
-    [Fact]
-    public void Strip_LineDirective_Removed()
-    {
-        var source = "#line 100 \"foo.cs\"\nclass Bar {}";
-        var result = PreprocessorStripper.Strip(source);
-        Assert.DoesNotContain("#line", result);
-        Assert.Contains("class Bar {}", result);
-    }
+    private static SelectedBranchResult Select(string source, params string[] symbols)
+        => PreprocessorStripper.SelectActiveBranchLossy(
+            source,
+            new CSharpParseOptions(
+                LanguageVersion.Preview,
+                preprocessorSymbols: symbols));
 }

@@ -99,7 +99,11 @@ public sealed class ContractSimplificationPass
             module.RefinementTypes,
             module.IndexedTypes,
             module.TypePreprocessorBlocks,
-            module.IdentifierSpan);
+            module.IdentifierSpan,
+            RemapItems(
+                module.Items,
+                module.Functions.Cast<AstNode>().Concat(module.Classes).Concat(module.Interfaces),
+                simplifiedFunctions.Cast<AstNode>().Concat(simplifiedClasses).Concat(simplifiedInterfaces)));
     }
 
     private FunctionNode SimplifyFunction(FunctionNode function)
@@ -197,7 +201,11 @@ public sealed class ContractSimplificationPass
             cls.NestedInterfaces,
             cls.NestedEnums,
             cls.Indexers,
-            cls.NestedDelegates);
+            cls.NestedDelegates,
+            items: RemapItems(
+                cls.Items,
+                cls.Methods,
+                simplifiedMethods));
     }
 
     private InterfaceDefinitionNode SimplifyInterface(InterfaceDefinitionNode iface)
@@ -233,7 +241,29 @@ public sealed class ContractSimplificationPass
             iface.Properties,
             iface.Attributes,
             iface.CSharpAttributes,
-            iface.Indexers);
+            iface.Indexers,
+            interopBlocks: iface.InteropBlocks,
+            preprocessorBlocks: iface.PreprocessorBlocks,
+            items: RemapItems(
+                iface.Items,
+                iface.Methods,
+                simplifiedMethods));
+    }
+
+    private static IReadOnlyList<AstNode> RemapItems(
+        IReadOnlyList<AstNode> items,
+        IEnumerable<AstNode> originals,
+        IEnumerable<AstNode> replacements)
+    {
+        if (items.Count == 0)
+            return items;
+        var map = originals.Zip(replacements)
+            .ToDictionary(pair => pair.First, pair => pair.Second);
+        return items
+            .Select(item => map.TryGetValue(item, out var replacement)
+                ? replacement
+                : item)
+            .ToList();
     }
 
     private MethodNode SimplifyMethod(MethodNode method)

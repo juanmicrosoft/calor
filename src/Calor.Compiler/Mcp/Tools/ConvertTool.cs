@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Ids;
@@ -99,9 +100,61 @@ public sealed class ConvertTool : McpToolBase
                         }
                     }
                 },
+                "selectActivePreprocessorBranchLossy": {
+                    "type": "boolean",
+                    "description": "Explicitly lossy opt-in: keep only the branch Roslyn activates for the supplied symbols (default: false; requires lossy fidelity)"
+                },
                 "stripPreprocessor": {
                     "type": "boolean",
-                    "description": "Strip C# preprocessor directives (#if, #region, #pragma, etc.) before conversion to prevent hangs/OOM (default: true)"
+                    "description": "Deprecated compatibility alias for selectActivePreprocessorBranchLossy. Omitted callers preserve every branch."
+                },
+                "definedSymbols": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Conditional-compilation symbols supplied to Roslyn"
+                },
+                "configuration": {
+                    "type": "string",
+                    "description": "Configuration recorded in conversion metadata"
+                },
+                "targetFramework": {
+                    "type": "string",
+                    "description": "Target framework recorded in conversion metadata"
+                },
+                "languageVersion": {
+                    "type": "string",
+                    "description": "C# language version used by Roslyn"
+                },
+                "documentationMode": {
+                    "type": "string",
+                    "enum": ["none", "parse", "diagnose"],
+                    "description": "Roslyn documentation mode"
+                },
+                "sourceCodeKind": {
+                    "type": "string",
+                    "enum": ["regular", "script"],
+                    "description": "Roslyn source kind"
+                },
+                "parseFeatures": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" },
+                    "description": "Roslyn CSharpParseOptions feature key/value map"
+                },
+                "references": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": { "type": "string" },
+                            "aliases": {
+                                "type": "array",
+                                "items": { "type": "string" }
+                            }
+                        },
+                        "required": ["path"],
+                        "additionalProperties": false
+                    },
+                    "description": "Metadata references with optional extern aliases"
                 },
                 "passthroughOnError": {
                     "type": "boolean",
@@ -149,7 +202,7 @@ public sealed class ConvertTool : McpToolBase
             {
                 source = File.ReadAllText(inputPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return Task.FromResult(McpToolResult.Error($"Failed to read input file: {ex.Message}"));
             }
@@ -168,7 +221,14 @@ public sealed class ConvertTool : McpToolBase
         }
         var fallback = GetBool(arguments, "fallback", defaultValue: true);
         var explain = GetBool(arguments, "explain", defaultValue: false);
-        var stripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true);
+        var selectActivePreprocessorBranchLossy = GetBool(
+            arguments,
+            "selectActivePreprocessorBranchLossy",
+            defaultValue: false);
+        var legacyStripPreprocessor = GetBool(
+            arguments,
+            "stripPreprocessor",
+            defaultValue: false);
         var passthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false);
         var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
         var conversionMode = ResolveConversionMode(arguments);
@@ -183,16 +243,27 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = fallback,
                 Explain = explain,
-                Fidelity = fidelity,
+                Fidelity = legacyStripPreprocessor
+                    || selectActivePreprocessorBranchLossy
+                    ? ConversionFidelity.Lossy
+                    : fidelity,
                 Mode = conversionMode,
-                StripPreprocessor = stripPreprocessor,
+                PreprocessorMode = selectActivePreprocessorBranchLossy
+                    || legacyStripPreprocessor
+                    ? PreprocessorConversionMode.SelectActiveBranchLossy
+                    : PreprocessorConversionMode.PreserveAllBranches,
+                DefinedSymbols = GetStringArray(arguments, "definedSymbols"),
+                Configuration = GetString(arguments, "configuration"),
+                TargetFramework = GetString(arguments, "targetFramework"),
+                ParseOptions = ResolveParseOptions(arguments),
+                References = GetConversionReferences(arguments),
                 PassthroughOnError = passthroughOnError,
                 UseImplicitCallCloser = !explicitCallClosers
             };
 
             var converter = new CSharpToCalorConverter(options);
             cancellationToken.ThrowIfCancellationRequested();
-            var result = converter.Convert(source, inputPath);
+            var result = converter.Convert(source, inputPath, cancellationToken);
 
             // Always compute explanation for unsupported feature summary
             var explanation = result.Context.GetExplanation();
@@ -251,7 +322,9 @@ public sealed class ConvertTool : McpToolBase
             cancellationToken.ThrowIfCancellationRequested();
             if (success && !string.IsNullOrWhiteSpace(calorSourceForOutput))
             {
-                var parseResult = CalorSourceHelper.Parse(calorSourceForOutput, "converted-output.calr");
+                var parseResult = CalorSourceHelper.Parse(
+                    calorSourceForOutput,
+                    "converted-output.calr");
                 if (!parseResult.IsSuccess)
                 {
                     // Attempt auto-fix before reporting errors
@@ -260,7 +333,9 @@ public sealed class ConvertTool : McpToolBase
 
                     if (fixResult.WasModified)
                     {
-                        var retryParse = CalorSourceHelper.Parse(fixResult.FixedSource, "converted-output.calr");
+                        var retryParse = CalorSourceHelper.Parse(
+                            fixResult.FixedSource,
+                            "converted-output.calr");
                         if (retryParse.IsSuccess)
                         {
                             // Auto-fix succeeded — use fixed source
@@ -299,7 +374,7 @@ public sealed class ConvertTool : McpToolBase
                         calorSourceForOutput,
                         cancellationToken: cancellationToken).GetAwaiter().GetResult();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     issues.Add(ConversionIssueEnvelope.Message(
                         DiagnosticCode.ConversionIssue, "error",
@@ -320,7 +395,8 @@ public sealed class ConvertTool : McpToolBase
             var output = new ConvertToolOutput
             {
                 Success = success,
-                Fidelity = fidelity.ToString().ToLowerInvariant(),
+                Fidelity = result.Context.Fidelity.ToString().ToLowerInvariant(),
+                Metadata = result.Metadata,
                 CalorSource = calorSourceForOutput,
                 OutputPath = outputPath,
                 Issues = issues,
@@ -346,7 +422,7 @@ public sealed class ConvertTool : McpToolBase
 
             return Task.FromResult(McpToolResult.Json(output, isError: !success));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return Task.FromResult(McpToolResult.Error($"Conversion failed: {ex.Message}"));
         }
@@ -372,7 +448,7 @@ public sealed class ConvertTool : McpToolBase
             {
                 source = File.ReadAllText(inputPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return Task.FromResult(McpToolResult.Error($"Failed to read input file: {ex.Message}"));
             }
@@ -405,6 +481,14 @@ public sealed class ConvertTool : McpToolBase
             var compatIssues = new List<string>();
 
             // Stage 1: Convert
+            var legacyStripPreprocessor = GetBool(
+                arguments,
+                "stripPreprocessor",
+                defaultValue: false);
+            var selectActivePreprocessorBranchLossy = GetBool(
+                arguments,
+                "selectActivePreprocessorBranchLossy",
+                defaultValue: false);
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
@@ -412,15 +496,26 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = true,
                 Explain = false,
-                Fidelity = fidelity,
+                Fidelity = legacyStripPreprocessor
+                    || selectActivePreprocessorBranchLossy
+                    ? ConversionFidelity.Lossy
+                    : fidelity,
                 Mode = conversionMode,
-                StripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true),
+                PreprocessorMode = selectActivePreprocessorBranchLossy
+                    || legacyStripPreprocessor
+                    ? PreprocessorConversionMode.SelectActiveBranchLossy
+                    : PreprocessorConversionMode.PreserveAllBranches,
+                DefinedSymbols = GetStringArray(arguments, "definedSymbols"),
+                Configuration = GetString(arguments, "configuration"),
+                TargetFramework = GetString(arguments, "targetFramework"),
+                ParseOptions = ResolveParseOptions(arguments),
+                References = GetConversionReferences(arguments),
                 PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false),
                 UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);
-            var convResult = converter.Convert(source, inputPath);
+            var convResult = converter.Convert(source, inputPath, cancellationToken);
 
             conversionIssues.AddRange(convResult.Issues
                 .Select(i => ConversionIssueEnvelope.Build(i, inputPath)));
@@ -438,7 +533,9 @@ public sealed class ConvertTool : McpToolBase
             var calorSource = convResult.CalorSource!;
 
             // Stage 2: Parse + auto-fix
-            var parseResult = CalorSourceHelper.Parse(calorSource, "validated-output.calr");
+            var parseResult = CalorSourceHelper.Parse(
+                calorSource,
+                "validated-output.calr");
             if (!parseResult.IsSuccess)
             {
                 var fixer = new PostConversionFixer();
@@ -451,7 +548,9 @@ public sealed class ConvertTool : McpToolBase
                         autoFixes.Add($"{fix.Rule}: {fix.Description}");
                     }
 
-                    var retryParse = CalorSourceHelper.Parse(fixResult.FixedSource, "validated-output.calr");
+                    var retryParse = CalorSourceHelper.Parse(
+                        fixResult.FixedSource,
+                        "validated-output.calr");
                     if (retryParse.IsSuccess)
                     {
                         calorSource = fixResult.FixedSource;
@@ -487,6 +586,7 @@ public sealed class ConvertTool : McpToolBase
                 {
                     EnforceEffects = false,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    DeferGeneratedOutputValidation = true,
                     CancellationToken = cancellationToken
                 };
                 var compileResult = Program.Compile(calorSource, "validated-output.calr", compileOptions);
@@ -512,8 +612,40 @@ public sealed class ConvertTool : McpToolBase
                 }
 
                 generatedCSharp = compileResult.GeneratedCode;
+                var generatedValidation = GeneratedCSharpCompiler.Validate(
+                    [new GeneratedCSharpSource(
+                        generatedCSharp,
+                        inputPath ?? "validated-output.g.cs")],
+                    CreateGeneratedValidationContext(convResult.Metadata));
+                if (!generatedValidation.CompilationSuccess)
+                {
+                    foreach (var diagnostic in generatedValidation.SyntaxErrors
+                                 .Concat(generatedValidation.CompilationErrors))
+                    {
+                        diagnosticEntries.Add(
+                            ConversionIssueEnvelope.Message(
+                                DiagnosticCode.ConversionIssue,
+                                "error",
+                                $"Generated C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
+                                inputPath));
+                    }
+                    sw.Stop();
+                    return Task.FromResult(McpToolResult.Json(
+                        BuildValidatedOutput(
+                            success: false,
+                            stage: "generated-csharp",
+                            calorSource,
+                            generatedCSharp,
+                            conversionIssues,
+                            autoFixes,
+                            diagnosticEntries,
+                            compatIssues,
+                            convResult,
+                            sw.Elapsed),
+                        isError: true));
+                }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 sw.Stop();
                 diagnosticEntries.Add(ConversionIssueEnvelope.Message(
@@ -576,7 +708,7 @@ public sealed class ConvertTool : McpToolBase
                         calorSource,
                         cancellationToken: cancellationToken).GetAwaiter().GetResult();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     conversionIssues.Add(ConversionIssueEnvelope.Message(
                         DiagnosticCode.ConversionIssue, "error",
@@ -598,7 +730,7 @@ public sealed class ConvertTool : McpToolBase
                 conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                 convResult, sw.Elapsed)));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return Task.FromResult(McpToolResult.Error($"Validated conversion failed: {ex.Message}"));
         }
@@ -627,20 +759,39 @@ public sealed class ConvertTool : McpToolBase
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            var legacyStripPreprocessor = GetBool(
+                arguments,
+                "stripPreprocessor",
+                defaultValue: false);
+            var selectActivePreprocessorBranchLossy = GetBool(
+                arguments,
+                "selectActivePreprocessorBranchLossy",
+                defaultValue: false);
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
                 PreserveComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = true,
-                Fidelity = ResolveFidelity(arguments),
+                Fidelity = legacyStripPreprocessor
+                    || selectActivePreprocessorBranchLossy
+                    ? ConversionFidelity.Lossy
+                    : ResolveFidelity(arguments),
                 Mode = ConversionMode.Interop,
-                StripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true),
+                PreprocessorMode = selectActivePreprocessorBranchLossy
+                    || legacyStripPreprocessor
+                    ? PreprocessorConversionMode.SelectActiveBranchLossy
+                    : PreprocessorConversionMode.PreserveAllBranches,
+                DefinedSymbols = GetStringArray(arguments, "definedSymbols"),
+                Configuration = GetString(arguments, "configuration"),
+                TargetFramework = GetString(arguments, "targetFramework"),
+                ParseOptions = ResolveParseOptions(arguments),
+                References = GetConversionReferences(arguments),
                 UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);
-            var result = converter.Convert(source);
+            var result = converter.Convert(source, null, cancellationToken);
 
             if (result.Success && !string.IsNullOrWhiteSpace(result.CalorSource))
             {
@@ -652,7 +803,7 @@ public sealed class ConvertTool : McpToolBase
                 conversionErrors.AddRange(result.Issues.Select(i => ConversionIssueEnvelope.Build(i)));
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             conversionErrors.Add(ConversionIssueEnvelope.Message(
                 DiagnosticCode.CliInternalError, "error", $"Conversion exception: {ex.Message}"));
@@ -691,7 +842,7 @@ public sealed class ConvertTool : McpToolBase
                             .Where(e => e.Severity == "error"));
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 compilationErrors.Add(ConversionIssueEnvelope.Message(
                     DiagnosticCode.CliInternalError, "error", $"Compilation exception: {ex.Message}"));
@@ -788,7 +939,7 @@ public sealed class ConvertTool : McpToolBase
 
             return Task.FromResult(McpToolResult.Json(output));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return Task.FromResult(McpToolResult.Error($"Analysis failed: {ex.Message}"));
         }
@@ -816,6 +967,146 @@ public sealed class ConvertTool : McpToolBase
         return fidelity.Equals("lossy", StringComparison.OrdinalIgnoreCase)
             ? ConversionFidelity.Lossy
             : ConversionFidelity.Lossless;
+    }
+
+    private static Microsoft.CodeAnalysis.CSharp.CSharpParseOptions?
+        ResolveParseOptions(JsonElement? arguments)
+    {
+        var languageVersion = GetString(arguments, "languageVersion");
+        var documentationMode = GetString(arguments, "documentationMode");
+        var sourceCodeKind = GetString(arguments, "sourceCodeKind");
+        var features = GetStringMap(arguments, "parseFeatures");
+        if (string.IsNullOrWhiteSpace(languageVersion)
+            && string.IsNullOrWhiteSpace(documentationMode)
+            && string.IsNullOrWhiteSpace(sourceCodeKind)
+            && features.Count == 0)
+            return null;
+        var parsed = Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview;
+        if (!string.IsNullOrWhiteSpace(languageVersion)
+            && !Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
+                languageVersion,
+                out parsed))
+        {
+            throw new ArgumentException(
+                $"Unknown C# language version '{languageVersion}'.");
+        }
+        var effectiveLanguage = string.IsNullOrWhiteSpace(languageVersion)
+            ? Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview
+            : parsed;
+        var effectiveDocumentation = string.IsNullOrWhiteSpace(documentationMode)
+            ? Microsoft.CodeAnalysis.DocumentationMode.Parse
+            : Enum.TryParse<Microsoft.CodeAnalysis.DocumentationMode>(
+                documentationMode,
+                true,
+                out var parsedDocumentation)
+                ? parsedDocumentation
+                : throw new ArgumentException(
+                    $"Unknown documentation mode '{documentationMode}'.");
+        var effectiveKind = string.IsNullOrWhiteSpace(sourceCodeKind)
+            ? Microsoft.CodeAnalysis.SourceCodeKind.Regular
+            : Enum.TryParse<Microsoft.CodeAnalysis.SourceCodeKind>(
+                sourceCodeKind,
+                true,
+                out var parsedKind)
+                ? parsedKind
+                : throw new ArgumentException(
+                    $"Unknown source kind '{sourceCodeKind}'.");
+        return new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            effectiveLanguage,
+            effectiveDocumentation,
+            effectiveKind)
+            .WithFeatures(features);
+    }
+
+    private static IReadOnlyDictionary<string, string> GetStringMap(
+        JsonElement? arguments,
+        string propertyName)
+    {
+        if (arguments is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty(propertyName, out var property)
+            || property.ValueKind != JsonValueKind.Object)
+        {
+            return new Dictionary<string, string>();
+        }
+        return property.EnumerateObject()
+            .Where(item => item.Value.ValueKind == JsonValueKind.String)
+            .ToDictionary(
+                item => item.Name,
+                item => item.Value.GetString() ?? "",
+                StringComparer.Ordinal);
+    }
+
+    private static IReadOnlyList<ConversionReference> GetConversionReferences(
+        JsonElement? arguments)
+    {
+        if (arguments is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty("references", out var references)
+            || references.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+        return references.EnumerateArray()
+            .Where(reference => reference.ValueKind == JsonValueKind.Object
+                && reference.TryGetProperty("path", out _))
+            .Select(reference =>
+            {
+                var path = reference.GetProperty("path").GetString() ?? "";
+                var aliases = reference.TryGetProperty(
+                        "aliases",
+                        out var aliasValues)
+                    && aliasValues.ValueKind == JsonValueKind.Array
+                    ? aliasValues.EnumerateArray()
+                        .Where(alias => alias.ValueKind == JsonValueKind.String)
+                        .Select(alias => alias.GetString()!)
+                        .ToArray()
+                    : Array.Empty<string>();
+                return new ConversionReference(
+                    Path.GetFullPath(path),
+                    aliases);
+            })
+            .ToArray();
+    }
+
+    private static GeneratedCSharpCompilationContext
+        CreateGeneratedValidationContext(ConversionMetadata metadata)
+    {
+        var languageVersion =
+            Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
+                metadata.LanguageVersion,
+                out var parsed)
+                ? parsed
+                : Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default;
+        var outputKind = Enum.TryParse<Microsoft.CodeAnalysis.OutputKind>(
+            metadata.OutputKind,
+            ignoreCase: true,
+            out var parsedOutputKind)
+            ? parsedOutputKind
+            : Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary;
+        var documentationMode = Enum.TryParse<Microsoft.CodeAnalysis.DocumentationMode>(
+            metadata.DocumentationMode,
+            ignoreCase: true,
+            out var parsedDocumentationMode)
+            ? parsedDocumentationMode
+            : Microsoft.CodeAnalysis.DocumentationMode.Parse;
+        var sourceCodeKind = Enum.TryParse<Microsoft.CodeAnalysis.SourceCodeKind>(
+            metadata.SourceCodeKind,
+            ignoreCase: true,
+            out var parsedSourceCodeKind)
+            ? parsedSourceCodeKind
+            : Microsoft.CodeAnalysis.SourceCodeKind.Regular;
+        return new GeneratedCSharpCompilationContext
+        {
+            LanguageVersion = languageVersion,
+            DocumentationMode = documentationMode,
+            SourceCodeKind = sourceCodeKind,
+            Features = metadata.Features,
+            PreprocessorSymbols = metadata.DefinedSymbols,
+            References = metadata.References.Select(reference =>
+                new GeneratedCSharpReference(
+                    reference.Path,
+                    reference.Aliases)),
+            OutputKind = outputKind
+        };
     }
 
     private static string NormalizeWhitespace(string text)
@@ -861,6 +1152,7 @@ public sealed class ConvertTool : McpToolBase
             Success = success,
             Stage = stage,
             Fidelity = result.Context.Fidelity.ToString().ToLowerInvariant(),
+            Metadata = result.Metadata,
             CalorSource = calorSource,
             GeneratedCSharp = generatedCSharp,
             ConversionIssues = conversionIssues,
@@ -894,6 +1186,9 @@ public sealed class ConvertTool : McpToolBase
 
         [JsonPropertyName("fidelity")]
         public required string Fidelity { get; init; }
+
+        [JsonPropertyName("metadata")]
+        public required ConversionMetadata Metadata { get; init; }
 
         [JsonPropertyName("calorSource")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1042,6 +1337,9 @@ public sealed class ConvertTool : McpToolBase
 
         [JsonPropertyName("fidelity")]
         public required string Fidelity { get; init; }
+
+        [JsonPropertyName("metadata")]
+        public required ConversionMetadata Metadata { get; init; }
 
         [JsonPropertyName("calorSource")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
