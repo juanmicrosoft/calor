@@ -265,8 +265,9 @@ public class GitHubCopilotMcpTests : IDisposable
     // ------------------------------------------------------------------
 
     // Program built purely from the exemplar idioms shipped in
-    // copilot-instructions.md.template: inline §F signature, §E{mut} for a
-    // mutating body, the empty-list literal, §PUSH under a loop, §CNT, and §R.
+    // copilot-instructions.md.template: inline §F signature, §E{mut,alloc} for
+    // a mutating body that allocates a list, the empty-list literal, §PUSH
+    // under a loop, §CNT, and §R.
     private const string ExemplarIdiomProgram =
         "§M{m001:CopilotSmoke}\n" +
         "  §F{f001:Collect:pub} (i32:n) -> i32\n" +
