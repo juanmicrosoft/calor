@@ -59,6 +59,7 @@ public class FeatureCheckCommandTests
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
     [InlineData("record", SupportLevel.NotSupported)]
+    [InlineData("local-function", SupportLevel.NotSupported)]
     public void FeatureCheck_NotSupported_ReturnsNotSupportedLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Local functions now fail safe during C# migration (#777).** Any containing member is preserved
+  verbatim as counted C# interop instead of hoisting nested functions and breaking captures,
+  recursion, generic constraints, modifiers, or ref semantics. Feature scorecards now report this
+  containment as partial rather than native conversion.
+
 ## [0.13.2] - 2026-08-12
 
 ### Benchmark Results (Statistical: 30 runs)

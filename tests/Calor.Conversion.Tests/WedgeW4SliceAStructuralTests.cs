@@ -25,14 +25,19 @@ public class WedgeW4SliceAStructuralTests
         _output = output;
     }
 
-    private static ConversionResult Convert(string csharp, bool selectActiveBranchLossy = false)
+    private static ConversionResult Convert(
+        string csharp,
+        bool selectActiveBranchLossy = false,
+        ConversionFidelity fidelity = ConversionFidelity.Lossy,
+        IReadOnlyCollection<string>? definedSymbols = null)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
-            Fidelity = ConversionFidelity.Lossy,
+            Fidelity = fidelity,
             ModuleName = "W4SliceA",
             GracefulFallback = true,
             AutoGenerateIds = true,
+            DefinedSymbols = definedSymbols ?? Array.Empty<string>(),
             PreprocessorMode = selectActiveBranchLossy
                 ? PreprocessorConversionMode.SelectActiveBranchLossy
                 : PreprocessorConversionMode.PreserveAllBranches,
@@ -249,9 +254,8 @@ public class WedgeW4SliceAStructuralTests
     [Fact]
     public void D4_GenericLocalFunction_EscalatesContainingMemberToInterop()
     {
-        // A generic local function loses its type parameters when hoisted to
-        // module scope (silent identity loss). The containing member must escalate
-        // to §CSHARP interop.
+        // The retired module-scope hoist lost generic identity. The containing
+        // member must remain in §CSHARP interop.
         var csharp = """
             public class C
             {
@@ -278,8 +282,7 @@ public class WedgeW4SliceAStructuralTests
     [Fact]
     public void D4_CapturingLocalFunction_EscalatesContainingMemberToInterop()
     {
-        // A local function that captures an enclosing local/parameter references a
-        // name that does not exist at module scope after hoisting. Escalate loudly.
+        // Captures made the retired module-scope hoist invalid. Escalate loudly.
         var csharp = """
             public class E
             {
@@ -321,6 +324,307 @@ public class WedgeW4SliceAStructuralTests
         Assert.Contains("§CSHARP", result.CalorSource);
         // Never hoisted as a native module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
+    }
+
+    public static TheoryData<string, string, bool> LocalFunctionForms => new()
+    {
+        {
+            """
+            public class C
+            {
+                public int M()
+                {
+                    int Add(int a, int b) => a + b;
+                    return Add(1, 2);
+                }
+            }
+            """,
+            "Add",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                private int _offset = 2;
+                public int M(int value)
+                {
+                    int Next() => ++value + this._offset;
+                    return Next();
+                }
+            }
+            """,
+            "Next",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public bool M(int value)
+                {
+                    bool Even(int n) => n == 0 || Odd(n - 1);
+                    bool Odd(int n) => n != 0 && Even(n - 1);
+                    return Even(value);
+                }
+            }
+            """,
+            "Even",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public T M<T>(T value) where T : class
+                {
+                    T Identity<TLocal>(TLocal ignored, T result)
+                        where TLocal : struct => result;
+                    return Identity(1, value);
+                }
+            }
+            """,
+            "Identity",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public async System.Threading.Tasks.Task<int> M()
+                {
+                    static async System.Threading.Tasks.Task<int> Local()
+                    {
+                        await System.Threading.Tasks.Task.Yield();
+                        return 1;
+                    }
+                    return await Local();
+                }
+            }
+            """,
+            "Local",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public System.Collections.Generic.IEnumerable<int> M()
+                {
+                    System.Collections.Generic.IEnumerable<int> Local()
+                    {
+                        yield return 1;
+                    }
+                    return Local();
+                }
+            }
+            """,
+            "Local",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public int M(scoped ref int value, out int copy)
+                {
+                    static int Local(scoped ref int item, out int result)
+                    {
+                        result = item;
+                        return ++item;
+                    }
+                    return Local(ref value, out copy);
+                }
+            }
+            """,
+            "Local",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public unsafe int M(int* value)
+                {
+                    unsafe int Local(int* item) => *item;
+                    return Local(value);
+                }
+            }
+            """,
+            "Local",
+            true
+        },
+        {
+            """
+            public class C
+            {
+                public int M()
+                {
+                    [System.Obsolete("local")]
+                    static int Local(int value) => value;
+                    return Local(1);
+                }
+            }
+            """,
+            "Local",
+            true
+        }
+    };
+
+    public static TheoryData<string, string> LocalFunctionContainingContexts => new()
+    {
+        {
+            """
+            public class C
+            {
+                private int _value;
+                public C()
+                {
+                    int Local() => 1;
+                    _value = Local();
+                }
+            }
+            """,
+            "constructor"
+        },
+        {
+            """
+            public class C
+            {
+                public int Value
+                {
+                    get
+                    {
+                        int Local() => 1;
+                        return Local();
+                    }
+                }
+            }
+            """,
+            "property"
+        },
+        {
+            """
+            public class C
+            {
+                public static C operator +(C left, C right)
+                {
+                    C Local() => left;
+                    return Local();
+                }
+            }
+            """,
+            "operator"
+        },
+        {
+            """
+            public class C
+            {
+                public int M()
+                {
+                    System.Func<int> value = () =>
+                    {
+                        int Local() => 1;
+                        return Local();
+                    };
+                    return value();
+                }
+            }
+            """,
+            "method"
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(LocalFunctionForms))]
+    public void D4_AllLocalFunctionForms_PreserveContainingMember(
+        string csharp,
+        string localName,
+        bool roundTripCompiles)
+    {
+        var conversion = Convert(csharp, fidelity: ConversionFidelity.Lossless);
+
+        AssertLocalFunctionEscalated(conversion, localName);
+        var interopLoss = Assert.Single(conversion.Losses.Where(loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved));
+        Assert.Equal("method", interopLoss.Feature);
+        Assert.Contains(localName, conversion.CalorSource);
+
+        if (roundTripCompiles)
+        {
+            var roundTrip = TestHelpers.FullRoundTrip(
+                csharp,
+                "LocalFunctionContainment");
+            Assert.True(
+                roundTrip.RoslynSuccess,
+                string.Join("; ", roundTrip.RoslynErrors));
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(LocalFunctionContainingContexts))]
+    public void D4_LocalFunctionsInAllContainingContexts_EscalateWholeMember(
+        string csharp,
+        string expectedInteropFeature)
+    {
+        var conversion = Convert(csharp, fidelity: ConversionFidelity.Lossless);
+
+        Assert.True(
+            conversion.Success,
+            string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Contains(
+            conversion.Issues,
+            issue => issue.Feature == "local-function");
+        Assert.Contains(
+            conversion.Losses,
+            loss =>
+                loss.Kind == ConversionLossKind.InteropPreserved &&
+                loss.Feature == expectedInteropFeature);
+        Assert.DoesNotContain(
+            conversion.Losses,
+            loss => loss.Kind == ConversionLossKind.Dropped);
+        Assert.Contains("Local()", conversion.CalorSource);
+
+        var roundTrip = TestHelpers.FullRoundTrip(
+            csharp,
+            "LocalFunctionContainingContext");
+        Assert.True(
+            roundTrip.RoslynSuccess,
+            string.Join("; ", roundTrip.RoslynErrors));
+    }
+
+    [Fact]
+    public void D4_ConditionalLocalFunction_IsPreservedWithoutDrops()
+    {
+        var csharp = """
+            public class C
+            {
+                public int M()
+                {
+                #if FEATURE
+                    int Local() => 1;
+                    return Local();
+                #else
+                    return 2;
+                #endif
+                }
+            }
+            """;
+
+        var conversion = Convert(
+            csharp,
+            fidelity: ConversionFidelity.Lossless,
+            definedSymbols: ["FEATURE"]);
+
+        Assert.True(conversion.Success);
+        Assert.Contains("int Local() => 1", conversion.CalorSource);
+        var interopLoss = Assert.Single(conversion.Losses.Where(loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved));
+        Assert.Equal("conditional-unmodeled-placement", interopLoss.Feature);
+        Assert.Contains("public int M()", conversion.CalorSource);
+        Assert.DoesNotContain(
+            conversion.Losses,
+            loss => loss.Kind == ConversionLossKind.Dropped);
     }
 
     [Fact]
