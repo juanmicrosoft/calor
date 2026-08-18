@@ -134,6 +134,69 @@ public class Issue769NamespaceTopologyTests
             .GetTypeByMetadataName("GlobalType"));
     }
 
+    [Theory]
+    [InlineData("protected", "prot", Accessibility.Protected)]
+    [InlineData(
+        "protected internal",
+        "prot-int",
+        Accessibility.ProtectedOrInternal)]
+    [InlineData(
+        "private protected",
+        "priv-prot",
+        Accessibility.ProtectedAndInternal)]
+    public void NamespacedOverride_PreservesProtectedAccessibilityDuringSingleFileReplacement(
+        string accessibility,
+        string calorVisibility,
+        Accessibility expectedAccessibility)
+    {
+        var baseSource =
+            $$"""
+            namespace FluentValidation.Validators;
+
+            public interface IValidatorSelector { }
+            public class ValidationContext<T> { }
+
+            public class ChildValidatorAdaptor<T, TProperty>
+            {
+                {{accessibility}} virtual IValidatorSelector GetSelector(
+                    ValidationContext<T> context,
+                    TProperty value) => null;
+            }
+            """;
+        var derivedSource =
+            $$"""
+            namespace FluentValidation.Validators;
+
+            public class PolymorphicValidator<T, TProperty>
+                : ChildValidatorAdaptor<T, TProperty>
+            {
+                {{accessibility}} override IValidatorSelector GetSelector(
+                    ValidationContext<T> context,
+                    TProperty value) => null;
+            }
+            """;
+
+        var result = ConvertLossy(derivedSource);
+        Assert.Contains(
+            $":GetSelector:{calorVisibility}:over}}",
+            result.CalorSource);
+
+        var generated = new CSharpEmitter().Emit(ParseCalor(result.CalorSource!));
+        Assert.Contains($"{accessibility} override", generated);
+
+        var compilation = CreateCompilation(baseSource, generated);
+        AssertNoCompilationErrors(compilation);
+        var derived = compilation.GetTypeByMetadataName(
+            "FluentValidation.Validators.PolymorphicValidator`2");
+        Assert.NotNull(derived);
+        var method = Assert.Single(
+            derived.GetMembers("GetSelector").OfType<IMethodSymbol>());
+        Assert.Equal(expectedAccessibility, method.DeclaredAccessibility);
+        Assert.Equal(
+            expectedAccessibility,
+            method.OverriddenMethod!.DeclaredAccessibility);
+    }
+
     [Fact]
     public void LossyConversion_PreservesSameNamedTypesAcrossNamespaces()
     {

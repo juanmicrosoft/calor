@@ -246,10 +246,11 @@ public sealed class PartialClassMerger
 
     private static int VisibilityRank(Visibility v) => v switch
     {
-        Visibility.Public => 4,
-        Visibility.ProtectedInternal => 3,
-        Visibility.Internal => 2,
-        Visibility.Protected => 1,
+        Visibility.Public => 5,
+        Visibility.ProtectedInternal => 4,
+        Visibility.Internal => 3,
+        Visibility.Protected => 2,
+        Visibility.PrivateProtected => 1,
         Visibility.Private => 0,
         _ => 0
     };

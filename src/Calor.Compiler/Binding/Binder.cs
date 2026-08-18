@@ -2519,7 +2519,7 @@ public sealed class Binder
                     function.ContainingTypeName,
                     _currentClassName,
                     StringComparison.Ordinal),
-            Visibility.Protected =>
+            Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
                 && IsSameOrDerivedClass(_currentClass, function.ContainingTypeName),
             _ => true,
@@ -2567,7 +2567,7 @@ public sealed class Binder
                     member.DeclaringTypeName,
                     _currentClassName,
                     StringComparison.Ordinal),
-            Visibility.Protected =>
+            Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
                 && IsSameOrDerivedClass(_currentClass, member.DeclaringTypeName),
             Visibility.Internal or Visibility.ProtectedInternal => true,

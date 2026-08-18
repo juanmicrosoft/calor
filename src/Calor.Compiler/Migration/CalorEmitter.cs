@@ -789,11 +789,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             {
                 var accessors = new List<string>();
                 if (node.Getter != null)
-                    accessors.Add(node.Getter.Visibility == Visibility.Private ? "priget" :
+                    accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
+                                  node.Getter.Visibility == Visibility.Private ? "priget" :
                                   node.Getter.Visibility == Visibility.Internal ? "intget" :
                                   node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
                 if (node.Setter != null)
-                    accessors.Add(node.Setter.Visibility == Visibility.Private ? "priset" :
+                    accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
+                                  node.Setter.Visibility == Visibility.Private ? "priset" :
                                   node.Setter.Visibility == Visibility.Internal ? "intset" :
                                   node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
                 if (node.Initer != null)
@@ -842,11 +844,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var accessors = new List<string>();
             if (node.Getter != null)
-                accessors.Add(node.Getter.Visibility == Visibility.Private ? "priget" :
+                accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
+                              node.Getter.Visibility == Visibility.Private ? "priget" :
                               node.Getter.Visibility == Visibility.Internal ? "intget" :
                               node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
             if (node.Setter != null)
-                accessors.Add(node.Setter.Visibility == Visibility.Private ? "priset" :
+                accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
+                              node.Setter.Visibility == Visibility.Private ? "priset" :
                               node.Setter.Visibility == Visibility.Internal ? "intset" :
                               node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
             if (node.Initer != null)
@@ -3860,6 +3864,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             Visibility.Public => "pub",
             Visibility.ProtectedInternal => "prot-int",
+            Visibility.PrivateProtected => "priv-prot",
             Visibility.Protected => "prot",
             Visibility.Internal => "int",
             Visibility.Private => "priv",

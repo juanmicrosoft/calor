@@ -6764,6 +6764,7 @@ public sealed class Parser
         {
             "public" or "pub" => Visibility.Public,
             "protected-internal" or "prot-int" => Visibility.ProtectedInternal,
+            "private-protected" or "priv-prot" => Visibility.PrivateProtected,
             "internal" or "int" => Visibility.Internal,
             "protected" or "prot" => Visibility.Protected,
             "private" or "priv" => Visibility.Private,
@@ -12892,13 +12893,15 @@ public sealed class Parser
             || value.Equals("public", StringComparison.OrdinalIgnoreCase)
             || value.Equals("private", StringComparison.OrdinalIgnoreCase)
             || value.Equals("protected", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("private-protected", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("priv-prot", StringComparison.OrdinalIgnoreCase)
             || value.Equals("internal", StringComparison.OrdinalIgnoreCase);
     }
 
     private static readonly HashSet<string> VisibilityKeywords = new(StringComparer.OrdinalIgnoreCase)
     {
-        "pub", "pri", "pro", "prot", "priv", "int",
-        "public", "private", "protected", "internal"
+        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot",
+        "public", "private", "private-protected", "protected", "internal"
     };
 
     /// <summary>
@@ -12937,8 +12940,8 @@ public sealed class Parser
     {
         "abs", "abstract", "seal", "sealed", "st", "stat", "static",
         "partial", "struct", "readonly",
-        "pub", "pri", "pro", "prot", "priv", "int",
-        "public", "private", "protected", "internal"
+        "pub", "pri", "pro", "prot", "priv", "int", "priv-prot",
+        "public", "private", "private-protected", "protected", "internal"
     };
 
     private static bool IsClassModifierOrVisibility(string value)
@@ -13132,8 +13135,8 @@ public sealed class Parser
     {
         "g", "s", "i", "gs", "gi", "si", "gsi", "gis",
         "get", "set", "init",
-        "priget", "proget", "intget",
-        "priset", "proset", "intset",
+        "priget", "proget", "intget", "privprotget",
+        "priset", "proset", "intset", "privprotset",
         "priinit", "proinit", "intinit"
     };
 
@@ -13230,6 +13233,7 @@ public sealed class Parser
         return prefix switch
         {
             "pri" or "priv" or "private" => Visibility.Private,
+            "privprot" => Visibility.PrivateProtected,
             "pro" or "prot" or "protected" => Visibility.Protected,
             "int" or "internal" => Visibility.Internal,
             _ => null

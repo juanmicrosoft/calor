@@ -10215,6 +10215,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (modifiers.Any(SyntaxKind.PublicKeyword))
             return Visibility.Public;
         // Check compound modifiers before individual ones
+        if (modifiers.Any(SyntaxKind.PrivateKeyword) && modifiers.Any(SyntaxKind.ProtectedKeyword))
+            return Visibility.PrivateProtected;
         if (modifiers.Any(SyntaxKind.ProtectedKeyword) && modifiers.Any(SyntaxKind.InternalKeyword))
             return Visibility.ProtectedInternal;
         if (modifiers.Any(SyntaxKind.InternalKeyword))
@@ -10229,6 +10231,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (modifiers.Any(SyntaxKind.PublicKeyword))
             return Visibility.Public;
         // Check compound modifiers before individual ones
+        if (modifiers.Any(SyntaxKind.PrivateKeyword) && modifiers.Any(SyntaxKind.ProtectedKeyword))
+            return Visibility.PrivateProtected;
         if (modifiers.Any(SyntaxKind.ProtectedKeyword) && modifiers.Any(SyntaxKind.InternalKeyword))
             return Visibility.ProtectedInternal;
         if (modifiers.Any(SyntaxKind.InternalKeyword))

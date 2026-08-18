@@ -1467,7 +1467,8 @@ public sealed class WorkspaceState
                     candidate.Symbol.ContainingTypeName,
                     callerContainingType,
                     StringComparison.Ordinal),
-            Calor.Compiler.Ast.Visibility.Protected =>
+            Calor.Compiler.Ast.Visibility.Protected
+                or Calor.Compiler.Ast.Visibility.PrivateProtected =>
                 callerContainingType != null
                 && candidate.Symbol.ContainingTypeName != null
                 && IsSameOrDerivedType(
@@ -2594,7 +2595,8 @@ public sealed class WorkspaceState
                     candidate.Symbol.DeclaringTypeName,
                     callerContainingType,
                     StringComparison.Ordinal),
-            Calor.Compiler.Ast.Visibility.Protected =>
+            Calor.Compiler.Ast.Visibility.Protected
+                or Calor.Compiler.Ast.Visibility.PrivateProtected =>
                 callerContainingType != null
                 && candidate.Symbol.DeclaringTypeName != null
                 && IsSameOrDerivedType(
