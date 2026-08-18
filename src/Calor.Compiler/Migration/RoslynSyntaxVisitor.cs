@@ -1,6 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SyntaxCapabilityClassifier =
+    Calor.Compiler.Migration.FeatureSupport.SyntaxCapabilityClassifier;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Effects;

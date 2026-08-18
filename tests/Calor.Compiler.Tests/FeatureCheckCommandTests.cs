@@ -1,5 +1,7 @@
 using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis.CSharp;
+using SyntaxCapabilityClassifier =
+    Calor.Compiler.Migration.FeatureSupport.SyntaxCapabilityClassifier;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
