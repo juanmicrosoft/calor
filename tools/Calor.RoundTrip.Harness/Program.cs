@@ -125,6 +125,7 @@ async Task<int> RunCommand(string[] runArgs)
             OriginalProjectPath = config.OriginalProjectPath,
             LibrarySourceRelativePath = config.LibrarySourceRelativePath,
             SolutionOrProjectFile = config.SolutionOrProjectFile,
+            ParseContextProjectFile = config.ParseContextProjectFile,
             DotnetPath = config.DotnetPath,
             TargetFramework = config.TargetFramework,
             Configuration = config.Configuration,
@@ -689,7 +690,8 @@ async Task<int> EnumerateSupplyCommand(string[] args)
     SupplyEnumeration.Result result;
     var supplyParseOptions = new Dictionary<
         string,
-        Dictionary<string, Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>(
+        Dictionary<string, IReadOnlyList<
+            Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>>(
         StringComparer.Ordinal);
     try
     {
@@ -704,16 +706,27 @@ async Task<int> EnumerateSupplyCommand(string[] args)
                 supplyParseOptions[project.ProjectName] = files
                     .Select(file => (
                         file.FilePath,
-                        Contexts: report.EvaluatedParseContexts.TryGetValue(
+                        Contexts: report.EvaluatedParseResolutions.TryGetValue(
                             ProjectParseContextResolver.Canonicalize(
                                 Path.Combine(dir, file.FilePath)),
-                            out var context)
-                            ? context.ParseOptions
-                            : null))
-                    .Where(entry => entry.Contexts != null)
+                            out var resolution)
+                            ? resolution switch
+                            {
+                                ResolvedProjectFileParseContext resolved =>
+                                    new[] { resolved.Context.ParseOptions },
+                                AmbiguousProjectFileParseContext ambiguous =>
+                                    ambiguous.Contexts
+                                        .Select(context => context.ParseOptions)
+                                        .ToArray(),
+                                _ => []
+                            }
+                            : []))
+                    .Where(entry => entry.Contexts.Length > 0)
                     .ToDictionary(
                         entry => entry.FilePath,
-                        entry => entry.Contexts!,
+                        entry => (IReadOnlyList<
+                            Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>)
+                            entry.Contexts,
                         StringComparer.Ordinal);
                 return files;
             },
@@ -761,6 +774,7 @@ RoundTripConfig CloneForSupply(RoundTripConfig c, string workDir) => new()
     OriginalProjectPath = c.OriginalProjectPath,
     LibrarySourceRelativePath = c.LibrarySourceRelativePath,
     SolutionOrProjectFile = c.SolutionOrProjectFile,
+    ParseContextProjectFile = c.ParseContextProjectFile,
     WorkingDirectory = workDir,
     ExcludePatterns = c.ExcludePatterns,
     DotnetPath = c.DotnetPath,

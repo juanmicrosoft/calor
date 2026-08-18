@@ -131,8 +131,8 @@ public static class ReportGenerator
         // File-by-file results
         sb.AppendLine("## File-by-File Results");
         sb.AppendLine();
-        sb.AppendLine("| File | Status | Conv. Rate | Losses | Interop | Gaps | Errors |");
-        sb.AppendLine("|------|--------|-----------|--------|---------|------|--------|");
+        sb.AppendLine("| File | Status | Context mode | Contexts | Conv. Rate | Losses | Interop | Gaps | Errors |");
+        sb.AppendLine("|------|--------|--------------|----------|-----------|--------|---------|------|--------|");
 
         foreach (var file in report.FileResults.OrderBy(f => f.FilePath))
         {
@@ -149,7 +149,7 @@ public static class ReportGenerator
             };
             var errors = file.Errors.Count > 0 ? file.Errors.First().Truncate(80) : "-";
             var gaps = file.Gaps.Count > 0 ? string.Join("; ", file.Gaps.Take(3)) + (file.Gaps.Count > 3 ? $"; +{file.Gaps.Count - 3}" : "") : "-";
-            sb.AppendLine($"| {file.FilePath} | {statusEmoji} | {file.ConversionRate:F0}% | {file.LossCount} | {file.InteropBlocks} | {gaps} | {errors} |");
+            sb.AppendLine($"| {file.FilePath} | {statusEmoji} | {file.ContextSelectionMode ?? "-"} | {file.ValidatedContexts.Count} | {file.ConversionRate:F0}% | {file.LossCount} | {file.InteropBlocks} | {gaps} | {errors} |");
         }
 
         sb.AppendLine();
@@ -327,6 +327,8 @@ public static class ReportGenerator
                     target_framework = f.TargetFramework,
                     language_version = f.LanguageVersion,
                     defined_symbols = f.DefinedSymbols,
+                    context_selection_mode = f.ContextSelectionMode,
+                    validated_contexts = f.ValidatedContexts,
                     loss_count = f.LossCount,
                     loss_kinds = f.LossKindCounts,
                     losses = f.Losses,

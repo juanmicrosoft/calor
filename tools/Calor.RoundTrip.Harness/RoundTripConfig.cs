@@ -22,6 +22,13 @@ public sealed class RoundTripConfig
     /// </summary>
     public required string SolutionOrProjectFile { get; init; }
 
+    /// <summary>
+    /// Optional project whose evaluated graph supplies conversion parse contexts.
+    /// Use the subject library project when the test graph also compiles linked or
+    /// multi-target copies of the same physical source.
+    /// </summary>
+    public string? ParseContextProjectFile { get; init; }
+
     /// <summary>Working directory for the round-trip. Files will be copied here.</summary>
     public string? WorkingDirectory { get; init; }
 

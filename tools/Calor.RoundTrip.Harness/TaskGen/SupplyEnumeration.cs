@@ -194,7 +194,8 @@ public static class SupplyEnumeration
         Func<RoundTripConfig, Task<IReadOnlyList<FileConversionResult>>> convertProject,
         Func<RoundTripConfig, string, Task<string?>> readOriginalSource,
         Func<RoundTripConfig, string,
-            Microsoft.CodeAnalysis.CSharp.CSharpParseOptions?>? resolveParseOptions = null)
+            IReadOnlyList<Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>?
+            resolveParseOptions = null)
     {
         var results = new List<ProjectSupply>();
 
@@ -202,9 +203,7 @@ public static class SupplyEnumeration
         {
             var files = await convertProject(project);
 
-            var native = files.Where(f =>
-                                  f.Status == FileStatus.Replaced
-                                  && f.LossCount == 0)
+            var native = files.Where(f => f.EligibleNativeSource)
                               .Select(f => f.FilePath).ToList();
             var withLoss = files.Where(f =>
                                     f.Status == FileStatus.Replaced
@@ -250,7 +249,9 @@ public static class SupplyEnumeration
             IReadOnlyList<string> relPaths,
             Func<RoundTripConfig, string, Task<string?>> readOriginalSource,
             Func<RoundTripConfig, string,
-                Microsoft.CodeAnalysis.CSharp.CSharpParseOptions?>? resolveParseOptions)
+                IReadOnlyList<
+                    Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>?
+                resolveParseOptions)
     {
         var byOperator = new Dictionary<string, int>(StringComparer.Ordinal);
         var byFile = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -264,10 +265,16 @@ public static class SupplyEnumeration
             // missing-subject guard exists to prevent. Count it so it cannot pass as a corpus fact.
             if (source == null) { skipped++; continue; }
 
-            var candidates = ExpressibleMutationOperators.Enumerate(
-                source,
-                rel,
-                resolveParseOptions?.Invoke(project, rel));
+            var parseOptions = resolveParseOptions?.Invoke(project, rel)
+                ?? [null!];
+            var candidates = parseOptions
+                .SelectMany(options =>
+                    ExpressibleMutationOperators.Enumerate(
+                        source,
+                        rel,
+                        options))
+                .DistinctBy(candidate => candidate.Id)
+                .ToList();
             if (candidates.Count == 0) continue;
 
             total += candidates.Count;

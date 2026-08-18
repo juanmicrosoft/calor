@@ -1,3 +1,5 @@
+using Calor.Compiler.Migration;
+
 namespace Calor.RoundTrip.Harness.TaskGen;
 
 /// <summary>
@@ -35,24 +37,42 @@ public sealed class TaskGenerator
         if (!nativeBuild.Succeeded)
             await _pipeline.RecoverBuildAsync(nativeDir, project, nativeResults);
         var coverage = ConversionCoverage.Compute(nativeResults, probeReport.ExcludedFileCount);
-        var nativeFiles = nativeResults.Where(f => f.ConvertedNative).Select(f => f.FilePath).ToList();
+        var nativeFiles = nativeResults
+            .Where(f => f.EligibleNativeSource)
+            .Select(f => f.FilePath)
+            .ToList();
         var nativeParseContexts =
             probeReport.EvaluatedParseContexts;
+        var nativeParseResolutions =
+            probeReport.EvaluatedParseResolutions;
         Console.WriteLine($"[{project.ProjectName}]   NativeFraction {coverage.NativeFraction:P1} " +
             $"({coverage.ConvertedNative} native of {coverage.TotalConvertibleFiles}); siting mutations in {nativeFiles.Count} native file(s)");
 
         // --- Enumerate candidates from the selected source(s), sited in native regions ONLY. ---
         var nativeSet = nativeFiles.ToHashSet(StringComparer.Ordinal);
         var enumerated = new List<MutationCandidate>();
-        Microsoft.CodeAnalysis.CSharp.CSharpParseOptions? ParseOptionsFor(
-            string relPath)
-            => nativeParseContexts.TryGetValue(
+        var candidateContexts =
+            new Dictionary<MutationCandidate, ProjectFileParseContext>();
+        IReadOnlyList<ProjectFileParseContext> ContextsFor(string relPath)
+        {
+            if (!nativeParseResolutions.TryGetValue(
                 ProjectParseContextResolver.Canonicalize(
                     Path.Combine(nativeDir, relPath)),
-                out var context)
-                ? context.ParseOptions
-                : throw new InvalidOperationException(
+                out var resolution))
+            {
+                throw new InvalidOperationException(
                     $"Native candidate '{relPath}' has no evaluated parse context.");
+            }
+            return resolution switch
+            {
+                ResolvedProjectFileParseContext resolved =>
+                    [resolved.Context],
+                AmbiguousProjectFileParseContext ambiguous =>
+                    ambiguous.Contexts,
+                _ => throw new InvalidOperationException(
+                    $"Native candidate '{relPath}' has no usable evaluated parse context.")
+            };
+        }
 
         ProjectFileParseContext ContextFor(string relPath)
             => nativeParseContexts.TryGetValue(
@@ -74,11 +94,15 @@ public sealed class TaskGenerator
                 // NegateCondition always compiles, but inverts a whole branch (all-or-nothing coverage),
                 // so it is dropped from the DEFAULT bounded set to keep the demo focused on point mutations;
                 // the operator itself remains available in InjectedMutationOperators and unit-tested.
-                enumerated.AddRange(InjectedMutationOperators.Enumerate(
-                        source,
-                        relPath,
-                        ParseOptionsFor(relPath))
-                    .Where(c => c.Operator != MutationOperatorKind.NegateCondition));
+                AddCandidates(
+                    ContextsFor(relPath),
+                    context => InjectedMutationOperators.Enumerate(
+                            source,
+                            relPath,
+                            context.ParseOptions)
+                        .Where(candidate =>
+                            candidate.Operator
+                                != MutationOperatorKind.NegateCondition));
             }
         }
 
@@ -92,10 +116,12 @@ public sealed class TaskGenerator
                 var absOriginal = Path.Combine(project.OriginalProjectPath, relPath);
                 if (!File.Exists(absOriginal)) continue;
                 var source = await File.ReadAllTextAsync(absOriginal);
-                enumerated.AddRange(ExpressibleMutationOperators.Enumerate(
-                    source,
-                    relPath,
-                    ParseOptionsFor(relPath)));
+                AddCandidates(
+                    ContextsFor(relPath),
+                    context => ExpressibleMutationOperators.Enumerate(
+                        source,
+                        relPath,
+                        context.ParseOptions));
             }
 
         }
@@ -124,6 +150,8 @@ public sealed class TaskGenerator
                     if (nativeSet.Contains(res.Candidate.FileRelPath))
                     {
                         enumerated.Add(res.Candidate);
+                        candidateContexts[res.Candidate] =
+                            ContextFor(res.Candidate.FileRelPath);
                         minedOk++;
                     }
                     else
@@ -167,7 +195,7 @@ public sealed class TaskGenerator
                 coverage.NativeFraction,
                 workRoot,
                 idx,
-                ContextFor(candidate.FileRelPath));
+                candidateContexts[candidate]);
             accounting.Record(new CandidateDisposition
             {
                 ProjectName = project.ProjectName,
@@ -201,6 +229,29 @@ public sealed class TaskGenerator
             Bundles = bundles,
             Accounting = accounting,
         };
+
+        void AddCandidates(
+            IReadOnlyList<ProjectFileParseContext> contexts,
+            Func<ProjectFileParseContext, IEnumerable<MutationCandidate>>
+                enumerate)
+        {
+            var existing = enumerated
+                .Select(candidate =>
+                    $"{candidate.FileRelPath}\0{candidate.Id}")
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var context in contexts)
+            {
+                foreach (var candidate in enumerate(context))
+                {
+                    var key =
+                        $"{candidate.FileRelPath}\0{candidate.Id}";
+                    if (!existing.Add(key))
+                        continue;
+                    enumerated.Add(candidate);
+                    candidateContexts[candidate] = context;
+                }
+            }
+        }
     }
 
     private async Task<(EligibilityVerdict, TaskBundle?, VerificationAddressability.Result?)> EvaluateCandidateAsync(
@@ -328,7 +379,7 @@ public sealed class TaskGenerator
                 CancellationToken.None);
             if (!contexts.TryGetValue(
                     ProjectParseContextResolver.Canonicalize(attributionPath),
-                    out var attributionContext))
+                    out var attributionResolution))
             {
                 return (Excluded(
                     ExclusionReason.ConverterAttributed,
@@ -336,11 +387,43 @@ public sealed class TaskGenerator
                     null,
                     addressability);
             }
+            var attributionContexts = attributionResolution switch
+            {
+                ResolvedProjectFileParseContext resolved =>
+                    new[] { resolved.Context },
+                AmbiguousProjectFileParseContext ambiguous =>
+                    ambiguous.Contexts.ToArray(),
+                _ => []
+            };
+            if (attributionContexts.Length == 0)
+            {
+                return (Excluded(
+                    ExclusionReason.ConverterAttributed,
+                    "the clean attribution conversion has no evaluated project parse context"),
+                    null,
+                    addressability);
+            }
+            var attributionMode =
+                attributionContexts
+                    .Select(context => PreprocessorStripper
+                        .SelectActiveBranchLossy(
+                            originalUnmutated,
+                            context.ParseOptions)
+                        .Source.Replace(
+                            "\r\n",
+                            "\n",
+                            StringComparison.Ordinal))
+                    .Distinct(StringComparer.Ordinal)
+                    .Count() > 1
+                    ? PreprocessorConversionMode.PreserveAllBranches
+                    : PreprocessorConversionMode.SelectActiveBranchLossy;
+            var attributionContext = attributionContexts[0];
             var unmutatedConverted = _pipeline.ConvertSourceToRoundTripCSharp(
                 originalUnmutated,
                 attributionPath,
                 project,
-                attributionContext);
+                attributionContext,
+                attributionMode);
             if (unmutatedConverted == null)
             {
                 // The clean file does not convert-and-recompile here (it should, since the prefilter said
@@ -539,6 +622,7 @@ public sealed class TaskGenerator
         OriginalProjectPath = c.OriginalProjectPath,
         LibrarySourceRelativePath = c.LibrarySourceRelativePath,
         SolutionOrProjectFile = c.SolutionOrProjectFile,
+        ParseContextProjectFile = c.ParseContextProjectFile,
         WorkingDirectory = workDir,
         ExcludePatterns = c.ExcludePatterns,
         DotnetPath = c.DotnetPath,

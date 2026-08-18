@@ -12,6 +12,10 @@ public sealed class RoundTripReport
     internal IReadOnlyDictionary<string, ProjectFileParseContext>
         EvaluatedParseContexts { get; set; } =
             new Dictionary<string, ProjectFileParseContext>();
+    [JsonIgnore]
+    internal IReadOnlyDictionary<string, ProjectFileParseResolution>
+        EvaluatedParseResolutions { get; set; } =
+            new Dictionary<string, ProjectFileParseResolution>();
     public required string ProjectName { get; init; }
     public string CalorVersion { get; set; } = "";
     public DateTimeOffset StartedAt { get; set; }
@@ -64,6 +68,8 @@ public sealed class FileConversionResult
     public string? TargetFramework { get; set; }
     public string? LanguageVersion { get; set; }
     public List<string> DefinedSymbols { get; set; } = [];
+    public string? ContextSelectionMode { get; set; }
+    public List<FileContextDetail> ValidatedContexts { get; set; } = [];
 
     /// <summary>Total structured losses recorded by the conversion loss ledger (#770) for this file.</summary>
     public int LossCount { get; set; }
@@ -96,6 +102,10 @@ public sealed class FileConversionResult
     [JsonIgnore]
     public string? EmittedCSharp { get; set; }
 
+    [JsonIgnore]
+    internal IReadOnlyList<ProjectFileParseContext> ObservedContexts
+        { get; set; } = [];
+
     /// <summary>True when the file was converted and KEPT in the built project.</summary>
     [JsonIgnore]
     public bool ConvertedAndKept => Status == FileStatus.Replaced;
@@ -103,6 +113,14 @@ public sealed class FileConversionResult
     /// <summary>True when the file was converted, kept, and recorded zero losses.</summary>
     [JsonIgnore]
     public bool ConvertedNative => ConvertedAndKept && LossCount == 0;
+
+    /// <summary>
+    /// True when the file is safe to use as native benchmark supply. Replaced
+    /// project candidates have already compiled in every observed build context.
+    /// </summary>
+    [JsonIgnore]
+    public bool EligibleNativeSource =>
+        ConvertedNative && InteropBlocks == 0;
 
     /// <summary>
     /// Populate the loss-derived metrics (LossCount, LossKindCounts, Gaps,
@@ -132,6 +150,30 @@ public sealed class FileConversionResult
             Line = l.Line,
         }).ToList();
     }
+}
+
+public sealed record FileContextDetail
+{
+    public required string ProjectFile { get; init; }
+    public required string Configuration { get; init; }
+    public required string Platform { get; init; }
+    public string? TargetFramework { get; init; }
+    public required string LanguageVersion { get; init; }
+    public required string DocumentationMode { get; init; }
+    public required string SourceCodeKind { get; init; }
+    public List<string> DefinedSymbols { get; init; } = [];
+    public List<string> Provenance { get; init; } = [];
+    public List<FileBuildStateDetail> BuildStates { get; init; } = [];
+}
+
+public sealed record FileBuildStateDetail
+{
+    public required string ProjectFile { get; init; }
+    public required string Configuration { get; init; }
+    public required string Platform { get; init; }
+    public string? TargetFramework { get; init; }
+    public Dictionary<string, string> GlobalProperties { get; init; } = [];
+    public List<string> ProjectGraphPath { get; init; } = [];
 }
 
 /// <summary>One conversion-ledger loss, serialized into the harness report.</summary>
