@@ -950,7 +950,7 @@ public class BuildStateCacheTests : IDisposable
         Assert.NotEqual(baseline, task.ComputeCacheInputs().Serialize());
     }
 
-    // Regression pin for #883 (tracked under #998 in the F4/R2 test-suite audit).
+    // Regression guard for #883 (tracked under #998 in the F4/R2 test-suite audit).
     //
     // #883: "MSBuild incremental build: IL-analysis inputs are not in the options
     // hash." When EnableILAnalysis=true, mutating ReferencedAssemblies,
@@ -958,27 +958,24 @@ public class BuildStateCacheTests : IDisposable
     // must invalidate the cache — otherwise diagnostics the new input set would
     // produce (effect discovery from IL, for example) are silently skipped.
     //
-    // This test is Skip'd on purpose. The 2026-08-18 test-suite audit (F4)
-    // flagged this as a "known open residual" with no dedicated pin. The audit's
-    // R2 remediation asks for a Skip'd Fact that describes the CORRECT behavior
-    // and references the underlying issue, so that whoever verifies the fix
-    // removes the Skip attribute here rather than editing an unrelated cache
-    // test to notice.
+    // Status: #883 was closed on 2026-08-11 by PR #890. The 2026-08-18
+    // test-suite audit's F4 finding was stale on this point; existing tests
+    // (CanonicalInputs_MutatingAnalysisInput_InvalidatesWarmCache and the
+    // *ContentMutation_InvalidatesWarmCache pair in CompileCalorIntegrationTests)
+    // already cover related shapes. This test is kept as a live green guard
+    // that pins the four-input matrix explicitly, so a future refactor that
+    // silently drops one of them from the options hash fails here with a
+    // named sub-case rather than requiring a re-read of the audit trail.
     //
-    // Removing the Skip:
-    //   1. Confirm #883 is closed and the fix is in main (each of the four
-    //      inputs should already be folded into ComputeOptionsHash via
-    //      CompileCalorCacheInputs.Serialize()).
-    //   2. Delete the Skip parameter below.
-    //   3. Run this test; if it fails, the fix regressed — do not delete this
-    //      test to make it pass.
+    // If this test starts failing, the fix regressed — do not delete this test
+    // to make it pass. Instead, restore the four inputs to the options-hash
+    // path and verify with `git log --oneline src/Calor.Tasks/` for the #890
+    // fix as reference.
     //
     // The four sub-cases are asserted individually so a partial regression
     // (e.g., only DepsFilePath drops out of the hash) surfaces as a specific
     // failure rather than a boolean pass/fail on the whole set.
-    [Fact(Skip = "#883 known issue: MSBuild cache key does not include IL-analysis inputs "
-        + "(ReferencedAssemblies, RuntimeDirectory, NuGetPackageRoot, DepsFilePath). "
-        + "See #998 (audit F4/R2). Remove Skip when #883 is verified fixed on main.")]
+    [Fact]
     public void ILAnalysisInputs_MutatingAnyOfTheFour_MustChangeOptionsHash_Issue883()
     {
         // Establish a warm baseline: EnableILAnalysis=true with one reference,
