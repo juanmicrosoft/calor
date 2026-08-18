@@ -2,11 +2,10 @@
 title: "Telemetry and Privacy"
 section: "guides"
 order: 6
-description: "Calor v0.12.1 telemetry is opt-in, metadata-only, and off by default"
+description: "Calor telemetry is opt-in, metadata-only, and off by default"
 ---
 
-Calor v0.12.1 CLI telemetry is **off by default**. A normal invocation sends
-nothing.
+Calor CLI telemetry is **off by default**. A normal invocation sends nothing.
 
 ## Enable or Disable It
 
@@ -37,12 +36,12 @@ names are pinned to `calor-cli` so the SDK cannot attach the machine hostname.
 Source code, file paths, file names, identifiers, diagnostic messages,
 exception messages, stack traces, environment variables, machine hostnames, or
 content hashes are not sent. Earlier builds used source/output hashes for
-determinism tracking; v0.12 removes them because they can identify an exact
-file.
+determinism tracking; current releases remove them because they can identify
+an exact file.
 
 Enabled telemetry goes to the Calor project's Azure Application Insights
-instance through the connection bundled with v0.12.1. This release does not
-provide `--telemetry-preview` or a connection-string environment override.
+instance through the connection bundled with each release. This release does
+not provide `--telemetry-preview` or a connection-string environment override.
 Before the v0.11 work folded into v0.12, telemetry was default-on and included
-raw diagnostic messages and full exception payloads. v0.12 reverses that
-posture and strips the payload.
+raw diagnostic messages and full exception payloads. That posture is reversed
+in current releases, which strip the payload.

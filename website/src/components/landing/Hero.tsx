@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Github, ArrowRight } from 'lucide-react';
 import { getBasePath } from '@/lib/utils';
@@ -12,11 +12,15 @@ const basePath = getBasePath();
 
 export function Hero() {
   const heroRef = useRef<HTMLDivElement>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    setPrefersReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }, []);
 
   useEffect(() => {
     const el = heroRef.current;
     if (!el) return;
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return;
 
     // Stagger hero elements on load
@@ -36,17 +40,27 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden py-28 sm:py-36 lg:py-44">
-      {/* Video background */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover -z-20"
-        poster={`${basePath}/og-image.jpg`}
-      >
-        <source src={`${basePath}/calor-lava.mp4`} type="video/mp4" />
-      </video>
+      {/* Video background — replaced by a poster image when the visitor prefers reduced motion */}
+      {prefersReducedMotion ? (
+        <div
+          className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
+          style={{ backgroundImage: `url(${basePath}/og-image.jpg)` }}
+          aria-hidden="true"
+        />
+      ) : (
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 w-full h-full object-cover -z-20"
+          poster={`${basePath}/og-image.jpg`}
+          aria-hidden="true"
+        >
+          <source src={`${basePath}/calor-lava.mp4`} type="video/mp4" />
+        </video>
+      )}
 
       {/* Gradient overlay — navy at top/bottom, transparent center */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-calor-navy/80 via-calor-navy/20 to-calor-navy/90" />

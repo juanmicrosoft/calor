@@ -44,7 +44,8 @@ produces a model. Vacuity is a separate flag.
 | `2` | Invalid weakening-check invocation |
 
 `calor verify` reports verdicts; it does not opt compilation into guard
-elision. In released v0.12.1, compiling separately with `--verify`
-automatically elides an eligible clean, non-vacuous, assumption-free guard. See
+elision. In 0.13.2, verification is diagnostic by default — guards remain
+regardless of verdict unless `calor compile --verify --elide-proven-guards`
+is used together. See
 [Verification Guarantees](/docs/guides/verification-guarantees/) before using
 proof results as a gate.

@@ -36,7 +36,7 @@ calor lint src/*.calr --fix --experimental --verbose
 | `--format` | `text`, schema 2.0 `json`, or `sarif`; no short alias |
 | `--experimental` | Acknowledge known formatter write defects |
 
-> **v0.12 release policy:** `lint --fix` is refused with `Calor1346` unless
+> **Release policy:** `lint --fix` is refused with `Calor1346` unless
 > you pass `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`. The
 > shared writer can rewrite identifiers and drop comments. Read-only linting
 > remains available without acknowledgment.

@@ -28,6 +28,7 @@ Findings use the `Calor1320`–`Calor1328` band (see
 ## Covered files
 
 - `CLAUDE.md`
+- `.github/copilot-instructions.md`
 - every `docs/syntax-reference/*.md`
 - every `docs/cli/*.md`
 - the **version scan only** additionally covers all of `docs/**/*.md`,
