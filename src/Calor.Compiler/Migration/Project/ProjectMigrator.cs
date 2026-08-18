@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Mcp.Tools;
@@ -37,6 +38,8 @@ public sealed class ProjectMigrator
     /// </summary>
     public async Task<MigrationReport> ExecuteAsync(MigrationPlan plan, bool dryRun = false, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default)
     {
+        ProjectDiscovery.ResolveOutputPathCollisions(plan.Entries);
+
         var reportBuilder = new MigrationReportBuilder()
             .SetDirection(plan.Direction)
             .IncludeBenchmark(_options.IncludeBenchmark);
@@ -246,7 +249,7 @@ public sealed class ProjectMigrator
         MigrationPlanEntry entry,
         MigrationDirection direction,
         bool dryRun,
-        IReadOnlyDictionary<string, string>? crossModuleMap,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap,
         CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
@@ -342,9 +345,7 @@ public sealed class ProjectMigrator
             metrics = BenchmarkIntegration.CalculateMetrics(originalSource, result.CalorSource);
         }
 
-        var status = result.Success
-            ? (result.Context.HasWarnings ? FileMigrationStatus.Partial : FileMigrationStatus.Success)
-            : FileMigrationStatus.Failed;
+        var status = GetMigrationStatus(result);
 
         // Validate: parse and compile the generated Calor to catch false-positive "success"
         var issues = result.Issues.ToList();
@@ -482,6 +483,13 @@ public sealed class ProjectMigrator
             GeneratedCSharp = generatedCSharp
         };
     }
+
+    internal static FileMigrationStatus GetMigrationStatus(ConversionResult result)
+        => result.Success
+            ? result.Context.HasWarnings || result.Losses.Count > 0
+                ? FileMigrationStatus.Partial
+                : FileMigrationStatus.Success
+            : FileMigrationStatus.Failed;
 
     private static async Task FinalizeLosslessProjectAsync(
         MigrationReport report,
@@ -1038,7 +1046,7 @@ public sealed class ProjectMigrator
         MigrationPlanEntry entry,
         bool dryRun,
         DateTime startTime,
-        IReadOnlyDictionary<string, string>? crossModuleMap,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap,
         CancellationToken cancellationToken)
     {
         var source = await File.ReadAllTextAsync(entry.SourcePath, cancellationToken);

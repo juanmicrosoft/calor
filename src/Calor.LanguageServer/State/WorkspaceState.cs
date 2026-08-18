@@ -1166,7 +1166,15 @@ public sealed class WorkspaceState
             }
         }
 
-        var typeName = GetNominalTypeName(creation.TypeName);
+        if (!TryGetLookupName(
+                creation.TypeReference.Name,
+                creation.TypeReference.TypeArguments.Count,
+                out var typeName))
+        {
+            return new ProjectSymbolLocation(null, null, null);
+        }
+
+        var simpleTypeName = typeName[(typeName.LastIndexOf('.') + 1)..];
         var matches = documents
             .SelectMany(document =>
                 document.Analysis.BoundModule?.SymbolsById.Values
@@ -1174,8 +1182,15 @@ public sealed class WorkspaceState
                     .Select(symbol => (Owner: document, Symbol: symbol))
                 ?? Enumerable.Empty<(WorkspaceDocumentSnapshot Owner, TypeSymbol Symbol)>())
             .Where(candidate =>
-                string.Equals(candidate.Symbol.Name, typeName, StringComparison.Ordinal)
-                || string.Equals(candidate.Symbol.QualifiedName, typeName, StringComparison.Ordinal))
+                string.Equals(
+                    candidate.Symbol.QualifiedName,
+                    typeName,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    candidate.Symbol.QualifiedName[
+                        (candidate.Symbol.QualifiedName.LastIndexOf('.') + 1)..],
+                    simpleTypeName,
+                    StringComparison.Ordinal))
             .Where(candidate =>
                 candidate.Symbol.Visibility != Calor.Compiler.Ast.Visibility.Private
                 || candidate.Owner.Document.Uri == caller.Uri)
@@ -1262,21 +1277,73 @@ public sealed class WorkspaceState
         if (resolvedType != null)
             return resolvedType;
 
-        var firstDot = target.IndexOf('.');
-        if (firstDot <= 0)
+        const string globalPrefix = "global::";
+        if (target.StartsWith(globalPrefix, StringComparison.Ordinal))
+            target = target[globalPrefix.Length..];
+
+        var lastDot = target.LastIndexOf('.');
+        if (lastDot <= 0)
             return null;
 
-        var receiverName = target[..firstDot];
-        var generic = receiverName.IndexOf('<');
-        if (generic > 0)
-            receiverName = receiverName[..generic];
+        if (!TryGetLookupName(
+                target[..lastDot],
+                explicitArity: null,
+                out var receiverName))
+        {
+            return null;
+        }
+
+        var simpleReceiverName = receiverName[
+            (receiverName.LastIndexOf('.') + 1)..];
         var matches = visibleTypes
             .Where(type =>
-                string.Equals(type.Name, receiverName, StringComparison.Ordinal)
-                || string.Equals(type.QualifiedName, receiverName, StringComparison.Ordinal))
+                string.Equals(
+                    type.QualifiedName,
+                    receiverName,
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    type.QualifiedName[
+                        (type.QualifiedName.LastIndexOf('.') + 1)..],
+                    simpleReceiverName,
+                    StringComparison.Ordinal))
             .Take(2)
             .ToArray();
         return matches.Length == 1 ? matches[0] : null;
+    }
+
+    private static TextSpan? GetReceiverTypeReferenceSpan(BoundNode call)
+    {
+        var (target, calleeSpan) = call switch
+        {
+            BoundCallExpression expression => (
+                expression.Target,
+                expression.CalleeSpan),
+            BoundCallStatement statement => (
+                statement.Target,
+                statement.CalleeSpan),
+            _ => (string.Empty, TextSpan.Empty),
+        };
+        var lastDot = target.LastIndexOf('.');
+        if (lastDot <= 0)
+            return null;
+
+        var receiver = target[..lastDot];
+        var identifierStart = receiver.LastIndexOf('.') + 1;
+        var genericStart = receiver.IndexOf('<', identifierStart);
+        var identifierEnd = genericStart >= 0
+            ? genericStart
+            : receiver.Length;
+        var identifierLength = identifierEnd - identifierStart;
+        if (identifierLength <= 0)
+            return null;
+
+        var targetStart = calleeSpan.Start - (lastDot + 1);
+        var targetColumn = calleeSpan.Column - (lastDot + 1);
+        return new TextSpan(
+            targetStart + identifierStart,
+            identifierLength,
+            calleeSpan.Line,
+            targetColumn + identifierStart);
     }
 
     private static bool TryGetCallShape(
@@ -1357,6 +1424,19 @@ public sealed class WorkspaceState
         if (array > 0)
             type = type[..array];
         return type.TrimEnd('?', '*');
+    }
+
+    private static bool TryGetLookupName(
+        string? typeName,
+        int? explicitArity,
+        out string lookupName)
+    {
+        lookupName = string.Empty;
+        if (string.IsNullOrWhiteSpace(typeName))
+            return false;
+
+        lookupName = TypeIdentity.ToLookupName(typeName, explicitArity);
+        return true;
     }
 
     private static bool CallableNameMatches(string declaredName, string lookupName)
@@ -1819,7 +1899,9 @@ public sealed class WorkspaceState
                     AddOccurrence(
                         document,
                         receiver.Id,
-                        expression.ReceiverSpan ?? expression.Span,
+                        GetReceiverTypeReferenceSpan(expression)
+                        ?? expression.ReceiverSpan
+                        ?? expression.Span,
                         SymbolOccurrenceKind.Reference);
                     break;
                 case BoundCallStatement statement
@@ -1835,7 +1917,9 @@ public sealed class WorkspaceState
                     AddOccurrence(
                         document,
                         receiver.Id,
-                        statement.ReceiverSpan ?? statement.Span,
+                        GetReceiverTypeReferenceSpan(statement)
+                        ?? statement.ReceiverSpan
+                        ?? statement.Span,
                         SymbolOccurrenceKind.Reference);
                     break;
             }
@@ -3127,8 +3211,8 @@ public sealed class WorkspaceState
     }
 
     private static bool CrossModuleMapsEqual(
-        IReadOnlyDictionary<string, string>? baseline,
-        IReadOnlyDictionary<string, string>? candidate)
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? baseline,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? candidate)
     {
         if (ReferenceEquals(baseline, candidate))
             return true;
@@ -3136,12 +3220,12 @@ public sealed class WorkspaceState
             return false;
         return baseline.All(pair =>
             candidate.TryGetValue(pair.Key, out var value)
-            && string.Equals(pair.Value, value, StringComparison.Ordinal));
+            && pair.Value == value);
     }
 
     private static bool TryEmit(
         ModuleNode module,
-        IReadOnlyDictionary<string, string>? crossModuleMap,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap,
         string sourcePath,
         out string generated)
     {

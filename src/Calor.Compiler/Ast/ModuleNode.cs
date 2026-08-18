@@ -38,6 +38,8 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; }
     // Dependent Types: Indexed type definitions at module level
     public IReadOnlyList<IndexedTypeNode> IndexedTypes { get; }
+    // Lexical C# namespace declarations preserved during migration.
+    public IReadOnlyList<NamespaceScopeInfo> NamespaceScopes { get; }
 
     public ModuleNode(
         TextSpan span,
@@ -176,7 +178,8 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<RefinementTypeNode>? refinementTypes = null,
         IReadOnlyList<IndexedTypeNode>? indexedTypes = null,
         IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        IReadOnlyList<NamespaceScopeInfo>? namespaceScopes = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -199,6 +202,7 @@ public sealed class ModuleNode : AstNode
         RefinementTypes = refinementTypes ?? Array.Empty<RefinementTypeNode>();
         IndexedTypes = indexedTypes ?? Array.Empty<IndexedTypeNode>();
         TypePreprocessorBlocks = typePreprocessorBlocks ?? Array.Empty<TypePreprocessorBlockNode>();
+        NamespaceScopes = namespaceScopes ?? Array.Empty<NamespaceScopeInfo>();
     }
 
     /// <summary>

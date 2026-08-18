@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Calor.Compiler;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 
@@ -581,7 +582,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // the surface where csc actually consumes the outputs, so it needs the same
         // map the CLI driver builds. Warm-skip validity: a changed map invalidates
         // every skip (a cached .g.cs may carry stale qualification).
-        IReadOnlyDictionary<string, string>? crossModuleMap = null;
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
         string? crossModuleMapHash = null;
         if (SourceFiles.Length > 1)
         {

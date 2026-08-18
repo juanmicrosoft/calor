@@ -93,6 +93,7 @@ public sealed class Binder
     private readonly Dictionary<ClassDefinitionNode, TypeSymbol> _classSymbols = new();
     private readonly Dictionary<string, ClassDefinitionNode> _classesByQualifiedName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
     private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
@@ -101,6 +102,7 @@ public sealed class Binder
     private ClassDefinitionNode? _currentClass;
     private Scope? _currentClassScope;
     private SymbolId _currentClassIdentity;
+    private string? _currentNamespaceIdentity;
     private bool _isStaticContext;
 
     public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
@@ -176,8 +178,10 @@ public sealed class Binder
         _classSymbols.Clear();
         _classesByQualifiedName.Clear();
         _classesBySimpleName.Clear();
+        _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
         _declarationIdOccurrences.Clear();
+        _currentNamespaceIdentity = null;
         _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
         _declarationContext = _moduleSymbolId;
 
@@ -219,7 +223,21 @@ public sealed class Binder
                 definitionSpan: function.Span);
             _functionSymbols.Add(function, symbol);
 
-            var lookupName = GetCallableLookupName(function.Name);
+            var simpleLookupName = GetCallableLookupName(function.Name);
+            var lookupName = QualifyTopLevelName(
+                function,
+                simpleLookupName);
+            if (!_topLevelFunctionLookupNames.TryGetValue(
+                    simpleLookupName,
+                    out var qualifiedLookupNames))
+            {
+                qualifiedLookupNames = new HashSet<string>(StringComparer.Ordinal);
+                _topLevelFunctionLookupNames.Add(
+                    simpleLookupName,
+                    qualifiedLookupNames);
+            }
+            qualifiedLookupNames.Add(lookupName);
+
             if (!_scope.TryDeclareOverload(lookupName, symbol, out var duplicate))
                 ReportDuplicateSignature(function.Span, lookupName, symbol, duplicate);
         }
@@ -234,7 +252,7 @@ public sealed class Binder
                 "interface",
                 @interface.Id,
                 @interface.Name,
-                @interface.Name,
+                GetQualifiedTypeName(@interface),
                 Visibility.Public,
                 @interface.IdentifierSpan,
                 @interface.Span);
@@ -247,7 +265,7 @@ public sealed class Binder
                 "enum",
                 @enum.Id,
                 @enum.Name,
-                @enum.Name,
+                GetQualifiedTypeName(@enum),
                 @enum.Visibility,
                 @enum.IdentifierSpan,
                 @enum.Span);
@@ -260,7 +278,7 @@ public sealed class Binder
                 "delegate",
                 @delegate.Id,
                 @delegate.Name,
-                @delegate.Name,
+                GetQualifiedTypeName(@delegate),
                 Visibility.Public,
                 @delegate.IdentifierSpan,
                 @delegate.Span);
@@ -293,8 +311,8 @@ public sealed class Binder
     {
         var classIdentity = CreateDeclarationId(parentIdentity, "class", cls.Id, cls.Name);
         var qualifiedClassName = containingTypeName == null
-            ? cls.Name
-            : $"{containingTypeName}.{cls.Name}";
+            ? GetQualifiedTypeName(cls)
+            : $"{containingTypeName}.{GetTypeNameWithArity(cls.Name, cls.TypeParameters.Count)}";
         var classScope = _scope.CreateChild();
         var classSymbol = new TypeSymbol(
             classIdentity,
@@ -310,10 +328,13 @@ public sealed class Binder
         _classSymbolIds.Add(cls, classIdentity);
         _classSymbols.Add(cls, classSymbol);
         _classesByQualifiedName[qualifiedClassName] = cls;
-        if (!_classesBySimpleName.TryGetValue(cls.Name, out var simpleMatches))
+        var simpleLookupName = GetTypeNameWithArity(
+            cls.Name,
+            cls.TypeParameters.Count);
+        if (!_classesBySimpleName.TryGetValue(simpleLookupName, out var simpleMatches))
         {
             simpleMatches = new List<ClassDefinitionNode>();
-            _classesBySimpleName.Add(cls.Name, simpleMatches);
+            _classesBySimpleName.Add(simpleLookupName, simpleMatches);
         }
         simpleMatches.Add(cls);
 
@@ -755,6 +776,27 @@ public sealed class Binder
             : declaredName;
     }
 
+    private static string QualifyTopLevelName(AstNode declaration, string name)
+        => declaration.NamespaceIdentity == null
+            || string.IsNullOrEmpty(declaration.NamespaceIdentity)
+            ? name
+            : $"{declaration.NamespaceIdentity}.{name}";
+
+    private static string GetQualifiedTypeName(TypeDefinitionNode type)
+    {
+        var name = QualifyTopLevelName(type, type.Name);
+        var arity = type switch
+        {
+            ClassDefinitionNode cls => cls.TypeParameters.Count,
+            InterfaceDefinitionNode iface => iface.TypeParameters.Count,
+            _ => 0
+        };
+        return TypeIdentity.ToLookupName(name, arity);
+    }
+
+    private static string GetTypeNameWithArity(string name, int arity)
+        => TypeIdentity.ToLookupName(name, arity);
+
     private static IReadOnlyList<string> GetCallableTypeParameters(
         string declaredName,
         IEnumerable<string> representedTypeParameters)
@@ -777,16 +819,25 @@ public sealed class Binder
         using var _ = PushScope(functionScope);
         var functionSymbol = _functionSymbols[func];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
+        var previousNamespaceIdentity = _currentNamespaceIdentity;
+        _currentNamespaceIdentity = func.NamespaceIdentity;
 
-        DeclareParameters(functionSymbol.Parameters, func.Parameters);
+        try
+        {
+            DeclareParameters(functionSymbol.Parameters, func.Parameters);
 
-        // Bind body
-        var boundBody = BindStatements(func.Body);
+            // Bind body
+            var boundBody = BindStatements(func.Body);
 
-        // Extract declared effects for taint analysis
-        var declaredEffects = ExtractEffects(func);
+            // Extract declared effects for taint analysis
+            var declaredEffects = ExtractEffects(func);
 
-        return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
+            return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
+        }
+        finally
+        {
+            _currentNamespaceIdentity = previousNamespaceIdentity;
+        }
     }
 
     private void DeclareParameters(
@@ -1280,19 +1331,49 @@ public sealed class Binder
     {
         var boundArgs = BindExpressions(newExpr.Arguments);
         var boundTypeReference = BindTypeReference(newExpr.TypeReference);
-        var resolution = ResolveCall(
-            newExpr.Span,
-            $"{newExpr.TypeName}..ctor",
-            boundArgs,
-            argumentNames: null,
-            argumentModifiers: null,
-            typeArguments: null);
         var initializers = newExpr.Initializers
             .Select(initializer => new BoundObjectInitializer(
                 initializer.Value.Span,
                 initializer.PropertyName,
                 BindExpression(initializer.Value)))
             .ToArray();
+        if (string.IsNullOrWhiteSpace(newExpr.TypeName)
+            || string.IsNullOrWhiteSpace(newExpr.TypeReference.Name))
+        {
+            if (!_diagnostics.Any(diagnostic =>
+                    diagnostic.Code == DiagnosticCode.ExpectedTypeName
+                    && diagnostic.Span.Start == newExpr.TypeNameSpan.Start
+                    && diagnostic.Span.Length == newExpr.TypeNameSpan.Length))
+            {
+                _diagnostics.ReportError(
+                    newExpr.TypeNameSpan,
+                    DiagnosticCode.ExpectedTypeName,
+                    "§NEW requires a non-empty type name.");
+            }
+
+            return new BoundNewExpression(
+                newExpr.Span,
+                newExpr.TypeName,
+                newExpr.TypeArguments,
+                boundArgs,
+                initializers,
+                resolvedConstructor: null,
+                resolvedType: null,
+                typeNameSpan: newExpr.TypeNameSpan,
+                resolvedConstructors: Array.Empty<FunctionSymbol>(),
+                typeReference: boundTypeReference);
+        }
+
+        var constructorTypeName = TypeIdentity.ToLookupName(
+            newExpr.TypeReference.Name,
+            newExpr.TypeReference.TypeArguments.Count);
+        var resolution = ResolveCall(
+            newExpr.Span,
+            $"{constructorTypeName}..ctor",
+            boundArgs,
+            argumentNames: null,
+            argumentModifiers: null,
+            typeArguments: null);
 
         return new BoundNewExpression(
             newExpr.Span,
@@ -1317,7 +1398,9 @@ public sealed class Binder
             typeReference.Span,
             string.IsNullOrEmpty(typeReference.Name)
                 ? null
-                : ResolveTypeSymbol(typeReference.Name),
+                : ResolveTypeSymbol(
+                    typeReference.Name,
+                    typeReference.TypeArguments.Count),
             typeArguments);
     }
 
@@ -2192,8 +2275,9 @@ public sealed class Binder
         var typePart = target[..lastDot];
         return (
             receiverSymbol != null
-                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
-                    GetNominalTypeName(receiverSymbol.TypeName))
+                ? ResolveTypeSymbol(receiverSymbol.TypeName)?.QualifiedName
+                    ?? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
+                        receiverSymbol.TypeName)
                 : receiverTypeSymbol != null
                     ? receiverTypeSymbol.QualifiedName
                     : !typePart.Contains('.')
@@ -2231,15 +2315,25 @@ public sealed class Binder
 
     private TypeSymbol? ResolveCallReceiverType(string target)
     {
-        var firstDot = target.IndexOf('.');
-        if (firstDot <= 0)
+        var receiverName = GetTypeQualifiedCallReceiver(target);
+        if (receiverName == null)
             return null;
 
-        var receiverName = target[..firstDot];
-        var genericStart = receiverName.IndexOf('<');
-        if (genericStart > 0)
-            receiverName = receiverName[..genericStart];
         return ResolveTypeSymbol(receiverName);
+    }
+
+    private static string? GetTypeQualifiedCallReceiver(string target)
+    {
+        const string globalPrefix = "global::";
+        if (target.StartsWith(globalPrefix, StringComparison.Ordinal))
+            target = target[globalPrefix.Length..];
+
+        const string constructorSuffix = "..ctor";
+        if (target.EndsWith(constructorSuffix, StringComparison.Ordinal))
+            return target[..^constructorSuffix.Length];
+
+        var lastDot = target.LastIndexOf('.');
+        return lastDot <= 0 ? null : target[..lastDot];
     }
 
     private OverloadResolutionResult ResolveCall(
@@ -2411,6 +2505,10 @@ public sealed class Binder
 
     private bool IsFunctionAccessible(FunctionSymbol function)
     {
+        // Top-level functions belong to the ModuleNode, not to the generated
+        // namespace-specific static class used by C# emission. Every top-level
+        // declaration in this binding unit is therefore module-local and
+        // accessible from every namespace scope in the same module.
         if (function.ContainingTypeName == null)
             return true;
 
@@ -2505,6 +2603,13 @@ public sealed class Binder
 
     private IEnumerable<string> GetCallLookupNames(string target)
     {
+        const string globalPrefix = "global::";
+        if (target.StartsWith(globalPrefix, StringComparison.Ordinal))
+        {
+            yield return target[globalPrefix.Length..];
+            yield break;
+        }
+
         if (target.StartsWith("this.", StringComparison.Ordinal) && _currentClassName != null)
         {
             foreach (var lookupName in EnumerateHierarchyLookupNames(
@@ -2541,15 +2646,28 @@ public sealed class Binder
                 }
             }
 
+            if (!string.IsNullOrEmpty(_currentNamespaceIdentity))
+                yield return $"{_currentNamespaceIdentity}.{target}";
+
+            if (_topLevelFunctionLookupNames.TryGetValue(
+                    GetCallableLookupName(target),
+                    out var qualifiedLookupNames)
+                && qualifiedLookupNames.Count == 1)
+            {
+                yield return qualifiedLookupNames.Single();
+            }
+
             yield return target;
             yield break;
         }
 
         var receiverName = target[..firstDot];
-        if (_scope.Lookup(receiverName) is VariableSymbol receiver)
+        var receiver = _scope.LookupAll(receiverName)
+            .OfType<VariableSymbol>()
+            .FirstOrDefault();
+        if (receiver != null)
         {
-            var receiverType = GetNominalTypeName(receiver.TypeName);
-            var receiverClass = ResolveClass(receiverType);
+            var receiverClass = ResolveClass(receiver.TypeName);
             if (receiverClass != null)
             {
                 foreach (var lookupName in EnumerateHierarchyLookupNames(
@@ -2558,6 +2676,22 @@ public sealed class Binder
                 {
                     yield return lookupName;
                 }
+            }
+            else
+            {
+                yield return target;
+            }
+            yield break;
+        }
+
+        var typeReceiverName = GetTypeQualifiedCallReceiver(target);
+        if (typeReceiverName != null)
+        {
+            var receiverClass = ResolveClass(typeReceiverName);
+            if (receiverClass != null)
+            {
+                yield return
+                    $"{_qualifiedClassNames[receiverClass]}{target[typeReceiverName.Length..]}";
                 yield break;
             }
         }
@@ -2578,45 +2712,52 @@ public sealed class Binder
         }
     }
 
-    private static string GetNominalTypeName(string typeName)
+    private TypeSymbol? ResolveTypeSymbol(
+        string typeName,
+        int? explicitArity = null)
     {
-        var type = typeName.Trim().TrimStart('?');
-        var generic = type.IndexOf('<');
-        if (generic > 0)
-            type = type[..generic];
-        var array = type.IndexOf('[');
-        if (array > 0)
-            type = type[..array];
-        return type.TrimEnd('?', '*');
-    }
-
-    private TypeSymbol? ResolveTypeSymbol(string typeName)
-    {
-        var cls = ResolveClass(typeName);
+        var cls = ResolveClass(typeName, explicitArity);
         return cls == null ? null : _classSymbols[cls];
     }
 
     private ClassDefinitionNode? ResolveBaseClass(ClassDefinitionNode? cls) =>
         cls?.BaseClass is { Length: > 0 } baseClass ? ResolveClass(baseClass) : null;
 
-    private ClassDefinitionNode? ResolveClass(string typeName)
+    private ClassDefinitionNode? ResolveClass(
+        string typeName,
+        int? explicitArity = null)
     {
-        var nominal = GetNominalTypeName(typeName);
-        if (_classesByQualifiedName.TryGetValue(nominal, out var qualified))
+        var lookupName = TypeIdentity.ToLookupName(
+            typeName,
+            explicitArity);
+        if (_classesByQualifiedName.TryGetValue(lookupName, out var qualified))
             return qualified;
+
+        if (!string.IsNullOrEmpty(_currentNamespaceIdentity))
+        {
+            var namespaceCandidate =
+                $"{_currentNamespaceIdentity}.{lookupName}";
+            if (_classesByQualifiedName.TryGetValue(
+                    namespaceCandidate,
+                    out var namespaced))
+            {
+                return namespaced;
+            }
+        }
 
         if (_currentClassName != null)
         {
             var containingSeparator = _currentClassName.LastIndexOf('.');
             if (containingSeparator > 0)
             {
-                var nestedCandidate = $"{_currentClassName[..containingSeparator]}.{nominal}";
+                var nestedCandidate =
+                    $"{_currentClassName[..containingSeparator]}.{lookupName}";
                 if (_classesByQualifiedName.TryGetValue(nestedCandidate, out var nested))
                     return nested;
             }
         }
 
-        return _classesBySimpleName.TryGetValue(nominal, out var matches) && matches.Count == 1
+        return _classesBySimpleName.TryGetValue(lookupName, out var matches) && matches.Count == 1
             ? matches[0]
             : null;
     }
@@ -3147,10 +3288,12 @@ public sealed class Binder
         var previousClass = _currentClass;
         var previousClassScope = _currentClassScope;
         var previousClassIdentity = _currentClassIdentity;
+        var previousNamespaceIdentity = _currentNamespaceIdentity;
         _currentClassName = className;
         _currentClass = cls;
         _currentClassScope = classScope;
         _currentClassIdentity = _classSymbolIds[cls];
+        _currentNamespaceIdentity = cls.NamespaceIdentity;
 
         try
         {
@@ -3322,6 +3465,7 @@ public sealed class Binder
             _currentClass = previousClass;
             _currentClassScope = previousClassScope;
             _currentClassIdentity = previousClassIdentity;
+            _currentNamespaceIdentity = previousNamespaceIdentity;
         }
     }
 

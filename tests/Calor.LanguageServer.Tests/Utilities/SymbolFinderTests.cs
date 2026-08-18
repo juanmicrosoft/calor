@@ -185,6 +185,85 @@ public class SymbolFinderTests
     }
 
     [Fact]
+    public void TupleGenericNewTypes_IndexContainersAndSkipAnonymousTupleNodes()
+    {
+        const string source = """
+            §M{m001:TupleReferences}
+              §CL{c001:List:pub}<T>
+                §CTOR{ctor001:pub} ()
+                  §P STR:"list"
+              §CL{c002:Dictionary:pub}<TKey,TValue>
+                §CTOR{ctor002:pub} ()
+                  §P STR:"dictionary"
+              §F{f001:MakeList:pub} () -> object
+                §R §NEW{List<(i32,i32)>} §/NEW
+              §F{f002:MakeDictionary:pub} () -> object
+                §R §NEW{Dictionary<str,(i32,i32)>} §/NEW
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        Assert.NotNull(state.Ast);
+        Assert.True(
+            state.BoundModule != null,
+            string.Join(
+                Environment.NewLine,
+                state.Diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}")));
+        var typeSymbols = state.BoundModule.SymbolsById.Values
+            .OfType<TypeSymbol>()
+            .ToArray();
+        var list = Assert.Single(
+            typeSymbols,
+            symbol => symbol.QualifiedName == "List`1");
+        var dictionary = Assert.Single(
+            typeSymbols,
+            symbol => symbol.QualifiedName == "Dictionary`2");
+
+        TypeReferenceIndexResult? index = null;
+        var exception = Record.Exception(
+            () => index = TypeReferenceIndex.BuildDetailed(
+                state.Ast,
+                state.BoundModule,
+                source,
+                typeSymbols));
+
+        Assert.Null(exception);
+        Assert.NotNull(index);
+        Assert.Contains(
+            index.References,
+            reference => reference.SymbolId == list.Id
+                && TextAt(source, reference.Span) == "List");
+        Assert.Contains(
+            index.References,
+            reference => reference.SymbolId == dictionary.Id
+                && TextAt(source, reference.Span) == "Dictionary");
+        Assert.DoesNotContain(
+            index.References,
+            reference => string.IsNullOrWhiteSpace(reference.Name));
+
+        foreach (var (name, expectedId) in new[]
+                 {
+                     ("List<(i32,i32)>", list.Id),
+                     ("Dictionary<str,(i32,i32)>", dictionary.Id),
+                 })
+        {
+            var offset = source.IndexOf(name, StringComparison.Ordinal);
+            var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+            var symbol = SymbolFinder.FindSymbolAtPosition(
+                state.Ast,
+                line,
+                column,
+                source,
+                state.BoundModule);
+
+            Assert.NotNull(symbol);
+            Assert.Equal(expectedId, symbol.SymbolId);
+        }
+
+        Assert.Throws<ArgumentException>(
+            () => TypeIdentity.ToLookupName(" \t"));
+    }
+
+    [Fact]
     public void NestedLocalDeclarationSpans_AreIdentifierTokens()
     {
         var source = """
@@ -229,6 +308,9 @@ public class SymbolFinderTests
                 source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
         }
     }
+
+    private static string TextAt(string source, TextSpan span) =>
+        source.Substring(span.Start, span.Length);
 
     [Fact]
     public void FindDefinition_Function_ReturnsFunction()

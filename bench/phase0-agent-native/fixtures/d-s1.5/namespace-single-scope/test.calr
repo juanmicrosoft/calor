@@ -1,0 +1,5 @@
+§M{m001:FixtureTest}
+  §NS{ns1:SingleScope}
+    §CL{c1:Value:pub:stat}
+      §MT{m1:Get:pub:stat} () -> i32
+        §R INT:42

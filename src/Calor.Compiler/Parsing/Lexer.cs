@@ -38,6 +38,7 @@ public sealed class Lexer
         ["D"] = TokenKind.Record,           // §D = Record (Data)
         ["V"] = TokenKind.Variant,          // §V = Variant
         ["U"] = TokenKind.Using,            // §U = Using
+        ["NS"] = TokenKind.Namespace,        // §NS = Namespace scope
 
         // Closing tags (§/X pattern)
         ["/M"] = TokenKind.EndModule,       // §/M
@@ -49,6 +50,7 @@ public sealed class Lexer
         ["/K"] = TokenKind.EndCase,         // §/K - closing case tag
         ["/T"] = TokenKind.EndType,         // §/T
         ["/D"] = TokenKind.EndRecord,       // §/D
+        ["/NS"] = TokenKind.EndNamespace,   // §/NS
 
         // Control flow keywords
         ["IF"] = TokenKind.If,              // §IF = explicit if
@@ -508,7 +510,11 @@ public sealed class Lexer
                     {
                         lastPopped = indentStack.Pop();
                         yield return new Token(TokenKind.Dedent, "",
-                            new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
+                            new TextSpan(
+                                tok.Span.Start,
+                                0,
+                                tok.Span.Line,
+                                indentStack.Peek() + 1));
                     }
                     if (indentStack.Peek() != currentIndent)
                     {
@@ -598,7 +604,11 @@ public sealed class Lexer
                 {
                     indentStack.Pop();
                     yield return new Token(TokenKind.Dedent, "",
-                        new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
+                        new TextSpan(
+                            tok.Span.Start,
+                            0,
+                            tok.Span.Line,
+                            indentStack.Peek() + 1));
                 }
                 // Phase 3 (indent-aware): always emit one final implicit
                 // Dedent at EOF. This lets the outermost block (typically

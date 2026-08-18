@@ -41,7 +41,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         string Namespace,
         string? Alias,
         bool IsStatic,
-        bool IsGlobal);
+        bool IsGlobal,
+        string? NamespaceScopeId);
 
     private sealed class EmissionContext
     {
@@ -57,22 +58,31 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private EmissionContext _emissionContext = new();
     private HashSet<string> _reservedGeneratedIdentifiers = new(StringComparer.Ordinal);
     private string? _currentClassName;
-    private string _currentModuleName = "";
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
+    private HashSet<string> _allModuleFunctionNames = new(StringComparer.Ordinal);
+    private HashSet<string> _allModuleQualifiedFunctionNames = new(StringComparer.Ordinal);
+    private IReadOnlyDictionary<string, CrossModuleFunctionTarget> _intraModuleFunctionModules =
+        new Dictionary<string, CrossModuleFunctionTarget>(StringComparer.Ordinal);
+    private HashSet<FunctionNode> _moduleFunctionsRequiringWiderVisibility = [];
     private HashSet<string> _currentClassMemberNames = new(StringComparer.Ordinal);
     private Stack<(HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
 
     /// <summary>
-    /// Bare public function name → defining module name, for qualifying
-    /// cross-module calls at emission (G3/#809). Without qualification a
+    /// Bare or explicit function target → emitted namespace/static-class
+    /// container, for qualifying cross-module calls at emission (G3/#809).
+    /// Without qualification a
     /// bare-name call into another module emits as-is and fails csc with
     /// CS0103 (each module emits into its own namespace/static class). Only
     /// unambiguous names appear here; ambiguous bare names stay bare (and are
     /// likewise skipped by cross-module effect resolution). Null for
     /// single-module compiles.
     /// </summary>
-    public IReadOnlyDictionary<string, string>? CrossModuleFunctionModules { get; set; }
+    public IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules
+    {
+        get;
+        set;
+    }
     private string? _currentFunctionId;
     private string? _currentFilePath;
     private string _currentNamespace = "";
@@ -89,6 +99,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly Verification.Obligations.ObligationTracker? _obligationTracker;
     private readonly Verification.Obligations.ObligationPolicy _obligationPolicy;
     private readonly Diagnostics.DiagnosticBag? _diagnostics;
+    private readonly Diagnostics.DiagnosticBag _standaloneDiagnostics = new();
+
+    public Diagnostics.DiagnosticBag EmissionDiagnostics
+        => _diagnostics ?? _standaloneDiagnostics;
 
     // Track current indices for contract emission
     private int _currentPostconditionIndex;
@@ -477,8 +491,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _emissionContext = new EmissionContext();
         _reservedGeneratedIdentifiers = CollectReservedModuleIdentifiers(module);
         _currentClassName = null;
-        _currentModuleName = "";
         _currentModuleFunctionNames = new HashSet<string>(StringComparer.Ordinal);
+        _intraModuleFunctionModules =
+            CompilationDriver.BuildIntraModuleFunctionMap(module);
+        _allModuleFunctionNames = module.Functions
+            .Select(function => GetModuleFunctionLookupName(function.Name))
+            .ToHashSet(StringComparer.Ordinal);
+        _allModuleQualifiedFunctionNames =
+            CollectQualifiedModuleFunctionNames(module);
+        _moduleFunctionsRequiringWiderVisibility =
+            CollectFunctionsRequiringWiderVisibility(
+                module,
+                _intraModuleFunctionModules);
         _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
         _classMemberScopes = new Stack<(HashSet<string> Members, bool Suppress)>();
         _suppressCrossModuleQualification = false;
@@ -518,6 +542,91 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _lineDirectiveFile = string.IsNullOrEmpty(LineDirectiveFilePath)
             ? null
             : EscapeString(LineDirectiveFilePath);
+    }
+
+    private static HashSet<string> CollectQualifiedModuleFunctionNames(
+        ModuleNode module)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var function in module.Functions)
+        {
+            var functionName = GetModuleFunctionLookupName(function.Name);
+            if (!string.IsNullOrEmpty(module.Name))
+                names.Add($"{module.Name}.{functionName}");
+
+            var target = CrossModuleFunctionTarget.Create(module, function);
+            if (target != null && !string.IsNullOrEmpty(target.NamespaceIdentity))
+                names.Add($"{target.NamespaceIdentity}.{functionName}");
+        }
+
+        return names;
+    }
+
+    private static HashSet<FunctionNode> CollectFunctionsRequiringWiderVisibility(
+        ModuleNode module,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget> intraModuleTargets)
+    {
+        var result = new HashSet<FunctionNode>();
+        foreach (var declaration in EnumerateModuleDeclarations(module))
+        {
+            var callerNamespace = declaration is FunctionNode caller
+                ? CrossModuleFunctionTarget.Create(module, caller)?.NamespaceIdentity ?? ""
+                : declaration.NamespaceIdentity ?? "";
+            foreach (var descendant in DescendantsAndSelf(declaration))
+            {
+                var callTarget = descendant switch
+                {
+                    CallStatementNode call => call.Target,
+                    CallExpressionNode call => call.Target,
+                    _ => null
+                };
+                if (string.IsNullOrEmpty(callTarget))
+                    continue;
+
+                const string globalPrefix = "global::";
+                if (callTarget.StartsWith(globalPrefix, StringComparison.Ordinal))
+                    callTarget = callTarget[globalPrefix.Length..];
+                if (!intraModuleTargets.TryGetValue(callTarget, out var target))
+                    continue;
+
+                var sharesModuleClass =
+                    declaration is FunctionNode
+                    && string.Equals(
+                        callerNamespace,
+                        target.NamespaceIdentity,
+                        StringComparison.Ordinal);
+                if (sharesModuleClass)
+                    continue;
+
+                var separator = callTarget.LastIndexOf('.');
+                var functionName = separator < 0
+                    ? callTarget
+                    : callTarget[(separator + 1)..];
+                foreach (var function in module.Functions)
+                {
+                    if (!string.Equals(
+                            GetModuleFunctionLookupName(function.Name),
+                            functionName,
+                            StringComparison.Ordinal)
+                        || CrossModuleFunctionTarget.Create(module, function) != target)
+                    {
+                        continue;
+                    }
+
+                    result.Add(function);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static string GetModuleFunctionLookupName(string name)
+    {
+        var genericStart = name.LastIndexOf('<');
+        return genericStart > 0 && name.EndsWith('>')
+            ? name[..genericStart]
+            : name;
     }
 
     public string Emit(ModuleNode module)
@@ -1190,12 +1299,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             RegisterConditionalUsingDependencies(block);
         }
 
-        var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
-        var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
-        _currentNamespace = namespaceName;
-        _currentModuleName = node.Name;
-        _currentModuleFunctionNames = node.Functions.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
-
         // Emit module-level extended metadata as file-level comments
         if (node.Context != null)
         {
@@ -1216,113 +1319,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
         }
 
-        if (!isGlobalNamespace)
-        {
-            AppendLine($"namespace {namespaceName}");
-            AppendLine("{");
-            Indent();
-        }
-
-        // Emit module-level issues as comments
-        foreach (var issue in node.Issues)
-        {
-            AppendLine(Visit(issue));
-        }
-        // Emit module-level assumptions
-        foreach (var assume in node.Assumptions)
-        {
-            AppendLine(Visit(assume));
-        }
-        // Emit module-level invariants as comments
-        foreach (var invariant in node.Invariants)
-        {
-            var invCode = Visit(invariant);
-            AppendLine($"// INVARIANT: {invCode}");
-        }
-        if (node.Issues.Count > 0 || node.Assumptions.Count > 0 || node.Invariants.Count > 0)
-        {
-            AppendLine();
-        }
-
-        // Emit interfaces
-        foreach (var iface in node.Interfaces)
-        {
-            Visit(iface);
-            AppendLine();
-        }
-
-        // Emit enums
-        foreach (var enumDef in node.Enums)
-        {
-            Visit(enumDef);
-            AppendLine();
-        }
-
-        // Emit enum extensions
-        foreach (var enumExt in node.EnumExtensions)
-        {
-            Visit(enumExt);
-            AppendLine();
-        }
-
-        // Emit delegates
-        foreach (var del in node.Delegates)
-        {
-            Visit(del);
-            AppendLine();
-        }
-
-        // Emit classes
-        foreach (var cls in node.Classes)
-        {
-            Visit(cls);
-            AppendLine();
-        }
-
-        // Emit C# interop blocks
-        foreach (var interop in node.InteropBlocks)
-        {
-            Visit(interop);
-            AppendLine();
-        }
-
-        // Emit type-level preprocessor blocks
-        foreach (var tpp in node.TypePreprocessorBlocks)
-        {
-            if (ContainsConditionalTypes(tpp))
-            {
-                Visit(tpp);
-                AppendLine();
-            }
-        }
-
-        // Emit module-level functions in a static class
-        if (node.Functions.Count > 0)
-        {
-            var moduleClassName = isGlobalNamespace
-                ? "GlobalModule"
-                : SanitizeIdentifier(node.Name.Contains('.')
-                    ? node.Name.Split('.').Last()
-                    : node.Name) + "Module";
-            AppendLine($"public static class {moduleClassName}");
-            AppendLine("{");
-            Indent();
-
-            foreach (var function in node.Functions)
-            {
-                Visit(function);
-                AppendLine();
-            }
-
-            Dedent();
-            AppendLine("}");
-        }
-
-        if (!isGlobalNamespace)
-        {
-            Dedent();
-            AppendLine("}");
-        }
+        if (HasExplicitNamespaceTopology(node))
+            EmitExplicitNamespaceTopology(node, userUsings);
+        else
+            EmitLegacyModuleNamespace(node);
 
         // Replace the placeholder from the structural dependency registry.
         // No emitted-text scanning is permitted here: dependencies are registered
@@ -1335,7 +1335,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var directive in userUsings.Where(u => u.IsGlobal))
             AppendUsing(directive);
         foreach (var block in node.TypePreprocessorBlocks)
-            AppendConditionalUsings(usingBlock, block, globalOnly: true);
+            AppendConditionalUsings(
+                usingBlock,
+                block,
+                globalOnly: true,
+                namespaceScopeId: null);
 
         foreach (var ns in OrderRequiredNamespaces(_requiredNamespaces))
         {
@@ -1345,10 +1349,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendUsing(directive);
         }
 
-        foreach (var directive in userUsings.Where(u => !u.IsGlobal))
+        foreach (var directive in userUsings.Where(
+                     u => !u.IsGlobal && u.NamespaceScopeId == null))
             AppendUsing(directive);
         foreach (var block in node.TypePreprocessorBlocks)
-            AppendConditionalUsings(usingBlock, block, globalOnly: false);
+            AppendConditionalUsings(
+                usingBlock,
+                block,
+                globalOnly: false,
+                namespaceScopeId: null);
 
         void AppendUsing(UsingDirectiveNode directive)
         {
@@ -1363,6 +1372,418 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                      .Replace(usingPlaceholder + "\n", usingBlock.ToString())
                      .Replace(usingPlaceholder, usingBlock.ToString());
     }
+
+    private static bool HasExplicitNamespaceTopology(ModuleNode node)
+        => node.NamespaceScopes.Count > 0
+           || node.Usings.Any(item => item.NamespaceScopeId != null)
+           || EnumerateModuleDeclarations(node).Any(item =>
+               item.NamespaceScopeId != null
+               && !(item.NamespaceScopeId == ""
+                    && !string.IsNullOrEmpty(item.NamespaceIdentity)));
+
+    private void EmitLegacyModuleNamespace(ModuleNode node)
+    {
+        var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
+        var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
+        _currentNamespace = namespaceName;
+
+        if (!isGlobalNamespace)
+        {
+            AppendLine($"namespace {namespaceName}");
+            AppendLine("{");
+            Indent();
+        }
+
+        EmitModuleDiagnostics(node);
+        EmitScopedDeclarations(node, scopeId: null, namespaceName);
+
+        if (!isGlobalNamespace)
+        {
+            Dedent();
+            AppendLine("}");
+        }
+    }
+
+    private void EmitExplicitNamespaceTopology(
+        ModuleNode node,
+        IReadOnlyList<UsingDirectiveNode> userUsings)
+    {
+        _currentNamespace = "";
+        EmitModuleDiagnostics(node);
+
+        if (EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == ""))
+            EmitScopedDeclarations(node, "", "");
+
+        var emittedScopeIds = new HashSet<string>(StringComparer.Ordinal);
+        var roots = node.NamespaceScopes
+            .Where(scope => scope.ParentScopeId == null)
+            .ToList();
+        var canUseFileScopedNamespace =
+            roots.Count == 1
+            && roots[0].IsFileScoped
+            && !roots[0].IsGlobal
+            && !EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == "")
+            && !node.NamespaceScopes.Any(scope => scope.ParentScopeId == roots[0].Id);
+
+        foreach (var root in roots)
+        {
+            EmitNamespaceScope(
+                node,
+                userUsings,
+                root,
+                emittedScopeIds,
+                useFileScopedSyntax: canUseFileScopedNamespace);
+        }
+
+        var orphanScopeIds = EnumerateModuleDeclarations(node)
+            .Select(item => item.NamespaceScopeId)
+            .Concat(userUsings.Select(item => item.NamespaceScopeId))
+            .Where(scopeId => !string.IsNullOrEmpty(scopeId) && !emittedScopeIds.Contains(scopeId))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        foreach (var scopeId in orphanScopeIds)
+        {
+            var namespaceIdentity = EnumerateModuleDeclarations(node)
+                .FirstOrDefault(item => item.NamespaceScopeId == scopeId)
+                ?.NamespaceIdentity
+                ?? userUsings.FirstOrDefault(item => item.NamespaceScopeId == scopeId)
+                    ?.NamespaceIdentity;
+            if (namespaceIdentity == null)
+            {
+                ReportMalformedNamespaceTopology(
+                    EnumerateModuleDeclarations(node)
+                        .FirstOrDefault(item => item.NamespaceScopeId == scopeId)
+                    ?? userUsings.FirstOrDefault(item =>
+                        item.NamespaceScopeId == scopeId),
+                    $"Namespace scope '{scopeId}' has no scope declaration or namespace identity; " +
+                    "its declarations were preserved in the global namespace.");
+                namespaceIdentity = "";
+            }
+            EmitSyntheticNamespaceScope(
+                node,
+                userUsings,
+                scopeId!,
+                namespaceIdentity);
+            emittedScopeIds.Add(scopeId!);
+        }
+
+        var unscopedDeclarations = EnumerateEmittableModuleDeclarations(node)
+            .Where(item => item.NamespaceScopeId == null)
+            .ToList();
+        foreach (var namespaceGroup in unscopedDeclarations
+                     .Where(item => !string.IsNullOrEmpty(item.NamespaceIdentity))
+                     .GroupBy(item => item.NamespaceIdentity!, StringComparer.Ordinal))
+        {
+            EmitUnscopedNamespaceFallback(node, namespaceGroup.Key);
+        }
+
+        var unresolvedDeclarations = unscopedDeclarations
+            .Where(item => item.NamespaceIdentity == null)
+            .ToList();
+        foreach (var declaration in unresolvedDeclarations)
+        {
+            ReportMalformedNamespaceTopology(
+                declaration,
+                "Explicit namespace topology contains declarations with neither a namespace scope " +
+                "nor an explicit namespace identity; the declaration was preserved in the global namespace: " +
+                (declaration.FullyQualifiedSymbolIdentity
+                 ?? declaration.GetType().Name));
+        }
+
+        if (unresolvedDeclarations.Count > 0
+            || unscopedDeclarations.Any(item => item.NamespaceIdentity == ""))
+        {
+            EmitUnscopedNamespaceFallback(
+                node,
+                "",
+                includeMissingNamespaceIdentity: true);
+        }
+    }
+
+    private void EmitNamespaceScope(
+        ModuleNode node,
+        IReadOnlyList<UsingDirectiveNode> userUsings,
+        NamespaceScopeInfo scope,
+        HashSet<string> emittedScopeIds,
+        bool useFileScopedSyntax)
+    {
+        emittedScopeIds.Add(scope.Id);
+        var previousNamespace = _currentNamespace;
+        _currentNamespace = scope.IsGlobal ? "" : SanitizeNamespace(scope.FullName);
+
+        if (scope.IsGlobal)
+        {
+            EmitNamespaceScopedUsings(node, userUsings, scope.Id);
+            EmitScopedDeclarations(node, scope.Id, "");
+            foreach (var child in node.NamespaceScopes.Where(
+                         candidate => candidate.ParentScopeId == scope.Id))
+            {
+                EmitNamespaceScope(
+                    node,
+                    userUsings,
+                    child,
+                    emittedScopeIds,
+                    useFileScopedSyntax: false);
+            }
+        }
+        else if (useFileScopedSyntax)
+        {
+            AppendLine($"namespace {_currentNamespace};");
+            AppendLine();
+            EmitNamespaceScopedUsings(node, userUsings, scope.Id);
+            EmitScopedDeclarations(node, scope.Id, scope.FullName);
+        }
+        else
+        {
+            var declaredName = SanitizeNamespace(scope.Name);
+            AppendLine($"namespace {declaredName}");
+            AppendLine("{");
+            Indent();
+            EmitNamespaceScopedUsings(node, userUsings, scope.Id);
+            EmitScopedDeclarations(node, scope.Id, scope.FullName);
+            foreach (var child in node.NamespaceScopes.Where(
+                         candidate => candidate.ParentScopeId == scope.Id))
+            {
+                EmitNamespaceScope(
+                    node,
+                    userUsings,
+                    child,
+                    emittedScopeIds,
+                    useFileScopedSyntax: false);
+            }
+            Dedent();
+            AppendLine("}");
+            AppendLine();
+        }
+
+        _currentNamespace = previousNamespace;
+    }
+
+    private void EmitUnscopedNamespaceFallback(
+        ModuleNode node,
+        string namespaceIdentity,
+        bool includeMissingNamespaceIdentity = false)
+    {
+        var previousNamespace = _currentNamespace;
+        _currentNamespace = string.IsNullOrEmpty(namespaceIdentity)
+            ? ""
+            : SanitizeNamespace(namespaceIdentity);
+        if (string.IsNullOrEmpty(namespaceIdentity))
+        {
+            EmitScopedDeclarations(
+                node,
+                scopeId: null,
+                namespaceIdentity,
+                explicitUnscopedFallback: true,
+                includeMissingNamespaceIdentity);
+        }
+        else
+        {
+            AppendLine($"namespace {_currentNamespace}");
+            AppendLine("{");
+            Indent();
+            EmitScopedDeclarations(
+                node,
+                scopeId: null,
+                namespaceIdentity,
+                explicitUnscopedFallback: true,
+                includeMissingNamespaceIdentity);
+            Dedent();
+            AppendLine("}");
+            AppendLine();
+        }
+        _currentNamespace = previousNamespace;
+    }
+
+    private void EmitSyntheticNamespaceScope(
+        ModuleNode node,
+        IReadOnlyList<UsingDirectiveNode> userUsings,
+        string scopeId,
+        string namespaceIdentity)
+    {
+        var previousNamespace = _currentNamespace;
+        _currentNamespace = string.IsNullOrEmpty(namespaceIdentity)
+            ? ""
+            : SanitizeNamespace(namespaceIdentity);
+        if (string.IsNullOrEmpty(namespaceIdentity))
+        {
+            EmitNamespaceScopedUsings(node, userUsings, scopeId);
+            EmitScopedDeclarations(node, scopeId, namespaceIdentity);
+        }
+        else
+        {
+            AppendLine($"namespace {_currentNamespace}");
+            AppendLine("{");
+            Indent();
+            EmitNamespaceScopedUsings(node, userUsings, scopeId);
+            EmitScopedDeclarations(node, scopeId, namespaceIdentity);
+            Dedent();
+            AppendLine("}");
+            AppendLine();
+        }
+        _currentNamespace = previousNamespace;
+    }
+
+    private void EmitNamespaceScopedUsings(
+        ModuleNode node,
+        IReadOnlyList<UsingDirectiveNode> userUsings,
+        string scopeId)
+    {
+        var emittedAny = false;
+        foreach (var directive in userUsings.Where(
+                     item => !item.IsGlobal && item.NamespaceScopeId == scopeId))
+        {
+            AppendLine(Visit(directive));
+            emittedAny = true;
+        }
+
+        var conditional = new StringBuilder();
+        foreach (var block in node.TypePreprocessorBlocks)
+        {
+            AppendConditionalUsings(
+                conditional,
+                block,
+                globalOnly: false,
+                namespaceScopeId: scopeId);
+        }
+        foreach (var line in conditional.ToString()
+                     .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            AppendLine(line);
+            emittedAny = true;
+        }
+
+        if (emittedAny)
+            AppendLine();
+    }
+
+    private void EmitModuleDiagnostics(ModuleNode node)
+    {
+        foreach (var issue in node.Issues)
+            AppendLine(Visit(issue));
+        foreach (var assume in node.Assumptions)
+            AppendLine(Visit(assume));
+        foreach (var invariant in node.Invariants)
+            AppendLine($"// INVARIANT: {Visit(invariant)}");
+        if (node.Issues.Count > 0 || node.Assumptions.Count > 0 || node.Invariants.Count > 0)
+            AppendLine();
+    }
+
+    private void EmitScopedDeclarations(
+        ModuleNode node,
+        string? scopeId,
+        string namespaceIdentity,
+        bool explicitUnscopedFallback = false,
+        bool includeMissingNamespaceIdentity = false)
+    {
+        bool InScope(AstNode item) => explicitUnscopedFallback
+            ? item.NamespaceScopeId == null
+              && (string.Equals(
+                      item.NamespaceIdentity,
+                      namespaceIdentity,
+                      StringComparison.Ordinal)
+                  || includeMissingNamespaceIdentity
+                  && item.NamespaceIdentity == null)
+            : scopeId == null || item.NamespaceScopeId == scopeId;
+
+        var previousModuleFunctionNames = _currentModuleFunctionNames;
+        var functions = node.Functions.Where(InScope).ToList();
+        _currentModuleFunctionNames = functions
+            .Select(function => GetModuleFunctionLookupName(function.Name))
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var iface in node.Interfaces.Where(InScope))
+        {
+            Visit(iface);
+            AppendLine();
+        }
+        foreach (var enumDef in node.Enums.Where(InScope))
+        {
+            Visit(enumDef);
+            AppendLine();
+        }
+        foreach (var enumExt in node.EnumExtensions.Where(InScope))
+        {
+            Visit(enumExt);
+            AppendLine();
+        }
+        foreach (var del in node.Delegates.Where(InScope))
+        {
+            Visit(del);
+            AppendLine();
+        }
+        foreach (var cls in node.Classes.Where(InScope))
+        {
+            Visit(cls);
+            AppendLine();
+        }
+        foreach (var interop in node.InteropBlocks.Where(InScope))
+        {
+            Visit(interop);
+            AppendLine();
+        }
+        foreach (var preprocessor in node.TypePreprocessorBlocks.Where(InScope))
+        {
+            if (ContainsConditionalTypes(preprocessor))
+            {
+                Visit(preprocessor);
+                AppendLine();
+            }
+        }
+
+        if (functions.Count == 0)
+        {
+            _currentModuleFunctionNames = previousModuleFunctionNames;
+            return;
+        }
+
+        var moduleClassName = string.IsNullOrEmpty(namespaceIdentity)
+            ? "GlobalModule"
+            : SanitizeIdentifier(namespaceIdentity.Split('.').Last()) + "Module";
+        AppendLine($"public static class {moduleClassName}");
+        AppendLine("{");
+        Indent();
+        foreach (var function in functions)
+        {
+            Visit(function);
+            AppendLine();
+        }
+        Dedent();
+        AppendLine("}");
+        _currentModuleFunctionNames = previousModuleFunctionNames;
+    }
+
+    private void ReportMalformedNamespaceTopology(
+        AstNode? declaration,
+        string message)
+    {
+        EmissionDiagnostics.ReportError(
+            declaration?.Span ?? TextSpan.Empty,
+            Diagnostics.DiagnosticCode.MalformedNamespaceTopology,
+            message);
+    }
+
+    private static IEnumerable<AstNode> EnumerateModuleDeclarations(ModuleNode node)
+        => node.Interfaces.Cast<AstNode>()
+            .Concat(node.Enums)
+            .Concat(node.EnumExtensions)
+            .Concat(node.Delegates)
+            .Concat(node.Classes)
+            .Concat(node.RefinementTypes)
+            .Concat(node.IndexedTypes)
+            .Concat(node.Functions)
+            .Concat(node.InteropBlocks)
+            .Concat(node.TypePreprocessorBlocks);
+
+    private static IEnumerable<AstNode> EnumerateEmittableModuleDeclarations(ModuleNode node)
+        => node.Interfaces.Cast<AstNode>()
+            .Concat(node.Enums)
+            .Concat(node.EnumExtensions)
+            .Concat(node.Delegates)
+            .Concat(node.Classes)
+            .Concat(node.Functions)
+            .Concat(node.InteropBlocks)
+            .Concat(node.TypePreprocessorBlocks.Where(ContainsConditionalTypes));
 
     public string Visit(UsingDirectiveNode node)
     {
@@ -1402,9 +1823,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private void AppendConditionalUsings(
         StringBuilder builder,
         TypePreprocessorBlockNode block,
-        bool globalOnly)
+        bool globalOnly,
+        string? namespaceScopeId)
     {
-        if (!ContainsConditionalUsing(block, globalOnly))
+        if (!ContainsConditionalUsing(block, globalOnly, namespaceScopeId))
             return;
 
         AppendBranch(block, isFirst: true);
@@ -1424,13 +1846,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 if (item is UsingDirectiveNode directive
                     && directive.IsGlobal == globalOnly
+                    && directive.NamespaceScopeId == namespaceScopeId
                     && seen.Add(GetUsingDirectiveKey(directive)))
                 {
                     builder.AppendLine(Visit(directive));
                 }
                 else if (item is TypePreprocessorBlockNode nested)
                 {
-                    AppendConditionalUsings(builder, nested, globalOnly);
+                    AppendConditionalUsings(
+                        builder,
+                        nested,
+                        globalOnly,
+                        namespaceScopeId);
                 }
             }
 
@@ -1441,12 +1868,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static bool ContainsConditionalUsing(
         TypePreprocessorBlockNode block,
-        bool isGlobal)
-        => block.Usings.Any(directive => directive.IsGlobal == isGlobal)
+        bool isGlobal,
+        string? namespaceScopeId)
+        => block.Usings.Any(directive =>
+               directive.IsGlobal == isGlobal
+               && directive.NamespaceScopeId == namespaceScopeId)
             || block.NestedBlocks.Any(nested =>
-                ContainsConditionalUsing(nested, isGlobal))
+                ContainsConditionalUsing(nested, isGlobal, namespaceScopeId))
             || block.ElseBranch != null
-            && ContainsConditionalUsing(block.ElseBranch, isGlobal);
+            && ContainsConditionalUsing(
+                block.ElseBranch,
+                isGlobal,
+                namespaceScopeId);
 
     private static bool ContainsConditionalTypes(TypePreprocessorBlockNode block)
         => block.Classes.Count > 0
@@ -1524,6 +1957,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var visibility = node.Visibility switch
         {
             Visibility.Public => "public",
+            Visibility.ProtectedInternal
+                when _moduleFunctionsRequiringWiderVisibility.Contains(node) => "internal",
+            Visibility.Protected
+                when _moduleFunctionsRequiringWiderVisibility.Contains(node) => "internal",
+            Visibility.Private
+                when _moduleFunctionsRequiringWiderVisibility.Contains(node) => "internal",
             Visibility.ProtectedInternal => "protected internal",
             Visibility.Internal => "internal",
             Visibility.Protected => "protected",
@@ -1663,11 +2102,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Qualifies a bare-name call target that resolves to another module's public
-    /// function (G3/#809): `SaveSnapshot` → `global::Store.StoreModule.SaveSnapshot`,
-    /// mirroring the module emission naming (namespace = sanitized module name,
-    /// class = sanitized last segment + "Module"). Self-module names, dotted or
-    /// generic targets, and names absent from the map pass through untouched.
+    /// Qualifies a call target that resolves to a function in another emitted
+    /// module static class, whether that class comes from another file or another
+    /// namespace in the same ModuleNode (G3/#809): `SaveSnapshot` →
+    /// `global::Company.Store.StoreModule.SaveSnapshot`, using the function's
+    /// actual emitted namespace and static module class rather than its Calor
+    /// module name. Generic targets and names absent from the map pass through.
     /// Skip order matters (#823 review C1/C2): locals and parameters in scope
     /// (the emitter tracks them in _declScopes), the enclosing class's own
     /// members, and the module's own functions all shadow other modules'
@@ -1675,23 +2115,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// </summary>
     private string QualifyCrossModuleTarget(string target)
     {
-        if (CrossModuleFunctionModules != null && target.Contains('.'))
+        if (target.Contains('.') && !HasValueReceiver(target))
         {
-            var separator = target.LastIndexOf('.');
-            var module = target[..separator];
-            var function = target[(separator + 1)..];
-            if (CrossModuleFunctionModules.TryGetValue(target, out var explicitModule) &&
-                explicitModule == module &&
-                explicitModule != _currentModuleName)
+            if (_intraModuleFunctionModules.TryGetValue(
+                    target,
+                    out var localExplicitTarget))
             {
-                var explicitNamespace = SanitizeNamespace(explicitModule);
-                var explicitClass = SanitizeIdentifier(explicitModule.Split('.').Last()) + "Module";
-                return $"global::{explicitNamespace}.{explicitClass}.{function}";
+                var separator = target.LastIndexOf('.');
+                var function = target[(separator + 1)..];
+                return QualifyCrossModuleTarget(localExplicitTarget, function);
+            }
+
+            if (_allModuleQualifiedFunctionNames.Contains(target))
+                return target;
+
+            if (TryGetCrossModuleFunctionTarget(
+                    target,
+                    out var externalExplicitTarget))
+            {
+                var separator = target.LastIndexOf('.');
+                var function = target[(separator + 1)..];
+                return QualifyCrossModuleTarget(
+                    externalExplicitTarget,
+                    function);
             }
         }
 
-        if (CrossModuleFunctionModules == null
-            || _suppressCrossModuleQualification
+        if (_suppressCrossModuleQualification
             || target.Length == 0
             || target.Contains('.')
             || target.Contains('<')
@@ -1702,19 +2152,83 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // was mis-qualified to another module — silent wrong code). Union
             // over the scope stack errs toward under-qualification, the
             // accepted failure direction.
-            || _classMemberScopes.Any(scope => scope.Members.Contains(target))
-            || _currentModuleFunctionNames.Contains(target)
-            || !CrossModuleFunctionModules.TryGetValue(target, out var calleeModule)
-            || calleeModule == _currentModuleName)
+            || _classMemberScopes.Any(scope => scope.Members.Contains(target)))
         {
             return target;
         }
 
-        var calleeNamespace = SanitizeNamespace(calleeModule);
-        var calleeClass = SanitizeIdentifier(calleeModule.Contains('.')
-            ? calleeModule.Split('.').Last()
-            : calleeModule) + "Module";
-        return $"global::{calleeNamespace}.{calleeClass}.{target}";
+        if (_allModuleFunctionNames.Contains(target))
+        {
+            if (!_intraModuleFunctionModules.TryGetValue(
+                    target,
+                    out var localTarget))
+            {
+                return target;
+            }
+
+            if (_currentClassName == null
+                && _currentModuleFunctionNames.Contains(target)
+                && IsCurrentNamespace(localTarget))
+            {
+                return target;
+            }
+
+            return QualifyCrossModuleTarget(localTarget, target);
+        }
+
+        return TryGetCrossModuleFunctionTarget(target, out var externalTarget)
+            && !IsCurrentNamespace(externalTarget)
+                ? QualifyCrossModuleTarget(externalTarget, target)
+                : target;
+    }
+
+    private bool TryGetCrossModuleFunctionTarget(
+        string target,
+        out CrossModuleFunctionTarget functionTarget)
+    {
+        if (CrossModuleFunctionModules != null
+            && CrossModuleFunctionModules.TryGetValue(
+                target,
+                out functionTarget!))
+        {
+            return true;
+        }
+
+        functionTarget = null!;
+        return false;
+    }
+
+    private bool IsCurrentNamespace(CrossModuleFunctionTarget target)
+        => string.Equals(
+            _currentNamespace,
+            string.IsNullOrEmpty(target.NamespaceIdentity)
+                ? ""
+                : SanitizeNamespace(target.NamespaceIdentity),
+            StringComparison.Ordinal);
+
+    private bool HasValueReceiver(string target)
+    {
+        var separator = target.IndexOf('.');
+        if (separator <= 0)
+            return false;
+
+        var receiver = target[..separator];
+        return receiver is "this" or "base"
+               || IsVarDeclaredInScope(receiver)
+               || _currentClassMemberNames.Contains(receiver)
+               || _classMemberScopes.Any(scope =>
+                   scope.Members.Contains(receiver));
+    }
+
+    private static string QualifyCrossModuleTarget(
+        CrossModuleFunctionTarget target,
+        string function)
+    {
+        var className = SanitizeIdentifier(target.ModuleClassName);
+        if (string.IsNullOrEmpty(target.NamespaceIdentity))
+            return $"global::{className}.{function}";
+
+        return $"global::{SanitizeNamespace(target.NamespaceIdentity)}.{className}.{function}";
     }
 
     public string Visit(CallStatementNode node)
@@ -6038,7 +6552,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     private static UsingDirectiveKey GetUsingDirectiveKey(UsingDirectiveNode node)
-        => new(node.Namespace, node.Alias, node.IsStatic, node.IsGlobal);
+        => new(
+            node.Namespace,
+            node.Alias,
+            node.IsStatic,
+            node.IsGlobal,
+            node.NamespaceScopeId);
 
     private static IEnumerable<string> OrderRequiredNamespaces(
         IEnumerable<string> namespaces)

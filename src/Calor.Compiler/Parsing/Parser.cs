@@ -208,6 +208,24 @@ public sealed class Parser
     private bool IsBlockEnd(TokenKind explicitCloser)
         => Check(explicitCloser) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
+    private bool IsBlockEndAtIndent(TokenKind explicitCloser, Token blockStart)
+        => Check(explicitCloser)
+           || Check(TokenKind.Eof)
+           || Check(TokenKind.Dedent)
+           && Current.Span.Column <= blockStart.Span.Column;
+
+    private bool ConsumeContinuationDedent(Token blockStart)
+    {
+        if (!Check(TokenKind.Dedent)
+            || Current.Span.Column <= blockStart.Span.Column)
+        {
+            return false;
+        }
+
+        Advance();
+        return true;
+    }
+
     /// <summary>
     /// v0.6.4 -- returns true when the current token is a Dedent and the
     /// following run of contiguous Dedents is terminated by an explicit
@@ -276,6 +294,17 @@ public sealed class Parser
             return Current;
         }
         return Expect(explicitCloser);
+    }
+
+    private Token ExpectBlockEndAtIndent(
+        TokenKind explicitCloser,
+        Token blockStart)
+    {
+        while (ConsumeContinuationDedent(blockStart))
+        {
+        }
+
+        return ExpectBlockEnd(explicitCloser);
     }
 
     /// <summary>
@@ -669,12 +698,35 @@ public sealed class Parser
         var refinementTypes = new List<RefinementTypeNode>();
         var indexedTypes = new List<IndexedTypeNode>();
         var typePreprocessorBlocks = new List<TypePreprocessorBlockNode>();
+        var namespaceScopes = new List<NamespaceScopeInfo>();
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndModule))
+        while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndModule, startToken))
         {
+            if (ConsumeContinuationDedent(startToken))
+            {
+                continue;
+            }
             if (Check(TokenKind.Using))
             {
                 usings.Add(ParseUsingDirective());
+            }
+            else if (Check(TokenKind.Namespace))
+            {
+                ParseNamespaceScope(
+                    parentFullName: null,
+                    parentScopeId: null,
+                    namespaceScopes,
+                    usings,
+                    interfaces,
+                    classes,
+                    enums,
+                    enumExtensions,
+                    delegates,
+                    functions,
+                    interopBlocks,
+                    refinementTypes,
+                    indexedTypes,
+                    typePreprocessorBlocks);
             }
             else if (Check(TokenKind.Interface))
             {
@@ -757,12 +809,12 @@ public sealed class Parser
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, NS, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndModule);
+        var endToken = ExpectBlockEndAtIndent(TokenKind.EndModule, startToken);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndModuleAttributes(endAttrs);
 
@@ -786,12 +838,304 @@ public sealed class Parser
             _diagnostics.ReportUnexpectedToken(Current.Span, TokenKind.Eof, Current.Kind);
         }
 
+        if (namespaceScopes.Count > 0)
+        {
+            foreach (var declaration in interfaces.Cast<AstNode>()
+                         .Concat(classes)
+                         .Concat(enums)
+                         .Concat(enumExtensions)
+                         .Concat(delegates)
+                         .Concat(functions)
+                         .Concat(interopBlocks)
+                         .Concat(refinementTypes)
+                         .Concat(indexedTypes)
+                         .Concat(typePreprocessorBlocks.Where(
+                             ContainsNamespaceScopedDeclarations))
+                         .Where(item =>
+                             item.NamespaceIdentity == null
+                             && item.NamespaceScopeId == null))
+            {
+                ApplyNamespaceMetadata(declaration, "", "");
+            }
+        }
+
         var span = startToken.Span.Union(endToken.Span);
         return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
             enums, enumExtensions, delegates, functions, attrs,
             issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes,
             typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null,
-            GetIdentifierSpan(attrs, moduleNameKey, moduleName));
+            GetIdentifierSpan(attrs, moduleNameKey, moduleName),
+            namespaceScopes);
+    }
+
+    private void ParseNamespaceScope(
+        string? parentFullName,
+        string? parentScopeId,
+        List<NamespaceScopeInfo> namespaceScopes,
+        List<UsingDirectiveNode> usings,
+        List<InterfaceDefinitionNode> interfaces,
+        List<ClassDefinitionNode> classes,
+        List<EnumDefinitionNode> enums,
+        List<EnumExtensionNode> enumExtensions,
+        List<DelegateDefinitionNode> delegates,
+        List<FunctionNode> functions,
+        List<CSharpInteropBlockNode> interopBlocks,
+        List<RefinementTypeNode> refinementTypes,
+        List<IndexedTypeNode> indexedTypes,
+        List<TypePreprocessorBlockNode> typePreprocessorBlocks)
+    {
+        var startToken = Expect(TokenKind.Namespace);
+        var attrs = ParseAttributes();
+        var id = attrs["_pos0"] ?? "";
+        var name = attrs["_pos1"] ?? "";
+        var scopeMarkers = new[]
+        {
+            attrs["_pos2"],
+            attrs["_pos3"],
+            attrs["_pos4"]
+        }.Where(marker => !string.IsNullOrEmpty(marker)).ToArray();
+        var positionCount = int.TryParse(attrs["_posCount"], out var count) ? count : 0;
+        if (positionCount < 2)
+        {
+            name = id;
+            id = GenerateParserAutoId("ns");
+        }
+        if (string.IsNullOrEmpty(id))
+            id = GenerateParserAutoId("ns");
+
+        var hasExplicitGlobalMarker = scopeMarkers.Contains(
+            "global",
+            StringComparer.OrdinalIgnoreCase);
+        var hasExplicitNamedMarker = scopeMarkers.Contains(
+            "named",
+            StringComparer.OrdinalIgnoreCase);
+        var isGlobal = hasExplicitGlobalMarker
+                       || name == "_global" && !hasExplicitNamedMarker;
+        var fullName = isGlobal
+            ? ""
+            : string.IsNullOrEmpty(parentFullName)
+                ? name
+                : $"{parentFullName}.{name}";
+        var isFileScoped = scopeMarkers.Contains(
+            "file",
+            StringComparer.OrdinalIgnoreCase);
+        namespaceScopes.Add(new NamespaceScopeInfo(
+            id,
+            name,
+            fullName,
+            parentScopeId,
+            isFileScoped,
+            startToken.Span,
+            isGlobal ? NamespaceScopeKind.Global : NamespaceScopeKind.Named));
+
+        while (!IsAtEnd
+               && !IsBlockEndAtIndent(TokenKind.EndNamespace, startToken)
+               && !IsNamespaceSiblingBoundary(startToken))
+        {
+            if (ConsumeContinuationDedent(startToken))
+                continue;
+
+            AstNode? parsed = null;
+            if (Check(TokenKind.Using))
+            {
+                parsed = ParseUsingDirective();
+                usings.Add((UsingDirectiveNode)parsed);
+            }
+            else if (Check(TokenKind.Namespace))
+            {
+                ParseNamespaceScope(
+                    fullName,
+                    id,
+                    namespaceScopes,
+                    usings,
+                    interfaces,
+                    classes,
+                    enums,
+                    enumExtensions,
+                    delegates,
+                    functions,
+                    interopBlocks,
+                    refinementTypes,
+                    indexedTypes,
+                    typePreprocessorBlocks);
+                continue;
+            }
+            else if (Check(TokenKind.Interface))
+            {
+                parsed = ParseInterfaceDefinition();
+                interfaces.Add((InterfaceDefinitionNode)parsed);
+            }
+            else if (Check(TokenKind.Class))
+            {
+                parsed = ParseClassDefinition();
+                classes.Add((ClassDefinitionNode)parsed);
+            }
+            else if (Check(TokenKind.Func))
+            {
+                parsed = ParseFunction();
+                functions.Add((FunctionNode)parsed);
+            }
+            else if (Check(TokenKind.AsyncFunc))
+            {
+                parsed = ParseAsyncFunction();
+                functions.Add((FunctionNode)parsed);
+            }
+            else if (Check(TokenKind.Delegate))
+            {
+                parsed = ParseDelegateDefinition();
+                delegates.Add((DelegateDefinitionNode)parsed);
+            }
+            else if (Check(TokenKind.Enum))
+            {
+                parsed = ParseEnumDefinition();
+                enums.Add((EnumDefinitionNode)parsed);
+            }
+            else if (Check(TokenKind.EnumExtension))
+            {
+                parsed = ParseEnumExtension();
+                enumExtensions.Add((EnumExtensionNode)parsed);
+            }
+            else if (Check(TokenKind.CSharpInterop))
+            {
+                parsed = ParseCSharpInteropBlock();
+                interopBlocks.Add((CSharpInteropBlockNode)parsed);
+            }
+            else if (Check(TokenKind.RefinedType))
+            {
+                parsed = ParseRefinementType();
+                refinementTypes.Add((RefinementTypeNode)parsed);
+            }
+            else if (Check(TokenKind.IndexedType))
+            {
+                parsed = ParseIndexedType();
+                indexedTypes.Add((IndexedTypeNode)parsed);
+            }
+            else if (Check(TokenKind.Preprocessor))
+            {
+                parsed = ParseTypePreprocessorBlock();
+                typePreprocessorBlocks.Add((TypePreprocessorBlockNode)parsed);
+            }
+            else
+            {
+                _diagnostics.ReportUnexpectedToken(
+                    Current.Span,
+                    "USING, NS, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_NS",
+                    Current.Kind);
+                Advance();
+            }
+
+            if (parsed != null)
+                ApplyNamespaceMetadata(parsed, fullName, id);
+        }
+
+        if (IsNamespaceSiblingBoundary(startToken))
+            return;
+
+        var endToken = ExpectBlockEndAtIndent(
+            TokenKind.EndNamespace,
+            startToken);
+        var endAttrs = ParseAttributes();
+        var endId = endAttrs["_pos0"] ?? "";
+        if (ShouldReportMismatchedId(endId, id, endToken))
+        {
+            _diagnostics.ReportMismatchedIdWithFix(
+                endToken.Span, "NS", id, "END_NS", endId);
+        }
+    }
+
+    private bool IsNamespaceSiblingBoundary(Token startToken)
+    {
+        if (Current.Span.Line <= startToken.Span.Line
+            || Current.Span.Column > startToken.Span.Column)
+        {
+            return false;
+        }
+
+        return Current.Kind is TokenKind.Using
+            or TokenKind.Namespace
+            or TokenKind.Interface
+            or TokenKind.Class
+            or TokenKind.Func
+            or TokenKind.AsyncFunc
+            or TokenKind.Delegate
+            or TokenKind.Enum
+            or TokenKind.EnumExtension
+            or TokenKind.CSharpInterop
+            or TokenKind.RefinedType
+            or TokenKind.IndexedType
+            or TokenKind.Preprocessor;
+    }
+
+    private static void ApplyNamespaceMetadata(
+        AstNode node,
+        string namespaceIdentity,
+        string namespaceScopeId)
+    {
+        node.NamespaceIdentity = namespaceIdentity;
+        node.NamespaceScopeId = namespaceScopeId;
+
+        if (node is TypeDefinitionNode type)
+        {
+            ApplyTypeIdentity(type, namespaceIdentity, namespaceScopeId, null);
+        }
+        else if (node is FunctionNode function)
+        {
+            var arity = function.TypeParameters.Count;
+            function.FullyQualifiedSymbolIdentity =
+                $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}" +
+                function.Name +
+                (arity > 0 ? $"`{arity}" : "");
+        }
+        else if (node is TypePreprocessorBlockNode preprocessor)
+        {
+            foreach (var item in preprocessor.Items)
+                ApplyNamespaceMetadata(item, namespaceIdentity, namespaceScopeId);
+            if (preprocessor.ElseBranch != null)
+                ApplyNamespaceMetadata(preprocessor.ElseBranch, namespaceIdentity, namespaceScopeId);
+        }
+    }
+
+    private static bool ContainsNamespaceScopedDeclarations(
+        TypePreprocessorBlockNode block)
+        => block.Classes.Count > 0
+           || block.Interfaces.Count > 0
+           || block.Enums.Count > 0
+           || block.Delegates.Count > 0
+           || block.InteropBlocks.Count > 0
+           || block.NestedBlocks.Any(ContainsNamespaceScopedDeclarations)
+           || block.ElseBranch != null
+           && ContainsNamespaceScopedDeclarations(block.ElseBranch);
+
+    private static void ApplyTypeIdentity(
+        TypeDefinitionNode type,
+        string namespaceIdentity,
+        string namespaceScopeId,
+        string? containingIdentity)
+    {
+        type.NamespaceIdentity = namespaceIdentity;
+        type.NamespaceScopeId = namespaceScopeId;
+        var arity = type switch
+        {
+            ClassDefinitionNode cls => cls.TypeParameters.Count,
+            InterfaceDefinitionNode iface => iface.TypeParameters.Count,
+            _ => 0
+        };
+        var suffix = arity > 0 ? $"`{arity}" : "";
+        var identity = containingIdentity != null
+            ? $"{containingIdentity}+{type.Name}{suffix}"
+            : $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}{type.Name}{suffix}";
+        type.FullyQualifiedSymbolIdentity = identity;
+
+        if (type is not ClassDefinitionNode classNode)
+            return;
+        foreach (var nested in classNode.NestedClasses)
+            ApplyTypeIdentity(nested, namespaceIdentity, namespaceScopeId, identity);
+        foreach (var nested in classNode.NestedInterfaces)
+            ApplyTypeIdentity(nested, namespaceIdentity, namespaceScopeId, identity);
+        foreach (var nested in classNode.NestedEnums)
+            ApplyTypeIdentity(nested, namespaceIdentity, namespaceScopeId, identity);
+        foreach (var nested in classNode.NestedDelegates)
+            ApplyTypeIdentity(nested, namespaceIdentity, namespaceScopeId, identity);
     }
 
     /// <summary>
@@ -7688,7 +8032,9 @@ public sealed class Parser
         var properties = new List<PropertyNode>();
         var indexers = new List<IndexerNode>();
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndInterface))
+        while (!IsAtEnd
+               && !IsBlockEnd(TokenKind.EndInterface)
+               && !Check(TokenKind.Namespace))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -7729,13 +8075,26 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndInterface);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        Token endToken;
+        if (Check(TokenKind.Namespace))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IFACE", id, "END_IFACE", endId);
+            endToken = Peek(-1);
+        }
+        else
+        {
+            endToken = ExpectBlockEnd(TokenKind.EndInterface);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(
+                    endToken.Span,
+                    "IFACE",
+                    id,
+                    "END_IFACE",
+                    endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -8012,7 +8371,9 @@ public sealed class Parser
         var nestedEnums = new List<EnumDefinitionNode>();
         var nestedDelegates = new List<DelegateDefinitionNode>();
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndClass))
+        while (!IsAtEnd
+               && !IsBlockEnd(TokenKind.EndClass)
+               && !Check(TokenKind.Namespace))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -8109,13 +8470,26 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndClass);
-        var endAttrs = ParseAttributes();
-        var endId = endAttrs["_pos0"] ?? "";
-
-        if (ShouldReportMismatchedId(endId, id, endToken))
+        Token endToken;
+        if (Check(TokenKind.Namespace))
         {
-            _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "CLASS", id, "END_CLASS", endId);
+            endToken = Peek(-1);
+        }
+        else
+        {
+            endToken = ExpectBlockEnd(TokenKind.EndClass);
+            var endAttrs = ParseAttributes();
+            var endId = endAttrs["_pos0"] ?? "";
+
+            if (ShouldReportMismatchedId(endId, id, endToken))
+            {
+                _diagnostics.ReportMismatchedIdWithFix(
+                    endToken.Span,
+                    "CLASS",
+                    id,
+                    "END_CLASS",
+                    endId);
+            }
         }
 
         var span = startToken.Span.Union(endToken.Span);
@@ -8543,7 +8917,8 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         // Positional: [typeName:typeArg1:typeArg2:...]
-        var rawTypeName = attrs["_pos0"] ?? "object";
+        var rawTypeName = attrs["_pos0"] ?? "";
+        var rawTypeNameSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
 
         string typeName;
         var typeArgs = new List<string>();
@@ -8572,6 +8947,14 @@ public sealed class Parser
                     }
                 }
             }
+        }
+
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            _diagnostics.ReportError(
+                rawTypeNameSpan,
+                DiagnosticCode.ExpectedTypeName,
+                "§NEW requires a non-empty type name.");
         }
 
         // Handle optional empty parens: §NEW{X}() -- consume silently
@@ -8691,7 +9074,6 @@ public sealed class Parser
         var span = endSpan != startToken.Span ? startToken.Span.Union(endSpan)
             : arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span)
             : startToken.Span;
-        var rawTypeNameSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
         var typeReference = ParseTypeReference(rawTypeNameSpan)
             ?? new TypeReferenceNode(
                 new TextSpan(
@@ -10511,6 +10893,13 @@ public sealed class Parser
         {
             ExpectBlockEnd(TokenKind.EndPreprocessor);
         }
+        else if (Check(TokenKind.Dedent))
+        {
+            // The nested #elif parser consumes the shared explicit closer. The
+            // remaining dedent belongs to this outer branch body and must not
+            // terminate the containing module before its next sibling.
+            Advance();
+        }
 
         return new TypePreprocessorBlockNode(startToken.Span, condition,
             classes, interfaces, enums, delegates, elseBranch, usings,
@@ -12204,8 +12593,11 @@ public sealed class Parser
         var members = new List<EnumMemberNode>();
 
         // Parse enum members until we hit the closing tag
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEnum))
+        while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndEnum, startToken))
         {
+            if (ConsumeContinuationDedent(startToken))
+                continue;
+
             // Parse optional C# attributes before enum member (e.g., [@Obsolete])
             var memberAttrs = ParseCSharpAttributes();
 
@@ -12242,7 +12634,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndEnum);
+        var endToken = ExpectBlockEndAtIndent(TokenKind.EndEnum, startToken);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 

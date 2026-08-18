@@ -38,13 +38,17 @@ public sealed class UsingDirectiveNode : AstNode
         string @namespace,
         string? alias = null,
         bool isStatic = false,
-        bool isGlobal = false)
+        bool isGlobal = false,
+        string? namespaceIdentity = null,
+        string? namespaceScopeId = null)
         : base(span)
     {
         Namespace = @namespace ?? throw new ArgumentNullException(nameof(@namespace));
         Alias = alias;
         IsStatic = isStatic;
         IsGlobal = isGlobal;
+        NamespaceIdentity = namespaceIdentity;
+        NamespaceScopeId = namespaceScopeId;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

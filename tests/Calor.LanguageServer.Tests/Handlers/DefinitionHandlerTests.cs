@@ -272,6 +272,51 @@ public class DefinitionHandlerTests
     }
 
     [Fact]
+    public async Task DefinitionResolvesNamespacedGenericStaticReceiverByArityAsync()
+    {
+        const string source = """
+            §M{m001:GenericDefinitions}
+              §NS{ns1:Alpha}
+                §CL{c001:Box:pub}<T>
+                  §MT{m001:Create:pub:stat} (i32:value) -> i32
+                    §R value
+                §CL{c002:Box:pub}<TLeft,TRight>
+                  §MT{m002:Create:pub:stat} (str:value) -> str
+                    §R value
+              §NS{ns2:Beta}
+                §F{f001:UseStatic:pub} () -> i32
+                  §R §C{Alpha.Box<i32>.Create} §A INT:1 §/C
+            """;
+        var uri = DocumentUri.From("file:///generic-definition.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var handler = new DefinitionHandler(workspace);
+        var declarationOffset = source.IndexOf(
+            "Box:pub",
+            StringComparison.Ordinal);
+        var referenceOffset = source.IndexOf(
+            "Box<i32>.Create",
+            StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(
+            source,
+            referenceOffset);
+        var result = await handler.Handle(
+            new DefinitionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        var location = Assert.Single(result).Location;
+        Assert.NotNull(location);
+        Assert.Equal(
+            declarationOffset,
+            PositionConverter.ToOffset(location!.Range.Start, source));
+    }
+
+    [Fact]
     public async Task DefinitionDoesNotResolveWhitespaceOrEndAdjacentCursorAsync()
     {
         const string source = """
@@ -297,6 +342,43 @@ public class DefinitionHandlerTests
                 CancellationToken.None);
             Assert.Null(result);
         }
+    }
+
+    [Fact]
+    public async Task DefinitionResolvesNamespacedTypeQualifiedStaticCallAsync()
+    {
+        const string source = """
+            §M{m001:TestModule}
+              §NS{ns1:Alpha}
+                §CL{c1:Widget:pub}
+                  §MT{m1:Create:pub:stat} (i32:value) -> i32
+                    §R value
+                §F{f1:Use:pub} () -> i32
+                  §R §C{Widget.Create} §A INT:42 §/C
+            """;
+        var uri = DocumentUri.From("file:///namespaced-static-definition.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var callStart = source.LastIndexOf(
+            "Widget.Create",
+            StringComparison.Ordinal);
+        var offset = callStart + "Widget.".Length;
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+
+        var result = await new DefinitionHandler(workspace).Handle(
+            new DefinitionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        var location = Assert.Single(result).Location;
+        Assert.NotNull(location);
+        Assert.Equal(
+            source.IndexOf("Create:pub", StringComparison.Ordinal),
+            PositionConverter.ToOffset(location!.Range.Start, source));
     }
 
     private static string CreateWorkspaceDirectory()

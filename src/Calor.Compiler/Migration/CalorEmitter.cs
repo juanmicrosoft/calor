@@ -13,7 +13,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 {
     private StringBuilder _builder = new();
     private int _indentLevel;
-    private readonly ConversionContext? _context;
+    private readonly ConversionContext _context;
     private bool _inInterpolation;
     private readonly List<string> _pendingHoistedLines = new();
     private int _ternaryCounter;
@@ -43,8 +43,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public CalorEmitter(ConversionContext? context = null)
     {
-        _context = context;
+        _context = context ?? new ConversionContext();
     }
+
+    public IReadOnlyList<ConversionIssue> Issues => _context.Issues;
 
     public string Emit(ModuleNode module)
     {
@@ -159,86 +161,315 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine($"§M{{{node.Id}:{moduleName}}}");
         Indent();
 
-        // Emit using directives
-        foreach (var usingDir in node.Usings)
+        if (HasExplicitNamespaceTopology(node))
         {
-            Visit(usingDir);
+            EmitScopedModuleBody(node);
         }
-        if (node.Usings.Count > 0)
-            AppendLine();
-
-        // Emit interfaces
-        foreach (var iface in node.Interfaces)
+        else
         {
-            Visit(iface);
-            AppendLine();
-        }
-
-        // Emit enums
-        foreach (var enumDef in node.Enums)
-        {
-            Visit(enumDef);
-            AppendLine();
-        }
-
-        // Emit enum extensions
-        foreach (var enumExt in node.EnumExtensions)
-        {
-            Visit(enumExt);
-            AppendLine();
-        }
-
-        // Emit delegate declarations
-        foreach (var del in node.Delegates)
-        {
-            Visit(del);
-            AppendLine();
-        }
-
-        // Emit classes
-        foreach (var cls in node.Classes)
-        {
-            Visit(cls);
-            AppendLine();
-        }
-
-        // Emit refinement type definitions
-        foreach (var rtype in node.RefinementTypes)
-        {
-            Visit(rtype);
-        }
-
-        // Emit indexed type definitions
-        foreach (var itype in node.IndexedTypes)
-        {
-            Visit(itype);
-        }
-
-        // Emit module-level functions
-        foreach (var func in node.Functions)
-        {
-            Visit(func);
-            AppendLine();
-        }
-
-        // Emit C# interop blocks
-        foreach (var interop in node.InteropBlocks)
-        {
-            Visit(interop);
-            AppendLine();
-        }
-
-        // Emit type-level preprocessor blocks
-        foreach (var tpp in node.TypePreprocessorBlocks)
-        {
-            Visit(tpp);
-            AppendLine();
+            EmitModuleItems(node, scopeId: null, includeUsings: true);
         }
 
         Dedent();
         EmitBlockEnd($"§/M{{{node.Id}}}");
 
         return _builder.ToString();
+    }
+
+    private static bool HasExplicitNamespaceTopology(ModuleNode node)
+        => node.NamespaceScopes.Count > 0
+           || node.Usings.Any(item => item.NamespaceScopeId != null)
+           || EnumerateModuleDeclarations(node).Any(item =>
+               item.NamespaceScopeId != null
+               && !(item.NamespaceScopeId == ""
+                    && !string.IsNullOrEmpty(item.NamespaceIdentity)));
+
+    private void EmitScopedModuleBody(ModuleNode node)
+    {
+        foreach (var usingDirective in node.Usings.Where(item => item.NamespaceScopeId == null))
+            Visit(usingDirective);
+        if (node.Usings.Any(item => item.NamespaceScopeId == null))
+            AppendLine();
+        foreach (var preprocessor in node.TypePreprocessorBlocks.Where(
+                     item => item.NamespaceScopeId == null
+                             && !ContainsConditionalDeclarations(item)))
+        {
+            Visit(preprocessor);
+            AppendLine();
+        }
+
+        var usedScopeIds = EnumerateModuleDeclarations(node)
+            .Select(item => item.NamespaceScopeId)
+            .Concat(node.Usings.Select(item => item.NamespaceScopeId))
+            .Concat(node.NamespaceScopes.Select(scope => scope.Id))
+            .Where(scopeId => !string.IsNullOrEmpty(scopeId))
+            .Select(scopeId => scopeId!)
+            .ToHashSet(StringComparer.Ordinal);
+        var emittedScopeIds = new HashSet<string>(StringComparer.Ordinal);
+        if (EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == ""))
+        {
+            EmitSyntheticNamespaceScope(
+                node,
+                CreateSyntheticScopeId("ns_global", usedScopeIds),
+                "_global",
+                "",
+                NamespaceScopeKind.Global);
+        }
+
+        foreach (var root in node.NamespaceScopes.Where(scope => scope.ParentScopeId == null))
+        {
+            EmitNamespaceScope(node, root, emittedScopeIds);
+        }
+
+        var orphanScopeIds = EnumerateModuleDeclarations(node)
+            .Select(item => item.NamespaceScopeId)
+            .Concat(node.Usings.Select(item => item.NamespaceScopeId))
+            .Where(scopeId => !string.IsNullOrEmpty(scopeId) && !emittedScopeIds.Contains(scopeId))
+            .Select(scopeId => scopeId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        foreach (var scopeId in orphanScopeIds)
+        {
+            var namespaceIdentity = EnumerateModuleDeclarations(node)
+                .FirstOrDefault(item => item.NamespaceScopeId == scopeId)
+                ?.NamespaceIdentity
+                ?? node.Usings.FirstOrDefault(item => item.NamespaceScopeId == scopeId)
+                    ?.NamespaceIdentity;
+            if (namespaceIdentity == null)
+            {
+                _context.AddError(
+                    $"Namespace scope '{scopeId}' has no scope declaration or namespace identity; " +
+                    "its declarations were preserved in the global namespace.",
+                    feature: "namespace-topology");
+                namespaceIdentity = "";
+            }
+            EmitSyntheticNamespaceScope(
+                node,
+                scopeId,
+                string.IsNullOrEmpty(namespaceIdentity) ? "_global" : namespaceIdentity,
+                scopeId,
+                string.IsNullOrEmpty(namespaceIdentity)
+                    ? NamespaceScopeKind.Global
+                    : NamespaceScopeKind.Named);
+        }
+
+        var unscopedDeclarations = EnumerateModuleDeclarations(node)
+            .Where(item => item.NamespaceScopeId == null)
+            .ToList();
+        foreach (var namespaceIdentity in unscopedDeclarations
+                     .Where(item => !string.IsNullOrEmpty(item.NamespaceIdentity))
+                     .Select(item => item.NamespaceIdentity!)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            EmitSyntheticNamespaceScope(
+                node,
+                CreateSyntheticScopeId("ns_synthetic", usedScopeIds),
+                namespaceIdentity,
+                scopeId: null,
+                NamespaceScopeKind.Named,
+                exactUnscoped: true,
+                unscopedNamespaceIdentity: namespaceIdentity);
+        }
+
+        var missingIdentity = unscopedDeclarations
+            .Where(item => item.NamespaceIdentity == null)
+            .ToList();
+        if (missingIdentity.Count > 0)
+        {
+            _context.AddError(
+                "Explicit namespace topology contains declarations with neither a namespace scope " +
+                "nor an explicit namespace identity; they were preserved in the global namespace: " +
+                string.Join(
+                    ", ",
+                    missingIdentity.Select(item =>
+                        item.FullyQualifiedSymbolIdentity ?? item.GetType().Name)),
+                feature: "namespace-topology");
+        }
+
+        if (missingIdentity.Count > 0
+            || unscopedDeclarations.Any(item => item.NamespaceIdentity == ""))
+        {
+            EmitSyntheticNamespaceScope(
+                node,
+                CreateSyntheticScopeId("ns_global", usedScopeIds),
+                "_global",
+                scopeId: null,
+                NamespaceScopeKind.Global,
+                exactUnscoped: true,
+                unscopedNamespaceIdentity: "",
+                includeMissingNamespaceIdentity: true);
+        }
+    }
+
+    private void EmitNamespaceScope(
+        ModuleNode module,
+        NamespaceScopeInfo scope,
+        HashSet<string> emittedScopeIds)
+    {
+        emittedScopeIds.Add(scope.Id);
+        AppendLine(
+            $"§NS{{{scope.Id}:{scope.Name}{GetNamespaceScopeMarkers(scope)}}}");
+        Indent();
+        EmitModuleItems(module, scope.Id, includeUsings: true);
+        foreach (var child in module.NamespaceScopes.Where(item => item.ParentScopeId == scope.Id))
+            EmitNamespaceScope(module, child, emittedScopeIds);
+        Dedent();
+        EmitBlockEnd($"§/NS{{{scope.Id}}}");
+        AppendLine();
+    }
+
+    private void EmitSyntheticNamespaceScope(
+        ModuleNode module,
+        string id,
+        string name,
+        string? scopeId,
+        NamespaceScopeKind kind,
+        bool exactUnscoped = false,
+        string? unscopedNamespaceIdentity = null,
+        bool includeMissingNamespaceIdentity = false)
+    {
+        var marker = kind == NamespaceScopeKind.Global
+            ? ":global"
+            : name == "_global"
+                ? ":named"
+                : "";
+        AppendLine($"§NS{{{id}:{name}{marker}}}");
+        Indent();
+        EmitModuleItems(
+            module,
+            scopeId,
+            includeUsings: !exactUnscoped,
+            exactUnscoped,
+            unscopedNamespaceIdentity,
+            includeMissingNamespaceIdentity);
+        Dedent();
+        EmitBlockEnd($"§/NS{{{id}}}");
+        AppendLine();
+    }
+
+    private void EmitModuleItems(
+        ModuleNode node,
+        string? scopeId,
+        bool includeUsings,
+        bool exactUnscoped = false,
+        string? unscopedNamespaceIdentity = null,
+        bool includeMissingNamespaceIdentity = false)
+    {
+        bool InScope(AstNode item)
+        {
+            if (exactUnscoped)
+            {
+                return item.NamespaceScopeId == null
+                       && (string.Equals(
+                               item.NamespaceIdentity,
+                               unscopedNamespaceIdentity,
+                               StringComparison.Ordinal)
+                           || includeMissingNamespaceIdentity
+                           && item.NamespaceIdentity == null);
+            }
+
+            return scopeId == null || item.NamespaceScopeId == scopeId;
+        }
+
+        if (includeUsings)
+        {
+            foreach (var usingDirective in node.Usings.Where(InScope))
+                Visit(usingDirective);
+            if (node.Usings.Any(InScope))
+                AppendLine();
+        }
+
+        foreach (var iface in node.Interfaces.Where(InScope))
+        {
+            Visit(iface);
+            AppendLine();
+        }
+        foreach (var enumDef in node.Enums.Where(InScope))
+        {
+            Visit(enumDef);
+            AppendLine();
+        }
+        foreach (var enumExt in node.EnumExtensions.Where(InScope))
+        {
+            Visit(enumExt);
+            AppendLine();
+        }
+        foreach (var del in node.Delegates.Where(InScope))
+        {
+            Visit(del);
+            AppendLine();
+        }
+        foreach (var cls in node.Classes.Where(InScope))
+        {
+            Visit(cls);
+            AppendLine();
+        }
+        foreach (var rtype in node.RefinementTypes.Where(InScope))
+            Visit(rtype);
+        foreach (var itype in node.IndexedTypes.Where(InScope))
+            Visit(itype);
+        foreach (var func in node.Functions.Where(InScope))
+        {
+            Visit(func);
+            AppendLine();
+        }
+        foreach (var interop in node.InteropBlocks.Where(InScope))
+        {
+            Visit(interop);
+            AppendLine();
+        }
+        foreach (var preprocessor in node.TypePreprocessorBlocks.Where(InScope))
+        {
+            Visit(preprocessor);
+            AppendLine();
+        }
+    }
+
+    private static IEnumerable<AstNode> EnumerateModuleDeclarations(ModuleNode node)
+        => node.Interfaces.Cast<AstNode>()
+            .Concat(node.Enums)
+            .Concat(node.EnumExtensions)
+            .Concat(node.Delegates)
+            .Concat(node.Classes)
+            .Concat(node.RefinementTypes)
+            .Concat(node.IndexedTypes)
+            .Concat(node.Functions)
+            .Concat(node.InteropBlocks)
+            .Concat(node.TypePreprocessorBlocks.Where(
+                ContainsConditionalDeclarations));
+
+    private static bool ContainsConditionalDeclarations(
+        TypePreprocessorBlockNode block)
+        => block.Classes.Count > 0
+           || block.Interfaces.Count > 0
+           || block.Enums.Count > 0
+           || block.Delegates.Count > 0
+           || block.InteropBlocks.Count > 0
+           || block.NestedBlocks.Any(ContainsConditionalDeclarations)
+           || block.ElseBranch != null
+           && ContainsConditionalDeclarations(block.ElseBranch);
+
+    private static string GetNamespaceScopeMarkers(NamespaceScopeInfo scope)
+    {
+        var markers = new List<string>();
+        if (scope.IsGlobal)
+            markers.Add("global");
+        else if (scope.Name == "_global")
+            markers.Add("named");
+        if (scope.IsFileScoped)
+            markers.Add("file");
+        return markers.Count == 0 ? "" : ":" + string.Join(":", markers);
+    }
+
+    private static string CreateSyntheticScopeId(
+        string prefix,
+        ISet<string> usedScopeIds)
+    {
+        var candidate = prefix;
+        var suffix = 1;
+        while (!usedScopeIds.Add(candidate))
+            candidate = $"{prefix}_{suffix++}";
+        return candidate;
     }
 
     public string Visit(UsingDirectiveNode node)

@@ -109,4 +109,66 @@ public class BinderOverloadSetTests
         Assert.Equal("str", CallerResolvedType(bound));
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.DuplicateFunctionSignature);
     }
+
+    [Fact]
+    public void NamespaceQualifiedTopLevelOverloads_ResolveBareCallsAndReportNoMatch()
+    {
+        var intPick = Func("f001", "Pick", "i32", new[] { ("i32", "x") });
+        var stringPick = Func("f002", "Pick", "str", new[] { ("str", "value") });
+        var resolvedCaller = Func(
+            "f003",
+            "ResolvedCaller",
+            "i32",
+            Array.Empty<(string, string)>(),
+            new ReturnStatementNode(
+                S,
+                new CallExpressionNode(
+                    S,
+                    "Pick",
+                    [new IntLiteralNode(S, 42)])));
+        var mismatchedCaller = Func(
+            "f004",
+            "MismatchedCaller",
+            "OBJECT",
+            Array.Empty<(string, string)>(),
+            new ReturnStatementNode(
+                S,
+                new CallExpressionNode(
+                    S,
+                    "Pick",
+                    [new BoolLiteralNode(S, true)])));
+        foreach (var function in new[]
+                 {
+                     intPick,
+                     stringPick,
+                     resolvedCaller,
+                     mismatchedCaller
+                 })
+        {
+            function.NamespaceIdentity = "Alpha";
+            function.NamespaceScopeId = "ns1";
+        }
+
+        var (bound, diagnostics) = Bind(
+            intPick,
+            stringPick,
+            resolvedCaller,
+            mismatchedCaller);
+
+        var resolvedCall = Assert.IsType<BoundCallExpression>(
+            bound.Functions.Single(function =>
+                    function.Symbol.Name == "ResolvedCaller")
+                .Body.OfType<BoundReturnStatement>()
+                .Single()
+                .Expression);
+        Assert.NotNull(resolvedCall.ResolvedSymbol);
+        Assert.Equal("i32", resolvedCall.TypeName);
+        Assert.Contains(
+            diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload
+                          && diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(
+            diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+    }
 }
