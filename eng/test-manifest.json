@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7288,
+      "expectedTotal": 7383,
       "expectedSkipped": 2
     },
     {
@@ -68,7 +68,7 @@
       "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 234,
+      "expectedTotal": 260,
       "expectedSkipped": 0
     },
     {

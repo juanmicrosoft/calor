@@ -1450,6 +1450,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(YieldReturnStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(YieldBreakStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(CompilerDirectiveNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RawCSharpExpressionNode node) => node;
     public ExpressionNode Visit(PreprocessorDirectiveNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(MemberPreprocessorBlockNode node) => throw new InvalidOperationException();

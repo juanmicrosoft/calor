@@ -99,8 +99,12 @@ public sealed class ContractSimplificationPass
             module.RefinementTypes,
             module.IndexedTypes,
             module.TypePreprocessorBlocks,
-            module.IdentifierSpan,
-            module.NamespaceScopes));
+            identifierSpan: module.IdentifierSpan,
+            items: RemapItems(
+                module.Items,
+                module.Functions.Cast<AstNode>().Concat(module.Classes).Concat(module.Interfaces),
+                simplifiedFunctions.Cast<AstNode>().Concat(simplifiedClasses).Concat(simplifiedInterfaces)),
+            namespaceScopes: module.NamespaceScopes));
     }
 
     private FunctionNode SimplifyFunction(FunctionNode function)
@@ -200,9 +204,13 @@ public sealed class ContractSimplificationPass
             cls.NestedEnums,
             cls.Indexers,
             cls.NestedDelegates,
-            cls.IdentifierSpan,
-            cls.BaseClassSpan,
-            cls.ImplementedInterfaceSpans));
+            identifierSpan: cls.IdentifierSpan,
+            baseClassSpan: cls.BaseClassSpan,
+            implementedInterfaceSpans: cls.ImplementedInterfaceSpans,
+            items: RemapItems(
+                cls.Items,
+                cls.Methods,
+                simplifiedMethods)));
     }
 
     private InterfaceDefinitionNode SimplifyInterface(InterfaceDefinitionNode iface)
@@ -239,8 +247,30 @@ public sealed class ContractSimplificationPass
             iface.Attributes,
             iface.CSharpAttributes,
             iface.Indexers,
-            iface.BaseInterfaceSpans,
-            iface.IdentifierSpan));
+            baseInterfaceSpans: iface.BaseInterfaceSpans,
+            identifierSpan: iface.IdentifierSpan,
+            interopBlocks: iface.InteropBlocks,
+            preprocessorBlocks: iface.PreprocessorBlocks,
+            items: RemapItems(
+                iface.Items,
+                iface.Methods,
+                simplifiedMethods)));
+    }
+
+    private static IReadOnlyList<AstNode> RemapItems(
+        IReadOnlyList<AstNode> items,
+        IEnumerable<AstNode> originals,
+        IEnumerable<AstNode> replacements)
+    {
+        if (items.Count == 0)
+            return items;
+        var map = originals.Zip(replacements)
+            .ToDictionary(pair => pair.First, pair => pair.Second);
+        return items
+            .Select(item => map.TryGetValue(item, out var replacement)
+                ? replacement
+                : item)
+            .ToList();
     }
 
     private MethodNode SimplifyMethod(MethodNode method)

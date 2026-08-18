@@ -1,6 +1,6 @@
 {
-  "trackedFileCount": 884,
-  "successfulTransformationCount": 652,
+  "trackedFileCount": 886,
+  "successfulTransformationCount": 653,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -47,6 +47,7 @@
   ],
   "conservativeFallbacks": {
     "semanticErrors": [
+      "bench/phase0-agent-native/fixtures/d-s1.5/conditional-declaration/expected.calr",
       "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l1m01.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l1m02.calr",

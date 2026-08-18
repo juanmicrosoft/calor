@@ -22,6 +22,52 @@ public sealed class LosslessConversionContractTests
     }
 
     [Fact]
+    public void CliPolicy_SelectedBranch_IsExplicitLossyAndCarriesParseMetadata()
+    {
+        var options = Commands.ConvertCommand.BuildCSharpToCalorOptions(
+            benchmark: false,
+            verbose: false,
+            explain: false,
+            noFallback: false,
+            passthrough: false,
+            explicitCallClosers: false,
+            selectActivePreprocessorBranchLossy: true,
+            definedSymbols: ["FEATURE"],
+            configuration: "Release",
+            targetFramework: "net10.0",
+            languageVersion: "preview",
+            documentationMode: "diagnose",
+            sourceKind: "script",
+            features: ["test_feature=enabled"],
+            references: ["reference.dll=One,Two"]);
+
+        Assert.Equal(ConversionFidelity.Lossy, options.Fidelity);
+        Assert.Equal(
+            PreprocessorConversionMode.SelectActiveBranchLossy,
+            options.PreprocessorMode);
+        Assert.Contains("FEATURE", options.DefinedSymbols);
+        Assert.Equal("Release", options.Configuration);
+        Assert.Equal("net10.0", options.TargetFramework);
+        Assert.Equal(
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
+            options.ParseOptions!.LanguageVersion);
+        Assert.Equal(
+            Microsoft.CodeAnalysis.DocumentationMode.Diagnose,
+            options.ParseOptions.DocumentationMode);
+        Assert.Equal(
+            Microsoft.CodeAnalysis.SourceCodeKind.Script,
+            options.ParseOptions.Kind);
+        Assert.Equal(
+            "enabled",
+            options.ParseOptions.Features
+                .ToDictionary(
+                    feature => feature.Key,
+                    feature => feature.Value)["test_feature"]);
+        var reference = Assert.Single(options.References);
+        Assert.Equal(["One", "Two"], reference.Aliases);
+    }
+
+    [Fact]
     public void UnsupportedDescendant_IsPreservedAtMemberBoundary()
     {
         const string source = """
@@ -171,6 +217,7 @@ public sealed class LosslessConversionContractTests
             Assert.Contains(interop.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
             Assert.Contains("§CSHARP", await File.ReadAllTextAsync(Path.ChangeExtension(interopPath, ".calr")));
         }
+
         finally
         {
             foreach (var file in Directory.GetFiles(directory))
@@ -178,6 +225,52 @@ public sealed class LosslessConversionContractTests
                 File.Delete(file);
             }
             Directory.Delete(directory);
+        }
+
+        static MigrationPlanEntry Entry(string sourcePath) => new()
+        {
+            SourcePath = sourcePath,
+            OutputPath = Path.ChangeExtension(sourcePath, ".calr"),
+            Convertibility = FileConvertibility.Full,
+            FileSizeBytes = new FileInfo(sourcePath).Length
+        };
+    }
+
+    [Fact]
+    public async Task ProjectMigration_CallerCancellation_PropagatesInsteadOfTimingOut()
+    {
+        var directory = Path.Combine(
+            AppContext.BaseDirectory,
+            $"calor-project-cancel-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var sourcePath = Path.Combine(directory, "Cancelled.cs");
+        await File.WriteAllTextAsync(
+            sourcePath,
+            "public class Cancelled { }");
+        var plan = new MigrationPlan
+        {
+            ProjectPath = directory,
+            Direction = MigrationDirection.CSharpToCalor,
+            Entries = [Entry(sourcePath)]
+        };
+        var migrator = new ProjectMigrator(new MigrationPlanOptions
+        {
+            Parallel = false,
+            MergePartialClasses = false
+        });
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => migrator.ExecuteAsync(
+                    plan,
+                    cancellationToken: cts.Token));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
 
         static MigrationPlanEntry Entry(string sourcePath) => new()

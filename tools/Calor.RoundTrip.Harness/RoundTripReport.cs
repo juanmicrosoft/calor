@@ -8,6 +8,14 @@ namespace Calor.RoundTrip.Harness;
 /// </summary>
 public sealed class RoundTripReport
 {
+    [JsonIgnore]
+    internal IReadOnlyDictionary<string, ProjectFileParseContext>
+        EvaluatedParseContexts { get; set; } =
+            new Dictionary<string, ProjectFileParseContext>();
+    [JsonIgnore]
+    internal IReadOnlyDictionary<string, ProjectFileParseResolution>
+        EvaluatedParseResolutions { get; set; } =
+            new Dictionary<string, ProjectFileParseResolution>();
     public required string ProjectName { get; init; }
     public string CalorVersion { get; set; } = "";
     public DateTimeOffset StartedAt { get; set; }
@@ -55,6 +63,13 @@ public sealed class FileConversionResult
     public FileStatus Status { get; set; }
     public bool ConversionSuccess { get; set; }
     public double ConversionRate { get; set; }
+    public string? PreprocessorMode { get; set; }
+    public string? Configuration { get; set; }
+    public string? TargetFramework { get; set; }
+    public string? LanguageVersion { get; set; }
+    public List<string> DefinedSymbols { get; set; } = [];
+    public string? ContextSelectionMode { get; set; }
+    public List<FileContextDetail> ValidatedContexts { get; set; } = [];
 
     /// <summary>Total structured losses recorded by the conversion loss ledger (#770) for this file.</summary>
     public int LossCount { get; set; }
@@ -87,13 +102,25 @@ public sealed class FileConversionResult
     [JsonIgnore]
     public string? EmittedCSharp { get; set; }
 
+    [JsonIgnore]
+    internal IReadOnlyList<ProjectFileParseContext> ObservedContexts
+        { get; set; } = [];
+
     /// <summary>True when the file was converted and KEPT in the built project.</summary>
     [JsonIgnore]
     public bool ConvertedAndKept => Status == FileStatus.Replaced;
 
-    /// <summary>True when the file was converted, kept, and the ledger recorded zero losses.</summary>
+    /// <summary>True when the file was converted, kept, and recorded zero losses.</summary>
     [JsonIgnore]
     public bool ConvertedNative => ConvertedAndKept && LossCount == 0;
+
+    /// <summary>
+    /// True when the file is safe to use as native benchmark supply. Replaced
+    /// project candidates have already compiled in every observed build context.
+    /// </summary>
+    [JsonIgnore]
+    public bool EligibleNativeSource =>
+        ConvertedNative && InteropBlocks == 0;
 
     /// <summary>
     /// Populate the loss-derived metrics (LossCount, LossKindCounts, Gaps,
@@ -123,6 +150,30 @@ public sealed class FileConversionResult
             Line = l.Line,
         }).ToList();
     }
+}
+
+public sealed record FileContextDetail
+{
+    public required string ProjectFile { get; init; }
+    public required string Configuration { get; init; }
+    public required string Platform { get; init; }
+    public string? TargetFramework { get; init; }
+    public required string LanguageVersion { get; init; }
+    public required string DocumentationMode { get; init; }
+    public required string SourceCodeKind { get; init; }
+    public List<string> DefinedSymbols { get; init; } = [];
+    public List<string> Provenance { get; init; } = [];
+    public List<FileBuildStateDetail> BuildStates { get; init; } = [];
+}
+
+public sealed record FileBuildStateDetail
+{
+    public required string ProjectFile { get; init; }
+    public required string Configuration { get; init; }
+    public required string Platform { get; init; }
+    public string? TargetFramework { get; init; }
+    public Dictionary<string, string> GlobalProperties { get; init; } = [];
+    public List<string> ProjectGraphPath { get; init; } = [];
 }
 
 /// <summary>One conversion-ledger loss, serialized into the harness report.</summary>
@@ -316,7 +367,8 @@ public sealed class ConversionCoverage
     {
         var counted = files.Where(f => f.Status != FileStatus.Excluded).ToList();
         var native = counted.Count(f => f.ConvertedNative);
-        var withLosses = counted.Count(f => f.ConvertedAndKept && f.LossCount > 0);
+        var withLosses = counted.Count(f =>
+            f.ConvertedAndKept && f.LossCount > 0);
         var reverted = counted.Count(f => f.Status == FileStatus.Reverted);
         var excluded = excludedFileCount + files.Count(f => f.Status == FileStatus.Excluded);
         var total = counted.Count + excluded;

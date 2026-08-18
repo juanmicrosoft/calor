@@ -13,8 +13,7 @@ public class NewtonsoftRegressionTests
 {
     private readonly CSharpToCalorConverter _converter = new(new ConversionOptions
     {
-        Fidelity = ConversionFidelity.Lossy,
-        StripPreprocessor = false
+        Fidelity = ConversionFidelity.Lossy
     });
 
     private ConversionResult Convert(string csharpSource)

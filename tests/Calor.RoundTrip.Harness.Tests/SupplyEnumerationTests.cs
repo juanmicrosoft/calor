@@ -48,6 +48,85 @@ public class SupplyEnumerationTests
             (_, rel) => Task.FromResult<string?>(sources.GetValueOrDefault(rel)));
 
     [Fact]
+    public async Task Enumeration_UsesEvaluatedPreprocessorSymbols()
+    {
+        const string conditional = """
+            #if FEATURE
+            public class Active
+            {
+                public int Value() { return 1; }
+            }
+            #endif
+            """;
+        var project = Project("P");
+        var ledger = new Dictionary<string, List<FileConversionResult>>
+        {
+            ["P"] = [File("conditional.cs", FileStatus.Replaced, 0)]
+        };
+        var sources = new Dictionary<string, string>
+        {
+            ["conditional.cs"] = conditional
+        };
+        var withoutSymbols = await Run([project], ledger, sources);
+        var withSymbols = await SupplyEnumeration.RunAsync(
+            [project],
+            p => Task.FromResult<IReadOnlyList<FileConversionResult>>(
+                ledger[p.ProjectName]),
+            (_, rel) => Task.FromResult<string?>(
+                sources.GetValueOrDefault(rel)),
+            (_, _) =>
+            [
+                new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                    preprocessorSymbols: ["FEATURE"])
+            ]);
+
+        Assert.Equal(0, Assert.Single(withoutSymbols.Projects).SupplyNative);
+        Assert.True(Assert.Single(withSymbols.Projects).SupplyNative > 0);
+    }
+
+    [Fact]
+    public async Task Enumeration_UnionsCandidatesAcrossEvaluatedContexts()
+    {
+        const string conditional = """
+            #if FIRST
+            public class First
+            {
+                public int Value() { return 1; }
+            }
+            #else
+            public class Second
+            {
+                public int Value() { return 2; }
+            }
+            #endif
+            """;
+        var project = Project("P");
+        var ledger = new Dictionary<string, List<FileConversionResult>>
+        {
+            ["P"] = [File("conditional.cs", FileStatus.Replaced, 0)]
+        };
+        var sources = new Dictionary<string, string>
+        {
+            ["conditional.cs"] = conditional
+        };
+
+        var result = await SupplyEnumeration.RunAsync(
+            [project],
+            p => Task.FromResult<IReadOnlyList<FileConversionResult>>(
+                ledger[p.ProjectName]),
+            (_, rel) => Task.FromResult<string?>(
+                sources.GetValueOrDefault(rel)),
+            (_, _) =>
+            [
+                new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                    preprocessorSymbols: ["FIRST"]),
+                new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions()
+            ]);
+
+        Assert.Equal(2, Assert.Single(result.Projects).SupplyNative);
+    }
+
+    [Fact]
     public async Task Classifies_native_versus_withloss_by_the_loss_ledger()
     {
         var result = await Run(
@@ -60,6 +139,29 @@ public class SupplyEnumerationTests
         Assert.Equal(1, p.WithLossFiles);
         Assert.Equal(1, p.SupplyNative);
         Assert.Equal(1, p.SupplyWithLoss);
+    }
+
+    [Fact]
+    public async Task Divergent_preserve_all_is_native_when_zero_loss_and_no_interop()
+    {
+        var divergent = File("divergent.cs", FileStatus.Replaced, 0);
+        divergent.ContextSelectionMode =
+            "multi-context-divergent-preserve";
+        var interop = File("interop.cs", FileStatus.Replaced, 0);
+        interop.InteropBlocks = 1;
+
+        var result = await Run(
+            [Project("P")],
+            new() { ["P"] = [divergent, interop] },
+            new()
+            {
+                ["divergent.cs"] = OneEffectCandidate,
+                ["interop.cs"] = OneEffectCandidate,
+            });
+
+        var project = Assert.Single(result.Projects);
+        Assert.Equal(1, project.NativeFiles);
+        Assert.Equal(1, project.SupplyNative);
     }
 
     [Fact]

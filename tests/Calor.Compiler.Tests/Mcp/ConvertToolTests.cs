@@ -1,5 +1,8 @@
 using System.Text.Json;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Mcp.Tools;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests.Mcp;
@@ -47,6 +50,17 @@ public class ConvertToolTests
         Assert.True(props.TryGetProperty("source", out _));
         Assert.True(props.TryGetProperty("moduleName", out _));
         Assert.True(props.TryGetProperty("fidelity", out _));
+        Assert.True(props.TryGetProperty(
+            "selectActivePreprocessorBranchLossy",
+            out _));
+        Assert.True(props.TryGetProperty("definedSymbols", out _));
+        Assert.True(props.TryGetProperty("configuration", out _));
+        Assert.True(props.TryGetProperty("targetFramework", out _));
+        Assert.True(props.TryGetProperty("languageVersion", out _));
+        Assert.True(props.TryGetProperty("documentationMode", out _));
+        Assert.True(props.TryGetProperty("sourceCodeKind", out _));
+        Assert.True(props.TryGetProperty("parseFeatures", out _));
+        Assert.True(props.TryGetProperty("references", out _));
     }
 
     [Fact]
@@ -148,6 +162,201 @@ public class ConvertToolTests
         Assert.Equal(1, lossSummary.GetProperty("drops").GetInt32());
         Assert.True(Assert.Single(lossSummary.GetProperty("locations").EnumerateArray())
             .GetProperty("line").GetInt32() > 0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SelectedBranch_ReportsEffectiveMetadata()
+    {
+        var args = JsonSerializer.SerializeToElement(new
+        {
+            source = """
+                #if FEATURE
+                public class Selected { }
+                #else
+                public class Fallback { }
+                #endif
+                """,
+            selectActivePreprocessorBranchLossy = true,
+            definedSymbols = new[] { "FEATURE" },
+            configuration = "Release",
+            targetFramework = "net10.0",
+            languageVersion = "preview",
+            documentationMode = "diagnose",
+            sourceCodeKind = "regular",
+            parseFeatures = new { test_feature = "enabled" }
+        });
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        var metadata = root.GetProperty("metadata");
+        Assert.Equal("Release", metadata.GetProperty("configuration").GetString());
+        Assert.Equal("net10.0", metadata.GetProperty("targetFramework").GetString());
+        Assert.Contains(
+            metadata.GetProperty("definedSymbols").EnumerateArray(),
+            symbol => symbol.GetString() == "FEATURE");
+        Assert.Equal(
+            "Diagnose",
+            metadata.GetProperty("documentationMode").GetString());
+        Assert.Equal(
+            "Regular",
+            metadata.GetProperty("sourceCodeKind").GetString());
+        Assert.Equal(
+            "enabled",
+            metadata.GetProperty("features")
+                .GetProperty("test_feature").GetString());
+        Assert.Contains("Selected", root.GetProperty("calorSource").GetString());
+        Assert.DoesNotContain("Fallback", root.GetProperty("calorSource").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LegacyStripTrue_ForcesEffectiveLossyFidelity()
+    {
+        var args = JsonSerializer.SerializeToElement(new
+        {
+            source = """
+                #if false
+                public class Dead { }
+                #else
+                public class Live { }
+                #endif
+                """,
+            stripPreprocessor = true
+        });
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.False(result.IsError);
+        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        Assert.Contains("Live", root.GetProperty("calorSource").GetString());
+        Assert.DoesNotContain("Dead", root.GetProperty("calorSource").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CallerCancellation_Propagates()
+    {
+        var args = JsonSerializer.SerializeToElement(new
+        {
+            source = "public class Cancelled { }"
+        });
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _tool.ExecuteAsync(args, cts.Token));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ValidateMode_UsesExactDefinedSymbolsForErrorDirectives()
+    {
+        const string source = """
+            #if FEATURE
+            #error feature-only
+            #endif
+            public class ErrorHost { }
+            """;
+        var inactive = await _tool.ExecuteAsync(
+            JsonSerializer.SerializeToElement(new
+            {
+                source,
+                mode = "validate",
+                definedSymbols = Array.Empty<string>()
+            }));
+        Assert.False(
+            inactive.IsError,
+            inactive.Content[0].Text);
+
+        var active = await _tool.ExecuteAsync(
+            JsonSerializer.SerializeToElement(new
+            {
+                source,
+                mode = "validate",
+                definedSymbols = new[] { "FEATURE" }
+            }));
+        Assert.True(active.IsError);
+        var root = JsonDocument.Parse(active.Content[0].Text!).RootElement;
+        Assert.Contains(
+            root.GetProperty("conversionIssues").EnumerateArray(),
+            issue => issue.GetProperty("message").GetString()!
+                .Contains("active-error-directive", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AliasAwareReferences_ValidateConflictingTypes()
+    {
+        var directory = Path.Combine(
+            AppContext.BaseDirectory,
+            $"issue772-mcp-alias-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var firstPath = Path.Combine(directory, "First.dll");
+        var secondPath = Path.Combine(directory, "Second.dll");
+        try
+        {
+            EmitAssembly(firstPath, "First", 1);
+            EmitAssembly(secondPath, "Second", 2);
+            var args = JsonSerializer.SerializeToElement(new
+            {
+                source = """
+                    extern alias FirstAlias;
+                    extern alias SecondAlias;
+                    public static class AliasHarness
+                    {
+                        public static int Get()
+                            => new FirstAlias::Shared.Value().Number
+                             + new SecondAlias::Shared.Value().Number;
+                    }
+                    """,
+                references = new[]
+                {
+                    new
+                    {
+                        path = firstPath,
+                        aliases = new[] { "FirstAlias" }
+                    },
+                    new
+                    {
+                        path = secondPath,
+                        aliases = new[] { "SecondAlias" }
+                    }
+                }
+            });
+
+            var result = await _tool.ExecuteAsync(args);
+            Assert.False(result.IsError, result.Content[0].Text);
+            var root = JsonDocument.Parse(result.Content[0].Text!)
+                .RootElement;
+            Assert.Equal(
+                2,
+                root.GetProperty("metadata")
+                    .GetProperty("references")
+                    .GetArrayLength());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        static void EmitAssembly(
+            string path,
+            string assemblyName,
+            int value)
+        {
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                [CSharpSyntaxTree.ParseText(
+                    $"namespace Shared; public sealed class Value {{ public int Number => {value}; }}")],
+                GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+            using var stream = File.Create(path);
+            var emit = compilation.Emit(stream);
+            Assert.True(
+                emit.Success,
+                string.Join("\n", emit.Diagnostics));
+        }
     }
 
     [Fact]

@@ -186,16 +186,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private void EmitScopedModuleBody(ModuleNode node)
     {
-        foreach (var usingDirective in node.Usings.Where(item => item.NamespaceScopeId == null))
-            Visit(usingDirective);
-        if (node.Usings.Any(item => item.NamespaceScopeId == null))
-            AppendLine();
-        foreach (var preprocessor in node.TypePreprocessorBlocks.Where(
-                     item => item.NamespaceScopeId == null
-                             && !ContainsConditionalDeclarations(item)))
+        var leadingItems = node.Items.Count > 0
+            ? node.Items.TakeWhile(IsCompilationUnitPrefixItem).ToList()
+            : [];
+        if (leadingItems.Count > 0)
         {
-            Visit(preprocessor);
-            AppendLine();
+            foreach (var item in leadingItems)
+                EmitModuleItem(item);
+        }
+        else
+        {
+            foreach (var usingDirective in node.Usings.Where(item => item.NamespaceScopeId == null))
+                Visit(usingDirective);
+            if (node.Usings.Any(item => item.NamespaceScopeId == null))
+                AppendLine();
+            foreach (var preprocessor in node.TypePreprocessorBlocks.Where(
+                         item => item.NamespaceScopeId == null
+                                 && !ContainsConditionalDeclarations(item)))
+            {
+                Visit(preprocessor);
+                AppendLine();
+            }
         }
 
         var usedScopeIds = EnumerateModuleDeclarations(node)
@@ -206,19 +217,36 @@ public sealed class CalorEmitter : IAstVisitor<string>
             .Select(scopeId => scopeId!)
             .ToHashSet(StringComparer.Ordinal);
         var emittedScopeIds = new HashSet<string>(StringComparer.Ordinal);
-        if (EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == ""))
+        var hasGlobalScopeItems =
+            EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == "")
+            || node.Items.Except(leadingItems).Any(item =>
+                item.NamespaceScopeId == null
+                && item is CompilerDirectiveNode);
+        if (hasGlobalScopeItems)
         {
             EmitSyntheticNamespaceScope(
                 node,
                 CreateSyntheticScopeId("ns_global", usedScopeIds),
                 "_global",
                 "",
-                NamespaceScopeKind.Global);
+                NamespaceScopeKind.Global,
+                includeUnscopedCompilerItems: true,
+                excludedItems: leadingItems);
         }
 
         foreach (var root in node.NamespaceScopes.Where(scope => scope.ParentScopeId == null))
         {
             EmitNamespaceScope(node, root, emittedScopeIds);
+        }
+        if (!hasGlobalScopeItems)
+        {
+            foreach (var directive in node.Items
+                         .Except(leadingItems)
+                         .OfType<CompilerDirectiveNode>()
+                         .Where(item => item.NamespaceScopeId == null))
+            {
+                Visit(directive);
+            }
         }
 
         var orphanScopeIds = EnumerateModuleDeclarations(node)
@@ -326,7 +354,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         NamespaceScopeKind kind,
         bool exactUnscoped = false,
         string? unscopedNamespaceIdentity = null,
-        bool includeMissingNamespaceIdentity = false)
+        bool includeMissingNamespaceIdentity = false,
+        bool includeUnscopedCompilerItems = false,
+        IReadOnlyCollection<AstNode>? excludedItems = null)
     {
         var marker = kind == NamespaceScopeKind.Global
             ? ":global"
@@ -341,7 +371,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             includeUsings: !exactUnscoped,
             exactUnscoped,
             unscopedNamespaceIdentity,
-            includeMissingNamespaceIdentity);
+            includeMissingNamespaceIdentity,
+            includeUnscopedCompilerItems,
+            excludedItems);
         Dedent();
         EmitBlockEnd($"§/NS{{{id}}}");
         AppendLine();
@@ -353,10 +385,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         bool includeUsings,
         bool exactUnscoped = false,
         string? unscopedNamespaceIdentity = null,
-        bool includeMissingNamespaceIdentity = false)
+        bool includeMissingNamespaceIdentity = false,
+        bool includeUnscopedCompilerItems = false,
+        IReadOnlyCollection<AstNode>? excludedItems = null)
     {
         bool InScope(AstNode item)
         {
+            if (excludedItems?.Contains(item) == true)
+                return false;
             if (exactUnscoped)
             {
                 return item.NamespaceScopeId == null
@@ -368,7 +404,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
                            && item.NamespaceIdentity == null);
             }
 
-            return scopeId == null || item.NamespaceScopeId == scopeId;
+            return scopeId == null
+                   || item.NamespaceScopeId == scopeId
+                   || includeUnscopedCompilerItems
+                   && scopeId == ""
+                   && item.NamespaceScopeId == null
+                   && item is CompilerDirectiveNode;
+        }
+
+        if (node.Items.Count > 0)
+        {
+            foreach (var item in node.Items.Where(InScope))
+            {
+                if (!includeUsings && item is UsingDirectiveNode)
+                    continue;
+                EmitModuleItem(item);
+            }
+            return;
         }
 
         if (includeUsings)
@@ -444,10 +496,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
            || block.Interfaces.Count > 0
            || block.Enums.Count > 0
            || block.Delegates.Count > 0
-           || block.InteropBlocks.Count > 0
+           || block.InteropBlocks.Any(interop =>
+               !IsCompilerDirectiveCode(interop.CSharpCode))
            || block.NestedBlocks.Any(ContainsConditionalDeclarations)
            || block.ElseBranch != null
            && ContainsConditionalDeclarations(block.ElseBranch);
+
+    private static bool IsCompilationUnitPrefixItem(AstNode item)
+        => item.NamespaceScopeId == null
+           && (item is UsingDirectiveNode or CompilerDirectiveNode
+               || item is TypePreprocessorBlockNode block
+               && !ContainsConditionalDeclarations(block));
+
+    private static bool IsCompilerDirectiveCode(string code)
+        => code.TrimStart().StartsWith("#", StringComparison.Ordinal);
 
     private static string GetNamespaceScopeMarkers(NamespaceScopeInfo scope)
     {
@@ -470,6 +532,60 @@ public sealed class CalorEmitter : IAstVisitor<string>
         while (!usedScopeIds.Add(candidate))
             candidate = $"{prefix}_{suffix++}";
         return candidate;
+    }
+
+    private void EmitModuleItem(AstNode item)
+    {
+        switch (item)
+        {
+            case UsingDirectiveNode node:
+                Visit(node);
+                break;
+            case InterfaceDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case ClassDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case EnumDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case EnumExtensionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case DelegateDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case FunctionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case CSharpInteropBlockNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case CompilerDirectiveNode node:
+                Visit(node);
+                break;
+            case TypePreprocessorBlockNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case RefinementTypeNode node:
+                Visit(node);
+                break;
+            case IndexedTypeNode node:
+                Visit(node);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported source-ordered module item: {item.GetType().Name}");
+        }
     }
 
     public string Visit(UsingDirectiveNode node)
@@ -508,19 +624,48 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         EmitTypeParameterConstraints(node.TypeParameters);
 
-        foreach (var prop in node.Properties)
+        if (node.Items.Count > 0)
         {
-            Visit(prop);
+            foreach (var item in node.Items)
+            {
+                switch (item)
+                {
+                    case PropertyNode property:
+                        Visit(property);
+                        break;
+                    case IndexerNode indexer:
+                        Visit(indexer);
+                        break;
+                    case MethodSignatureNode method:
+                        Visit(method);
+                        break;
+                    case CSharpInteropBlockNode interop:
+                        Visit(interop);
+                        break;
+                    case CompilerDirectiveNode directive:
+                        Visit(directive);
+                        break;
+                    case MemberPreprocessorBlockNode preprocessor:
+                        Visit(preprocessor);
+                        break;
+                    default:
+                        throw new InvalidOperationException(
+                            $"Unsupported source-ordered interface item: {item.GetType().Name}");
+                }
+            }
         }
-
-        foreach (var indexer in node.Indexers)
+        else
         {
-            Visit(indexer);
-        }
-
-        foreach (var method in node.Methods)
-        {
-            Visit(method);
+            foreach (var prop in node.Properties)
+                Visit(prop);
+            foreach (var indexer in node.Indexers)
+                Visit(indexer);
+            foreach (var method in node.Methods)
+                Visit(method);
+            foreach (var interop in node.InteropBlocks)
+                Visit(interop);
+            foreach (var preprocessor in node.PreprocessorBlocks)
+                Visit(preprocessor);
         }
 
         Dedent();
@@ -637,99 +782,141 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.BaseClass != null || node.ImplementedInterfaces.Count > 0 || node.TypeParameters.Any(tp => tp.Constraints.Count > 0))
             AppendLine();
 
-        // Emit fields
-        foreach (var field in node.Fields)
+        if (node.Items.Count > 0)
         {
-            Visit(field);
+            foreach (var item in node.Items)
+                EmitClassItem(item);
         }
-        if (node.Fields.Count > 0)
-            AppendLine();
-
-        // Emit events
-        foreach (var evt in node.Events)
+        else
         {
-            Visit(evt);
-        }
-        if (node.Events.Count > 0)
-            AppendLine();
-
-        // Emit properties
-        foreach (var prop in node.Properties)
-        {
-            Visit(prop);
-        }
-        if (node.Properties.Count > 0)
-            AppendLine();
-
-        // Emit indexers
-        foreach (var indexer in node.Indexers)
-        {
-            Visit(indexer);
-        }
-        if (node.Indexers.Count > 0)
-            AppendLine();
-
-        // Emit constructors
-        foreach (var ctor in node.Constructors)
-        {
-            Visit(ctor);
-            AppendLine();
-        }
-
-        // Emit methods
-        foreach (var method in node.Methods)
-        {
-            Visit(method);
-            AppendLine();
-        }
-
-        // Emit operator overloads
-        foreach (var op in node.OperatorOverloads)
-        {
-            Visit(op);
-            AppendLine();
-        }
-
-        // Emit C# interop blocks
-        foreach (var interop in node.InteropBlocks)
-        {
-            Visit(interop);
-            AppendLine();
-        }
-
-        // Emit preprocessor blocks
-        foreach (var ppBlock in node.PreprocessorBlocks)
-        {
-            Visit(ppBlock);
-            AppendLine();
-        }
-
-        // Emit nested types
-        foreach (var nestedClass in node.NestedClasses)
-        {
-            Visit(nestedClass);
-            AppendLine();
-        }
-        foreach (var nestedIface in node.NestedInterfaces)
-        {
-            Visit(nestedIface);
-            AppendLine();
-        }
-        foreach (var nestedEnum in node.NestedEnums)
-        {
-            Visit(nestedEnum);
-            AppendLine();
-        }
-        foreach (var nestedDelegate in node.NestedDelegates)
-        {
-            Visit(nestedDelegate);
-            AppendLine();
+            foreach (var field in node.Fields)
+                Visit(field);
+            if (node.Fields.Count > 0)
+                AppendLine();
+            foreach (var evt in node.Events)
+                Visit(evt);
+            if (node.Events.Count > 0)
+                AppendLine();
+            foreach (var prop in node.Properties)
+                Visit(prop);
+            if (node.Properties.Count > 0)
+                AppendLine();
+            foreach (var indexer in node.Indexers)
+                Visit(indexer);
+            if (node.Indexers.Count > 0)
+                AppendLine();
+            foreach (var ctor in node.Constructors)
+            {
+                Visit(ctor);
+                AppendLine();
+            }
+            foreach (var method in node.Methods)
+            {
+                Visit(method);
+                AppendLine();
+            }
+            foreach (var op in node.OperatorOverloads)
+            {
+                Visit(op);
+                AppendLine();
+            }
+            foreach (var interop in node.InteropBlocks)
+            {
+                Visit(interop);
+                AppendLine();
+            }
+            foreach (var ppBlock in node.PreprocessorBlocks)
+            {
+                Visit(ppBlock);
+                AppendLine();
+            }
+            foreach (var nestedClass in node.NestedClasses)
+            {
+                Visit(nestedClass);
+                AppendLine();
+            }
+            foreach (var nestedIface in node.NestedInterfaces)
+            {
+                Visit(nestedIface);
+                AppendLine();
+            }
+            foreach (var nestedEnum in node.NestedEnums)
+            {
+                Visit(nestedEnum);
+                AppendLine();
+            }
+            foreach (var nestedDelegate in node.NestedDelegates)
+            {
+                Visit(nestedDelegate);
+                AppendLine();
+            }
         }
 
         Dedent();
         EmitBlockEnd($"§/CL{{{node.Id}}}");
 
         return "";
+    }
+
+    private void EmitClassItem(AstNode item)
+    {
+        switch (item)
+        {
+            case ClassFieldNode node:
+                Visit(node);
+                break;
+            case PropertyNode node:
+                Visit(node);
+                break;
+            case IndexerNode node:
+                Visit(node);
+                break;
+            case ConstructorNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case MethodNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case EventDefinitionNode node:
+                Visit(node);
+                break;
+            case OperatorOverloadNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case CSharpInteropBlockNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case CompilerDirectiveNode node:
+                Visit(node);
+                break;
+            case MemberPreprocessorBlockNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case ClassDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case InterfaceDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case EnumDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            case DelegateDefinitionNode node:
+                Visit(node);
+                AppendLine();
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported source-ordered class item: {item.GetType().Name}");
+        }
     }
 
     public string Visit(ClassFieldNode node)
@@ -4274,7 +4461,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _builder.Append(new string(' ', _indentLevel * 2));
         _builder.AppendLine("§RAW");
         _builder.Append(node.CSharpCode);
+        if (node.CSharpCode.Length == 0
+            || node.CSharpCode[^1] is not '\r' and not '\n')
+        {
+            _builder.AppendLine();
+        }
+        _builder.Append(new string(' ', _indentLevel * 2));
         _builder.AppendLine("§/RAW");
+        return "";
+    }
+
+    public string Visit(CompilerDirectiveNode node)
+    {
+        var encoded = Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes(node.Code))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        AppendLine($"§CDIR{{{node.Feature}:{encoded}}}");
         return "";
     }
 
@@ -4342,6 +4546,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     Visit(method);
                     AppendLine();
                     break;
+                case MethodSignatureNode method:
+                    Visit(method);
+                    break;
                 case OperatorOverloadNode op:
                     Visit(op);
                     AppendLine();
@@ -4351,6 +4558,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     break;
                 case CSharpInteropBlockNode interop:
                     Visit(interop);
+                    break;
+                case CompilerDirectiveNode directive:
+                    Visit(directive);
+                    break;
+                case MemberPreprocessorBlockNode nested:
+                    Visit(nested);
+                    break;
+                case ClassDefinitionNode nestedClass:
+                    Visit(nestedClass);
+                    break;
+                case InterfaceDefinitionNode nestedInterface:
+                    Visit(nestedInterface);
+                    break;
+                case EnumDefinitionNode nestedEnum:
+                    Visit(nestedEnum);
+                    break;
+                case DelegateDefinitionNode nestedDelegate:
+                    Visit(nestedDelegate);
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -4379,8 +4604,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
             Dedent();
         }
-        if (node.ElseBranch == null || string.IsNullOrEmpty(node.ElseBranch.Condition))
-            AppendLine($"§/PP{{{node.Condition}}}");
+        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 
@@ -4415,6 +4639,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 case CSharpInteropBlockNode interop:
                     Visit(interop);
                     break;
+                case CompilerDirectiveNode directive:
+                    Visit(directive);
+                    break;
                 default:
                     throw new InvalidOperationException(
                         $"Unsupported type preprocessor item: {item.GetType().Name}");
@@ -4436,7 +4663,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         FlushHoistedLines();
         _builder.Append(new string(' ', _indentLevel * 2));
         _builder.Append("§CSHARP{");
+        if (node.IsCompilationUnitPassthrough)
+            _builder.Append(
+                CSharpInteropBlockNode.CompilationUnitPassthroughMarker);
         _builder.Append(node.CSharpCode);
+        if (node.CSharpCode.EndsWith('\n')
+            || node.CSharpCode.EndsWith('\r'))
+        {
+            _builder.Append(new string(' ', _indentLevel * 2));
+        }
+        else if (node.CSharpCode[
+                     (node.CSharpCode.LastIndexOfAny(['\r', '\n']) + 1)..]
+                 .Contains("//", StringComparison.Ordinal))
+        {
+            _builder.AppendLine();
+            _builder.Append(new string(' ', _indentLevel * 2));
+        }
         _builder.AppendLine("}§/CSHARP");
         return "";
     }

@@ -25,7 +25,7 @@ public class WedgeW4SliceAStructuralTests
         _output = output;
     }
 
-    private static ConversionResult Convert(string csharp, bool stripPreprocessor = false)
+    private static ConversionResult Convert(string csharp, bool selectActiveBranchLossy = false)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -33,7 +33,9 @@ public class WedgeW4SliceAStructuralTests
             ModuleName = "W4SliceA",
             GracefulFallback = true,
             AutoGenerateIds = true,
-            StripPreprocessor = stripPreprocessor,
+            PreprocessorMode = selectActiveBranchLossy
+                ? PreprocessorConversionMode.SelectActiveBranchLossy
+                : PreprocessorConversionMode.PreserveAllBranches,
         });
         return converter.Convert(csharp, "W4SliceA.cs");
     }
@@ -41,43 +43,39 @@ public class WedgeW4SliceAStructuralTests
     // ==================================================================
     // D1 — #772 preprocessor / conditional-compilation
     // ==================================================================
-    // The default pipeline strips conditional-compilation directives and keeps
-    // the first #if branch UNEVALUATED. That branch selection is not something
-    // the converter can evaluate deterministically, so it must be LOUD: each
-    // stripped conditional directive is recorded as a PreprocessorStripped loss,
-    // making the file non-native (LossCount > 0) → excluded by the predicate.
+    // Lossy selected-branch mode delegates condition evaluation to Roslyn and
+    // records every removed conditional directive.
 
     [Fact]
     public void D1_Registry_Preprocessor_IsNotClaimedFull()
     {
-        // Registry honesty: the false-green "preprocessor fully supported" claim
-        // is downgraded — conditional compilation is not faithfully preserved.
+        // The aggregate stays Partial until interface/enum member directives are
+        // native rather than explicit interop boundaries.
         Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("preprocessor-directive"));
     }
 
     [Fact]
-    public void D1_DeadFirstBranch_IsRefusedLoudly_NotSilentlyPicked()
+    public void D1_DeadFirstBranch_SelectedLossyUsesRoslynAndReportsLoss()
     {
-        // The pathological case from #772: `#if false ... #else ... #endif` would
-        // silently convert DEAD code and discard LIVE code. It must not survive as
-        // a native (zero-loss) conversion.
+        // The pathological case from #772 must choose the live #else branch through
+        // Roslyn, never the first branch by source position.
         var csharp = "#if false\n" +
                      "public class A { public int X() => 1; }\n" +
                      "#else\n" +
                      "public class A { public int X() => 2; }\n" +
                      "#endif\n";
 
-        var result = Convert(csharp, stripPreprocessor: true);
+        var result = Convert(csharp, selectActiveBranchLossy: true);
         Assert.True(result.Success);
 
         var ppLosses = result.Context.Losses
             .Where(l => l.Kind == ConversionLossKind.PreprocessorStripped)
             .ToList();
         foreach (var l in ppLosses) _output.WriteLine(l.ToString());
+        _output.WriteLine(result.CalorSource!);
 
-        // At least one conditional directive recorded as a loss → the file is
-        // non-native. The predicate's LossCount == 0 native gate excludes it, so
-        // the wrongly-picked branch never enters the measurement silently.
+        Assert.Contains("§R 2", result.CalorSource);
+        Assert.DoesNotContain("§R 1", result.CalorSource);
         Assert.NotEmpty(ppLosses);
         Assert.True(result.Context.Losses.Count > 0,
             "Conditional compilation must make the file non-native (LossCount > 0).");
@@ -89,7 +87,7 @@ public class WedgeW4SliceAStructuralTests
         // A file with no conditional compilation is unaffected — the honesty pass
         // does not tax ordinary code.
         var csharp = "public class Plain { public int X() => 42; }\n";
-        var result = Convert(csharp, stripPreprocessor: true);
+        var result = Convert(csharp, selectActiveBranchLossy: true);
         Assert.True(result.Success);
         Assert.DoesNotContain(result.Context.Losses,
             l => l.Kind == ConversionLossKind.PreprocessorStripped);

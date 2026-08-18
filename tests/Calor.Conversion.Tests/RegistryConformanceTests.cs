@@ -20,7 +20,7 @@ public class RegistryConformanceTests
         _output = output;
     }
 
-    private static ConversionResult Convert(string csharp, bool stripPreprocessor = false)
+    private static ConversionResult Convert(string csharp, bool selectActiveBranchLossy = false)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -28,7 +28,9 @@ public class RegistryConformanceTests
             ModuleName = "ConformanceTest",
             GracefulFallback = true,
             AutoGenerateIds = true,
-            StripPreprocessor = stripPreprocessor
+            PreprocessorMode = selectActiveBranchLossy
+                ? PreprocessorConversionMode.SelectActiveBranchLossy
+                : PreprocessorConversionMode.PreserveAllBranches
         });
         return converter.Convert(csharp, "Conformance.cs");
     }
@@ -115,18 +117,34 @@ public class RegistryConformanceTests
     }
 
     // ------------------------------------------------------------------
-    // Preprocessor directives (#773): registry no longer claims Full, and
-    // default-pipeline stripping records structured losses with locations.
+    // Preprocessor directives (#772/#773): preservation is the default; explicit
+    // Roslyn-selected lossy mode records every removed conditional directive.
     // ------------------------------------------------------------------
 
     [Fact]
     public void Registry_PreprocessorDirective_IsNotClaimedFull()
     {
         Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("preprocessor-directive"));
+        Assert.Equal(
+            SupportLevel.Partial,
+            FeatureSupport.GetSupportLevel("conditional-declaration"));
+        Assert.Equal(
+            SupportLevel.NotSupported,
+            FeatureSupport.GetSupportLevel("conditional-member"));
+        Assert.Equal(
+            SupportLevel.NotSupported,
+            FeatureSupport.GetSupportLevel("conditional-statement"));
+        Assert.Equal(
+            SupportLevel.NotSupported,
+            FeatureSupport.GetSupportLevel("conditional-namespace"));
+        Assert.Equal(SupportLevel.Partial, FeatureSupport.GetSupportLevel("pragma"));
+        Assert.Equal(
+            SupportLevel.NotSupported,
+            FeatureSupport.GetSupportLevel("nullable-directive"));
     }
 
     [Fact]
-    public void PreprocessorStripping_RecordsLossPerConditionalDirective()
+    public void SelectedBranchLossy_RecordsLossPerConditionalDirective()
     {
         var csharp = """
             public class Config
@@ -139,7 +157,7 @@ public class RegistryConformanceTests
             }
             """;
 
-        var result = Convert(csharp, stripPreprocessor: true);
+        var result = Convert(csharp, selectActiveBranchLossy: true);
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
 
@@ -148,14 +166,14 @@ public class RegistryConformanceTests
             .ToList();
         foreach (var loss in ppLosses) _output.WriteLine(loss.ToString());
 
-        // #if (line 3) and #else (line 5) both recorded; #else notes its dropped branch.
-        Assert.Equal(2, ppLosses.Count);
+        Assert.Equal(3, ppLosses.Count);
         Assert.Contains(ppLosses, l => l.Description.Contains("#if DEBUG") && l.Line == 3);
-        Assert.Contains(ppLosses, l => l.Description.Contains("#else") && l.Description.Contains("dropped"));
+        Assert.Contains(ppLosses, l => l.Description.Contains("#else") && l.Line == 5);
+        Assert.Contains(ppLosses, l => l.Description.Contains("#endif") && l.Line == 7);
     }
 
     [Fact]
-    public void PreprocessorStripping_CosmeticDirectives_NotCountedAsLoss()
+    public void SelectedBranchLossy_RegionDirectives_NotCountedAsLoss()
     {
         var csharp = """
             public class Config
@@ -166,7 +184,7 @@ public class RegistryConformanceTests
             }
             """;
 
-        var result = Convert(csharp, stripPreprocessor: true);
+        var result = Convert(csharp, selectActiveBranchLossy: true);
 
         Assert.True(result.Success);
         Assert.DoesNotContain(result.Context.Losses,
@@ -727,7 +745,6 @@ public class RegistryConformanceTests
             ModuleName = "ConformanceTest",
             GracefulFallback = true,
             AutoGenerateIds = true,
-            StripPreprocessor = false,
             PassthroughOnError = true
         });
         var result = converter.Convert(csharp, "Conformance.cs");
@@ -805,7 +822,7 @@ public class RegistryConformanceTests
             }
             """;
 
-        var result = Convert(csharp); // StripPreprocessor=false → §PP conversion path
+        var result = Convert(csharp); // Production default → lossless §PP conversion path
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
         _output.WriteLine(result.CalorSource!);

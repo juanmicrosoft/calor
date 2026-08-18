@@ -1,0 +1,13 @@
+{
+  "featureKey": "conditional-declaration",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Get",
+  "runtimeExpectedInt": 127,
+  "convertedRuntimeEntryPoint": "Get",
+  "convertedExpectedUndefinedInt": 130,
+  "convertedExpectedDefinedInt": 119,
+  "definedSymbols": ["FEATURE"]
+}

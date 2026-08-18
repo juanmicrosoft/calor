@@ -79,9 +79,16 @@ public class Foo
         var result = converter.Convert(csharp, "Test.cs");
 
         Assert.True(result.Success, string.Join("; ", result.Issues));
-        Assert.Contains("DEL", result.CalorSource);
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains(
+            "private delegate bool Handler(string input);",
+            result.CalorSource);
         var cls = Assert.Single(result.Ast!.Classes);
-        var del = Assert.Single(cls.NestedDelegates);
-        Assert.Equal("Handler", del.Name);
+        Assert.Empty(cls.NestedDelegates);
+        Assert.Contains(
+            cls.InteropBlocks,
+            block => block.CSharpCode.Contains(
+                "private delegate bool Handler",
+                StringComparison.Ordinal));
     }
 }

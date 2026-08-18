@@ -196,6 +196,29 @@ public sealed class RawCSharpNode : StatementNode
 }
 
 /// <summary>
+/// A nonconditional C# compiler directive preserved exactly at its source
+/// position. The Calor surface stores the UTF-8 bytes as base64 in §CDIR.
+/// </summary>
+public sealed class CompilerDirectiveNode : StatementNode
+{
+    public string Code { get; }
+    public string Feature { get; }
+
+    public CompilerDirectiveNode(
+        TextSpan span,
+        string code,
+        string feature)
+        : base(span)
+    {
+        Code = code ?? throw new ArgumentNullException(nameof(code));
+        Feature = feature ?? throw new ArgumentNullException(nameof(feature));
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}
+
+/// <summary>
 /// Represents a preprocessor conditional block.
 /// §PP{CONDITION}
 ///   ... body ...
@@ -362,6 +385,8 @@ public enum InteropMemberKind
 /// </summary>
 public sealed class CSharpInteropBlockNode : AstNode
 {
+    public const string CompilationUnitPassthroughMarker =
+        "/*__CALOR_COMPILATION_UNIT_PASSTHROUGH__*/";
     /// <summary>
     /// The raw C# source code preserved verbatim.
     /// </summary>
@@ -381,16 +406,20 @@ public sealed class CSharpInteropBlockNode : AstNode
     /// The kind of C# member this block represents.
     /// </summary>
     public InteropMemberKind MemberKind { get; }
+    public bool IsCompilationUnitPassthrough { get; }
 
     public CSharpInteropBlockNode(TextSpan span, string csharpCode,
         string? featureName = null, string? reason = null,
-        InteropMemberKind memberKind = InteropMemberKind.Other)
+        InteropMemberKind memberKind = InteropMemberKind.Other,
+        bool isCompilationUnitPassthrough = false)
         : base(span)
     {
         CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
         FeatureName = featureName;
         Reason = reason;
         MemberKind = memberKind;
+        IsCompilationUnitPassthrough =
+            isCompilationUnitPassthrough;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

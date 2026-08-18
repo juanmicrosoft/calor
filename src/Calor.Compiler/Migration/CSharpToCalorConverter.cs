@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections.Immutable;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Effects;
@@ -22,11 +23,14 @@ public sealed class ConversionResult
     public bool HasWarnings => Context.HasWarnings;
     public IReadOnlyList<ConversionIssue> Issues => Context.Issues;
     public IReadOnlyList<ConversionLoss> Losses => Context.Losses;
+    public ConversionMetadata Metadata => Context.Metadata;
     public int NativeConversionCount => Context.Stats.ConvertedNodes;
     public int InteropPreservationCount => Context.Losses.Count(
         loss => loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
     public int LossySubstitutionCount => Context.Losses.Count(
-        loss => loss.Kind is ConversionLossKind.FallbackTodo or ConversionLossKind.PreprocessorStripped);
+        loss => loss.Kind is ConversionLossKind.FallbackTodo
+            or ConversionLossKind.PreprocessorStripped
+            or ConversionLossKind.DirectiveRemoved);
     public int DropCount => Context.Losses.Count(loss => loss.Kind == ConversionLossKind.Dropped);
 }
 
@@ -62,6 +66,21 @@ public enum ConversionMode
     /// preserving the original C# code verbatim for round-trip compilation.
     /// </summary>
     Interop
+}
+
+/// <summary>
+/// Controls how C# conditional-compilation branches are handled.
+/// </summary>
+public enum PreprocessorConversionMode
+{
+    /// <summary>Preserve every #if/#elif/#else branch as explicit Calor preprocessor AST.</summary>
+    PreserveAllBranches,
+
+    /// <summary>
+    /// Explicitly lossy opt-in that keeps only the branch Roslyn activates for the
+    /// supplied parse options and symbols.
+    /// </summary>
+    SelectActiveBranchLossy
 }
 
 /// <summary>
@@ -122,10 +141,51 @@ public sealed class ConversionOptions
     public ConversionMode Mode { get; set; } = ConversionMode.Standard;
 
     /// <summary>
-    /// Whether to strip C# preprocessor directives (#if, #region, #pragma, etc.) before conversion.
-    /// Prevents infinite hangs and OOM from conditional compilation blocks.
+    /// Conditional-compilation handling. The safe default preserves every branch.
     /// </summary>
-    public bool StripPreprocessor { get; set; } = true;
+    public PreprocessorConversionMode PreprocessorMode { get; set; } =
+        PreprocessorConversionMode.PreserveAllBranches;
+
+    /// <summary>
+    /// Compatibility alias for callers that explicitly set the former option.
+    /// Omitted callers now get lossless preservation; <c>true</c> maps to the
+    /// explicitly lossy Roslyn-selected mode.
+    /// </summary>
+    [Obsolete("Use PreprocessorMode. true maps to SelectActiveBranchLossy; false maps to PreserveAllBranches.")]
+    public bool StripPreprocessor
+    {
+        get => PreprocessorMode == PreprocessorConversionMode.SelectActiveBranchLossy;
+        set
+        {
+            PreprocessorMode = value
+                ? PreprocessorConversionMode.SelectActiveBranchLossy
+                : PreprocessorConversionMode.PreserveAllBranches;
+            if (value)
+                Fidelity = ConversionFidelity.Lossy;
+        }
+    }
+
+    /// <summary>
+    /// Roslyn parse options to use. When omitted, Preview language syntax is accepted.
+    /// Symbols from <see cref="DefinedSymbols"/> are merged with these options.
+    /// </summary>
+    public CSharpParseOptions? ParseOptions { get; set; }
+
+    /// <summary>Additional conditional-compilation symbols supplied by the caller.</summary>
+    public IReadOnlyCollection<string> DefinedSymbols { get; set; } = Array.Empty<string>();
+
+    /// <summary>Optional project configuration name recorded in conversion metadata.</summary>
+    public string? Configuration { get; set; }
+
+    /// <summary>Optional target framework recorded in conversion metadata.</summary>
+    public string? TargetFramework { get; set; }
+
+    /// <summary>Output kind used for semantic and generated-C# validation.</summary>
+    public OutputKind OutputKind { get; set; } = OutputKind.DynamicallyLinkedLibrary;
+
+    /// <summary>Additional metadata references, including extern aliases.</summary>
+    public IReadOnlyCollection<ConversionReference> References { get; set; } =
+        Array.Empty<ConversionReference>();
 
     /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
     public bool PassthroughOnError { get; set; } = false;
@@ -181,25 +241,103 @@ public sealed class CSharpToCalorConverter
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM.
-            // Stripping keeps the first #if branch UNEVALUATED and deletes the
-            // alternates — a semantic loss, recorded per directive (#770/#773).
-            if (_options.StripPreprocessor && _options.Fidelity == ConversionFidelity.Lossy)
+            var parseOptions = GetEffectiveParseOptions(sourceFile);
+            var effectiveOutputKind = _options.OutputKind;
+            context.Metadata = new ConversionMetadata
+            {
+                PreprocessorMode = _options.PreprocessorMode,
+                Configuration = _options.Configuration,
+                TargetFramework = _options.TargetFramework,
+                LanguageVersion = parseOptions.LanguageVersion.ToString(),
+                DocumentationMode = parseOptions.DocumentationMode.ToString(),
+                SourceCodeKind = parseOptions.Kind.ToString(),
+                DefinedSymbols = parseOptions.PreprocessorSymbolNames
+                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                    .ToArray(),
+                Features = parseOptions.Features
+                    .OrderBy(feature => feature.Key, StringComparer.Ordinal)
+                    .ToDictionary(
+                        feature => feature.Key,
+                        feature => feature.Value,
+                        StringComparer.Ordinal),
+                References = _options.References
+                    .Select(reference => reference with
+                    {
+                        Path = Path.GetFullPath(reference.Path)
+                    })
+                    .ToArray(),
+                OutputKind = _options.OutputKind.ToString()
+            };
+
+            if (_options.PreprocessorMode == PreprocessorConversionMode.SelectActiveBranchLossy
+                && _options.Fidelity != ConversionFidelity.Lossy)
+            {
+                context.AddError(
+                    "SelectActiveBranchLossy requires explicit lossy conversion fidelity.",
+                    feature: "preprocessor-selected-branch");
+                return new ConversionResult
+                {
+                    Success = false,
+                    Context = context,
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
+
+            // Explicitly lossy branch selection is delegated to Roslyn so #if false,
+            // defined symbols, boolean expressions, and #elif chains use compiler
+            // semantics rather than source order.
+            if (_options.PreprocessorMode == PreprocessorConversionMode.SelectActiveBranchLossy)
             {
                 try
                 {
-                    var stripResult = PreprocessorStripper.StripWithReport(csharpSource);
-                    csharpSource = stripResult.Source;
-                    foreach (var directive in stripResult.ConditionalDirectives)
+                    var originalTree = CSharpSyntaxTree.ParseText(
+                        csharpSource,
+                        parseOptions,
+                        cancellationToken: cancellationToken);
+                    var malformedDirective = originalTree.GetDiagnostics(
+                            cancellationToken)
+                        .FirstOrDefault(diagnostic =>
+                            diagnostic.Id is "CS1027" or "CS1028");
+                    if (malformedDirective != null)
                     {
-                        var dropped = directive.DroppedLines > 0
-                            ? $"; {directive.DroppedLines} line(s) of the inactive branch dropped"
-                            : "";
+                        var span = malformedDirective.Location.GetLineSpan()
+                            .StartLinePosition;
+                        context.AddError(
+                            $"C# parse error: {malformedDirective.GetMessage()}",
+                            line: span.Line + 1,
+                            column: span.Character + 1,
+                            feature: "malformed-preprocessor-directive");
+                        return new ConversionResult
+                        {
+                            Success = false,
+                            Context = context,
+                            Duration = DateTime.UtcNow - startTime
+                        };
+                    }
+                    var stripResult = PreprocessorStripper.SelectActiveBranchLossy(
+                        csharpSource,
+                        parseOptions,
+                        cancellationToken);
+                    csharpSource = stripResult.Source;
+                    foreach (var directive in stripResult.RemovedConditionalDirectives)
+                    {
                         context.RecordLoss(ConversionLossKind.PreprocessorStripped,
                             "preprocessor-directive",
-                            $"'{directive.Directive}' stripped (first branch kept unevaluated{dropped})",
+                            $"'{directive.Directive}' removed after Roslyn selected the active branch",
                             directive.Line);
                     }
+                    foreach (var directive in stripResult.RemovedNonconditionalDirectives)
+                    {
+                        context.RecordLoss(
+                            ConversionLossKind.DirectiveRemoved,
+                            directive.Feature,
+                            $"Inactive directive removed after Roslyn selected the active branch: '{directive.Directive}'",
+                            directive.Line);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception stripEx)
                 {
@@ -208,24 +346,35 @@ public sealed class CSharpToCalorConverter
                 }
             }
 
-            // Step 1: Parse C# with Roslyn (use Latest language version to accept all C# features)
-            var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
+            // Step 1: Parse C# with Roslyn using the caller/project configuration.
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 csharpSource,
                 parseOptions,
                 cancellationToken: cancellationToken);
             var root = syntaxTree.GetCompilationUnitRoot();
+            effectiveOutputKind = parseOptions.Kind == SourceCodeKind.Script
+                ? OutputKind.DynamicallyLinkedLibrary
+                : root.Members.OfType<GlobalStatementSyntax>().Any()
+                    ? OutputKind.ConsoleApplication
+                    : _options.OutputKind;
+            context.Metadata = context.Metadata with
+            {
+                OutputKind = effectiveOutputKind.ToString()
+            };
             cancellationToken.ThrowIfCancellationRequested();
+            var activeErrorDirectives = root.GetDiagnostics()
+                .Where(diagnostic => diagnostic.Id == "CS1029"
+                    && diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToList();
 
-            // Check for parse errors.
-            // Skip CS1028 ("Unexpected preprocessor directive") — occurs with "# endregion"
-            // (space before endregion). Valid C# that Roslyn recovers from.
+            // Check for parse errors. Unexpected or unmatched directives are
+            // never globally suppressed; callers receive an explicit parse error.
             List<Microsoft.CodeAnalysis.Diagnostic> diagnostics;
             try
             {
                 diagnostics = root.GetDiagnostics()
                     .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
-                             && d.Id != "CS1028")
+                             && d.Id != "CS1029")
                     .ToList();
             }
             catch
@@ -263,7 +412,10 @@ public sealed class CSharpToCalorConverter
                     csharpSource,
                     root,
                     context,
-                    startTime);
+                    startTime,
+                    parseOptions,
+                    effectiveOutputKind,
+                    cancellationToken);
             }
 
             // Step 2: Create semantic model for type inference (best-effort)
@@ -272,8 +424,8 @@ public sealed class CSharpToCalorConverter
             {
                 var compilation = CSharpCompilation.Create("ConversionAnalysis",
                     new[] { syntaxTree },
-                    GetBasicMetadataReferences(),
-                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                    GetSemanticMetadataReferences(),
+                    new CSharpCompilationOptions(effectiveOutputKind));
                 semanticModel = compilation.GetSemanticModel(syntaxTree);
             }
             catch
@@ -380,9 +532,27 @@ public sealed class CSharpToCalorConverter
                     feature: "generated-calor-validation");
             }
 
-            if (_options.Fidelity == ConversionFidelity.Lossless)
+            if (_options.ValidateRoundTripCSharp
+                && (_options.Fidelity == ConversionFidelity.Lossless
+                    || _options.PreprocessorMode
+                        == PreprocessorConversionMode.SelectActiveBranchLossy))
             {
-                ValidateLosslessRoundTrip(calorSource, context, _options.ValidateRoundTripCSharp);
+                ValidateLosslessRoundTrip(
+                    calorSource,
+                    context,
+                    _options.ValidateRoundTripCSharp,
+                    parseOptions,
+                    effectiveOutputKind,
+                    cancellationToken);
+            }
+            foreach (var diagnostic in activeErrorDirectives)
+            {
+                var span = diagnostic.Location.GetLineSpan().StartLinePosition;
+                context.AddError(
+                    $"Active #error directive ({diagnostic.Id}): {diagnostic.GetMessage()}",
+                    line: span.Line + 1,
+                    column: span.Character + 1,
+                    feature: "active-error-directive");
             }
 
             var destructiveLosses = context.Losses.Count(loss => loss.IsSemanticLoss);
@@ -490,6 +660,7 @@ public sealed class CSharpToCalorConverter
         return ext switch
         {
             ".cs" => ConversionDirection.CSharpToCalor,
+            ".csx" => ConversionDirection.CSharpToCalor,
             ".calr" => ConversionDirection.CalorToCSharp,
             _ => ConversionDirection.Unknown
         };
@@ -554,7 +725,10 @@ public sealed class CSharpToCalorConverter
             string csharpSource,
             CompilationUnitSyntax root,
             ConversionContext context,
-            DateTime startTime)
+            DateTime startTime,
+            CSharpParseOptions parseOptions,
+            OutputKind outputKind,
+            CancellationToken cancellationToken)
         {
             var interop = new CSharpInteropBlockNode(
                 new Parsing.TextSpan(
@@ -610,7 +784,10 @@ public sealed class CSharpToCalorConverter
             ValidateLosslessRoundTrip(
                 calorSource,
                 context,
-                _options.ValidateRoundTripCSharp);
+                _options.ValidateRoundTripCSharp,
+                parseOptions,
+                outputKind,
+                cancellationToken);
             return new ConversionResult
             {
                 Success = !context.HasErrors,
@@ -659,7 +836,9 @@ public sealed class CSharpToCalorConverter
         }
 
         var diagnostics = new Diagnostics.DiagnosticBag();
-        var tokens = new Parsing.Lexer(calorSource, diagnostics).TokenizeAllForParser();
+        var tokens = new Parsing.Lexer(
+            calorSource,
+            diagnostics).TokenizeAllForParser();
         if (diagnostics.HasErrors)
         {
             return false;
@@ -686,13 +865,16 @@ public sealed class CSharpToCalorConverter
         var failedEnums = new List<EnumDefinitionNode>();
         var failedDelegates = new List<DelegateDefinitionNode>();
         var interops = new List<CSharpInteropBlockNode>();
+        var replacements = new Dictionary<AstNode, CSharpInteropBlockNode>();
 
         foreach (var cls in module.Classes)
         {
             if (!MemberParsesCleanly(module, classes: new[] { cls }) &&
                 TryTakeSource(sources, "class", GetSymbolIdentity(cls, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, cls));
+                var interop = MakeFallbackInterop(csharp, cls);
+                interops.Add(interop);
+                replacements[cls] = interop;
                 failedClasses.Add(cls);
             }
         }
@@ -702,7 +884,9 @@ public sealed class CSharpToCalorConverter
             if (!MemberParsesCleanly(module, interfaces: new[] { iface }) &&
                 TryTakeSource(sources, "interface", GetSymbolIdentity(iface, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, iface));
+                var interop = MakeFallbackInterop(csharp, iface);
+                interops.Add(interop);
+                replacements[iface] = interop;
                 failedInterfaces.Add(iface);
             }
         }
@@ -712,7 +896,9 @@ public sealed class CSharpToCalorConverter
             if (!MemberParsesCleanly(module, enums: new[] { en }) &&
                 TryTakeSource(sources, "enum", GetSymbolIdentity(en, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, en));
+                var interop = MakeFallbackInterop(csharp, en);
+                interops.Add(interop);
+                replacements[en] = interop;
                 failedEnums.Add(en);
             }
         }
@@ -722,7 +908,9 @@ public sealed class CSharpToCalorConverter
             if (!MemberParsesCleanly(module, delegates: new[] { del }) &&
                 TryTakeSource(sources, "delegate", GetSymbolIdentity(del, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, del));
+                var interop = MakeFallbackInterop(csharp, del);
+                interops.Add(interop);
+                replacements[del] = interop;
                 failedDelegates.Add(del);
             }
         }
@@ -739,6 +927,11 @@ public sealed class CSharpToCalorConverter
             context.RecordLoss(ConversionLossKind.InteropPreserved, "post-validation-fallback",
                 interop.Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)");
         }
+        var items = module.Items
+            .Select(item => replacements.TryGetValue(item, out var replacement)
+                ? (AstNode)replacement
+                : item)
+            .ToList();
 
         return module.CopyMetadataTo(new ModuleNode(
             module.Span, module.Id, module.Name, module.Usings,
@@ -751,6 +944,7 @@ public sealed class CSharpToCalorConverter
             module.Invariants, module.Decisions, module.Context,
             module.InteropBlocks.Concat(interops).ToList(),
             module.RefinementTypes, module.IndexedTypes, module.TypePreprocessorBlocks,
+            items: items.Count > 0 ? items : null,
             namespaceScopes: module.NamespaceScopes));
     }
 
@@ -939,10 +1133,39 @@ public sealed class CSharpToCalorConverter
         };
     }
 
+    private CSharpParseOptions GetEffectiveParseOptions(string? sourceFile)
+    {
+        var parseOptions = _options.ParseOptions
+            ?? new CSharpParseOptions(
+                LanguageVersion.Preview,
+                kind: string.Equals(
+                    Path.GetExtension(sourceFile),
+                    ".csx",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? SourceCodeKind.Script
+                    : SourceCodeKind.Regular);
+        if (string.Equals(
+                Path.GetExtension(sourceFile),
+                ".csx",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            parseOptions = parseOptions.WithKind(SourceCodeKind.Script);
+        }
+        var symbols = parseOptions.PreprocessorSymbolNames
+            .Concat(_options.DefinedSymbols ?? Array.Empty<string>())
+            .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return parseOptions.WithPreprocessorSymbols(symbols);
+    }
+
     private static void ValidateLosslessRoundTrip(
         string calorSource,
         ConversionContext context,
-        bool validateGeneratedCSharp)
+        bool validateGeneratedCSharp,
+        CSharpParseOptions parseOptions,
+        OutputKind outputKind,
+        CancellationToken cancellationToken)
     {
         CompilationResult compileResult;
         if (!validateGeneratedCSharp)
@@ -958,8 +1181,14 @@ public sealed class CSharpToCalorConverter
                 new CompilationOptions
                 {
                     EnforceEffects = false,
-                    UnknownCallPolicy = UnknownCallPolicy.Permissive
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    DeferGeneratedOutputValidation = true,
+                    CancellationToken = cancellationToken
                 });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -985,7 +1214,24 @@ public sealed class CSharpToCalorConverter
 
         try
         {
-            var validation = GeneratedCSharpCompiler.Validate(compileResult.GeneratedCode);
+            cancellationToken.ThrowIfCancellationRequested();
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(
+                    compileResult.GeneratedCode,
+                    context.SourceFile ?? "converted-output.g.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    LanguageVersion = parseOptions.LanguageVersion,
+                    DocumentationMode = parseOptions.DocumentationMode,
+                    SourceCodeKind = parseOptions.Kind,
+                    Features = parseOptions.Features,
+                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+                    References = context.Metadata.References.Select(
+                        reference => new GeneratedCSharpReference(
+                            reference.Path,
+                            reference.Aliases)),
+                    OutputKind = outputKind
+                });
             foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
             {
                 var span = diagnostic.Location.GetLineSpan().StartLinePosition;
@@ -995,6 +1241,10 @@ public sealed class CSharpToCalorConverter
                     column: span.Character + 1,
                     feature: "roundtrip-csharp-validation");
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -1039,6 +1289,18 @@ public sealed class CSharpToCalorConverter
 
         return refs.ToArray();
     }
+
+    private MetadataReference[] GetSemanticMetadataReferences()
+        => GetBasicMetadataReferences()
+            .Concat(_options.References
+                .Where(reference => File.Exists(reference.Path))
+                .Select(reference => MetadataReference.CreateFromFile(
+                    Path.GetFullPath(reference.Path),
+                    reference.Aliases.Count == 0
+                        ? MetadataReferenceProperties.Assembly
+                        : MetadataReferenceProperties.Assembly.WithAliases(
+                            reference.Aliases.ToImmutableArray()))))
+            .ToArray();
 
     private static string DeriveModuleName(string? sourceFile, CompilationUnitSyntax root)
     {

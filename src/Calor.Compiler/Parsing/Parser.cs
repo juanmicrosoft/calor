@@ -698,6 +698,7 @@ public sealed class Parser
         var refinementTypes = new List<RefinementTypeNode>();
         var indexedTypes = new List<IndexedTypeNode>();
         var typePreprocessorBlocks = new List<TypePreprocessorBlockNode>();
+        var moduleItems = new List<AstNode>();
         var namespaceScopes = new List<NamespaceScopeInfo>();
 
         while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndModule, startToken))
@@ -708,7 +709,9 @@ public sealed class Parser
             }
             if (Check(TokenKind.Using))
             {
-                usings.Add(ParseUsingDirective());
+                var node = ParseUsingDirective();
+                usings.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.Namespace))
             {
@@ -726,35 +729,50 @@ public sealed class Parser
                     interopBlocks,
                     refinementTypes,
                     indexedTypes,
-                    typePreprocessorBlocks);
+                    typePreprocessorBlocks,
+                    moduleItems);
             }
             else if (Check(TokenKind.Interface))
             {
-                interfaces.Add(ParseInterfaceDefinition());
+                var node = ParseInterfaceDefinition();
+                interfaces.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.Class))
             {
-                classes.Add(ParseClassDefinition());
+                var node = ParseClassDefinition();
+                classes.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.Func))
             {
-                functions.Add(ParseFunction());
+                var node = ParseFunction();
+                functions.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.AsyncFunc))
             {
-                functions.Add(ParseAsyncFunction());
+                var node = ParseAsyncFunction();
+                functions.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.Delegate))
             {
-                delegates.Add(ParseDelegateDefinition());
+                var node = ParseDelegateDefinition();
+                delegates.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.Enum))
             {
-                enums.Add(ParseEnumDefinition());
+                var node = ParseEnumDefinition();
+                enums.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.EnumExtension))
             {
-                enumExtensions.Add(ParseEnumExtension());
+                var node = ParseEnumExtension();
+                enumExtensions.Add(node);
+                moduleItems.Add(node);
             }
             // Extended Features: Module-level metadata
             else if (Check(TokenKind.Todo))
@@ -793,19 +811,31 @@ public sealed class Parser
             }
             else if (Check(TokenKind.CSharpInterop))
             {
-                interopBlocks.Add(ParseCSharpInteropBlock());
+                var node = ParseCSharpInteropBlock();
+                interopBlocks.Add(node);
+                moduleItems.Add(node);
+            }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                moduleItems.Add(ParseCompilerDirective());
             }
             else if (Check(TokenKind.RefinedType))
             {
-                refinementTypes.Add(ParseRefinementType());
+                var node = ParseRefinementType();
+                refinementTypes.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.IndexedType))
             {
-                indexedTypes.Add(ParseIndexedType());
+                var node = ParseIndexedType();
+                indexedTypes.Add(node);
+                moduleItems.Add(node);
             }
             else if (Check(TokenKind.Preprocessor))
             {
-                typePreprocessorBlocks.Add(ParseTypePreprocessorBlock());
+                var node = ParseTypePreprocessorBlock();
+                typePreprocessorBlocks.Add(node);
+                moduleItems.Add(node);
             }
             else
             {
@@ -865,6 +895,7 @@ public sealed class Parser
             issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes,
             typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null,
             GetIdentifierSpan(attrs, moduleNameKey, moduleName),
+            moduleItems,
             namespaceScopes);
     }
 
@@ -882,7 +913,8 @@ public sealed class Parser
         List<CSharpInteropBlockNode> interopBlocks,
         List<RefinementTypeNode> refinementTypes,
         List<IndexedTypeNode> indexedTypes,
-        List<TypePreprocessorBlockNode> typePreprocessorBlocks)
+        List<TypePreprocessorBlockNode> typePreprocessorBlocks,
+        List<AstNode> moduleItems)
     {
         var startToken = Expect(TokenKind.Namespace);
         var attrs = ParseAttributes();
@@ -957,7 +989,8 @@ public sealed class Parser
                     interopBlocks,
                     refinementTypes,
                     indexedTypes,
-                    typePreprocessorBlocks);
+                    typePreprocessorBlocks,
+                    moduleItems);
                 continue;
             }
             else if (Check(TokenKind.Interface))
@@ -1015,6 +1048,10 @@ public sealed class Parser
                 parsed = ParseTypePreprocessorBlock();
                 typePreprocessorBlocks.Add((TypePreprocessorBlockNode)parsed);
             }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                parsed = ParseCompilerDirective();
+            }
             else
             {
                 _diagnostics.ReportUnexpectedToken(
@@ -1025,7 +1062,10 @@ public sealed class Parser
             }
 
             if (parsed != null)
+            {
                 ApplyNamespaceMetadata(parsed, fullName, id);
+                moduleItems.Add(parsed);
+            }
         }
 
         if (IsNamespaceSiblingBoundary(startToken))
@@ -1063,7 +1103,8 @@ public sealed class Parser
             or TokenKind.CSharpInterop
             or TokenKind.RefinedType
             or TokenKind.IndexedType
-            or TokenKind.Preprocessor;
+            or TokenKind.Preprocessor
+            or TokenKind.CompilerDirective;
     }
 
     private static void ApplyNamespaceMetadata(
@@ -1101,7 +1142,10 @@ public sealed class Parser
            || block.Interfaces.Count > 0
            || block.Enums.Count > 0
            || block.Delegates.Count > 0
-           || block.InteropBlocks.Count > 0
+           || block.InteropBlocks.Any(interop =>
+               !interop.CSharpCode.TrimStart().StartsWith(
+                   "#",
+                   StringComparison.Ordinal))
            || block.NestedBlocks.Any(ContainsNamespaceScopedDeclarations)
            || block.ElseBranch != null
            && ContainsNamespaceScopedDeclarations(block.ElseBranch);
@@ -2065,6 +2109,10 @@ public sealed class Parser
         else if (Check(TokenKind.RawCSharp))
         {
             return ParseRawCSharpStatement();
+        }
+        else if (Check(TokenKind.CompilerDirective))
+        {
+            return ParseCompilerDirective();
         }
         // Preprocessor conditional block
         else if (Check(TokenKind.Preprocessor))
@@ -8032,6 +8080,9 @@ public sealed class Parser
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
         var indexers = new List<IndexerNode>();
+        var interopBlocks = new List<CSharpInteropBlockNode>();
+        var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
+        var interfaceItems = new List<AstNode>();
 
         while (!IsAtEnd
                && !IsBlockEnd(TokenKind.EndInterface)
@@ -8059,15 +8110,37 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Method))
             {
-                methods.Add(ParseMethodSignature());
+                var node = ParseMethodSignature();
+                methods.Add(node);
+                interfaceItems.Add(node);
             }
             else if (Check(TokenKind.Property))
             {
-                properties.Add(ParseProperty());
+                var node = ParseProperty();
+                properties.Add(node);
+                interfaceItems.Add(node);
             }
             else if (Check(TokenKind.Indexer))
             {
-                indexers.Add(ParseIndexer());
+                var node = ParseIndexer();
+                indexers.Add(node);
+                interfaceItems.Add(node);
+            }
+            else if (Check(TokenKind.CSharpInterop))
+            {
+                var node = ParseCSharpInteropBlock();
+                interopBlocks.Add(node);
+                interfaceItems.Add(node);
+            }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                interfaceItems.Add(ParseCompilerDirective());
+            }
+            else if (Check(TokenKind.Preprocessor))
+            {
+                var node = ParseMemberPreprocessorBlock();
+                preprocessorBlocks.Add(node);
+                interfaceItems.Add(node);
             }
             else
             {
@@ -8102,7 +8175,14 @@ public sealed class Parser
         return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs,
             indexers: indexers.Count > 0 ? indexers : null,
             baseInterfaceSpans: baseInterfaceSpans,
-            identifierSpan: GetIdentifierSpan(attrs, interfaceNameKey, name));
+            identifierSpan: GetIdentifierSpan(attrs, interfaceNameKey, name),
+            interopBlocks: interopBlocks,
+            preprocessorBlocks: preprocessorBlocks,
+            items: preprocessorBlocks.Count > 0
+                || interopBlocks.Any(block =>
+                    block.CSharpCode.TrimStart().StartsWith("#", StringComparison.Ordinal))
+                    ? interfaceItems
+                    : null);
     }
 
     /// <summary>
@@ -8189,7 +8269,11 @@ public sealed class Parser
         }
 
         Token endToken;
-        if (TryExpectMemberBlockEnd(TokenKind.EndMethod, startToken, bodyHadContent, out endToken))
+        if (Check(TokenKind.CSharpInterop) || Check(TokenKind.Preprocessor))
+        {
+            endToken = startToken;
+        }
+        else if (TryExpectMemberBlockEnd(TokenKind.EndMethod, startToken, bodyHadContent, out endToken))
         {
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
@@ -8371,6 +8455,7 @@ public sealed class Parser
         var nestedInterfaces = new List<InterfaceDefinitionNode>();
         var nestedEnums = new List<EnumDefinitionNode>();
         var nestedDelegates = new List<DelegateDefinitionNode>();
+        var classItems = new List<AstNode>();
 
         while (!IsAtEnd
                && !IsBlockEnd(TokenKind.EndClass)
@@ -8405,59 +8490,91 @@ public sealed class Parser
             }
             else if (Check(TokenKind.FieldDef))
             {
-                fields.Add(ParseClassField());
+                var node = ParseClassField();
+                fields.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Property))
             {
-                properties.Add(ParseProperty());
+                var node = ParseProperty();
+                properties.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Indexer))
             {
-                indexers.Add(ParseIndexer());
+                var node = ParseIndexer();
+                indexers.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Constructor))
             {
-                constructors.Add(ParseConstructor());
+                var node = ParseConstructor();
+                constructors.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.OperatorOverload))
             {
-                operatorOverloads.Add(ParseOperatorOverload());
+                var node = ParseOperatorOverload();
+                operatorOverloads.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Method))
             {
-                methods.Add(ParseMethodDefinition());
+                var node = ParseMethodDefinition();
+                methods.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.AsyncMethod))
             {
-                methods.Add(ParseAsyncMethodDefinition());
+                var node = ParseAsyncMethodDefinition();
+                methods.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Event))
             {
-                events.Add(ParseEventDefinition());
+                var node = ParseEventDefinition();
+                events.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.CSharpInterop))
             {
-                interopBlocks.Add(ParseCSharpInteropBlock());
+                var node = ParseCSharpInteropBlock();
+                interopBlocks.Add(node);
+                classItems.Add(node);
+            }
+            else if (Check(TokenKind.CompilerDirective))
+            {
+                classItems.Add(ParseCompilerDirective());
             }
             else if (Check(TokenKind.Preprocessor))
             {
-                preprocessorBlocks.Add(ParseMemberPreprocessorBlock());
+                var node = ParseMemberPreprocessorBlock();
+                preprocessorBlocks.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Class))
             {
-                nestedClasses.Add(ParseClassDefinition());
+                var node = ParseClassDefinition();
+                nestedClasses.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Interface))
             {
-                nestedInterfaces.Add(ParseInterfaceDefinition());
+                var node = ParseInterfaceDefinition();
+                nestedInterfaces.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Enum))
             {
-                nestedEnums.Add(ParseEnumDefinition());
+                var node = ParseEnumDefinition();
+                nestedEnums.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.Delegate))
             {
-                nestedDelegates.Add(ParseDelegateDefinition());
+                var node = ParseDelegateDefinition();
+                nestedDelegates.Add(node);
+                classItems.Add(node);
             }
             else if (Check(TokenKind.List) || Check(TokenKind.Dict) || Check(TokenKind.Set))
             {
@@ -8506,7 +8623,8 @@ public sealed class Parser
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
             identifierSpan: identifierSpan,
             baseClassSpan: baseClassSpan,
-            implementedInterfaceSpans: implementedInterfaceSpans);
+            implementedInterfaceSpans: implementedInterfaceSpans,
+            items: classItems);
     }
 
     /// <summary>
@@ -8517,7 +8635,20 @@ public sealed class Parser
     {
         var token = Expect(TokenKind.CSharpInterop);
         var content = token.Value as string ?? "";
-        return new CSharpInteropBlockNode(token.Span, content);
+        var isCompilationUnitPassthrough = content.StartsWith(
+            CSharpInteropBlockNode.CompilationUnitPassthroughMarker,
+            StringComparison.Ordinal);
+        if (isCompilationUnitPassthrough)
+        {
+            content = content[
+                CSharpInteropBlockNode.CompilationUnitPassthroughMarker
+                    .Length..];
+        }
+        return new CSharpInteropBlockNode(
+            token.Span,
+            content,
+            isCompilationUnitPassthrough:
+                isCompilationUnitPassthrough);
     }
 
     /// <summary>
@@ -10692,6 +10823,40 @@ public sealed class Parser
         return new RawCSharpNode(token.Span, content);
     }
 
+    private CompilerDirectiveNode ParseCompilerDirective()
+    {
+        var token = Expect(TokenKind.CompilerDirective);
+        var attrs = ParseAttributes();
+        var feature = attrs["_pos0"] ?? "compiler-directive";
+        var encoded = attrs["_pos1"] ?? "";
+        try
+        {
+            var padded = encoded
+                .Replace('-', '+')
+                .Replace('_', '/');
+            padded = padded.PadRight(
+                padded.Length + (4 - padded.Length % 4) % 4,
+                '=');
+            var code = System.Text.Encoding.UTF8.GetString(
+                Convert.FromBase64String(padded));
+            return new CompilerDirectiveNode(
+                token.Span,
+                code,
+                feature);
+        }
+        catch (FormatException)
+        {
+            _diagnostics.ReportError(
+                token.Span,
+                DiagnosticCode.InvalidModifier,
+                "Invalid §CDIR base64 payload.");
+            return new CompilerDirectiveNode(
+                token.Span,
+                "",
+                feature);
+        }
+    }
+
     /// <summary>
     /// Parses an inline raw C# expression.
     /// §CS{expr} (content already captured by lexer as single token)
@@ -10765,6 +10930,9 @@ public sealed class Parser
                 fields, properties, constructors, methods, events,
                 operatorOverloads, interopBlocks: interopBlocks, items: items);
         }
+        ConsumeDedentBeforeChain(
+            TokenKind.PreprocessorElse,
+            TokenKind.EndPreprocessor);
 
         MemberPreprocessorBlockNode? elseBranch = null;
         if (Match(TokenKind.PreprocessorElse))
@@ -10794,6 +10962,7 @@ public sealed class Parser
                         interopBlocks: elseInteropBlocks,
                         items: elseItems);
                 }
+                ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
 
                 elseBranch = new MemberPreprocessorBlockNode(startToken.Span, "",
                     elseFields, elseProperties, elseConstructors, elseMethods,
@@ -10807,6 +10976,12 @@ public sealed class Parser
         if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
         {
             ExpectBlockEnd(TokenKind.EndPreprocessor);
+        }
+        else
+        {
+            ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
+            if (IsBlockEnd(TokenKind.EndPreprocessor))
+                ExpectBlockEnd(TokenKind.EndPreprocessor);
         }
 
         return new MemberPreprocessorBlockNode(startToken.Span, condition,
@@ -10894,12 +11069,13 @@ public sealed class Parser
         {
             ExpectBlockEnd(TokenKind.EndPreprocessor);
         }
-        else if (Check(TokenKind.Dedent))
+        else
         {
-            // The nested #elif parser consumes the shared explicit closer. The
-            // remaining dedent belongs to this outer branch body and must not
-            // terminate the containing module before its next sibling.
-            Advance();
+            ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
+            if (IsBlockEnd(TokenKind.EndPreprocessor))
+                ExpectBlockEnd(TokenKind.EndPreprocessor);
+            else if (Check(TokenKind.Dedent))
+                Advance();
         }
 
         return new TypePreprocessorBlockNode(startToken.Span, condition,
@@ -10958,6 +11134,30 @@ public sealed class Parser
             var node = ParseCSharpInteropBlock();
             interopBlocks.Add(node);
             items?.Add(node);
+        }
+        else if (Check(TokenKind.CompilerDirective))
+        {
+            items?.Add(ParseCompilerDirective());
+        }
+        else if (Check(TokenKind.Preprocessor))
+        {
+            items?.Add(ParseMemberPreprocessorBlock());
+        }
+        else if (Check(TokenKind.Class))
+        {
+            items?.Add(ParseClassDefinition());
+        }
+        else if (Check(TokenKind.Interface))
+        {
+            items?.Add(ParseInterfaceDefinition());
+        }
+        else if (Check(TokenKind.Enum))
+        {
+            items?.Add(ParseEnumDefinition());
+        }
+        else if (Check(TokenKind.Delegate))
+        {
+            items?.Add(ParseDelegateDefinition());
         }
         else
         {
@@ -11030,6 +11230,30 @@ public sealed class Parser
             var node = ParseCSharpInteropBlock();
             interopBlocks.Add(node);
             items?.Add(node);
+        }
+        else if (Check(TokenKind.CompilerDirective))
+        {
+            items?.Add(ParseCompilerDirective());
+        }
+        else if (Check(TokenKind.Preprocessor))
+        {
+            items?.Add(ParseMemberPreprocessorBlock());
+        }
+        else if (Check(TokenKind.Class))
+        {
+            items?.Add(ParseClassDefinition());
+        }
+        else if (Check(TokenKind.Interface))
+        {
+            items?.Add(ParseInterfaceDefinition());
+        }
+        else if (Check(TokenKind.Enum))
+        {
+            items?.Add(ParseEnumDefinition());
+        }
+        else if (Check(TokenKind.Delegate))
+        {
+            items?.Add(ParseDelegateDefinition());
         }
         else
         {

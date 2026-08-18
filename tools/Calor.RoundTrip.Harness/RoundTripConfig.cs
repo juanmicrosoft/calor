@@ -22,6 +22,13 @@ public sealed class RoundTripConfig
     /// </summary>
     public required string SolutionOrProjectFile { get; init; }
 
+    /// <summary>
+    /// Optional project whose evaluated graph supplies conversion parse contexts.
+    /// Use the subject library project when the test graph also compiles linked or
+    /// multi-target copies of the same physical source.
+    /// </summary>
+    public string? ParseContextProjectFile { get; init; }
+
     /// <summary>Working directory for the round-trip. Files will be copied here.</summary>
     public string? WorkingDirectory { get; init; }
 
@@ -54,6 +61,9 @@ public sealed class RoundTripConfig
     /// <summary>Target framework to use for dotnet test (e.g., "net10.0").</summary>
     public string? TargetFramework { get; init; }
 
+    /// <summary>Concrete MSBuild configuration evaluated by the harness.</summary>
+    public string Configuration { get; init; } = "Debug";
+
     /// <summary>
     /// Extra MSBuild properties appended to every restore/build/test invocation for
     /// this project (e.g. <c>-p:NuGetAudit=false -p:TreatWarningsAsErrors=false</c>).
@@ -65,6 +75,12 @@ public sealed class RoundTripConfig
     /// Calor's own Synthetic project.
     /// </summary>
     public string ExtraBuildProperties { get; init; } = "";
+
+    /// <summary>
+    /// Explicitly allows conversion without an evaluated project. Selected-branch
+    /// project runs must leave this false so missing project context fails closed.
+    /// </summary>
+    public bool LooseDirectoryMode { get; init; }
 
     /// <summary>Path to dotnet executable.</summary>
     public string DotnetPath { get; init; } = "dotnet";

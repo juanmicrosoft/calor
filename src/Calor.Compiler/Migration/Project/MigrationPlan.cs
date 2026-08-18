@@ -8,6 +8,7 @@ namespace Calor.Compiler.Migration.Project;
 public sealed class MigrationPlan
 {
     public required string ProjectPath { get; init; }
+    public string? ProjectFilePath { get; init; }
     public required MigrationDirection Direction { get; init; }
     public required List<MigrationPlanEntry> Entries { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
@@ -129,6 +130,26 @@ public sealed class MigrationPlanOptions
 
     /// <summary>Conversion fidelity. Lossless is the safe default.</summary>
     public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
+
+    /// <summary>Conditional-compilation handling. Preserving every branch is the default.</summary>
+    public PreprocessorConversionMode PreprocessorMode { get; set; } =
+        PreprocessorConversionMode.PreserveAllBranches;
+
+    /// <summary>MSBuild configuration used to resolve parse options and defined symbols.</summary>
+    public string Configuration { get; set; } = "Debug";
+
+    /// <summary>Additional conditional-compilation symbols merged with MSBuild DefineConstants.</summary>
+    public List<string> DefinedSymbols { get; init; } = new();
+
+    /// <summary>Target framework to select for configuration-sensitive conversion.</summary>
+    public string? TargetFramework { get; set; }
+
+    /// <summary>Optional language-version override.</summary>
+    public Microsoft.CodeAnalysis.CSharp.LanguageVersion? LanguageVersion { get; set; }
+    public Microsoft.CodeAnalysis.DocumentationMode DocumentationMode { get; set; } =
+        Microsoft.CodeAnalysis.DocumentationMode.Parse;
+    public Dictionary<string, string> ParseFeatures { get; init; } =
+        new(StringComparer.Ordinal);
 
     /// <summary>
     /// When true (default), the emitter elides redundant §/C closers for zero-arg §C calls (v0.6.1 default).

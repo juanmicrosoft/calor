@@ -57,6 +57,8 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
     // Preprocessor conditional blocks wrapping entire type declarations
     public IReadOnlyList<TypePreprocessorBlockNode> TypePreprocessorBlocks { get; }
+    // Source-ordered module items used when directives must retain lexical placement.
+    public IReadOnlyList<AstNode> Items { get; }
     // Dependent Types: Refinement type definitions at module level
     public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; }
     // Dependent Types: Indexed type definitions at module level
@@ -202,6 +204,7 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<IndexedTypeNode>? indexedTypes = null,
         IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null,
         TextSpan? identifierSpan = null,
+        IReadOnlyList<AstNode>? items = null,
         IReadOnlyList<NamespaceScopeInfo>? namespaceScopes = null)
         : base(span)
     {
@@ -225,6 +228,7 @@ public sealed class ModuleNode : AstNode
         RefinementTypes = refinementTypes ?? Array.Empty<RefinementTypeNode>();
         IndexedTypes = indexedTypes ?? Array.Empty<IndexedTypeNode>();
         TypePreprocessorBlocks = typePreprocessorBlocks ?? Array.Empty<TypePreprocessorBlockNode>();
+        Items = items ?? Array.Empty<AstNode>();
         NamespaceScopes = namespaceScopes ?? Array.Empty<NamespaceScopeInfo>();
     }
 

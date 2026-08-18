@@ -192,7 +192,10 @@ public static class SupplyEnumeration
     public static async Task<Result> RunAsync(
         IReadOnlyList<RoundTripConfig> projects,
         Func<RoundTripConfig, Task<IReadOnlyList<FileConversionResult>>> convertProject,
-        Func<RoundTripConfig, string, Task<string?>> readOriginalSource)
+        Func<RoundTripConfig, string, Task<string?>> readOriginalSource,
+        Func<RoundTripConfig, string,
+            IReadOnlyList<Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>?
+            resolveParseOptions = null)
     {
         var results = new List<ProjectSupply>();
 
@@ -200,9 +203,11 @@ public static class SupplyEnumeration
         {
             var files = await convertProject(project);
 
-            var native = files.Where(f => f.Status == FileStatus.Replaced && f.LossCount == 0)
+            var native = files.Where(f => f.EligibleNativeSource)
                               .Select(f => f.FilePath).ToList();
-            var withLoss = files.Where(f => f.Status == FileStatus.Replaced && f.LossCount > 0)
+            var withLoss = files.Where(f =>
+                                    f.Status == FileStatus.Replaced
+                                    && f.LossCount > 0)
                                 .Select(f => f.FilePath).ToList();
             // The third population, and the one that decides whether the ceiling is a property of
             // the CORPUS or of the CONVERTER: candidates sited in files the pipeline failed to
@@ -211,9 +216,12 @@ public static class SupplyEnumeration
             var unconverted = files.Where(f => f.Status != FileStatus.Replaced)
                                    .Select(f => f.FilePath).ToList();
 
-            var (nativeCount, nativeByOp, nativeByFile, nativeSkipped) = await EnumerateOver(project, native, readOriginalSource);
-            var (lossCount, lossByOp, _, lossSkipped) = await EnumerateOver(project, withLoss, readOriginalSource);
-            var (lostCount, _, _, lostSkipped) = await EnumerateOver(project, unconverted, readOriginalSource);
+            var (nativeCount, nativeByOp, nativeByFile, nativeSkipped) = await EnumerateOver(
+                project, native, readOriginalSource, resolveParseOptions);
+            var (lossCount, lossByOp, _, lossSkipped) = await EnumerateOver(
+                project, withLoss, readOriginalSource, resolveParseOptions);
+            var (lostCount, _, _, lostSkipped) = await EnumerateOver(
+                project, unconverted, readOriginalSource, resolveParseOptions);
 
             results.Add(new ProjectSupply
             {
@@ -239,7 +247,11 @@ public static class SupplyEnumeration
         EnumerateOver(
             RoundTripConfig project,
             IReadOnlyList<string> relPaths,
-            Func<RoundTripConfig, string, Task<string?>> readOriginalSource)
+            Func<RoundTripConfig, string, Task<string?>> readOriginalSource,
+            Func<RoundTripConfig, string,
+                IReadOnlyList<
+                    Microsoft.CodeAnalysis.CSharp.CSharpParseOptions>>?
+                resolveParseOptions)
     {
         var byOperator = new Dictionary<string, int>(StringComparer.Ordinal);
         var byFile = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -253,7 +265,16 @@ public static class SupplyEnumeration
             // missing-subject guard exists to prevent. Count it so it cannot pass as a corpus fact.
             if (source == null) { skipped++; continue; }
 
-            var candidates = ExpressibleMutationOperators.Enumerate(source, rel);
+            var parseOptions = resolveParseOptions?.Invoke(project, rel)
+                ?? [null!];
+            var candidates = parseOptions
+                .SelectMany(options =>
+                    ExpressibleMutationOperators.Enumerate(
+                        source,
+                        rel,
+                        options))
+                .DistinctBy(candidate => candidate.Id)
+                .ToList();
             if (candidates.Count == 0) continue;
 
             total += candidates.Count;

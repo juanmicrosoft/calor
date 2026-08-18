@@ -564,17 +564,106 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Readonly structs are converted with struct and readonly modifiers"
         },
-        // #773: honest downgrade — the default pipeline STRIPS preprocessor
-        // directives before parsing, keeping the first #if branch unevaluated
-        // (a semantic loss, now counted with locations). §PP block conversion
-        // exists only when stripping is disabled (StripPreprocessor = false)
-        // and covers member/type-level #if blocks, not all directive shapes.
+        // #772: preservation is the production default. The aggregate remains
+        // Partial because interface/enum-member directive placement still falls
+        // back to verbatim interop rather than native member nodes.
         ["preprocessor-directive"] = new FeatureInfo
         {
             Name = "preprocessor-directive",
             Support = SupportLevel.Partial,
-            Description = "By default #if/#elif/#else directives are stripped keeping the first branch unevaluated (recorded as a conversion loss); §PP block conversion applies only when stripping is disabled",
-            Workaround = "Review conditional-compilation blocks manually; alternate branches are not preserved in the default pipeline"
+            Description = "Default conversion preserves all #if/#elif/#else branches as explicit §PP AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
+            Workaround = "Interface and enum member-level directives may use verbatim interop; review those counted preservation boundaries"
+        },
+        ["conditional-declaration"] = new FeatureInfo
+        {
+            Name = "conditional-declaration",
+            Support = SupportLevel.Partial,
+            Description = "Conditional declarations preserve every branch in source order, using explicit interop whenever a declaration is not natively representable",
+            Workaround = "Review InteropPreserved losses; preservation is lossless but not fully native"
+        },
+        ["conditional-member"] = new FeatureInfo
+        {
+            Name = "conditional-member",
+            Support = SupportLevel.NotSupported,
+            Description = "Class and struct member branches are native §PP AST; interface and enum member branches may require verbatim interop",
+            Workaround = "Review interface and enum member-level conditional blocks"
+        },
+        ["conditional-statement"] = new FeatureInfo
+        {
+            Name = "conditional-statement",
+            Support = SupportLevel.NotSupported,
+            Description = "Method block statement branches preserve #if/#elif/#else nesting as §PP AST; unsupported statement shapes remain explicit interop",
+            Workaround = "Review counted interop inside complex switch/accessor/lambda directive placements"
+        },
+        ["conditional-unmodeled-placement"] = new FeatureInfo
+        {
+            Name = "conditional-unmodeled-placement",
+            Support = SupportLevel.NotSupported,
+            Description = "Conditional expressions, accessors, lambdas, switch sections, local functions, and similar unmodeled placements preserve the complete enclosing C# boundary as scoped interop",
+            Workaround = "The source is lossless but non-native; review the counted interop boundary"
+        },
+        ["conditional-top-level-statement"] = new FeatureInfo
+        {
+            Name = "conditional-top-level-statement",
+            Support = SupportLevel.NotSupported,
+            Description = "A compilation unit containing conditional top-level statements is preserved verbatim as global C# interop",
+            Workaround = "Keep the compilation unit as C# interop until top-level conditional statements are modeled natively"
+        },
+        ["top-level-directive-ordering"] = new FeatureInfo
+        {
+            Name = "top-level-directive-ordering",
+            Support = SupportLevel.NotSupported,
+            Description = "Compiler directives interleaved with top-level statements preserve the complete compilation unit verbatim",
+            Workaround = "Keep the compilation unit as C# interop until directives can be represented inside synthetic Main without changing scope"
+        },
+        ["compilation-unit-using-ordering"] = new FeatureInfo
+        {
+            Name = "compilation-unit-using-ordering",
+            Support = SupportLevel.NotSupported,
+            Description = "A using directive after a declaration or completed conditional region preserves the complete compilation unit verbatim",
+            Workaround = "Keep the source as C# interop so configuration-specific using legality and diagnostics remain unchanged"
+        },
+        ["conditional-namespace"] = new FeatureInfo
+        {
+            Name = "conditional-namespace",
+            Support = SupportLevel.NotSupported,
+            Description = "Conditional namespace wrappers and their branch contents are preserved verbatim at compilation-unit scope",
+            Workaround = "Preserve namespace-wrapped branches as compilation-unit C# interop"
+        },
+        ["interface-method-semantics"] = new FeatureInfo
+        {
+            Name = "interface-method-semantics",
+            Support = SupportLevel.NotSupported,
+            Description = "Abstract signature-only interface methods are native; default/private/static/body-bearing methods preserve the declaration as interop",
+            Workaround = "Keep non-signature interface methods as exact C# interop declarations"
+        },
+        ["delegate-semantics"] = new FeatureInfo
+        {
+            Name = "delegate-semantics",
+            Support = SupportLevel.NotSupported,
+            Description = "Public non-generic delegates without attributes or extra modifiers are native; all other delegate declarations preserve exact C# interop",
+            Workaround = "Keep attributed, generic, non-public, or modified delegates as exact C# interop"
+        },
+        ["csharp-script"] = new FeatureInfo
+        {
+            Name = "csharp-script",
+            Support = SupportLevel.NotSupported,
+            Description = "Script compilation units, including #r and #load, are preserved by exact whole-unit passthrough",
+            Workaround = "Use whole-unit C# script passthrough until native script lowering exists"
+        },
+        ["compilation-unit-attribute"] = new FeatureInfo
+        {
+            Name = "compilation-unit-attribute",
+            Support = SupportLevel.NotSupported,
+            Description = "Assembly/module attributes preserve the complete compilation unit verbatim",
+            Workaround = "Preserve the compilation unit as C# interop"
+        },
+        ["extern-alias"] = new FeatureInfo
+        {
+            Name = "extern-alias",
+            Support = SupportLevel.NotSupported,
+            Description = "Compilation units with extern aliases preserve the complete source verbatim",
+            Workaround = "Preserve the compilation unit and aliased references as C# interop"
         },
 
         ["namespace"] = new FeatureInfo
@@ -925,14 +1014,43 @@ public static class FeatureSupport
         ["pragma"] = new FeatureInfo
         {
             Name = "pragma",
-            Support = SupportLevel.Full,
-            Description = "#pragma directives are stripped during conversion (trivia); cosmetic only"
+            Support = SupportLevel.Partial,
+            Description = "#pragma directives, including warning disable/restore and checksum, use an explicit source-ordered directive node",
+            Workaround = "Embedded placements that cannot be structurally owned preserve their enclosing C# boundary"
         },
         ["conditional-using"] = new FeatureInfo
         {
             Name = "conditional-using",
             Support = SupportLevel.Full,
             Description = "Using directives inside #if blocks supported via §PP wrapping §U"
+        },
+        ["nullable-directive"] = new FeatureInfo
+        {
+            Name = "nullable-directive",
+            Support = SupportLevel.NotSupported,
+            Description = "#nullable directives use an explicit source-ordered directive node when their boundary is modeled",
+            Workaround = "Unmodeled embedded placement preserves the enclosing C# boundary"
+        },
+        ["warning-directive"] = new FeatureInfo
+        {
+            Name = "warning-directive",
+            Support = SupportLevel.NotSupported,
+            Description = "#warning directives use an explicit source-ordered directive node and retain compiler warning behavior",
+            Workaround = "Unmodeled embedded placement preserves the enclosing C# boundary"
+        },
+        ["error-directive"] = new FeatureInfo
+        {
+            Name = "error-directive",
+            Support = SupportLevel.NotSupported,
+            Description = "#error directives use an explicit source-ordered directive node; active errors remain honest compilation failures",
+            Workaround = "Resolve active compiler errors in the selected configuration"
+        },
+        ["line-directive"] = new FeatureInfo
+        {
+            Name = "line-directive",
+            Support = SupportLevel.NotSupported,
+            Description = "#line directives are preserved verbatim in source order",
+            Workaround = "Preserve the complete compilation unit to retain exact line mapping"
         },
 
         // Conversion gap fixes
@@ -1022,6 +1140,11 @@ public static class FeatureSupport
     /// </summary>
     public static string? GetWorkaround(string featureName)
     {
-        return Features.TryGetValue(featureName, out var info) ? info.Workaround : null;
+        if (!Features.TryGetValue(featureName, out var info))
+            return null;
+        return info.Workaround
+            ?? (info.Support == SupportLevel.NotSupported
+                ? "Preserve the complete C# boundary as explicit interop."
+                : null);
     }
 }

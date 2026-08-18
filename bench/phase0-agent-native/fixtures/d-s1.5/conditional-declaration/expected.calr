@@ -1,0 +1,58 @@
+§M{m001:Fixture}
+  §PP{FEATURE}
+    §CL{c001:ConditionalClass:pub}
+      §MT{m002:Value:pub:stat} () -> i32
+        §R 1
+
+
+    §CSHARP{public record ConditionalRecord(int Value);
+    }§/CSHARP
+    §DEL{del003:ConditionalDelegate}
+      §I{i32:value}
+      §O{i32}
+
+    §CL{c004:ConditionalPartial:pub:partial}
+      §MT{m005:PartialValue:pub:stat} () -> i32
+        §R 10
+
+
+  §PPE
+    §CL{c006:ConditionalClass:pub}
+      §MT{m007:Value:pub:stat} () -> i32
+        §R 2
+
+
+    §CL{c008:ConditionalRecord:pub:seal}
+      §PROP{p010:Value:i32:pub:get}
+
+      §CTOR{ctor009:pub} (i32:value)
+        §ASSIGN Value value
+
+
+    §DEL{del011:ConditionalDelegate}
+      §I{i32:value}
+      §O{i32}
+
+    §CL{c012:ConditionalPartial:pub:partial}
+      §MT{m013:PartialValue:pub:stat} () -> i32
+        §R 20
+
+
+  §/PP{FEATURE}
+
+  §CL{c014:ConditionalPartial:pub:partial}
+    §MT{m015:Shared:pub:stat} () -> i32
+      §R 100
+
+
+  §CL{c016:ConditionalHarness:pub:stat}
+    §MT{m017:Get:pub:stat} () -> i32
+      §B{ConditionalDelegate:d} §LAM{lam018:value:i32} (+ value 1) §/LAM{lam018}
+      §B{~_hoist000} §NEW{ConditionalRecord} §A 3 §/NEW
+      §B{~_hoist001} §C{ConditionalClass.Value} §/C
+      §B{~_hoist002} §C{d} §A 4 §/C
+      §B{~_hoist003} §C{ConditionalPartial.PartialValue} §/C
+      §B{~_hoist004} §C{ConditionalPartial.Shared} §/C
+      §R (+ (+ (+ (+ _hoist001 _hoist000.Value) _hoist002) _hoist003) _hoist004)
+
+

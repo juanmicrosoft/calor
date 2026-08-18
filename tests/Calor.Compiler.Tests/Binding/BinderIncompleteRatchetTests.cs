@@ -69,7 +69,9 @@ public class BinderIncompleteRatchetTests
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
     private const string ScopeText =
-        "both F-2 legs; conversion leg skips when corpus submodules are absent";
+        "in-repo F-2 plus selected-active native conversion and preserve-all opaque coverage; "
+        + "Roslyn-selected conversion uses genuinely empty default symbols with "
+        + "C# Preview/regular/parse options; legacy source-order 18005 is informational";
 
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
@@ -127,7 +129,11 @@ public class BinderIncompleteRatchetTests
                 ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))
                 : null;
             File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                measured with { Conversion = existing?.Conversion },
+                measured with
+                {
+                    Conversion = existing?.Conversion,
+                    PreserveCoverage = existing?.PreserveCoverage
+                },
                 new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
@@ -153,89 +159,452 @@ public class BinderIncompleteRatchetTests
     [SkippableFact]
     public void ConversionLeg_IncompleteCount_MatchesBaseline()
     {
-        // F-2's second leg (activated in B2 as the amendment staged): the three A-1.5.3
-        // conversion subjects at their pinned submodule commits, converted in-process
-        // (the DS15 pattern — no CLI, no caching machinery needed at this speed) and
-        // their outputs bound. This leg exercises exactly the C#-shaped expression forms
-        // the in-repo leg under-represents. Skips when submodules are absent (plain CI
-        // test jobs); runs locally and in submodule-initialized jobs.
         var root = RepoRoot();
         var subjects = new[] { "MediatR", "serilog", "FluentValidation" }
-            .Select(s => Path.Combine(root, "bench", "corpus", s, "src"))
+            .Select(subject => Path.Combine(root, "bench", "corpus", subject, "src"))
             .ToList();
         Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not initialized");
 
-        int incomplete = 0, expressionsBound = 0, convertedAndBound = 0;
-        int convertExceptions = 0, emptyOutput = 0, outputParseFailures = 0;
-        foreach (var srcDir in subjects)
+        var files = subjects
+            .SelectMany(directory => Directory.EnumerateFiles(
+                directory, "*.cs", SearchOption.AllDirectories))
+            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .OrderBy(file => file, StringComparer.Ordinal)
+            .ToArray();
+        var preserveParseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
+            Microsoft.CodeAnalysis.DocumentationMode.Parse,
+            Microsoft.CodeAnalysis.SourceCodeKind.Regular,
+            preprocessorSymbols: Array.Empty<string>());
+
+        var native = new NativeConversionCoverage();
+        var preserve = new PreserveConversionCoverage();
+        var opaqueIdentities = new HashSet<string>(StringComparer.Ordinal);
+        var unconvertedIdentities = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var file in files)
         {
-            var csFiles = Directory.EnumerateFiles(srcDir, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                         && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-                .OrderBy(f => f, StringComparer.Ordinal);
-            foreach (var cs in csFiles)
-            {
-                Compiler.Migration.ConversionResult conv;
-                try
-                {
-                    conv = new Compiler.Migration.CSharpToCalorConverter(
-                        new Compiler.Migration.ConversionOptions
-                        {
-                            Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
-                            ModuleName = "Leg2",
-                            GracefulFallback = true,
-                            AutoGenerateIds = true
-                        }).Convert(File.ReadAllText(cs), Path.GetFileName(cs));
-                }
-                catch { convertExceptions++; continue; }
-                if (string.IsNullOrEmpty(conv.CalorSource)) { emptyOutput++; continue; }
-
-                var diagnostics = new DiagnosticBag();
-                var lexer = new Lexer(conv.CalorSource.Replace("\r\n", "\n"), diagnostics);
-                var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
-                var module = parser.Parse();
-                if (diagnostics.HasErrors) { outputParseFailures++; continue; }
-
-                var bindBag = new DiagnosticBag();
-                var binder = new Binder(bindBag);
-                binder.Bind(module);
-                expressionsBound += binder.ExpressionsBound;
-                incomplete += bindBag.Count(d => d.Code == DiagnosticCode.AnalysisIncomplete);
-                convertedAndBound++;
-            }
+            var source = File.ReadAllText(file);
+            MeasureNative(file, source, native);
+            MeasurePreserve(
+                file,
+                source,
+                preserveParseOptions,
+                preserve,
+                opaqueIdentities,
+                unconvertedIdentities);
         }
+        preserve.OpaqueIdentityCount =
+            opaqueIdentities.Count;
+        preserve.UnconvertedIdentityCount =
+            unconvertedIdentities.Count;
 
-        // Three DISTINCT failure modes recorded separately (review Major 3): the single
-        // NotConverted bucket hid that all 59 were converter round-trip validity
-        // failures — Calor the converter emitted that Calor's own parser rejects (#903).
-        var measured = new ConversionLeg(incomplete, expressionsBound, convertedAndBound,
-            convertExceptions, emptyOutput, outputParseFailures);
-
+        var measuredNative = native.ToRecord();
+        var measuredPreserve = preserve.ToRecord();
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
             var baseline = File.Exists(BaselinePath())
                 ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!
                 : new Baseline(0, 0, 0, 0, ScopeText);
             File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                baseline with { Conversion = measured, Scope = ScopeText },
+                baseline with
+                {
+                    Conversion = measuredNative,
+                    PreserveCoverage = measuredPreserve,
+                    Scope = ScopeText
+                },
                 new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
 
-        var recorded = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!.Conversion;
-        Assert.NotNull(recorded);
-        Assert.True(measured == recorded,
-            $"Conversion-leg movement: measured {measured} vs baseline {recorded}. Binder family " +
-            "PRs and converter changes must regenerate the baseline IN THIS PR with the change " +
-            "named — never silently (same ratchet discipline as the in-repo leg; the subjects " +
-            "are at pinned submodule commits, so drift here is OUR code, not theirs).");
+        var recorded = JsonSerializer.Deserialize<Baseline>(
+            File.ReadAllText(BaselinePath()))!;
+        Assert.NotNull(recorded.Conversion);
+        Assert.NotNull(recorded.PreserveCoverage);
+        Assert.Equal(
+            LegacySourceOrderAttempted,
+            measuredNative.LegacySourceOrderAttempted);
+        Assert.True(
+            measuredNative.RoslynSelectedAttempted
+                >= recorded.Conversion.RoslynSelectedAttempted,
+            $"Roslyn-selected attempted count regressed: "
+            + $"{measuredNative.RoslynSelectedAttempted} < "
+            + $"{recorded.Conversion.RoslynSelectedAttempted}.");
+        Assert.Equal(recorded.Conversion, measuredNative);
+        Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
+        Assert.Equal(
+            measuredPreserve.OpaqueBoundaries,
+            measuredPreserve.OpaqueIdentityCount);
+        Assert.Equal(
+            measuredPreserve.UnconvertedFiles,
+            measuredPreserve.UnconvertedIdentityCount);
+        Assert.True(
+            measuredPreserve.OpaqueBoundaries <= recorded.PreserveCoverage.OpaqueBoundaries
+            && measuredPreserve.OpaqueExpressions <= recorded.PreserveCoverage.OpaqueExpressions
+            && measuredPreserve.UnconvertedFiles <= recorded.PreserveCoverage.UnconvertedFiles,
+            $"Preserve-mode opaque coverage regressed: measured {measuredPreserve} "
+            + $"vs baseline {recorded.PreserveCoverage}.");
+        Assert.Equal(recorded.PreserveCoverage, measuredPreserve);
     }
 
-    private sealed record ConversionLeg(
-        int Incomplete, int ExpressionsBound, int ConvertedAndBound,
-        int ConvertExceptions, int EmptyOutput, int OutputParseFailures);
+    [Fact]
+    public void SelectedBranchMode_UsesRoslynBooleanConditions()
+    {
+        const string source = """
+            #if A && !B
+            public class SelectedAB { }
+            #elif C || D
+            public class SelectedCD { }
+            #else
+            public class SelectedFallback { }
+            #endif
+            """;
+
+        AssertSelection([], "SelectedFallback");
+        AssertSelection(["A"], "SelectedAB");
+        AssertSelection(["A", "B"], "SelectedFallback");
+        AssertSelection(["C"], "SelectedCD");
+        AssertSelection(["D"], "SelectedCD");
+
+        static void AssertSelection(
+            IReadOnlyList<string> symbols,
+            string expected)
+        {
+            var parseOptions =
+                new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                    Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
+                    Microsoft.CodeAnalysis.DocumentationMode.Parse,
+                    Microsoft.CodeAnalysis.SourceCodeKind.Regular,
+                    preprocessorSymbols: symbols);
+            var result =
+                new Compiler.Migration.CSharpToCalorConverter(
+                    new Compiler.Migration.ConversionOptions
+                    {
+                        Fidelity =
+                            Compiler.Migration.ConversionFidelity.Lossy,
+                        PreprocessorMode =
+                            Compiler.Migration.PreprocessorConversionMode
+                                .SelectActiveBranchLossy,
+                        ParseOptions = parseOptions,
+                        ModuleName = "Selection"
+                    }).Convert(source, "Selection.cs");
+            Assert.True(
+                result.Success,
+                string.Join("; ", result.Issues.Select(issue => issue.Message)));
+            Assert.Contains(expected, result.CalorSource);
+            foreach (var other in new[]
+                     {
+                         "SelectedAB",
+                         "SelectedCD",
+                         "SelectedFallback"
+                     }.Where(name => name != expected))
+                Assert.DoesNotContain(other, result.CalorSource);
+        }
+    }
+
+    private static void MeasureNative(
+        string file,
+        string source,
+        NativeConversionCoverage coverage)
+    {
+        coverage.FilesSeen++;
+        var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
+            Microsoft.CodeAnalysis.DocumentationMode.Parse,
+            Microsoft.CodeAnalysis.SourceCodeKind.Regular,
+            preprocessorSymbols: Array.Empty<string>());
+        Compiler.Migration.ConversionResult conversion;
+        try
+        {
+            conversion = new Compiler.Migration.CSharpToCalorConverter(
+                new Compiler.Migration.ConversionOptions
+                {
+                    Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
+                    PreprocessorMode = Compiler.Migration.PreprocessorConversionMode
+                        .SelectActiveBranchLossy,
+                    ParseOptions = parseOptions,
+                    DefinedSymbols = Array.Empty<string>(),
+                    ModuleName = "Leg2",
+                    GracefulFallback = true,
+                    AutoGenerateIds = true
+                }).Convert(source, Path.GetFileName(file));
+        }
+
+        catch
+        {
+            coverage.ConvertExceptions++;
+            return;
+        }
+        if (string.IsNullOrEmpty(conversion.CalorSource))
+        {
+            coverage.EmptyOutput++;
+            return;
+        }
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(
+            new Lexer(conversion.CalorSource.Replace("\r\n", "\n"), diagnostics)
+                .TokenizeAllForParser(),
+            diagnostics).Parse();
+        if (diagnostics.HasErrors)
+        {
+            coverage.OutputParseFailures++;
+            return;
+        }
+        var bindDiagnostics = new DiagnosticBag();
+        var binder = new Binder(bindDiagnostics);
+        binder.Bind(module);
+        coverage.ConvertedAndBound++;
+        coverage.RoslynSelectedAttempted +=
+            binder.ExpressionsBound;
+        coverage.Incomplete += bindDiagnostics.Count(diagnostic =>
+            diagnostic.Code == DiagnosticCode.AnalysisIncomplete);
+    }
+
+    private static void MeasurePreserve(
+        string file,
+        string source,
+        Microsoft.CodeAnalysis.CSharp.CSharpParseOptions parseOptions,
+        PreserveConversionCoverage coverage,
+        HashSet<string> opaqueIdentities,
+        HashSet<string> unconvertedIdentities)
+    {
+        coverage.FilesSeen++;
+        Compiler.Migration.ConversionResult? conversion = null;
+        var unconverted = false;
+        try
+        {
+            conversion = new Compiler.Migration.CSharpToCalorConverter(
+                new Compiler.Migration.ConversionOptions
+                {
+                    Fidelity = Compiler.Migration.ConversionFidelity.Lossless,
+                    PreprocessorMode = Compiler.Migration.PreprocessorConversionMode
+                        .PreserveAllBranches,
+                    ParseOptions = parseOptions,
+                    DefinedSymbols = Array.Empty<string>(),
+                    ModuleName = "Leg2",
+                    GracefulFallback = true,
+                    AutoGenerateIds = true,
+                    ValidateRoundTripCSharp = false
+                }).Convert(source, Path.GetFileName(file));
+        }
+        catch
+        {
+            coverage.ConvertExceptions++;
+            unconverted = true;
+        }
+
+        if (conversion?.Ast != null)
+        {
+            var spans = CollectOpaqueSpans(conversion.Ast, source, file, coverage);
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source, parseOptions);
+            var root = tree.GetRoot();
+            foreach (var span in spans)
+            {
+                var identity = $"{Path.GetFullPath(file)}:{span.Start}:{span.End}";
+                Assert.True(opaqueIdentities.Add(identity),
+                    $"Duplicate opaque identity: {identity}");
+                coverage.OpaqueBoundaries++;
+                var target = Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                    span.Start, span.End);
+                coverage.OpaqueExpressions += root.DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax>()
+                    .Count(expression => target.Contains(expression.Span));
+            }
+        }
+
+        if (string.IsNullOrEmpty(conversion?.CalorSource))
+        {
+            coverage.EmptyOutput++;
+            unconverted = true;
+        }
+        else
+        {
+            var diagnostics = new DiagnosticBag();
+            _ = new Parser(
+                new Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser(),
+                diagnostics).Parse();
+            if (diagnostics.HasErrors)
+            {
+                coverage.OutputParseFailures++;
+                unconverted = true;
+            }
+        }
+        if (conversion is { Success: false })
+            unconverted = true;
+        if (unconverted)
+        {
+            coverage.UnconvertedFiles++;
+            var identity = $"{Path.GetFullPath(file)}:0:{source.Length}";
+            Assert.True(unconvertedIdentities.Add(identity),
+                $"Duplicate unconverted identity: {identity}");
+        }
+    }
+
+    private static IReadOnlyList<(int Start, int End)> CollectOpaqueSpans(
+        Calor.Compiler.Ast.ModuleNode module,
+        string source,
+        string file,
+        PreserveConversionCoverage coverage)
+    {
+        var entries = new List<(Calor.Compiler.Ast.AstNode Node, string Code)>();
+        var stack = new Stack<Calor.Compiler.Ast.AstNode>();
+        var seen = new HashSet<Calor.Compiler.Ast.AstNode>(
+            ReferenceEqualityComparer.Instance);
+        stack.Push(module);
+        while (stack.TryPop(out var node))
+        {
+            if (!seen.Add(node))
+                continue;
+            switch (node)
+            {
+                case Calor.Compiler.Ast.CSharpInteropBlockNode interop:
+                    entries.Add((node, interop.CSharpCode));
+                    break;
+                case Calor.Compiler.Ast.RawCSharpNode raw:
+                    entries.Add((node, raw.CSharpCode));
+                    break;
+            }
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker
+                         .GetAllChildren(node))
+                stack.Push(child);
+        }
+
+        var used = new List<(int Start, int End)>();
+        foreach (var entry in entries
+                     .OrderByDescending(entry => entry.Node.Span.Length)
+                     .ThenByDescending(entry => entry.Code.Length))
+        {
+            var mapped = TryMapOpaqueSpan(entry.Node, entry.Code, source, used);
+            if (mapped == null)
+            {
+                coverage.OpaqueUnmapped++;
+                continue;
+            }
+            if (used.Any(existing => mapped.Value.Start >= existing.Start
+                && mapped.Value.End <= existing.End))
+                continue;
+            Assert.False(used.Any(existing => mapped.Value.Start < existing.End
+                && mapped.Value.End > existing.Start),
+                $"Partially overlapping opaque spans in {file}: "
+                + $"{mapped.Value.Start}..{mapped.Value.End}");
+            used.Add(mapped.Value);
+        }
+        return used.OrderBy(span => span.Start).ToArray();
+    }
+
+    private static (int Start, int End)? TryMapOpaqueSpan(
+        Calor.Compiler.Ast.AstNode node,
+        string code,
+        string source,
+        IReadOnlyList<(int Start, int End)> used)
+    {
+        if (node.Span.Length > 0
+            && node.Span.Start >= 0
+            && node.Span.End <= source.Length)
+        {
+            var span = (node.Span.Start, node.Span.End);
+            return span;
+        }
+        foreach (var candidate in new[] { code, code.Trim() }
+                     .Where(candidate => candidate.Length > 0)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            var search = 0;
+            while (search <= source.Length - candidate.Length)
+            {
+                var start = source.IndexOf(candidate, search, StringComparison.Ordinal);
+                if (start < 0)
+                    break;
+                var span = (Start: start, End: start + candidate.Length);
+                if (!used.Any(existing =>
+                        span.Start < existing.End
+                        && span.End > existing.Start)
+                    || used.Any(existing =>
+                        span.Start >= existing.Start
+                        && span.End <= existing.End))
+                    return span;
+                search = start + 1;
+            }
+        }
+        return null;
+    }
+
+    private const int LegacySourceOrderAttempted = 18005;
+
+    private sealed class NativeConversionCoverage
+    {
+        public int Incomplete;
+        public int RoslynSelectedAttempted;
+        public int FilesSeen;
+        public int ConvertedAndBound;
+        public int ConvertExceptions;
+        public int EmptyOutput;
+        public int OutputParseFailures;
+        public NativeConversionLeg ToRecord() => new(
+            Incomplete,
+            LegacySourceOrderAttempted,
+            RoslynSelectedAttempted,
+            FilesSeen,
+            ConvertedAndBound,
+            ConvertExceptions,
+            EmptyOutput,
+            OutputParseFailures);
+    }
+
+    private sealed class PreserveConversionCoverage
+    {
+        public int FilesSeen;
+        public int OpaqueBoundaries;
+        public int OpaqueExpressions;
+        public int OpaqueUnmapped;
+        public int OpaqueIdentityCount;
+        public int UnconvertedFiles;
+        public int UnconvertedIdentityCount;
+        public int ConvertExceptions;
+        public int EmptyOutput;
+        public int OutputParseFailures;
+        public PreserveCoverageLeg ToRecord() => new(
+            FilesSeen,
+            OpaqueBoundaries,
+            OpaqueExpressions,
+            OpaqueUnmapped,
+            OpaqueIdentityCount,
+            UnconvertedFiles,
+            UnconvertedIdentityCount,
+            ConvertExceptions,
+            EmptyOutput,
+            OutputParseFailures);
+    }
+
+    private sealed record NativeConversionLeg(
+        int Incomplete,
+        int LegacySourceOrderAttempted,
+        int RoslynSelectedAttempted,
+        int FilesSeen,
+        int ConvertedAndBound,
+        int ConvertExceptions,
+        int EmptyOutput,
+        int OutputParseFailures);
+
+    private sealed record PreserveCoverageLeg(
+        int FilesSeen,
+        int OpaqueBoundaries,
+        int OpaqueExpressions,
+        int OpaqueUnmapped,
+        int OpaqueIdentityCount,
+        int UnconvertedFiles,
+        int UnconvertedIdentityCount,
+        int ConvertExceptions,
+        int EmptyOutput,
+        int OutputParseFailures);
 
     private sealed record Baseline(
-        int IncompleteCount, int ParsedFiles, int ParseFailures, int ExpressionsBound, string Scope,
-        ConversionLeg? Conversion = null);
+        int IncompleteCount,
+        int ParsedFiles,
+        int ParseFailures,
+        int ExpressionsBound,
+        string Scope,
+        NativeConversionLeg? Conversion = null,
+        PreserveCoverageLeg? PreserveCoverage = null);
 }

@@ -61,6 +61,9 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
     /// C#-style attributes (e.g., [@Obsolete], [@ComVisible]).
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
+    public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; }
+    public IReadOnlyList<MemberPreprocessorBlockNode> PreprocessorBlocks { get; }
+    public IReadOnlyList<AstNode> Items { get; }
 
     public InterfaceDefinitionNode(
         TextSpan span,
@@ -124,7 +127,10 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         IReadOnlyList<IndexerNode>? indexers = null,
         IReadOnlyList<TextSpan>? baseInterfaceSpans = null,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
+        IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null,
+        IReadOnlyList<AstNode>? items = null)
         : base(span, id, name, attributes, identifierSpan)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
@@ -134,6 +140,9 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         Properties = properties ?? Array.Empty<PropertyNode>();
         Indexers = indexers ?? Array.Empty<IndexerNode>();
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
+        InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
+        PreprocessorBlocks = preprocessorBlocks ?? Array.Empty<MemberPreprocessorBlockNode>();
+        Items = items ?? Array.Empty<AstNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -364,6 +373,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// </summary>
     public IReadOnlyList<DelegateDefinitionNode> NestedDelegates { get; }
 
+    /// <summary>Source-ordered members used when compiler directives retain lexical placement.</summary>
+    public IReadOnlyList<AstNode> Items { get; }
+
     public ClassDefinitionNode(
         TextSpan span,
         string id,
@@ -501,7 +513,8 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null,
         TextSpan? identifierSpan = null,
         TextSpan? baseClassSpan = null,
-        IReadOnlyList<TextSpan>? implementedInterfaceSpans = null)
+        IReadOnlyList<TextSpan>? implementedInterfaceSpans = null,
+        IReadOnlyList<AstNode>? items = null)
         : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
@@ -530,6 +543,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         NestedInterfaces = nestedInterfaces ?? Array.Empty<InterfaceDefinitionNode>();
         NestedEnums = nestedEnums ?? Array.Empty<EnumDefinitionNode>();
         NestedDelegates = nestedDelegates ?? Array.Empty<DelegateDefinitionNode>();
+        Items = items ?? Array.Empty<AstNode>();
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

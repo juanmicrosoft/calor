@@ -608,7 +608,7 @@ public class MigrationLearningFixTests
             "namespace OtherLib;\n\npublic static class Helper { }");
 
         var emitted = Emit(module);
-        Assert.Contains("namespace MyLib", emitted);
+        Assert.DoesNotContain("namespace MyLib", emitted);
         Assert.Contains("namespace OtherLib", emitted);
     }
 
