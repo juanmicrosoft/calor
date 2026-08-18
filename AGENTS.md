@@ -15,6 +15,29 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 - `TreatWarningsAsErrors` is enabled globally — fix all warnings before committing
 - GPG signing workaround (1Password agent): `git -c commit.gpgsign=false commit -m "message"`
 
+### Corpus Submodules (round-trip harness)
+
+`.gitmodules` pins three real-world C# corpora under `bench/corpus/`:
+`MediatR`, `serilog`, and `FluentValidation`. `git clone` does **not** auto-init
+them — CI opts in per job (`.github/workflows/test.yml` at lines 59, 229, 719).
+
+Init them on a fresh clone (needed for the round-trip harness, the
+`roundtrip-verification` CI job when run locally, or the corpus binder-ratchet
+leg):
+
+```bash
+git submodule update --init --recursive   # first clone
+git submodule update --recursive           # refresh pinned SHAs later
+```
+
+The fast unit-test lane (`Calor.Compiler.Tests`, `Calor.Conversion.Tests`,
+`Calor.Semantics.Tests`, `Calor.Verification.Tests`, `Calor.Enforcement.Tests`,
+`Calor.Evaluation`) does **not** need submodules. Only the round-trip harness
+under `tools/Calor.RoundTrip.Harness/` and the corpus jobs touch
+`bench/corpus/`. Because CI initializes submodules per-job, corpus tests can
+pass in CI while failing locally on a fresh clone with an empty corpus —
+that's the fix.
+
 ### Test Projects
 
 | Project | What it covers |

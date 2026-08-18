@@ -50,6 +50,58 @@ embedded self-test fixtures explicitly, run
 
 ---
 
+## Corpus Submodules (Round-Trip Harness)
+
+`.gitmodules` pins three real-world C# corpora under `bench/corpus/`:
+
+- `bench/corpus/MediatR`
+- `bench/corpus/serilog`
+- `bench/corpus/FluentValidation`
+
+`git clone` does **not** auto-initialize these — CI opts in per job (see
+`.github/workflows/test.yml` at lines 59, 229, and 719 for the
+`submodules: recursive` checkouts). If you skip this step and later run the
+round-trip harness or the corpus binder-ratchet leg locally, you will see
+confusing "corpus submodules not initialized" errors or an
+apparently-empty `bench/corpus/` tree.
+
+**On a fresh clone**, initialize the submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+**After upstream changes** to the pinned SHAs, refresh them:
+
+```bash
+git submodule update --recursive
+```
+
+### When do I actually need this?
+
+You need the submodules populated **only** if you plan to:
+
+- Run the round-trip harness in `tools/Calor.RoundTrip.Harness/` locally.
+- Reproduce the `roundtrip-verification` CI job locally (e.g. debugging a
+  `MediatR: MinorRegressions` failure).
+- Reproduce the corpus binder-ratchet leg locally.
+
+The fast unit-test lane below (`Calor.Compiler.Tests`,
+`Calor.Conversion.Tests`, `Calor.Semantics.Tests`,
+`Calor.Verification.Tests`, `Calor.Enforcement.Tests`, and
+`Calor.Evaluation`) does **not** touch `bench/corpus/` and works fine on a
+fresh clone without submodules.
+
+Because CI initializes submodules per-job, it is possible for the corpus
+tests to be green in CI while failing locally on a fresh clone — running
+`git submodule update --init --recursive` is almost always the fix.
+
+See also the "Build & Test" section in the repo root
+[`AGENTS.md`](https://github.com/juanmicrosoft/calor/blob/main/AGENTS.md)
+and `CLAUDE.md` for the terser agent-oriented version of this note.
+
+---
+
 ## Project Structure
 
 ```
