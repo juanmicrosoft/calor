@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Binding;
@@ -31,6 +32,20 @@ public abstract class BoundStatement : BoundNode
 public abstract class BoundExpression : BoundNode
 {
     public abstract string TypeName { get; }
+
+    /// <summary>
+    /// v0.14 §D1 — ground-truth <see cref="BoundType"/> representation.
+    /// Default wraps the existing <see cref="TypeName"/> string in a
+    /// <see cref="NominalBoundType"/> so every <c>BoundExpression</c> has a
+    /// non-null <c>Type</c> without touching per-subclass constructors.
+    /// Subclasses will override in S3–S6 as they gain access to precise
+    /// metadata-backed shapes; <see cref="TypeName"/> is deleted at S7 (F-5).
+    /// </summary>
+    // TODO(S3): the default allocates on every get. Memoize (per-instance
+    // cache field) once analysis passes start reading .Type in hot loops.
+    // Deliberately unoptimized in S2 to keep the shim change zero-behaviour.
+    public virtual BoundType Type => new NominalBoundType(TypeName);
+
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
     public override IEnumerable<BoundNode> ChildNodes => Children;
