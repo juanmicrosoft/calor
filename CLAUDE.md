@@ -17,25 +17,44 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 ### Corpus Submodules (round-trip harness)
 
 `.gitmodules` pins three real-world C# corpora under `bench/corpus/`:
-`MediatR`, `serilog`, and `FluentValidation`. `git clone` does **not** auto-init
-them — CI opts in per job (`.github/workflows/test.yml` at lines 59, 229, 719).
+`MediatR`, `serilog`, and `FluentValidation`. `git clone` does **not**
+auto-init them — CI opts them in per job (`grep -n submodules:
+.github/workflows/test.yml` to find the current call sites; the `test`,
+`roundtrip-verification`, and the `compiler` shard of `remaining-tests` are
+the jobs that need them today).
 
-Init them on a fresh clone (needed for the round-trip harness, the
-`roundtrip-verification` CI job when run locally, or the corpus binder-ratchet
-leg):
+Init them on a fresh clone (needed for the round-trip harness under
+`tools/Calor.RoundTrip.Harness/`, the `roundtrip-verification` CI job when
+run locally, or the `corpus-binder-ratchet` leg):
 
 ```bash
-git submodule update --init --recursive   # first clone
-git submodule update --recursive           # refresh pinned SHAs later
+git submodule update --init   # first clone
+git submodule update          # refresh pinned SHAs after main advances
 ```
 
-The fast unit-test lane (`Calor.Compiler.Tests`, `Calor.Conversion.Tests`,
-`Calor.Semantics.Tests`, `Calor.Verification.Tests`, `Calor.Enforcement.Tests`,
-`Calor.Evaluation`) does **not** need submodules. Only the round-trip harness
-under `tools/Calor.RoundTrip.Harness/` and the corpus jobs touch
-`bench/corpus/`. Because CI initializes submodules per-job, corpus tests can
-pass in CI while failing locally on a fresh clone with an empty corpus —
-that's the fix.
+The three pinned submodules are flat (no nested submodules of their own),
+so `--recursive` is unnecessary here. CI passes it as a safe default.
+
+The three corpora add ~500 MB to a fresh clone; skip them if you are only
+running the unit-test lane.
+
+**Which tests need submodules?** Only the round-trip harness and
+`BinderIncompleteRatchetTests`
+(`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs`) read
+from `bench/corpus/`. `BinderIncompleteRatchetTests` uses
+`Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not
+initialized")` to skip cleanly on a bare clone, so running
+`dotnet test tests/Calor.Compiler.Tests/` is safe without submodules —
+you will silently skip that one class. `Calor.Conversion.Tests`,
+`Calor.Semantics.Tests`, `Calor.Verification.Tests`,
+`Calor.Enforcement.Tests`, and `Calor.Evaluation` do not touch
+`bench/corpus/` at all.
+
+Dev/CI parity: corpus tests can be green in CI while failing locally on a
+fresh clone. `git submodule update --init` on the outer repo is the fix.
+
+Origin: 2026-08-18 test-suite audit, finding F8 / recommendation R4
+(`docs/plans/2026-08-18-test-suite-audit.md`).
 
 ### Test Projects
 
