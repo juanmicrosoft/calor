@@ -51,10 +51,6 @@ export function trackFeatureLearnMore(feature: string) {
   sendEvent({ action: 'feature_learn_more', category: 'engagement', label: feature });
 }
 
-export function trackVSCodeExtensionClick(action: 'release' | 'marketplace') {
-  sendEvent({ action: 'vscode_extension_click', category: 'conversion', label: action });
-}
-
 export function trackBenchmarkDetailClick() {
   sendEvent({ action: 'benchmark_detail_click', category: 'engagement' });
 }

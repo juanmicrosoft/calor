@@ -6,7 +6,7 @@ const completedMilestones = [
   'Rule enforcement',
   'Side effect tracking',
   'Static verification',
-  'VS Code support',
+  'LSP support (any editor)',
   'Build integration',
   'Published MSBuild SDK',
   'Performance tests',
