@@ -566,9 +566,13 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             conversion.Success,
             string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
-        var iface = Assert.Single(conversion.Ast!.Interfaces);
-        Assert.Empty(iface.Methods);
-        Assert.Equal(3, iface.InteropBlocks.Count);
+        Assert.Empty(conversion.Ast!.Interfaces);
+        var loss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == "interface-method-semantics"));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(conversion.Losses, item =>
+            item.Kind == ConversionLossKind.Dropped);
+        Assert.DoesNotContain("§IFACE{", conversion.CalorSource);
         var generated = CompileConvertedCalor(conversion);
         var assembly = CompileAssembly(generated);
         Assert.Equal(

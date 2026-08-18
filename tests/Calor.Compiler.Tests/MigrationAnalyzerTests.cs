@@ -1347,8 +1347,8 @@ public class MigrationAnalyzerTests
 
         var result = _analyzer.AnalyzeSource(source, "test.cs", "test.cs");
 
-        // scoped-parameter is now fully supported
-        Assert.DoesNotContain(result.UnsupportedConstructs, c => c.Name == "scoped-parameter");
+        Assert.Contains(result.UnsupportedConstructs, c =>
+            c.Name == "scoped-parameter");
     }
 
     [Fact]

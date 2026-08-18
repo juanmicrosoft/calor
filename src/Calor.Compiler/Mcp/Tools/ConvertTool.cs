@@ -239,7 +239,7 @@ public sealed class ConvertTool : McpToolBase
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
-                PreserveComments = true,
+                PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = fallback,
                 Explain = explain,
@@ -492,7 +492,7 @@ public sealed class ConvertTool : McpToolBase
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
-                PreserveComments = true,
+                PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = true,
                 Explain = false,
@@ -770,7 +770,7 @@ public sealed class ConvertTool : McpToolBase
             var options = new ConversionOptions
             {
                 ModuleName = moduleName,
-                PreserveComments = true,
+                PreserveDocumentationComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = true,
                 Fidelity = legacyStripPreprocessor

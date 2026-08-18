@@ -22,7 +22,7 @@ public class ConvertAutoFixIntegrationTests
         {
             Fidelity = ConversionFidelity.Lossy,
             GracefulFallback = true,
-            PreserveComments = true,
+            PreserveDocumentationComments = true,
             AutoGenerateIds = true
         });
         var result = converter.Convert(csharpSource);

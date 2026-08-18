@@ -3437,7 +3437,7 @@ public class CSharpToCalorConversionTests
     }
 
     [Fact]
-    public void Convert_InterfaceWithEvent_WarnsAboutDroppedMember()
+    public void Convert_InterfaceWithEvent_PreservesWholeInterface()
     {
         var csharpSource = """
             public interface INotify
@@ -3449,10 +3449,13 @@ public class CSharpToCalorConversionTests
 
         var result = _converter.Convert(csharpSource);
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains(result.Issues, i =>
-            i.Severity == ConversionIssueSeverity.Warning &&
-            i.Message.Contains("Dropped"));
-        Assert.True(result.Context.Stats.MembersDropped > 0);
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("event System.EventHandler Changed;", result.CalorSource);
+        Assert.DoesNotContain("§IFACE{", result.CalorSource);
+        Assert.Contains(result.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved
+            && loss.Feature == "interface-member");
+        Assert.Equal(0, result.Context.Stats.MembersDropped);
     }
 
     [Fact]
