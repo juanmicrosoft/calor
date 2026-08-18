@@ -82,5 +82,7 @@ src/Calor.Compiler/Analysis/Dataflow/LoopStepSemantics.cs
 # overload resolution) is a compile-time query into the compiler's own type
 # system machinery. Same class as the #754 envelope machinery and the #786
 # typed CFG code above.
+# pending
 src/Calor.Compiler/Binding/Metadata/MetadataContext.cs
+# pending
 src/Calor.Compiler/Binding/Metadata/MetadataReferenceManifest.cs
