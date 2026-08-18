@@ -1,4 +1,5 @@
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -13,7 +14,6 @@ public class FeatureCheckCommandTests
 
     [Theory]
     [InlineData("class", SupportLevel.Full)]
-    [InlineData("interface", SupportLevel.Full)]
     [InlineData("async-await", SupportLevel.Full)]
     [InlineData("lambda", SupportLevel.Full)]
     [InlineData("generics", SupportLevel.Full)]
@@ -45,6 +45,7 @@ public class FeatureCheckCommandTests
     [Theory]
     [InlineData("ref-parameter", SupportLevel.Partial)]
     [InlineData("dynamic", SupportLevel.Partial)]
+    [InlineData("interface", SupportLevel.Partial)]
     public void FeatureCheck_PartiallySupported_ReturnsPartialLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -60,6 +61,8 @@ public class FeatureCheckCommandTests
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
     [InlineData("record", SupportLevel.NotSupported)]
     [InlineData("local-function", SupportLevel.NotSupported)]
+    [InlineData("scoped-parameter", SupportLevel.NotSupported)]
+    [InlineData("using-declaration", SupportLevel.NotSupported)]
     public void FeatureCheck_NotSupported_ReturnsNotSupportedLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -209,6 +212,7 @@ public class FeatureCheckCommandTests
     [InlineData("lock-statement")]
     [InlineData("await-foreach")]
     [InlineData("await-using")]
+    [InlineData("using-declaration")]
     [InlineData("scoped-parameter")]
     [InlineData("collection-expression")]
     [InlineData("readonly-struct")]
@@ -238,6 +242,40 @@ public class FeatureCheckCommandTests
             Assert.DoesNotContain("_", feature.Name);
             Assert.DoesNotMatch(@"[A-Z]", feature.Name);
         }
+    }
+
+    [Theory]
+    [InlineData("await foreach (var item in items) { }", "await-foreach")]
+    [InlineData("await using (resource) { }", "await-using")]
+    [InlineData("await using var resource = value;", "await-using")]
+    [InlineData("using var resource = value;", "using-declaration")]
+    [InlineData("public ref struct Buffer { }", "ref-struct")]
+    [InlineData("file class LocalType { }", "file-scoped-type")]
+    [InlineData("public void M(scoped ref int value) { }", "scoped-parameter")]
+    [InlineData("public interface I { void M() { } }", "interface-method-semantics")]
+    [InlineData("public interface I { int P { get => 1; } }", "interface-property-semantics")]
+    [InlineData("public interface I { int this[int i] { get => i; } }", "interface-indexer-semantics")]
+    [InlineData("public interface I { event System.Action Changed; }", "interface-member")]
+    [InlineData("internal interface I { void M(); }", "interface-semantics")]
+    [InlineData("public delegate T Factory<T>(T value);", "delegate-semantics")]
+    [InlineData("[System.Obsolete] public delegate void Legacy();", "delegate-semantics")]
+    public void SyntaxCapabilityClassifier_DetectsRequiredUnsupportedFeature(
+        string source,
+        string expectedFeature)
+    {
+        var root = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
+
+        var detection = Assert.Single(
+            SyntaxCapabilityClassifier.Detect(root)
+                .Where(item => item.FeatureName == expectedFeature));
+
+        Assert.Equal(expectedFeature, detection.FeatureName);
+        Assert.True(detection.Line > 0);
+        Assert.True(detection.Column > 0);
+        Assert.True(detection.SpanLength > 0);
+        Assert.Contains(expectedFeature, SyntaxCapabilityClassifier.RequiredUnsupportedFeatures);
     }
 
     #endregion

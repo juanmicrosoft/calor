@@ -38,7 +38,7 @@ public class TaskGenAddressabilityTests
         // Property 2 (native supply): the injected using/Directory.Exists/arithmetic must convert
         // WITHOUT interop fallback — otherwise clause (a) would exclude it as non-native.
         var conv = new Calor.Compiler.Migration.CSharpToCalorConverter(
-            new Calor.Compiler.Migration.ConversionOptions { GracefulFallback = true, PreserveComments = true, AutoGenerateIds = true })
+            new Calor.Compiler.Migration.ConversionOptions { GracefulFallback = true, PreserveDocumentationComments = true, AutoGenerateIds = true })
             .Convert(cand.MutatedSource, "Counter.cs");
         Assert.True(conv.Success, "mutated file must convert to Calor");
         Assert.DoesNotContain("CSHARP", conv.CalorSource ?? ""); // no interop escalation → native

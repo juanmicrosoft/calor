@@ -49,8 +49,9 @@ public static class FeatureSupport
         ["interface"] = new FeatureInfo
         {
             Name = "interface",
-            Support = SupportLevel.Full,
-            Description = "Interfaces are converted to Calor interface definitions"
+            Support = SupportLevel.Partial,
+            Description = "Public abstract signature-only methods, properties, and indexers are native; interfaces with non-representable contract members are preserved whole as counted C# interop",
+            Workaround = "Keep default, static abstract/virtual, private, event, and nested-type interface contracts as exact C# interop"
         },
         // #773: honest downgrade — the native conversion emitted a positional
         // record as a class with getter-only properties and NO constructor
@@ -521,8 +522,8 @@ public static class FeatureSupport
         {
             Name = "ref-struct",
             Support = SupportLevel.NotSupported,
-            Description = "ref struct types are not supported",
-            Workaround = "Use regular struct or class types"
+            Description = "ref struct types are preserved whole as counted C# interop so stack-only semantics remain exact",
+            Workaround = "Keep the type as exact C# interop or use a regular struct only when stack-only behavior is unnecessary"
         },
 
         // Phase 3 features
@@ -536,21 +537,29 @@ public static class FeatureSupport
         {
             Name = "await-foreach",
             Support = SupportLevel.NotSupported,
-            Description = "await foreach (async streams) is not supported",
-            Workaround = "Enumerate the async enumerable manually with explicit await"
+            Description = "Members containing await foreach are preserved whole as counted C# interop so async enumeration and disposal semantics remain exact",
+            Workaround = "Keep the containing member as exact C# interop"
         },
         ["await-using"] = new FeatureInfo
         {
             Name = "await-using",
             Support = SupportLevel.NotSupported,
-            Description = "await using statements are not supported",
-            Workaround = "Use explicit try/finally with await DisposeAsync()"
+            Description = "Members containing await using statements or declarations are preserved whole as counted C# interop so asynchronous disposal remains exact",
+            Workaround = "Keep the containing member as exact C# interop"
         },
         ["scoped-parameter"] = new FeatureInfo
         {
             Name = "scoped-parameter",
-            Support = SupportLevel.Full,
-            Description = "scoped keyword is stripped during conversion; parameter is preserved"
+            Support = SupportLevel.NotSupported,
+            Description = "Members with scoped parameters are preserved whole as counted C# interop so ref-safety semantics are not stripped",
+            Workaround = "Keep the containing member as exact C# interop until scoped ref-safety is modeled"
+        },
+        ["using-declaration"] = new FeatureInfo
+        {
+            Name = "using-declaration",
+            Support = SupportLevel.NotSupported,
+            Description = "Using declarations are preserved with their complete containing member because resource lifetime extends to the containing scope",
+            Workaround = "Keep the containing member as exact C# interop or rewrite it as an explicit using statement with the same lifetime"
         },
         ["collection-expression"] = new FeatureInfo
         {
@@ -637,6 +646,34 @@ public static class FeatureSupport
             Description = "Abstract signature-only interface methods are native; default/private/static/body-bearing methods preserve the declaration as interop",
             Workaround = "Keep non-signature interface methods as exact C# interop declarations"
         },
+        ["interface-semantics"] = new FeatureInfo
+        {
+            Name = "interface-semantics",
+            Support = SupportLevel.NotSupported,
+            Description = "Non-public, partial, or otherwise modified interface declarations preserve the complete interface as exact C# interop",
+            Workaround = "Keep the interface as C# interop until declaration modifiers are represented natively"
+        },
+        ["interface-property-semantics"] = new FeatureInfo
+        {
+            Name = "interface-property-semantics",
+            Support = SupportLevel.NotSupported,
+            Description = "Body-bearing, private, static, virtual, or otherwise non-representable interface properties preserve the containing interface as exact C# interop",
+            Workaround = "Keep the containing interface as exact C# interop"
+        },
+        ["interface-indexer-semantics"] = new FeatureInfo
+        {
+            Name = "interface-indexer-semantics",
+            Support = SupportLevel.NotSupported,
+            Description = "Body-bearing, private, static, virtual, or otherwise non-representable interface indexers preserve the containing interface as exact C# interop",
+            Workaround = "Keep the containing interface as exact C# interop"
+        },
+        ["interface-member"] = new FeatureInfo
+        {
+            Name = "interface-member",
+            Support = SupportLevel.NotSupported,
+            Description = "Events, nested types, and other non-representable interface members preserve the containing interface as exact C# interop",
+            Workaround = "Keep the containing interface as exact C# interop"
+        },
         ["delegate-semantics"] = new FeatureInfo
         {
             Name = "delegate-semantics",
@@ -715,8 +752,8 @@ public static class FeatureSupport
         {
             Name = "file-scoped-type",
             Support = SupportLevel.NotSupported,
-            Description = "file-scoped types (C# 11) are not supported",
-            Workaround = "Use internal or private nested types"
+            Description = "File-local classes, structs, interfaces, enums, and delegates are preserved whole as counted C# interop so file-only accessibility remains exact",
+            Workaround = "Keep the declaration as exact C# interop"
         },
         ["utf8-string-literal"] = new FeatureInfo
         {
@@ -810,7 +847,7 @@ public static class FeatureSupport
         {
             Name = "generic-delegate",
             Support = SupportLevel.NotSupported,
-            Description = "Generic delegate declarations lose their type parameters in native conversion; they are preserved verbatim as §CSHARP interop",
+            Description = "Generic delegate declarations are preserved verbatim as counted §CSHARP interop so type parameters and constraints remain exact",
             Workaround = "Use Func<>/Action<> or keep the delegate as §CSHARP interop"
         },
         ["conversion-error"] = new FeatureInfo

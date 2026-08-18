@@ -144,7 +144,7 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ValidateMode_ReportsLossyDropLocations()
+    public async Task ExecuteAsync_ValidateMode_ReportsInteropPreservationLocations()
     {
         var args = JsonSerializer.SerializeToElement(new
         {
@@ -159,7 +159,10 @@ public class ConvertToolTests
         var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
         Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
         var lossSummary = root.GetProperty("lossSummary");
-        Assert.Equal(1, lossSummary.GetProperty("drops").GetInt32());
+        Assert.Equal(0, lossSummary.GetProperty("drops").GetInt32());
+        Assert.Equal(
+            1,
+            lossSummary.GetProperty("interopPreservations").GetInt32());
         Assert.True(Assert.Single(lossSummary.GetProperty("locations").EnumerateArray())
             .GetProperty("line").GetInt32() > 0);
     }
