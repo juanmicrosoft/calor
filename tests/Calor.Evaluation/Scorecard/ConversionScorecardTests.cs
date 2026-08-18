@@ -14,14 +14,12 @@ namespace Calor.Evaluation.Scorecard;
 /// </summary>
 public class ConversionScorecardTests
 {
-    // Re-calibrated 2026-08-14 (#766): standalone generated C#, complete
-    // declaration/type mapping, and structural conditional imports raise the
-    // full semantic round-trip result to 96/100. The remaining 4 partials are
-    // pinned per fixture in baseline.json.
+    // Re-calibrated for #775: interop-preserved records round-trip faithfully
+    // but are partial conversions, so they no longer inflate the native score.
     // Baselines are exact (no slack): the corpus and converter are
     // deterministic, and per-fixture zero-regression is enforced against
     // baseline.json by NoRegressionsVsCommittedBaseline.
-    private const int BASELINE_FULLY_CONVERTED = 96;
+    private const int BASELINE_FULLY_CONVERTED = 92;
     private const int BASELINE_ROUNDTRIP = 96;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
@@ -106,6 +104,17 @@ public class ConversionScorecardTests
     public void AllSnippetsHaveResults()
     {
         Assert.Equal(100, Scorecard.Total);
+    }
+
+    [Fact]
+    public void RecordInterop_IsNotReportedAsNativeFeatureConversion()
+    {
+        Assert.Contains("record", Scorecard.ByFeature);
+        var records = Scorecard.ByFeature["record"];
+
+        Assert.Equal(2, records.Total);
+        Assert.Equal(0, records.Passed);
+        Assert.Equal(0, records.Rate);
     }
 
     [Fact]

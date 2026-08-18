@@ -31,9 +31,11 @@ This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP
 
 Most C# features convert cleanly to Calor. Key supported features include:
 
-**Fully supported**: classes, structs, interfaces, enums, records, abstract/sealed/static classes, generics (including nested), inheritance, properties (auto/computed/init), fields, constructors (with base/this chains), methods (virtual/override/abstract/async), operators (including implicit/explicit conversion), indexers, events, delegates, lambdas, LINQ, pattern matching (type/constant/relational/logical and/or/not/var/discard/tuple/positional patterns), switch expressions, nullable types, string interpolation, collection expressions, goto/label, yield return/break, throw expressions, lock, stackalloc, volatile, extension methods, using declarations, with expressions, required members.
+**Fully supported**: classes, structs, interfaces, enums, abstract/sealed/static classes, generics (including nested), inheritance, properties (auto/computed/init), fields, constructors (with base/this chains), methods (virtual/override/abstract/async), operators (including implicit/explicit conversion), indexers, events, delegates, lambdas, LINQ, pattern matching (type/constant/relational/logical and/or/not/var/discard/tuple/positional patterns), switch expressions, nullable types, string interpolation, collection expressions, goto/label, yield return/break, throw expressions, lock, stackalloc, volatile, extension methods, using declarations, with expressions, required members.
 
 **Partial support** (most usage converts): is-pattern with complex recursion, implicit `new()` with arguments, checked/unchecked blocks (wrapper stripped, body preserved).
+
+**Preserved as C# interop**: records and record structs (all synthesized and user-defined record semantics remain verbatim).
 
 **Not yet supported**: list/slice patterns (`[a, ..rest]`), `ref struct`, `static abstract` interface members, `in` parameters, mixed collection spread (`[1, ..other]`).
 

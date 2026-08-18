@@ -222,8 +222,11 @@ public class ConversionScorecardRunner
             }
         }
 
-        // FullyConverted = conversion + Calor compilation + C# COMPILATION.
-        var status = csharpCompilationSuccess && semanticLosses.Length == 0
+        // FullyConverted requires native conversion. Verbatim interop is
+        // behavior-preserving, but it is still partial conversion and must not
+        // inflate feature support or native-conversion rates.
+        var status = csharpCompilationSuccess
+            && conversionResult.Losses.Count == 0
             ? SnippetStatus.FullyConverted
             : SnippetStatus.PartiallyConverted;
 
@@ -282,7 +285,11 @@ public class ConversionScorecardRunner
                     featureResults[feature] = (0, 0);
 
                 var (t, p) = featureResults[feature];
-                featureResults[feature] = (t + 1, p + (result.RoundTripSuccess ? 1 : 0));
+                featureResults[feature] = (
+                    t + 1,
+                    p + (result.Status == SnippetStatus.FullyConverted
+                        ? 1
+                        : 0));
             }
         }
 

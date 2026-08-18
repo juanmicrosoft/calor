@@ -2066,10 +2066,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _insideMemberPreprocessorRecovery = true;
                     try
                     {
+                        var member = node.Members[index];
                         activeItems.Add(CreateInteropBlock(
-                            node.Members[index],
-                            "conditional-interface-member",
-                            GetInteropMemberKind(node.Members[index])));
+                            member,
+                            member is RecordDeclarationSyntax
+                                ? "record"
+                                : "conditional-interface-member",
+                            GetInteropMemberKind(member)));
                     }
                     finally
                     {
@@ -2197,6 +2200,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             InteropMemberKind.Property);
                     }
                     return ConvertIndexer(indexerSyntax);
+                case RecordDeclarationSyntax recordSyntax:
+                    return CreateInteropBlock(
+                        recordSyntax,
+                        "record",
+                        InteropMemberKind.Class);
                 default:
                     if (_context.ShouldPreserveCSharp)
                     {
@@ -2402,35 +2410,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        // #773: the FeatureSupport registry is executable — while records are
-        // not Full, they are preserved verbatim as §CSHARP interop (the native
-        // conversion emitted a positional record as a class with getter-only
-        // properties and NO constructor — broken output). Counted as a loss.
-        if (FeatureSupport.GetSupportLevel("record") != SupportLevel.Full)
-        {
-            AddModuleInteropBlock(CreateInteropBlock(node, "record", InteropMemberKind.Class));
-            return;
-        }
-
-        _context.RecordFeatureUsage("record");
-        _context.EnterType(node.Identifier.Text);
-        try
-        {
-            var classNode = ConvertRecord(node);
-            AssociateTypeNamespace(classNode);
-            AttachDocComment(classNode, node);
-            _classes.Add(classNode);
-            _context.Stats.ClassesConverted++;
-            _context.IncrementConverted();
-        }
-        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
-        {
-            AddModuleInteropBlock(CreateInteropBlock(node, "record", InteropMemberKind.Class));
-        }
-        finally
-        {
-            _context.ExitType();
-        }
+        // #775: the former native lowering silently replaced records with
+        // classes and lost synthesized and user-defined record semantics.
+        // Keep this fail-safe independent of registry drift until a dedicated
+        // record AST and behavioral equivalence suite exist.
+        AddModuleInteropBlock(CreateInteropBlock(
+            node,
+            "record",
+            InteropMemberKind.Class));
     }
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
@@ -2908,26 +2895,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             if (member is RecordDeclarationSyntax nestedRecord)
             {
-                // #773: executable registry — nested records are preserved as
-                // §CSHARP interop while record support is not Full (see
-                // VisitRecordDeclaration).
-                if (FeatureSupport.GetSupportLevel("record") != SupportLevel.Full)
-                {
-                    interopBlocks.Add(CreateInteropBlock(member, "record", InteropMemberKind.Class));
-                    continue;
-                }
-                try
-                {
-                    _context.RecordFeatureUsage("nested-type");
-                    _context.EnterType(nestedRecord.Identifier.Text);
-                    nestedClasses.Add(ConvertRecord(nestedRecord));
-                    _context.ExitType();
-                }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
-                {
-                    _context.ExitType();
-                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
-                }
+                interopBlocks.Add(CreateInteropBlock(
+                    nestedRecord,
+                    "record",
+                    InteropMemberKind.Class));
                 continue;
             }
             if (member is InterfaceDeclarationSyntax nestedIface)
@@ -3447,6 +3418,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(ns.Identifier.Text); nestedClasses.Add(ConvertStruct(ns)); _context.ExitType(); }
                 catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                continue;
+            }
+            if (member is RecordDeclarationSyntax nestedRecord)
+            {
+                interopBlocks.Add(CreateInteropBlock(
+                    nestedRecord,
+                    "record",
+                    InteropMemberKind.Class));
                 continue;
             }
             if (member is InterfaceDeclarationSyntax ni)
@@ -5554,6 +5533,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<AstNode> items,
         string interopFeature = "preprocessor-member")
     {
+        if (member is RecordDeclarationSyntax record)
+        {
+            var recordInterop = CreateInteropBlock(
+                record,
+                "record",
+                InteropMemberKind.Class);
+            interopBlocks.Add(recordInterop);
+            items.Add(recordInterop);
+            return;
+        }
         if (_conditionalInteropMemberStarts.Contains(member.SpanStart)
             || _conditionalInteropTypeStarts.Contains(member.SpanStart))
         {
