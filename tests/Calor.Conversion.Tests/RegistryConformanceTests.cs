@@ -1,4 +1,5 @@
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -20,7 +21,10 @@ public class RegistryConformanceTests
         _output = output;
     }
 
-    private static ConversionResult Convert(string csharp, bool selectActiveBranchLossy = false)
+    private static ConversionResult Convert(
+        string csharp,
+        bool selectActiveBranchLossy = false,
+        IEnumerable<string>? symbols = null)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -28,6 +32,8 @@ public class RegistryConformanceTests
             ModuleName = "ConformanceTest",
             GracefulFallback = true,
             AutoGenerateIds = true,
+            ParseOptions = new CSharpParseOptions(
+                preprocessorSymbols: symbols),
             PreprocessorMode = selectActiveBranchLossy
                 ? PreprocessorConversionMode.SelectActiveBranchLossy
                 : PreprocessorConversionMode.PreserveAllBranches
@@ -94,6 +100,108 @@ public class RegistryConformanceTests
         Assert.Contains("record Person", result.EmittedCSharp);
         Assert.True(result.RoslynSuccess,
             "Round-tripped record does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Theory]
+    [InlineData(
+        "public readonly record struct Point<T>(T X, T Y) where T : unmanaged;",
+        "readonly record struct Point<T>",
+        1)]
+    [InlineData(
+        "[System.Obsolete] public record Base(int X); public record Derived(int X, int Y) : Base(X);",
+        "record Derived(int X, int Y) : Base(X)",
+        2)]
+    [InlineData(
+        "public partial record Person(string Name); public partial record Person { public void Deconstruct(out string name) => name = Name; }",
+        "partial record Person",
+        2)]
+    [InlineData(
+        "public record Nominal { public int Value { get; init; } protected Nominal(Nominal other) { Value = other.Value; } }",
+        "protected Nominal(Nominal other)",
+        1)]
+    public void RecordVariants_ArePreservedVerbatimAndCompile(
+        string csharp,
+        string expectedText,
+        int expectedLossCount)
+    {
+        var conversion = Convert(csharp);
+        var result = RoundTrip(csharp);
+
+        Assert.Contains(expectedText, result.EmittedCSharp);
+        Assert.True(
+            result.RoslynSuccess,
+            "Round-tripped record variant does not compile: "
+            + string.Join("; ", result.RoslynErrors));
+        var recordLosses = conversion.Losses
+            .Where(loss => loss.Feature == "record")
+            .ToList();
+        Assert.Equal(expectedLossCount, recordLosses.Count);
+        Assert.All(
+            recordLosses,
+            loss => Assert.Equal(
+                ConversionLossKind.InteropPreserved,
+                loss.Kind));
+    }
+
+    [Theory]
+    [InlineData(
+        "public struct Container { public record Inner(int Value); }",
+        "record Inner(int Value)")]
+    [InlineData(
+        "public interface IContainer { public record Inner(int Value); }",
+        "record Inner(int Value)")]
+    public void RecordNestedInOtherType_IsNeverDropped(
+        string csharp,
+        string expectedText)
+    {
+        var conversion = Convert(csharp);
+        var result = RoundTrip(csharp);
+
+        var loss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == "record"));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(
+            conversion.Losses,
+            item => item.Kind == ConversionLossKind.Dropped);
+        Assert.Contains(expectedText, result.EmittedCSharp);
+        Assert.True(
+            result.RoslynSuccess,
+            "Round-tripped nested record does not compile: "
+            + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Theory]
+    [InlineData("public class Container")]
+    [InlineData("public struct Container")]
+    [InlineData("public interface Container")]
+    public void ActiveConditionalNestedRecord_IsAttributedAndNeverDropped(
+        string container)
+    {
+        var csharp = $$"""
+            {{container}}
+            {
+            #if FEATURE
+                public record Inner(int Value);
+            #endif
+            }
+            """;
+
+        var conversion = Convert(
+            csharp,
+            symbols: ["FEATURE"]);
+        var result = RoundTrip(csharp);
+
+        var recordLoss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == "record"));
+        Assert.Equal(
+            ConversionLossKind.InteropPreserved,
+            recordLoss.Kind);
+        Assert.DoesNotContain(
+            conversion.Losses,
+            item => item.Kind == ConversionLossKind.Dropped);
+        Assert.Contains("#if FEATURE", result.EmittedCSharp);
+        Assert.Contains("record Inner(int Value)", result.EmittedCSharp);
+        Assert.True(result.RoslynSuccess);
     }
 
     [Fact]

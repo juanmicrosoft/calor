@@ -101,6 +101,14 @@ public class ConversionScorecardRunner
             .Where(loss => loss.IsSemanticLoss)
             .Select(loss => loss.ToString())
             .ToArray();
+        var interopPreservationDiagnostics = conversionResult.Losses
+            .Where(loss => loss.Kind is
+                ConversionLossKind.InteropPreserved
+                or ConversionLossKind.EmitterFallback)
+            .Select(loss => loss.ToString())
+            .ToArray();
+        var interopPreservationCount =
+            conversionResult.InteropPreservationCount;
         var conversionErrors = conversionResult.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error);
         var conversionWarnings = conversionResult.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning);
 
@@ -128,7 +136,10 @@ public class ConversionScorecardRunner
                 CompilationDuration: TimeSpan.Zero)
             {
                 SemanticLossCount = semanticLosses.Length,
-                SemanticLossDiagnostics = semanticLosses
+                SemanticLossDiagnostics = semanticLosses,
+                InteropPreservationCount = interopPreservationCount,
+                InteropPreservationDiagnostics =
+                    interopPreservationDiagnostics
             };
         }
 
@@ -169,7 +180,10 @@ public class ConversionScorecardRunner
                 CompilationDuration: TimeSpan.Zero)
             {
                 SemanticLossCount = semanticLosses.Length,
-                SemanticLossDiagnostics = semanticLosses
+                SemanticLossDiagnostics = semanticLosses,
+                InteropPreservationCount = interopPreservationCount,
+                InteropPreservationDiagnostics =
+                    interopPreservationDiagnostics
             };
         }
 
@@ -198,7 +212,10 @@ public class ConversionScorecardRunner
                 CompilationDuration: compilationDuration)
             {
                 SemanticLossCount = semanticLosses.Length,
-                SemanticLossDiagnostics = semanticLosses
+                SemanticLossDiagnostics = semanticLosses,
+                InteropPreservationCount = interopPreservationCount,
+                InteropPreservationDiagnostics =
+                    interopPreservationDiagnostics
             };
         }
 
@@ -222,8 +239,11 @@ public class ConversionScorecardRunner
             }
         }
 
-        // FullyConverted = conversion + Calor compilation + C# COMPILATION.
-        var status = csharpCompilationSuccess && semanticLosses.Length == 0
+        // FullyConverted requires native conversion. Verbatim interop is
+        // behavior-preserving, but it is still partial conversion and must not
+        // inflate feature support or native-conversion rates.
+        var status = csharpCompilationSuccess
+            && conversionResult.Losses.Count == 0
             ? SnippetStatus.FullyConverted
             : SnippetStatus.PartiallyConverted;
 
@@ -246,7 +266,10 @@ public class ConversionScorecardRunner
             CompilationDuration: compilationDuration)
         {
             SemanticLossCount = semanticLosses.Length,
-            SemanticLossDiagnostics = semanticLosses
+            SemanticLossDiagnostics = semanticLosses,
+            InteropPreservationCount = interopPreservationCount,
+            InteropPreservationDiagnostics =
+                interopPreservationDiagnostics
         };
     }
 
@@ -282,7 +305,11 @@ public class ConversionScorecardRunner
                     featureResults[feature] = (0, 0);
 
                 var (t, p) = featureResults[feature];
-                featureResults[feature] = (t + 1, p + (result.RoundTripSuccess ? 1 : 0));
+                featureResults[feature] = (
+                    t + 1,
+                    p + (result.Status == SnippetStatus.FullyConverted
+                        ? 1
+                        : 0));
             }
         }
 

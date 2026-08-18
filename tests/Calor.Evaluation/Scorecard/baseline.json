@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-08-14T18:37:56.257566Z",
-  "commitHash": "a986d0ef",
+  "timestamp": "2026-08-18T18:59:04.881783Z",
+  "commitHash": "76be43c9",
   "version": "1.0",
   "total": 100,
-  "fullyConverted": 96,
-  "partiallyConverted": 4,
+  "fullyConverted": 92,
+  "partiallyConverted": 8,
   "blocked": 0,
   "crashed": 0,
   "roundTripPassing": 96,
@@ -218,13 +218,13 @@
     },
     "unary_minus": {
       "total": 1,
-      "passed": 1,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     },
     "unary_plus": {
       "total": 1,
-      "passed": 1,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     },
     "parenthesized_expression": {
       "total": 1,
@@ -443,13 +443,13 @@
     },
     "record": {
       "total": 2,
-      "passed": 2,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     },
     "positional_record": {
       "total": 1,
-      "passed": 1,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     },
     "enum": {
       "total": 2,
@@ -743,8 +743,8 @@
     },
     "local_function": {
       "total": 1,
-      "passed": 1,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     },
     "extension_method": {
       "total": 1,
@@ -1023,13 +1023,13 @@
     },
     "with_expression": {
       "total": 1,
-      "passed": 1,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     },
     "computed_property": {
       "total": 1,
-      "passed": 1,
-      "rate": 1
+      "passed": 0,
+      "rate": 0
     }
   },
   "results": [
@@ -1053,10 +1053,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.4899173",
-      "compilationDuration": "00:00:00.0035024",
+      "conversionDuration": "00:00:00.4556217",
+      "compilationDuration": "00:00:00.0094075",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1079,10 +1081,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0226070",
-      "compilationDuration": "00:00:00.0030263",
+      "conversionDuration": "00:00:00.0214697",
+      "compilationDuration": "00:00:00.0031790",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1103,10 +1107,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0087187",
-      "compilationDuration": "00:00:00.0029925",
+      "conversionDuration": "00:00:00.0070353",
+      "compilationDuration": "00:00:00.0030592",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1128,10 +1134,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0144173",
-      "compilationDuration": "00:00:00.0030002",
+      "conversionDuration": "00:00:00.0131907",
+      "compilationDuration": "00:00:00.0030705",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1153,10 +1161,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0073247",
-      "compilationDuration": "00:00:00.0028623",
+      "conversionDuration": "00:00:00.0065701",
+      "compilationDuration": "00:00:00.0029061",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1177,10 +1187,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0124056",
-      "compilationDuration": "00:00:00.0147504",
+      "conversionDuration": "00:00:00.0112955",
+      "compilationDuration": "00:00:00.0029583",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1202,10 +1214,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0229998",
-      "compilationDuration": "00:00:00.0027009",
+      "conversionDuration": "00:00:00.0251540",
+      "compilationDuration": "00:00:00.0022684",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1227,10 +1241,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0068223",
-      "compilationDuration": "00:00:00.0025664",
+      "conversionDuration": "00:00:00.0047910",
+      "compilationDuration": "00:00:00.0022632",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1252,10 +1268,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0060030",
-      "compilationDuration": "00:00:00.0021164",
+      "conversionDuration": "00:00:00.0046620",
+      "compilationDuration": "00:00:00.0021753",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1277,10 +1295,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0083361",
-      "compilationDuration": "00:00:00.0019496",
+      "conversionDuration": "00:00:00.0048207",
+      "compilationDuration": "00:00:00.0022548",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1301,10 +1321,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0054756",
-      "compilationDuration": "00:00:00.0018640",
+      "conversionDuration": "00:00:00.0045273",
+      "compilationDuration": "00:00:00.0022274",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1325,10 +1347,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0059155",
-      "compilationDuration": "00:00:00.0018300",
+      "conversionDuration": "00:00:00.0057632",
+      "compilationDuration": "00:00:00.0027549",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1350,10 +1374,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0295152",
-      "compilationDuration": "00:00:00.0020123",
+      "conversionDuration": "00:00:00.0304735",
+      "compilationDuration": "00:00:00.0032188",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1374,10 +1400,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0092161",
-      "compilationDuration": "00:00:00.0021947",
+      "conversionDuration": "00:00:00.0131335",
+      "compilationDuration": "00:00:00.0022191",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1401,10 +1429,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0090913",
-      "compilationDuration": "00:00:00.0022120",
+      "conversionDuration": "00:00:00.0070753",
+      "compilationDuration": "00:00:00.0023912",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1426,10 +1456,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0082350",
-      "compilationDuration": "00:00:00.0020246",
+      "conversionDuration": "00:00:00.0074634",
+      "compilationDuration": "00:00:00.0023213",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1440,7 +1472,7 @@
         "unary_minus",
         "unary_plus"
       ],
-      "status": "FullyConverted",
+      "status": "PartiallyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
       "conversionWarnings": 1,
@@ -1452,10 +1484,14 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0106874",
-      "compilationDuration": "00:00:00.0021700",
+      "conversionDuration": "00:00:00.0100694",
+      "compilationDuration": "00:00:00.0024686",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 1,
+      "interopPreservationDiagnostics": [
+        "[InteropPreserved] Level1_Basic/017_UnaryOperators.cs:12 [unsupported-prefix-operator] Statement preserved as raw C#: return \u002Bx;"
+      ],
       "roundTripSuccess": true
     },
     {
@@ -1476,10 +1512,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0070033",
-      "compilationDuration": "00:00:00.0019330",
+      "conversionDuration": "00:00:00.0058071",
+      "compilationDuration": "00:00:00.0022485",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1500,10 +1538,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0239081",
-      "compilationDuration": "00:00:00.0024080",
+      "conversionDuration": "00:00:00.0131515",
+      "compilationDuration": "00:00:00.0025245",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1524,10 +1564,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0061583",
-      "compilationDuration": "00:00:00.0021252",
+      "conversionDuration": "00:00:00.0056942",
+      "compilationDuration": "00:00:00.0024400",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1548,10 +1590,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0114253",
-      "compilationDuration": "00:00:00.0019684",
+      "conversionDuration": "00:00:00.0103358",
+      "compilationDuration": "00:00:00.0021785",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1572,10 +1616,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0058640",
-      "compilationDuration": "00:00:00.0018669",
+      "conversionDuration": "00:00:00.0046777",
+      "compilationDuration": "00:00:00.0021805",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1596,10 +1642,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0071167",
-      "compilationDuration": "00:00:00.0034688",
+      "conversionDuration": "00:00:00.0057765",
+      "compilationDuration": "00:00:00.0021678",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1621,10 +1669,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0292792",
-      "compilationDuration": "00:00:00.0026867",
+      "conversionDuration": "00:00:00.0291462",
+      "compilationDuration": "00:00:00.0030301",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1644,10 +1694,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0088740",
-      "compilationDuration": "00:00:00.0021034",
+      "conversionDuration": "00:00:00.0122930",
+      "compilationDuration": "00:00:00.0022881",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1667,10 +1719,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0104523",
-      "compilationDuration": "00:00:00.0020716",
+      "conversionDuration": "00:00:00.0087201",
+      "compilationDuration": "00:00:00.0023177",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1691,10 +1745,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0117472",
-      "compilationDuration": "00:00:00.0029045",
+      "conversionDuration": "00:00:00.0082777",
+      "compilationDuration": "00:00:00.0031420",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1716,10 +1772,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0107009",
-      "compilationDuration": "00:00:00.0022517",
+      "conversionDuration": "00:00:00.0097820",
+      "compilationDuration": "00:00:00.0043905",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1740,10 +1798,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0092614",
-      "compilationDuration": "00:00:00.0025938",
+      "conversionDuration": "00:00:00.0082882",
+      "compilationDuration": "00:00:00.0028245",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1764,10 +1824,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0151697",
-      "compilationDuration": "00:00:00.0021887",
+      "conversionDuration": "00:00:00.0137112",
+      "compilationDuration": "00:00:00.0025067",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1788,10 +1850,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0131462",
-      "compilationDuration": "00:00:00.0027728",
+      "conversionDuration": "00:00:00.0104653",
+      "compilationDuration": "00:00:00.0028714",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1812,10 +1876,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0061893",
-      "compilationDuration": "00:00:00.0021299",
+      "conversionDuration": "00:00:00.0055382",
+      "compilationDuration": "00:00:00.0025049",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1837,10 +1903,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0316082",
-      "compilationDuration": "00:00:00.0023617",
+      "conversionDuration": "00:00:00.0334602",
+      "compilationDuration": "00:00:00.0029229",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1861,10 +1929,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0127152",
-      "compilationDuration": "00:00:00.0020820",
+      "conversionDuration": "00:00:00.0111249",
+      "compilationDuration": "00:00:00.0024100",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1885,10 +1955,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0112946",
-      "compilationDuration": "00:00:00.0089327",
+      "conversionDuration": "00:00:00.0113887",
+      "compilationDuration": "00:00:00.0034971",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1909,10 +1981,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0132942",
-      "compilationDuration": "00:00:00.0026351",
+      "conversionDuration": "00:00:00.0098142",
+      "compilationDuration": "00:00:00.0030324",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1933,10 +2007,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0070662",
-      "compilationDuration": "00:00:00.0021768",
+      "conversionDuration": "00:00:00.0078757",
+      "compilationDuration": "00:00:00.0025143",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1957,10 +2033,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0056119",
-      "compilationDuration": "00:00:00.0019697",
+      "conversionDuration": "00:00:00.0049936",
+      "compilationDuration": "00:00:00.0022666",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -1981,10 +2059,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0056607",
-      "compilationDuration": "00:00:00.0019177",
+      "conversionDuration": "00:00:00.0051378",
+      "compilationDuration": "00:00:00.0021944",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2005,10 +2085,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0077866",
-      "compilationDuration": "00:00:00.0023333",
+      "conversionDuration": "00:00:00.0076505",
+      "compilationDuration": "00:00:00.0030569",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2030,10 +2112,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0322010",
-      "compilationDuration": "00:00:00.0022888",
+      "conversionDuration": "00:00:00.0334247",
+      "compilationDuration": "00:00:00.0026930",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2055,10 +2139,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0071772",
-      "compilationDuration": "00:00:00.0024932",
+      "conversionDuration": "00:00:00.0087459",
+      "compilationDuration": "00:00:00.0022710",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2079,10 +2165,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0408270",
-      "compilationDuration": "00:00:00.0033135",
+      "conversionDuration": "00:00:00.0213807",
+      "compilationDuration": "00:00:00.0028535",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2093,7 +2181,7 @@
         "record",
         "positional_record"
       ],
-      "status": "FullyConverted",
+      "status": "PartiallyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
       "conversionWarnings": 0,
@@ -2105,10 +2193,14 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0283997",
-      "compilationDuration": "00:00:00.0034452",
+      "conversionDuration": "00:00:00.0223987",
+      "compilationDuration": "00:00:00.0033872",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 1,
+      "interopPreservationDiagnostics": [
+        "[InteropPreserved] Level3_Types/044_Record.cs:3 [record] Class preserved as \u00A7CSHARP interop: public record Point(int X, int Y);"
+      ],
       "roundTripSuccess": true
     },
     {
@@ -2129,10 +2221,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0137316",
-      "compilationDuration": "00:00:00.0033505",
+      "conversionDuration": "00:00:00.0105848",
+      "compilationDuration": "00:00:00.0024310",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2154,10 +2248,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0150607",
-      "compilationDuration": "00:00:00.0036427",
+      "conversionDuration": "00:00:00.0090249",
+      "compilationDuration": "00:00:00.0026682",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2179,10 +2275,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0265935",
-      "compilationDuration": "00:00:00.0036726",
+      "conversionDuration": "00:00:00.0185940",
+      "compilationDuration": "00:00:00.0026630",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2203,10 +2301,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0192884",
-      "compilationDuration": "00:00:00.0048413",
+      "conversionDuration": "00:00:00.0109633",
+      "compilationDuration": "00:00:00.0032709",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2228,10 +2328,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0261751",
-      "compilationDuration": "00:00:00.0040941",
+      "conversionDuration": "00:00:00.0191090",
+      "compilationDuration": "00:00:00.0029350",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2253,10 +2355,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0175792",
-      "compilationDuration": "00:00:00.0029254",
+      "conversionDuration": "00:00:00.0135518",
+      "compilationDuration": "00:00:00.0029940",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2277,10 +2381,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0141527",
-      "compilationDuration": "00:00:00.0024241",
+      "conversionDuration": "00:00:00.0136574",
+      "compilationDuration": "00:00:00.0026907",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2302,10 +2408,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0081513",
-      "compilationDuration": "00:00:00.0022975",
+      "conversionDuration": "00:00:00.0078742",
+      "compilationDuration": "00:00:00.0024099",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2327,10 +2435,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0101021",
-      "compilationDuration": "00:00:00.0025659",
+      "conversionDuration": "00:00:00.0097450",
+      "compilationDuration": "00:00:00.0027611",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2352,10 +2462,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0082241",
-      "compilationDuration": "00:00:00.0020977",
+      "conversionDuration": "00:00:00.0083340",
+      "compilationDuration": "00:00:00.0023163",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2376,10 +2488,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0127397",
-      "compilationDuration": "00:00:00.0022854",
+      "conversionDuration": "00:00:00.0157562",
+      "compilationDuration": "00:00:00.0025316",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2401,10 +2515,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0066555",
-      "compilationDuration": "00:00:00.0021755",
+      "conversionDuration": "00:00:00.0064799",
+      "compilationDuration": "00:00:00.0031610",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2425,10 +2541,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0070637",
-      "compilationDuration": "00:00:00.0020325",
+      "conversionDuration": "00:00:00.0069807",
+      "compilationDuration": "00:00:00.0023398",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2449,10 +2567,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0145741",
-      "compilationDuration": "00:00:00.0028218",
+      "conversionDuration": "00:00:00.0104748",
+      "compilationDuration": "00:00:00.0029135",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2474,10 +2594,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0136019",
-      "compilationDuration": "00:00:00.0022993",
+      "conversionDuration": "00:00:00.0134617",
+      "compilationDuration": "00:00:00.0028201",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2497,10 +2619,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0099109",
-      "compilationDuration": "00:00:00.0023241",
+      "conversionDuration": "00:00:00.0092908",
+      "compilationDuration": "00:00:00.0027175",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2521,10 +2645,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0062162",
-      "compilationDuration": "00:00:00.0023323",
+      "conversionDuration": "00:00:00.0063239",
+      "compilationDuration": "00:00:00.0024058",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2545,10 +2671,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0086662",
-      "compilationDuration": "00:00:00.0025220",
+      "conversionDuration": "00:00:00.0084142",
+      "compilationDuration": "00:00:00.0028281",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2568,10 +2696,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0080024",
-      "compilationDuration": "00:00:00.0021616",
+      "conversionDuration": "00:00:00.0076362",
+      "compilationDuration": "00:00:00.0022755",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2591,10 +2721,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0063313",
-      "compilationDuration": "00:00:00.0022089",
+      "conversionDuration": "00:00:00.0077696",
+      "compilationDuration": "00:00:00.0024905",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2614,10 +2746,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0063582",
-      "compilationDuration": "00:00:00.0021294",
+      "conversionDuration": "00:00:00.0058125",
+      "compilationDuration": "00:00:00.0022881",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2637,10 +2771,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0064458",
-      "compilationDuration": "00:00:00.0022212",
+      "conversionDuration": "00:00:00.0054455",
+      "compilationDuration": "00:00:00.0025304",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2661,10 +2797,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0082933",
-      "compilationDuration": "00:00:00.0022869",
+      "conversionDuration": "00:00:00.0062422",
+      "compilationDuration": "00:00:00.0025303",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2686,10 +2824,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0060262",
-      "compilationDuration": "00:00:00.0021438",
+      "conversionDuration": "00:00:00.0060322",
+      "compilationDuration": "00:00:00.0025065",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2711,10 +2851,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0071975",
-      "compilationDuration": "00:00:00.0022897",
+      "conversionDuration": "00:00:00.0088895",
+      "compilationDuration": "00:00:00.0031099",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2735,10 +2877,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0070267",
-      "compilationDuration": "00:00:00.0025071",
+      "conversionDuration": "00:00:00.0063741",
+      "compilationDuration": "00:00:00.0029603",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2759,10 +2903,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0136902",
-      "compilationDuration": "00:00:00.0035528",
+      "conversionDuration": "00:00:00.0109670",
+      "compilationDuration": "00:00:00.0040385",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2782,10 +2928,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0079752",
-      "compilationDuration": "00:00:00.0024217",
+      "conversionDuration": "00:00:00.0084032",
+      "compilationDuration": "00:00:00.0027666",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2806,10 +2954,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0069938",
-      "compilationDuration": "00:00:00.0025882",
+      "conversionDuration": "00:00:00.0083530",
+      "compilationDuration": "00:00:00.0028984",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2819,7 +2969,7 @@
       "features": [
         "local_function"
       ],
-      "status": "FullyConverted",
+      "status": "PartiallyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
       "conversionWarnings": 2,
@@ -2834,10 +2984,15 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0139597",
-      "compilationDuration": "00:00:00.0026385",
+      "conversionDuration": "00:00:00.0129105",
+      "compilationDuration": "00:00:00.0030545",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 2,
+      "interopPreservationDiagnostics": [
+        "[InteropPreserved] Level4_Methods/074_LocalFunctions.cs:5 [method] Method preserved as \u00A7CSHARP interop: public static int Calculate(int x, int y)\n        {\n            int Add(int a...",
+        "[InteropPreserved] Level4_Methods/074_LocalFunctions.cs:22 [method] Method preserved as \u00A7CSHARP interop: public static int Factorial(int n)\n        {\n            int FactorialInterna..."
+      ],
       "roundTripSuccess": true
     },
     {
@@ -2858,10 +3013,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0235542",
-      "compilationDuration": "00:00:00.0033188",
+      "conversionDuration": "00:00:00.0222443",
+      "compilationDuration": "00:00:00.0050624",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2882,10 +3039,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0072779",
-      "compilationDuration": "00:00:00.0022022",
+      "conversionDuration": "00:00:00.0073718",
+      "compilationDuration": "00:00:00.0024458",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2907,10 +3066,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0095081",
-      "compilationDuration": "00:00:00.0027900",
+      "conversionDuration": "00:00:00.0111704",
+      "compilationDuration": "00:00:00.0030082",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2925,19 +3086,21 @@
       "conversionErrors": 3,
       "conversionWarnings": 0,
       "conversionIssues": [
-        "Error [roundtrip-calor-validation] (line 26, col 25): Generated Calor failed compilation: Generated C# failed compilation (CS1551): Indexers must have at least one parameter",
-        "Error [roundtrip-calor-validation] (line 12, col 29): Generated Calor failed compilation: Generated C# failed compilation (CS0103): The name \u0027index\u0027 does not exist in the current context",
-        "Error [roundtrip-calor-validation] (line 14, col 22): Generated Calor failed compilation: Generated C# failed compilation (CS0103): The name \u0027index\u0027 does not exist in the current context"
+        "Error [roundtrip-csharp-validation] (line 26, col 25): Round-tripped C# failed compilation (CS1551): Indexers must have at least one parameter",
+        "Error [roundtrip-csharp-validation] (line 31, col 29): Round-tripped C# failed compilation (CS0103): The name \u0027index\u0027 does not exist in the current context",
+        "Error [roundtrip-csharp-validation] (line 37, col 22): Round-tripped C# failed compilation (CS0103): The name \u0027index\u0027 does not exist in the current context"
       ],
       "compilationSuccess": false,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": false,
       "cSharpCompilationSuccess": false,
-      "conversionDuration": "00:00:00.0134950",
+      "conversionDuration": "00:00:00.0128992",
       "compilationDuration": "00:00:00",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": false
     },
     {
@@ -2957,10 +3120,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0163465",
-      "compilationDuration": "00:00:00.0030237",
+      "conversionDuration": "00:00:00.0128989",
+      "compilationDuration": "00:00:00.0042958",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -2981,10 +3146,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0093597",
-      "compilationDuration": "00:00:00.0031200",
+      "conversionDuration": "00:00:00.0115715",
+      "compilationDuration": "00:00:00.0034458",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3006,10 +3173,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0149701",
-      "compilationDuration": "00:00:00.0028155",
+      "conversionDuration": "00:00:00.0141065",
+      "compilationDuration": "00:00:00.0062135",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3031,10 +3200,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0458884",
-      "compilationDuration": "00:00:00.0028812",
+      "conversionDuration": "00:00:00.0462850",
+      "compilationDuration": "00:00:00.0033029",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3056,10 +3227,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0479499",
-      "compilationDuration": "00:00:00.0147897",
+      "conversionDuration": "00:00:00.0240393",
+      "compilationDuration": "00:00:00.0043379",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3081,10 +3254,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0401456",
-      "compilationDuration": "00:00:00.0131199",
+      "conversionDuration": "00:00:00.0172090",
+      "compilationDuration": "00:00:00.0045951",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3105,10 +3280,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0143439",
-      "compilationDuration": "00:00:00.0029644",
+      "conversionDuration": "00:00:00.0130799",
+      "compilationDuration": "00:00:00.0031318",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3124,20 +3301,22 @@
       "conversionErrors": 4,
       "conversionWarnings": 0,
       "conversionIssues": [
-        "Error [roundtrip-calor-validation] (line 7, col 13): Generated Calor failed compilation: Generated C# failed compilation (CS0246): The type or namespace name \u0027temp\u0027 could not be found (are you missing a using directive or an assembly reference?)",
-        "Error [roundtrip-calor-validation] (line 7, col 18): Generated Calor failed compilation: Generated C# failed compilation (CS0412): \u0027T\u0027: a parameter, local variable, or local function cannot have the same name as a method type parameter",
-        "Error [roundtrip-calor-validation] (line 9, col 17): Generated Calor failed compilation: Generated C# failed compilation (CS0103): The name \u0027temp\u0027 does not exist in the current context",
-        "Error [roundtrip-calor-validation] (line 13, col 30): Generated Calor failed compilation: Generated C# failed compilation (CS0118): \u0027result\u0027 is a variable but is used like a type"
+        "Error [roundtrip-csharp-validation] (line 24, col 13): Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027temp\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Error [roundtrip-csharp-validation] (line 24, col 18): Round-tripped C# failed compilation (CS0412): \u0027T\u0027: a parameter, local variable, or local function cannot have the same name as a method type parameter",
+        "Error [roundtrip-csharp-validation] (line 30, col 17): Round-tripped C# failed compilation (CS0103): The name \u0027temp\u0027 does not exist in the current context",
+        "Error [roundtrip-csharp-validation] (line 37, col 30): Round-tripped C# failed compilation (CS0118): \u0027result\u0027 is a variable but is used like a type"
       ],
       "compilationSuccess": false,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": false,
       "cSharpCompilationSuccess": false,
-      "conversionDuration": "00:00:00.0176103",
+      "conversionDuration": "00:00:00.0180760",
       "compilationDuration": "00:00:00",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": false
     },
     {
@@ -3159,10 +3338,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0195886",
-      "compilationDuration": "00:00:00.0034654",
+      "conversionDuration": "00:00:00.0151946",
+      "compilationDuration": "00:00:00.0052166",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3183,10 +3364,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0212513",
-      "compilationDuration": "00:00:00.0041575",
+      "conversionDuration": "00:00:00.0165426",
+      "compilationDuration": "00:00:00.0040449",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3210,10 +3393,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0328530",
-      "compilationDuration": "00:00:00.0200512",
+      "conversionDuration": "00:00:00.0145030",
+      "compilationDuration": "00:00:00.0044753",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3235,10 +3420,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0346001",
-      "compilationDuration": "00:00:00.0132127",
+      "conversionDuration": "00:00:00.0305646",
+      "compilationDuration": "00:00:00.0057295",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3260,10 +3447,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0362481",
-      "compilationDuration": "00:00:00.0126254",
+      "conversionDuration": "00:00:00.0188771",
+      "compilationDuration": "00:00:00.0044063",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3285,10 +3474,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0137628",
-      "compilationDuration": "00:00:00.0030301",
+      "conversionDuration": "00:00:00.0357575",
+      "compilationDuration": "00:00:00.0038410",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3309,10 +3500,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0203963",
-      "compilationDuration": "00:00:00.0041257",
+      "conversionDuration": "00:00:00.0193345",
+      "compilationDuration": "00:00:00.0044834",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3334,10 +3527,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0194898",
-      "compilationDuration": "00:00:00.0036751",
+      "conversionDuration": "00:00:00.0183815",
+      "compilationDuration": "00:00:00.0041772",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3359,10 +3554,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0115692",
-      "compilationDuration": "00:00:00.0027527",
+      "conversionDuration": "00:00:00.0107243",
+      "compilationDuration": "00:00:00.0049363",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3383,10 +3580,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0273372",
-      "compilationDuration": "00:00:00.0030990",
+      "conversionDuration": "00:00:00.0212553",
+      "compilationDuration": "00:00:00.0033682",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3409,10 +3608,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0168350",
-      "compilationDuration": "00:00:00.0041945",
+      "conversionDuration": "00:00:00.0186577",
+      "compilationDuration": "00:00:00.0044217",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
@@ -3429,17 +3630,19 @@
       "conversionErrors": 1,
       "conversionWarnings": 0,
       "conversionIssues": [
-        "Error [roundtrip-calor-validation] (line 20, col 33): Generated Calor failed compilation: Generated C# failed compilation (CS0246): The type or namespace name \u0027arrT004\u0027 could not be found (are you missing a using directive or an assembly reference?)"
+        "Error [roundtrip-csharp-validation] (line 22, col 33): Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027arrT005\u0027 could not be found (are you missing a using directive or an assembly reference?)"
       ],
       "compilationSuccess": false,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": false,
       "cSharpCompilationSuccess": false,
-      "conversionDuration": "00:00:00.0106642",
+      "conversionDuration": "00:00:00.0200082",
       "compilationDuration": "00:00:00",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": false
     },
     {
@@ -3455,18 +3658,20 @@
       "conversionErrors": 2,
       "conversionWarnings": 0,
       "conversionIssues": [
-        "Error [roundtrip-calor-validation] (line 27, col 29): Generated Calor failed compilation: Generated C# failed compilation (CS1061): \u0027Point\u0027 does not contain a definition for \u0027Item1\u0027 and no accessible extension method \u0027Item1\u0027 accepting a first argument of type \u0027Point\u0027 could be found (are you missing a using directive or an assembly reference?)",
-        "Error [roundtrip-calor-validation] (line 28, col 29): Generated Calor failed compilation: Generated C# failed compilation (CS1061): \u0027Point\u0027 does not contain a definition for \u0027Item2\u0027 and no accessible extension method \u0027Item2\u0027 accepting a first argument of type \u0027Point\u0027 could be found (are you missing a using directive or an assembly reference?)"
+        "Error [roundtrip-csharp-validation] (line 71, col 29): Round-tripped C# failed compilation (CS1061): \u0027Point\u0027 does not contain a definition for \u0027Item1\u0027 and no accessible extension method \u0027Item1\u0027 accepting a first argument of type \u0027Point\u0027 could be found (are you missing a using directive or an assembly reference?)",
+        "Error [roundtrip-csharp-validation] (line 74, col 29): Round-tripped C# failed compilation (CS1061): \u0027Point\u0027 does not contain a definition for \u0027Item2\u0027 and no accessible extension method \u0027Item2\u0027 accepting a first argument of type \u0027Point\u0027 could be found (are you missing a using directive or an assembly reference?)"
       ],
       "compilationSuccess": false,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": false,
       "cSharpCompilationSuccess": false,
-      "conversionDuration": "00:00:00.0215250",
+      "conversionDuration": "00:00:00.0223103",
       "compilationDuration": "00:00:00",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": false
     },
     {
@@ -3478,7 +3683,7 @@
         "with_expression",
         "computed_property"
       ],
-      "status": "FullyConverted",
+      "status": "PartiallyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
       "conversionWarnings": 0,
@@ -3491,10 +3696,15 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0104407",
-      "compilationDuration": "00:00:00.0036917",
+      "conversionDuration": "00:00:00.0089432",
+      "compilationDuration": "00:00:00.0040835",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
+      "interopPreservationCount": 2,
+      "interopPreservationDiagnostics": [
+        "[InteropPreserved] Level5_Advanced/100_RecordWithMethods.cs:3 [record] Class preserved as \u00A7CSHARP interop: public record Person(string FirstName, string LastName, int Age)\n    {\n      ...",
+        "[InteropPreserved] Level5_Advanced/100_RecordWithMethods.cs:20 [record] Class preserved as \u00A7CSHARP interop: public record Point3D(double X, double Y, double Z)\n    {\n        public doub..."
+      ],
       "roundTripSuccess": true
     }
   ]

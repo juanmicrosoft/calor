@@ -548,6 +548,42 @@ jobs:
               PartiallyConverted: 2,
               FullyConverted: 3,
             };
+            const addedMultisetEntries = (baselineEntries, currentEntries) => {
+              const remaining = new Map();
+              for (const entry of baselineEntries) {
+                remaining.set(
+                  entry,
+                  (remaining.get(entry) ?? 0) + 1);
+              }
+              const added = [];
+              for (const entry of currentEntries) {
+                const count = remaining.get(entry) ?? 0;
+                if (count === 0) {
+                  added.push(entry);
+                } else {
+                  remaining.set(entry, count - 1);
+                }
+              }
+              return added;
+            };
+            const legacyInteropIdentity = issue => {
+              const feature =
+                issue.match(/\[([^\]]+)\]/)?.[1] ?? 'unknown';
+              const line =
+                issue.match(/\(line (\d+)/)?.[1] ?? 'unknown';
+              return `InteropPreserved|${feature}|${line}`;
+            };
+            const structuredInteropIdentity = diagnostic => {
+              const brackets =
+                [...diagnostic.matchAll(/\[([^\]]+)\]/g)]
+                  .map(match => match[1]);
+              const kind = brackets[0] ?? 'unknown';
+              const feature =
+                brackets[brackets.length - 1] ?? 'unknown';
+              const line =
+                diagnostic.match(/:(\d+) \[/)?.[1] ?? 'unknown';
+              return `${kind}|${feature}|${line}`;
+            };
             for (const b of baseline.results) {
               const r = currentById[b.id];
               if (!r) {
@@ -562,7 +598,93 @@ jobs:
                 r.compilationSuccess &&
                 r.cSharpCompilationSuccess &&
                 (r.semanticLossCount ?? 0) === 0;
-              if (statusRank[r.status] < statusRank[b.status] || (bPass && !cPass)) {
+              const legacyInfoInterop = (b.conversionIssues ?? []).filter(
+                issue => issue.startsWith('Info ') &&
+                  issue.includes('interop block preserved'));
+              const legacyAnyInterop = (b.conversionIssues ?? []).filter(
+                issue => issue.includes('interop block preserved') ||
+                  issue.includes('§CSHARP interop preservation'));
+              const baselineInteropCount =
+                b.interopPreservationCount ??
+                (legacyInfoInterop.length > 0
+                  ? legacyInfoInterop.length
+                  : legacyAnyInterop.length);
+              const currentInteropCount =
+                r.interopPreservationCount ?? 0;
+              const baselineDiagnostics =
+                b.interopPreservationDiagnostics ?? [];
+              const currentDiagnostics =
+                r.interopPreservationDiagnostics ?? [];
+              const currentLossFieldsValid =
+                Number.isInteger(r.interopPreservationCount) &&
+                r.interopPreservationCount >= 0 &&
+                Array.isArray(r.interopPreservationDiagnostics) &&
+                Number.isInteger(r.semanticLossCount) &&
+                r.semanticLossCount >= 0 &&
+                Array.isArray(r.semanticLossDiagnostics);
+              const baselineInteropIdentities =
+                baselineDiagnostics.length > 0
+                  ? baselineDiagnostics
+                  : (legacyInfoInterop.length > 0
+                      ? legacyInfoInterop
+                      : legacyAnyInterop)
+                    .map(legacyInteropIdentity);
+              const currentInteropIdentities =
+                baselineDiagnostics.length > 0
+                  ? currentDiagnostics
+                  : currentDiagnostics
+                    .map(structuredInteropIdentity);
+              const interopDiagnosticsConsistent =
+                currentDiagnostics.length === currentInteropCount &&
+                (baselineDiagnostics.length === 0 ||
+                 baselineDiagnostics.length === baselineInteropCount);
+              const addedInteropDiagnostics = addedMultisetEntries(
+                baselineInteropIdentities,
+                currentInteropIdentities);
+              const addedInterop =
+                currentInteropCount > baselineInteropCount ||
+                !interopDiagnosticsConsistent ||
+                addedInteropDiagnostics.length > 0;
+              const baselineSemanticCount =
+                b.semanticLossCount ?? 0;
+              const currentSemanticCount =
+                r.semanticLossCount ?? 0;
+              const baselineSemanticDiagnostics =
+                b.semanticLossDiagnostics ?? [];
+              const currentSemanticDiagnostics =
+                r.semanticLossDiagnostics ?? [];
+              const addedSemanticLoss =
+                currentSemanticCount > baselineSemanticCount ||
+                currentSemanticDiagnostics.length
+                  !== currentSemanticCount ||
+                (baselineSemanticDiagnostics.length > 0 &&
+                 addedMultisetEntries(
+                   baselineSemanticDiagnostics,
+                   currentSemanticDiagnostics).length > 0);
+              const lostSuccessfulStage =
+                (b.conversionSuccess === true &&
+                 r.conversionSuccess !== true) ||
+                (b.compilationSuccess === true &&
+                 r.compilationSuccess !== true) ||
+                (b.cSharpSyntaxSuccess === true &&
+                 r.cSharpSyntaxSuccess !== true) ||
+                (b.cSharpCompilationSuccess === true &&
+                 r.cSharpCompilationSuccess !== true);
+              const honestInteropReclassification =
+                b.status === 'FullyConverted' &&
+                r.status === 'PartiallyConverted' &&
+                bPass &&
+                cPass &&
+                baselineInteropCount > 0 &&
+                currentInteropCount === baselineInteropCount &&
+                !addedInterop;
+              if ((statusRank[r.status] < statusRank[b.status] &&
+                   !honestInteropReclassification) ||
+                  (bPass && !cPass) ||
+                  addedInterop ||
+                  addedSemanticLoss ||
+                  lostSuccessfulStage ||
+                  !currentLossFieldsValid) {
                 regressions.push(b.id);
               }
             }
