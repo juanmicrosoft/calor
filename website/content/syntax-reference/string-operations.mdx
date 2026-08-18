@@ -42,14 +42,14 @@ Omitting a mode is not uniform in .NET. `contains` and instance `equals` are
 ordinal, while `starts`, `ends`, and `indexof` use the current culture. Specify
 `:ordinal` when culture-independent runtime behavior is required.
 
-### v0.12 verification boundary
+### Verification boundary
 
 The verifier refuses non-ordinal comparison modes. It also refuses bare
 `starts`, `ends`, and `indexof`, because those overloads are culture-sensitive.
 Those obligations are `unsupported`, and their runtime checks remain.
 
 Even ordinal string obligations cannot produce an elision-authorizing proof in
-v0.12. Z3 strings are null-free and measure UTF-8 units, while .NET strings are
+0.13.2. Z3 strings are null-free and measure UTF-8 units, while .NET strings are
 nullable references whose `Length` counts UTF-16 code units. Any otherwise
 modeled proof that depends on the Z3 string sort is therefore demoted to
 `assumed`, and the runtime check remains. See [verification guarantees](/docs/guides/verification-guarantees/).

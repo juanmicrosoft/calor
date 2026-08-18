@@ -68,7 +68,7 @@ clean, non-vacuous proof can remove an emitted runtime check.
 
 Calor is a **verification-first language** that happens to be agent-friendly—not just an "agent DSL." The explicit syntax serves verification: contracts in a structured format can be parsed and proven by Z3.
 
-The v0.12 static benchmark reports:
+The 0.13.2 static benchmark (30-run statistical suite) reports:
 
 - **1.49x Error Detection** — more explicit detection signals under the calculator
 - **1.84x Comprehension** — more explicit structural signals
@@ -108,25 +108,25 @@ This might look unusual to human programmers, but for an AI agent:
 
 **Hypothesis:** Explicit contracts, effects, and structure markers improve comprehension.
 
-**v0.12 result:** 1.84x under the deterministic comprehension calculator.
+**0.13.2 result:** 1.84x under the deterministic comprehension calculator.
 
 ### 2. Can AI agents find bugs more effectively with first-class contracts?
 
 **Hypothesis:** Contracts surface invariant violations that would be hidden in imperative code.
 
-**v0.12 result:** 1.49x under the deterministic error-detection calculator.
+**0.13.2 result:** 1.49x under the deterministic error-detection calculator.
 
 ### 3. Can explicit IDs make structural targets easier to identify?
 
 **Hypothesis:** Preserved explicit identifiers make structural targets less ambiguous.
 
-**v0.12 result:** 1.36x under the deterministic source-pattern calculator. It
+**0.13.2 result:** 1.36x under the deterministic source-pattern calculator. It
 does not execute agent edits, and it does not model mature C#/Roslyn refactoring
 tools; see the [metric limits](/docs/benchmarking/metrics/edit-precision/).
 
 ### 4. What's the cost of explicit semantics?
 
-**Honest answer:** Calor pays a raw-token premium on small programs. The v0.12
+**Honest answer:** Calor pays a raw-token premium on small programs. The
 token-economics composite nevertheless favors Calor at 1.42x because it also
 includes characters and lines. Information density narrowly favors C# at
 0.98x.
@@ -137,16 +137,18 @@ includes characters and lines. Information density narrowly favors C# at
 
 Calor is not trying to replace C#, Python, or any other language. It's a research project exploring whether language design can be optimized for AI agent workflows—where the AI writes the code and humans define the outcomes.
 
-Use Calor when:
-- You want AI agents to write verifiable, contract-checked code
-- You prefer defining *what* software should do over *how* it does it
-- You need automatic proofs for supported contract obligations, with assumptions disclosed
-- You want to shift from code review to requirements review
+### For you if / Not for you if
 
-Use traditional languages when:
-- You prefer writing code yourself
-- Human readability of source is the priority
-- You need ecosystem libraries without interop overhead
+| For you if… | Not for you if… |
+|:------------|:----------------|
+| You ship .NET code with AI coding agents and want compile-time guarantees on effects and contracts | Your team dislikes explicit annotations or prefers to author every line of source by hand |
+| You are comfortable running a pre-1.0 tool from a single maintainer | You need a stable v1 API today or commercial support |
+| You want to shift review from line-by-line code to requirements, contracts, and proof verdicts | Human readability of source is the priority and no agent is involved |
+| You value a tested eject path — the generated C# is yours and can be built without Calor | You depend on features that would require heavy interop (delegate-heavy or reflection-heavy service layers) |
+
+See the [adoption playbook](/docs/guides/adoption-playbook/) for the incremental
+path and the [verification guarantees](/docs/guides/verification-guarantees/)
+for what `proven` — and every other verdict — actually promises.
 
 ---
 
@@ -181,7 +183,7 @@ Calor compiles to readable C# code. For debugging or auditing purposes, you can 
 
 ### "This seems verbose compared to C#"
 
-Calor often uses more raw tokens on small examples. Its v0.12 token-economics
+Calor often uses more raw tokens on small examples. Its token-economics
 composite favors Calor once character and line counts are included, while
 information density narrowly favors C#. The explicit syntax is a deliberate
 tradeoff, not a universal efficiency win.
@@ -202,7 +204,7 @@ Calor compiles to standard .NET assemblies. That means:
 - Your existing CI/CD pipeline works
 - NuGet packages work
 
-The Calor CLI includes a language server for IDE integration. VS Code extension is available for syntax highlighting and diagnostics.
+The Calor CLI includes a language server (`calor lsp`) that speaks standard LSP over stdio and works with any LSP-capable editor. The dedicated VS Code Marketplace extension was withdrawn after v0.13.1; see the [changelog](/docs/changelog/).
 
 ### "Is this production-ready?"
 
