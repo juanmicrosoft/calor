@@ -73,3 +73,16 @@ src/Calor.Compiler/Mcp/McpMemoryAdmissionPolicy.cs
 # bound tree or participate in the compiler's abstract interpretation.
 src/Calor.Compiler/Analysis/BugPatterns/TypedBugPatternAnalysis.cs
 src/Calor.Compiler/Analysis/Dataflow/LoopStepSemantics.cs
+
+# v0.14 §3.1 metadata-binding entry spike (docs/plans/v0.14-metadata-binding-scoping.md
+# §D3/D4) — compiler-internal machinery that owns the Roslyn CSharpCompilation +
+# TPA-derived MetadataReference set used to resolve Calor call sites against real
+# .NET metadata. Calor has no access to Roslyn's SymbolInfo/IMethodSymbol/
+# ITypeSymbol APIs; the D4 mechanism (synthetic invocation syntax + Roslyn's
+# overload resolution) is a compile-time query into the compiler's own type
+# system machinery. Same class as the #754 envelope machinery and the #786
+# typed CFG code above.
+# pending
+src/Calor.Compiler/Binding/Metadata/MetadataContext.cs
+# pending
+src/Calor.Compiler/Binding/Metadata/MetadataReferenceManifest.cs
