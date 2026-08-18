@@ -270,7 +270,7 @@ public class GitHubCopilotMcpTests : IDisposable
     private const string ExemplarIdiomProgram =
         "§M{m001:CopilotSmoke}\n" +
         "  §F{f001:Collect:pub} (i32:n) -> i32\n" +
-        "    §E{mut}\n" +
+        "    §E{mut,alloc}\n" +
         "    §LIST{items:i32}\n" +
         "    §/LIST{items}\n" +
         "    §L{l001:i:1:n:1}\n" +
