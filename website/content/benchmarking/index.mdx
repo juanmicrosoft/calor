@@ -6,15 +6,16 @@ hasChildren: true
 ---
 
 
-The published v0.12 dashboard compares **217 paired programs across eight
-deterministic metrics**. It reports a 1.32x overall Calor/C# composite, with
-Calor ahead in seven metrics and C# ahead in information density.
+The v0.13.2 dashboard compares **217 paired programs across eight
+deterministic metrics**, run as a **30-run statistical suite** (0.13.2 replaced
+the earlier single-run mode). It reports a 1.32x overall Calor/C# composite,
+with Calor ahead in seven metrics and C# ahead in information density.
 
 ---
 
 ## The Metrics
 
-### Published v0.12 Metrics
+### Published Metrics
 
 | Category | What It Measures | Why It Matters |
 |:---------|:-----------------|:---------------|
@@ -31,8 +32,7 @@ The repository also contains separate LLM and estimation-mode suites for
 [task completion](/docs/benchmarking/metrics/task-completion/),
 [safety](/docs/benchmarking/metrics/safety/), and
 [effect discipline](/docs/benchmarking/metrics/effect-discipline/). Their
-results are not included in the v0.12 eight-metric headline or the 1.32x
-composite.
+results are not included in the eight-metric headline or the 1.32x composite.
 
 ---
 
@@ -62,9 +62,10 @@ read as a raw-token advantage.
 
 The [Agent Task Benchmark](/docs/benchmarking/agent-tasks/) tests Claude's ability to generate correct Calor code from natural language prompts. It validates skill documentation quality by measuring how well Claude can learn Calor syntax.
 
-The latest committed agent-task artifact is dated **2026-02-16** and reports an
-**86.5% pass rate** (77 of 89 tasks across 17 categories). It is a separate,
-single-run benchmark and is not part of the v0.12 dashboard composite.
+The latest committed agent-task artifact is dated **2026-02-16 (point-in-time,
+pre-0.13.x)** and reports an **86.5% pass rate** (77 of 89 tasks across 17
+categories). It is a separate, single-run benchmark and is not part of the
+dashboard composite. A regenerate against 0.13.x is a tracked follow-up.
 
 ---
 

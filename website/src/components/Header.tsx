@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, getBasePath } from '@/lib/utils';
+import { SITE_VERSION } from '@/lib/version';
 import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/lib/analytics';
 
 // basePath needed for pathname comparison since usePathname returns full path
@@ -45,6 +46,12 @@ export function Header() {
                 className="h-8 w-8"
               />
               <span className="text-xl font-bold font-display">Calor</span>
+              <span
+                className="hidden sm:inline-flex items-center rounded-full border border-calor-cerulean/30 bg-calor-cerulean/10 px-2 py-0.5 text-xs font-medium text-calor-cerulean"
+                title={`Docs describe compiler v${SITE_VERSION}`}
+              >
+                v{SITE_VERSION}
+              </span>
             </Link>
           </div>
 

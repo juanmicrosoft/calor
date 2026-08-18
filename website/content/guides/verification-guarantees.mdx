@@ -2,7 +2,7 @@
 title: "Verification Guarantees and Limits"
 section: "guides"
 order: 2
-description: "How to interpret v0.12.1 verification results and guard elision safely"
+description: "How to interpret verification results and guard elision safely"
 ---
 
 Calor verifies individual contract obligations under a positive, enumerated
@@ -24,9 +24,11 @@ number of soundness gaps that have not yet been found is not knowable.
 Preconditions are never elided from satisfiability results. A vacuous proof is
 reported with a flag and also keeps its runtime check.
 
-In released v0.12.1, compiling with `--verify` automatically removes an
-eligible runtime guard after a clean, non-vacuous, assumption-free proof.
-`assumed` and all inconclusive outcomes keep their guards.
+In 0.13.2, verification is diagnostic by default: compiling with `--verify`
+reports verdicts but keeps every runtime guard. Passing
+`--verify --elide-proven-guards` together removes the guard only after a
+clean, non-vacuous, assumption-free proof. `assumed` and all inconclusive
+outcomes always keep their guards.
 
 ## What Changed in v0.12
 
@@ -77,7 +79,7 @@ incorrectly.
 
 ## Type and Effect Defaults
 
-Type checking is on by default in v0.12. Use `--no-type-check` on the root
+Type checking is on by default. Use `--no-type-check` on the root
 build command, `CALOR_NO_TYPE_CHECK=1` on other entry points, or
 `CalorTypeCheck=false` in MSBuild only as explicit migration opt-outs.
 
@@ -88,7 +90,7 @@ calls are pure and therefore voids the guarantee.
 
 ## Review Checklist
 
-1. In v0.12.1, remember that `--verify` automatically elides eligible guards.
+1. In 0.13.2, `--verify` alone is diagnostic; `--elide-proven-guards` is required to drop eligible guards.
 2. Treat only a non-vacuous, assumption-free `proven` as eligible for elision.
 3. Read every named assumption on `assumed` results.
 4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their

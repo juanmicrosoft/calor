@@ -9,7 +9,7 @@ const features = [
   {
     name: 'Rules That Enforce Themselves',
     description:
-      'Define what a function requires and guarantees. Calor proves supported forms and keeps runtime checks when a proof is conditional or unavailable.',
+      'Contracts you write are proved by Z3 and guarded at runtime by default. Opt in to --elide-proven-guards to drop the guard when the verdict is Proven.',
     icon: Shield,
     code: '§Q (>= x 0)\n§S (>= result 0)',
     href: '/docs/philosophy/effects-contracts-enforcement/',
@@ -25,7 +25,7 @@ const features = [
   {
     name: 'Rename Without Breaking',
     description:
-      'Every function has a stable ID. Rename files, move code around—AI agents can still target the same declaration.',
+      'Add a stable ID to any declaration and refactoring stops breaking cross-agent references. IDs are optional, preserved through renames when present.',
     icon: Fingerprint,
     code: '§F{f001:Process:pub}',
     href: '/docs/philosophy/stable-identifiers/',
