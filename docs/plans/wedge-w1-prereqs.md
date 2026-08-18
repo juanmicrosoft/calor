@@ -59,7 +59,7 @@ Neither `Migration/` nor the round-trip harness has any commit since #750 — ev
 | **#775** records | 3 files total corpus-wide, but output is **actively broken** (positional record → class with getter-only properties and **no constructor**, `RoslynSyntaxVisitor.cs:1156–1194`) | **GO — containment only** (registry downgrade + preserve-as-interop, S). Full native records: NO-GO |
 | **#777** local functions | Confirmed in MediatR + Serilog (one inside an `#if` block); the former hoist dropped captures/type-params | **IMPLEMENTED containment**: every containing member is preserved verbatim as counted interop, including conditional placements. Full closure conversion remains NO-GO. |
 | **#769** namespace topology | **Zero** multi-namespace files in all three projects | **NO-GO** for v0.11; #770 whole-file interop covers the residue |
-| **#751** standalone block scope | No corpus instances; fails loud (`Calor0258`) post-#731 | **NO-GO**; becomes an honest coverage exclusion under fixed #776 |
+| **#751** standalone block scope | 8 corpus members; native flattening lost lexical scope and could drop all but the first child statement | **IMPLEMENTED containment**: the complete containing member is preserved as counted interop, so sibling scopes round-trip without `Calor0258`/CS0128. The corpus baseline records +8 opaque boundaries and 16 fewer Roslyn-selected expressions. |
 | **#774** silent substitutions | ~96 char-literal lines (Serilog) + ~79 (FluentValidation); 16 exotic compound-assigns | **GO — gate subset** (§1.3 cluster table row; Slice 3, size M) — listed here so the D-W1.3 per-item format is complete (review m1) |
 
 ### 1.4 Release-policy containment gaps (new finding — T3)

@@ -114,14 +114,8 @@ public class DuplicateBindingTests
     }
 
     [Fact]
-    public void KnownGap_ConverterFlattensBareBlocks_ProducesCalor0258() // #751
+    public void Converter_PreservesSiblingStandaloneBlockScopes() // #751
     {
-        // Documented limitation surfaced by #731: the converter flattens standalone `{ }`
-        // block scopes (dropping the braces), so two sibling blocks that each declare `x`
-        // — valid, independent C# scopes — become a same-scope duplicate that Calor0258 now
-        // rejects. Pre-#731 this was a silent downstream CS0128; the root cause is the
-        // converter's block-scope fidelity gap, tracked in #751. Pins the CURRENT behavior
-        // so closing #751 (round-trip stays clean) trips this test to be updated.
         var csharp = """
             public class Test
             {
@@ -136,8 +130,28 @@ public class DuplicateBindingTests
         var result = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy }).Convert(csharp);
         Assert.True(result.Success);
         Assert.NotNull(result.CalorSource);
+        Assert.Contains("§CSHARP", result.CalorSource);
+        var loss = Assert.Single(result.Losses.Where(item =>
+            item.Feature == "standalone-block"));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(
+            result.Losses,
+            item => item.Kind == ConversionLossKind.Dropped);
 
         var compiled = Program.Compile(result.CalorSource!);
-        Assert.Contains(compiled.Diagnostics, d => d.Code == DiagnosticCode.BindDuplicateInScope);
+        Assert.DoesNotContain(
+            compiled.Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.BindDuplicateInScope);
+        Assert.False(compiled.Diagnostics.HasErrors);
+        Assert.Contains("int x = 1", compiled.GeneratedCode);
+        Assert.Contains("int x = 2", compiled.GeneratedCode);
+        Assert.Equal(
+            2,
+            compiled.GeneratedCode.Split(
+                "System.Console.WriteLine(x)",
+                StringSplitOptions.None).Length - 1);
+        var roslynErrors =
+            ExemplarCompileChecker.RoslynErrors(compiled.GeneratedCode);
+        Assert.Empty(roslynErrors);
     }
 }
