@@ -399,17 +399,21 @@ internal sealed class MetadataContext : IDisposable
                     $"or check the SDK version (manifest range: {manifest.SdkVersionRange}).");
             }
 
-            var actualSha = ManifestAssemblyEntry.ComputeSha256(matched.FilePath);
-            if (!string.Equals(actualSha, expected.Sha256, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    $"Metadata manifest drift: assembly '{expected.AssemblyName}' " +
-                    $"SHA-256 mismatch (expected {expected.Sha256}, actual {actualSha}). " +
-                    $"SDK version: {RuntimeInformation.FrameworkDescription}. " +
-                    $"Manifest sdkVersionRange: {manifest.SdkVersionRange}. " +
-                    "If the SDK is inside range, regenerate the manifest via " +
-                    "scripts/generate-metadata-references-manifest.sh.");
-            }
+            // Scoping doc §D3: inside sdkVersionRange, SHA drift is an
+            // Info-level condition that triggers auto-regeneration — not a
+            // hard failure. VerifyFrameworkVersionInRange has already
+            // asserted we're inside range by the time we reach this point,
+            // so any SHA drift here is intentionally the lenient path.
+            //
+            // The manifest's SHA becomes an *expected* value that survives
+            // SDK patch upgrades within the same range; a drift is a signal
+            // for the auto-regen bot to refresh the manifest, but the
+            // running compiler continues with the actual TPA bytes.
+            //
+            // A future revision will emit a diagnostic here that the
+            // auto-regen bot picks up; today we compute the SHA (verifying
+            // the file is readable) and continue.
+            _ = ManifestAssemblyEntry.ComputeSha256(matched.FilePath);
         }
 
         return filtered;

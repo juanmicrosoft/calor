@@ -126,11 +126,16 @@ public class MetadataContextTests
         Assert.Contains("SDK version", ex.Message);
     }
 
-    // Test (iv cont'd) — SHA-256 drift for a real assembly is also a hard fail.
+    // Test (iv cont'd) — SHA drift inside sdkVersionRange is intentionally
+    // NOT a hard failure (scoping doc §D3: inside-range SHA drift is the
+    // Info/auto-regen path; only outside-range framework version is fatal).
+    // This test pins the leniency so a future revision that reintroduces
+    // hard-fail-on-drift breaks CI on every SDK patch — which is exactly
+    // the round-2-M4 rollForward-fragility bug this design mitigates.
     [Fact]
-    public void CreateWithManifest_ShaMismatch_HardFailsWithSpecificMessage()
+    public void CreateWithManifest_ShaDriftInsideRange_DoesNotThrow()
     {
-        var badManifest = new MetadataReferenceManifest(
+        var driftedManifest = new MetadataReferenceManifest(
             SdkVersionRange: "10.0.0 - 10.9.999",
             GeneratedFrom: null,
             GeneratedAt: null,
@@ -140,11 +145,8 @@ public class MetadataContextTests
                     Version: "10.0.0",
                     Sha256: "deadbeef00000000000000000000000000000000000000000000000000000000")));
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => MetadataContext.CreateWithManifest(badManifest));
-        Assert.Contains("Metadata manifest drift", ex.Message);
-        Assert.Contains("System.Runtime", ex.Message);
-        Assert.Contains("SHA-256 mismatch", ex.Message);
+        using var ctx = MetadataContext.CreateWithManifest(driftedManifest);
+        Assert.NotNull(ctx);
     }
 
     // Discriminating pin for §S1 F-2: reverting the mutation (using the real
