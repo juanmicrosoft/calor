@@ -92,5 +92,4 @@ src/Calor.Compiler/Binding/Metadata/MetadataReferenceManifest.cs
 # UnresolvedBoundType) plus the abstract base — all in a single file. Calor
 # cannot inspect its own bound tree; same class as the metadata entries above
 # and the #786 typed CFG code.
-# pending
 src/Calor.Compiler/Binding/BoundTypes/BoundType.cs
