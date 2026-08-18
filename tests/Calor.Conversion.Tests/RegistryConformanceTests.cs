@@ -24,7 +24,8 @@ public class RegistryConformanceTests
     private static ConversionResult Convert(
         string csharp,
         bool selectActiveBranchLossy = false,
-        IEnumerable<string>? symbols = null)
+        IEnumerable<string>? symbols = null,
+        bool preserveDocumentationComments = true)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -32,6 +33,7 @@ public class RegistryConformanceTests
             ModuleName = "ConformanceTest",
             GracefulFallback = true,
             AutoGenerateIds = true,
+            PreserveDocumentationComments = preserveDocumentationComments,
             ParseOptions = new CSharpParseOptions(
                 preprocessorSymbols: symbols),
             PreprocessorMode = selectActiveBranchLossy
@@ -1042,5 +1044,331 @@ public class RegistryConformanceTests
         Assert.Contains("case > 100:", result.CalorSource);
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
+    }
+
+    [Theory]
+    [InlineData(
+        "public interface IWorker { void Work() { System.Console.WriteLine(\"work\"); } }",
+        "interface-method-semantics",
+        "void Work()")]
+    [InlineData(
+        "public interface IParser { static abstract int Parse(string value); }",
+        "interface-method-semantics",
+        "static abstract int Parse")]
+    [InlineData(
+        "public interface IWorker { private void Trace() { } }",
+        "interface-method-semantics",
+        "private void Trace")]
+    [InlineData(
+        "public interface IEvents { event System.Action Changed; }",
+        "interface-member",
+        "event System.Action Changed")]
+    [InlineData(
+        "public interface IContainer { class Nested { } }",
+        "interface-member",
+        "class Nested")]
+    [InlineData(
+        "internal interface IHidden { void M(); }",
+        "interface-semantics",
+        "internal interface IHidden")]
+    [InlineData(
+        "public partial interface IPartial { void M(); }",
+        "interface-semantics",
+        "partial interface IPartial")]
+    public void NonRepresentableInterfaceContract_PreservesWholeInterface(
+        string csharp,
+        string feature,
+        string originalSyntax)
+    {
+        var conversion = Convert(csharp);
+        var roundTrip = RoundTrip(csharp);
+
+        Assert.Contains("§CSHARP", conversion.CalorSource);
+        Assert.Contains(originalSyntax, conversion.CalorSource);
+        Assert.DoesNotContain("§IFACE{", conversion.CalorSource);
+        var loss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == feature));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(conversion.Losses, item =>
+            item.Kind == ConversionLossKind.Dropped);
+        Assert.Contains(originalSyntax, roundTrip.EmittedCSharp);
+        Assert.True(roundTrip.RoslynSuccess,
+            string.Join("; ", roundTrip.RoslynErrors));
+    }
+
+    [Fact]
+    public void AbstractPublicInterfaceSignatures_RemainNative()
+    {
+        var result = Convert("""
+            public interface IContract
+            {
+                void Run();
+                int Value { get; }
+                int this[int index] { get; }
+            }
+            """);
+
+        Assert.Contains("§IFACE{", result.CalorSource);
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Empty(result.Losses);
+    }
+
+    [Theory]
+    [InlineData(
+        "public async System.Threading.Tasks.Task Read(System.Collections.Generic.IAsyncEnumerable<int> items) { await foreach (var item in items) { System.Console.WriteLine(item); } }",
+        "await-foreach",
+        "await foreach")]
+    [InlineData(
+        "public async System.Threading.Tasks.Task Use(System.IAsyncDisposable resource) { await using (resource) { } }",
+        "await-using",
+        "await using (resource)")]
+    [InlineData(
+        "public async System.Threading.Tasks.Task Use(System.IAsyncDisposable resource) { await using var owned = resource; System.Console.WriteLine(owned); }",
+        "await-using",
+        "await using var owned")]
+    [InlineData(
+        "public void Use(System.IDisposable resource) { using var owned = resource; System.Console.WriteLine(owned); }",
+        "using-declaration",
+        "using var owned")]
+    [InlineData(
+        "public void Update(scoped ref int value) { value++; }",
+        "scoped-parameter",
+        "scoped ref int value")]
+    public void MemberLifetimeOrRefSafetySemantics_PreserveWholeMember(
+        string member,
+        string feature,
+        string originalSyntax)
+    {
+        var csharp = $"public class Container {{ {member} }}";
+        var conversion = Convert(csharp);
+        var roundTrip = RoundTrip(csharp);
+
+        Assert.Contains("§CL{", conversion.CalorSource);
+        Assert.Contains("§CSHARP", conversion.CalorSource);
+        Assert.Contains(originalSyntax, conversion.CalorSource);
+        Assert.DoesNotContain("§MT{", conversion.CalorSource);
+        var loss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == feature));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(conversion.Losses, item =>
+            item.Kind == ConversionLossKind.Dropped);
+        Assert.Contains(originalSyntax, roundTrip.EmittedCSharp);
+        Assert.True(roundTrip.RoslynSuccess,
+            string.Join("; ", roundTrip.RoslynErrors));
+    }
+
+    [Theory]
+    [InlineData("public ref struct Buffer { public int Value; }", "ref-struct", "§CL{")]
+    [InlineData("file class LocalClass { }", "file-scoped-type", "§CL{")]
+    [InlineData("file struct LocalStruct { }", "file-scoped-type", "§CL{")]
+    [InlineData("file interface ILocal { void M(); }", "file-scoped-type", "§IFACE{")]
+    [InlineData("file enum LocalKind { One }", "file-scoped-type", "§EN{")]
+    public void UnsupportedTypeSemantics_PreserveWholeType(
+        string csharp,
+        string feature,
+        string nativeMarker)
+    {
+        var conversion = Convert(csharp);
+        var roundTrip = RoundTrip(csharp);
+
+        Assert.Contains("§CSHARP", conversion.CalorSource);
+        Assert.Contains(csharp, conversion.CalorSource);
+        Assert.DoesNotContain(nativeMarker, conversion.CalorSource);
+        var loss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == feature));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(conversion.Losses, item =>
+            item.Kind == ConversionLossKind.Dropped);
+        Assert.Contains(csharp, roundTrip.EmittedCSharp);
+        Assert.True(roundTrip.RoslynSuccess,
+            string.Join("; ", roundTrip.RoslynErrors));
+    }
+
+    [Theory]
+    [InlineData(
+        "public delegate T Factory<T>(T value) where T : class;",
+        "delegate T Factory<T>")]
+    [InlineData(
+        "[System.Obsolete] public delegate void Legacy(int value);",
+        "[System.Obsolete] public delegate void Legacy")]
+    [InlineData(
+        "internal delegate void Hidden();",
+        "internal delegate void Hidden")]
+    [InlineData(
+        "file delegate void LocalDelegate();",
+        "file delegate void LocalDelegate")]
+    [InlineData(
+        "public delegate ref int RefFactory();",
+        "delegate ref int RefFactory")]
+    public void NonRepresentableDelegate_PreservesExactDeclaration(
+        string csharp,
+        string originalSyntax)
+    {
+        var conversion = Convert(csharp);
+        var roundTrip = RoundTrip(csharp);
+        var expectedFeature = csharp.StartsWith("file ", StringComparison.Ordinal)
+            ? "file-scoped-type"
+            : "delegate-semantics";
+
+        Assert.Contains("§CSHARP", conversion.CalorSource);
+        Assert.Contains(originalSyntax, conversion.CalorSource);
+        Assert.DoesNotContain("§DEL{", conversion.CalorSource);
+        var loss = Assert.Single(conversion.Losses.Where(item =>
+            item.Feature == expectedFeature));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.DoesNotContain(conversion.Losses, item =>
+            item.Kind == ConversionLossKind.Dropped);
+        Assert.Contains(originalSyntax, roundTrip.EmittedCSharp);
+        Assert.True(roundTrip.RoslynSuccess,
+            string.Join("; ", roundTrip.RoslynErrors));
+    }
+
+    [Fact]
+    public void DocumentationComments_ArePreservedWhenEnabled()
+    {
+        var result = Convert("""
+            /// <summary>Important contract.</summary>
+            public class Documented { }
+            """);
+
+        Assert.Contains("// Important contract.", result.CalorSource);
+        Assert.Contains("Important contract.", result.CalorSource);
+    }
+
+    [Fact]
+    public void DocumentationComments_AreOmittedWhenDisabled()
+    {
+        var result = Convert("""
+            /// <summary>Important contract.</summary>
+            public class Documented { }
+            """, preserveDocumentationComments: false);
+
+        Assert.DoesNotContain("// Important contract.", result.CalorSource);
+        Assert.DoesNotContain("Important contract.", result.CalorSource);
+    }
+
+    [Fact]
+    public void PreserveCommentsCompatibilityAlias_DoesNotPromiseOrdinaryComments()
+    {
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            PreserveComments = true,
+            Fidelity = ConversionFidelity.Lossy,
+            GracefulFallback = true
+        });
+        var result = converter.Convert("""
+            // ordinary implementation note
+            public class Plain { }
+            """);
+
+        Assert.DoesNotContain("ordinary implementation note", result.CalorSource);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void DocumentationCommentOption_AppliesToInteropDeclarations(
+        bool preserve,
+        bool insideNamespace)
+    {
+        var declaration = """
+            /// <summary>Interop contract.</summary>
+            internal interface IInterop { void M(); }
+            """;
+        var csharp = insideNamespace
+            ? $$"""
+                namespace N
+                {
+                {{string.Join(
+                    Environment.NewLine,
+                    declaration.Split(Environment.NewLine)
+                        .Select(line => "    " + line))}}
+                }
+                """
+            : declaration;
+
+        var result = Convert(
+            csharp,
+            preserveDocumentationComments: preserve);
+
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Equal(
+            preserve,
+            result.CalorSource!.Contains(
+                "Interop contract.",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NestedRefStruct_PreservesOnlyNestedDeclaration()
+    {
+        var csharp = """
+            public class Outer
+            {
+                public int Value() => 1;
+                public ref struct Buffer { public int Value; }
+            }
+            """;
+
+        var result = Convert(csharp);
+
+        Assert.Contains("§CL{", result.CalorSource);
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("ref struct Buffer", result.CalorSource);
+        Assert.Contains("§MT{", result.CalorSource);
+        var loss = Assert.Single(result.Losses.Where(item =>
+            item.Feature == "ref-struct"));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+    }
+
+    [Theory]
+    [InlineData("file class Local { }")]
+    [InlineData("file struct Local { }")]
+    [InlineData("file enum Local { One }")]
+    public void NestedFileLocalDeclaration_NeverEmitsNatively(
+        string nestedDeclaration)
+    {
+        var csharp = $"public class Outer {{ {nestedDeclaration} }}";
+
+        var result = Convert(csharp);
+
+        Assert.Contains("§CL{", result.CalorSource);
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains(nestedDeclaration, result.CalorSource);
+        var loss = Assert.Single(result.Losses.Where(item =>
+            item.Feature == "file-scoped-type"));
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DocumentationCommentOption_AppliesToConditionalInterop(
+        bool preserve)
+    {
+        var csharp = """
+            public class Container
+            {
+            #if FEATURE
+                /// <summary>Conditional contract.</summary>
+                public ref struct Buffer { }
+            #endif
+            }
+            """;
+
+        var result = Convert(
+            csharp,
+            symbols: ["FEATURE"],
+            preserveDocumentationComments: preserve);
+
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Equal(
+            preserve,
+            result.CalorSource!.Contains(
+                "Conditional contract.",
+                StringComparison.Ordinal));
     }
 }

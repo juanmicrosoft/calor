@@ -95,7 +95,7 @@ public sealed class LosslessConversionContractTests
     }
 
     [Fact]
-    public void LossyMode_ReportsEveryDropLocation()
+    public void LossyMode_PreservesUnsupportedInterfaceWithLocation()
     {
         const string source = """
             public interface IEvents
@@ -110,10 +110,13 @@ public sealed class LosslessConversionContractTests
         }).Convert(source, "IEvents.cs");
 
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
-        var loss = Assert.Single(result.Losses, item => item.Kind == ConversionLossKind.Dropped);
+        var loss = Assert.Single(result.Losses, item =>
+            item.Kind == ConversionLossKind.InteropPreserved
+            && item.Feature == "interface-member");
         Assert.Equal("IEvents.cs", loss.File);
         Assert.True(loss.Line > 0);
-        Assert.Equal(1, result.DropCount);
+        Assert.Equal(0, result.DropCount);
+        Assert.Equal(1, result.InteropPreservationCount);
     }
 
     [Fact]

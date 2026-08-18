@@ -101,9 +101,20 @@ public sealed class ConversionOptions
     public string? ModuleName { get; set; }
 
     /// <summary>
-    /// Whether to preserve original comments in the output.
+    /// Whether to preserve XML documentation comments in the output.
     /// </summary>
-    public bool PreserveComments { get; set; } = true;
+    public bool PreserveDocumentationComments { get; set; } = true;
+
+    /// <summary>
+    /// Compatibility alias for <see cref="PreserveDocumentationComments"/>.
+    /// This option has always applied only to XML documentation comments, not
+    /// ordinary source comments.
+    /// </summary>
+    public bool PreserveComments
+    {
+        get => PreserveDocumentationComments;
+        set => PreserveDocumentationComments = value;
+    }
 
     /// <summary>
     /// Whether to include benchmark metrics comparison.
@@ -1122,7 +1133,7 @@ public sealed class CSharpToCalorConverter
             SourceFile = sourceFile,
             Verbose = _options.Verbose,
             IncludeBenchmark = _options.IncludeBenchmark,
-            PreserveComments = _options.PreserveComments,
+            PreserveDocumentationComments = _options.PreserveDocumentationComments,
             AutoGenerateIds = _options.AutoGenerateIds,
             ModuleName = _options.ModuleName,
             GracefulFallback = _options.GracefulFallback,

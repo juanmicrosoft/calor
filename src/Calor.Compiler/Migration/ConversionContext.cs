@@ -280,9 +280,19 @@ public sealed class ConversionContext
     public bool IncludeBenchmark { get; set; }
 
     /// <summary>
-    /// Whether to preserve original comments.
+    /// Whether to preserve XML documentation comments.
     /// </summary>
-    public bool PreserveComments { get; set; } = true;
+    public bool PreserveDocumentationComments { get; set; } = true;
+
+    /// <summary>
+    /// Compatibility alias for <see cref="PreserveDocumentationComments"/>.
+    /// It does not preserve ordinary source comments.
+    /// </summary>
+    public bool PreserveComments
+    {
+        get => PreserveDocumentationComments;
+        set => PreserveDocumentationComments = value;
+    }
 
     /// <summary>
     /// Whether to generate module IDs automatically.

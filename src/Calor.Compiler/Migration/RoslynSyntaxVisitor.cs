@@ -1,6 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SyntaxCapabilityClassifier =
+    Calor.Compiler.Migration.FeatureSupport.SyntaxCapabilityClassifier;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Effects;
@@ -1828,8 +1830,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// <summary>
     /// Extracts doc comment and attaches it to an AST node.
     /// </summary>
-    private static void AttachDocComment(AstNode astNode, SyntaxNode roslynNode)
+    private void AttachDocComment(AstNode astNode, SyntaxNode roslynNode)
     {
+        if (!_context.PreserveDocumentationComments)
+            return;
         var doc = ExtractDocComment(roslynNode);
         if (doc != null)
             astNode.DocComment = doc;
@@ -1915,6 +1919,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private void VisitGlobalStatementCore(GlobalStatementSyntax node)
     {
+        var unsupported = SyntaxCapabilityClassifier.FindFirst(node.Statement);
+        if (unsupported != null)
+            throw EscalateExpression(node.Statement, unsupported.FeatureName);
+
         // Handle chained method calls in local declarations (e.g., var x = a.Where(...).First())
         // Skip chains handled by native operations (string, StringBuilder, regex, char)
         if (node.Statement is LocalDeclarationStatementSyntax chainDecl
@@ -1984,6 +1992,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        var unsupported =
+            SyntaxCapabilityClassifier.FindUnsupportedInterface(node);
+        if (unsupported != null)
+        {
+            AddModuleInteropBlock(CreateInteropBlock(
+                node,
+                unsupported.FeatureName,
+                InteropMemberKind.Class));
+            return;
+        }
+
         _context.RecordFeatureUsage("interface");
         _context.EnterType(node.Identifier.Text);
         try
@@ -2007,6 +2026,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private InterfaceDefinitionNode ConvertInterface(InterfaceDeclarationSyntax node)
     {
+        var unsupported =
+            SyntaxCapabilityClassifier.FindUnsupportedInterface(node);
+        if (unsupported != null)
+            throw EscalateExpression(node, unsupported.FeatureName);
+
         var id = _context.GenerateId("i");
         var name = node.Identifier.Text;
         var baseInterfaces = node.BaseList?.Types
@@ -2362,6 +2386,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        var unsupported =
+            SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
+        if (unsupported?.FeatureName == "file-scoped-type")
+        {
+            AddModuleInteropBlock(CreateInteropBlock(
+                node,
+                unsupported.FeatureName,
+                InteropMemberKind.Class));
+            return;
+        }
+
         _context.RecordFeatureUsage("class");
         _context.EnterType(node.Identifier.Text);
         try
@@ -2445,6 +2480,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        var unsupported =
+            SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
+        if (unsupported?.FeatureName is "ref-struct" or "file-scoped-type")
+        {
+            AddModuleInteropBlock(CreateInteropBlock(
+                node,
+                unsupported.FeatureName,
+                InteropMemberKind.Class));
+            return;
+        }
+
         _context.RecordFeatureUsage("struct");
         _context.EnterType(node.Identifier.Text);
         try
@@ -2500,6 +2546,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     InteropMemberKind.Other));
                 return;
             }
+        }
+
+        var unsupported =
+            SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
+        if (unsupported?.FeatureName == "file-scoped-type")
+        {
+            AddModuleInteropBlock(CreateInteropBlock(
+                node,
+                unsupported.FeatureName,
+                InteropMemberKind.Other));
+            return;
         }
 
         _context.RecordFeatureUsage("enum");
@@ -2565,23 +2622,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return;
         }
 
-        // DelegateDefinitionNode emits a public, non-generic, un-attributed
-        // delegate with no modifiers. Preserve every declaration outside that
-        // exact representable surface verbatim.
-        if (!IsRepresentableDelegate(node))
+        var unsupported = SyntaxCapabilityClassifier.FindFirst(node);
+        if (unsupported != null)
         {
             if (node.Parent is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
             {
                 AddModuleInteropBlock(CreateInteropBlock(
                     node,
-                    "delegate-semantics",
+                    unsupported.FeatureName,
                     InteropMemberKind.Other));
                 return;
             }
-            // Nested: escalate so the enclosing type's member loop preserves it.
-            throw EscalateExpression(node, "delegate-semantics");
+            throw EscalateExpression(node, unsupported.FeatureName);
         }
 
+        // DelegateDefinitionNode emits a public, non-generic, un-attributed
+        // delegate with no modifiers. Preserve every declaration outside that
+        // exact representable surface verbatim.
         _context.RecordFeatureUsage("delegate");
         try
         {
@@ -2615,16 +2672,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
     }
 
-    private static bool IsRepresentableDelegate(
-        DelegateDeclarationSyntax node)
-        => node.TypeParameterList == null
-            && node.ConstraintClauses.Count == 0
-            && node.AttributeLists.Count == 0
-            && node.Modifiers.Count == 1
-            && node.Modifiers[0].IsKind(SyntaxKind.PublicKeyword);
-
     private ClassDefinitionNode ConvertClass(ClassDeclarationSyntax node)
     {
+        var unsupported =
+            SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
+        if (unsupported?.FeatureName == "file-scoped-type")
+            throw EscalateExpression(node, unsupported.FeatureName);
+
         var id = _context.GenerateId("c");
         var name = node.Identifier.Text;
         var isAbstract = node.Modifiers.Any(SyntaxKind.AbstractKeyword);
@@ -2873,7 +2927,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     _context.ExitType();
-                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                    interopBlocks.Add(CreateInteropBlock(
+                        member,
+                        GetRequiredCapabilityFeature(ex),
+                        InteropMemberKind.Other));
                 }
                 continue;
             }
@@ -2889,7 +2946,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     _context.ExitType();
-                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                    interopBlocks.Add(CreateInteropBlock(
+                        member,
+                        GetRequiredCapabilityFeature(ex),
+                        InteropMemberKind.Other));
                 }
                 continue;
             }
@@ -2910,7 +2970,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
-                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                    interopBlocks.Add(CreateInteropBlock(
+                        member,
+                        GetRequiredCapabilityFeature(ex),
+                        InteropMemberKind.Other));
                 }
                 continue;
             }
@@ -2918,6 +2981,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 try
                 {
+                    var enumUnsupported =
+                        SyntaxCapabilityClassifier.FindDeclaredTypeModifier(
+                            nestedEnum);
+                    if (enumUnsupported?.FeatureName == "file-scoped-type")
+                    {
+                        throw EscalateExpression(
+                            nestedEnum,
+                            enumUnsupported.FeatureName);
+                    }
                     _context.RecordFeatureUsage("nested-type");
                     var nestedId = _context.GenerateId("e");
                     var nestedName = nestedEnum.Identifier.Text;
@@ -2934,7 +3006,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
-                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                    interopBlocks.Add(CreateInteropBlock(
+                        member,
+                        GetRequiredCapabilityFeature(ex),
+                        InteropMemberKind.Other));
                 }
                 continue;
             }
@@ -2952,7 +3027,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
-                    interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
+                    interopBlocks.Add(CreateInteropBlock(
+                        member,
+                        GetRequiredCapabilityFeature(ex),
+                        InteropMemberKind.Other));
                 }
                 continue;
             }
@@ -2974,7 +3052,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     EventDeclarationSyntax => InteropMemberKind.Event,
                     _ => InteropMemberKind.Other
                 };
-                interopBlocks.Add(CreateInteropBlock(member, null, kind));
+                interopBlocks.Add(CreateInteropBlock(
+                    member,
+                    GetRequiredCapabilityFeature(ex),
+                    kind));
             }
         }
 
@@ -3053,6 +3134,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<OperatorOverloadNode> operatorOverloads,
         List<IndexerNode>? indexers = null)
     {
+        if (!member.DescendantNodes()
+                .OfType<LocalFunctionStatementSyntax>()
+                .Any())
+        {
+            var unsupported = SyntaxCapabilityClassifier.FindFirst(member);
+            if (unsupported != null)
+                throw EscalateExpression(member, unsupported.FeatureName);
+        }
+
         switch (member)
         {
             case FieldDeclarationSyntax fieldSyntax:
@@ -3221,6 +3311,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ClassDefinitionNode ConvertStruct(StructDeclarationSyntax node)
     {
+        var unsupported =
+            SyntaxCapabilityClassifier.FindDeclaredTypeModifier(node);
+        if (unsupported?.FeatureName is "ref-struct" or "file-scoped-type")
+            throw EscalateExpression(node, unsupported.FeatureName);
+
         var id = _context.GenerateId("s");
         var name = node.Identifier.Text;
         var isReadOnly = node.Modifiers.Any(SyntaxKind.ReadOnlyKeyword);
@@ -3411,13 +3506,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (member is ClassDeclarationSyntax nc)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(nc.Identifier.Text); nestedClasses.Add(ConvertClass(nc)); _context.ExitType(); }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is StructDeclarationSyntax ns)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(ns.Identifier.Text); nestedClasses.Add(ConvertStruct(ns)); _context.ExitType(); }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is RecordDeclarationSyntax nestedRecord)
@@ -3431,13 +3526,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (member is InterfaceDeclarationSyntax ni)
             {
                 try { _context.RecordFeatureUsage("nested-type"); nestedInterfaces.Add(ConvertInterface(ni)); }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is EnumDeclarationSyntax ne)
             {
                 try
                 {
+                    var enumUnsupported =
+                        SyntaxCapabilityClassifier.FindDeclaredTypeModifier(ne);
+                    if (enumUnsupported?.FeatureName == "file-scoped-type")
+                    {
+                        throw EscalateExpression(
+                            ne,
+                            enumUnsupported.FeatureName);
+                    }
                     _context.RecordFeatureUsage("nested-type");
                     var nestedId = _context.GenerateId("e");
                     var nestedName = ne.Identifier.Text;
@@ -3452,7 +3555,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(ne), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
             if (member is DelegateDeclarationSyntax nd)
@@ -3467,7 +3570,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _delegates.Clear();
                     _delegates.AddRange(savedDelegates);
                 }
-                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, GetRequiredCapabilityFeature(ex), InteropMemberKind.Other)); }
                 continue;
             }
 
@@ -3488,7 +3591,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     EventDeclarationSyntax => InteropMemberKind.Event,
                     _ => InteropMemberKind.Other
                 };
-                interopBlocks.Add(CreateInteropBlock(member, null, kind));
+                interopBlocks.Add(CreateInteropBlock(
+                    member,
+                    GetRequiredCapabilityFeature(ex),
+                    kind));
             }
         }
 
@@ -5585,11 +5691,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             items.AddRange(events.Skip(eventCount));
             items.AddRange(operatorOverloads.Skip(operatorCount));
         }
-        catch
+        catch (Exception ex)
         {
             var interop = CreateInteropBlock(
                 member,
-                interopFeature,
+                GetRequiredCapabilityFeature(ex) ?? interopFeature,
                 GetInteropMemberKind(member));
             interopBlocks.Add(interop);
             items.Add(interop);
@@ -5610,6 +5716,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             BaseTypeDeclarationSyntax => InteropMemberKind.Class,
             _ => InteropMemberKind.Other
         };
+
+    private static string? GetRequiredCapabilityFeature(Exception exception)
+        => exception is MemberInteropEscalationException escalation
+            && SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
+                escalation.FeatureName)
+                ? escalation.FeatureName
+                : null;
 
     /// <summary>
     /// Builds a (potentially nested) MemberPreprocessorBlockNode from an ordered list of branches.
@@ -12738,34 +12851,51 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Use ToString() (without trivia) when the node lives inside a namespace.
         // ToFullString() can capture leading trivia that bleeds namespace context,
         // causing duplicate namespace wrappers since the module tag already provides one.
+        var nodeForInterop = _context.PreserveDocumentationComments
+            ? node
+            : node.WithLeadingTrivia(node.GetLeadingTrivia().Where(trivia =>
+                !trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia)));
         string sourceCode;
         if ((_insideConditionalModuleRecovery
                 || _insideMemberPreprocessorRecovery)
-            && HasConditionalTrivia(node))
+            && HasConditionalTrivia(nodeForInterop))
         {
-            sourceCode = StripConditionalTrivia(node);
+            sourceCode = StripConditionalTrivia(
+                nodeForInterop,
+                _context.PreserveDocumentationComments);
         }
         else if (node.Parent is BaseNamespaceDeclarationSyntax)
         {
-            sourceCode = node.ToString();
+            var docs = _context.PreserveDocumentationComments
+                ? string.Concat(node.GetLeadingTrivia()
+                    .Where(trivia =>
+                        trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                        || trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                    .Select(trivia => trivia.ToFullString()))
+                : "";
+            sourceCode = docs + nodeForInterop.ToString();
         }
-        else if (node.GetLeadingTrivia().Any(t => t.IsDirective) ||
-                 node.GetTrailingTrivia().Any(t => t.IsDirective))
+        else if (nodeForInterop.GetLeadingTrivia().Any(t => t.IsDirective) ||
+                 nodeForInterop.GetTrailingTrivia().Any(t => t.IsDirective))
         {
             // #836 C2: ToFullString() would capture preprocessor directive
             // trivia (e.g. the `#if` opening the active branch this member
             // sits in) WITHOUT its matching `#endif`, emitting a dangling
             // directive inside the §CSHARP block (CS1027 on re-compilation).
             // Keep doc comments, drop directive-bearing trivia.
-            var docs = string.Concat(node.GetLeadingTrivia()
-                .Where(t => t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
-                         || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
-                .Select(t => t.ToFullString()));
-            sourceCode = docs + node.ToString();
+            var docs = _context.PreserveDocumentationComments
+                ? string.Concat(node.GetLeadingTrivia()
+                    .Where(t =>
+                        t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                        || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                    .Select(t => t.ToFullString()))
+                : "";
+            sourceCode = docs + nodeForInterop.ToString();
         }
         else
         {
-            sourceCode = node.ToFullString();
+            sourceCode = nodeForInterop.ToFullString();
         }
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
@@ -12806,22 +12936,37 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 or EndIfDirectiveTriviaSyntax
                 || trivia.IsKind(SyntaxKind.DisabledTextTrivia));
 
-    private static string StripConditionalTrivia(SyntaxNode node)
+    private static string StripConditionalTrivia(
+        SyntaxNode node,
+        bool preserveDocumentationComments)
     {
-        var rewritten = new ConditionalTriviaStripper().Visit(node)
+        var rewritten = new ConditionalTriviaStripper(
+            preserveDocumentationComments).Visit(node)
             ?? node;
         return rewritten.ToFullString();
     }
 
     private sealed class ConditionalTriviaStripper : CSharpSyntaxRewriter
     {
+        private readonly bool _preserveDocumentationComments;
+
+        public ConditionalTriviaStripper(bool preserveDocumentationComments)
+        {
+            _preserveDocumentationComments = preserveDocumentationComments;
+        }
+
         public override SyntaxTrivia VisitTrivia(SyntaxTrivia trivia)
         {
             if (trivia.GetStructure() is IfDirectiveTriviaSyntax
                 or ElifDirectiveTriviaSyntax
                 or ElseDirectiveTriviaSyntax
                 or EndIfDirectiveTriviaSyntax
-                || trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                || trivia.IsKind(SyntaxKind.DisabledTextTrivia)
+                || (!_preserveDocumentationComments
+                    && (trivia.IsKind(
+                            SyntaxKind.SingleLineDocumentationCommentTrivia)
+                        || trivia.IsKind(
+                            SyntaxKind.MultiLineDocumentationCommentTrivia))))
             {
                 return default;
             }
