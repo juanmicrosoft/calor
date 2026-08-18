@@ -84,3 +84,13 @@ src/Calor.Compiler/Analysis/Dataflow/LoopStepSemantics.cs
 # typed CFG code above.
 src/Calor.Compiler/Binding/Metadata/MetadataContext.cs
 src/Calor.Compiler/Binding/Metadata/MetadataReferenceManifest.cs
+
+# v0.14 §3.1 S2 — BoundType hierarchy (docs/plans/v0.14-metadata-binding-scoping.md
+# §D1/D2/S2). Compiler-internal ground-truth type representation on bound-tree
+# nodes. Six concrete kinds (PrimitiveBoundType, NominalBoundType,
+# GenericInstantiationBoundType, ArrayBoundType, FunctionBoundType,
+# UnresolvedBoundType) plus the abstract base — all in a single file. Calor
+# cannot inspect its own bound tree; same class as the metadata entries above
+# and the #786 typed CFG code.
+# pending
+src/Calor.Compiler/Binding/BoundTypes/BoundType.cs
