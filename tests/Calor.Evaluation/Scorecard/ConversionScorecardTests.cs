@@ -118,6 +118,17 @@ public class ConversionScorecardTests
     }
 
     [Fact]
+    public void LocalFunctionInterop_IsNotReportedAsNativeFeatureConversion()
+    {
+        Assert.Contains("local_function", Scorecard.ByFeature);
+        var localFunctions = Scorecard.ByFeature["local_function"];
+
+        Assert.Equal(1, localFunctions.Total);
+        Assert.Equal(0, localFunctions.Passed);
+        Assert.Equal(0, localFunctions.Rate);
+    }
+
+    [Fact]
     public async Task NoRegressionsVsCommittedBaseline()
     {
         var baselinePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scorecard", "baseline.json");

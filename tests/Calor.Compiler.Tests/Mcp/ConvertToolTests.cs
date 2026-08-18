@@ -502,20 +502,19 @@ public class ConvertToolTests
         var compileText = compileResult.Content[0].Text!;
         var compileJson = JsonDocument.Parse(compileText);
 
-        // The compiled C# should contain the hoisted function
+        // The compiled C# should contain the original member and nested local
+        // function, not a module-level hoist.
         Assert.True(compileJson.RootElement.TryGetProperty("generatedCode", out var csharpProp),
             $"Round-trip compile should produce C# output. Result: {compileText}");
         var csharp = csharpProp.GetString()!;
+        Assert.Contains("Calculate", csharp);
         Assert.Contains("Double", csharp);
+        Assert.Contains("return Double(x)", csharp);
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithLocalFunction_ClosureNotCaptured()
+    public async Task ExecuteAsync_WithLocalFunction_ClosureIsPreserved()
     {
-        // Known limitation: local functions that capture outer variables are hoisted
-        // to module level, which means the captured variable is out of scope.
-        // The converter still hoists the function but the round-trip compile may fail
-        // because the variable reference cannot be resolved.
         var args = JsonDocument.Parse("""
             {
                 "source": "public class Example { public int Compute(int x) { int multiplier = 3; int Multiply(int n) { return n * multiplier; } return Multiply(x); } }",
@@ -525,14 +524,14 @@ public class ConvertToolTests
 
         var result = await _tool.ExecuteAsync(args);
 
-        // Conversion itself succeeds (the local function is hoisted)
-        Assert.False(result.IsError, "Conversion should succeed even with closure");
+        Assert.False(result.IsError, "Conversion should preserve the containing member");
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
+        Assert.Contains("\u00A7CSHARP", calorSource);
         Assert.Contains("Multiply", calorSource);
-        // Note: The hoisted function references 'multiplier' which is not in scope.
-        // This is a known limitation documented in Issue #315.
+        Assert.Contains("multiplier", calorSource);
+        Assert.DoesNotContain("\u00A7F{", calorSource);
     }
 
     [Fact]
