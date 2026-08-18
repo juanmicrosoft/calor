@@ -101,6 +101,14 @@ public class ConversionScorecardRunner
             .Where(loss => loss.IsSemanticLoss)
             .Select(loss => loss.ToString())
             .ToArray();
+        var interopPreservationDiagnostics = conversionResult.Losses
+            .Where(loss => loss.Kind is
+                ConversionLossKind.InteropPreserved
+                or ConversionLossKind.EmitterFallback)
+            .Select(loss => loss.ToString())
+            .ToArray();
+        var interopPreservationCount =
+            conversionResult.InteropPreservationCount;
         var conversionErrors = conversionResult.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error);
         var conversionWarnings = conversionResult.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning);
 
@@ -128,7 +136,10 @@ public class ConversionScorecardRunner
                 CompilationDuration: TimeSpan.Zero)
             {
                 SemanticLossCount = semanticLosses.Length,
-                SemanticLossDiagnostics = semanticLosses
+                SemanticLossDiagnostics = semanticLosses,
+                InteropPreservationCount = interopPreservationCount,
+                InteropPreservationDiagnostics =
+                    interopPreservationDiagnostics
             };
         }
 
@@ -169,7 +180,10 @@ public class ConversionScorecardRunner
                 CompilationDuration: TimeSpan.Zero)
             {
                 SemanticLossCount = semanticLosses.Length,
-                SemanticLossDiagnostics = semanticLosses
+                SemanticLossDiagnostics = semanticLosses,
+                InteropPreservationCount = interopPreservationCount,
+                InteropPreservationDiagnostics =
+                    interopPreservationDiagnostics
             };
         }
 
@@ -198,7 +212,10 @@ public class ConversionScorecardRunner
                 CompilationDuration: compilationDuration)
             {
                 SemanticLossCount = semanticLosses.Length,
-                SemanticLossDiagnostics = semanticLosses
+                SemanticLossDiagnostics = semanticLosses,
+                InteropPreservationCount = interopPreservationCount,
+                InteropPreservationDiagnostics =
+                    interopPreservationDiagnostics
             };
         }
 
@@ -249,7 +266,10 @@ public class ConversionScorecardRunner
             CompilationDuration: compilationDuration)
         {
             SemanticLossCount = semanticLosses.Length,
-            SemanticLossDiagnostics = semanticLosses
+            SemanticLossDiagnostics = semanticLosses,
+            InteropPreservationCount = interopPreservationCount,
+            InteropPreservationDiagnostics =
+                interopPreservationDiagnostics
         };
     }
 

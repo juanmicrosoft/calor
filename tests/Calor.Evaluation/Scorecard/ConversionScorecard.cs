@@ -30,6 +30,9 @@ public record SnippetResult(
 {
     public int SemanticLossCount { get; init; }
     public string[] SemanticLossDiagnostics { get; init; } = Array.Empty<string>();
+    public int InteropPreservationCount { get; init; }
+    public string[] InteropPreservationDiagnostics { get; init; } =
+        Array.Empty<string>();
 
     // #771: round-trip success requires the generated C# to COMPILE (full
     // Roslyn semantic compilation), not merely parse — syntax-valid but
