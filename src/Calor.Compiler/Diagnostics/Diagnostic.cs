@@ -843,6 +843,13 @@ public static class DiagnosticCode
     /// </summary>
     public const string IteratorPostconditionUnsupported = "Calor1004";
 
+    /// <summary>
+    /// Error: namespace topology metadata is incomplete or inconsistent.
+    /// The emitter preserves the declaration in the global namespace rather
+    /// than throwing or silently omitting it.
+    /// </summary>
+    public const string MalformedNamespaceTopology = "Calor1005";
+
     // C# Interop diagnostics (Calor1010-1019)
 
     /// <summary>

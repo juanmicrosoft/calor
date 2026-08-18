@@ -46,11 +46,24 @@ public sealed class PartialClassMerger
         var mergedClasses = new HashSet<ClassDefinitionNode>();
         // Maps target module -> list of merged classes to add
         var mergedByModule = new Dictionary<ModuleNode, List<ClassDefinitionNode>>();
+        var additionalUsingsByModule =
+            new Dictionary<ModuleNode, List<UsingDirectiveNode>>();
 
         foreach (var (_, group) in partialGroups)
         {
             if (group.Count <= 1)
                 continue;
+
+            var targetModule = group[0].Module;
+            var targetClass = group[0].Class;
+            if (!TryCollectMergedUsings(
+                    group,
+                    targetModule,
+                    targetClass,
+                    out var additionalUsings))
+            {
+                continue;
+            }
 
             var merged = MergePartialClasses(group.Select(g => g.Class).ToList());
 
@@ -61,13 +74,23 @@ public sealed class PartialClassMerger
             }
 
             // The merged class goes into the first module that contained a partial
-            var targetModule = group[0].Module;
             if (!mergedByModule.TryGetValue(targetModule, out var mergedList))
             {
                 mergedList = new List<ClassDefinitionNode>();
                 mergedByModule[targetModule] = mergedList;
             }
             mergedList.Add(merged);
+            if (additionalUsings.Count > 0)
+            {
+                if (!additionalUsingsByModule.TryGetValue(
+                        targetModule,
+                        out var usingList))
+                {
+                    usingList = new List<UsingDirectiveNode>();
+                    additionalUsingsByModule[targetModule] = usingList;
+                }
+                usingList.AddRange(additionalUsings);
+            }
         }
 
         // Rebuild modules, removing merged partials and adding merged results
@@ -85,9 +108,22 @@ public sealed class PartialClassMerger
 
             // Rebuild module only if its classes changed
             if (remainingClasses.Count != module.Classes.Count ||
-                !remainingClasses.SequenceEqual(module.Classes))
+                !remainingClasses.SequenceEqual(module.Classes) ||
+                additionalUsingsByModule.ContainsKey(module))
             {
-                result.Add(RebuildModule(module, remainingClasses));
+                var usings = module.Usings.ToList();
+                if (additionalUsingsByModule.TryGetValue(module, out var additions))
+                {
+                    var existing = usings
+                        .Select(GetUsingKey)
+                        .ToHashSet();
+                    foreach (var addition in additions)
+                    {
+                        if (existing.Add(GetUsingKey(addition)))
+                            usings.Add(addition);
+                    }
+                }
+                result.Add(RebuildModule(module, remainingClasses, usings));
             }
             else
             {
@@ -100,14 +136,16 @@ public sealed class PartialClassMerger
 
     private static string GetQualifiedName(ModuleNode module, ClassDefinitionNode cls)
     {
-        // Group by module name (= C# namespace) + class name + arity.
-        // In project migration, the converter derives module name from the C# namespace,
-        // so partial classes in the same namespace get the same module name and merge.
-        // Classes with the same name in different namespaces stay separate.
+        if (!string.IsNullOrEmpty(cls.FullyQualifiedSymbolIdentity))
+            return cls.FullyQualifiedSymbolIdentity;
+
+        var namespaceIdentity = cls.NamespaceIdentity ?? module.Name;
         var typeParamSuffix = cls.TypeParameters.Count > 0
             ? $"`{cls.TypeParameters.Count}"
             : "";
-        return $"{module.Name}.{cls.Name}{typeParamSuffix}";
+        return $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}" +
+               cls.Name +
+               typeParamSuffix;
     }
 
     /// <summary>
@@ -168,7 +206,7 @@ public sealed class PartialClassMerger
             .Distinct()
             .ToList();
 
-        var merged = new ClassDefinitionNode(
+        var merged = primary.CopyMetadataTo(new ClassDefinitionNode(
             primary.Span,
             primary.Id,
             primary.Name,
@@ -197,28 +235,94 @@ public sealed class PartialClassMerger
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: items.Count > 0 ? items : null);
+            identifierSpan: primary.IdentifierSpan,
+            items: items.Count > 0 ? items : null));
 
         // Tag with source files
         if (sourceFiles.Count > 0)
         {
             merged.SourceFile = string.Join(", ", sourceFiles);
         }
-
         return merged;
     }
 
     private static int VisibilityRank(Visibility v) => v switch
     {
-        Visibility.Public => 4,
-        Visibility.ProtectedInternal => 3,
-        Visibility.Internal => 2,
-        Visibility.Protected => 1,
+        Visibility.Public => 5,
+        Visibility.ProtectedInternal => 4,
+        Visibility.Internal => 3,
+        Visibility.Protected => 2,
+        Visibility.PrivateProtected => 1,
         Visibility.Private => 0,
         _ => 0
     };
 
-    private static ModuleNode RebuildModule(ModuleNode original, List<ClassDefinitionNode> newClasses)
+    private static bool TryCollectMergedUsings(
+        IReadOnlyList<(ModuleNode Module, ClassDefinitionNode Class)> group,
+        ModuleNode targetModule,
+        ClassDefinitionNode targetClass,
+        out List<UsingDirectiveNode> additions)
+    {
+        additions = new List<UsingDirectiveNode>();
+        var applicable = group
+            .SelectMany(item => GetApplicableUsings(item.Module, item.Class))
+            .ToList();
+        var aliasConflicts = applicable
+            .Where(item => item.Alias != null)
+            .GroupBy(item => item.Alias!, StringComparer.Ordinal)
+            .Any(aliasGroup => aliasGroup
+                .Select(item => (item.Namespace, item.IsStatic))
+                .Distinct()
+                .Count() > 1);
+        if (aliasConflicts)
+            return false;
+
+        var targetApplicable = GetApplicableUsings(targetModule, targetClass)
+            .Select(GetUsingKey)
+            .ToHashSet();
+        foreach (var usingDirective in applicable.Where(item => !item.IsGlobal))
+        {
+            var clone = new UsingDirectiveNode(
+                usingDirective.Span,
+                usingDirective.Namespace,
+                usingDirective.Alias,
+                usingDirective.IsStatic,
+                isGlobal: false,
+                namespaceIdentity: targetClass.NamespaceIdentity,
+                namespaceScopeId: string.IsNullOrEmpty(targetClass.NamespaceScopeId)
+                    ? null
+                    : targetClass.NamespaceScopeId);
+            if (targetApplicable.Add(GetUsingKey(clone)))
+                additions.Add(clone);
+        }
+        return true;
+    }
+
+    private static IEnumerable<UsingDirectiveNode> GetApplicableUsings(
+        ModuleNode module,
+        ClassDefinitionNode cls)
+        => module.Usings.Where(usingDirective =>
+            usingDirective.IsGlobal
+            || usingDirective.NamespaceScopeId == null
+            || usingDirective.NamespaceScopeId == cls.NamespaceScopeId);
+
+    private static (
+        string Namespace,
+        string? Alias,
+        bool IsStatic,
+        bool IsGlobal,
+        string? ScopeId) GetUsingKey(UsingDirectiveNode usingDirective)
+        => (
+            usingDirective.Namespace,
+            usingDirective.Alias,
+            usingDirective.IsStatic,
+            usingDirective.IsGlobal,
+            usingDirective.NamespaceScopeId);
+
+    private static ModuleNode RebuildModule(
+        ModuleNode original,
+        List<ClassDefinitionNode> newClasses,
+        IReadOnlyList<UsingDirectiveNode> usings)
     {
         var replacements = newClasses
             .Where(cls => !original.Classes.Contains(cls))
@@ -227,7 +331,7 @@ public sealed class PartialClassMerger
                 group => group.Key,
                 group => new Queue<ClassDefinitionNode>(group));
         var items = new List<AstNode>();
-        foreach (var item in CanonicalModuleItems(original))
+        foreach (var item in CanonicalModuleItems(original, usings))
         {
             if (item is not ClassDefinitionNode cls)
             {
@@ -247,11 +351,12 @@ public sealed class PartialClassMerger
             }
         }
         items.AddRange(replacements.Values.SelectMany(queue => queue));
-        return new ModuleNode(
+
+        return original.CopyMetadataTo(new ModuleNode(
             original.Span,
             original.Id,
             original.Name,
-            original.Usings,
+            usings,
             original.Interfaces,
             newClasses,
             original.Enums,
@@ -268,7 +373,9 @@ public sealed class PartialClassMerger
             refinementTypes: original.RefinementTypes.Count > 0 ? original.RefinementTypes : null,
             indexedTypes: original.IndexedTypes.Count > 0 ? original.IndexedTypes : null,
             typePreprocessorBlocks: original.TypePreprocessorBlocks.Count > 0 ? original.TypePreprocessorBlocks : null,
-            items: items.Count > 0 ? items : null);
+            identifierSpan: original.IdentifierSpan,
+            items: items.Count > 0 ? items : null,
+            namespaceScopes: original.NamespaceScopes));
     }
 
     private static IReadOnlyList<AstNode> CanonicalClassItems(
@@ -290,10 +397,11 @@ public sealed class PartialClassMerger
                 .Concat(cls.NestedDelegates));
 
     private static IReadOnlyList<AstNode> CanonicalModuleItems(
-        ModuleNode module)
+        ModuleNode module,
+        IReadOnlyList<UsingDirectiveNode> usings)
         => Canonicalize(
             module.Items,
-            module.Usings.Cast<AstNode>()
+            usings.Cast<AstNode>()
                 .Concat(module.Interfaces)
                 .Concat(module.Classes)
                 .Concat(module.Enums)

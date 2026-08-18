@@ -76,11 +76,64 @@ Modules are like C# namespaces. They group related functions.
 
 ---
 
+## Namespace Scopes
+
+`§NS` preserves lexical C# namespace declarations inside a module. The scope
+ID distinguishes separate declarations of the same namespace so local using
+aliases never leak between them.
+
+```calor
+§NS{ns1:Company.Product}
+  §U{Model:Company.Contracts.Model}
+  §CL{c1:Service:pub}
+```
+
+For a file-scoped namespace:
+
+```calor
+§NS{ns2:Company.Product:file}
+  §CL{c2:FileScopedType:pub}
+```
+
+For the C# global namespace:
+
+```calor
+§NS{ns3:_global:global}
+  §CL{c3:GlobalType:pub}
+```
+
+`global`, `named`, and `file` are explicit scope markers. `global` means no C#
+namespace wrapper is emitted. `named` disambiguates the legal C# namespace name
+`_global` from the historical global-namespace spelling:
+
+```calor
+§NS{ns4:_global:named}
+  §CL{c4:Thing:pub} // C# identity: global::_global.Thing
+```
+
+Markers can be combined, for example `§NS{ns5:_global:named:file}`. For
+backward compatibility, legacy `§NS{id:_global}` still parses as the global
+namespace, but canonical re-emission adds the explicit `global` marker.
+
+Nested `§NS` blocks preserve nested namespace hierarchy. The optional `file`
+marker preserves a file-scoped namespace when it is the file's only namespace
+scope. C# conversion associates declarations with both their fully-qualified
+namespace and lexical scope identity.
+
+An empty `§NS` ends before the next namespace or module member at the same
+indentation, so a following sibling is never treated as its child. Continuation
+indentation inside expressions is balanced independently and cannot terminate
+the surrounding namespace scope.
+
+---
+
 ## Using Directives
 
 Using directives retain their complete C# meaning. Exact duplicates are removed
-using the full `(target, alias, static, global)` tuple; directives that share a
-target but differ in alias or flags remain distinct.
+using the full `(target, alias, static, global, namespace scope)` tuple;
+directives that share a target but differ in alias, flags, or scope remain
+distinct. Directives inside `§NS` are emitted inside that C# namespace scope;
+global and compilation-unit usings remain outside all namespace declarations.
 
 ```calor
 §U{System.Collections.Generic}             // using System.Collections.Generic;
@@ -118,7 +171,15 @@ Functions are the primary code containers.
 | Value | Meaning | C# Equivalent |
 |:------|:--------|:--------------|
 | `pub` | Public | `public static` |
-| `pri` | Private | `private static` |
+| `pri` | Private to the Calor module | `private static` |
+
+Namespace scopes do not create separate Calor modules. A module function,
+including a private function, is callable from every `§NS` scope in the same
+`ModuleNode`; overload resolution still uses the declared signatures. Because
+those scopes emit as separate C# static classes, the compiler qualifies sibling
+calls and may widen the generated member to `internal` as an implementation
+detail. Private functions are never exported to another input file's
+cross-module call map.
 
 ### Examples
 

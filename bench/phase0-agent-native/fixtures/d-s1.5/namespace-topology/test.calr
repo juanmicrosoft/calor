@@ -1,0 +1,7 @@
+§M{m001:FixtureTest}
+  §NS{ns1:Alpha}
+    §CL{c1:Marker:pub:stat}
+  §NS{ns2:Beta}
+    §CL{c2:Value:pub:stat}
+      §MT{m1:Get:pub:stat} () -> i32
+        §R INT:42

@@ -1,6 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Calor.Compiler.Incremental;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Security.Cryptography;
+using System.Text;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 using CSharpExtensions = Microsoft.CodeAnalysis.CSharpExtensions;
 
@@ -121,6 +124,7 @@ public sealed class ProjectDiscovery
             var entry = await AnalyzeFileAsync(csFile, direction);
             entries.Add(entry);
         }
+        ResolveOutputPathCollisions(entries);
 
         return new MigrationPlan
         {
@@ -238,6 +242,8 @@ public sealed class ProjectDiscovery
         var estimatedIssues = 0;
         var convertibility = FileConvertibility.Full;
         string? skipReason = null;
+        var declaredNamespaceIdentities = new List<string>();
+        string? primarySymbolIdentity = null;
 
         try
         {
@@ -253,6 +259,24 @@ public sealed class ProjectDiscovery
                         : SourceCodeKind.Regular),
                 filePath);
             var root = syntaxTree.GetCompilationUnitRoot();
+            declaredNamespaceIdentities = root.DescendantNodes()
+                .OfType<BaseNamespaceDeclarationSyntax>()
+                .Select(GetFullNamespaceIdentity)
+                .Concat(root.Members.Any(member =>
+                    member is BaseTypeDeclarationSyntax
+                        or DelegateDeclarationSyntax
+                        or GlobalStatementSyntax)
+                    ? [""]
+                    : Array.Empty<string>())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            primarySymbolIdentity = root.DescendantNodes()
+                .OfType<MemberDeclarationSyntax>()
+                .Where(member =>
+                    member.Parent is CompilationUnitSyntax
+                        or BaseNamespaceDeclarationSyntax)
+                .Select(GetDeclaredSymbolIdentity)
+                .FirstOrDefault(identity => identity != null);
 
             // Check for parse errors
             var errors = root.GetDiagnostics()
@@ -274,6 +298,10 @@ public sealed class ProjectDiscovery
                 detector.Visit(root);
 
                 detectedFeatures = detector.DetectedFeatures.ToList();
+                var namespaceFeature =
+                    CSharpToCalorConverter.GetNamespaceFeature(root);
+                if (namespaceFeature != null)
+                    detectedFeatures.Add(namespaceFeature);
 
                 // Check for unsupported features
                 foreach (var feature in detectedFeatures)
@@ -319,8 +347,99 @@ public sealed class ProjectDiscovery
             PotentialIssues = potentialIssues,
             EstimatedIssues = estimatedIssues,
             FileSizeBytes = fileInfo.Length,
-            SkipReason = skipReason
+            SkipReason = skipReason,
+            DeclaredNamespaceIdentities = declaredNamespaceIdentities,
+            PrimarySymbolIdentity = primarySymbolIdentity
         };
+    }
+
+    internal static void ResolveOutputPathCollisions(
+        IReadOnlyList<MigrationPlanEntry> entries)
+    {
+        var comparer = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        var used = new HashSet<string>(comparer);
+        foreach (var entry in entries.OrderBy(item => item.SourcePath, comparer))
+        {
+            var fullOutputPath = Path.GetFullPath(entry.OutputPath);
+            if (used.Add(fullOutputPath))
+                continue;
+
+            var directory = Path.GetDirectoryName(entry.OutputPath) ?? "";
+            var baseName = Path.GetFileNameWithoutExtension(entry.OutputPath);
+            var extension = Path.GetExtension(entry.OutputPath);
+            var qualifier = SanitizeOutputQualifier(
+                entry.PrimarySymbolIdentity
+                ?? entry.DeclaredNamespaceIdentities.FirstOrDefault()
+                ?? Path.GetFileNameWithoutExtension(entry.SourcePath));
+            var candidate = Path.Combine(
+                directory,
+                $"{baseName}.{qualifier}{extension}");
+            var suffix = 2;
+            while (!used.Add(Path.GetFullPath(candidate)))
+            {
+                candidate = Path.Combine(
+                    directory,
+                    $"{baseName}.{qualifier}.{suffix}{extension}");
+                suffix++;
+            }
+            entry.OutputPath = candidate;
+        }
+    }
+
+    private static string SanitizeOutputQualifier(string value)
+    {
+        var normalized = value.Replace("global::", "", StringComparison.Ordinal);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            builder.Append(char.IsLetterOrDigit(character) ? character : '_');
+        }
+        var result = builder.ToString().Trim('_');
+        if (string.IsNullOrEmpty(result))
+        {
+            var hash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(value)))[..8];
+            return $"symbol_{hash}";
+        }
+        return result.Length <= 80 ? result : result[..80];
+    }
+
+    private static string GetFullNamespaceIdentity(
+        BaseNamespaceDeclarationSyntax declaration)
+        => string.Join(
+            ".",
+            declaration.AncestorsAndSelf()
+                .OfType<BaseNamespaceDeclarationSyntax>()
+                .Select(item => item.Name.ToString().Replace("@", ""))
+                .Reverse());
+
+    private static string? GetDeclaredSymbolIdentity(
+        MemberDeclarationSyntax member)
+    {
+        var (name, arity) = member switch
+        {
+            TypeDeclarationSyntax type =>
+                (type.Identifier.Text, type.TypeParameterList?.Parameters.Count ?? 0),
+            EnumDeclarationSyntax @enum => (@enum.Identifier.Text, 0),
+            DelegateDeclarationSyntax @delegate =>
+                (@delegate.Identifier.Text,
+                    @delegate.TypeParameterList?.Parameters.Count ?? 0),
+            _ => (null, 0)
+        };
+        if (name == null)
+            return null;
+
+        var namespaceIdentity = string.Join(
+            ".",
+            member.Ancestors()
+                .OfType<BaseNamespaceDeclarationSyntax>()
+                .Select(item => item.Name.ToString().Replace("@", ""))
+                .Reverse());
+        return $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}" +
+               name +
+               (arity > 0 ? $"`{arity}" : "");
     }
 
     private Task<MigrationPlanEntry> AnalyzeCalorFileAsync(string filePath)

@@ -157,7 +157,7 @@ internal static class CompilationDriver
         // skip-ambiguous rule so emission and enforcement agree. Warm-skip
         // validity depends on this map: its hash participates in global
         // invalidation below.
-        IReadOnlyDictionary<string, string>? crossModuleMap = null;
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
         string? crossModuleMapHash = null;
         if (sources.Count > 1)
         {
@@ -429,12 +429,12 @@ internal static class CompilationDriver
 
     /// <summary>
     /// Pre-parses every input for its module name and public function names,
-    /// producing the bare-name → module map used for cross-module call
-    /// qualification (G3/#809). Files that fail to parse contribute nothing
-    /// (they fail properly in the main compile loop); ambiguous names are
-    /// dropped entirely.
+    /// producing the call-target → emitted namespace/static-class map used for
+    /// cross-module call qualification (G3/#809). Files that fail to parse
+    /// contribute nothing (they fail properly in the main compile loop);
+    /// ambiguous names are dropped entirely.
     /// </summary>
-    internal static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+    internal static IReadOnlyDictionary<string, CrossModuleFunctionTarget> BuildCrossModuleFunctionMap(
         IReadOnlyList<FileInfo> sources)
     {
         var modules = new List<ModuleNode>();
@@ -447,7 +447,7 @@ internal static class CompilationDriver
                 var lexer = new Parsing.Lexer(text, diagnostics);
                 var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
                 var module = parser.Parse();
-                if (module == null || string.IsNullOrEmpty(module.Name) || module.Name == "_global")
+                if (module == null)
                 {
                     continue;
                 }
@@ -466,49 +466,103 @@ internal static class CompilationDriver
     /// parsed modules. Editor validation uses this overload so it shares the
     /// driver's exact visibility and ambiguity rules without reparsing snapshots.
     /// </summary>
-    internal static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+    internal static IReadOnlyDictionary<string, CrossModuleFunctionTarget> BuildCrossModuleFunctionMap(
         IReadOnlyList<ModuleNode> modules)
+        => BuildFunctionTargetMap(
+            modules,
+            function => function.Visibility is Ast.Visibility.Public or Ast.Visibility.Internal);
+
+    /// <summary>
+    /// Builds the emitted target map for every function declared by one
+    /// <see cref="ModuleNode"/>, including private functions. Namespace scopes
+    /// split one Calor module into multiple generated static classes, but they
+    /// do not split the module's function visibility or binding scope.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, CrossModuleFunctionTarget>
+        BuildIntraModuleFunctionMap(ModuleNode module)
+        => BuildFunctionTargetMap([module], _ => true);
+
+    private static IReadOnlyDictionary<string, CrossModuleFunctionTarget>
+        BuildFunctionTargetMap(
+            IReadOnlyList<ModuleNode> modules,
+            Func<FunctionNode, bool> includeFunction)
     {
-        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var byName = new Dictionary<string, List<CrossModuleFunctionTarget>>(
+            StringComparer.Ordinal);
+        var byQualifiedName =
+            new Dictionary<string, List<CrossModuleFunctionTarget>>(
+                StringComparer.Ordinal);
         foreach (var module in modules)
         {
-            if (string.IsNullOrEmpty(module.Name) || module.Name == "_global")
-                continue;
-
             foreach (var fn in module.Functions)
             {
-                // Match CrossModuleEffectRegistry's surface exactly (public AND
-                // internal — #823 review M1): enforcement resolves internal
-                // cross-module calls, so emission must qualify them too, or the
-                // front-end passes and csc fails (the exact #809 shape).
-                if (fn.Visibility is not (Ast.Visibility.Public or Ast.Visibility.Internal))
+                if (!includeFunction(fn))
                     continue;
 
-                if (!byName.TryGetValue(fn.Name, out var definingModules))
+                var target = CrossModuleFunctionTarget.Create(module, fn);
+                if (target == null)
+                    continue;
+
+                var functionName = GetFunctionLookupName(fn.Name);
+                if (!byName.TryGetValue(functionName, out var definingTargets))
                 {
-                    definingModules = [];
-                    byName[fn.Name] = definingModules;
+                    definingTargets = [];
+                    byName[functionName] = definingTargets;
                 }
-                if (!definingModules.Contains(module.Name))
-                    definingModules.Add(module.Name);
+                if (!definingTargets.Contains(target))
+                    definingTargets.Add(target);
+
+                AddQualifiedTarget(module.Name);
+                AddQualifiedTarget(target.NamespaceIdentity);
+
+                void AddQualifiedTarget(string qualifier)
+                {
+                    if (string.IsNullOrEmpty(qualifier))
+                        return;
+
+                    var qualifiedName = $"{qualifier}.{functionName}";
+                    if (!byQualifiedName.TryGetValue(
+                            qualifiedName,
+                            out var qualifiedTargets))
+                    {
+                        qualifiedTargets = [];
+                        byQualifiedName[qualifiedName] = qualifiedTargets;
+                    }
+                    if (!qualifiedTargets.Contains(target))
+                        qualifiedTargets.Add(target);
+                }
             }
         }
 
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (name, definingModules) in byName)
+        var map = new Dictionary<string, CrossModuleFunctionTarget>(
+            StringComparer.Ordinal);
+        foreach (var (name, definingTargets) in byName)
         {
-            foreach (var module in definingModules)
-                map[$"{module}.{name}"] = module;
-            if (definingModules.Count == 1)
-                map[name] = definingModules[0];
+            if (definingTargets.Count == 1)
+                map[name] = definingTargets[0];
+        }
+        foreach (var (qualifiedName, targets) in byQualifiedName)
+        {
+            if (targets.Count == 1)
+                map[qualifiedName] = targets[0];
         }
         return map;
     }
 
-    internal static string ComputeCrossModuleMapHash(IReadOnlyDictionary<string, string> map)
+    private static string GetFunctionLookupName(string name)
+    {
+        var genericStart = name.LastIndexOf('<');
+        return genericStart > 0 && name.EndsWith('>')
+            ? name[..genericStart]
+            : name;
+    }
+
+    internal static string ComputeCrossModuleMapHash(
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget> map)
     {
         var canonical = string.Join(";", map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => $"{kv.Key}={kv.Value}"));
+            .Select(kv =>
+                $"{kv.Key}={kv.Value.ModuleName}|{kv.Value.NamespaceIdentity}|{kv.Value.ModuleClassName}"));
         var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes);
     }

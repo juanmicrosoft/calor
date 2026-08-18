@@ -11,7 +11,8 @@ public enum Visibility
     Protected,
     Internal,
     ProtectedInternal,
-    Public
+    Public,
+    PrivateProtected
 }
 
 /// <summary>

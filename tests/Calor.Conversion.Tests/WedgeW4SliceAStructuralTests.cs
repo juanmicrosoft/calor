@@ -98,19 +98,20 @@ public class WedgeW4SliceAStructuralTests
     // ==================================================================
 
     [Fact]
-    public void D2_Registry_Namespace_IsNotClaimedFull()
+    public void D2_Registry_DistinguishesNativeSingleScopeFromPartialTopology()
     {
-        // Namespace topology is flattened; the registry must not claim faithful
-        // namespace preservation.
-        Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("namespace"));
+        Assert.Equal(SupportLevel.Partial, FeatureSupport.GetSupportLevel("namespace"));
+        Assert.Equal(
+            SupportLevel.Full,
+            FeatureSupport.GetSupportLevel("namespace-single-scope"));
+        Assert.Equal(
+            SupportLevel.Partial,
+            FeatureSupport.GetSupportLevel("namespace-topology"));
     }
 
     [Fact]
-    public void D2_SameNameAcrossNamespaces_IsRefusedAsInterop_NotMerged()
+    public void D2_SameNameAcrossNamespaces_StaysNativeAndDistinct()
     {
-        // Two distinct `Foo` types in different namespaces would flatten into one
-        // module and collapse to a single identity — a silent merge that changes
-        // type identity. Both must be refused (preserved verbatim as §CSHARP).
         var csharp = """
             namespace A { public class Foo { public int V() => 1; } }
             namespace B { public class Foo { public int V() => 2; } }
@@ -120,16 +121,19 @@ public class WedgeW4SliceAStructuralTests
         Assert.True(result.Success);
         _output.WriteLine(result.CalorSource);
 
-        var collisionLosses = result.Context.Losses
-            .Where(l => l.Feature == "namespace-collision"
-                        && l.Kind == ConversionLossKind.InteropPreserved)
-            .ToList();
-
-        // Both same-named types escalate to interop (a counted loss) → non-native.
-        Assert.Equal(2, collisionLosses.Count);
-        Assert.Contains("§CSHARP", result.CalorSource);
-        // The native merged shape (a Calor class definition) must be gone.
-        Assert.DoesNotContain("§CL{", result.CalorSource);
+        Assert.Contains(
+            "namespace-topology",
+            result.Context.GetExplanation().PartialFeatures);
+        Assert.Empty(result.Context.Losses);
+        Assert.Equal(2, result.Ast!.Classes.Count);
+        Assert.Contains(
+            result.Ast.Classes,
+            type => type.FullyQualifiedSymbolIdentity == "global::A.Foo");
+        Assert.Contains(
+            result.Ast.Classes,
+            type => type.FullyQualifiedSymbolIdentity == "global::B.Foo");
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Contains("§CL{", result.CalorSource);
     }
 
     [Fact]

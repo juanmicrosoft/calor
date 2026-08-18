@@ -64,9 +64,11 @@ using/declaration path and includes an executable integer value oracle.
 - **Value assertions execute by manifest:** every `test.calr` exposes the
   parameterless public static method named by `runtimeEntryPoint`; the registry
   invokes it and compares its integer result with `runtimeExpectedInt`.
-- **Full means zero loss; Partial declares its losses:** Full fixtures permit no
-  conversion losses. Partial fixtures must list every expected and allowed loss
-  kind, execute the converted output, and reject drops or undeclared loss.
+- **Full means zero loss; Partial declares its scope:** Full fixtures permit no
+  conversion losses. Partial fixtures either list every expected and allowed
+  loss kind, or use empty loss lists plus `lossKindCertifiedAbsent` to prove a
+  fully faithful supported subset while the feature remains partial overall.
+  Both forms execute the converted output and reject drops or undeclared loss.
 - **Fixture-to-feature linkage is nominal**: nothing yet asserts `input.cs` actually exercises
   the promoted feature (a converter-ledger-touch check is the registered follow-up). Until it
   lands, a review of the fixture's content is part of reviewing the promotion PR.

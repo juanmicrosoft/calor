@@ -2,6 +2,29 @@ using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Ast;
 
+public enum NamespaceScopeKind
+{
+    Named,
+    Global
+}
+
+/// <summary>
+/// A lexical C# namespace declaration preserved during C# → Calor migration.
+/// Multiple declarations may have the same <see cref="FullName"/> while keeping
+/// distinct using scopes.
+/// </summary>
+public sealed record NamespaceScopeInfo(
+    string Id,
+    string Name,
+    string FullName,
+    string? ParentScopeId,
+    bool IsFileScoped,
+    TextSpan Span,
+    NamespaceScopeKind Kind = NamespaceScopeKind.Named)
+{
+    public bool IsGlobal => Kind == NamespaceScopeKind.Global;
+}
+
 /// <summary>
 /// Represents an Calor module declaration.
 /// §MODULE[id=xxx][name=xxx]
@@ -40,6 +63,8 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; }
     // Dependent Types: Indexed type definitions at module level
     public IReadOnlyList<IndexedTypeNode> IndexedTypes { get; }
+    // Lexical C# namespace declarations preserved during migration.
+    public IReadOnlyList<NamespaceScopeInfo> NamespaceScopes { get; }
 
     public ModuleNode(
         TextSpan span,
@@ -179,7 +204,8 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<IndexedTypeNode>? indexedTypes = null,
         IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null,
         TextSpan? identifierSpan = null,
-        IReadOnlyList<AstNode>? items = null)
+        IReadOnlyList<AstNode>? items = null,
+        IReadOnlyList<NamespaceScopeInfo>? namespaceScopes = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -203,6 +229,7 @@ public sealed class ModuleNode : AstNode
         IndexedTypes = indexedTypes ?? Array.Empty<IndexedTypeNode>();
         TypePreprocessorBlocks = typePreprocessorBlocks ?? Array.Empty<TypePreprocessorBlockNode>();
         Items = items ?? Array.Empty<AstNode>();
+        NamespaceScopes = namespaceScopes ?? Array.Empty<NamespaceScopeInfo>();
     }
 
     /// <summary>

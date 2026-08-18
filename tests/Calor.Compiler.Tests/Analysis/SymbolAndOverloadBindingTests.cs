@@ -279,8 +279,8 @@ public sealed class SymbolAndOverloadBindingTests
               §F{f1:Create:pub} () -> object
                 §R §NEW{Box<List<Widget>>} §/NEW
               §CL{c1:Widget:pub}
-              §CL{c2:List:pub}
-              §CL{c3:Box:pub}
+              §CL{c2:List:pub}<T>
+              §CL{c3:Box:pub}<T>
                 §FLD{i32:_dummy:priv}
             """;
 

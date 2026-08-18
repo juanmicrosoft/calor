@@ -48,6 +48,34 @@ public class DocumentStateTests
         Assert.True(state.Diagnostics.HasErrors);
     }
 
+    [Theory]
+    [InlineData("§NEW{}")]
+    [InlineData("§NEW{   }")]
+    [InlineData("§NEW{<i32>}")]
+    public void Reanalyze_MalformedNewType_PublishesDiagnosticWithoutThrowing(
+        string expression)
+    {
+        var source = $$"""
+            §M{m001:TestModule}
+              §F{f001:Make:pub} () -> object
+                §R {{expression}}
+            """;
+
+        DocumentState? state = null;
+        var exception = Record.Exception(
+            () => state = LspTestHarness.CreateDocument(source));
+
+        Assert.Null(exception);
+        Assert.NotNull(state);
+        var diagnostic = Assert.Single(
+            state.Diagnostics,
+            item => item.Code
+                    == Compiler.Diagnostics.DiagnosticCode.ExpectedTypeName);
+        Assert.Equal(
+            "§NEW requires a non-empty type name.",
+            diagnostic.Message);
+    }
+
     [Fact]
     public void Reanalyze_InteropConstruct_PublishesInfoSeverityUnsupported_NotError()
     {

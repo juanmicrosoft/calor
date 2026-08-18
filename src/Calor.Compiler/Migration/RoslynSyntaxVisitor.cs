@@ -27,17 +27,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly List<CSharpInteropBlockNode> _moduleInteropBlocks = new();
     private readonly List<CompilerDirectiveNode> _moduleCompilerDirectives = new();
     private readonly List<AstNode> _moduleItems = new();
+    private readonly List<NamespaceScopeInfo> _namespaceScopes = new();
     private List<CSharpInteropBlockNode>? _conditionalModuleInteropSink;
     private readonly List<TypePreprocessorBlockNode> _typePreprocessorBlocks = new();
     private bool _insideTypePreprocessorConversion;
     private bool _insideConditionalModuleRecovery;
     private bool _insideMemberPreprocessorRecovery;
 
-    // #769 (WS-W4 D2): bare type names declared by top-level types in two or more
-    // distinct namespaces within this file. Flattening every namespace into one
-    // module would collapse them to a single identity, so any type whose name is
-    // in this set is refused (escalated to §CSHARP interop) rather than merged.
-    private readonly HashSet<string> _crossNamespaceCollisionNames = new(StringComparer.Ordinal);
     private HashSet<string> _reassignedVariables = new();
     private readonly HashSet<int> _conditionalUsingDirectiveStarts = new();
     private readonly HashSet<int> _conditionalTypeDeclarationStarts = new();
@@ -113,6 +109,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _moduleInteropBlocks.Clear();
         _moduleCompilerDirectives.Clear();
         _moduleItems.Clear();
+        _namespaceScopes.Clear();
         _conditionalModuleInteropSink = null;
         _typePreprocessorBlocks.Clear();
         _conditionalUsingDirectiveStarts.Clear();
@@ -125,7 +122,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _preserveWholeCompilationUnitForConditionalTopLevel = false;
         _wholeCompilationUnitFeature = null;
         _wholeCompilationUnitReason = null;
-        _crossNamespaceCollisionNames.Clear();
         _reassignedVariables = CollectReassignedVariables(root);
         _parseOptions = (CSharpParseOptions)root.SyntaxTree.Options;
 
@@ -225,10 +221,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 items: [interop]);
         }
 
-        // #769 (WS-W4 D2): find bare type names shared by top-level types across
-        // two or more namespaces, so those types are refused (interop) instead of
-        // silently merged when the module flattens all namespaces.
-        ScanCrossNamespaceCollisions(root);
         _cancellationToken.ThrowIfCancellationRequested();
 
         // Recover complete module-level conditional groups before the ordinary
@@ -239,6 +231,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Visit all nodes
         Visit(root);
         PreserveModuleCompilerDirectives(root);
+        NormalizeNamespaceMetadata();
         if (_typePreprocessorBlocks.Count > 0 && _moduleItems.Count == 0)
             RebuildModuleItems();
 
@@ -263,6 +256,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 attributes: new AttributeCollection());
 
             functions.Add(mainFunction);
+            var namespaceIdentity = GetCurrentNamespaceIdentity();
+            var namespaceScopeId = GetCurrentNamespaceScopeId();
+            AssociateNamespace(
+                mainFunction,
+                namespaceIdentity,
+                namespaceScopeId,
+                $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}Main");
             if (_moduleItems.Count > 0)
                 _moduleItems.Add(mainFunction);
             _context.Stats.MethodsConverted++;
@@ -289,7 +289,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             refinementTypes: null,
             indexedTypes: null,
             typePreprocessorBlocks: _typePreprocessorBlocks.Count > 0 ? _typePreprocessorBlocks.ToList() : null,
-            items: _moduleItems.Count > 0 ? _moduleItems.ToList() : null);
+            items: _moduleItems.Count > 0 ? _moduleItems.ToList() : null,
+            namespaceScopes: _namespaceScopes.ToList());
     }
 
     private void AnalyzeUnsupportedConditionalPlacements(
@@ -741,6 +742,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (!_conditionalUsingDirectiveStarts.Contains(node.SpanStart)
             && TryConvertUsingDirective(node, GetTextSpan(node), out var usingNode))
         {
+            if (!usingNode.IsGlobal && _context.CurrentNamespace != null)
+            {
+                usingNode.NamespaceIdentity = _context.CurrentNamespace;
+                usingNode.NamespaceScopeId = _context.CurrentNamespaceScopeId;
+            }
             _usings.Add(usingNode);
         }
 
@@ -1414,7 +1420,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private void PreserveModuleCompilerDirectives(CompilationUnitSyntax root)
     {
-        var directives = GetDirectCompilerDirectives(root)
+        var directives = root.DescendantTrivia(descendIntoTrivia: true)
+            .Where(trivia => trivia.HasStructure)
+            .Select(trivia => trivia.GetStructure())
+            .OfType<DirectiveTriviaSyntax>()
+            .Where(IsPreservedCompilerDirective)
+            .Where(directive => GetDirectiveScope(directive) is
+                CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
             .Where(directive => !_conditionalModuleRanges.Any(range =>
                 directive.SpanStart >= range.Start
                 && directive.Span.End <= range.End))
@@ -1563,10 +1575,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var feature = GetCompilerDirectiveFeature(directive);
         var code = directive.ToFullString().TrimEnd('\r', '\n');
         RecordCompilerDirectivePreservation(directive, code);
-        return new CompilerDirectiveNode(
+        var node = new CompilerDirectiveNode(
             GetTextSpan(directive),
             code,
             feature);
+        var scope = _namespaceScopes
+            .Where(candidate =>
+                directive.SpanStart >= candidate.Span.Start
+                && directive.Span.End <= candidate.Span.End)
+            .OrderBy(candidate => candidate.Span.Length)
+            .FirstOrDefault();
+        if (scope != null)
+            AssociateNamespace(node, scope.FullName, scope.Id);
+        return node;
     }
 
     private static string GetCompilerDirectiveFeature(
@@ -1836,16 +1857,38 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitNamespaceDeclaration(NamespaceDeclarationSyntax node)
     {
-        _context.EnterNamespace(node.Name.ToString().Replace("@", ""));
-        base.VisitNamespaceDeclaration(node);
-        _context.ExitNamespace();
+        VisitNamespaceScope(node, isFileScoped: false);
     }
 
     public override void VisitFileScopedNamespaceDeclaration(FileScopedNamespaceDeclarationSyntax node)
     {
-        _context.EnterNamespace(node.Name.ToString().Replace("@", ""));
-        base.VisitFileScopedNamespaceDeclaration(node);
-        _context.ExitNamespace();
+        VisitNamespaceScope(node, isFileScoped: true);
+    }
+
+    private void VisitNamespaceScope(BaseNamespaceDeclarationSyntax node, bool isFileScoped)
+    {
+        var declaredName = node.Name.ToString().Replace("@", "");
+        var parentScopeId = _context.CurrentNamespaceScopeId;
+        var scopeId = _context.GenerateId("ns");
+        _context.EnterNamespace(declaredName, scopeId);
+        _namespaceScopes.Add(new NamespaceScopeInfo(
+            scopeId,
+            declaredName,
+            _context.CurrentNamespace!,
+            parentScopeId,
+            isFileScoped,
+            GetTextSpan(node)));
+        try
+        {
+            if (node is NamespaceDeclarationSyntax blockNamespace)
+                base.VisitNamespaceDeclaration(blockNamespace);
+            else
+                base.VisitFileScopedNamespaceDeclaration((FileScopedNamespaceDeclarationSyntax)node);
+        }
+        finally
+        {
+            _context.ExitNamespace();
+        }
     }
 
     public override void VisitGlobalStatement(GlobalStatementSyntax node)
@@ -1941,14 +1984,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Class))
-            return;
-
         _context.RecordFeatureUsage("interface");
         _context.EnterType(node.Identifier.Text);
         try
         {
             var interfaceNode = ConvertInterface(node);
+            AssociateTypeNamespace(interfaceNode);
             AttachDocComment(interfaceNode, node);
             _interfaces.Add(interfaceNode);
             _context.Stats.InterfacesConverted++;
@@ -2313,14 +2354,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Class))
-            return;
-
         _context.RecordFeatureUsage("class");
         _context.EnterType(node.Identifier.Text);
         try
         {
             var classNode = ConvertClass(node);
+            AssociateTypeNamespace(classNode);
             AttachDocComment(classNode, node);
             _classes.Add(classNode);
             _context.Stats.ClassesConverted++;
@@ -2378,6 +2417,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         try
         {
             var classNode = ConvertRecord(node);
+            AssociateTypeNamespace(classNode);
             AttachDocComment(classNode, node);
             _classes.Add(classNode);
             _context.Stats.ClassesConverted++;
@@ -2418,14 +2458,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Class))
-            return;
-
         _context.RecordFeatureUsage("struct");
         _context.EnterType(node.Identifier.Text);
         try
         {
             var classNode = ConvertStruct(node);
+            AssociateTypeNamespace(classNode);
             AttachDocComment(classNode, node);
             _classes.Add(classNode);
             _context.Stats.ClassesConverted++;
@@ -2477,9 +2515,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Other))
-            return;
-
         _context.RecordFeatureUsage("enum");
         try
         {
@@ -2517,6 +2552,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 csharpAttrs,
                 visibility);
 
+            AssociateTypeNamespace(enumNode);
             _enums.Add(enumNode);
             AttachDocComment(enumNode, node);
             _context.Stats.EnumsConverted++;
@@ -2559,9 +2595,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             throw EscalateExpression(node, "delegate-semantics");
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Other))
-            return;
-
         _context.RecordFeatureUsage("delegate");
         try
         {
@@ -2584,6 +2617,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 effects: null,
                 new AttributeCollection());
 
+            AssociateTypeNamespace(delegateNode);
             _delegates.Add(delegateNode);
             _context.IncrementConverted();
         }
@@ -4377,89 +4411,149 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return Array.Empty<StatementNode>();
     }
 
-    // ------------------------------------------------------------------
-    // #769 (WS-W4 D2): cross-namespace same-name refusal
-    // ------------------------------------------------------------------
+    private void AssociateTypeNamespace(TypeDefinitionNode node)
+        => AssociateTypeNamespace(
+            node,
+            GetCurrentNamespaceIdentity(),
+            GetCurrentNamespaceScopeId(),
+            containingIdentity: null);
 
-    /// <summary>
-    /// Populates <see cref="_crossNamespaceCollisionNames"/> with the identity keys
-    /// (bare name + generic arity) of top-level types declared in two or more
-    /// distinct namespaces. The module flattens every namespace into one unit, so
-    /// two such types would collapse to a single identity — a silent merge (#769).
-    /// Recording the key lets the type visitors refuse those types (escalate to
-    /// §CSHARP interop) instead of merging. Types with a unique key, or all in one
-    /// namespace, are not collisions. Generic arity is part of the key so
-    /// <c>A.Foo</c> and <c>B.Foo&lt;T&gt;</c> — distinct types that coexist fine —
-    /// are NOT treated as a collision.
-    /// </summary>
-    private void ScanCrossNamespaceCollisions(CompilationUnitSyntax root)
+    private static void AssociateTypeNamespace(
+        TypeDefinitionNode node,
+        string namespaceIdentity,
+        string namespaceScopeId,
+        string? containingIdentity)
     {
-        var namespacesByKey = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var member in root.DescendantNodes().OfType<MemberDeclarationSyntax>())
+        var arity = node switch
         {
-            if (member.Parent is not (BaseNamespaceDeclarationSyntax or CompilationUnitSyntax))
-                continue;
-
-            var key = TypeIdentityKey(member);
-            if (key == null)
-                continue;
-
-            // Full namespace path (outer→inner), so A.X.Foo and C.X.Foo are two
-            // distinct namespaces, not one — otherwise the innermost-name-only view
-            // would treat them as the same and miss the collision.
-            var ns = string.Join(".", member.Ancestors()
-                .OfType<BaseNamespaceDeclarationSyntax>()
-                .Select(n => n.Name.ToString())
-                .Reverse());
-            if (!namespacesByKey.TryGetValue(key, out var set))
-                namespacesByKey[key] = set = new HashSet<string>(StringComparer.Ordinal);
-            set.Add(ns);
-        }
-
-        foreach (var (key, namespaces) in namespacesByKey)
-        {
-            if (namespaces.Count >= 2)
-                _crossNamespaceCollisionNames.Add(key);
-        }
-    }
-
-    /// <summary>
-    /// The flatten-identity key for a top-level type/delegate declaration:
-    /// <c>Name`Arity</c>. Arity distinguishes <c>Foo</c> from <c>Foo&lt;T&gt;</c>,
-    /// which are separate types that never collide. Returns null for non-type
-    /// members.
-    /// </summary>
-    private static string? TypeIdentityKey(MemberDeclarationSyntax member)
-    {
-        var (name, arity) = member switch
-        {
-            TypeDeclarationSyntax t => (t.Identifier.Text, t.TypeParameterList?.Parameters.Count ?? 0),
-            EnumDeclarationSyntax e => (e.Identifier.Text, 0),
-            DelegateDeclarationSyntax d => (d.Identifier.Text, d.TypeParameterList?.Parameters.Count ?? 0),
-            _ => (null, 0),
+            ClassDefinitionNode cls => cls.TypeParameters.Count,
+            InterfaceDefinitionNode iface => iface.TypeParameters.Count,
+            _ => 0
         };
-        return name == null ? null : $"{name}`{arity}";
+        var suffix = arity > 0 ? $"`{arity}" : "";
+        var identity = containingIdentity != null
+            ? $"{containingIdentity}+{node.Name}{suffix}"
+            : $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}{node.Name}{suffix}";
+        AssociateNamespace(node, namespaceIdentity, namespaceScopeId, identity);
+
+        if (node is not ClassDefinitionNode classNode)
+            return;
+
+        foreach (var nested in classNode.NestedClasses)
+            AssociateTypeNamespace(nested, namespaceIdentity, namespaceScopeId, identity);
+        foreach (var nested in classNode.NestedInterfaces)
+            AssociateTypeNamespace(nested, namespaceIdentity, namespaceScopeId, identity);
+        foreach (var nested in classNode.NestedEnums)
+            AssociateTypeNamespace(nested, namespaceIdentity, namespaceScopeId, identity);
+        foreach (var nested in classNode.NestedDelegates)
+            AssociateTypeNamespace(nested, namespaceIdentity, namespaceScopeId, identity);
     }
 
-    /// <summary>
-    /// If <paramref name="node"/> is a top-level type whose identity (name + arity)
-    /// collides with a same-identity type in another namespace (#769), refuse to
-    /// flatten/merge it: preserve it verbatim as a §CSHARP interop block (a counted
-    /// loss, so the file is non-native) and return true. Returns false otherwise.
-    /// </summary>
-    private bool TryRefuseCrossNamespaceCollision(
-        MemberDeclarationSyntax node, InteropMemberKind kind)
+    private static void AssociateNamespace(
+        AstNode node,
+        string namespaceIdentity,
+        string namespaceScopeId,
+        string? symbolIdentity = null)
     {
-        var key = TypeIdentityKey(node);
-        if (key == null || !_crossNamespaceCollisionNames.Contains(key))
-            return false;
-        if (node.Parent is not (BaseNamespaceDeclarationSyntax or CompilationUnitSyntax))
-            return false;
-
-        _context.RecordFeatureUsage("namespace");
-        AddModuleInteropBlock(CreateInteropBlock(node, "namespace-collision", kind));
-        return true;
+        node.NamespaceIdentity = namespaceIdentity;
+        node.NamespaceScopeId = namespaceScopeId;
+        node.FullyQualifiedSymbolIdentity = symbolIdentity;
     }
+
+    private string GetCurrentNamespaceIdentity()
+        => _context.CurrentNamespace
+           ?? _context.ModuleName
+           ?? "";
+
+    private string GetCurrentNamespaceScopeId()
+        => _context.CurrentNamespaceScopeId
+           ?? "";
+
+    private void NormalizeNamespaceMetadata()
+    {
+        foreach (var block in _typePreprocessorBlocks)
+        {
+            var scope = _namespaceScopes
+                .Where(candidate =>
+                    block.Span.Start >= candidate.Span.Start
+                    && block.Span.End <= candidate.Span.End)
+                .OrderBy(candidate => candidate.Span.Length)
+                .FirstOrDefault();
+            if (scope == null)
+            {
+                if (ContainsConditionalTypes(block))
+                {
+                    AssociatePreprocessorNamespace(
+                        block,
+                        GetCurrentNamespaceIdentity(),
+                        GetCurrentNamespaceScopeId());
+                }
+                continue;
+            }
+            var namespaceIdentity = scope?.FullName ?? block.NamespaceIdentity ?? "";
+            var namespaceScopeId = scope?.Id ?? block.NamespaceScopeId ?? "";
+            AssociatePreprocessorNamespace(
+                block,
+                namespaceIdentity,
+                namespaceScopeId);
+        }
+    }
+
+    private static void AssociatePreprocessorNamespace(
+        TypePreprocessorBlockNode block,
+        string namespaceIdentity,
+        string namespaceScopeId)
+    {
+        AssociateNamespace(block, namespaceIdentity, namespaceScopeId);
+        foreach (var item in block.Items)
+        {
+            switch (item)
+            {
+                case TypeDefinitionNode type:
+                    AssociateTypeNamespace(
+                        type,
+                        namespaceIdentity,
+                        namespaceScopeId,
+                        containingIdentity: null);
+                    break;
+                case TypePreprocessorBlockNode nested:
+                    AssociatePreprocessorNamespace(
+                        nested,
+                        namespaceIdentity,
+                        namespaceScopeId);
+                    break;
+                case UsingDirectiveNode usingDirective
+                    when string.IsNullOrEmpty(namespaceIdentity):
+                    usingDirective.NamespaceIdentity = null;
+                    usingDirective.NamespaceScopeId = null;
+                    break;
+                default:
+                    AssociateNamespace(item, namespaceIdentity, namespaceScopeId);
+                    break;
+            }
+        }
+
+        if (block.ElseBranch != null)
+        {
+            AssociatePreprocessorNamespace(
+                block.ElseBranch,
+                namespaceIdentity,
+                namespaceScopeId);
+        }
+    }
+
+    private static bool ContainsConditionalTypes(TypePreprocessorBlockNode block)
+        => block.Classes.Count > 0
+           || block.Interfaces.Count > 0
+           || block.Enums.Count > 0
+           || block.Delegates.Count > 0
+           || block.InteropBlocks.Any(interop =>
+               !interop.CSharpCode.TrimStart().StartsWith(
+                   "#",
+                   StringComparison.Ordinal))
+           || block.NestedBlocks.Any(ContainsConditionalTypes)
+           || block.ElseBranch != null
+           && ContainsConditionalTypes(block.ElseBranch);
 
     /// <summary>
     /// A single branch within a preprocessor region (#if, #elif, or #else).
@@ -5844,6 +5938,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var ppNode = BuildTypePreprocessorNode(span, condition,
             activeClasses, activeInterfaces, activeEnums, activeDelegates, branches);
 
+        AssociatePreprocessorNamespace(
+            ppNode,
+            GetCurrentNamespaceIdentity(),
+            GetCurrentNamespaceScopeId());
         _typePreprocessorBlocks.Add(ppNode);
     }
 
@@ -6008,7 +6106,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         namespaceName,
                         alias,
                         isStatic,
-                        isGlobal));
+                        isGlobal,
+                        isGlobal ? null : _context.CurrentNamespace,
+                        isGlobal ? null : _context.CurrentNamespaceScopeId));
                 }
             }
 
@@ -12038,6 +12138,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (modifiers.Any(SyntaxKind.PublicKeyword))
             return Visibility.Public;
         // Check compound modifiers before individual ones
+        if (modifiers.Any(SyntaxKind.PrivateKeyword) && modifiers.Any(SyntaxKind.ProtectedKeyword))
+            return Visibility.PrivateProtected;
         if (modifiers.Any(SyntaxKind.ProtectedKeyword) && modifiers.Any(SyntaxKind.InternalKeyword))
             return Visibility.ProtectedInternal;
         if (modifiers.Any(SyntaxKind.InternalKeyword))
@@ -12052,6 +12154,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (modifiers.Any(SyntaxKind.PublicKeyword))
             return Visibility.Public;
         // Check compound modifiers before individual ones
+        if (modifiers.Any(SyntaxKind.PrivateKeyword) && modifiers.Any(SyntaxKind.ProtectedKeyword))
+            return Visibility.PrivateProtected;
         if (modifiers.Any(SyntaxKind.ProtectedKeyword) && modifiers.Any(SyntaxKind.InternalKeyword))
             return Visibility.ProtectedInternal;
         if (modifiers.Any(SyntaxKind.InternalKeyword))
@@ -12688,12 +12792,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
             $"{kind} preserved as §CSHARP interop: {TruncateForMessage(node.ToString())}", line);
 
-        return new CSharpInteropBlockNode(
+        var block = new CSharpInteropBlockNode(
             GetTextSpan(node),
             sourceCode,
             featureName,
             reason,
             kind);
+        var namespaceIdentity = GetCurrentNamespaceIdentity();
+        var namespaceScopeId = GetCurrentNamespaceScopeId();
+        AssociateNamespace(
+            block,
+            namespaceIdentity,
+            namespaceScopeId,
+            GetSyntaxSymbolIdentity(node, namespaceIdentity));
+        return block;
     }
 
     private static bool HasConditionalTrivia(SyntaxNode node)
@@ -12727,6 +12839,44 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return base.VisitTrivia(trivia);
         }
     }
+
+    private static string? GetSyntaxSymbolIdentity(
+        SyntaxNode node,
+        string namespaceIdentity)
+    {
+        if (node is not MemberDeclarationSyntax member)
+            return null;
+
+        var declaredParts = member.AncestorsAndSelf()
+            .OfType<MemberDeclarationSyntax>()
+            .Reverse()
+            .Select(GetDeclaredTypeIdentityPart)
+            .Where(part => part != null)
+            .Cast<string>()
+            .ToArray();
+        if (declaredParts.Length == 0)
+            return null;
+
+        return $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}" +
+               string.Join("+", declaredParts);
+    }
+
+    private static string? GetDeclaredTypeIdentityPart(MemberDeclarationSyntax member)
+        => member switch
+        {
+            TypeDeclarationSyntax type =>
+                type.Identifier.Text +
+                (type.TypeParameterList?.Parameters.Count > 0
+                    ? $"`{type.TypeParameterList.Parameters.Count}"
+                    : ""),
+            EnumDeclarationSyntax @enum => @enum.Identifier.Text,
+            DelegateDeclarationSyntax @delegate =>
+                @delegate.Identifier.Text +
+                (@delegate.TypeParameterList?.Parameters.Count > 0
+                    ? $"`{@delegate.TypeParameterList.Parameters.Count}"
+                    : ""),
+            _ => null
+        };
 
     /// <summary>
     /// Heuristic to determine if an expression looks like an event target.

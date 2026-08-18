@@ -1,0 +1,6 @@
+{
+  "featureKey": "namespace-single-scope",
+  "lossKindCertifiedAbsent": null,
+  "runtimeEntryPoint": "Get",
+  "runtimeExpectedInt": 42
+}

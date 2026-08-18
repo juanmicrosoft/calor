@@ -1,0 +1,9 @@
+{
+  "featureKey": "namespace-topology",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "supportLevel": "Partial",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Get",
+  "runtimeExpectedInt": 42
+}

@@ -70,13 +70,8 @@ public class PostValidationFallbackTests
     }
 
     [Fact]
-    public void CrossNamespaceSameNameCollision_IsRefusedUpFront_NoDuplication()
+    public void CrossNamespaceSameNameTypes_RemainNativeAndDistinct()
     {
-        // Two distinct classes both named Foo in different namespaces would flatten
-        // into one module and collapse to a single identity (#769 / WS-W4 D2). The
-        // converter now refuses that merge up front: BOTH are preserved verbatim as
-        // §CSHARP interop (one block each — no duplication, no CS0101), before the
-        // native conversion or the #717 post-validation rewrap is ever reached.
         const string src =
             "namespace N1 { public class Foo { public int A() => 1; } } " +
             "namespace N2 { public class Foo { public int B() => 2; } }";
@@ -85,19 +80,17 @@ public class PostValidationFallbackTests
         var result = converter.Convert(src);
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
-        Assert.Equal(2, result.Context!.Stats.InteropBlocksEmitted);
-
-        // Each variant's body survives exactly once; neither is dragged into the
-        // other's block nor merged into a native class.
-        Assert.DoesNotContain("§CL", result.CalorSource!);
-        Assert.Single(Regex.Matches(result.CalorSource!, Regex.Escape("public int A() => 1;")));
-        Assert.Single(Regex.Matches(result.CalorSource!, Regex.Escape("public int B() => 2;")));
-
-        var collisionLosses = result.Context.Losses
-            .Where(l => l.Feature == "namespace-collision"
-                        && l.Kind == ConversionLossKind.InteropPreserved)
-            .ToList();
-        Assert.Equal(2, collisionLosses.Count);
+        Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
+        Assert.Equal(2, result.Ast!.Classes.Count);
+        Assert.Contains("§CL", result.CalorSource!);
+        var compiled = Program.Compile(result.CalorSource!);
+        Assert.False(
+            compiled.HasErrors,
+            string.Join("; ", compiled.Diagnostics.Errors.Select(error => error.Message)));
+        Assert.Contains("namespace N1", compiled.GeneratedCode);
+        Assert.Contains("namespace N2", compiled.GeneratedCode);
+        Assert.Single(Regex.Matches(compiled.GeneratedCode!, "int A\\("));
+        Assert.Single(Regex.Matches(compiled.GeneratedCode!, "int B\\("));
     }
 
     [Fact]

@@ -148,16 +148,27 @@ public class DS15FixtureRegistryTests
         }
         else
         {
-            Assert.NotEmpty(
-                expectedLosses);
-            Assert.NotEmpty(
-                allowedLosses);
-            Assert.Subset(
-                allowedLosses,
-                actualLosses);
-            Assert.Subset(
-                actualLosses,
-                expectedLosses);
+            if (expectedLosses.Count == 0
+                && allowedLosses.Count == 0)
+            {
+                Assert.NotEqual(
+                    JsonValueKind.Null,
+                    certifiedAbsent.ValueKind);
+                Assert.Empty(converted.Losses);
+            }
+            else
+            {
+                Assert.NotEmpty(
+                    expectedLosses);
+                Assert.NotEmpty(
+                    allowedLosses);
+                Assert.Subset(
+                    allowedLosses,
+                    actualLosses);
+                Assert.Subset(
+                    actualLosses,
+                    expectedLosses);
+            }
             Assert.DoesNotContain(
                 converted.Losses,
                 loss => loss.Kind is

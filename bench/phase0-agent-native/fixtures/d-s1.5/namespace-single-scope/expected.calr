@@ -1,0 +1,7 @@
+§M{m001:Fixture}
+  §NS{ns001:SingleScope}
+    §CL{c002:Value:pub:stat}
+      §MT{m003:Get:pub:stat} () -> i32
+        §R 42
+
+

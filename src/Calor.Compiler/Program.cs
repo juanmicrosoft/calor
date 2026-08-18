@@ -1168,13 +1168,18 @@ public sealed class CompilationOptions
     public bool Verbose { get; init; }
 
     /// <summary>
-    /// Bare public function name → defining module name, for cross-module call
-    /// qualification at emission (G3/#809). Built by the multi-file driver from
-    /// a pre-parse of all inputs; unambiguous names only. Settable (not init)
+    /// Bare or explicit function target → actual emitted namespace/static-class
+    /// container, for cross-module call qualification at emission (G3/#809).
+    /// Built by the multi-file driver from a pre-parse of all inputs;
+    /// unambiguous targets only. Settable (not init)
     /// because the driver constructs per-file options via a factory and applies
     /// the shared map afterward.
     /// </summary>
-    public IReadOnlyDictionary<string, string>? CrossModuleFunctionModules { get; set; }
+    public IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules
+    {
+        get;
+        set;
+    }
 
     /// <summary>
     /// Writer for verbose/status messages emitted during compilation phases.

@@ -3952,7 +3952,7 @@ public class Test
     }
 
     [Fact]
-    public async Task ProjectMigration_DetectsParallelCsCsxOutputCollisionBeforeWrites()
+    public async Task ProjectMigration_ResolvesParallelCsCsxOutputCollisionBeforeWrites()
     {
         var directory = Path.Combine(
             TestArtifactsRoot(),
@@ -3979,6 +3979,11 @@ public class Test
             Assert.Equal(
                 2,
                 plan.Entries.Count);
+            Assert.Equal(
+                2,
+                plan.Entries.Select(entry => entry.OutputPath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count());
 
             var report = await migrator.ExecuteAsync(plan);
 
@@ -3987,12 +3992,14 @@ public class Test
                 report.FileResults,
                 result =>
                 {
-                    Assert.Equal(FileMigrationStatus.Failed, result.Status);
-                    Assert.Contains(
+                    Assert.NotEqual(FileMigrationStatus.Failed, result.Status);
+                    Assert.DoesNotContain(
                         result.Issues,
                         issue => issue.Feature == "migration-output-collision");
                 });
-            Assert.False(File.Exists(Path.Combine(directory, "Foo.calr")));
+            Assert.All(
+                plan.Entries,
+                entry => Assert.True(File.Exists(entry.OutputPath)));
         }
         finally
         {

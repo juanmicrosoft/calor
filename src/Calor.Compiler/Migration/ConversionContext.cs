@@ -260,6 +260,7 @@ public sealed class ConversionContext
     private readonly List<ConversionLoss> _losses = new();
     private readonly HashSet<string> _usedFeatures = new();
     private readonly Stack<string> _scopeStack = new();
+    private readonly Stack<(string FullName, string ScopeId)> _namespaceStack = new();
     private readonly Dictionary<string, List<UnsupportedFeatureInstance>> _unsupportedFeatures = new();
     private int _idCounter = 0;
 
@@ -337,6 +338,11 @@ public sealed class ConversionContext
     /// Current namespace being processed.
     /// </summary>
     public string? CurrentNamespace { get; private set; }
+
+    /// <summary>
+    /// Current lexical namespace declaration identity.
+    /// </summary>
+    public string? CurrentNamespaceScopeId { get; private set; }
 
     /// <summary>
     /// Current type being processed.
@@ -463,10 +469,15 @@ public sealed class ConversionContext
     /// <summary>
     /// Enters a new namespace scope.
     /// </summary>
-    public void EnterNamespace(string namespaceName)
+    public void EnterNamespace(string namespaceName, string scopeId)
     {
-        CurrentNamespace = namespaceName;
-        _scopeStack.Push($"namespace:{namespaceName}");
+        var fullName = string.IsNullOrEmpty(CurrentNamespace)
+            ? namespaceName
+            : $"{CurrentNamespace}.{namespaceName}";
+        _namespaceStack.Push((fullName, scopeId));
+        CurrentNamespace = fullName;
+        CurrentNamespaceScopeId = scopeId;
+        _scopeStack.Push($"namespace:{fullName}");
     }
 
     /// <summary>
@@ -477,10 +488,14 @@ public sealed class ConversionContext
         if (_scopeStack.Count > 0 && _scopeStack.Peek().StartsWith("namespace:"))
         {
             _scopeStack.Pop();
-            CurrentNamespace = _scopeStack
-                .Where(s => s.StartsWith("namespace:"))
-                .Select(s => s["namespace:".Length..])
-                .FirstOrDefault();
+            if (_namespaceStack.Count > 0)
+                _namespaceStack.Pop();
+            CurrentNamespace = _namespaceStack.Count > 0
+                ? _namespaceStack.Peek().FullName
+                : null;
+            CurrentNamespaceScopeId = _namespaceStack.Count > 0
+                ? _namespaceStack.Peek().ScopeId
+                : null;
         }
     }
 
@@ -700,6 +715,8 @@ public sealed class ConversionContext
         _unsupportedFeatures.Clear();
         _idCounter = 0;
         CurrentNamespace = null;
+        CurrentNamespaceScopeId = null;
+        _namespaceStack.Clear();
         CurrentTypeName = null;
         CurrentMethodName = null;
         Stats.TotalNodes = 0;

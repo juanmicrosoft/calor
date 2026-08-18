@@ -605,8 +605,7 @@ public class Issue766DeclarationModuleSemanticsTests
                 "internal delegate int HiddenHandler",
                 StringComparison.Ordinal));
         var assembly = CompileAssembly(CompileConvertedCalor(conversion));
-        var delegateType = assembly.GetType(
-            "DelegateSemantics.HiddenHandler")
+        var delegateType = assembly.GetType("HiddenHandler")
             ?? throw new InvalidOperationException("HiddenHandler missing");
         Assert.True(delegateType.IsNotPublic);
         Assert.NotNull(delegateType.GetCustomAttribute<ObsoleteAttribute>());
