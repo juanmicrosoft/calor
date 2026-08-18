@@ -349,9 +349,11 @@ These rules ensure that objects of derived classes can substitute for objects of
 | Modifier | Syntax | Inherited Access |
 |----------|--------|------------------|
 | Public | `pub` | Accessible everywhere |
-| Protected | `pro` | Accessible in derived classes |
-| Private | `pri` | Not accessible in derived classes |
+| Protected internal | `prot-int` | Accessible in derived classes or the same assembly |
 | Internal | `int` | Accessible in same assembly |
+| Protected | `prot` | Accessible in derived classes |
+| Private protected | `priv-prot` | Accessible in derived classes in the same assembly |
+| Private | `pri` | Not accessible in derived classes |
 
 ### 6.2 Method Visibility Rules
 

@@ -1,3 +1,6 @@
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -165,6 +168,67 @@ public class CliMultiFileTests : IDisposable
     }
 
     [Fact]
+    public void MultiFile_GlobalAmbiguityFallsBackToCurrentTopologyMap()
+    {
+        var topologyPath = Path.Combine(_tempDir, "topology.calr");
+        var unrelatedPath = Path.Combine(_tempDir, "unrelated.calr");
+        File.WriteAllText(topologyPath, """
+            §M{m001:Topology}
+              §NS{ns1:Alpha}
+                §F{f001:Foo:pub} () -> i32
+                  §R INT:41
+              §NS{ns2:Beta}
+                §F{f002:Caller:pub} () -> i32
+                  §R §C{Foo}
+            """);
+        File.WriteAllText(unrelatedPath, """
+            §M{m002:Unrelated}
+              §F{f003:Foo:pub} () -> i32
+                §R INT:99
+            """);
+
+        var files = new[]
+        {
+            new FileInfo(topologyPath),
+            new FileInfo(unrelatedPath),
+        };
+        var globalMap = CompilationDriver.BuildCrossModuleFunctionMap(files);
+        Assert.False(globalMap.ContainsKey("Foo"));
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(
+            new Lexer(
+                File.ReadAllText(topologyPath),
+                diagnostics).TokenizeAllForParser(),
+            diagnostics).Parse();
+        var localMap = CompilationDriver.BuildCrossModuleFunctionMap([module]);
+        Assert.Equal("Alpha", localMap["Foo"].NamespaceIdentity);
+        var directEmitter = new CSharpEmitter
+        {
+            CrossModuleFunctionModules = globalMap,
+        };
+        Assert.Contains(
+            "global::Alpha.AlphaModule.Foo()",
+            directEmitter.Emit(module));
+
+        var (exit, stdOut, stdErr) = RunCli(
+            "--input",
+            topologyPath,
+            "--input",
+            unrelatedPath,
+            "--no-enforce-effects");
+
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+        var emitted = File.ReadAllText(
+            Path.Combine(_tempDir, "topology.g.cs"));
+        Assert.Contains(
+            "global::Alpha.AlphaModule.Foo()",
+            emitted);
+        Assert.DoesNotContain(
+            "global::Unrelated.UnrelatedModule.Foo()",
+            emitted);
+    }
+
+    [Fact]
     public void MultiFile_ExplicitCallRemainsQualifiedWhenBareNameIsAmbiguous()
     {
         var alphaPath = Path.Combine(_tempDir, "alpha.calr");
@@ -187,8 +251,8 @@ public class CliMultiFileTests : IDisposable
             """);
         var map = CompilationDriver.BuildCrossModuleFunctionMap(
             [new FileInfo(alphaPath), new FileInfo(betaPath), new FileInfo(consumerPath)]);
-        Assert.Equal("Alpha", map["Alpha.Emit"]);
-        Assert.Equal("Beta", map["Beta.Emit"]);
+        Assert.Equal("Alpha", map["Alpha.Emit"].NamespaceIdentity);
+        Assert.Equal("Beta", map["Beta.Emit"].NamespaceIdentity);
 
         var (exit, stdOut, stdErr) = RunCli(
             "--input", alphaPath, "--input", betaPath, "--input", consumerPath,

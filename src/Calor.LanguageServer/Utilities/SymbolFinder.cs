@@ -1228,7 +1228,10 @@ public static class TypeReferenceIndex
         ISet<SymbolId> incompleteSymbolIds)
     {
         var resolvedType = reference.ResolvedType
-            ?? ResolveTypeSymbol(reference.Name, typeSymbols);
+            ?? ResolveTypeSymbol(
+                reference.Name,
+                typeSymbols,
+                reference.TypeArguments.Count);
         if (resolvedType is { Id.IsNone: false }
             && reference.Span.Length > 0
             && reference.Span.Start >= 0
@@ -1257,26 +1260,44 @@ public static class TypeReferenceIndex
 
     private static TypeSymbol? ResolveTypeSymbol(
         string typeName,
-        IReadOnlyList<TypeSymbol> typeSymbols)
+        IReadOnlyList<TypeSymbol> typeSymbols,
+        int? explicitArity = null)
     {
-        var name = typeName.Trim().TrimStart('?').TrimEnd('?', '*');
-        var generic = name.IndexOf('<');
-        if (generic > 0)
-            name = name[..generic];
-        var array = name.IndexOf('[');
-        if (array > 0)
-            name = name[..array];
+        if (!TryGetLookupName(typeName, explicitArity, out var lookupName))
+            return null;
 
-        var matches = name.Contains('.', StringComparison.Ordinal)
+        var simpleLookupName = lookupName[
+            (lookupName.LastIndexOf('.') + 1)..];
+        var matches = lookupName.Contains('.', StringComparison.Ordinal)
             ? typeSymbols.Where(symbol =>
-                string.Equals(symbol.QualifiedName, name, StringComparison.Ordinal)
+                string.Equals(
+                    symbol.QualifiedName,
+                    lookupName,
+                    StringComparison.Ordinal)
                 || symbol.QualifiedName.EndsWith(
-                    "." + name,
+                    "." + lookupName,
                     StringComparison.Ordinal))
             : typeSymbols.Where(symbol =>
-                string.Equals(symbol.Name, name, StringComparison.Ordinal));
+                string.Equals(
+                    symbol.QualifiedName[
+                        (symbol.QualifiedName.LastIndexOf('.') + 1)..],
+                    simpleLookupName,
+                    StringComparison.Ordinal));
         var resolved = matches.Take(2).ToArray();
         return resolved.Length == 1 ? resolved[0] : null;
+    }
+
+    private static bool TryGetLookupName(
+        string? typeName,
+        int? explicitArity,
+        out string lookupName)
+    {
+        lookupName = string.Empty;
+        if (string.IsNullOrWhiteSpace(typeName))
+            return false;
+
+        lookupName = TypeIdentity.ToLookupName(typeName, explicitArity);
+        return true;
     }
 
     private static TypeSymbol? ResolveTypeSymbol(

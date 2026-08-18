@@ -168,6 +168,83 @@ public static class SymbolSourceIdentity
 /// </summary>
 public static class TypeIdentity
 {
+    /// <summary>
+    /// Produces the metadata-style lookup identity used for declared generic
+    /// types while preserving namespace and nested-type qualification.
+    /// Constructed spellings such as <c>Alpha.Outer&lt;T&gt;.Inner&lt;U,V&gt;</c>
+    /// become <c>Alpha.Outer`1.Inner`2</c>. An explicit arity applies to the
+    /// final type segment when the caller stores generic arguments separately.
+    /// </summary>
+    public static string ToLookupName(string typeName, int? explicitArity = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+        var type = StripLookupDecorators(typeName.Trim());
+        const string globalPrefix = "global::";
+        if (type.StartsWith(globalPrefix, StringComparison.Ordinal))
+            type = type[globalPrefix.Length..];
+
+        var builder = new System.Text.StringBuilder(type.Length);
+        for (var index = 0; index < type.Length;)
+        {
+            if (type[index] != '<')
+            {
+                if (!char.IsWhiteSpace(type[index]))
+                    builder.Append(type[index]);
+                index++;
+                continue;
+            }
+
+            var depth = 0;
+            var arity = 1;
+            var close = -1;
+            for (var nested = index + 1; nested < type.Length; nested++)
+            {
+                switch (type[nested])
+                {
+                    case '<':
+                        depth++;
+                        break;
+                    case '>':
+                        if (depth == 0)
+                        {
+                            close = nested;
+                        }
+                        else
+                        {
+                            depth--;
+                        }
+                        break;
+                    case ',' when depth == 0:
+                        arity++;
+                        break;
+                }
+
+                if (close >= 0)
+                    break;
+            }
+
+            if (close < 0)
+            {
+                builder.Append(type[index..]);
+                break;
+            }
+
+            builder.Append('`').Append(arity);
+            index = close + 1;
+        }
+
+        var lookupName = builder.ToString();
+        if (explicitArity is > 0)
+        {
+            var finalSeparator = lookupName.LastIndexOf('.');
+            var finalSegment = lookupName[(finalSeparator + 1)..];
+            if (!finalSegment.Contains('`'))
+                lookupName += $"`{explicitArity.Value}";
+        }
+
+        return lookupName;
+    }
+
     public static bool TryUnwrapOptionOrNullable(string typeName, out string elementType)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
@@ -203,6 +280,35 @@ public static class TypeIdentity
 
         elementType = string.Empty;
         return false;
+    }
+
+    private static string StripLookupDecorators(string type)
+    {
+        while (type.StartsWith('?') && type.Length > 1)
+            type = type[1..].TrimStart();
+
+        while (type.Length > 1)
+        {
+            if (type.EndsWith('?') || type.EndsWith('*'))
+            {
+                type = type[..^1].TrimEnd();
+                continue;
+            }
+
+            if (!type.EndsWith(']'))
+                break;
+
+            var openBracket = type.LastIndexOf('[');
+            if (openBracket <= 0
+                || type[(openBracket + 1)..^1].Any(character => character != ','))
+            {
+                break;
+            }
+
+            type = type[..openBracket].TrimEnd();
+        }
+
+        return type;
     }
 
     public static string Canonicalize(string typeName)

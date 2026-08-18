@@ -1,6 +1,7 @@
 using System.Text;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
@@ -148,54 +149,36 @@ public sealed class ReviewPacketBuilder
     }
 
     /// <summary>
-    /// Builds the bare-name → defining-module map from the in-memory sources,
-    /// matching <c>CompilationDriver.BuildCrossModuleFunctionMap</c>'s rule
-    /// exactly (public AND internal functions; ambiguous names dropped). The
+    /// Builds the call-target → emitted namespace/static-class map from the
+    /// in-memory sources, matching
+    /// <c>CompilationDriver.BuildCrossModuleFunctionMap</c>'s rule exactly
+    /// (public AND internal functions; ambiguous names dropped). The
     /// driver's helper reads from disk — the packet builder's inputs may not
     /// exist on disk (tests, editor buffers), so the map is built from the
     /// sources it already holds.
     /// </summary>
-    private static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+    private static IReadOnlyDictionary<string, CrossModuleFunctionTarget> BuildCrossModuleFunctionMap(
         IReadOnlyList<InputFile> files)
     {
-        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var modules = new List<ModuleNode>();
         foreach (var file in files)
         {
             var diagnostics = new DiagnosticBag();
-            ModuleNode? module;
             try
             {
                 var lexer = new Parsing.Lexer(file.Source, diagnostics);
                 var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
-                module = parser.Parse();
+                var module = parser.Parse();
+                if (module != null)
+                    modules.Add(module);
             }
             catch (Exception)
             {
                 // Pre-parse is best-effort; the real compile reports errors.
-                continue;
-            }
-
-            if (module is null || string.IsNullOrEmpty(module.Name) || module.Name == "_global")
-                continue;
-
-            foreach (var fn in module.Functions)
-            {
-                if (fn.Visibility is not (Visibility.Public or Visibility.Internal))
-                    continue;
-                if (!byName.TryGetValue(fn.Name, out var modules))
-                    byName[fn.Name] = modules = [];
-                if (!modules.Contains(module.Name))
-                    modules.Add(module.Name);
             }
         }
 
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (name, modules) in byName)
-        {
-            if (modules.Count == 1)
-                map[name] = modules[0];
-        }
-        return map;
+        return CompilationDriver.BuildCrossModuleFunctionMap(modules);
     }
 
     // ------------------------------------------------------------------

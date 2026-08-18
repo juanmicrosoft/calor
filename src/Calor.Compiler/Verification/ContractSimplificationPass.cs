@@ -78,7 +78,7 @@ public sealed class ContractSimplificationPass
         // the previous overload silently dropped EnumExtensions, InteropBlocks,
         // RefinementTypes, IndexedTypes, and TypePreprocessorBlocks whenever any
         // contract simplified.
-        return new ModuleNode(
+        return module.CopyMetadataTo(new ModuleNode(
             module.Span,
             module.Id,
             module.Name,
@@ -99,7 +99,8 @@ public sealed class ContractSimplificationPass
             module.RefinementTypes,
             module.IndexedTypes,
             module.TypePreprocessorBlocks,
-            module.IdentifierSpan);
+            module.IdentifierSpan,
+            module.NamespaceScopes));
     }
 
     private FunctionNode SimplifyFunction(FunctionNode function)
@@ -120,7 +121,7 @@ public sealed class ContractSimplificationPass
             return function;
         }
 
-        return new FunctionNode(
+        return function.CopyMetadataTo(new FunctionNode(
             function.Span,
             function.Id,
             function.Name,
@@ -146,7 +147,8 @@ public sealed class ContractSimplificationPass
             function.Lock,
             function.Author,
             function.TaskRef,
-            function.IsAsync);
+            function.IsAsync,
+            function.IdentifierSpan));
     }
 
     private ClassDefinitionNode SimplifyClass(ClassDefinitionNode cls)
@@ -169,7 +171,7 @@ public sealed class ContractSimplificationPass
             return cls;
         }
 
-        return new ClassDefinitionNode(
+        return cls.CopyMetadataTo(new ClassDefinitionNode(
             cls.Span,
             cls.Id,
             cls.Name,
@@ -197,7 +199,10 @@ public sealed class ContractSimplificationPass
             cls.NestedInterfaces,
             cls.NestedEnums,
             cls.Indexers,
-            cls.NestedDelegates);
+            cls.NestedDelegates,
+            cls.IdentifierSpan,
+            cls.BaseClassSpan,
+            cls.ImplementedInterfaceSpans));
     }
 
     private InterfaceDefinitionNode SimplifyInterface(InterfaceDefinitionNode iface)
@@ -223,7 +228,7 @@ public sealed class ContractSimplificationPass
         // W1 Slice 1 (#781 preservation half): the 8-arg overload defaulted
         // Properties/Indexers to empty — simplifying an interface's method
         // contracts silently deleted its property and indexer members.
-        return new InterfaceDefinitionNode(
+        return iface.CopyMetadataTo(new InterfaceDefinitionNode(
             iface.Span,
             iface.Id,
             iface.Name,
@@ -233,7 +238,9 @@ public sealed class ContractSimplificationPass
             iface.Properties,
             iface.Attributes,
             iface.CSharpAttributes,
-            iface.Indexers);
+            iface.Indexers,
+            iface.BaseInterfaceSpans,
+            iface.IdentifierSpan));
     }
 
     private MethodNode SimplifyMethod(MethodNode method)
@@ -254,7 +261,7 @@ public sealed class ContractSimplificationPass
             return method;
         }
 
-        return new MethodNode(
+        return method.CopyMetadataTo(new MethodNode(
             method.Span,
             method.Id,
             method.Name,
@@ -269,7 +276,8 @@ public sealed class ContractSimplificationPass
             method.Body,
             method.Attributes,
             method.CSharpAttributes,
-            method.IsAsync);
+            method.IsAsync,
+            method.IdentifierSpan));
     }
 
     private MethodSignatureNode SimplifyMethodSignature(MethodSignatureNode method)
@@ -290,7 +298,7 @@ public sealed class ContractSimplificationPass
             return method;
         }
 
-        return new MethodSignatureNode(
+        return method.CopyMetadataTo(new MethodSignatureNode(
             method.Span,
             method.Id,
             method.Name,
@@ -301,7 +309,7 @@ public sealed class ContractSimplificationPass
             simplifiedPreconditions,
             simplifiedPostconditions,
             method.Attributes,
-            method.CSharpAttributes);
+            method.CSharpAttributes));
     }
 
     private IReadOnlyList<T> SimplifyContracts<T>(IReadOnlyList<T> contracts, Func<T, T> simplifier)
@@ -336,7 +344,8 @@ public sealed class ContractSimplificationPass
             return requires;
         }
 
-        return new RequiresNode(requires.Span, simplifiedCondition, requires.Message, requires.Attributes);
+        return requires.CopyMetadataTo(
+            new RequiresNode(requires.Span, simplifiedCondition, requires.Message, requires.Attributes));
     }
 
     private EnsuresNode SimplifyEnsures(EnsuresNode ensures)
@@ -348,7 +357,8 @@ public sealed class ContractSimplificationPass
             return ensures;
         }
 
-        return new EnsuresNode(ensures.Span, simplifiedCondition, ensures.Message, ensures.Attributes);
+        return ensures.CopyMetadataTo(
+            new EnsuresNode(ensures.Span, simplifiedCondition, ensures.Message, ensures.Attributes));
     }
 
     private InvariantNode SimplifyInvariant(InvariantNode invariant)
@@ -360,7 +370,8 @@ public sealed class ContractSimplificationPass
             return invariant;
         }
 
-        return new InvariantNode(invariant.Span, simplifiedCondition, invariant.Message, invariant.Attributes);
+        return invariant.CopyMetadataTo(
+            new InvariantNode(invariant.Span, simplifiedCondition, invariant.Message, invariant.Attributes));
     }
 
     /// <summary>

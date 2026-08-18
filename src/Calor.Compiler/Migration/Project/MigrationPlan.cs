@@ -30,13 +30,15 @@ public sealed class MigrationPlan
 public sealed class MigrationPlanEntry
 {
     public required string SourcePath { get; init; }
-    public required string OutputPath { get; init; }
+    public required string OutputPath { get; set; }
     public required FileConvertibility Convertibility { get; init; }
     public List<string> DetectedFeatures { get; init; } = new();
     public List<string> PotentialIssues { get; init; } = new();
     public int EstimatedIssues { get; init; }
     public long FileSizeBytes { get; init; }
     public string? SkipReason { get; init; }
+    public List<string> DeclaredNamespaceIdentities { get; init; } = new();
+    public string? PrimarySymbolIdentity { get; init; }
 
     /// <summary>
     /// Analysis score from MigrationAnalyzer, populated during the analyze phase.

@@ -1,0 +1,11 @@
+§M{m001:Fixture}
+  §NS{ns001:Alpha}
+    §CL{c002:Marker:pub:stat}
+
+
+  §NS{ns003:Beta}
+    §CL{c004:Value:pub:stat}
+      §MT{m005:Get:pub:stat} () -> i32
+        §R 42
+
+

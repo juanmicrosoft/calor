@@ -252,6 +252,20 @@ public sealed class CSharpToCalorConverter
                 };
             }
 
+            var namespaceFeature = GetNamespaceFeature(root);
+            if (namespaceFeature != null)
+                context.RecordFeatureUsage(namespaceFeature);
+
+            if (_options.Fidelity == ConversionFidelity.Lossless
+                && RequiresWholeFileNamespaceInterop(root))
+            {
+                return ConvertWholeFileNamespaceInterop(
+                    csharpSource,
+                    root,
+                    context,
+                    startTime);
+            }
+
             // Step 2: Create semantic model for type inference (best-effort)
             SemanticModel? semanticModel = null;
             try
@@ -510,6 +524,113 @@ public sealed class CSharpToCalorConverter
         }
     }
 
+    internal static bool RequiresWholeFileNamespaceInterop(CompilationUnitSyntax root)
+    {
+        var namespaceDeclarations = root.DescendantNodes()
+            .OfType<BaseNamespaceDeclarationSyntax>()
+            .ToList();
+        if (namespaceDeclarations.Count > 1)
+            return true;
+
+        return namespaceDeclarations.Count == 1
+               && root.Members.Any(member =>
+                   member is not BaseNamespaceDeclarationSyntax
+                   && member is BaseTypeDeclarationSyntax
+                       or DelegateDeclarationSyntax
+                       or GlobalStatementSyntax);
+    }
+
+    internal static string? GetNamespaceFeature(CompilationUnitSyntax root)
+    {
+        if (!root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>().Any())
+            return null;
+
+        return RequiresWholeFileNamespaceInterop(root)
+            ? "namespace-topology"
+            : "namespace-single-scope";
+    }
+
+    private ConversionResult ConvertWholeFileNamespaceInterop(
+            string csharpSource,
+            CompilationUnitSyntax root,
+            ConversionContext context,
+            DateTime startTime)
+        {
+            var interop = new CSharpInteropBlockNode(
+                new Parsing.TextSpan(
+                    0,
+                    csharpSource.Length,
+                    1,
+                    1),
+                csharpSource,
+                featureName: "namespace-topology",
+                reason:
+                    "Multiple lexical namespace scopes are preserved as one whole-file interop boundary in lossless mode.")
+            {
+                NamespaceIdentity = "",
+                NamespaceScopeId = "",
+                FullyQualifiedSymbolIdentity = "global::<compilation-unit>"
+            };
+            context.RecordLoss(
+                ConversionLossKind.InteropPreserved,
+                "namespace-topology",
+                "Whole C# file preserved because lossless conversion does not split multi-namespace topology.",
+                line: 1);
+            context.Stats.InteropBlocksEmitted++;
+            context.AddInfo(
+                "Multiple namespace scopes preserved as whole-file C# interop in lossless mode.",
+                feature: "namespace-topology",
+                line: 1);
+
+            var module = new ModuleNode(
+                GetRootSpan(root),
+                "m001",
+                "_global",
+                Array.Empty<UsingDirectiveNode>(),
+                Array.Empty<InterfaceDefinitionNode>(),
+                Array.Empty<ClassDefinitionNode>(),
+                Array.Empty<EnumDefinitionNode>(),
+                Array.Empty<EnumExtensionNode>(),
+                Array.Empty<DelegateDefinitionNode>(),
+                Array.Empty<FunctionNode>(),
+                new AttributeCollection(),
+                Array.Empty<IssueNode>(),
+                Array.Empty<AssumeNode>(),
+                Array.Empty<InvariantNode>(),
+                Array.Empty<DecisionNode>(),
+                null,
+                [interop]);
+            var calorSource = new CalorEmitter(context).Emit(module);
+            if (!ParsesCleanly(calorSource))
+            {
+                context.AddError(
+                    "Whole-file namespace interop failed generated Calor validation.",
+                    feature: "namespace-topology");
+            }
+            ValidateLosslessRoundTrip(
+                calorSource,
+                context,
+                _options.ValidateRoundTripCSharp);
+            return new ConversionResult
+            {
+                Success = !context.HasErrors,
+                CalorSource = calorSource,
+                Ast = module,
+                Context = context,
+                Duration = DateTime.UtcNow - startTime
+            };
+        }
+
+    private static Parsing.TextSpan GetRootSpan(CompilationUnitSyntax root)
+        {
+            var lineSpan = root.GetLocation().GetLineSpan();
+            return new Parsing.TextSpan(
+                root.SpanStart,
+                root.Span.Length,
+                lineSpan.StartLinePosition.Line + 1,
+                lineSpan.StartLinePosition.Character + 1);
+    }
+
     private static List<int> FindFallbackTokenLines(string text)
     {
         var diagnostics = new Diagnostics.DiagnosticBag();
@@ -569,9 +690,9 @@ public sealed class CSharpToCalorConverter
         foreach (var cls in module.Classes)
         {
             if (!MemberParsesCleanly(module, classes: new[] { cls }) &&
-                TryTakeSource(sources, "class", cls.Name, out var csharp))
+                TryTakeSource(sources, "class", GetSymbolIdentity(cls, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, cls.Name));
+                interops.Add(MakeFallbackInterop(csharp, cls));
                 failedClasses.Add(cls);
             }
         }
@@ -579,9 +700,9 @@ public sealed class CSharpToCalorConverter
         foreach (var iface in module.Interfaces)
         {
             if (!MemberParsesCleanly(module, interfaces: new[] { iface }) &&
-                TryTakeSource(sources, "interface", iface.Name, out var csharp))
+                TryTakeSource(sources, "interface", GetSymbolIdentity(iface, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, iface.Name));
+                interops.Add(MakeFallbackInterop(csharp, iface));
                 failedInterfaces.Add(iface);
             }
         }
@@ -589,9 +710,9 @@ public sealed class CSharpToCalorConverter
         foreach (var en in module.Enums)
         {
             if (!MemberParsesCleanly(module, enums: new[] { en }) &&
-                TryTakeSource(sources, "enum", en.Name, out var csharp))
+                TryTakeSource(sources, "enum", GetSymbolIdentity(en, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, en.Name));
+                interops.Add(MakeFallbackInterop(csharp, en));
                 failedEnums.Add(en);
             }
         }
@@ -599,9 +720,9 @@ public sealed class CSharpToCalorConverter
         foreach (var del in module.Delegates)
         {
             if (!MemberParsesCleanly(module, delegates: new[] { del }) &&
-                TryTakeSource(sources, "delegate", del.Name, out var csharp))
+                TryTakeSource(sources, "delegate", GetSymbolIdentity(del, module), out var csharp))
             {
-                interops.Add(MakeFallbackInterop(csharp, del.Name));
+                interops.Add(MakeFallbackInterop(csharp, del));
                 failedDelegates.Add(del);
             }
         }
@@ -619,7 +740,7 @@ public sealed class CSharpToCalorConverter
                 interop.Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)");
         }
 
-        return new ModuleNode(
+        return module.CopyMetadataTo(new ModuleNode(
             module.Span, module.Id, module.Name, module.Usings,
             module.Interfaces.Where(i => !failedInterfaces.Contains(i)).ToList(),
             module.Classes.Where(c => !failedClasses.Contains(c)).ToList(),
@@ -629,7 +750,8 @@ public sealed class CSharpToCalorConverter
             module.Functions, module.Attributes, module.Issues, module.Assumptions,
             module.Invariants, module.Decisions, module.Context,
             module.InteropBlocks.Concat(interops).ToList(),
-            module.RefinementTypes, module.IndexedTypes, module.TypePreprocessorBlocks);
+            module.RefinementTypes, module.IndexedTypes, module.TypePreprocessorBlocks,
+            namespaceScopes: module.NamespaceScopes));
     }
 
     /// <summary>Emits a module containing only the given member(s) and reports whether
@@ -650,29 +772,29 @@ public sealed class CSharpToCalorConverter
             delegates ?? Array.Empty<DelegateDefinitionNode>(),
             Array.Empty<FunctionNode>(), module.Attributes,
             Array.Empty<IssueNode>(), Array.Empty<AssumeNode>(),
-            Array.Empty<InvariantNode>(), Array.Empty<DecisionNode>(), null);
+            Array.Empty<InvariantNode>(), Array.Empty<DecisionNode>(), null,
+            namespaceScopes: module.NamespaceScopes);
 
         // Fresh context so the probe emission does not perturb the real conversion's stats.
         var emitted = new CalorEmitter(CreateContext(null)).Emit(solo);
         return ParsesCleanly(emitted);
     }
 
-    private static CSharpInteropBlockNode MakeFallbackInterop(string csharpSource, string memberName)
-        => new(
+    private static CSharpInteropBlockNode MakeFallbackInterop(
+        string csharpSource,
+        TypeDefinitionNode member)
+        => member.CopyMetadataTo(new CSharpInteropBlockNode(
             Parsing.TextSpan.Empty,
             csharpSource,
             featureName: "post-validation-fallback",
-            reason: $"Converted Calor for '{memberName}' did not parse; original C# preserved (#717).");
+            reason: $"Converted Calor for '{member.FullyQualifiedSymbolIdentity ?? member.Name}' did not parse; original C# preserved (#717)."));
 
     private sealed record TypeSource(bool IsPartial, string Text);
 
     /// <summary>
-    /// Collects top-level (compilation-unit or namespace level) type declarations from the
-    /// C# tree, keyed by "kind/name" — the resolution the Calor side can address, since the
-    /// module flattens namespaces so a Calor member carries only its bare name. The value is
-    /// the list of C# declarations with that key: usually one, several when the type is
-    /// <c>partial</c>, or — the ambiguous case — several distinct types of the same name in
-    /// different namespaces. <see cref="TryTakeSource"/> decides what is safely recoverable.
+    /// Collects top-level type declarations by kind and fully-qualified symbol
+    /// identity. Several entries for one identity are legitimate partial
+    /// declarations; same-named types in other namespaces have different keys.
     /// </summary>
     private static Dictionary<string, List<TypeSource>> CollectTopLevelTypeSources(CompilationUnitSyntax root)
     {
@@ -698,7 +820,8 @@ public sealed class CSharpToCalorConverter
             }
 
             var isPartial = member.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
-            var key = $"{kind}/{name}";
+            var identity = GetSyntaxTypeIdentity(member, name);
+            var key = $"{kind}/{identity}";
             (map.TryGetValue(key, out var list) ? list : map[key] = new List<TypeSource>())
                 .Add(new TypeSource(isPartial, DeclarationSourceText(member)));
         }
@@ -723,17 +846,18 @@ public sealed class CSharpToCalorConverter
 
     /// <summary>
     /// Recovers the original C# for a top-level member the Calor emitter could not render.
-    /// Safe cases: exactly one declaration with that kind/name, or several that are all
-    /// <c>partial</c> (one merged type — concatenate). The ambiguous case — two or more
-    /// distinct same-named types in different namespaces — is refused (returns false) rather
-    /// than risk dragging a healthy type into another's interop block. Entries are removed on
-    /// take so a second same-named failure cannot reuse them.
+    /// Safe cases: exactly one declaration with that identity, or several that
+    /// are all <c>partial</c> (one symbol — concatenate). Entries are removed on
+    /// take so a second failure cannot reuse them.
     /// </summary>
     private static bool TryTakeSource(
-        Dictionary<string, List<TypeSource>> sources, string kind, string name, out string csharp)
+        Dictionary<string, List<TypeSource>> sources,
+        string kind,
+        string symbolIdentity,
+        out string csharp)
     {
         csharp = "";
-        var key = $"{kind}/{name}";
+        var key = $"{kind}/{symbolIdentity}";
         if (!sources.TryGetValue(key, out var list) || list.Count == 0)
         {
             return false;
@@ -754,6 +878,47 @@ public sealed class CSharpToCalorConverter
 
         sources.Remove(key);
         return true;
+    }
+
+    private static string GetSymbolIdentity(
+        TypeDefinitionNode member,
+        ModuleNode module)
+    {
+        if (!string.IsNullOrEmpty(member.FullyQualifiedSymbolIdentity))
+            return member.FullyQualifiedSymbolIdentity;
+
+        var namespaceIdentity = member.NamespaceIdentity ?? module.Name;
+        var arity = member switch
+        {
+            ClassDefinitionNode cls => cls.TypeParameters.Count,
+            InterfaceDefinitionNode iface => iface.TypeParameters.Count,
+            _ => 0
+        };
+        return $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}" +
+               member.Name +
+               (arity > 0 ? $"`{arity}" : "");
+    }
+
+    private static string GetSyntaxTypeIdentity(
+        MemberDeclarationSyntax member,
+        string name)
+    {
+        var namespaceIdentity = string.Join(
+            ".",
+            member.Ancestors()
+                .OfType<BaseNamespaceDeclarationSyntax>()
+                .Select(item => item.Name.ToString().Replace("@", ""))
+                .Reverse());
+        var arity = member switch
+        {
+            TypeDeclarationSyntax type => type.TypeParameterList?.Parameters.Count ?? 0,
+            DelegateDeclarationSyntax @delegate =>
+                @delegate.TypeParameterList?.Parameters.Count ?? 0,
+            _ => 0
+        };
+        return $"global::{(string.IsNullOrEmpty(namespaceIdentity) ? "" : namespaceIdentity + ".")}" +
+               name +
+               (arity > 0 ? $"`{arity}" : "");
     }
 
     private ConversionContext CreateContext(string? sourceFile)

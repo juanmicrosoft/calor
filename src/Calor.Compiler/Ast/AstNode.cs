@@ -10,6 +10,26 @@ public abstract class AstNode
     public TextSpan Span { get; }
 
     /// <summary>
+    /// Fully-qualified C# namespace associated with this declaration.
+    /// <c>null</c> means legacy module-level namespace inheritance and an empty
+    /// string means the explicit global namespace.
+    /// </summary>
+    public string? NamespaceIdentity { get; set; }
+
+    /// <summary>
+    /// Identity of the lexical namespace declaration that contains this node.
+    /// Separate declarations of the same namespace intentionally have distinct
+    /// scope IDs because their using aliases do not share a lexical scope.
+    /// </summary>
+    public string? NamespaceScopeId { get; set; }
+
+    /// <summary>
+    /// Fully-qualified symbol identity used by recovery, source mapping, and
+    /// partial-type merging.
+    /// </summary>
+    public string? FullyQualifiedSymbolIdentity { get; set; }
+
+    /// <summary>
     /// Optional XML doc comment extracted during C# → Calor conversion.
     /// Emitted as line comments above the construct.
     /// </summary>
@@ -18,6 +38,16 @@ public abstract class AstNode
     protected AstNode(TextSpan span)
     {
         Span = span;
+    }
+
+    internal T CopyMetadataTo<T>(T target) where T : AstNode
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        target.NamespaceIdentity = NamespaceIdentity;
+        target.NamespaceScopeId = NamespaceScopeId;
+        target.FullyQualifiedSymbolIdentity = FullyQualifiedSymbolIdentity;
+        target.DocComment = DocComment;
+        return target;
     }
 
     public abstract void Accept(IAstVisitor visitor);

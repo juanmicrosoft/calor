@@ -333,6 +333,10 @@ public enum TokenKind
     SyncBlock,          // §SYNC - lock statement
     EndSyncBlock,       // §/SYNC - end lock statement
 
+    // Namespace topology
+    Namespace,          // §NS{id:name} - lexical namespace scope
+    EndNamespace,       // §/NS{id}
+
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
@@ -375,7 +379,7 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndSyncBlock;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndNamespace;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;
