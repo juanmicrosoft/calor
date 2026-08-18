@@ -5,7 +5,11 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
+<<<<<<< HEAD
       "expectedTotal": 7385,
+=======
+      "expectedTotal": 7403,
+>>>>>>> 3d060a7a (chore(v0.14 S1): bump Calor.Compiler.Tests expected count for 20 new tests)
       "expectedSkipped": 2
     },
     {
