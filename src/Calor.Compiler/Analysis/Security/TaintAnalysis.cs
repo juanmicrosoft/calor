@@ -647,7 +647,7 @@ public sealed class TaintAnalysis
         }
 
         if (HasStableObjectIdentity(target.TypeName)
-            && HasStableObjectIdentity(value.TypeName)
+            && HasStableObjectIdentity(value.Type.DisplayString)  // S7 batch-4: BoundExpression → .Type.DisplayString
             && TryGetAccessPath(value, input, out var sourcePath))
         {
             var (referenceState, targets) = input.GetOrCreateReferenceTargets(sourcePath);
@@ -667,8 +667,9 @@ public sealed class TaintAnalysis
         TaintState input,
         TextSpan location)
     {
-        if (HasStableObjectIdentity(target.TypeName)
-            && HasStableObjectIdentity(value.TypeName)
+        // S7 batch-4: both target and value are BoundExpression → migrate to .Type.DisplayString.
+        if (HasStableObjectIdentity(target.Type.DisplayString)
+            && HasStableObjectIdentity(value.Type.DisplayString)
             && TryGetAccessPath(value, input, out var sourcePath)
             && TryGetAccessPath(target, input, out var targetPath))
         {
