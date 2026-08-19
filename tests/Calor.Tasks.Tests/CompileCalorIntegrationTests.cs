@@ -903,6 +903,14 @@ public class CompileCalorIntegrationTests : IDisposable
             m => m.Contains("skipping"));
     }
 
+    // Also serves as the regression pin for #883 / audit-F4/R2 (test-suite
+    // audit 2026-08-18). #883 was closed by #890 (2026-08-11); this Theory
+    // is the canonical guard against silent reintroduction — the four
+    // IL-analysis inputs (ReferencedAssemblies, RuntimeDirectory,
+    // NuGetPackageRoot, DepsFilePath) must each move the options hash when
+    // mutated against a warm cache. See sibling
+    // `CanonicalInputs_*ContentMutation_InvalidatesWarmCache` tests for the
+    // content-hash axis (file contents changing at the same path).
     [Theory]
     [InlineData("referencedAssembly")]
     [InlineData("runtimeDirectory")]

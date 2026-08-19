@@ -950,6 +950,21 @@ public class BuildStateCacheTests : IDisposable
         Assert.NotEqual(baseline, task.ComputeCacheInputs().Serialize());
     }
 
+    // #883 / audit-F4/R2 pin note: a low-level regression Fact was proposed
+    // for the four IL-analysis inputs (ReferencedAssemblies, RuntimeDirectory,
+    // NuGetPackageRoot, DepsFilePath). It was dropped as a duplicate — see
+    // `CompileCalorIntegrationTests.CanonicalInputs_MutatingAnalysisInput_InvalidatesWarmCache`
+    // which is already a [Theory] over the same four inputs, uses a real DLL
+    // (typeof(object).Assembly.Location) rather than fake bytes, exercises the
+    // real MSBuild Execute() path, and asserts the "[options-or-inputs-changed]"
+    // telemetry. The `CanonicalInputs_ReferencedAssemblyContentMutation_
+    // InvalidatesWarmCache` / `CanonicalInputs_DepsFileContentMutation_
+    // InvalidatesWarmCache` pair covers the content-hash axis.
+    //
+    // #883 was closed by #890 (2026-08-11); the 2026-08-18 audit's F4
+    // "known open residual" wording is stale and should be updated in a
+    // follow-up PR.
+
     private static string FindFrameworkReferenceAssembly(string fileName)
     {
         var runtimeDirectory = new DirectoryInfo(
