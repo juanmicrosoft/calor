@@ -93,3 +93,12 @@ src/Calor.Compiler/Binding/Metadata/MetadataReferenceManifest.cs
 # cannot inspect its own bound tree; same class as the metadata entries above
 # and the #786 typed CFG code.
 src/Calor.Compiler/Binding/BoundTypes/BoundType.cs
+
+# v0.14 §3.1 S4 — MetadataBinder (docs/plans/v0.14-metadata-binding-scoping.md
+# §S4). Compiler-internal binder that consumes MetadataContext to produce
+# either (a) a resolved IMethodSymbol wrapped in BoundType, or (b) an
+# UnresolvedBoundType with a Calor0270 diagnostic. Runs against F-1's 15
+# shape fixtures and produces the resolved-fraction measurement that S5's
+# pinned corpus bar keys on. Calor cannot orchestrate Roslyn's SymbolInfo
+# API surface; same class as the S1 metadata entries above.
+src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs
