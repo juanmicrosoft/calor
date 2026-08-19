@@ -1018,3 +1018,86 @@ jobs:
 
       - name: Run phase-2 gate dry-run smoke
         run: python3 scripts/smoke_phase_2_gate_dryrun.py
+
+  snapshot-diff-heuristic:
+    # Soft warning gate: scan .approved.calr snapshot diffs for
+    # suspicious drops (comments, §CSHARP interop blocks/bytes) that
+    # a bulk CALOR_UPDATE_SNAPSHOTS=1 refresh might silently produce.
+    # NEVER fails the job — posts a PR comment when signals fire.
+    # Refs #999 (audit finding F5 / recommendation R3).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Self-test the heuristic
+        run: python3 scripts/check_snapshot_diffs.py --self-test
+
+      - name: Scan snapshot diffs
+        # The script guarantees exit code 0 even on internal error
+        # (see try/except in main()); continue-on-error is
+        # belt-and-suspenders so a shell-level surprise (missing python,
+        # OOM, etc.) still cannot fail the job.
+        continue-on-error: true
+        run: |
+          python3 scripts/check_snapshot_diffs.py \
+            --base "origin/${{ github.base_ref }}" \
+            --head HEAD \
+            > /tmp/snapshot-warnings.md || true
+
+      - name: Post PR comment when signals fire
+        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/snapshot-warnings.md';
+            if (!fs.existsSync(path)) {
+              core.info('No snapshot-warnings.md produced.');
+              return;
+            }
+            const md = fs.readFileSync(path, 'utf8').trim();
+            if (!md) {
+              core.info('No suspicious snapshot diffs detected.');
+              return;
+            }
+            const marker = '<!-- calor-snapshot-diff-heuristic -->';
+            const body = md.startsWith(marker) ? md : `${marker}\n${md}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
