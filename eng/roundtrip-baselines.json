@@ -1,0 +1,37 @@
+{
+  "_comment": "Baseline round-trip pass counts per corpus project. Consumed by scripts/roundtrip_delta.py from the roundtrip-verification CI job to detect incremental per-project regressions the absolute-threshold gate misses (issue #1005; audit F3/R9). SEEDED VALUES ARE 'CURRENT STATE', NOT 'KNOWN-GOOD': MediatR 155/157 is exactly the state that surfaced as MinorRegressions on PRs #986/#992 — codifying it here means the alarm treats that as the new floor rather than re-alarming every PR. When a maintainer knows a project should be higher (e.g., the actual known-good MediatR is 157/157), edit this file to the higher value; the next PR that regresses will trigger the alarm. Automated main-branch write-back is tracked in issue #1030.",
+  "_source_run": "https://github.com/juanmicrosoft/calor/actions/runs/32280829013",
+  "_updated_at": "2026-08-19T17:18:17Z",
+  "projects": {
+    "FluentValidation": {
+      "round_trip_passed": 865,
+      "round_trip_total": 866,
+      "native_fraction": 0.5539568345323741,
+      "coverage_fraction": 0.5971223021582733
+    },
+    "MediatR": {
+      "round_trip_passed": 155,
+      "round_trip_total": 157,
+      "native_fraction": 0.5,
+      "coverage_fraction": 0.75
+    },
+    "Serilog": {
+      "round_trip_passed": 811,
+      "round_trip_total": 811,
+      "native_fraction": 0.38392857142857145,
+      "coverage_fraction": 0.5535714285714286
+    },
+    "Synthetic": {
+      "round_trip_passed": 52,
+      "round_trip_total": 52,
+      "native_fraction": 1.0,
+      "coverage_fraction": 1.0
+    },
+    "Synthetic2": {
+      "round_trip_passed": 20,
+      "round_trip_total": 20,
+      "native_fraction": 1.0,
+      "coverage_fraction": 1.0
+    }
+  }
+}

@@ -811,6 +811,82 @@ jobs:
               });
             }
 
+      # Warning-only incremental delta alarm (#1005). Compares the current
+      # per-project round-trip pass counts to the committed baseline in
+      # eng/roundtrip-baselines.json. If ANY project lost ground, posts a PR
+      # comment (marker `<!-- calor-roundtrip-delta -->`). Never fails the job —
+      # the absolute-threshold gate (RoundTripExitPolicy) remains authoritative
+      # for merge-blocking. This surfaces drifts the absolute gate does not
+      # catch (see the MediatR MinorRegressions signal on PRs #986 / #992 that
+      # a maintainer had to interpret manually).
+      - name: Self-test round-trip delta script
+        # Verifies the delta-computation logic itself before running it
+        # against real reports. Matches the pattern used by check_coverage.py,
+        # check_trx.py, and run_mutation_gate.py at earlier CI steps.
+        if: always()
+        run: python3 scripts/roundtrip_delta.py --self-test
+
+      - name: Compute round-trip delta vs baseline
+        # Never fails the job — the absolute-threshold gate
+        # (RoundTripExitPolicy) remains authoritative for merge-blocking.
+        # Belt-and-suspenders: continue-on-error at the step level +
+        # explicit `has_delta=false` fallback on ANY script error so a
+        # silent skip is impossible. If the script crashes (missing
+        # baseline, malformed JSON, git surprise), the step still emits
+        # `has_delta=false` and the workflow continues.
+        if: always()
+        id: rt_delta
+        continue-on-error: true
+        run: |
+          set +e
+          python3 scripts/roundtrip_delta.py \
+            --baseline eng/roundtrip-baselines.json \
+            --reports conversion-reports/ \
+            --output-markdown conversion-reports/_delta.md
+          script_exit=$?
+          if [ "$script_exit" -ne 0 ]; then
+            echo "roundtrip_delta.py exited $script_exit — skipping delta comment"
+            echo "has_delta=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -s conversion-reports/_delta.md ]; then
+            echo "has_delta=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_delta=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post round-trip delta warning to PR
+        if: >-
+          always() &&
+          steps.rt_delta.outputs.has_delta == 'true' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- calor-roundtrip-delta -->';
+            const body = fs.readFileSync('conversion-reports/_delta.md', 'utf8');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              });
+            }
+
       - name: Upload round-trip reports
         if: always()
         uses: actions/upload-artifact@v4
