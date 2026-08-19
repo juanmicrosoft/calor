@@ -41,6 +41,7 @@ jobs:
       - name: Check test manifest, skips, and assertion quality
         run: |
           python3 scripts/check_test_quality.py
+          python3 scripts/generate_ast_infrastructure.py --check
           python3 scripts/sync-self-test-resources.py --check
           python3 scripts/test_supply_chain.py
 

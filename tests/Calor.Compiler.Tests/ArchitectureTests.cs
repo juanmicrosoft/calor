@@ -1,7 +1,12 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -147,6 +152,292 @@ public class ArchitectureTests
             node.Accept(genericVisitor);
             AssertSingleMatchingDispatch(nodeType, node, genericRecorder.Calls);
         }
+    }
+
+    [Fact]
+    public void AstSchema_CoversEveryNodeDispatchAndChildRelation()
+    {
+        using var document = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(RepoRoot(), "eng", "ast-schema.json")));
+        var schemaNodes = document.RootElement.GetProperty("nodes")
+            .EnumerateArray()
+            .Select(entry => (
+                Name: entry.GetProperty("name").GetString()!,
+                Source: entry.GetProperty("source").GetString()!))
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            .ToArray();
+        var concreteNodes = typeof(AstNode).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract && typeof(AstNode).IsAssignableFrom(type))
+            .OrderBy(type => type.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(concreteNodes.Select(type => type.Name), schemaNodes.Select(entry => entry.Name));
+        Assert.Equal(
+            concreteNodes,
+            AstSchemaMetadata.NodeTypes.OrderBy(type => type.Name, StringComparer.Ordinal));
+
+        var nonGenericVisits = typeof(IAstVisitor).GetMethods()
+            .Select(method => Assert.Single(method.GetParameters()).ParameterType)
+            .OrderBy(type => type.Name, StringComparer.Ordinal);
+        var genericVisits = typeof(IAstVisitor<>).GetMethods()
+            .Select(method => Assert.Single(method.GetParameters()).ParameterType)
+            .OrderBy(type => type.Name, StringComparer.Ordinal);
+        Assert.Equal(concreteNodes, nonGenericVisits);
+        Assert.Equal(concreteNodes, genericVisits);
+
+        foreach (var node in AstSchemaMetadata.Nodes)
+        {
+            Assert.Equal(
+                RecursiveAstWalker.GetAllChildProperties(node.NodeType)
+                    .Select(property => property.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal),
+                node.ChildProperties);
+            var sourcePath = Path.Combine(
+                RepoRoot(),
+                "src",
+                "Calor.Compiler",
+                "Ast",
+                node.SourceFile);
+            Assert.True(File.Exists(sourcePath), $"Missing schema source {node.SourceFile}");
+        }
+
+        var redundantDispatch = concreteNodes
+            .SelectMany(type => type.GetMethods(
+                BindingFlags.Public |
+                BindingFlags.Instance |
+                BindingFlags.DeclaredOnly))
+            .Where(method => method.Name == nameof(AstNode.Accept))
+            .Select(method => method.DeclaringType!.Name)
+            .ToArray();
+        Assert.Empty(redundantDispatch);
+    }
+
+    [Fact]
+    public void ModuleUpdate_MirrorsEveryAggregateFieldAndPreservesMetadata()
+    {
+        var aggregateProperties = typeof(ModuleNode)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(property => property.Name != nameof(ModuleNode.HasExtendedMetadata))
+            .Select(property => property.Name)
+            .Append(nameof(AstNode.Span))
+            .OrderBy(name => name, StringComparer.Ordinal);
+        var updateProperties = typeof(ModuleNode.ModuleUpdate)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal);
+        Assert.Equal(aggregateProperties, updateProperties);
+
+        var original = EmptyModule("Original");
+        original.NamespaceIdentity = "Example";
+        original.NamespaceScopeId = "scope";
+        original.FullyQualifiedSymbolIdentity = "Example.Original";
+        original.DocComment = "docs";
+        var copy = original.With(update => update.Name = "Copy");
+
+        Assert.Equal("Copy", copy.Name);
+        foreach (var property in typeof(ModuleNode)
+                     .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                     .Where(property => property.Name is not nameof(ModuleNode.Name)))
+        {
+            Assert.Equal(property.GetValue(original), property.GetValue(copy));
+        }
+        Assert.Equal(original.NamespaceIdentity, copy.NamespaceIdentity);
+        Assert.Equal(original.NamespaceScopeId, copy.NamespaceScopeId);
+        Assert.Equal(original.FullyQualifiedSymbolIdentity, copy.FullyQualifiedSymbolIdentity);
+        Assert.Equal(original.DocComment, copy.DocComment);
+
+        var astNodeSource = CSharpSyntaxTree.ParseText(
+            File.ReadAllText(Path.Combine(
+                RepoRoot(),
+                "src",
+                "Calor.Compiler",
+                "Ast",
+                "AstNode.cs"))).GetRoot();
+        var copiedMetadata = astNodeSource.DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "CopyMetadataTo")
+            .DescendantNodes()
+            .OfType<AssignmentExpressionSyntax>()
+            .Select(assignment => assignment.Left)
+            .OfType<MemberAccessExpressionSyntax>()
+            .Where(access => access.Expression.ToString() == "target")
+            .Select(access => access.Name.Identifier.ValueText)
+            .OrderBy(name => name, StringComparer.Ordinal);
+        var mutableMetadata = typeof(AstNode)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(property => property.SetMethod != null)
+            .Select(property => property.Name)
+            .OrderBy(name => name, StringComparer.Ordinal);
+        Assert.Equal(mutableMetadata, copiedMetadata);
+    }
+
+    [Fact]
+    public void Emitters_ReusedAcrossModules_MatchFreshInstances()
+    {
+        var first = ParseModule(
+            """
+            §M{m001:First}
+              §F{f001:Run:pub} () -> void
+                §E{cw}
+                §L{loop:i:1:3:1}
+                  §IF{branch} (== (% i 2) 0)
+                    §P "even"
+                  §EL
+                    §P i
+            """);
+        var second = ParseModule(
+            """
+            §M{m002:Second}
+              §F{f002:Run:pub} () -> int
+                §E{}
+                §B{value:int} 42
+                §R value
+            """);
+
+        var reusedCSharp = new CSharpEmitter();
+        _ = reusedCSharp.Emit(first);
+        Assert.Equal(new CSharpEmitter().Emit(second), reusedCSharp.Emit(second));
+
+        var reusedCalor = new CalorEmitter();
+        _ = reusedCalor.Emit(first);
+        Assert.Equal(new CalorEmitter().Emit(second), reusedCalor.Emit(second));
+    }
+
+    [Fact]
+    public void ModuleConstruction_IsRestrictedToCreationBoundaries()
+    {
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Migration/CSharpToCalorConverter.cs:ConvertWholeFileNamespaceInterop",
+            "Migration/CSharpToCalorConverter.cs:MemberParsesCleanly",
+            "Migration/RoslynSyntaxVisitor.cs:Convert",
+            "Parsing/Parser.cs:ParseModule",
+        };
+        var actual = new HashSet<string>(StringComparer.Ordinal);
+        var compilerRoot = Path.Combine(RepoRoot(), "src", "Calor.Compiler");
+
+        foreach (var file in Directory.EnumerateFiles(
+                     compilerRoot,
+                     "*.cs",
+                     SearchOption.AllDirectories))
+        {
+            if (file.EndsWith("Ast/ModuleNode.cs", StringComparison.Ordinal))
+                continue;
+            var root = CSharpSyntaxTree.ParseText(File.ReadAllText(file)).GetRoot();
+            foreach (var creation in root.DescendantNodes()
+                         .OfType<ObjectCreationExpressionSyntax>()
+                         .Where(node => node.Type.ToString().EndsWith(
+                             nameof(ModuleNode),
+                             StringComparison.Ordinal)))
+            {
+                var method = creation.Ancestors()
+                    .OfType<MethodDeclarationSyntax>()
+                    .FirstOrDefault();
+                Assert.NotNull(method);
+                actual.Add(
+                    $"{Path.GetRelativePath(compilerRoot, file).Replace('\\', '/')}:" +
+                    method.Identifier.ValueText);
+            }
+        }
+
+        Assert.Equal(allowed.Order(), actual.Order());
+    }
+
+    [Fact]
+    public void CompilerComponents_MatchDeclaredDependencyContract()
+    {
+        using var document = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(
+                RepoRoot(),
+                "eng",
+                "compiler-components.json")));
+        var components = document.RootElement.GetProperty("components")
+            .EnumerateArray()
+            .Select(entry => new
+            {
+                Name = entry.GetProperty("name").GetString()!,
+                Path = entry.GetProperty("path").GetString()!,
+                Allowed = entry.GetProperty("allowedDependencies")
+                    .EnumerateArray()
+                    .Select(value => value.GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+            })
+            .ToArray();
+        var knownCycles = document.RootElement.GetProperty("knownCycles")
+            .EnumerateArray()
+            .Select(cycle => string.Join(
+                "|",
+                cycle.EnumerateArray()
+                    .Select(value => value.GetString()!)
+                    .OrderBy(name => name, StringComparer.Ordinal)))
+            .OrderBy(cycle => cycle, StringComparer.Ordinal)
+            .ToArray();
+        var compilerRoot = Path.Combine(RepoRoot(), "src", "Calor.Compiler");
+        var graph = components.ToDictionary(
+            component => component.Name,
+            component => component.Allowed,
+            StringComparer.Ordinal);
+
+        foreach (var component in components)
+        {
+            var source = string.Join(
+                Environment.NewLine,
+                Directory.EnumerateFiles(
+                        Path.Combine(compilerRoot, component.Path),
+                        "*.cs",
+                        SearchOption.AllDirectories)
+                    .Select(File.ReadAllText));
+            var actual = components
+                .Where(candidate => candidate.Name != component.Name)
+                .Where(candidate => source.Contains(
+                    $"Calor.Compiler.{candidate.Name}",
+                    StringComparison.Ordinal))
+                .Select(candidate => candidate.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            Assert.True(
+                component.Allowed.SetEquals(actual),
+                $"{component.Name} dependency contract drifted. " +
+                $"Expected [{string.Join(", ", component.Allowed.Order())}], " +
+                $"actual [{string.Join(", ", actual.Order())}].");
+        }
+
+        bool IsReachable(string start, string target)
+        {
+            var pending = new Stack<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            pending.Push(start);
+            while (pending.Count > 0)
+            {
+                var current = pending.Pop();
+                if (!seen.Add(current))
+                    continue;
+                foreach (var dependency in graph[current])
+                {
+                    if (dependency == target)
+                        return true;
+                    pending.Push(dependency);
+                }
+            }
+            return false;
+        }
+
+        var actualCycles = components
+            .Select(component => components
+                .Where(candidate =>
+                    candidate.Name != component.Name
+                    && IsReachable(component.Name, candidate.Name)
+                    && IsReachable(candidate.Name, component.Name))
+                .Select(candidate => candidate.Name)
+                .Append(component.Name)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray())
+            .Where(cycle => cycle.Length > 1)
+            .Select(cycle => string.Join("|", cycle))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(cycle => cycle, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(knownCycles, actualCycles);
     }
 
     [Fact]
@@ -378,6 +669,25 @@ public class ArchitectureTests
             "..",
             "..",
             ".."));
+
+    private static ModuleNode EmptyModule(string name) =>
+        new(
+            Calor.Compiler.Parsing.TextSpan.Empty,
+            $"m-{name}",
+            name,
+            Array.Empty<UsingDirectiveNode>(),
+            Array.Empty<FunctionNode>(),
+            new AttributeCollection());
+
+    private static ModuleNode ParseModule(string source)
+    {
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.Empty(diagnostics.Errors);
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.Empty(diagnostics.Errors);
+        return module;
+    }
 
     private static IEnumerable<PatternSyntax> GetSwitchPatterns(SyntaxNode switchNode)
     {

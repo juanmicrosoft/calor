@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "knownCycles": [
+    ["Ast", "Parsing"],
+    ["Analysis", "Binding", "CodeGen", "Migration", "Verification"]
+  ],
+  "components": [
+    {
+      "name": "Ast",
+      "path": "Ast",
+      "allowedDependencies": ["Parsing"]
+    },
+    {
+      "name": "Parsing",
+      "path": "Parsing",
+      "allowedDependencies": ["Ast"]
+    },
+    {
+      "name": "Binding",
+      "path": "Binding",
+      "allowedDependencies": ["Ast", "CodeGen", "Parsing"]
+    },
+    {
+      "name": "Analysis",
+      "path": "Analysis",
+      "allowedDependencies": ["Ast", "Binding", "Migration", "Parsing", "Verification"]
+    },
+    {
+      "name": "Migration",
+      "path": "Migration",
+      "allowedDependencies": ["Analysis", "Ast", "CodeGen", "Ids", "Parsing", "Verification"]
+    },
+    {
+      "name": "CodeGen",
+      "path": "CodeGen",
+      "allowedDependencies": ["Analysis", "Ast", "Migration", "Parsing", "Verification"]
+    },
+    {
+      "name": "Verification",
+      "path": "Verification",
+      "allowedDependencies": ["Analysis", "Ast", "Binding", "Parsing"]
+    },
+    {
+      "name": "Ids",
+      "path": "Ids",
+      "allowedDependencies": ["Ast", "Parsing"]
+    }
+  ]
+}

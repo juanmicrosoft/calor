@@ -37,8 +37,7 @@ public sealed class TypeOperationNode : ExpressionNode
         TargetTypeSpan = targetTypeSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -66,8 +65,7 @@ public sealed class IsPatternNode : ExpressionNode
         VariableName = variableName;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>

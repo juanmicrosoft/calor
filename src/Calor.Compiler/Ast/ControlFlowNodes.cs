@@ -39,8 +39,7 @@ public sealed class ForStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -68,8 +67,7 @@ public sealed class WhileStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -97,8 +95,7 @@ public sealed class DoWhileStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -132,8 +129,7 @@ public sealed class IfStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -155,8 +151,7 @@ public sealed class ElseIfClauseNode : AstNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -193,8 +188,7 @@ public sealed class BindStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -219,8 +213,7 @@ public sealed class BinaryOperationNode : ExpressionNode
         Right = right ?? throw new ArgumentNullException(nameof(right));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -267,8 +260,7 @@ public sealed class ContinueStatementNode : StatementNode
 {
     public ContinueStatementNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -279,8 +271,7 @@ public sealed class BreakStatementNode : StatementNode
 {
     public BreakStatementNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -296,8 +287,7 @@ public sealed class GotoStatementNode : StatementNode
     public bool IsDefault { get; init; }
     public GotoStatementNode(TextSpan span, string label) : base(span) { Label = label; }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -309,8 +299,7 @@ public sealed class LabelStatementNode : StatementNode
     public string Label { get; }
     public LabelStatementNode(TextSpan span, string label) : base(span) { Label = label; }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -327,8 +316,7 @@ public sealed class YieldReturnStatementNode : StatementNode
         Expression = expression;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -339,8 +327,7 @@ public sealed class YieldBreakStatementNode : StatementNode
 {
     public YieldBreakStatementNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 public static class BinaryOperatorExtensions

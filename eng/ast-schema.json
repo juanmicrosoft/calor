@@ -1,0 +1,741 @@
+{
+  "schemaVersion": 1,
+  "nodes": [
+    {
+      "name": "ModuleNode",
+      "source": "ModuleNode.cs"
+    },
+    {
+      "name": "FunctionNode",
+      "source": "FunctionNode.cs"
+    },
+    {
+      "name": "OutputNode",
+      "source": "FunctionNode.cs"
+    },
+    {
+      "name": "EffectsNode",
+      "source": "FunctionNode.cs"
+    },
+    {
+      "name": "ParameterNode",
+      "source": "FunctionNode.cs"
+    },
+    {
+      "name": "CallStatementNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "ReturnStatementNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "IntLiteralNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "StringLiteralNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "BoolLiteralNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "ConditionalExpressionNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "FloatLiteralNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "DecimalLiteralNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "ReferenceNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "ForStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "WhileStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "DoWhileStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "IfStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "ElseIfClauseNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "BindStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "BinaryOperationNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "UnaryOperationNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "ContinueStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "BreakStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "GotoStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "LabelStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "PrintStatementNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "RecordDefinitionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "FieldDefinitionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "UnionTypeDefinitionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "VariantDefinitionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "TypeReferenceNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "EnumDefinitionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "EnumMemberNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "EnumExtensionNode",
+      "source": "EnumExtensionNode.cs"
+    },
+    {
+      "name": "RecordCreationNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "FieldAssignmentNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "FieldAccessNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "SomeExpressionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "NoneExpressionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "OkExpressionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "ErrExpressionNode",
+      "source": "TypeNodes.cs"
+    },
+    {
+      "name": "MatchExpressionNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "MatchStatementNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "MatchCaseNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "WildcardPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "VariablePatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "LiteralPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "SomePatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "NonePatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "OkPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "ErrPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "RequiresNode",
+      "source": "ContractNodes.cs"
+    },
+    {
+      "name": "EnsuresNode",
+      "source": "ContractNodes.cs"
+    },
+    {
+      "name": "InvariantNode",
+      "source": "ContractNodes.cs"
+    },
+    {
+      "name": "UsingDirectiveNode",
+      "source": "UsingDirectiveNode.cs"
+    },
+    {
+      "name": "ArrayCreationNode",
+      "source": "ArrayNodes.cs"
+    },
+    {
+      "name": "ArrayAccessNode",
+      "source": "ArrayNodes.cs"
+    },
+    {
+      "name": "ArrayLengthNode",
+      "source": "ArrayNodes.cs"
+    },
+    {
+      "name": "ForeachStatementNode",
+      "source": "ArrayNodes.cs"
+    },
+    {
+      "name": "ListCreationNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "DictionaryCreationNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "KeyValuePairNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "SetCreationNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionPushNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "DictionaryPutNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionRemoveNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionSetIndexNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionClearNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionInsertNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionContainsNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "DictionaryForeachNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "CollectionCountNode",
+      "source": "CollectionNodes.cs"
+    },
+    {
+      "name": "TypeParameterNode",
+      "source": "GenericNodes.cs"
+    },
+    {
+      "name": "TypeConstraintNode",
+      "source": "GenericNodes.cs"
+    },
+    {
+      "name": "GenericTypeNode",
+      "source": "GenericNodes.cs"
+    },
+    {
+      "name": "InterfaceDefinitionNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "MethodSignatureNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "ClassDefinitionNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "ClassFieldNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "MethodNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "NewExpressionNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "AnonymousObjectCreationNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "CallExpressionNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "ThisExpressionNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "BaseExpressionNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "TupleLiteralNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "PropertyNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "IndexerNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "PropertyAccessorNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "ConstructorNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "OperatorOverloadNode",
+      "source": "ClassNodes.cs"
+    },
+    {
+      "name": "ConstructorInitializerNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "AssignmentStatementNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "CompoundAssignmentStatementNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "UsingStatementNode",
+      "source": "PropertyNodes.cs"
+    },
+    {
+      "name": "TryStatementNode",
+      "source": "ExceptionNodes.cs"
+    },
+    {
+      "name": "CatchClauseNode",
+      "source": "ExceptionNodes.cs"
+    },
+    {
+      "name": "ThrowStatementNode",
+      "source": "ExceptionNodes.cs"
+    },
+    {
+      "name": "ThrowExpressionNode",
+      "source": "ExceptionNodes.cs"
+    },
+    {
+      "name": "RethrowStatementNode",
+      "source": "ExceptionNodes.cs"
+    },
+    {
+      "name": "LambdaParameterNode",
+      "source": "LambdaNodes.cs"
+    },
+    {
+      "name": "LambdaExpressionNode",
+      "source": "LambdaNodes.cs"
+    },
+    {
+      "name": "DelegateDefinitionNode",
+      "source": "LambdaNodes.cs"
+    },
+    {
+      "name": "EventDefinitionNode",
+      "source": "LambdaNodes.cs"
+    },
+    {
+      "name": "EventSubscribeNode",
+      "source": "LambdaNodes.cs"
+    },
+    {
+      "name": "EventUnsubscribeNode",
+      "source": "LambdaNodes.cs"
+    },
+    {
+      "name": "AwaitExpressionNode",
+      "source": "AsyncNodes.cs"
+    },
+    {
+      "name": "InterpolatedStringNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "InterpolatedStringTextNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "InterpolatedStringExpressionNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "NullCoalesceNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "NullConditionalNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "RangeExpressionNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "IndexFromEndNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "WithExpressionNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "WithPropertyAssignmentNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "PositionalPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "PropertyPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "PropertyMatchNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "RelationalPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "ListPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "VarPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "ConstantPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "NegatedPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "OrPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "AndPatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "TypePatternNode",
+      "source": "PatternNodes.cs"
+    },
+    {
+      "name": "ExampleNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "IssueNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "DependencyNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "UsesNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "UsedByNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "AssumeNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "ComplexityNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "SinceNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "DeprecatedNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "BreakingChangeNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "DecisionNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "RejectedOptionNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "ContextNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "FileRefNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "PropertyTestNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "LockNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "AuthorNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "TaskRefNode",
+      "source": "MetadataNodes.cs"
+    },
+    {
+      "name": "CalorAttributeNode",
+      "source": "AttributeNodes.cs"
+    },
+    {
+      "name": "QuantifierVariableNode",
+      "source": "QuantifierNodes.cs"
+    },
+    {
+      "name": "ForallExpressionNode",
+      "source": "QuantifierNodes.cs"
+    },
+    {
+      "name": "ExistsExpressionNode",
+      "source": "QuantifierNodes.cs"
+    },
+    {
+      "name": "ImplicationExpressionNode",
+      "source": "QuantifierNodes.cs"
+    },
+    {
+      "name": "StringOperationNode",
+      "source": "StringOperationNode.cs"
+    },
+    {
+      "name": "CharOperationNode",
+      "source": "CharOperationNode.cs"
+    },
+    {
+      "name": "StringBuilderOperationNode",
+      "source": "StringBuilderOperationNode.cs"
+    },
+    {
+      "name": "TypeOperationNode",
+      "source": "TypeOperationNode.cs"
+    },
+    {
+      "name": "IsPatternNode",
+      "source": "TypeOperationNode.cs"
+    },
+    {
+      "name": "ExpressionStatementNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "FallbackExpressionNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "FallbackCommentNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "TypeOfExpressionNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "NameOfExpressionNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "ExpressionCallNode",
+      "source": "ModernOperatorNodes.cs"
+    },
+    {
+      "name": "YieldReturnStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "YieldBreakStatementNode",
+      "source": "ControlFlowNodes.cs"
+    },
+    {
+      "name": "RawCSharpNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "CompilerDirectiveNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "CSharpInteropBlockNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "StackAllocNode",
+      "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "UnsafeBlockNode",
+      "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "FixedStatementNode",
+      "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "AddressOfNode",
+      "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "PointerDereferenceNode",
+      "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "SizeOfNode",
+      "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "MultiDimArrayCreationNode",
+      "source": "ArrayNodes.cs"
+    },
+    {
+      "name": "MultiDimArrayAccessNode",
+      "source": "ArrayNodes.cs"
+    },
+    {
+      "name": "RawCSharpExpressionNode",
+      "source": "ExpressionNodes.cs"
+    },
+    {
+      "name": "PreprocessorDirectiveNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "MemberPreprocessorBlockNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "TypePreprocessorBlockNode",
+      "source": "StatementNodes.cs"
+    },
+    {
+      "name": "RefinementTypeNode",
+      "source": "RefinementNodes.cs"
+    },
+    {
+      "name": "SelfRefNode",
+      "source": "RefinementNodes.cs"
+    },
+    {
+      "name": "ProofObligationNode",
+      "source": "RefinementNodes.cs"
+    },
+    {
+      "name": "IndexedTypeNode",
+      "source": "RefinementNodes.cs"
+    },
+    {
+      "name": "SyncBlockNode",
+      "source": "UnsafeNodes.cs"
+    }
+  ]
+}

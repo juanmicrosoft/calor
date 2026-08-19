@@ -80,8 +80,7 @@ public sealed class CallStatementNode : StatementNode
         TypeArguments = typeArguments;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -98,8 +97,7 @@ public sealed class ReturnStatementNode : StatementNode
         Expression = expression;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -118,8 +116,7 @@ public sealed class PrintStatementNode : StatementNode
         IsWriteLine = isWriteLine;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -136,8 +133,7 @@ public sealed class ExpressionStatementNode : StatementNode
         Expression = expression ?? throw new ArgumentNullException(nameof(expression));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -169,8 +165,7 @@ public sealed class FallbackCommentNode : StatementNode
         Suggestion = suggestion;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -191,8 +186,7 @@ public sealed class RawCSharpNode : StatementNode
         CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -214,8 +208,7 @@ public sealed class CompilerDirectiveNode : StatementNode
         Feature = feature ?? throw new ArgumentNullException(nameof(feature));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -239,8 +232,7 @@ public sealed class PreprocessorDirectiveNode : StatementNode
         ElseBody = elseBody;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -301,8 +293,7 @@ public sealed class MemberPreprocessorBlockNode : AstNode
         ElseBranch = elseBranch;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -359,8 +350,7 @@ public sealed class TypePreprocessorBlockNode : AstNode
         ElseBranch = elseBranch;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -422,6 +412,5 @@ public sealed class CSharpInteropBlockNode : AstNode
             isCompilationUnitPassthrough;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

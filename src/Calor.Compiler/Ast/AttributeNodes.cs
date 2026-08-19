@@ -30,8 +30,6 @@ public sealed class CalorAttributeNode : AstNode
         Target = target;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 
     /// <summary>
     /// Returns true if this attribute has no arguments.

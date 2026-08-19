@@ -22,8 +22,7 @@ public sealed class InterpolatedStringNode : ExpressionNode
         Parts = parts ?? throw new ArgumentNullException(nameof(parts));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -47,8 +46,7 @@ public sealed class InterpolatedStringTextNode : InterpolatedStringPartNode
         Text = text ?? "";
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -78,8 +76,7 @@ public sealed class InterpolatedStringExpressionNode : InterpolatedStringPartNod
         SourceText = sourceText;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -106,8 +103,7 @@ public sealed class NullCoalesceNode : ExpressionNode
         Right = right ?? throw new ArgumentNullException(nameof(right));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -134,8 +130,7 @@ public sealed class NullConditionalNode : ExpressionNode
         MemberName = memberName ?? "";
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -162,8 +157,7 @@ public sealed class RangeExpressionNode : ExpressionNode
         End = end;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -184,8 +178,7 @@ public sealed class IndexFromEndNode : ExpressionNode
         Offset = offset ?? throw new ArgumentNullException(nameof(offset));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -207,8 +200,7 @@ public sealed class TypeOfExpressionNode : ExpressionNode
         TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -225,8 +217,7 @@ public sealed class NameOfExpressionNode : ExpressionNode
         Name = name ?? throw new ArgumentNullException(nameof(name));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -245,6 +236,5 @@ public sealed class ExpressionCallNode : ExpressionNode
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

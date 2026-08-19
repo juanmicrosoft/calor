@@ -145,8 +145,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         Items = items ?? Array.Empty<AstNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -232,8 +231,7 @@ public sealed class MethodSignatureNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -546,8 +544,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         Items = items ?? Array.Empty<AstNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -620,8 +617,7 @@ public sealed class ClassFieldNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -722,8 +718,7 @@ public sealed class MethodNode : AstNode
     public bool IsUnsafe => (Modifiers & MethodModifiers.Unsafe) != 0;
     public bool HasContracts => Preconditions.Count > 0 || Postconditions.Count > 0;
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -876,8 +871,7 @@ public sealed class OperatorOverloadNode : AstNode
         };
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -930,8 +924,7 @@ public sealed class NewExpressionNode : ExpressionNode
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -964,8 +957,7 @@ public sealed class AnonymousObjectCreationNode : ExpressionNode
         Initializers = initializers ?? throw new ArgumentNullException(nameof(initializers));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -1033,8 +1025,7 @@ public sealed class CallExpressionNode : ExpressionNode
         ReceiverSpan = receiverSpan;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -1045,8 +1036,7 @@ public sealed class ThisExpressionNode : ExpressionNode
 {
     public ThisExpressionNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -1057,8 +1047,7 @@ public sealed class BaseExpressionNode : ExpressionNode
 {
     public BaseExpressionNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -1075,6 +1064,5 @@ public sealed class TupleLiteralNode : ExpressionNode
         Elements = elements ?? throw new ArgumentNullException(nameof(elements));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

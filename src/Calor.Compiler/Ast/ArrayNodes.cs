@@ -57,8 +57,7 @@ public sealed class ArrayCreationNode : ExpressionNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -84,8 +83,7 @@ public sealed class ArrayAccessNode : ExpressionNode
         Index = index ?? throw new ArgumentNullException(nameof(index));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -105,8 +103,7 @@ public sealed class ArrayLengthNode : ExpressionNode
         Array = array ?? throw new ArgumentNullException(nameof(array));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -178,8 +175,7 @@ public sealed class ForeachStatementNode : StatementNode
         IndexVariableSpan = indexVariableName == null ? null : indexVariableSpan ?? span;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -230,8 +226,7 @@ public sealed class MultiDimArrayCreationNode : ExpressionNode
         Initializer = initializer ?? Array.Empty<IReadOnlyList<ExpressionNode>>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -250,6 +245,5 @@ public sealed class MultiDimArrayAccessNode : ExpressionNode
         Indices = indices ?? throw new ArgumentNullException(nameof(indices));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

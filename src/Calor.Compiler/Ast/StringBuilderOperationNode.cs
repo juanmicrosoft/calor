@@ -42,8 +42,7 @@ public sealed class StringBuilderOperationNode : ExpressionNode
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>

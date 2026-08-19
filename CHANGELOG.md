@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 - **Standalone C# block scope is preserved during migration (#751).** Members containing bare
   `{ }` statement blocks now remain counted C# interop instead of flattening lexical scopes,
   duplicating sibling local names, or dropping all but the first child statement.
+- **AST change amplification is mechanically constrained (#791).** A single AST schema now
+  generates visitor interfaces, centralized exhaustive dispatch, and structural metadata;
+  aggregate transforms use metadata-preserving `ModuleNode.With` copies; emitter reuse and
+  compiler component dependency contracts are enforced by architecture tests.
 
 ## [0.13.2] - 2026-08-12
 

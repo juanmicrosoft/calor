@@ -73,38 +73,17 @@ public sealed class ContractSimplificationPass
             return module;
         }
 
-        // W1 Slice 1 (#781 preservation half): this pass runs unconditionally on the
-        // main compile path, so its reconstruction must preserve EVERY module field —
-        // the previous overload silently dropped EnumExtensions, InteropBlocks,
-        // RefinementTypes, IndexedTypes, and TypePreprocessorBlocks whenever any
-        // contract simplified.
-        return module.CopyMetadataTo(new ModuleNode(
-            module.Span,
-            module.Id,
-            module.Name,
-            module.Usings,
-            simplifiedInterfaces,
-            simplifiedClasses,
-            module.Enums,
-            module.EnumExtensions,
-            module.Delegates,
-            simplifiedFunctions,
-            module.Attributes,
-            module.Issues,
-            module.Assumptions,
-            simplifiedInvariants,
-            module.Decisions,
-            module.Context,
-            module.InteropBlocks,
-            module.RefinementTypes,
-            module.IndexedTypes,
-            module.TypePreprocessorBlocks,
-            identifierSpan: module.IdentifierSpan,
-            items: RemapItems(
+        return module.With(update =>
+        {
+            update.Interfaces = simplifiedInterfaces;
+            update.Classes = simplifiedClasses;
+            update.Functions = simplifiedFunctions;
+            update.Invariants = simplifiedInvariants;
+            update.Items = RemapItems(
                 module.Items,
                 module.Functions.Cast<AstNode>().Concat(module.Classes).Concat(module.Interfaces),
-                simplifiedFunctions.Cast<AstNode>().Concat(simplifiedClasses).Concat(simplifiedInterfaces)),
-            namespaceScopes: module.NamespaceScopes));
+                simplifiedFunctions.Cast<AstNode>().Concat(simplifiedClasses).Concat(simplifiedInterfaces));
+        });
     }
 
     private FunctionNode SimplifyFunction(FunctionNode function)
