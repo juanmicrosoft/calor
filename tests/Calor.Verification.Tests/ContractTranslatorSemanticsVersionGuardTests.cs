@@ -69,13 +69,31 @@ public class ContractTranslatorSemanticsVersionGuardTests
             $"  Current   fixture hash:     '{actualHash}'\n" +
             "\n" +
             "The translator output hash and/or SemanticsVersion has changed since\n" +
-            "this checkpoint was recorded. If this change is intentional, bump\n" +
-            "`ContractTranslator.SemanticsVersion` (so existing Z3 verification\n" +
-            "cache entries are invalidated) AND update `ExpectedSemanticsVersion`\n" +
-            "and `ExpectedFixtureHash` in this test to the current values shown\n" +
-            "above, in the same commit. If the change is NOT intentional, revert\n" +
-            "the translator diff — old cached proofs would otherwise be served for\n" +
-            "AST fingerprints that now translate differently (see #961 / #997).";
+            "this checkpoint was recorded.\n" +
+            "\n" +
+            "To decide the right fix, ask:\n" +
+            "  * Did this PR touch src/Calor.Compiler/Verification/Z3/ContractTranslator.cs\n" +
+            "    or any of its collaborators (e.g., ExpressionSimplifier)?\n" +
+            "    → INTENTIONAL translator change. Bump `SemanticsVersion` (so existing\n" +
+            "      Z3 verification cache entries are invalidated) AND update\n" +
+            "      `ExpectedSemanticsVersion` + `ExpectedFixtureHash` in this test\n" +
+            "      to the current values shown above, in the same commit.\n" +
+            "  * Did this PR bump the pinned Microsoft.Z3 native version (see\n" +
+            "    `src/Calor.Compiler/scripts/download-z3.sh` and\n" +
+            "    `.github/z3-binaries-*.sha256`)?\n" +
+            "    → Z3 UPGRADE. `Expr.ToString()` output depends on the Z3 native\n" +
+            "      version, so a version bump changes the fixture hash without\n" +
+            "      any translator change. Bumping `SemanticsVersion` is the safe\n" +
+            "      move (Z3 upgrades reset the proof cache anyway); update this\n" +
+            "      test's baseline in the same commit.\n" +
+            "  * Neither?\n" +
+            "    → UNINTENTIONAL drift. Something upstream changed under you;\n" +
+            "      `git bisect` starting from the last passing commit will point\n" +
+            "      at the offending change. Do NOT ship a green build until you\n" +
+            "      understand why the translator output moved.\n" +
+            "\n" +
+            "Cached proofs would otherwise be served for AST fingerprints that\n" +
+            "now translate differently (see #961 / #997).";
 
         Assert.Fail(message);
     }
