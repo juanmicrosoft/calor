@@ -90,6 +90,17 @@ internal sealed class MetadataContext : IDisposable
     }
 
     /// <summary>
+    /// S4 accessor — <see cref="MetadataBinder"/> needs the underlying
+    /// compilation to add its own synthetic trees (with different usings).
+    /// Kept <c>internal</c> so callers outside <c>Calor.Compiler</c> cannot
+    /// bypass the manifest-verified reference set.
+    /// </summary>
+    internal CSharpCompilation HostCompilationForBinder
+    {
+        get { ThrowIfDisposed(); return _hostCompilation; }
+    }
+
+    /// <summary>
     /// Standard entry point: loads the F-2 manifest from its pinned location,
     /// verifies against the current TPA, and constructs a context. Throws
     /// <see cref="InvalidOperationException"/> on manifest drift with a

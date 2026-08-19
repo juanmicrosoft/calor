@@ -101,5 +101,4 @@ src/Calor.Compiler/Binding/BoundTypes/BoundType.cs
 # shape fixtures and produces the resolved-fraction measurement that S5's
 # pinned corpus bar keys on. Calor cannot orchestrate Roslyn's SymbolInfo
 # API surface; same class as the S1 metadata entries above.
-# pending
 src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs
