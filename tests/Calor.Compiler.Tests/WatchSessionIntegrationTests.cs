@@ -4,30 +4,38 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// End-to-end coverage for <c>calor watch</c> (issue #1002, audit finding F1 / R6):
-/// exercises the full session — initial baseline compile, debounced change batches,
-/// and interaction with the incremental build cache — through the same
-/// <see cref="WatchSession"/> entry point that the CLI wraps.
+/// Integration coverage for the <see cref="WatchSession"/> — the core of
+/// <c>calor watch</c> — closing the gap that <see cref="WatchDebouncerTests"/>
+/// left open on batched change handling and cache-warmth reporting (issue #1002,
+/// audit finding F1 / R6).
 ///
-/// <para><b>Test-hook flow.</b> <see cref="WatchSession.InjectChange"/> feeds change
-/// events as if the file-system watcher had raised them, so the test bypasses the
-/// real <see cref="FileSystemWatcher"/> (whose latency varies by platform). The
-/// session is driven with <c>useFileSystemWatchers: false</c> to avoid double-feeds.
-/// <see cref="WatchSession.RebuildCompleted"/> signals each rebuild's completion so
-/// the test can await batches deterministically rather than polling stdout.</para>
+/// <para><b>Not a full E2E.</b> Renamed from <c>WatchCommandE2ETests</c> per
+/// adversarial-review feedback: this suite drives the session with
+/// <c>useFileSystemWatchers: false</c> and feeds changes through
+/// <see cref="WatchSession.InjectChange"/>, so it bypasses the real
+/// <see cref="FileSystemWatcher"/> — the component that produces most
+/// platform-specific watch flake (debounced editor-save bursts, macOS FSEvents
+/// coalescing, network drives, LastWrite vs. Size notify filters). A follow-up
+/// with a real FS-watcher fixture is tracked in issue #1032.</para>
+///
+/// <para><b>Test-hook flow.</b> <see cref="WatchSession.RebuildCompleted"/>
+/// signals each rebuild's completion so the test can await batches
+/// deterministically rather than polling stdout. See the <c>Task.Run</c>
+/// comment at first use — it is load-bearing, not defensive.</para>
 ///
 /// <para><b>Cache-hit signal.</b> <see cref="WatchSession.RebuildResult.Compiled"/>
 /// and <see cref="WatchSession.RebuildResult.Skipped"/> are the load-bearing signal:
-/// a cache-hit file is reported as skipped, so asserting the (Compiled, Skipped)
-/// pair after a targeted edit proves both the batching and the cache warmth.</para>
+/// <c>CompilationDriver</c> only increments <c>Skipped</c> on the cache-hit branch,
+/// so asserting the <c>(Compiled, Skipped)</c> pair after a targeted edit proves
+/// both the batching and the cache warmth.</para>
 ///
 /// <para><b>Timing budget.</b> The debounce window is set to 50ms — small enough
 /// that four sequential rebuilds finish inside a single test run, large enough
 /// that back-to-back <c>InjectChange</c> calls land in the same batch on a busy
-/// CI runner. The per-rebuild wait is capped at 60s so a stuck rebuild fails
-/// loudly instead of exhausting the xUnit per-collection timeout.</para>
+/// CI runner. The per-rebuild wait is capped at 60s as a stuck-session guard;
+/// see <c>RebuildTimeout</c> for the corrected rationale.</para>
 /// </summary>
-public sealed class WatchCommandE2ETests : IDisposable
+public sealed class WatchSessionIntegrationTests : IDisposable
 {
     // 50ms is deliberately generous relative to WatchDebouncerTests' 100ms virtual
     // clock: the fake-clock tests can pick any value, but we are on the real
@@ -36,17 +44,20 @@ public sealed class WatchCommandE2ETests : IDisposable
     // proven flaky on GitHub-hosted runners; 50ms is the audit-recommended floor.
     private const int DebounceMs = 50;
 
-    // 60s per rebuild is generous: the initial compile spins up Roslyn to
-    // validate generated C#, which can take double-digit seconds cold on CI.
-    // Warm rebuilds finish in <500ms locally; the cap only exists so a stuck
-    // session surfaces as a test failure instead of a collection-level hang.
+    // 60s is a stuck-session guard, NOT a cold-Roslyn budget. Adversarial
+    // review corrected the earlier justification: CompilationDriver sets
+    // DeferGeneratedOutputValidation = true, so per-file Roslyn validation
+    // does not run in this path and warm rebuilds finish in <500ms. The cap
+    // exists so a stuck session (see the deadlock case tracked in issue
+    // #1032) fails as a normal test failure instead of exhausting the xUnit
+    // per-collection timeout.
     private static readonly TimeSpan RebuildTimeout = TimeSpan.FromSeconds(60);
 
     private readonly string _root;
 
-    public WatchCommandE2ETests()
+    public WatchSessionIntegrationTests()
     {
-        _root = Path.Combine(Path.GetTempPath(), "calor-watch-e2e-tests", Guid.NewGuid().ToString("N"));
+        _root = Path.Combine(Path.GetTempPath(), "calor-watch-integration-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
     }
 
@@ -128,8 +139,25 @@ public sealed class WatchCommandE2ETests : IDisposable
             current.TrySetResult(result);
         };
 
-        // Run on a worker to isolate any sync-over-async in the compile pipeline
-        // from the test's own async context (defensive; not strictly required).
+        // Task.Run is LOAD-BEARING — do not remove it. Adversarial review of
+        // the first draft of this test proved that without the wrapper, all
+        // rebuilds time out at RebuildTimeout. Why:
+        //   1. WatchSession.RunAsync runs Rebuild(initial: true) SYNCHRONOUSLY
+        //      before its first await (see WatchCommand.cs around line 199).
+        //   2. The RebuildCompleted handler below snapshots `next`, reassigns
+        //      it to a fresh TCS, and completes the old one. If the handler
+        //      fires synchronously inside RunAsync's pre-await code, the
+        //      reassignment happens BEFORE the test's `await next.Task`
+        //      resolves — the awaiter then holds a reference to the NEW TCS,
+        //      which will never complete for this rebuild, and hangs.
+        //   3. Task.Run separates threads so the compile pipeline runs off
+        //      the awaiter's stack; by the time RunAsync fires the handler,
+        //      the test is already awaiting on the original `next`.
+        //
+        // The underlying architectural concern (sync-over-async in RunAsync,
+        // swap-vs-await race in the handler) is tracked in issue #1032.
+        // Refactoring the harness to Channel<RebuildResult> would remove
+        // both — that's the intended follow-up. Until then this wrapper stays.
         var runTask = Task.Run(() => session.RunAsync(cts.Token, useFileSystemWatchers: false), cts.Token);
 
         // Initial compile is rebuild 0.
