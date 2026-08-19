@@ -348,4 +348,102 @@ public class MetadataBinderShapeMeasurementTests
         Assert.False(result.IsResolved);
         Assert.NotNull(result.UnresolvedReason);
     }
+
+    // ================================================================
+    // Branch coverage — edge-case paths that the aggregate measurement
+    // does not naturally exercise. Keeps binder branch coverage ≥ 78%.
+    // ================================================================
+
+    [Fact]
+    public void ResolveConstructor_NoConstructors_UnresolvedReason()
+    {
+        // System.Void is a value type with no publicly-callable constructors.
+        var voidType = _ctx.TryResolveType("System.Void");
+        Assert.NotNull(voidType);
+        // Not every type has zero constructors — synthesize the empty case via
+        // an interface, which has none.
+        var enumerableInterface = _ctx.TryResolveType("System.Collections.Generic.IEnumerable`1");
+        Assert.NotNull(enumerableInterface);
+        var result = _binder.ResolveConstructor(enumerableInterface!,
+            Array.Empty<MetadataArgument>());
+        Assert.False(result.IsResolved);
+        Assert.NotNull(result.UnresolvedReason);
+        Assert.Contains("no accessible constructors", result.UnresolvedReason!);
+    }
+
+    [Fact]
+    public void ResolveConstructor_NoMatchingArity_UnresolvedReason()
+    {
+        var listUnbound = _ctx.TryResolveType("System.Collections.Generic.List`1");
+        var intType = _ctx.TryResolveType("System.Int32");
+        var stringType = _ctx.TryResolveType("System.String");
+        Assert.NotNull(listUnbound);
+        var listOfInt = listUnbound!.Construct(intType!);
+
+        // No List<T> constructor takes (string, string, string, string, string).
+        var result = _binder.ResolveConstructor(listOfInt,
+            new[]
+            {
+                new MetadataArgument(stringType!),
+                new MetadataArgument(stringType!),
+                new MetadataArgument(stringType!),
+                new MetadataArgument(stringType!),
+                new MetadataArgument(stringType!),
+            });
+        Assert.False(result.IsResolved);
+        Assert.NotNull(result.UnresolvedReason);
+    }
+
+    [Fact]
+    public void ResolveIndexer_NoIndexer_ReturnsNull()
+    {
+        // System.Object has no indexer.
+        var objectType = _ctx.TryResolveType("System.Object");
+        var stringType = _ctx.TryResolveType("System.String");
+        Assert.NotNull(objectType);
+        var indexer = _binder.ResolveIndexer(objectType!,
+            new[] { new MetadataArgument(stringType!) });
+        Assert.Null(indexer);
+    }
+
+    [Fact]
+    public void ResolveProperty_NonexistentProperty_ReturnsNull()
+    {
+        var stringType = _ctx.TryResolveType("System.String");
+        Assert.NotNull(stringType);
+        var prop = _binder.ResolveProperty(stringType!, "ThisPropertyDoesNotExist_ZZZ");
+        Assert.Null(prop);
+    }
+
+    [Fact]
+    public void ResolveCall_ReceiverWithNoInstanceOrStaticMethodOfName_UnresolvedReason()
+    {
+        var stringType = _ctx.TryResolveType("System.String");
+        Assert.NotNull(stringType);
+        // "Xyzzy" is not a method name on string.
+        var result = _binder.ResolveCall(stringType!, "Xyzzy_NotAMethod",
+            Array.Empty<MetadataArgument>());
+        Assert.False(result.IsResolved);
+        Assert.Contains("Xyzzy_NotAMethod", result.UnresolvedReason!);
+    }
+
+    [Fact]
+    public void MetadataBinderResult_ResolvedAndUnresolved_Discriminate()
+    {
+        var console = _ctx.TryResolveType("System.Console");
+        var intType = _ctx.TryResolveType("System.Int32");
+        Assert.NotNull(console);
+
+        var okResult = _binder.ResolveCall(console!, "WriteLine",
+            new[] { new MetadataArgument(intType!) });
+        Assert.True(okResult.IsResolved);
+        Assert.NotNull(okResult.Symbol);
+        Assert.Null(okResult.UnresolvedReason);
+
+        var badResult = _binder.ResolveCall(console!, "NoSuchThing",
+            Array.Empty<MetadataArgument>());
+        Assert.False(badResult.IsResolved);
+        Assert.Null(badResult.Symbol);
+        Assert.NotNull(badResult.UnresolvedReason);
+    }
 }
