@@ -950,97 +950,20 @@ public class BuildStateCacheTests : IDisposable
         Assert.NotEqual(baseline, task.ComputeCacheInputs().Serialize());
     }
 
-    // Regression guard for #883 (tracked under #998 in the F4/R2 test-suite audit).
+    // #883 / audit-F4/R2 pin note: a low-level regression Fact was proposed
+    // for the four IL-analysis inputs (ReferencedAssemblies, RuntimeDirectory,
+    // NuGetPackageRoot, DepsFilePath). It was dropped as a duplicate — see
+    // `CompileCalorIntegrationTests.CanonicalInputs_MutatingAnalysisInput_InvalidatesWarmCache`
+    // which is already a [Theory] over the same four inputs, uses a real DLL
+    // (typeof(object).Assembly.Location) rather than fake bytes, exercises the
+    // real MSBuild Execute() path, and asserts the "[options-or-inputs-changed]"
+    // telemetry. The `CanonicalInputs_ReferencedAssemblyContentMutation_
+    // InvalidatesWarmCache` / `CanonicalInputs_DepsFileContentMutation_
+    // InvalidatesWarmCache` pair covers the content-hash axis.
     //
-    // #883: "MSBuild incremental build: IL-analysis inputs are not in the options
-    // hash." When EnableILAnalysis=true, mutating ReferencedAssemblies,
-    // RuntimeDirectory, NuGetPackageRoot, or DepsFilePath against a warm cache
-    // must invalidate the cache — otherwise diagnostics the new input set would
-    // produce (effect discovery from IL, for example) are silently skipped.
-    //
-    // Status: #883 was closed on 2026-08-11 by PR #890. The 2026-08-18
-    // test-suite audit's F4 finding was stale on this point; existing tests
-    // (CanonicalInputs_MutatingAnalysisInput_InvalidatesWarmCache and the
-    // *ContentMutation_InvalidatesWarmCache pair in CompileCalorIntegrationTests)
-    // already cover related shapes. This test is kept as a live green guard
-    // that pins the four-input matrix explicitly, so a future refactor that
-    // silently drops one of them from the options hash fails here with a
-    // named sub-case rather than requiring a re-read of the audit trail.
-    //
-    // If this test starts failing, the fix regressed — do not delete this test
-    // to make it pass. Instead, restore the four inputs to the options-hash
-    // path and verify with `git log --oneline src/Calor.Tasks/` for the #890
-    // fix as reference.
-    //
-    // The four sub-cases are asserted individually so a partial regression
-    // (e.g., only DepsFilePath drops out of the hash) surfaces as a specific
-    // failure rather than a boolean pass/fail on the whole set.
-    [Fact]
-    public void ILAnalysisInputs_MutatingAnyOfTheFour_MustChangeOptionsHash_Issue883()
-    {
-        // Establish a warm baseline: EnableILAnalysis=true with one reference,
-        // one runtime dir, one package root, and one deps file — the exact
-        // configuration a real consumer produces via MSBuild ResolveAssemblyReferences.
-        var reference = CreateTempFile("refs/Baseline.dll", "reference-v1");
-        var runtimeDir = Path.Combine(_tempDir, "runtime");
-        var packageRoot = Path.Combine(_tempDir, "packages");
-        Directory.CreateDirectory(runtimeDir);
-        Directory.CreateDirectory(packageRoot);
-        var deps = CreateTempFile("project.deps.json", """{"runtimeTarget":{"name":"v1"}}""");
-
-        CompileCalor MakeTask()
-            => new()
-            {
-                ProjectDirectory = _tempDir,
-                EnableILAnalysis = true,
-                ReferencedAssemblies = [new TaskItem(reference)],
-                RuntimeDirectory = runtimeDir,
-                NuGetPackageRoot = packageRoot,
-                DepsFilePath = deps
-            };
-
-        var baselineHash = BuildStateCache.ComputeOptionsHash(
-            MakeTask().ComputeCacheInputs().Serialize());
-
-        // 1. Swapping the referenced assembly to a different file must move the hash.
-        var otherReference = CreateTempFile("refs/Other.dll", "reference-v2-different-content");
-        var withDifferentReference = MakeTask();
-        withDifferentReference.ReferencedAssemblies = [new TaskItem(otherReference)];
-        Assert.NotEqual(
-            baselineHash,
-            BuildStateCache.ComputeOptionsHash(
-                withDifferentReference.ComputeCacheInputs().Serialize()));
-
-        // 2. Pointing at a different RuntimeDirectory must move the hash.
-        var otherRuntimeDir = Path.Combine(_tempDir, "runtime-other");
-        Directory.CreateDirectory(otherRuntimeDir);
-        var withDifferentRuntime = MakeTask();
-        withDifferentRuntime.RuntimeDirectory = otherRuntimeDir;
-        Assert.NotEqual(
-            baselineHash,
-            BuildStateCache.ComputeOptionsHash(
-                withDifferentRuntime.ComputeCacheInputs().Serialize()));
-
-        // 3. Pointing at a different NuGetPackageRoot must move the hash.
-        var otherPackageRoot = Path.Combine(_tempDir, "packages-other");
-        Directory.CreateDirectory(otherPackageRoot);
-        var withDifferentPackages = MakeTask();
-        withDifferentPackages.NuGetPackageRoot = otherPackageRoot;
-        Assert.NotEqual(
-            baselineHash,
-            BuildStateCache.ComputeOptionsHash(
-                withDifferentPackages.ComputeCacheInputs().Serialize()));
-
-        // 4. Editing DepsFilePath contents (same path) must move the hash —
-        // content, not just path, must be fingerprinted, since a NuGet upgrade
-        // that rewrites project.deps.json is the classic silent-skip scenario.
-        var withDifferentDeps = MakeTask();
-        File.WriteAllText(deps, """{"runtimeTarget":{"name":"v2"}}""");
-        Assert.NotEqual(
-            baselineHash,
-            BuildStateCache.ComputeOptionsHash(
-                withDifferentDeps.ComputeCacheInputs().Serialize()));
-    }
+    // #883 was closed by #890 (2026-08-11); the 2026-08-18 audit's F4
+    // "known open residual" wording is stale and should be updated in a
+    // follow-up PR.
 
     private static string FindFrameworkReferenceAssembly(string fileName)
     {
