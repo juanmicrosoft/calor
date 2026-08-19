@@ -1048,11 +1048,16 @@ jobs:
         run: python3 scripts/check_snapshot_diffs.py --self-test
 
       - name: Scan snapshot diffs
+        # The script guarantees exit code 0 even on internal error
+        # (see try/except in main()); continue-on-error is
+        # belt-and-suspenders so a shell-level surprise (missing python,
+        # OOM, etc.) still cannot fail the job.
+        continue-on-error: true
         run: |
           python3 scripts/check_snapshot_diffs.py \
             --base "origin/${{ github.base_ref }}" \
             --head HEAD \
-            > /tmp/snapshot-warnings.md
+            > /tmp/snapshot-warnings.md || true
 
       - name: Post PR comment when signals fire
         if: >-

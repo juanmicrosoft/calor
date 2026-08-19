@@ -17,7 +17,7 @@ NEVER fails the CI job — the human reviewer still decides.
 
 Run the built-in unit tests with::
 
-    python3 -m unittest scripts.check_snapshot_diffs
+    python3 scripts/check_snapshot_diffs.py --self-test
 """
 
 from __future__ import annotations
@@ -32,22 +32,26 @@ from pathlib import Path
 from typing import Iterable
 
 
-# Regex for a comment line: leading whitespace then ``//`` (Calor and C#
-# style single-line comment marker used inside the snapshots).
+# Regex for a comment line: leading whitespace then ``//`` (Calor
+# style single-line comment marker used at the top level of snapshots).
+# We deliberately strip §CSHARP body ranges before counting, so ``//``
+# inside a C# interop block is NOT counted as a Calor comment.
 COMMENT_RE = re.compile(r"^\s*//")
 
 # Regex for the paired ``§CSHARP{...}§/CSHARP`` block. The interop body
-# can contain newlines and (importantly) balanced ``{...}`` — but there
-# are no known snapshots with nested unbalanced braces inside the
-# interop, so a non-greedy match up to the closing tag is sufficient
-# for the heuristic. This does NOT need to be a real parser.
+# can contain newlines and (importantly) balanced ``{...}`` from real
+# C# (``public void Foo() { }`` is the canonical shape). The non-greedy
+# match stops at the first ``}§/CSHARP`` sentinel, which is chosen
+# precisely so C# body braces do not confuse it — the sentinel does not
+# appear inside idiomatic C#.
 CSHARP_BLOCK_RE = re.compile(
     r"§CSHARP\{(?P<body>.*?)\}§/CSHARP", re.DOTALL
 )
 
-# ``§CSHARP`` block starts, whether or not they have a matching closer.
-# Used as a fallback count so a truncated closer doesn't inflate the
-# apparent drop artificially.
+# ``§CSHARP`` block openers, whether or not they have a matching closer.
+# We count openers (not paired blocks) so an orphan-closer scenario
+# (paired count > actual count, or paired count < actual openers)
+# cannot silently hide a regression.
 CSHARP_START_RE = re.compile(r"§CSHARP\{")
 
 # Shrink threshold for §CSHARP interop bytes.
@@ -64,14 +68,22 @@ class SnapshotMetrics:
 
     @classmethod
     def from_text(cls, text: str) -> "SnapshotMetrics":
-        comment_count = sum(1 for line in text.splitlines() if COMMENT_RE.match(line))
+        # Count opener occurrences directly — matches the "how many
+        # §CSHARP blocks does this snapshot have?" question honestly,
+        # even in the pathological case where a closer is missing or
+        # duplicated (adversary review flagged max(paired, starts) as
+        # able to hide orphan-closer regressions).
+        interop_block_count = len(CSHARP_START_RE.findall(text))
+
+        # Strip the §CSHARP body ranges out of the text before counting
+        # comments. C# comments (``//``) inside an interop block are
+        # part of the raw C#, not Calor prose — counting them as
+        # "comments dropped" would double-fire the same signal as
+        # "§CSHARP body shrank" and mislead the reviewer.
         bodies = CSHARP_BLOCK_RE.findall(text)
-        # Prefer the paired-block count. If the file has orphan starts
-        # (rare — a snapshot in flight) fall back to the wider count
-        # so removal of a block still registers.
-        paired = len(bodies)
-        starts = len(CSHARP_START_RE.findall(text))
-        interop_block_count = max(paired, starts)
+        stripped = CSHARP_BLOCK_RE.sub("", text)
+        comment_count = sum(1 for line in stripped.splitlines() if COMMENT_RE.match(line))
+
         interop_body_bytes = sum(len(body) for body in bodies)
         return cls(
             comment_count=comment_count,
@@ -145,9 +157,12 @@ def format_report(warnings: Iterable[Warning]) -> str:
         "<!-- calor-snapshot-diff-heuristic -->",
         "### Snapshot fidelity warnings",
         "",
-        "The following `.approved.calr` snapshot changes look suspicious.",
-        "This is a **soft warning** — the reviewer should confirm the changes",
-        "are intentional (e.g., regenerated via `CALOR_UPDATE_SNAPSHOTS=1`).",
+        "The following `.approved.calr` snapshot changes look worth a second look.",
+        "This is a **soft warning** — the reviewer just confirms the deltas are",
+        "intentional. Legitimate reasons include: the migrator got smarter and",
+        "inlined an interop block, a redundant comment was removed, or the",
+        "snapshot was regenerated via `CALOR_UPDATE_SNAPSHOTS=1`. Bulk snapshot",
+        "regenerations are the case worth double-checking.",
         "",
         "| Snapshot | Signal | Before → After |",
         "| --- | --- | --- |",
@@ -227,13 +242,25 @@ def main(argv: list[str] | None = None) -> int:
         result = runner.run(suite)
         return 0 if result.wasSuccessful() else 1
 
-    warnings = scan(args.base, args.head)
-    report = format_report(warnings)
-    if report:
-        sys.stdout.write(report)
-        if not report.endswith("\n"):
-            sys.stdout.write("\n")
-    return 0  # NEVER fail — soft warning only.
+    # NEVER fail — soft warning only. If anything explodes (missing ref,
+    # unicode weirdness, git subprocess failure), emit an operator note
+    # to stderr and exit 0 so the CI step stays green. The workflow also
+    # sets ``continue-on-error: true`` as belt-and-suspenders, but the
+    # promise of "never fails" must hold at the script boundary too.
+    try:
+        warnings = scan(args.base, args.head)
+        report = format_report(warnings)
+        if report:
+            sys.stdout.write(report)
+            if not report.endswith("\n"):
+                sys.stdout.write("\n")
+    except Exception as exc:  # noqa: BLE001 — deliberately broad; see comment above.
+        sys.stderr.write(
+            "check_snapshot_diffs: heuristic skipped due to internal error "
+            f"({type(exc).__name__}: {exc}). This does not fail the PR — the "
+            "reviewer just does not see the soft warning table for this run.\n"
+        )
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +293,49 @@ class MetricsTests(unittest.TestCase):
         text = "    // indented comment\ncode // not a comment start\n"
         metrics = SnapshotMetrics.from_text(text)
         self.assertEqual(metrics.comment_count, 1)
+
+    def test_brace_heavy_csharp_body(self) -> None:
+        # The canonical brace-heavy shape: real C# with balanced { } inside
+        # the interop body. The non-greedy regex must still terminate at
+        # the §/CSHARP sentinel and NOT at any inner `}`. Adversary review
+        # flagged this as untested.
+        body = (
+            "public void Foo() {\n"
+            "  if (x > 0) { return; }\n"
+            "  var d = new Dictionary<string, int> { { \"a\", 1 } };\n"
+            "}\n"
+        )
+        text = f"§CSHARP{{{body}}}§/CSHARP\n"
+        metrics = SnapshotMetrics.from_text(text)
+        self.assertEqual(metrics.interop_block_count, 1)
+        self.assertEqual(metrics.interop_body_bytes, len(body))
+
+    def test_comments_inside_csharp_body_are_not_counted(self) -> None:
+        # C# `//` comments inside a §CSHARP body are part of the raw C#,
+        # NOT Calor comments — must not double-fire with `§CSHARP body
+        # shrank` when the body is edited.
+        text = (
+            "// calor comment\n"
+            "§CSHARP{\n"
+            "  // c-sharp comment 1\n"
+            "  public void Foo() { }\n"
+            "  // c-sharp comment 2\n"
+            "}§/CSHARP\n"
+            "// another calor comment\n"
+        )
+        metrics = SnapshotMetrics.from_text(text)
+        self.assertEqual(metrics.comment_count, 2)  # only the two calor ones
+        self.assertEqual(metrics.interop_block_count, 1)
+
+    def test_orphan_closer_does_not_hide_missing_block(self) -> None:
+        # Adversary review: max(paired, starts) could hide the case where a
+        # snapshot originally had two paired blocks and later has one paired
+        # + one orphan closer (real regression, same paired count). Counting
+        # openers directly catches it.
+        old = "§CSHARP{a}§/CSHARP\n§CSHARP{b}§/CSHARP\n"      # 2 openers
+        new = "§CSHARP{a}§/CSHARP\nsome orphan }§/CSHARP\n"    # 1 opener
+        self.assertEqual(SnapshotMetrics.from_text(old).interop_block_count, 2)
+        self.assertEqual(SnapshotMetrics.from_text(new).interop_block_count, 1)
 
 
 class DiffTests(unittest.TestCase):
