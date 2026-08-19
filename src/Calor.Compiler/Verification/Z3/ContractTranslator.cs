@@ -53,6 +53,15 @@ public sealed class ContractTranslator
     /// Version of the executable-semantics model used to translate contracts.
     /// This value participates in verification cache validity.
     /// </summary>
+    /// <remarks>
+    /// If you bump this constant, also update <c>ExpectedSemanticsVersion</c>
+    /// and <c>ExpectedFixtureHash</c> in
+    /// <c>tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs</c>
+    /// in the same commit. That checkpoint test hashes the translator output on
+    /// a fixture set to catch translator changes that silently invalidated the
+    /// Z3 verification cache but forgot the version bump (the failure mode
+    /// #961 landed by hand in 0.13.2).
+    /// </remarks>
     public const string SemanticsVersion = "z3-executable-semantics-v2";
 
     private readonly Context _ctx;
