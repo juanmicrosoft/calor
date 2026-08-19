@@ -50,6 +50,83 @@ embedded self-test fixtures explicitly, run
 
 ---
 
+## Corpus Submodules (Round-Trip Harness)
+
+<!-- Keep this section broadly in sync with the terser version in CLAUDE.md
+     (and AGENTS.md, which is regenerated from CLAUDE.md). If you edit
+     substance here, mirror the change into CLAUDE.md's "Corpus Submodules"
+     section. -->
+
+`.gitmodules` pins three real-world C# corpora under `bench/corpus/`:
+
+- `bench/corpus/MediatR`
+- `bench/corpus/serilog`
+- `bench/corpus/FluentValidation`
+
+`git clone` does **not** auto-initialize these — CI opts them in per job.
+Find the current call sites with
+`grep -n submodules: .github/workflows/test.yml`; today the `test`,
+`roundtrip-verification`, and the `compiler` shard of `remaining-tests`
+jobs are the ones that need them. If you skip the init step and later run
+the round-trip harness or the corpus binder-ratchet leg locally, you will
+see confusing "corpus submodules not initialized" errors or an
+apparently-empty `bench/corpus/` tree. The three corpora add ~500 MB to
+a fresh clone.
+
+**On a fresh clone**, initialize the submodules:
+
+```bash
+git submodule update --init
+```
+
+`--recursive` is not needed — the three pinned submodules are flat (no
+nested submodules of their own). CI passes `--recursive` as a safe
+superset default; scripts can drop it.
+
+**After upstream changes** to the pinned SHAs, refresh them:
+
+```bash
+git submodule update
+```
+
+Note: this fast-forwards each submodule to the pinned SHA on your
+current outer-repo commit; if you have local changes inside a submodule
+they will be lost unless you `stash` or commit them first.
+
+### When do I actually need this?
+
+You need the submodules populated **only** if you plan to:
+
+- Run the round-trip harness in `tools/Calor.RoundTrip.Harness/` locally.
+- Reproduce the `roundtrip-verification` CI job locally (e.g. debugging a
+  `MediatR: MinorRegressions` failure).
+- Reproduce the `corpus-binder-ratchet` leg locally, or run the specific
+  `BinderIncompleteRatchetTests` class in `Calor.Compiler.Tests`.
+
+The rest of the test suite works fine on a bare clone:
+`BinderIncompleteRatchetTests`
+(`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs`)
+uses `Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not
+initialized")` to skip cleanly if the corpus is empty, so
+`dotnet test tests/Calor.Compiler.Tests/` is safe without submodules —
+you will just silently skip that one class. `Calor.Conversion.Tests`,
+`Calor.Semantics.Tests`, `Calor.Verification.Tests`,
+`Calor.Enforcement.Tests`, and `Calor.Evaluation` do not touch
+`bench/corpus/` at all.
+
+Because CI initializes submodules per-job, dev/CI parity issues show
+up as "corpus tests green in CI, failing locally". Running
+`git submodule update --init` on the outer repo is almost always the fix.
+
+See also the "Build & Test" section in the repo root
+[`AGENTS.md`](https://github.com/juanmicrosoft/calor/blob/main/AGENTS.md)
+and `CLAUDE.md` for the terser agent-oriented version of this note.
+
+Origin: 2026-08-18 test-suite audit, finding F8 / recommendation R4
+(`docs/plans/2026-08-18-test-suite-audit.md`).
+
+---
+
 ## Project Structure
 
 ```
