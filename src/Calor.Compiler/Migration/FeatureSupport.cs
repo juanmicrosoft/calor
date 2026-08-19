@@ -565,6 +565,13 @@ public static class FeatureSupport
             Description = "Using declarations are preserved with their complete containing member because resource lifetime extends to the containing scope",
             Workaround = "Keep the containing member as exact C# interop or rewrite it as an explicit using statement with the same lifetime"
         },
+        ["standalone-block"] = new FeatureInfo
+        {
+            Name = "standalone-block",
+            Support = SupportLevel.NotSupported,
+            Description = "Members containing bare statement blocks are preserved whole as counted C# interop so lexical scope and every child statement remain exact",
+            Workaround = "Keep the containing member as exact C# interop until standalone lexical scopes have a native Calor node"
+        },
         ["collection-expression"] = new FeatureInfo
         {
             Name = "collection-expression",
@@ -1159,6 +1166,7 @@ public static class FeatureSupport
                 "await-foreach",
                 "await-using",
                 "using-declaration",
+                "standalone-block",
                 "ref-struct",
                 "file-scoped-type",
                 "scoped-parameter",
@@ -1232,6 +1240,10 @@ public static class FeatureSupport
                     case ParameterSyntax parameter
                         when parameter.Modifiers.Any(SyntaxKind.ScopedKeyword):
                         Add(detections, parameter, "scoped-parameter");
+                        break;
+                    case BlockSyntax block
+                        when block.Parent is BlockSyntax or GlobalStatementSyntax:
+                        Add(detections, block, "standalone-block");
                         break;
                 }
             }

@@ -65,6 +65,7 @@ public class FeatureCheckCommandTests
     [InlineData("local-function", SupportLevel.NotSupported)]
     [InlineData("scoped-parameter", SupportLevel.NotSupported)]
     [InlineData("using-declaration", SupportLevel.NotSupported)]
+    [InlineData("standalone-block", SupportLevel.NotSupported)]
     public void FeatureCheck_NotSupported_ReturnsNotSupportedLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -215,6 +216,7 @@ public class FeatureCheckCommandTests
     [InlineData("await-foreach")]
     [InlineData("await-using")]
     [InlineData("using-declaration")]
+    [InlineData("standalone-block")]
     [InlineData("scoped-parameter")]
     [InlineData("collection-expression")]
     [InlineData("readonly-struct")]
@@ -259,6 +261,7 @@ public class FeatureCheckCommandTests
     [InlineData("public interface I { int this[int i] { get => i; } }", "interface-indexer-semantics")]
     [InlineData("public interface I { event System.Action Changed; }", "interface-member")]
     [InlineData("internal interface I { void M(); }", "interface-semantics")]
+    [InlineData("public void M() { { int x = 1; } }", "standalone-block")]
     [InlineData("public delegate T Factory<T>(T value);", "delegate-semantics")]
     [InlineData("[System.Obsolete] public delegate void Legacy();", "delegate-semantics")]
     public void SyntaxCapabilityClassifier_DetectsRequiredUnsupportedFeature(

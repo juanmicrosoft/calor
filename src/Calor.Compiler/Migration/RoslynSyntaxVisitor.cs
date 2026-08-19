@@ -8337,18 +8337,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private StatementNode ConvertBlockAsStatement(BlockSyntax block)
     {
-        var statements = ConvertBlock(block);
-        // Return the first statement or a placeholder
-        if (statements.Count > 0)
-        {
-            return statements[0];
-        }
-        return new CallStatementNode(
+        _context.RecordLoss(
+            ConversionLossKind.InteropPreserved,
+            "standalone-block",
+            $"Standalone block preserved as raw C#: {TruncateForMessage(block.ToString())}",
+            block.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return new RawCSharpNode(
             GetTextSpan(block),
-            "noop",
-            fallible: false,
-            Array.Empty<ExpressionNode>(),
-            new AttributeCollection());
+            block.ToFullString());
     }
 
     private MatchStatementNode ConvertSwitchStatement(SwitchStatementSyntax node)

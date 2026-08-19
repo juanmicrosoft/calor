@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
   verbatim as counted C# interop instead of hoisting nested functions and breaking captures,
   recursion, generic constraints, modifiers, or ref semantics. Feature scorecards now report this
   containment as partial rather than native conversion.
+- **Standalone C# block scope is preserved during migration (#751).** Members containing bare
+  `{ }` statement blocks now remain counted C# interop instead of flattening lexical scopes,
+  duplicating sibling local names, or dropping all but the first child statement.
 
 ## [0.13.2] - 2026-08-12
 
