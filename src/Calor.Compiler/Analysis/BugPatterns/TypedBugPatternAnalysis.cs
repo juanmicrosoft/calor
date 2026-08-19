@@ -1999,49 +1999,49 @@ internal sealed class TypedBugPatternAnalysis
                 ? new BigInteger(integer.UnsignedValue)
                 : new BigInteger(integer.Value);
             return AbstractValue.NumericValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 NumericDomain.Exact(value));
         }
         if (expression is BoundFloatLiteral)
-            return AbstractValue.Unknown(expression.TypeName);
+            return AbstractValue.Unknown(expression.Type.DisplayString);
         if (expression is BoundDecimalLiteral decimalLiteral)
         {
             return AbstractValue.DecimalValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 DecimalDomain.Constant(decimalLiteral.Value));
         }
         if (expression is BoundNoneLiteral)
         {
             return AbstractValue.VariantValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 VariantState.OptionNone,
                 $"none:{expression.Span.Start}");
         }
         if (expression is BoundSomeExpression)
         {
             return AbstractValue.VariantValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 VariantState.OptionSome,
                 $"some:{expression.Span.Start}");
         }
         if (expression is BoundOkExpression)
         {
             return AbstractValue.VariantValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 VariantState.ResultOk,
                 $"ok:{expression.Span.Start}");
         }
         if (expression is BoundErrExpression)
         {
             return AbstractValue.VariantValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 VariantState.ResultErr,
                 $"err:{expression.Span.Start}");
         }
         if (expression is BoundStringLiteral text)
         {
             return AbstractValue.SequenceValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 new SequenceShape(
                     SequenceKind.String,
                     $"string:{expression.Span.Start}",
@@ -2054,7 +2054,7 @@ internal sealed class TypedBugPatternAnalysis
                 ? NumericDomain.Exact(array.Initializer.Count)
                 : Evaluate(array.Size, state).Numeric;
             return AbstractValue.SequenceValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 new SequenceShape(
                     SequenceKind.Array,
                     $"array:{array.Span.Start}",
@@ -2064,7 +2064,7 @@ internal sealed class TypedBugPatternAnalysis
         if (expression is BoundMultiDimArrayCreation multi)
         {
             return AbstractValue.SequenceValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 new SequenceShape(
                     SequenceKind.MultiDimensionalArray,
                     $"array:{multi.Span.Start}",
@@ -2077,7 +2077,7 @@ internal sealed class TypedBugPatternAnalysis
         {
             var sequence = Evaluate(length.Array, state).Sequence;
             if (sequence == null)
-                return AbstractValue.Unknown(expression.TypeName);
+                return AbstractValue.Unknown(expression.Type.DisplayString);
 
             NumericDomain? numeric;
             var dimension = sequence.Kind == SequenceKind.MultiDimensionalArray
@@ -2096,7 +2096,7 @@ internal sealed class TypedBugPatternAnalysis
             }
 
             return AbstractValue.NumericValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 numeric.Value with
                 {
                     Length = new LengthTerm(
@@ -2132,7 +2132,7 @@ internal sealed class TypedBugPatternAnalysis
                     integral.CanonicalName,
                     Wrap(numeric.Negate(), integral));
             }
-            return AbstractValue.Unknown(expression.TypeName);
+            return AbstractValue.Unknown(expression.Type.DisplayString);
         }
         if (expression is BoundBinaryExpression binary)
             return EvaluateBinary(binary, state);
@@ -2172,11 +2172,11 @@ internal sealed class TypedBugPatternAnalysis
                 Evaluate(conditional.WhenFalse, whenFalseState));
         }
 
-        var canonicalType = TypeIdentity.Canonicalize(expression.TypeName);
+        var canonicalType = TypeIdentity.Canonicalize(expression.Type.DisplayString);
         if (TryGetSequenceKind(canonicalType, out var kind, out var rank))
         {
             return AbstractValue.SequenceValue(
-                expression.TypeName,
+                expression.Type.DisplayString,
                 new SequenceShape(
                     kind,
                     $"expression:{expression.Span.Start}",
@@ -2184,7 +2184,7 @@ internal sealed class TypedBugPatternAnalysis
                 Presence.Unknown);
         }
 
-        return AbstractValue.Unknown(expression.TypeName);
+        return AbstractValue.Unknown(expression.Type.DisplayString);
     }
 
     private AbstractValue EvaluateBinary(
