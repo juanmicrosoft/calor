@@ -85,19 +85,45 @@ public class MultiDocumentLspE2ETests
 
             Assert.NotEqual(JsonValueKind.Null, renameResult.ValueKind);
             var documentChanges = renameResult.GetProperty("documentChanges");
-            var editedUris = documentChanges
-                .EnumerateArray()
-                .Select(change => change.GetProperty("textDocument")
-                    .GetProperty("uri").GetString())
-                .Where(uri => uri != null)
-                .Select(uri => uri!)
-                .ToHashSet(StringComparer.Ordinal);
 
-            // The workspace edit must touch all 5 documents (target + 4 callers).
-            Assert.Equal(1 + callerCount, editedUris.Count);
-            Assert.Contains(targetUri, editedUris);
+            // Per-URI edit inventory: adversarial review flagged that asserting
+            // just the URI set is hollow — a regression that emitted duplicate
+            // edits, misspelled the newText, or ranged into the wrong bytes
+            // would still slip through. Assert every edit's shape.
+            var editsByUri = new Dictionary<string, List<JsonElement>>(StringComparer.Ordinal);
+            foreach (var change in documentChanges.EnumerateArray())
+            {
+                var uri = change.GetProperty("textDocument").GetProperty("uri").GetString()!;
+                var edits = change.GetProperty("edits").EnumerateArray().ToList();
+                editsByUri[uri] = edits;
+            }
+
+            // Structural invariants across the whole workspace edit:
+            //   * Exactly 5 documents touched (target + 4 callers).
+            //   * Target doc has exactly 1 edit (the declaration).
+            //   * Each caller doc has exactly 1 edit (the call site).
+            //   * Every edit uses the newName as newText.
+            //   * Every edit's range covers exactly oldName.Length characters.
+            Assert.Equal(1 + callerCount, editsByUri.Count);
+            Assert.Contains(targetUri, editsByUri.Keys);
             foreach (var callerUri in callerUris)
-                Assert.Contains(callerUri, editedUris);
+                Assert.Contains(callerUri, editsByUri.Keys);
+
+            foreach (var (uri, edits) in editsByUri)
+            {
+                Assert.True(edits.Count == 1,
+                    $"Expected exactly 1 edit for {uri}, got {edits.Count}. Duplicated edits from the rename handler would be a real regression.");
+                var edit = edits[0];
+                Assert.Equal(newName, edit.GetProperty("newText").GetString());
+                var range = edit.GetProperty("range");
+                var startChar = range.GetProperty("start").GetProperty("character").GetInt32();
+                var endChar = range.GetProperty("end").GetProperty("character").GetInt32();
+                var startLine = range.GetProperty("start").GetProperty("line").GetInt32();
+                var endLine = range.GetProperty("end").GetProperty("line").GetInt32();
+                Assert.True(startLine == endLine,
+                    $"Rename edit on {uri} spans multiple lines ({startLine}→{endLine}) — an identifier rename must be single-line.");
+                Assert.Equal(oldName.Length, endChar - startChar);
+            }
 
             // Apply the workspace edit in-memory and push the updated text back to
             // the server as didChange notifications, then verify diagnostics remain
@@ -156,10 +182,16 @@ public class MultiDocumentLspE2ETests
             foreach (var callerUri in callerUris)
                 Assert.Contains(callerUri, referenceUris);
 
-            // Semantic tokens on each doc must include the new symbol name after
-            // rename. We verify by requesting semantic tokens on the target
-            // document (where the declaration lives) and asserting the token
-            // stream covers the declaration span of the new name.
+            // Semantic tokens on the target document must include a token at
+            // the EXACT declaration span of the new name — not merely "somewhere
+            // in the document a token slices to the identifier spelling."
+            // Adversarial review flagged the previous assertion as
+            // tautological because it walked the server's token stream but
+            // then verified the slice against the test's own edit-applied
+            // source, so any correctly-shaped token stream would pass as long
+            // as its (line, char, length) triples happened to land on some
+            // occurrence of the string. The strengthened check pins the
+            // declaration span explicitly.
             var tokens = await client.RequestResultAsync(
                 "textDocument/semanticTokens/full",
                 new { textDocument = new { uri = targetUri } });
@@ -168,9 +200,14 @@ public class MultiDocumentLspE2ETests
             Assert.True(
                 tokenData.GetArrayLength() > 0,
                 "Expected non-empty semantic tokens data array for target document.");
+
+            // Declaration span: the FIRST occurrence of newName in the target
+            // document's updated source (immediately after the §F{...:) is the
+            // declaration site emitted by the rename edit.
+            var (declLine, declChar) = LineCharacterOf(updatedTargetSource, newName);
             Assert.True(
-                DecodedTokensCoverIdentifier(tokenData, updatedTargetSource, newName),
-                $"Semantic tokens for target should cover an occurrence of '{newName}'.");
+                DecodedTokensContainSpan(tokenData, declLine, declChar, newName.Length),
+                $"Semantic tokens for target must include a token at declaration span line={declLine} char={declChar} length={newName.Length} — proves the server recognises the renamed declaration as a semantic token, not just that a token happens to spell '{newName}'.");
             Assert.False(
                 DecodedTokensCoverIdentifier(tokenData, updatedTargetSource, oldName),
                 $"Semantic tokens for target must not still reference '{oldName}'.");
@@ -198,10 +235,17 @@ public class MultiDocumentLspE2ETests
             §R INT:42
         """;
 
+    // Note (adversarial review): `§U{TargetModule}` was previously included on the
+    // caller-module source. The parser treats §U payload as a .NET namespace path
+    // (System.Text style); a Calor `§M{id:Name}` module is not registered as an
+    // importable namespace, so `§U{TargetModule}` was a no-op — cross-module
+    // symbol resolution goes through WorkspaceState in the language server, which
+    // merges symbols across open documents regardless of using directives.
+    // Removed to keep the fixture honest about what's actually being tested
+    // (multi-document workspace-state resolution, not `§U` import).
     private static string BuildCallerSource(int index, string symbolName) =>
         $$"""
         §M{m{{index + 1:D3}}:CallerModule{{index}}}
-          §U{TargetModule}
           §F{f{{index + 100:D3}}:Run:pub} () -> i32
             §R §C{{{symbolName}}} §/C
         """;
@@ -276,6 +320,45 @@ public class MultiDocumentLspE2ETests
         return Math.Min(offset + character, source.Length);
     }
 
+    /// <summary>
+    /// Walks the LSP delta-encoded semantic-tokens stream and returns true iff
+    /// there is a token at exactly (targetLine, targetChar) with the given
+    /// length. Unlike <see cref="DecodedTokensCoverIdentifier"/> — which
+    /// merely proves the server emitted SOME token whose slice matches an
+    /// identifier's spelling — this pins the SPECIFIC span, catching a
+    /// regression where the server emits tokens for the wrong spans (e.g.,
+    /// the whole `§F{...}` header instead of the identifier).
+    /// </summary>
+    private static bool DecodedTokensContainSpan(
+        JsonElement tokenData,
+        int targetLine,
+        int targetChar,
+        int targetLength)
+    {
+        var array = tokenData.EnumerateArray().Select(item => item.GetInt32()).ToArray();
+        var currentLine = 0;
+        var currentChar = 0;
+        for (var offset = 0; offset + 5 <= array.Length; offset += 5)
+        {
+            var deltaLine = array[offset];
+            var deltaChar = array[offset + 1];
+            var length = array[offset + 2];
+            if (deltaLine > 0)
+            {
+                currentLine += deltaLine;
+                currentChar = deltaChar;
+            }
+            else
+            {
+                currentChar += deltaChar;
+            }
+
+            if (currentLine == targetLine && currentChar == targetChar && length == targetLength)
+                return true;
+        }
+        return false;
+    }
+
     private static bool DecodedTokensCoverIdentifier(
         JsonElement tokenData,
         string source,
@@ -314,6 +397,28 @@ public class MultiDocumentLspE2ETests
                 return true;
         }
         return false;
+    }
+
+    private static (int Line, int Character) LineCharacterOf(string source, string value)
+    {
+        var offset = source.IndexOf(value, StringComparison.Ordinal);
+        if (offset < 0)
+            throw new InvalidOperationException($"'{value}' not found in source.");
+        var line = 0;
+        var character = 0;
+        for (var index = 0; index < offset; index++)
+        {
+            if (source[index] == '\n')
+            {
+                line++;
+                character = 0;
+            }
+            else
+            {
+                character++;
+            }
+        }
+        return (line, character);
     }
 
     private static object PositionOf(string source, string value)
