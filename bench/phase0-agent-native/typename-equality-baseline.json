@@ -1,8 +1,11 @@
 {
   "$description": "F-3 baseline (v0.14 §S2). Snapshots the count of `TypeName ==` and `TypeName !=` occurrences under `src/` at S2 merge. ArchitectureTests.TypeName_StringEquality_NotAddedAfterFreeze asserts the live count is <= this baseline — the ratchet is strictly monotonically decreasing. S3–S6 migrate call sites off string equality (each migration lowers the count); S7 removes the property (F-5, v0.14 release exit criterion).",
   "$rule": "Additive PRs cannot increase this baseline. Subtractive amendments (raising the baseline) require an explicit supersession entry in this file AND cannot merge in the same PR as work that benefits from the raised ceiling.",
-  "baselineCount": 56,
-  "measuredAt": "2026-08-18",
+  "baselineCount": 54,
+  "measuredAt": "2026-08-19",
+  "s7BatchHistory": [
+    {"batch": 1, "count": 56, "date": "2026-08-19", "sites": "BoundConditionalExpression whenTrue/whenFalse.TypeName == NEVER (2 sites in BoundNodes.cs)"}
+  ],
   "measurementCommand": "grep -rn 'TypeName ==\\|TypeName !=' src/ | wc -l",
   "note": "Count is over the whole src/ tree because F-3's scoping-doc text is `TypeName ==` / `!=` sites in src/ (not narrowed to BoundExpression.TypeName). Includes ContainingTypeName, ResolvedTypeName, and any other TypeName-named property with equality comparisons — S6/S7 lower ALL of them by removing the shim."
 }

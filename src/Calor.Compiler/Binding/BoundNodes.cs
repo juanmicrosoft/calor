@@ -1645,12 +1645,16 @@ public sealed class BoundConditionalExpression : BoundExpression
             condition,
             whenTrue,
             whenFalse,
-            string.Equals(whenTrue.TypeName, whenFalse.TypeName, StringComparison.OrdinalIgnoreCase)
-                ? whenTrue.TypeName
-                : whenTrue.TypeName == "NEVER"
-                    ? whenFalse.TypeName
-                    : whenFalse.TypeName == "NEVER"
-                        ? whenTrue.TypeName
+            // S7 batch-1: migrated from whenTrue.TypeName / whenFalse.TypeName
+            // to Type.DisplayString. Behavior byte-identical (V-1's corpus
+            // byte-identity test pins this invariant). Drops 2 sites off
+            // F-3's ratchet.
+            string.Equals(whenTrue.Type.DisplayString, whenFalse.Type.DisplayString, StringComparison.OrdinalIgnoreCase)
+                ? whenTrue.Type.DisplayString
+                : whenTrue.Type.DisplayString == "NEVER"
+                    ? whenFalse.Type.DisplayString
+                    : whenFalse.Type.DisplayString == "NEVER"
+                        ? whenTrue.Type.DisplayString
                         : "OBJECT")
     {
     }
