@@ -34,8 +34,7 @@ public sealed class QuantifierVariableNode : AstNode
         TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -67,8 +66,7 @@ public sealed class ForallExpressionNode : ExpressionNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -100,8 +98,7 @@ public sealed class ExistsExpressionNode : ExpressionNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -131,6 +128,5 @@ public sealed class ImplicationExpressionNode : ExpressionNode
         Consequent = consequent ?? throw new ArgumentNullException(nameof(consequent));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

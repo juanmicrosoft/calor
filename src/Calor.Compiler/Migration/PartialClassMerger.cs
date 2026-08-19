@@ -352,30 +352,12 @@ public sealed class PartialClassMerger
         }
         items.AddRange(replacements.Values.SelectMany(queue => queue));
 
-        return original.CopyMetadataTo(new ModuleNode(
-            original.Span,
-            original.Id,
-            original.Name,
-            usings,
-            original.Interfaces,
-            newClasses,
-            original.Enums,
-            original.EnumExtensions,
-            original.Delegates,
-            original.Functions,
-            original.Attributes,
-            original.Issues,
-            original.Assumptions,
-            original.Invariants,
-            original.Decisions,
-            original.Context,
-            interopBlocks: original.InteropBlocks.Count > 0 ? original.InteropBlocks : null,
-            refinementTypes: original.RefinementTypes.Count > 0 ? original.RefinementTypes : null,
-            indexedTypes: original.IndexedTypes.Count > 0 ? original.IndexedTypes : null,
-            typePreprocessorBlocks: original.TypePreprocessorBlocks.Count > 0 ? original.TypePreprocessorBlocks : null,
-            identifierSpan: original.IdentifierSpan,
-            items: items.Count > 0 ? items : null,
-            namespaceScopes: original.NamespaceScopes));
+        return original.With(update =>
+        {
+            update.Usings = usings;
+            update.Classes = newClasses;
+            update.Items = items;
+        });
     }
 
     private static IReadOnlyList<AstNode> CanonicalClassItems(

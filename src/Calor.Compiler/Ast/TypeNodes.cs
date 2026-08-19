@@ -49,8 +49,7 @@ public sealed class RecordDefinitionNode : TypeDefinitionNode
         Fields = fields ?? throw new ArgumentNullException(nameof(fields));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -81,8 +80,7 @@ public sealed class FieldDefinitionNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -107,8 +105,7 @@ public sealed class UnionTypeDefinitionNode : TypeDefinitionNode
         Variants = variants ?? throw new ArgumentNullException(nameof(variants));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -133,8 +130,7 @@ public sealed class VariantDefinitionNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -153,8 +149,6 @@ public sealed class TypeReferenceNode : AstNode
         TypeArguments = typeArguments ?? Array.Empty<TypeReferenceNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 
     public override string ToString()
     {
@@ -186,8 +180,7 @@ public sealed class RecordCreationNode : ExpressionNode
         Fields = fields ?? throw new ArgumentNullException(nameof(fields));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -205,8 +198,7 @@ public sealed class FieldAssignmentNode : AstNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -231,8 +223,7 @@ public sealed class FieldAccessNode : ExpressionNode
         FieldNameSpan = fieldNameSpan ?? span;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -249,8 +240,7 @@ public sealed class SomeExpressionNode : ExpressionNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -272,8 +262,7 @@ public sealed class NoneExpressionNode : ExpressionNode
         TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -290,8 +279,7 @@ public sealed class OkExpressionNode : ExpressionNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -308,8 +296,7 @@ public sealed class ErrExpressionNode : ExpressionNode
         Error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -337,8 +324,7 @@ public sealed class EnumMemberNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -399,6 +385,5 @@ public sealed class EnumDefinitionNode : TypeDefinitionNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

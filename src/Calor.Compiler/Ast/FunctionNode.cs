@@ -29,8 +29,7 @@ public sealed class OutputNode : AstNode
         TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -45,8 +44,7 @@ public sealed class EffectsNode : AstNode
         Effects = effects ?? throw new ArgumentNullException(nameof(effects));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -230,8 +228,7 @@ public sealed class FunctionNode : AstNode
         Deprecated != null || BreakingChanges.Count > 0 || Properties.Count > 0 ||
         Lock != null || Author != null || TaskRef != null;
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -331,6 +328,5 @@ public sealed class ParameterNode : AstNode
         InlineRefinement = inlineRefinement;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

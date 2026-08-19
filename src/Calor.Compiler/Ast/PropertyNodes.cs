@@ -108,8 +108,7 @@ public sealed class PropertyNode : AstNode
         (Setter == null || Setter.IsAutoImplemented) &&
         (Initer == null || Initer.IsAutoImplemented);
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -183,8 +182,7 @@ public sealed class IndexerNode : AstNode
         (Setter == null || Setter.IsAutoImplemented) &&
         (Initer == null || Initer.IsAutoImplemented);
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -238,8 +236,7 @@ public sealed class PropertyAccessorNode : AstNode
 
     public bool IsAutoImplemented => Body.Count == 0;
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -318,8 +315,7 @@ public sealed class ConstructorNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -341,8 +337,7 @@ public sealed class ConstructorInitializerNode : AstNode
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -361,8 +356,7 @@ public sealed class AssignmentStatementNode : StatementNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -405,8 +399,7 @@ public sealed class CompoundAssignmentStatementNode : StatementNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -453,6 +446,5 @@ public sealed class UsingStatementNode : StatementNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

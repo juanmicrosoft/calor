@@ -39,8 +39,7 @@ public sealed class StackAllocNode : ExpressionNode
         Initializer = initializer ?? Array.Empty<ExpressionNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -59,8 +58,7 @@ public sealed class UnsafeBlockNode : StatementNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -94,8 +92,7 @@ public sealed class FixedStatementNode : StatementNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -112,8 +109,7 @@ public sealed class AddressOfNode : ExpressionNode
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -130,8 +126,7 @@ public sealed class PointerDereferenceNode : ExpressionNode
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -150,8 +145,7 @@ public sealed class SizeOfNode : ExpressionNode
         TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -177,6 +171,5 @@ public sealed class SyncBlockNode : StatementNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

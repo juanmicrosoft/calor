@@ -24,8 +24,7 @@ public sealed class RequiresNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -51,8 +50,7 @@ public sealed class EnsuresNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -77,8 +75,7 @@ public sealed class InvariantNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>

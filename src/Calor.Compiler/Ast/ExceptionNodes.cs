@@ -38,8 +38,7 @@ public sealed class TryStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -93,8 +92,7 @@ public sealed class CatchClauseNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -114,8 +112,7 @@ public sealed class ThrowStatementNode : StatementNode
         Exception = exception;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -135,8 +132,7 @@ public sealed class ThrowExpressionNode : ExpressionNode
         Exception = exception ?? throw new ArgumentNullException(nameof(exception));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -147,6 +143,5 @@ public sealed class RethrowStatementNode : StatementNode
 {
     public RethrowStatementNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

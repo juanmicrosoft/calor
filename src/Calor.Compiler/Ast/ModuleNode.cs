@@ -233,11 +233,103 @@ public sealed class ModuleNode : AstNode
     }
 
     /// <summary>
+    /// Creates a metadata-preserving copy after applying explicit updates.
+    /// The update object mirrors every aggregate field, so architecture tests
+    /// fail when a new field is added without participating in copies.
+    /// </summary>
+    public ModuleNode With(Action<ModuleUpdate> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        var update = new ModuleUpdate(this);
+        configure(update);
+        return CopyMetadataTo(update.Build());
+    }
+
+    public sealed class ModuleUpdate
+    {
+        internal ModuleUpdate(ModuleNode source)
+        {
+            Span = source.Span;
+            Id = source.Id;
+            Name = source.Name;
+            IdentifierSpan = source.IdentifierSpan;
+            Usings = source.Usings;
+            Interfaces = source.Interfaces;
+            Classes = source.Classes;
+            Enums = source.Enums;
+            EnumExtensions = source.EnumExtensions;
+            Delegates = source.Delegates;
+            Functions = source.Functions;
+            Attributes = source.Attributes;
+            Issues = source.Issues;
+            Assumptions = source.Assumptions;
+            Invariants = source.Invariants;
+            Decisions = source.Decisions;
+            Context = source.Context;
+            InteropBlocks = source.InteropBlocks;
+            TypePreprocessorBlocks = source.TypePreprocessorBlocks;
+            Items = source.Items;
+            RefinementTypes = source.RefinementTypes;
+            IndexedTypes = source.IndexedTypes;
+            NamespaceScopes = source.NamespaceScopes;
+        }
+
+        public TextSpan Span { get; set; }
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public TextSpan IdentifierSpan { get; set; }
+        public IReadOnlyList<UsingDirectiveNode> Usings { get; set; }
+        public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; set; }
+        public IReadOnlyList<ClassDefinitionNode> Classes { get; set; }
+        public IReadOnlyList<EnumDefinitionNode> Enums { get; set; }
+        public IReadOnlyList<EnumExtensionNode> EnumExtensions { get; set; }
+        public IReadOnlyList<DelegateDefinitionNode> Delegates { get; set; }
+        public IReadOnlyList<FunctionNode> Functions { get; set; }
+        public AttributeCollection Attributes { get; set; }
+        public IReadOnlyList<IssueNode> Issues { get; set; }
+        public IReadOnlyList<AssumeNode> Assumptions { get; set; }
+        public IReadOnlyList<InvariantNode> Invariants { get; set; }
+        public IReadOnlyList<DecisionNode> Decisions { get; set; }
+        public ContextNode? Context { get; set; }
+        public IReadOnlyList<CSharpInteropBlockNode> InteropBlocks { get; set; }
+        public IReadOnlyList<TypePreprocessorBlockNode> TypePreprocessorBlocks { get; set; }
+        public IReadOnlyList<AstNode> Items { get; set; }
+        public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; set; }
+        public IReadOnlyList<IndexedTypeNode> IndexedTypes { get; set; }
+        public IReadOnlyList<NamespaceScopeInfo> NamespaceScopes { get; set; }
+
+        internal ModuleNode Build() =>
+            new(
+                Span,
+                Id,
+                Name,
+                Usings,
+                Interfaces,
+                Classes,
+                Enums,
+                EnumExtensions,
+                Delegates,
+                Functions,
+                Attributes,
+                Issues,
+                Assumptions,
+                Invariants,
+                Decisions,
+                Context,
+                InteropBlocks,
+                RefinementTypes,
+                IndexedTypes,
+                TypePreprocessorBlocks,
+                IdentifierSpan,
+                Items,
+                NamespaceScopes);
+    }
+
+    /// <summary>
     /// Returns true if this module has extended metadata (issues, assumptions, etc.).
     /// </summary>
     public bool HasExtendedMetadata => Issues.Count > 0 || Assumptions.Count > 0 ||
         Invariants.Count > 0 || Decisions.Count > 0 || Context != null;
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

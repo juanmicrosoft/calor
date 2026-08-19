@@ -77,8 +77,7 @@ public sealed class IntLiteralNode : ExpressionNode
             : unchecked((long)magnitude);
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -106,8 +105,7 @@ public sealed class StringLiteralNode : ExpressionNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -123,8 +121,7 @@ public sealed class BoolLiteralNode : ExpressionNode
         Value = value;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -145,8 +142,7 @@ public sealed class ConditionalExpressionNode : ExpressionNode
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -181,8 +177,7 @@ public sealed class FloatLiteralNode : ExpressionNode
         IsDecimal = isDecimal;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -198,8 +193,7 @@ public sealed class DecimalLiteralNode : ExpressionNode
         Value = value;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -214,8 +208,7 @@ public sealed class ReferenceNode : ExpressionNode
         Name = name ?? throw new ArgumentNullException(nameof(name));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -233,8 +226,7 @@ public sealed class UnaryOperationNode : ExpressionNode
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -316,8 +308,7 @@ public sealed class FallbackExpressionNode : ExpressionNode
         Suggestion = suggestion;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -334,6 +325,5 @@ public sealed class RawCSharpExpressionNode : ExpressionNode
         CSharpCode = csharpCode ?? throw new ArgumentNullException(nameof(csharpCode));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

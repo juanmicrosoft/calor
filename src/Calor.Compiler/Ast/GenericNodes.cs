@@ -45,8 +45,7 @@ public sealed class TypeParameterNode : AstNode
         Variance = variance;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -104,8 +103,7 @@ public sealed class TypeConstraintNode : AstNode
         TypeName = typeName;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -138,6 +136,5 @@ public sealed class GenericTypeNode : ExpressionNode
         TypeArguments = typeArguments ?? throw new ArgumentNullException(nameof(typeArguments));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

@@ -26,8 +26,7 @@ public sealed class MatchExpressionNode : ExpressionNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -49,8 +48,7 @@ public sealed class MatchStatementNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -70,8 +68,7 @@ public sealed class MatchCaseNode : AstNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 // Phase 10: With expressions
@@ -102,8 +99,7 @@ public sealed class WithExpressionNode : ExpressionNode
         Assignments = assignments ?? throw new ArgumentNullException(nameof(assignments));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -122,8 +118,7 @@ public sealed class WithPropertyAssignmentNode : AstNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -143,8 +138,7 @@ public sealed class WildcardPatternNode : PatternNode
 {
     public WildcardPatternNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -161,8 +155,7 @@ public sealed class VariablePatternNode : PatternNode
         IdentifierSpan = identifierSpan ?? span;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -177,8 +170,7 @@ public sealed class LiteralPatternNode : PatternNode
         Literal = literal ?? throw new ArgumentNullException(nameof(literal));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -193,8 +185,7 @@ public sealed class SomePatternNode : PatternNode
         InnerPattern = innerPattern ?? throw new ArgumentNullException(nameof(innerPattern));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -204,8 +195,7 @@ public sealed class NonePatternNode : PatternNode
 {
     public NonePatternNode(TextSpan span) : base(span) { }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -220,8 +210,7 @@ public sealed class OkPatternNode : PatternNode
         InnerPattern = innerPattern ?? throw new ArgumentNullException(nameof(innerPattern));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -236,8 +225,7 @@ public sealed class ErrPatternNode : PatternNode
         InnerPattern = innerPattern ?? throw new ArgumentNullException(nameof(innerPattern));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 // Phase 10: Advanced Patterns
@@ -272,8 +260,7 @@ public sealed class PositionalPatternNode : PatternNode
         Patterns = patterns ?? throw new ArgumentNullException(nameof(patterns));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -306,8 +293,7 @@ public sealed class PropertyPatternNode : PatternNode
         Matches = matches ?? throw new ArgumentNullException(nameof(matches));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -326,8 +312,7 @@ public sealed class PropertyMatchNode : AstNode
         Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -354,8 +339,7 @@ public sealed class RelationalPatternNode : PatternNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -390,8 +374,7 @@ public sealed class ListPatternNode : PatternNode
         SliceIndex = sliceIndex >= 0 ? sliceIndex : patterns.Count;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -414,8 +397,7 @@ public sealed class VarPatternNode : PatternNode
         IdentifierSpan = identifierSpan ?? span;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -431,8 +413,7 @@ public sealed class ConstantPatternNode : PatternNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -448,8 +429,7 @@ public sealed class NegatedPatternNode : PatternNode
         Inner = inner ?? throw new ArgumentNullException(nameof(inner));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -467,8 +447,7 @@ public sealed class OrPatternNode : PatternNode
         Right = right ?? throw new ArgumentNullException(nameof(right));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -486,8 +465,7 @@ public sealed class AndPatternNode : PatternNode
         Right = right ?? throw new ArgumentNullException(nameof(right));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -524,6 +502,5 @@ public sealed class TypePatternNode : PatternNode
         BindingSpan = BindingName == null ? null : bindingSpan ?? span;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

@@ -53,8 +53,7 @@ public sealed class ListCreationNode : ExpressionNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -80,8 +79,7 @@ public sealed class KeyValuePairNode : AstNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -144,8 +142,7 @@ public sealed class DictionaryCreationNode : ExpressionNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -198,8 +195,7 @@ public sealed class SetCreationNode : ExpressionNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -225,8 +221,7 @@ public sealed class CollectionPushNode : StatementNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -258,8 +253,7 @@ public sealed class DictionaryPutNode : StatementNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -285,8 +279,7 @@ public sealed class CollectionRemoveNode : StatementNode
         KeyOrValue = keyOrValue ?? throw new ArgumentNullException(nameof(keyOrValue));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -318,8 +311,7 @@ public sealed class CollectionSetIndexNode : StatementNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -339,8 +331,7 @@ public sealed class CollectionClearNode : StatementNode
         CollectionName = collectionName ?? throw new ArgumentNullException(nameof(collectionName));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -372,8 +363,7 @@ public sealed class CollectionInsertNode : StatementNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -428,8 +418,7 @@ public sealed class CollectionContainsNode : ExpressionNode
         Mode = mode;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -485,8 +474,7 @@ public sealed class DictionaryForeachNode : StatementNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -506,6 +494,5 @@ public sealed class CollectionCountNode : ExpressionNode
         Collection = collection ?? throw new ArgumentNullException(nameof(collection));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }

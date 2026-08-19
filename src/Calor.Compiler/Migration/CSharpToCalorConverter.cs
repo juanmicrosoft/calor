@@ -944,19 +944,23 @@ public sealed class CSharpToCalorConverter
                 : item)
             .ToList();
 
-        return module.CopyMetadataTo(new ModuleNode(
-            module.Span, module.Id, module.Name, module.Usings,
-            module.Interfaces.Where(i => !failedInterfaces.Contains(i)).ToList(),
-            module.Classes.Where(c => !failedClasses.Contains(c)).ToList(),
-            module.Enums.Where(e => !failedEnums.Contains(e)).ToList(),
-            module.EnumExtensions,
-            module.Delegates.Where(d => !failedDelegates.Contains(d)).ToList(),
-            module.Functions, module.Attributes, module.Issues, module.Assumptions,
-            module.Invariants, module.Decisions, module.Context,
-            module.InteropBlocks.Concat(interops).ToList(),
-            module.RefinementTypes, module.IndexedTypes, module.TypePreprocessorBlocks,
-            items: items.Count > 0 ? items : null,
-            namespaceScopes: module.NamespaceScopes));
+        return module.With(update =>
+        {
+            update.Interfaces = module.Interfaces
+                .Where(iface => !failedInterfaces.Contains(iface))
+                .ToList();
+            update.Classes = module.Classes
+                .Where(cls => !failedClasses.Contains(cls))
+                .ToList();
+            update.Enums = module.Enums
+                .Where(enumDefinition => !failedEnums.Contains(enumDefinition))
+                .ToList();
+            update.Delegates = module.Delegates
+                .Where(delegateDefinition => !failedDelegates.Contains(delegateDefinition))
+                .ToList();
+            update.InteropBlocks = module.InteropBlocks.Concat(interops).ToList();
+            update.Items = items;
+        });
     }
 
     /// <summary>Emits a module containing only the given member(s) and reports whether

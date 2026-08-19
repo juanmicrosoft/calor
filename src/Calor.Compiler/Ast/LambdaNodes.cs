@@ -26,8 +26,7 @@ public sealed class LambdaParameterNode : AstNode
         TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -76,8 +75,7 @@ public sealed class LambdaExpressionNode : ExpressionNode
 
     public bool IsExpressionLambda => ExpressionBody != null;
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -108,8 +106,7 @@ public sealed class DelegateDefinitionNode : TypeDefinitionNode
         Effects = effects;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -182,8 +179,7 @@ public sealed class EventDefinitionNode : AstNode
         RemoveBody = removeBody;
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -202,8 +198,7 @@ public sealed class EventSubscribeNode : StatementNode
         Handler = handler ?? throw new ArgumentNullException(nameof(handler));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
 
 /// <summary>
@@ -222,6 +217,5 @@ public sealed class EventUnsubscribeNode : StatementNode
         Handler = handler ?? throw new ArgumentNullException(nameof(handler));
     }
 
-    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
-    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+
 }
