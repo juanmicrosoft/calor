@@ -54,7 +54,7 @@
       "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 481,
+      "expectedTotal": 482,
       "expectedSkipped": 0
     },
     {
