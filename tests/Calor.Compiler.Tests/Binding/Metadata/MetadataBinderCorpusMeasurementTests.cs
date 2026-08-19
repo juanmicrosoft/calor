@@ -87,16 +87,29 @@ public class MetadataBinderCorpusMeasurementTests
         }
         else
         {
+            // V-1 gap #35 fix: round-2 m4's anti-tautology pin. Strict
+            // per-subject and aggregate equality against the committed
+            // ledger — the current measurement (recomputed live) must match
+            // the ledger's numbers exactly. Prevents a scenario where a PR
+            // silently hardcodes a stale number in the ledger without a
+            // corresponding measurement update.
             using var stream = File.OpenRead(ledgerPath);
             var committed = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(stream);
-            var floorPct = committed.GetProperty("aggregateResolvedFraction").GetDouble();
 
-            Assert.True(aggregatePct + 0.5 >= floorPct,
-                $"S5 ratchet violated: current aggregate {aggregatePct:F2}% is below " +
-                $"committed floor {floorPct:F2}% (with 0.5% tolerance for measurement noise). " +
-                "If this drop is intentional (corpus SHA bump, whitelist narrowing, etc.), " +
-                "regenerate via CALOR_REGENERATE_S5_LEDGER=1 and update the ledger " +
-                "in the same PR with rationale in the commit message.");
+            var ledgerAggResolved = committed.GetProperty("aggregateResolved").GetInt32();
+            var ledgerAggCandidates = committed.GetProperty("aggregateCandidates").GetInt32();
+            Assert.Equal(ledgerAggResolved, totalResolved);
+            Assert.Equal(ledgerAggCandidates, totalCandidates);
+
+            var ledgerSubjects = committed.GetProperty("perSubject");
+            for (var i = 0; i < perSubject.Count; i++)
+            {
+                var ledgerSubject = ledgerSubjects[i];
+                var live = perSubject[i];
+                Assert.Equal(ledgerSubject.GetProperty("subject").GetString(), live.SubjectName);
+                Assert.Equal(ledgerSubject.GetProperty("resolvedCount").GetInt32(), live.ResolvedCount);
+                Assert.Equal(ledgerSubject.GetProperty("candidateCount").GetInt32(), live.CandidateCount);
+            }
         }
 
         Assert.True(totalCandidates > 0,
