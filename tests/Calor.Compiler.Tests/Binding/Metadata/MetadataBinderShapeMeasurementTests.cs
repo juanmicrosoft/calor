@@ -446,4 +446,118 @@ public class MetadataBinderShapeMeasurementTests
         Assert.Null(badResult.Symbol);
         Assert.NotNull(badResult.UnresolvedReason);
     }
+
+    // ================================================================
+    // F-4 diagnostic emission — Calor0270 (SignatureUnresolved) and
+    // Calor0271 (SignatureResolvedNullableOblivious). Verification-gap
+    // fix V-1: the codes are allocated in DiagnosticCode; ToDiagnostics
+    // is the emission surface.
+    // ================================================================
+
+    [Fact]
+    public void ToDiagnostics_Unresolved_EmitsCalor0270_WithReasonInMessage()
+    {
+        var console = _ctx.TryResolveType("System.Console");
+        Assert.NotNull(console);
+        var result = _binder.ResolveCall(console!, "NoSuchMethod_ZZZ",
+            Array.Empty<MetadataArgument>());
+        Assert.False(result.IsResolved);
+
+        var span = new Calor.Compiler.Parsing.TextSpan(0, 10, 1, 1);
+        var diagnostics = result.ToDiagnostics(span).ToArray();
+
+        Assert.Single(diagnostics);
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticCode.SignatureUnresolved, diagnostics[0].Code);
+        Assert.Equal("Calor0270", diagnostics[0].Code);
+        Assert.Contains("NoSuchMethod_ZZZ", diagnostics[0].Message);
+        // S4 default severity is Info; callers can promote per §3.5's path.
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticSeverity.Info, diagnostics[0].Severity);
+    }
+
+    [Fact]
+    public void ToDiagnostics_UnresolvedWithExplicitSeverity_PromotesToWarning()
+    {
+        var console = _ctx.TryResolveType("System.Console");
+        Assert.NotNull(console);
+        var result = _binder.ResolveCall(console!, "Bogus", Array.Empty<MetadataArgument>());
+        var span = new Calor.Compiler.Parsing.TextSpan(0, 0, 0, 0);
+
+        var atWarning = result.ToDiagnostics(span,
+            Calor.Compiler.Diagnostics.DiagnosticSeverity.Warning).ToArray();
+        Assert.Single(atWarning);
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticSeverity.Warning, atWarning[0].Severity);
+
+        var atError = result.ToDiagnostics(span,
+            Calor.Compiler.Diagnostics.DiagnosticSeverity.Error).ToArray();
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticSeverity.Error, atError[0].Severity);
+    }
+
+    [Fact]
+    public void ToDiagnostics_ResolvedNonOblivious_EmitsNoDiagnostics()
+    {
+        // System.Console.WriteLine(int) is well-annotated in .NET 10 (int
+        // params are always NotAnnotated by definition). No Calor0271.
+        var console = _ctx.TryResolveType("System.Console");
+        var intType = _ctx.TryResolveType("System.Int32");
+        Assert.NotNull(console);
+        var result = _binder.ResolveCall(console!, "WriteLine",
+            new[] { new MetadataArgument(intType!) });
+        Assert.True(result.IsResolved);
+
+        var diagnostics = result.ToDiagnostics(new Calor.Compiler.Parsing.TextSpan(0, 0, 0, 0)).ToArray();
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void SignatureUnresolvedCode_IsCalor0270()
+    {
+        // Direct pin on the allocated code — protects against accidental
+        // renumbering during future 0200-band expansion.
+        Assert.Equal("Calor0270", Calor.Compiler.Diagnostics.DiagnosticCode.SignatureUnresolved);
+    }
+
+    [Fact]
+    public void SignatureResolvedNullableObliviousCode_IsCalor0271()
+    {
+        Assert.Equal("Calor0271", Calor.Compiler.Diagnostics.DiagnosticCode.SignatureResolvedNullableOblivious);
+    }
+
+    // ================================================================
+    // §6 non-goal: dynamic receivers → UnresolvedBoundType by construction.
+    // Verification-gap fix V-1 gap #47.
+    // ================================================================
+
+    [Fact]
+    public void ResolveCall_DynamicReceiver_IsUnresolved()
+    {
+        // System.Object stands in for a dynamic receiver at the API level.
+        // A true `dynamic` typed receiver in a Calor call would produce an
+        // ITypeSymbol with SpecialType == System_Object and TypeKind ==
+        // Dynamic — the API can't be handed a dynamic ITypeSymbol without
+        // building one from Roslyn syntax. This test pins the observable
+        // property: MetadataBinder does not resolve arbitrary methods on
+        // System.Object beyond object's own members. `Foo` is not on object.
+        var objectType = _ctx.TryResolveType("System.Object");
+        Assert.NotNull(objectType);
+        var result = _binder.ResolveCall(objectType!, "Foo",
+            Array.Empty<MetadataArgument>());
+        Assert.False(result.IsResolved);
+        Assert.NotNull(result.UnresolvedReason);
+    }
+
+    // ================================================================
+    // F-1 fixture-count reflection pin — verification-gap fix V-1 gap #29/#36.
+    // ================================================================
+
+    [Fact]
+    public void F1FixtureSet_ContainsExactly15Shapes()
+    {
+        var fixtureType = typeof(BCLCallShapeFixtures);
+        var shapeMethods = fixtureType
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(m => m.Name.StartsWith("Shape", StringComparison.Ordinal))
+            .Where(m => m.GetCustomAttributes(typeof(FactAttribute), inherit: false).Length > 0)
+            .ToArray();
+        Assert.Equal(15, shapeMethods.Length);
+    }
 }

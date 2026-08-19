@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -305,4 +307,37 @@ internal readonly struct MetadataBinderResult
     public static MetadataBinderResult CreateResolved(IMethodSymbol symbol) => new(symbol, null);
 
     public static MetadataBinderResult CreateUnresolved(string reason) => new(null, reason);
+
+    /// <summary>
+    /// F-4: emit the diagnostic(s) this result implies at the given call-site
+    /// span. Unresolved → Calor0270 (SignatureUnresolved, Info severity in S4).
+    /// Resolved with Oblivious annotation → Calor0271 (Info severity always).
+    /// Callers control severity per §3.5's promotion path (Info → Warning →
+    /// Error over the release cycle).
+    /// </summary>
+    public IEnumerable<Calor.Compiler.Diagnostics.Diagnostic> ToDiagnostics(TextSpan span, Calor.Compiler.Diagnostics.DiagnosticSeverity severity = Calor.Compiler.Diagnostics.DiagnosticSeverity.Info)
+    {
+        if (!IsResolved)
+        {
+            yield return new Calor.Compiler.Diagnostics.Diagnostic(
+                DiagnosticCode.SignatureUnresolved,
+                $"Metadata resolution failed: {UnresolvedReason}",
+                span,
+                severity);
+            yield break;
+        }
+
+        // Resolved: check for Oblivious surface (return type or any parameter).
+        var oblivious = Symbol!.ReturnType.NullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.None ||
+                        Symbol.Parameters.Any(p => p.Type.NullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.None);
+        if (oblivious)
+        {
+            yield return new Calor.Compiler.Diagnostics.Diagnostic(
+                DiagnosticCode.SignatureResolvedNullableOblivious,
+                $"Resolved '{Symbol.ToDisplayString()}' but its nullable annotation is Oblivious; " +
+                "callers needing a non-null claim must adapt at the interop boundary.",
+                span,
+                Calor.Compiler.Diagnostics.DiagnosticSeverity.Info);
+        }
+    }
 }

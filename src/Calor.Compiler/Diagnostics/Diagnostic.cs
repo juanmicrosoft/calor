@@ -269,6 +269,26 @@ public static class DiagnosticCode
     /// </summary>
     public const string InheritanceCycle = "Calor0262";
 
+    /// <summary>
+    /// Info (S4) / Warning (S6) / Error (§3.5): the v0.14 metadata binder
+    /// could not resolve a .NET call site against real metadata. Message
+    /// includes receiver-type display, method name, and argument count.
+    /// Callers wrap the result as <c>UnresolvedBoundType</c> so downstream
+    /// analyses treat it as "do not claim".
+    /// See docs/plans/v0.14-metadata-binding-scoping.md §D6 / F-4.
+    /// </summary>
+    public const string SignatureUnresolved = "Calor0270";
+
+    /// <summary>
+    /// Info: the v0.14 metadata binder resolved a .NET call site but the
+    /// target's nullable annotation is <c>Oblivious</c> (either from an
+    /// unannotated reference assembly or a TPA/runtime-assembly mismatch).
+    /// Feeds the §3.2 "explicit boundary adapter" rule — callers that need
+    /// a non-null claim must adapt at the interop boundary.
+    /// See docs/plans/v0.14-metadata-binding-scoping.md §D6 / F-4.
+    /// </summary>
+    public const string SignatureResolvedNullableOblivious = "Calor0271";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";
