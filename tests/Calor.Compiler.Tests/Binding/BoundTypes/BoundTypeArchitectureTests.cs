@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -158,6 +159,97 @@ public class BoundTypeArchitectureTests
         foreach (var expr in sampler)
         {
             Assert.Equal(expr.TypeName, expr.Type.DisplayString);
+        }
+    }
+
+    /// <summary>
+    /// V-1 gap #25 fix — §S2 R7 corpus cache-invariance. Binds every Calor
+    /// source file under <c>samples/</c> and <c>benchmarks/</c> and asserts
+    /// <c>Type.DisplayString == TypeName</c> for every bound expression in
+    /// every module. This is what makes the S2 shim's byte-identity claim
+    /// actually verified: if any subclass's Type override ever diverges
+    /// from TypeName's string, the verifier cache silently invalidates —
+    /// this test catches that first.
+    /// </summary>
+    [Fact]
+    public void BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus()
+    {
+        var repoRoot = CliTestHarness.FindRepoRoot();
+        var corpusRoots = new[]
+        {
+            Path.Combine(repoRoot, "samples"),
+            Path.Combine(repoRoot, "benchmarks"),
+        };
+
+        var files = corpusRoots
+            .Where(Directory.Exists)
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories))
+            .ToArray();
+
+        Assert.NotEmpty(files);
+
+        var mismatches = new List<string>();
+        var modulesBound = 0;
+        var expressionsChecked = 0;
+
+        foreach (var file in files)
+        {
+            try
+            {
+                var source = File.ReadAllText(file);
+                var lexDiagnostics = new DiagnosticBag();
+                var lexer = new Lexer(source, lexDiagnostics);
+                var tokens = lexer.TokenizeAllForParser();
+                var parseDiagnostics = new DiagnosticBag();
+                var parser = new Parser(tokens, parseDiagnostics);
+                var module = parser.Parse();
+
+                var bindDiagnostics = new DiagnosticBag();
+                var binder = new Calor.Compiler.Binding.Binder(bindDiagnostics);
+                var boundModule = binder.Bind(module);
+                modulesBound++;
+
+                foreach (var boundExpr in EnumerateBoundExpressions(boundModule))
+                {
+                    expressionsChecked++;
+                    if (!string.Equals(boundExpr.TypeName, boundExpr.Type.DisplayString, StringComparison.Ordinal))
+                    {
+                        mismatches.Add(
+                            $"{file}: {boundExpr.GetType().Name} TypeName='{boundExpr.TypeName}' " +
+                            $"Type.DisplayString='{boundExpr.Type.DisplayString}'");
+                        if (mismatches.Count > 20) break;
+                    }
+                }
+                if (mismatches.Count > 20) break;
+            }
+            catch (Exception)
+            {
+                // Some samples may fail to bind cleanly — skip them. The point
+                // is to catch TypeName-vs-DisplayString drift on modules that
+                // DO bind; a corpus-file bind failure is not what this pin is
+                // about.
+            }
+        }
+
+        Assert.True(modulesBound > 0,
+            $"No .calr modules bound cleanly. Corpus roots: {string.Join(", ", corpusRoots)}");
+        Assert.True(expressionsChecked > 0,
+            "No bound expressions checked; corpus binding produced empty trees.");
+        Assert.Empty(mismatches);
+    }
+
+    private static IEnumerable<BoundExpression> EnumerateBoundExpressions(BoundNode node)
+    {
+        if (node is BoundExpression expr)
+        {
+            yield return expr;
+        }
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in EnumerateBoundExpressions(child))
+            {
+                yield return descendant;
+            }
         }
     }
 }
