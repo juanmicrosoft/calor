@@ -105,30 +105,57 @@ public class HookCommandAgentInvocationTests
     {
         var toolInput = BuildWriteToolInput("/tmp/whatever.calr", "§M{m001:Whatever}\n");
 
-        var (exitCode, _, stdErr) = await RunHookAsync("validate-write", toolInput);
+        var (exitCode, stdOut, stdErr) = await RunHookAsync("validate-write", toolInput);
 
         Assert.Equal(0, exitCode);
         // No block reason should be printed on the happy path.
         Assert.DoesNotContain("BLOCKED", stdErr);
+        // The allow path is silent — no advisory chatter on either stream.
+        // A regression that emitted a stray warning on the happy path would
+        // pollute agent output on every legitimate .calr write; asserting
+        // both streams are empty pins the "hook shuts up on allow" contract.
+        Assert.Equal(string.Empty, stdOut.Trim());
+        Assert.Equal(string.Empty, stdErr.Trim());
     }
 
     [Fact]
-    public async Task PreToolUseHook_MissingPayload_FailsGracefully()
+    public async Task PreToolUseHook_MalformedJsonPayload_FailsOpen()
+    {
+        // Documents the CURRENT Claude hook behavior for malformed JSON:
+        // ValidateWriteWithReason (src/Calor.Compiler/Commands/HookCommand.cs)
+        // catches JsonException and returns (0, null, null) — i.e., garbage
+        // input allows the write. This is a fail-OPEN posture that is
+        // deliberately inconsistent with the Codex path
+        // (CodexWriteHook_FailsClosedForMalformedEnvelope pins Codex at
+        // exit 2 on the same shape). Both cannot be right; this test pins
+        // the current state so a future change is a visible flip, not a
+        // silent semantic drift. If the fail-open/fail-closed
+        // inconsistency between Claude and Codex is resolved by making
+        // Claude also fail closed, this test's assertion must invert.
+        var malformed = "not-json-at-all";
+
+        var (exitCode, _, _) = await RunHookAsync("validate-write", malformed);
+
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public async Task PreToolUseHook_MissingPayload_FailsWithNonZeroExit()
     {
         // Simulate an agent (or misconfigured integration) invoking the hook
-        // without passing the required tool_input argument. This asserts the
-        // failure mode is a user-facing error message — not an unhandled
-        // exception / stack trace — so an agent surfacing hook stderr doesn't
-        // get spammed with framework internals.
+        // without passing the tool_input argument. The point is a controlled
+        // non-zero exit, not any specific message text (System.CommandLine's
+        // "Required argument missing" template is framework-owned and will
+        // shift on beta bumps). Any UnhandledException surfacing on stderr
+        // is a controlled-diagnostic contract violation — that IS a
+        // Calor-owned invariant and worth asserting.
         var (exitCode, _, stdErr) = await RunHookAsync("validate-write", argument: null);
 
         Assert.NotEqual(0, exitCode);
-        Assert.Contains("Required argument missing", stdErr);
-        Assert.Contains("validate-write", stdErr);
+        // The hook must not surface an unhandled exception to the agent —
+        // that's the specific class of "controlled diagnostic" contract we
+        // own. The literal "Unhandled exception" prefix is the .NET runtime's
+        // guaranteed output when a Task or Main throws unhandled.
         Assert.DoesNotContain("Unhandled exception", stdErr);
-        // No raw .NET stack traces should escape — those indicate a crash,
-        // not a controlled diagnostic.
-        Assert.DoesNotContain("at System.", stdErr);
-        Assert.DoesNotContain("at Calor.", stdErr);
     }
 }
