@@ -1,0 +1,37 @@
+{
+  "_comment": "Baseline round-trip pass counts per corpus project, seeded from main-branch CI run 32280829013 (2026-08-19). Used by .github/workflows/test.yml roundtrip-verification job to detect incremental regressions (issue #1005). This file is READ-only in the current implementation — a future follow-up will teach the harness to write it back on main-branch merges.",
+  "_source_run": "https://github.com/juanmicrosoft/calor/actions/runs/32280829013",
+  "_updated_at": "2026-08-19T17:18:17Z",
+  "projects": {
+    "FluentValidation": {
+      "round_trip_passed": 865,
+      "round_trip_total": 866,
+      "native_fraction": 0.5539568345323741,
+      "coverage_fraction": 0.5971223021582733
+    },
+    "MediatR": {
+      "round_trip_passed": 155,
+      "round_trip_total": 157,
+      "native_fraction": 0.5,
+      "coverage_fraction": 0.75
+    },
+    "Serilog": {
+      "round_trip_passed": 811,
+      "round_trip_total": 811,
+      "native_fraction": 0.38392857142857145,
+      "coverage_fraction": 0.5535714285714286
+    },
+    "Synthetic": {
+      "round_trip_passed": 52,
+      "round_trip_total": 52,
+      "native_fraction": 1.0,
+      "coverage_fraction": 1.0
+    },
+    "Synthetic2": {
+      "round_trip_passed": 20,
+      "round_trip_total": 20,
+      "native_fraction": 1.0,
+      "coverage_fraction": 1.0
+    }
+  }
+}
