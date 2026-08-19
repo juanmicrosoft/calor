@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round-trip delta alarm helper (issue #1005).
 
-Reads the committed round-trip baseline (bench/roundtrip-baseline.json) and the
+Reads the committed round-trip baseline (eng/roundtrip-baselines.json) and the
 per-project reports produced by the round-trip harness (*-roundtrip.json under
 the reports directory), then emits a Markdown summary of per-project pass-count
 drops. Intended for CI: warning-only, never blocks merge.
@@ -19,7 +19,7 @@ Design notes:
 
 Usage:
     python3 scripts/roundtrip_delta.py \\
-        --baseline bench/roundtrip-baseline.json \\
+        --baseline eng/roundtrip-baselines.json \\
         --reports conversion-reports/ \\
         --output-markdown delta.md
 
@@ -147,7 +147,7 @@ def format_markdown(deltas: list[dict[str, Any]]) -> str:
         "## Round-Trip Incremental Delta (warning only)",
         "",
         "One or more corpus projects lost ground vs the committed main-branch "
-        "baseline (`bench/roundtrip-baseline.json`). This is a **warning only** — "
+        "baseline (`eng/roundtrip-baselines.json`). This is a **warning only** — "
         "absolute thresholds (per-project native% and coverage%) may still be green, "
         "and this comment does not block merge.",
         "",
@@ -188,7 +188,7 @@ def format_markdown(deltas: list[dict[str, Any]]) -> str:
     lines.extend([
         "",
         "**What to do.** If this regression is expected (e.g. a new corpus test "
-        "surfaced a known gap), update `bench/roundtrip-baseline.json` in this PR "
+        "surfaced a known gap), update `eng/roundtrip-baselines.json` in this PR "
         "to acknowledge the new floor. Otherwise investigate whether a recent "
         "conversion or emitter change lost coverage.",
         "",

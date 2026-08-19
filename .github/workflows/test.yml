@@ -812,20 +812,42 @@ jobs:
 
       # Warning-only incremental delta alarm (#1005). Compares the current
       # per-project round-trip pass counts to the committed baseline in
-      # bench/roundtrip-baseline.json. If ANY project lost ground, posts a PR
+      # eng/roundtrip-baselines.json. If ANY project lost ground, posts a PR
       # comment (marker `<!-- calor-roundtrip-delta -->`). Never fails the job —
       # the absolute-threshold gate (RoundTripExitPolicy) remains authoritative
       # for merge-blocking. This surfaces drifts the absolute gate does not
       # catch (see the MediatR MinorRegressions signal on PRs #986 / #992 that
       # a maintainer had to interpret manually).
+      - name: Self-test round-trip delta script
+        # Verifies the delta-computation logic itself before running it
+        # against real reports. Matches the pattern used by check_coverage.py,
+        # check_trx.py, and run_mutation_gate.py at earlier CI steps.
+        if: always()
+        run: python3 scripts/roundtrip_delta.py --self-test
+
       - name: Compute round-trip delta vs baseline
+        # Never fails the job — the absolute-threshold gate
+        # (RoundTripExitPolicy) remains authoritative for merge-blocking.
+        # Belt-and-suspenders: continue-on-error at the step level +
+        # explicit `has_delta=false` fallback on ANY script error so a
+        # silent skip is impossible. If the script crashes (missing
+        # baseline, malformed JSON, git surprise), the step still emits
+        # `has_delta=false` and the workflow continues.
         if: always()
         id: rt_delta
+        continue-on-error: true
         run: |
+          set +e
           python3 scripts/roundtrip_delta.py \
-            --baseline bench/roundtrip-baseline.json \
+            --baseline eng/roundtrip-baselines.json \
             --reports conversion-reports/ \
             --output-markdown conversion-reports/_delta.md
+          script_exit=$?
+          if [ "$script_exit" -ne 0 ]; then
+            echo "roundtrip_delta.py exited $script_exit — skipping delta comment"
+            echo "has_delta=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -s conversion-reports/_delta.md ]; then
             echo "has_delta=true" >> "$GITHUB_OUTPUT"
           else
