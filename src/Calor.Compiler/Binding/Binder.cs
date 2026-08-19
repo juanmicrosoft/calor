@@ -1585,12 +1585,14 @@ public sealed class Binder
 
     private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
     {
+        // S7 batch-3: migrated left/right BoundExpression.TypeName reads
+        // to .Type.DisplayString. Byte-identical per V-1's corpus pin.
         var left = BindExpression(coalesce.Left);
         var right = BindExpression(coalesce.Right);
-        var leftValueType = UnwrapOptionOrNullable(left.TypeName);
+        var leftValueType = UnwrapOptionOrNullable(left.Type.DisplayString);
         return Structural(
             coalesce,
-            GetCommonType(leftValueType, right.TypeName),
+            GetCommonType(leftValueType, right.Type.DisplayString),
             [left, right],
             deferredChildren: [right]);
     }
@@ -1605,7 +1607,7 @@ public sealed class Binder
             new Dictionary<string, object?>
             {
                 ["MemberName"] = conditional.MemberName,
-                ["TargetType"] = target.TypeName,
+                ["TargetType"] = target.Type.DisplayString,
             });
     }
 
@@ -2040,14 +2042,15 @@ public sealed class Binder
     private BoundExpression BindAddressOf(AddressOfNode addressOf)
     {
         var operand = BindExpression(addressOf.Operand);
-        return Structural(addressOf, $"{operand.TypeName}*", [operand]);
+        return Structural(addressOf, $"{operand.Type.DisplayString}*", [operand]);
     }
 
     private BoundExpression BindPointerDereference(PointerDereferenceNode dereference)
     {
         var operand = BindExpression(dereference.Operand);
-        var resultType = operand.TypeName.EndsWith('*')
-            ? operand.TypeName[..^1]
+        var operandTypeName = operand.Type.DisplayString;
+        var resultType = operandTypeName.EndsWith('*')
+            ? operandTypeName[..^1]
             : "OBJECT";
         return Structural(dereference, resultType, [operand]);
     }
@@ -2180,8 +2183,8 @@ public sealed class Binder
         var left = BindExpression(binOp.Left);
         var right = BindExpression(binOp.Right);
 
-        // Determine result type based on operator
-        var resultType = GetBinaryOperationResultType(binOp.Operator, left.TypeName, right.TypeName);
+        // Determine result type based on operator (S7 batch-3: .Type.DisplayString shim).
+        var resultType = GetBinaryOperationResultType(binOp.Operator, left.Type.DisplayString, right.Type.DisplayString);
 
         return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, resultType);
     }
@@ -2210,9 +2213,9 @@ public sealed class Binder
         var resultType = unaryOp.Operator switch
         {
             UnaryOperator.Not => "BOOL",
-            UnaryOperator.Negate => operand.TypeName,
-            UnaryOperator.BitwiseNot => operand.TypeName,
-            _ => operand.TypeName
+            UnaryOperator.Negate => operand.Type.DisplayString,
+            UnaryOperator.BitwiseNot => operand.Type.DisplayString,
+            _ => operand.Type.DisplayString
         };
         return new BoundUnaryExpression(unaryOp.Span, unaryOp.Operator, operand, resultType);
     }
