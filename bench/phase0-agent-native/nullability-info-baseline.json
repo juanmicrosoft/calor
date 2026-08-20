@@ -1,0 +1,280 @@
+{
+  "$description": "S1 baseline for v0.14 nullability enforcement (issue #875). Enumerates every \u00a7B{...:string} binding in samples/ + benchmarks/ .calr files, classified by initializer shape. Projected-diagnostic-candidates is an over-approximation of the Info-level Calor0272 count that S3 will emit \u2014 real count will be measured against actual binder output at S3 and used as the F-1 ratchet baseline.",
+  "$rule": "Additive PRs cannot raise total_bindings without a supersession entry. Phase B (S5) exit criterion is annotated_nullable = 0 (this file tracks total_bindings by shape; the annotated_nullable / oblivious_irremediable split lives on the runtime baseline once S3 lights up).",
+  "measurement_command": "python3 /tmp/nullability_s1_baseline.py",
+  "measured_at": "2026-08-20",
+  "measured_at_git_sha": "a46f53c12704c1dfba7bd34bb2796fae90e7e0c4",
+  "phase": "A-pre-S3",
+  "total_bindings": 42,
+  "by_shape": {
+    "CALL_CALOR": 8,
+    "CALL_INTEROP": 7,
+    "CONCAT": 18,
+    "LITERAL_STRING": 7,
+    "VARIABLE_REF": 2
+  },
+  "projected_diagnostic_candidates_count": 17,
+  "note": "projected_diagnostic_candidates_count is an over-approximation \u2014 actual S3 diagnostic count will replace it once MetadataBinder-annotated nullability flows. This baseline exists to detect surprise regressions in the shape distribution, not to gate anything.",
+  "by_file": {
+    "benchmarks/null-safety/null-deref.calr": [
+      {
+        "line": 28,
+        "target": "inner",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL get_inner obj)"
+      },
+      {
+        "line": 29,
+        "target": "value",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL get_value inner)"
+      },
+      {
+        "line": 37,
+        "target": "safe",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL coalesce maybeNull STR:\"default\")"
+      }
+    ],
+    "benchmarks/security/command-injection.calr": [
+      {
+        "line": 12,
+        "target": "cmd",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"ls -la \" user_input)"
+      },
+      {
+        "line": 36,
+        "target": "cmd",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"cat \" filename)"
+      },
+      {
+        "line": 37,
+        "target": "result",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL popen cmd)"
+      },
+      {
+        "line": 46,
+        "target": "safe",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL shell_escape user_input)"
+      },
+      {
+        "line": 47,
+        "target": "cmd",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"echo \" safe)"
+      },
+      {
+        "line": 57,
+        "target": "script",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"python script.py --arg=\" query_param)"
+      },
+      {
+        "line": 67,
+        "target": "safeArg",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL sanitize arg)"
+      }
+    ],
+    "benchmarks/security/path-traversal.calr": [
+      {
+        "line": 12,
+        "target": "content",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL file.read user_path)"
+      },
+      {
+        "line": 21,
+        "target": "basePath",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"/app/public/\""
+      },
+      {
+        "line": 22,
+        "target": "safeName",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL path.basename filename)"
+      },
+      {
+        "line": 23,
+        "target": "fullPath",
+        "shape": "CONCAT",
+        "initializer_start": "(+ basePath safeName)"
+      },
+      {
+        "line": 24,
+        "target": "content",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL file.read fullPath)"
+      },
+      {
+        "line": 33,
+        "target": "base",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"/var/data\""
+      },
+      {
+        "line": 34,
+        "target": "fullPath",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL path.join base request_path)"
+      },
+      {
+        "line": 35,
+        "target": "content",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL fs.read fullPath)"
+      },
+      {
+        "line": 44,
+        "target": "sanitized",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL path_sanitize user_input)"
+      },
+      {
+        "line": 45,
+        "target": "base",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"/safe/directory/\""
+      },
+      {
+        "line": 46,
+        "target": "fullPath",
+        "shape": "CONCAT",
+        "initializer_start": "(+ base sanitized)"
+      },
+      {
+        "line": 47,
+        "target": "content",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL file.read fullPath)"
+      },
+      {
+        "line": 57,
+        "target": "path",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"/uploads/\" form_input)"
+      },
+      {
+        "line": 65,
+        "target": "path",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"/etc/app/config.json\""
+      },
+      {
+        "line": 66,
+        "target": "content",
+        "shape": "CALL_INTEROP",
+        "initializer_start": "(CALL file.read path)"
+      }
+    ],
+    "benchmarks/security/sql-injection.calr": [
+      {
+        "line": 12,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"SELECT * FROM users WHERE name = '\" user_input)"
+      },
+      {
+        "line": 13,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query STR:\"'\")"
+      },
+      {
+        "line": 23,
+        "target": "query",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"SELECT * FROM users WHERE name = ?\""
+      },
+      {
+        "line": 34,
+        "target": "query",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"INSERT INTO users (name, email) VALUES ('\""
+      },
+      {
+        "line": 35,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query name)"
+      },
+      {
+        "line": 36,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query STR:\"', '\")"
+      },
+      {
+        "line": 37,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query email)"
+      },
+      {
+        "line": 38,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query STR:\"')\")"
+      },
+      {
+        "line": 48,
+        "target": "escaped",
+        "shape": "CALL_CALOR",
+        "initializer_start": "(CALL sql_escape user_input)"
+      },
+      {
+        "line": 49,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"SELECT * FROM users WHERE name = '\" escaped)"
+      },
+      {
+        "line": 50,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query STR:\"'\")"
+      },
+      {
+        "line": 60,
+        "target": "name",
+        "shape": "VARIABLE_REF",
+        "initializer_start": "request_param"
+      },
+      {
+        "line": 61,
+        "target": "search",
+        "shape": "VARIABLE_REF",
+        "initializer_start": "name"
+      },
+      {
+        "line": 62,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"SELECT * FROM users WHERE name LIKE '%\" search)"
+      },
+      {
+        "line": 63,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ query STR:\"%'\")"
+      },
+      {
+        "line": 72,
+        "target": "tableName",
+        "shape": "LITERAL_STRING",
+        "initializer_start": "STR:\"users\""
+      },
+      {
+        "line": 73,
+        "target": "query",
+        "shape": "CONCAT",
+        "initializer_start": "(+ STR:\"SELECT COUNT(*) FROM \" tableName)"
+      }
+    ]
+  }
+}
