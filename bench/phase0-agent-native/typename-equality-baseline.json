@@ -11,7 +11,8 @@
     {"batch": 5, "count": 54, "date": "2026-08-19", "sites": "TypedBugPatternAnalysis.cs .TypeName reads (16 sites; reads only)"},
     {"batch": 6, "count": 54, "date": "2026-08-19", "sites": "Binder.cs + TypedBugPatternAnalysis.cs .TypeName reads (14 sites; reads only)"},
     {"batch": 7, "count": 54, "date": "2026-08-19", "sites": "CallGraphAnalysis + BoundNodes.cs internal ctor reads (10 sites; reads only)"},
-    {"batch": "F-5", "count": 54, "date": "2026-08-19", "sites": "Deleted abstract string TypeName from BoundExpression base; 45 subclass overrides converted to Type overrides; TypeName kept as compatibility shim (TypeName => Type.DisplayString) for test call sites. Follow-up PR migrates test reads and deletes shim entirely."}
+    {"batch": "F-5", "count": 54, "date": "2026-08-19", "sites": "Deleted abstract string TypeName from BoundExpression base; 45 subclass overrides converted to Type overrides; TypeName kept as compatibility shim (TypeName => Type.DisplayString) for test call sites. Follow-up PR migrates test reads and deletes shim entirely."},
+    {"batch": "F-5b", "count": 54, "date": "2026-08-19", "sites": "Deleted the TypeName compatibility shim from BoundExpression entirely; ~110 remaining test/LSP/ctor reads migrated to .Type.DisplayString via compiler-driven fixup. F-5 SATISFIED — BoundExpression.TypeName no longer exists."}
   ],
   "measurementCommand": "grep -rn 'TypeName ==\\|TypeName !=' src/ | wc -l",
   "note": "Count is over the whole src/ tree because F-3's scoping-doc text is `TypeName ==` / `!=` sites in src/ (not narrowed to BoundExpression.TypeName). Includes ContainingTypeName, ResolvedTypeName, and any other TypeName-named property with equality comparisons — S6/S7 lower ALL of them by removing the shim."

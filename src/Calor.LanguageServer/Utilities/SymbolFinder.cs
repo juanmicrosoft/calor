@@ -170,7 +170,7 @@ public static class SymbolFinder
                 BoundCallStatement statement => statement.Span.Contains(offset)
                     && (target == null || statement.Target == target),
                 BoundNewExpression creation => creation.TypeNameSpan.Contains(offset)
-                    && (target == null || creation.TypeName == target),
+                    && (target == null || creation.Type.DisplayString == target),
                 BoundExpressionCallExpression expressionCall => expressionCall.Span.Contains(offset),
                 _ => false,
             })
@@ -243,7 +243,7 @@ public static class SymbolFinder
                 }
                 break;
             case BoundNewExpression creation
-                when string.Equals(creation.TypeName, result.Name, StringComparison.Ordinal)
+                when string.Equals(creation.Type.DisplayString, result.Name, StringComparison.Ordinal)
                      && creation.TypeNameSpan.Contains(offset)
                      && creation.ResolvedTypeSymbolId is { IsNone: false } typeId:
                 return typeId;

@@ -34,17 +34,10 @@ public abstract class BoundExpression : BoundNode
     /// <summary>
     /// v0.14 F-5 — ground-truth <see cref="BoundType"/> representation.
     /// Every BoundExpression provides a non-null <c>Type</c>; string
-    /// spellings derive from <see cref="BoundType.DisplayString"/> so
-    /// there is a single source of truth for expression types.
+    /// spellings derive from <see cref="BoundType.DisplayString"/>.
+    /// (The <c>string TypeName</c> shim was removed at F-5.)
     /// </summary>
     public abstract BoundType Type { get; }
-
-    /// <summary>
-    /// v0.14 F-5 compatibility shim: forwards to <c>Type.DisplayString</c>.
-    /// External call sites should prefer <c>expression.Type.DisplayString</c>
-    /// directly. Slated for removal after test call sites migrate.
-    /// </summary>
-    public string TypeName => Type.DisplayString;
 
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
@@ -1615,7 +1608,7 @@ public sealed class BoundNewExpression : BoundExpression
         ResolvedConstructors = resolvedConstructors
             ?? (resolvedConstructor == null ? Array.Empty<FunctionSymbol>() : [resolvedConstructor]);
         TypeReference = typeReference ?? new BoundTypeReference(
-            TypeName,
+            Type.DisplayString,
             TypeNameSpan,
             resolvedType,
             TypeArguments

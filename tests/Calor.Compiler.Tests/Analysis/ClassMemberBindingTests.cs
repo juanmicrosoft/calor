@@ -745,7 +745,7 @@ public class ClassMemberBindingTests
         // The RHS (DEC:100) should NOT be zero
         var literal = Assert.IsType<BoundDecimalLiteral>(div.Right);
         Assert.Equal(100m, literal.Value);
-        Assert.Equal("DECIMAL", literal.TypeName);
+        Assert.Equal("DECIMAL", literal.Type.DisplayString);
     }
 
     #endregion

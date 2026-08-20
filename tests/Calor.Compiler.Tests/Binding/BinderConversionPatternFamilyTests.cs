@@ -45,7 +45,7 @@ public class BinderConversionPatternFamilyTests
         var (expr, diags) = BindReturn(new DecimalLiteralNode(S, precise));
         var bound = Assert.IsType<BoundDecimalLiteral>(expr);
         Assert.Equal(precise, bound.Value);
-        Assert.Equal("DECIMAL", bound.TypeName);
+        Assert.Equal("DECIMAL", bound.Type.DisplayString);
         AssertComplete(diags);
     }
 
@@ -55,7 +55,7 @@ public class BinderConversionPatternFamilyTests
         var (expr, diags) = BindReturn(new TypeOperationNode(S, TypeOp.Cast,
             new IntLiteralNode(S, 42), "f64"));
         var conv = Assert.IsType<BoundTypeOperationExpression>(expr);
-        Assert.Equal("f64", conv.TypeName); // the TARGET, not the operand's INT
+        Assert.Equal("f64", conv.Type.DisplayString); // the TARGET, not the operand's INT
         Assert.IsType<BoundIntLiteral>(conv.Operand);
         Assert.Equal(TypeOp.Cast, conv.Operation);
         AssertComplete(diags);
@@ -66,7 +66,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, _) = BindReturn(new TypeOperationNode(S, TypeOp.As,
             new ReferenceNode(S, "obj"), "MyClass"));
-        Assert.Equal("MyClass", Assert.IsType<BoundTypeOperationExpression>(expr).TypeName);
+        Assert.Equal("MyClass", Assert.IsType<BoundTypeOperationExpression>(expr).Type.DisplayString);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class BinderConversionPatternFamilyTests
         var (expr, _) = BindReturn(new TypeOperationNode(S, TypeOp.Is,
             new ReferenceNode(S, "x"), "str"));
         var test = Assert.IsType<BoundTypeOperationExpression>(expr);
-        Assert.Equal("BOOL", test.TypeName);
+        Assert.Equal("BOOL", test.Type.DisplayString);
         Assert.Equal("str", test.TargetType);
         // The defect shape: any checker seeing BoundBoolLiteral(true) here could fold.
         Assert.IsNotType<BoundBoolLiteral>(expr);
@@ -98,7 +98,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, diags) = BindReturn(new TypeOfExpressionNode(S, "MyClass"));
         var t = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("TYPE", t.TypeName);
+        Assert.Equal("TYPE", t.Type.DisplayString);
         Assert.Equal("MyClass", t.Metadata["OperandType"]);
         AssertComplete(diags);
     }

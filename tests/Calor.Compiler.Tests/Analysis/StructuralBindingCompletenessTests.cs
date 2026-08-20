@@ -20,7 +20,7 @@ public sealed class StructuralBindingCompletenessTests
 
         var literal = Assert.IsType<BoundDecimalLiteral>(bound);
         Assert.Equal(value, literal.Value);
-        Assert.Equal("DECIMAL", literal.TypeName);
+        Assert.Equal("DECIMAL", literal.Type.DisplayString);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class StructuralBindingCompletenessTests
 
         Assert.Equal("Dictionary", bound.GenericTypeName);
         Assert.Equal(["str", "List<i32>"], bound.TypeArguments);
-        Assert.Equal("Dictionary<str,List<i32>>", bound.TypeName);
+        Assert.Equal("Dictionary<str,List<i32>>", bound.Type.DisplayString);
     }
 
     [Fact]
@@ -42,26 +42,26 @@ public sealed class StructuralBindingCompletenessTests
         var cast = Assert.IsType<BoundTypeOperationExpression>(
             Bind(new TypeOperationNode(Span, TypeOp.Cast, operand, "DECIMAL"), out _, ("value", "OBJECT")));
         Assert.Equal(TypeOp.Cast, cast.Operation);
-        Assert.Equal("DECIMAL", cast.TypeName);
+        Assert.Equal("DECIMAL", cast.Type.DisplayString);
         Assert.Equal("DECIMAL", cast.TargetType);
         Assert.Equal("value", Assert.IsType<BoundVariableExpression>(Assert.Single(cast.Children)).Variable.Name);
 
         var asExpression = Assert.IsType<BoundTypeOperationExpression>(
             Bind(new TypeOperationNode(Span, TypeOp.As, operand, "Widget"), out _, ("value", "OBJECT")));
         Assert.Equal(TypeOp.As, asExpression.Operation);
-        Assert.Equal("Widget", asExpression.TypeName);
+        Assert.Equal("Widget", asExpression.Type.DisplayString);
         Assert.Single(asExpression.Children);
 
         var isExpression = Assert.IsType<BoundTypeOperationExpression>(
             Bind(new TypeOperationNode(Span, TypeOp.Is, operand, "Widget"), out _, ("value", "OBJECT")));
         Assert.Equal(TypeOp.Is, isExpression.Operation);
-        Assert.Equal("BOOL", isExpression.TypeName);
+        Assert.Equal("BOOL", isExpression.Type.DisplayString);
         Assert.Equal("Widget", isExpression.TargetType);
         Assert.Single(isExpression.Children);
 
         var pattern = Assert.IsType<BoundIsPatternExpression>(
             Bind(new IsPatternNode(Span, operand, "Widget", "widget"), out _, ("value", "OBJECT")));
-        Assert.Equal("BOOL", pattern.TypeName);
+        Assert.Equal("BOOL", pattern.Type.DisplayString);
         Assert.Equal("Widget", pattern.TargetType);
         Assert.Equal("widget", pattern.VariableName);
         Assert.Single(pattern.Children);
@@ -79,7 +79,7 @@ public sealed class StructuralBindingCompletenessTests
                 out _,
                 ("items", "STRING[]"),
                 ("index", "INT")));
-        Assert.Equal("STRING", index.TypeName);
+        Assert.Equal("STRING", index.Type.DisplayString);
         Assert.Equal(2, index.Children.Count);
         Assert.True(BoundNodeHelpers.ContainsArrayAccess(index, out var array, out var indexExpression));
         Assert.Same(index.Array, array);
@@ -95,7 +95,7 @@ public sealed class StructuralBindingCompletenessTests
                     [new IntLiteralNode(Span, 1), new IntLiteralNode(Span, 2)],
                     new AttributeCollection()),
                 out _));
-        Assert.Equal("List<i32>", list.TypeName);
+        Assert.Equal("List<i32>", list.Type.DisplayString);
         Assert.Equal(2, list.Children.Count);
 
         var dictionary = Assert.IsType<BoundDictionaryCreation>(
@@ -118,7 +118,7 @@ public sealed class StructuralBindingCompletenessTests
                     ],
                     new AttributeCollection()),
                 out _));
-        Assert.Equal("Dictionary<str,i32>", dictionary.TypeName);
+        Assert.Equal("Dictionary<str,i32>", dictionary.Type.DisplayString);
         Assert.Equal(4, dictionary.Children.Count);
         Assert.Equal(2, dictionary.Entries.Count);
         Assert.Empty(dictionary.Attributes.All());
@@ -139,7 +139,7 @@ public sealed class StructuralBindingCompletenessTests
 
         var bound = Assert.IsType<BoundNewExpression>(Bind(expression, out _));
 
-        Assert.Equal("Person", bound.TypeName);
+        Assert.Equal("Person", bound.Type.DisplayString);
         Assert.Equal(["T"], bound.TypeArguments);
         Assert.Single(bound.Arguments);
         Assert.Equal(["Name", "Age"], bound.Initializers.Select(initializer => initializer.MemberName));
@@ -161,7 +161,7 @@ public sealed class StructuralBindingCompletenessTests
                     new IntLiteralNode(Span, 1),
                     new StringLiteralNode(Span, "one")),
                 out _));
-        Assert.Equal("OBJECT", incompatibleConditional.TypeName);
+        Assert.Equal("OBJECT", incompatibleConditional.Type.DisplayString);
 
         var throwingConditional = Assert.IsType<BoundConditionalExpression>(
             Bind(
@@ -173,7 +173,7 @@ public sealed class StructuralBindingCompletenessTests
                         Span,
                         new NewExpressionNode(Span, "Exception", [], []))),
                 out _));
-        Assert.Equal("INT", throwingConditional.TypeName);
+        Assert.Equal("INT", throwingConditional.Type.DisplayString);
 
         var coalesce = Assert.IsType<BoundStructuralExpression>(
             Bind(
@@ -182,7 +182,7 @@ public sealed class StructuralBindingCompletenessTests
                     new NoneExpressionNode(Span, "i32"),
                     new IntLiteralNode(Span, 0)),
                 out _));
-        Assert.Equal("INT", coalesce.TypeName);
+        Assert.Equal("INT", coalesce.Type.DisplayString);
 
         var match = new MatchExpressionNode(
             Span,
@@ -203,7 +203,7 @@ public sealed class StructuralBindingCompletenessTests
             new AttributeCollection());
         var boundMatch = Assert.IsType<BoundMatchExpression>(
             Bind(match, out _, ("value", "INT")));
-        Assert.Equal("OBJECT", boundMatch.TypeName);
+        Assert.Equal("OBJECT", boundMatch.Type.DisplayString);
         Assert.Equal(2, boundMatch.Cases.Count);
         Assert.All(boundMatch.Cases, matchCase => Assert.NotNull(matchCase.Result));
     }
@@ -265,7 +265,7 @@ public sealed class StructuralBindingCompletenessTests
                 variable => variable.Variable.Name == "missing");
             Assert.All(
                 BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundExpression>(),
-                descendant => Assert.False(string.IsNullOrWhiteSpace(descendant.TypeName)));
+                descendant => Assert.False(string.IsNullOrWhiteSpace(descendant.Type.DisplayString)));
         }
     }
 
@@ -460,7 +460,7 @@ public sealed class StructuralBindingCompletenessTests
         Assert.Equal(["item"], bound.ArgumentNames);
         Assert.Equal(["in"], bound.ArgumentModifiers);
         Assert.Equal(["T"], bound.TypeArguments);
-        Assert.Equal("OBJECT", bound.TypeName);
+        Assert.Equal("OBJECT", bound.Type.DisplayString);
         Assert.Single(bound.Children);
     }
 

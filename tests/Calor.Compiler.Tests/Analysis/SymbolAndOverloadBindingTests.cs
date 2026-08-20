@@ -86,7 +86,7 @@ public sealed class SymbolAndOverloadBindingTests
             Assert.IsType<BoundReturnStatement>(Assert.Single(use.Body)).Expression);
 
         Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
-        Assert.Equal("INT", Assert.Single(call.Arguments).TypeName);
+        Assert.Equal("INT", Assert.Single(call.Arguments).Type.DisplayString);
         Assert.Same(pickInt.Symbol, call.ResolvedSymbol);
     }
 
@@ -171,7 +171,7 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
         Assert.Null(call.ResolvedSymbol);
         Assert.Null(call.ResolvedSymbolId);
-        Assert.Equal("OBJECT", call.TypeName);
+        Assert.Equal("OBJECT", call.Type.DisplayString);
     }
 
     [Fact]
@@ -842,7 +842,7 @@ public sealed class SymbolAndOverloadBindingTests
             Assert.IsType<BoundReturnStatement>(Assert.Single(run.Body)).Expression);
 
         Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
-        Assert.Equal("OBJECT", call.TypeName);
+        Assert.Equal("OBJECT", call.Type.DisplayString);
         Assert.Equal(
             alternatives.Select(function => function.SymbolId).OrderBy(id => id.Value).ToArray(),
             call.ResolvedSymbols.Select(symbol => symbol.Id).OrderBy(id => id.Value).ToArray());
@@ -958,7 +958,7 @@ public sealed class SymbolAndOverloadBindingTests
             diagnostic.Code is DiagnosticCode.DuplicateDefinition
                 or DiagnosticCode.DuplicateFunctionSignature);
         Assert.Equal(2, valueReference.ResolvedSymbols.Count);
-        Assert.Equal("OBJECT", valueReference.TypeName);
+        Assert.Equal("OBJECT", valueReference.Type.DisplayString);
         Assert.Equal(2, creation.ResolvedConstructors.Count);
         Assert.All(valueReference.ResolvedSymbols, symbol =>
             Assert.NotNull(symbol.ConditionalAlternative));

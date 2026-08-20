@@ -41,7 +41,7 @@ public class BinderCoreFamilyTests
     {
         var (expr, diags) = BindReturn(new SomeExpressionNode(S, new IntLiteralNode(S, 42)));
         var some = Assert.IsType<BoundSomeExpression>(expr);
-        Assert.Equal("Option<INT>", some.TypeName);
+        Assert.Equal("Option<INT>", some.Type.DisplayString);
         Assert.IsType<BoundIntLiteral>(some.Value);
         AssertComplete(diags);
     }
@@ -51,7 +51,7 @@ public class BinderCoreFamilyTests
     {
         var (expr, diags) = BindReturn(new OkExpressionNode(S, new IntLiteralNode(S, 1)));
         var ok = Assert.IsType<BoundOkExpression>(expr);
-        Assert.Equal("Result<INT, OBJECT>", ok.TypeName);
+        Assert.Equal("Result<INT, OBJECT>", ok.Type.DisplayString);
         AssertComplete(diags);
     }
 
@@ -60,7 +60,7 @@ public class BinderCoreFamilyTests
     {
         var (expr, diags) = BindReturn(new ErrExpressionNode(S, new StringLiteralNode(S, "boom")));
         var err = Assert.IsType<BoundErrExpression>(expr);
-        Assert.Equal("Result<OBJECT, STRING>", err.TypeName);
+        Assert.Equal("Result<OBJECT, STRING>", err.Type.DisplayString);
         Assert.IsType<BoundStringLiteral>(err.Error);
         AssertComplete(diags);
     }
@@ -74,7 +74,7 @@ public class BinderCoreFamilyTests
         var (expr, _) = BindReturn(node);
         var call = Assert.IsType<BoundExpressionCall>(expr);
         Assert.Equal(2, call.Arguments.Count);
-        Assert.Equal("OBJECT", call.TypeName);
+        Assert.Equal("OBJECT", call.Type.DisplayString);
         // The DEEP payoff: a division nested in an argument is now analyzable — the
         // pre-B2 fallback erased it (the #762 evidence bullet).
         var nested = new ExpressionCallNode(S, new ReferenceNode(S, "f"),
@@ -112,7 +112,7 @@ public class BinderCoreFamilyTests
         });
         var (expr, diags) = BindReturn(node);
         var rec = Assert.IsType<BoundRecordCreation>(expr);
-        Assert.Equal("Point", rec.TypeName);
+        Assert.Equal("Point", rec.Type.DisplayString);
         Assert.Equal(2, rec.Fields.Count);
         AssertComplete(diags);
     }
@@ -125,7 +125,7 @@ public class BinderCoreFamilyTests
             new[] { new WithPropertyAssignmentNode(S, "Value", new IntLiteralNode(S, 9)) });
         var (expr, diags) = BindReturn(node);
         var with = Assert.IsType<BoundWithExpression>(expr);
-        Assert.Equal("Option<INT>", with.TypeName);
+        Assert.Equal("Option<INT>", with.Type.DisplayString);
         Assert.Single(with.Assignments);
         AssertComplete(diags);
     }
@@ -136,7 +136,7 @@ public class BinderCoreFamilyTests
         var (expr, diags) = BindReturn(
             new ThrowExpressionNode(S, new StringLiteralNode(S, "bad")));
         var thrown = Assert.IsType<BoundThrowExpression>(expr);
-        Assert.Equal("NEVER", thrown.TypeName);
+        Assert.Equal("NEVER", thrown.Type.DisplayString);
         AssertComplete(diags);
     }
 
@@ -200,7 +200,7 @@ public class BinderCoreFamilyTests
         var (expr, diags) = BindReturn(new SelfRefNode(S));
         var self = Assert.IsType<BoundStructuralExpression>(expr);
         Assert.Equal(nameof(SelfRefNode), self.NodeTypeName);
-        Assert.Equal("OBJECT", self.TypeName);
+        Assert.Equal("OBJECT", self.Type.DisplayString);
         AssertComplete(diags);
     }
 }
