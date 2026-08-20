@@ -8,6 +8,40 @@ on:
   workflow_dispatch:
 
 jobs:
+  # #1009 (audit R13): the roundtrip-verification job takes ~30 minutes running
+  # `harness run --all` against MediatR/Serilog/FluentValidation. Docs-only PRs
+  # cannot regress round-trip conversion, so we detect the change set here and
+  # gate that one job on `has_non_docs_changes`. The filter is negative — it
+  # matches any file OUTSIDE the docs paths — so if compiler code is ever
+  # smuggled under `docs/` (or a new top-level directory appears), the job
+  # still runs. Other jobs (`test`, `remaining-tests`, etc.) are NOT gated on
+  # this and continue to run on docs-only PRs.
+  detect-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      has_non_docs_changes: ${{ steps.filter.outputs.non_docs }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          # On push events (main), paths-filter compares against the previous
+          # commit; on pull_request, against the merge base. Either way, any
+          # file that is NOT under website/, docs/, or a root .md/.mdx makes
+          # `non_docs` true. On workflow_dispatch there is no diff, so the
+          # filter conservatively reports true.
+          filters: |
+            non_docs:
+              - '!website/**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
+          predicate-quantifier: 'every'
+
   calor-first-guard:
     # Lifecycle hooks are useful guidance, but specialized Codex tool paths
     # can bypass them. This diff gate is the repository-level backstop.
@@ -700,10 +734,18 @@ jobs:
             }
 
   roundtrip-verification:
-    if: ${{ always() }}
+    # #1009 (audit R13): skip the ~30-minute round-trip harness on docs-only
+    # PRs. `detect-changes` sets `has_non_docs_changes=false` when the diff
+    # touches only website/, docs/, or root markdown. GitHub still surfaces
+    # skipped jobs on the PR check list, so the skip is visible, not silent.
+    # The `always()` clause is preserved so the job runs even if
+    # conversion-scorecard fails — but only when there are non-docs changes.
+    if: >-
+      always() &&
+      needs.detect-changes.outputs.has_non_docs_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: conversion-scorecard
+    needs: [detect-changes, conversion-scorecard]
     permissions:
       contents: read
       pull-requests: write
