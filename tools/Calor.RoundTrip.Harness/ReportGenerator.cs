@@ -179,6 +179,25 @@ public static class ReportGenerator
             sb.AppendLine("No regressions detected. All previously-passing tests continue to pass.");
         }
 
+        // Known-flake regressions that were excluded from the gate verdict.
+        // Surfaced explicitly so drift on upstream-flake tests stays visible.
+        if (report.Comparison is { IgnoredFlakyRegressions.Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Upstream Flake Regressions (Not Blocking)");
+            sb.AppendLine();
+            sb.AppendLine(
+                $"{report.Comparison.IgnoredFlakyRegressions.Count} test(s) regressed but are in the project's known-flake list; " +
+                "the gate does not block on them. See `RoundTripConfig.ExpectedFlakyTestFullyQualifiedNames` for provenance.");
+            sb.AppendLine();
+            foreach (var reg in report.Comparison.IgnoredFlakyRegressions.Take(50))
+            {
+                sb.AppendLine($"- **{reg.FullyQualifiedName}**");
+                if (reg.ErrorMessage != null)
+                    sb.AppendLine($"  > {reg.ErrorMessage.Truncate(200)}");
+            }
+        }
+
         sb.AppendLine();
 
         // Pre-existing failures

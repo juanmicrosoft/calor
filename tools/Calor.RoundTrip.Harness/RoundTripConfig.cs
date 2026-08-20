@@ -97,6 +97,22 @@ public sealed class RoundTripConfig
     /// <summary>Minimum fraction of all candidate files that must be converted natively with zero losses.</summary>
     public double MinimumNativeFraction { get; init; }
 
+    /// <summary>
+    /// Fully-qualified test names known to be flaky in the upstream corpus
+    /// (i.e. flake independently of anything Calor does — timing-dependent
+    /// tests, tests that rely on machine-wide state, etc.). Regressions on
+    /// these tests are NOT counted toward the block/warn thresholds; they
+    /// are recorded on <see cref="TestComparison.IgnoredFlakyRegressions"/>
+    /// so the drift stays auditable in the round-trip report.
+    ///
+    /// Each entry should be an exact match against <see cref="TestResult.FullyQualifiedName"/>
+    /// and should carry a comment linking to the investigation that added
+    /// it — the intent is "explicitly-known upstream flake", not "silence
+    /// anything red". Adding a name here should always be paired with a
+    /// GitHub issue or PR describing why the upstream test flakes.
+    /// </summary>
+    public HashSet<string> ExpectedFlakyTestFullyQualifiedNames { get; init; } = [];
+
     internal Action<string>? FileConversionStarted { get; init; }
 
     public static List<string> DefaultExcludePatterns() =>

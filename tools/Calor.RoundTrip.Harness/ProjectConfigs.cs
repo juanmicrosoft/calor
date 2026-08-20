@@ -114,6 +114,19 @@ public static class ProjectConfigs
         ExtraBuildProperties = "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
         MinimumCoverageFraction = 0.55,
         MinimumNativeFraction = 0.40,
+        // Upstream flake: this test is timing-dependent (its name advertises
+        // that it exercises a timeout code path) and flakes under CI load
+        // regardless of anything Calor does. Same commit passes with 155/157
+        // on a 70 s runner and fails with 154/157 on a 53 s runner — see the
+        // investigation on the 2026-08-18 test-suite audit + the follow-up
+        // that landed this allowlist. Verified by comparing job 96339235881
+        // (failing) to job 96334195356 (passing) on the same head: only
+        // execution duration differs. Kept until upstream MediatR either
+        // stabilizes the timeout margin or we pin past the offending revision.
+        ExpectedFlakyTestFullyQualifiedNames =
+        [
+            "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs",
+        ],
     };
 
     // Serilog — pinned v4.3.1 (0597ddfb), Apache-2.0. Both library and test target

@@ -113,7 +113,7 @@ public sealed class RoundTripPipeline
         }
 
         // Compare
-        report.Comparison = CompareTestResults(report.Baseline, report.RoundTripTests, report.BuildResult);
+        report.Comparison = CompareTestResults(config, report.Baseline, report.RoundTripTests, report.BuildResult);
 
         // Fidelity: separated verdict dimensions (coverage / build / tests)
         report.Fidelity = ProjectFidelity.Compute(report);
@@ -1696,6 +1696,7 @@ public sealed class RoundTripPipeline
     }
 
     private static TestComparison CompareTestResults(
+        RoundTripConfig config,
         TestRunResult? baseline, TestRunResult? roundTrip, BuildResult? buildResult)
     {
         if (buildResult is { Succeeded: false })
@@ -1779,6 +1780,25 @@ public sealed class RoundTripPipeline
                 roundTripResults
                     .Where(t => t.Outcome != "Passed" && !regressions.Contains(t))
                     .Take(regressionCount - regressions.Count));
+
+            // Route regressions that land on a known-flaky upstream test into
+            // IgnoredFlakyRegressions instead of Regressions. The gate then
+            // doesn't count them toward the block/warn thresholds, but the
+            // report still surfaces them so drift stays visible. See
+            // RoundTripConfig.ExpectedFlakyTestFullyQualifiedNames for
+            // provenance requirements.
+            if (config.ExpectedFlakyTestFullyQualifiedNames.Count > 0)
+            {
+                var flaky = regressions
+                    .Where(t => config.ExpectedFlakyTestFullyQualifiedNames.Contains(t.FullyQualifiedName))
+                    .ToList();
+                if (flaky.Count > 0)
+                {
+                    comparison.IgnoredFlakyRegressions.AddRange(flaky);
+                    regressions = regressions.Except(flaky).ToList();
+                }
+            }
+
             comparison.Regressions.AddRange(regressions);
         }
 

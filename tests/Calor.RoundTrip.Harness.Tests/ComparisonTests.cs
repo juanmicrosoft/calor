@@ -7,13 +7,35 @@ namespace Calor.RoundTrip.Harness.Tests;
 public class ComparisonTests
 {
     // Access the private static method via reflection
-    private static TestComparison Compare(TestRunResult? baseline, TestRunResult? roundTrip, BuildResult? build)
+    private static TestComparison Compare(
+        TestRunResult? baseline,
+        TestRunResult? roundTrip,
+        BuildResult? build,
+        RoundTripConfig? config = null)
     {
         var method = typeof(RoundTripPipeline).GetMethod(
             "CompareTestResults",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return (TestComparison)method!.Invoke(null, [baseline, roundTrip, build])!;
+        return (TestComparison)method!.Invoke(
+            null,
+            [config ?? StubConfig("Test"), baseline, roundTrip, build])!;
+    }
+
+    private static RoundTripConfig StubConfig(
+        string projectName,
+        params string[] expectedFlakyFullyQualifiedNames)
+    {
+        var config = new RoundTripConfig
+        {
+            ProjectName = projectName,
+            OriginalProjectPath = "/nonexistent",
+            LibrarySourceRelativePath = "src",
+            SolutionOrProjectFile = "test.csproj",
+        };
+        foreach (var fqn in expectedFlakyFullyQualifiedNames)
+            config.ExpectedFlakyTestFullyQualifiedNames.Add(fqn);
+        return config;
     }
 
     [Fact]
@@ -316,6 +338,75 @@ public class ComparisonTests
         Assert.Empty(result.Regressions);
         Assert.Equal(ComparisonStatus.Pass, result.Status);
         Assert.Equal(1, result.PreExistingFailures);
+    }
+
+    [Fact]
+    public void ExpectedFlakyTest_RoutedToIgnoredFlakyRegressions_NotBlocking()
+    {
+        // A regression whose FullyQualifiedName is on the config's known-flake
+        // list must NOT count toward the block threshold. It should land on
+        // IgnoredFlakyRegressions instead, so the report still surfaces the
+        // drift without failing the gate.
+        const string flakyFqn = "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
+        var baseline = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var roundTrip = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Failed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var config = StubConfig("MediatR", flakyFqn);
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true }, config);
+
+        Assert.Equal(ComparisonStatus.Pass, result.Status);
+        Assert.Empty(result.Regressions);
+        var ignored = Assert.Single(result.IgnoredFlakyRegressions);
+        Assert.Equal(flakyFqn, ignored.FullyQualifiedName);
+    }
+
+    [Fact]
+    public void UnlistedRegression_StillBlocks_EvenWhenFlakeListIsPopulated()
+    {
+        // With a flake list configured, a regression whose FQN is NOT on the
+        // list still counts as a real regression. The allowlist must not turn
+        // into a generic escape hatch.
+        const string flakyFqn = "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
+        var baseline = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var roundTrip = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Failed"));
+        var config = StubConfig("MediatR", flakyFqn);
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true }, config);
+
+        Assert.NotEqual(ComparisonStatus.Pass, result.Status);
+        var regression = Assert.Single(result.Regressions);
+        Assert.Equal("SomethingElse", regression.TestName);
+        Assert.Empty(result.IgnoredFlakyRegressions);
+    }
+
+    private static TestRunResult MakeRunWithFqn(
+        params (string FullyQualifiedName, string TestName, string Outcome)[] entries)
+    {
+        var results = entries.Select(e => new TestResult
+        {
+            TestName = e.TestName,
+            FullyQualifiedName = e.FullyQualifiedName,
+            Assembly = "tests.dll",
+            ExecutorUri = "executor://xunit",
+            Outcome = e.Outcome,
+        }).ToList();
+
+        return new TestRunResult
+        {
+            ExitCode = results.Any(r => r.Outcome == "Failed") ? 1 : 0,
+            TotalTests = results.Count,
+            Passed = results.Count(r => r.Outcome == "Passed"),
+            Failed = results.Count(r => r.Outcome == "Failed"),
+            Results = results,
+        };
     }
 
     [Fact]
