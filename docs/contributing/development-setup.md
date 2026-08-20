@@ -176,6 +176,53 @@ dotnet run --project src/Calor.Compiler -- \
 
 ## Running Tests
 
+Three lanes, ordered fastest to slowest. See the
+[Corpus Submodules](#corpus-submodules-round-trip-harness) section above for
+which projects touch `bench/corpus/` and why the fast lane is safe without
+submodules.
+
+### Fast Unit-Test Lane (no submodules)
+
+Seconds to run, no `bench/corpus/` init required:
+
+```bash
+dotnet test tests/Calor.Compiler.Tests/     # lexer/parser/emitter/analysis
+dotnet test tests/Calor.Conversion.Tests/   # C# → Calor snapshots
+dotnet test tests/Calor.Semantics.Tests/    # binding/semantic analysis
+dotnet test tests/Calor.Verification.Tests/ # Z3 contract verification
+dotnet test tests/Calor.Enforcement.Tests/  # effects/taint
+```
+
+`BinderIncompleteRatchetTests` silently skips on a bare clone (it uses
+`Skip.IfNot` when `bench/corpus/` is empty); everything else runs green
+without submodules. To iterate on a single class:
+
+```bash
+dotnet test --filter "FullyQualifiedName~ClassName"
+```
+
+### Full-Corpus Lane (submodules required)
+
+Adds ~500 MB and a few minutes; needed for the `BinderIncompleteRatchetTests`
+corpus assertions:
+
+```bash
+git submodule update --init && dotnet test
+```
+
+### Round-Trip Harness Lane (~30 min)
+
+Matches the `roundtrip-verification` CI job end-to-end:
+
+```bash
+git submodule update --init
+dotnet run --project tools/Calor.RoundTrip.Harness -- run --all
+```
+
+`run --all` iterates every project in `ProjectConfigs.KnownProjects` against
+the vendored `bench/corpus/` corpus. Pass a single project name
+(`run MediatR`) to shrink the loop while debugging a specific regression.
+
 ### E2E Tests
 
 ```bash
@@ -187,16 +234,6 @@ dotnet run --project src/Calor.Compiler -- \
 
 # Clean generated files
 ./tests/E2E/run-tests.sh --clean
-```
-
-### Unit Tests
-
-```bash
-# Run all unit tests
-dotnet test
-
-# Run specific test project
-dotnet test tests/Calor.Compiler.Tests
 ```
 
 ### Evaluation Framework
