@@ -30,9 +30,6 @@
   </ItemGroup>
 
   <!-- Shared Z3 test-seeding ModuleInitializer (issue #1006). -->
-  <ItemGroup>
-    <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
-  </ItemGroup>
 
   <ItemGroup>
     <!-- Include all test data files in the output directory -->
@@ -58,4 +55,8 @@
     </None>
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
+  </ItemGroup>
 </Project>

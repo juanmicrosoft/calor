@@ -27,4 +27,8 @@
     <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
+  </ItemGroup>
 </Project>

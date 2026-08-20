@@ -84,7 +84,14 @@ public sealed class KInductionProver : IDisposable
 
     public KInductionProver(KInductionOptions? options = null)
     {
-        _ctx = new Context(new Dictionary<string, string>
+        // Route through Z3ContextFactory.Create(extraSettings) rather than
+        // instantiating Context directly — the factory merges the caller's
+        // {"model","true"},{"proof","false"} settings on top of
+        // DefaultContextSettings, so the test-suite random_seed (issue #1006)
+        // still flows into k-induction contexts. Constructing Context
+        // directly here would silently bypass the seed and defeat the
+        // whole point of the test-time seeding.
+        _ctx = Z3ContextFactory.Create(new Dictionary<string, string>
         {
             { "model", "true" },
             { "proof", "false" }
