@@ -82,7 +82,7 @@ public sealed class CallGraphAnalysis
                         callees = expression.ResolvedSymbols;
                         break;
                     case BoundNewExpression creation:
-                        target = $"{creation.TypeName}..ctor";
+                        target = $"{creation.Type.DisplayString}..ctor";
                         span = creation.TypeNameSpan;
                         callees = creation.ResolvedConstructors;
                         break;
@@ -533,7 +533,7 @@ public sealed class CallGraphAnalysis
                             inaccessibleCall = expression.IsInaccessibleCall;
                             break;
                         case BoundNewExpression creation:
-                            target = $"{creation.TypeName}..ctor";
+                            target = $"{creation.Type.DisplayString}..ctor";
                             callees = creation.ResolvedConstructor == null
                                 ? Array.Empty<FunctionSymbol>()
                                 : [creation.ResolvedConstructor];

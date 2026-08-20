@@ -739,7 +739,7 @@ public sealed class BoundSomeExpression : BoundExpression
     public BoundSomeExpression(TextSpan span, BoundExpression value) : base(span)
     {
         Value = value;
-        TypeName = $"Option<{value.TypeName}>";
+        TypeName = $"Option<{value.Type.DisplayString}>";
     }
 }
 
@@ -755,7 +755,7 @@ public sealed class BoundOkExpression : BoundExpression
     public BoundOkExpression(TextSpan span, BoundExpression value) : base(span)
     {
         Value = value;
-        TypeName = $"Result<{value.TypeName}, OBJECT>";
+        TypeName = $"Result<{value.Type.DisplayString}, OBJECT>";
     }
 }
 
@@ -769,7 +769,7 @@ public sealed class BoundErrExpression : BoundExpression
     public BoundErrExpression(TextSpan span, BoundExpression error) : base(span)
     {
         Error = error;
-        TypeName = $"Result<OBJECT, {error.TypeName}>";
+        TypeName = $"Result<OBJECT, {error.Type.DisplayString}>";
     }
 }
 
@@ -832,7 +832,7 @@ public sealed class BoundWithExpression : BoundExpression
     {
         Target = target;
         Assignments = assignments;
-        TypeName = target.TypeName;
+        TypeName = target.Type.DisplayString;
     }
 }
 
@@ -886,8 +886,9 @@ public sealed class BoundArrayAccess : BoundExpression
     public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
     {
         Array = array; Index = index;
-        TypeName = array.TypeName.EndsWith("[]", StringComparison.Ordinal)
-            ? array.TypeName[..^2]
+        var arrayTypeName = array.Type.DisplayString;
+        TypeName = arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
+            ? arrayTypeName[..^2]
             : "OBJECT";
     }
 }
@@ -942,7 +943,7 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
         Array = array; Indices = indices;
         // LastIndexOf: on jagged shapes like "i32[][,]" the element type is
         // everything before the TRAILING bracket group ("i32[]"), not "i32" (B3 review m5).
-        var t = array.TypeName;
+        var t = array.Type.DisplayString;
         var open = t.LastIndexOf('[');
         TypeName = open > 0 ? t[..open] : "OBJECT";
     }
@@ -1089,7 +1090,7 @@ public sealed class BoundTupleLiteral : BoundExpression
     {
         Elements = elements;
         // Element types composed rather than discarded (review M3).
-        TypeName = $"Tuple<{string.Join(",", elements.Select(e => e.TypeName))}>";
+        TypeName = $"Tuple<{string.Join(",", elements.Select(e => e.Type.DisplayString))}>";
     }
 }
 
