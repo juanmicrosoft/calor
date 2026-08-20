@@ -2768,8 +2768,8 @@ internal sealed class TypedBugPatternAnalysis
         BoundExpression rightExpression,
         string boundResultType)
     {
-        var left = TypeIdentity.Canonicalize(leftExpression.TypeName);
-        var right = TypeIdentity.Canonicalize(rightExpression.TypeName);
+        var left = TypeIdentity.Canonicalize(leftExpression.Type.DisplayString);
+        var right = TypeIdentity.Canonicalize(rightExpression.Type.DisplayString);
         if (!TryGetIntegralType(left, out var leftIntegral)
             || !TryGetIntegralType(right, out var rightIntegral))
         {

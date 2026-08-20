@@ -988,7 +988,7 @@ public sealed class Binder
             resolvedMethodName,
             (resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
-                ?? args.Select(argument => argument.TypeName))
+                ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray());
     }
 
@@ -1073,7 +1073,7 @@ public sealed class Binder
         {
             initializer = BindExpression(bind.Initializer);
             // Infer type from initializer if not specified
-            typeName = bind.TypeName ?? initializer.TypeName;
+            typeName = bind.TypeName ?? initializer.Type.DisplayString;
         }
         else if (bind.TypeName != null)
         {
@@ -1118,7 +1118,7 @@ public sealed class Binder
             var annotatedType = bind.TypeName == null
                 ? null
                 : TypeIdentity.Canonicalize(bind.TypeName);
-            var valueType = initializer?.TypeName;
+            var valueType = initializer?.Type.DisplayString;
             if ((annotatedType != null
                     && !AreAssignmentCompatible(rebindTarget.TypeName, annotatedType))
                 || (valueType != null
@@ -1575,7 +1575,7 @@ public sealed class Binder
         var awaited = BindExpression(awaitExpression.Awaited);
         return Structural(
             awaitExpression,
-            UnwrapAwaitedType(awaited.TypeName),
+            UnwrapAwaitedType(awaited.Type.DisplayString),
             [awaited],
             new Dictionary<string, object?>
             {
@@ -1731,7 +1731,7 @@ public sealed class Binder
         var statementBody = lambda.StatementBody != null
             ? BindStatements(lambda.StatementBody)
             : null;
-        var returnType = expressionBody?.TypeName
+        var returnType = expressionBody?.Type.DisplayString
             ?? GetCommonType(CollectReturnTypes(statementBody))
             ?? "VOID";
         var effects = lambda.Effects?.Effects
@@ -1759,7 +1759,7 @@ public sealed class Binder
         var cases = BindMatchCases(match.Cases);
         var resultType = GetCommonType(
                 cases.Where(matchCase => matchCase.Result != null)
-                    .Select(matchCase => matchCase.Result!.TypeName))
+                    .Select(matchCase => matchCase.Result!.Type.DisplayString))
             ?? "OBJECT";
         return new BoundMatchExpression(
             match.Span,
@@ -2252,7 +2252,7 @@ public sealed class Binder
             resolvedMethodName,
             resolvedParameterTypes: (resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
-                ?? args.Select(argument => argument.TypeName))
+                ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray(),
             argumentNames: callExpr.ArgumentNames,
             argumentModifiers: callExpr.ArgumentModifiers,
@@ -2351,7 +2351,7 @@ public sealed class Binder
             .Select(argument =>
                 argument is BoundVariableExpression { Variable.Id.IsNone: true }
                     ? "<unresolved>"
-                    : argument.TypeName)
+                    : argument.Type.DisplayString)
             .ToArray();
         foreach (var lookupName in GetCallLookupNames(target).Distinct(StringComparer.Ordinal))
         {
@@ -2801,7 +2801,7 @@ public sealed class Binder
             condition,
             whenTrue,
             whenFalse,
-            GetCommonType(whenTrue.TypeName, whenFalse.TypeName));
+            GetCommonType(whenTrue.Type.DisplayString, whenFalse.Type.DisplayString));
     }
 
     private static BoundStructuralExpression Structural(
@@ -3057,7 +3057,7 @@ public sealed class Binder
             switch (statement)
             {
                 case BoundReturnStatement { Expression: not null } returnStatement:
-                    yield return returnStatement.Expression.TypeName;
+                    yield return returnStatement.Expression.Type.DisplayString;
                     break;
                 case BoundIfStatement ifStatement:
                     foreach (var type in CollectReturnTypes(ifStatement.ThenBody))
@@ -3197,7 +3197,7 @@ public sealed class Binder
         var collection = BindExpression(forEach.Collection);
         var variableType = string.IsNullOrWhiteSpace(forEach.VariableType)
                            || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase)
-            ? GetIndexedElementType(collection.TypeName)
+            ? GetIndexedElementType(collection.Type.DisplayString)
             : forEach.VariableType;
         var loopVar = CreateLocalVariable(
             forEach.VariableName,
