@@ -16,6 +16,23 @@ public static class Z3ContextFactory
     private static IntPtr _z3NativeHandle;
 
     /// <summary>
+    /// Optional key/value settings passed to <c>new Microsoft.Z3.Context(...)</c>
+    /// for every context this factory creates. Left <c>null</c> in production
+    /// (so behaviour is identical to a parameterless <c>Context()</c>).
+    ///
+    /// Origin: 2026-08-18 test-suite audit, finding F7 / recommendation R10
+    /// (`docs/plans/2026-08-18-test-suite-audit.md`, issue #1006). Test
+    /// assemblies use a <c>ModuleInitializer</c> to set
+    /// <c>random_seed = "42"</c> here so that if a Z3-backed test flakes,
+    /// solver non-determinism is one fewer axis to consider during triage.
+    ///
+    /// This is intentionally a mutable static — the seed applies to whichever
+    /// process sets it (i.e. only the xUnit test host), not to production
+    /// callers of <c>Calor.Compiler</c>.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string>? DefaultContextSettings { get; set; }
+
+    /// <summary>
     /// Registers a custom DLL import resolver and pre-loads the Z3 native library.
     /// Must be called before any Z3 types are accessed.
     /// </summary>
@@ -239,7 +256,7 @@ public static class Z3ContextFactory
     {
         try
         {
-            return new Microsoft.Z3.Context();
+            return NewContext();
         }
         catch (Exception)
         {
@@ -250,7 +267,23 @@ public static class Z3ContextFactory
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Microsoft.Z3.Context CreateInternal()
     {
-        return new Microsoft.Z3.Context();
+        return NewContext();
+    }
+
+    private static Microsoft.Z3.Context NewContext()
+    {
+        // In production `DefaultContextSettings` is null, so this collapses to
+        // the parameterless `new Context()` that Calor has always used. Tests
+        // opt in via a ModuleInitializer that sets `random_seed` — see the
+        // property's XML doc for background (issue #1006).
+        var settings = DefaultContextSettings;
+        if (settings == null || settings.Count == 0)
+            return new Microsoft.Z3.Context();
+
+        var dict = new Dictionary<string, string>(settings.Count);
+        foreach (var kvp in settings)
+            dict[kvp.Key] = kvp.Value;
+        return new Microsoft.Z3.Context(dict);
     }
 
     /// <summary>

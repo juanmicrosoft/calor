@@ -23,4 +23,9 @@
     <ProjectReference Include="../../tools/Calor.RoundTrip.Harness/Calor.RoundTrip.Harness.csproj" />
   </ItemGroup>
 
+  <!-- Shared Z3 test-seeding ModuleInitializer (issue #1006). -->
+  <ItemGroup>
+    <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
+  </ItemGroup>
+
 </Project>
