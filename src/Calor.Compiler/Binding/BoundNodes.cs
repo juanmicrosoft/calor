@@ -624,7 +624,8 @@ public class BoundCallExpression : BoundExpression
         TextSpan? calleeSpan = null,
         TextSpan? receiverSpan = null,
         bool isInaccessibleCall = false,
-        TypeSymbol? receiverTypeSymbol = null)
+        TypeSymbol? receiverTypeSymbol = null,
+        NominalBoundType? annotatedReturnType = null)
         : base(span)
     {
         Target = target;
@@ -632,7 +633,12 @@ public class BoundCallExpression : BoundExpression
         ResolvedSymbol = resolvedSymbol;
         ResolvedSymbols = resolvedSymbols
             ?? (resolvedSymbol == null ? Array.Empty<FunctionSymbol>() : [resolvedSymbol]);
-        Type = new NominalBoundType(resultType);
+        // v0.14 §S3b (nullability workstream): when MetadataBinder resolved a
+        // BCL-shaped call, it hands back an annotated NominalBoundType. Prefer
+        // that over the plain resultType-string wrap so downstream consumers
+        // (Calor0272 emitter, S8's typed CFG null-state slice) see real
+        // nullability annotations instead of the always-Oblivious default.
+        Type = annotatedReturnType ?? new NominalBoundType(resultType);
         ResolvedTypeName = resolvedTypeName;
         ResolvedMethodName = resolvedMethodName;
         ResolvedParameterTypes = resolvedParameterTypes;

@@ -105,11 +105,87 @@ public sealed class Binder
     private string? _currentNamespaceIdentity;
     private bool _isStaticContext;
 
+    /// <summary>
+    /// v0.14 §S3b (nullability workstream / issue #875) — lazily-constructed
+    /// MetadataBinder for enriching BCL-shaped call resolutions with Roslyn
+    /// NullableAnnotation. Lazy because MetadataContext.Create loads TPA
+    /// references (non-trivial cost); tests and small binds shouldn't pay
+    /// that cost unless they need it. Null until first BCL-shaped resolve.
+    /// </summary>
+    private Metadata.MetadataBinder? _metadataBinder;
+
     public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _sourceIdentity = SymbolSourceIdentity.Canonicalize(sourceIdentity);
         _scope = new Scope();
+    }
+
+    /// <summary>
+    /// Returns a shared per-Binder MetadataBinder, constructed on first use.
+    /// Returns null if MetadataContext.Create throws (e.g. TPA references
+    /// unavailable in the test/tools host); callers fall back to today's
+    /// Oblivious-default path in that case.
+    /// </summary>
+    private Metadata.MetadataBinder? GetOrCreateMetadataBinder()
+    {
+        if (_metadataBinder is not null) return _metadataBinder;
+        try
+        {
+            var ctx = Metadata.MetadataContext.Create();
+            _metadataBinder = new Metadata.MetadataBinder(ctx);
+        }
+        catch
+        {
+            // Deliberately swallow — MetadataBinder is an enrichment, not a
+            // correctness requirement. Fallback: Oblivious-default Type.
+        }
+        return _metadataBinder;
+    }
+
+    /// <summary>
+    /// Best-effort BCL-shaped call resolution via MetadataBinder. Returns
+    /// the annotated NominalBoundType for the resolved return type, or null
+    /// when the receiver is not BCL-shaped, MetadataBinder is unavailable,
+    /// or resolution fails. Additive: never subtracts from Binder's own
+    /// string-based resolve.
+    /// </summary>
+    private BoundTypes.NominalBoundType? TryResolveBclReturnType(string callTarget, IReadOnlyList<BoundExpression> args)
+    {
+        // BCL-shape heuristic: receiver contains at least one dot AND starts
+        // with System./Microsoft. or a capitalized identifier followed by a dot.
+        var lastDot = callTarget.LastIndexOf('.');
+        if (lastDot <= 0) return null;
+        var receiverName = callTarget[..lastDot];
+        var methodName = callTarget[(lastDot + 1)..];
+        if (string.IsNullOrEmpty(receiverName) || string.IsNullOrEmpty(methodName)) return null;
+        if (!(receiverName.StartsWith("System.", StringComparison.Ordinal)
+              || receiverName.StartsWith("Microsoft.", StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
+        var binder = GetOrCreateMetadataBinder();
+        if (binder is null) return null;
+
+        // Resolve receiver type via MetadataContext (reachable through binder).
+        var ctx = Metadata.MetadataContext.Create();
+        var receiverType = ctx.TryResolveType(receiverName);
+        if (receiverType is null) return null;
+
+        // Argument types: use each BoundExpression's Type.DisplayString to
+        // find a Roslyn type. Falling back to System.Object when unknown so
+        // MetadataBinder can at least attempt overload resolution.
+        var metaArgs = new Metadata.MetadataArgument[args.Count];
+        for (var i = 0; i < args.Count; i++)
+        {
+            var t = ctx.TryResolveType(args[i].Type.DisplayString) ?? ctx.TryResolveType("System.Object");
+            if (t is null) return null;
+            metaArgs[i] = new Metadata.MetadataArgument(t);
+        }
+
+        var result = binder.ResolveCall(receiverType, methodName, metaArgs);
+        return result.GetReturnBoundType();
     }
 
     private IDisposable PushScope(Scope newScope)
@@ -1161,23 +1237,73 @@ public sealed class Binder
                 $"Variable '{bind.Name}' is already defined");
         }
 
-        // v0.14 §S3 nullability check gate (issue #875, D2 predicate). The
-        // NullabilityChecker predicate is in place at
-        // src/Calor.Compiler/Binding/NullabilityChecker.cs and unit-tested,
-        // but production emission is intentionally not wired here: today's
-        // BoundCallExpression.Type is always Oblivious (the MetadataBinder-
-        // resolved Roslyn annotation from S2 does not yet flow into the
-        // BoundExpression tree). Turning the check on before that wiring
-        // lands would produce all-noise diagnostics on every string binding.
-        // Follow-on slice (S3b or S4 precursor) wires
-        // MetadataBinder→BindCallExpression and BindNewExpression so the
-        // annotation reaches the Type property; Calor0272 emission from
-        // BindBindStatement re-lands in that slice.
+        // v0.14 §S3 nullability check (issue #875, D2 predicate). Fires when
+        // an explicit :string / :str target is initialized with a value whose
+        // BoundType.NullableAnnotation is Annotated or Oblivious (per D3,
+        // Oblivious is treated conservatively as possibly-null).
         //
-        // The predicate is callable today for tests and downstream consumers.
+        // S3b wired MetadataBinder into BindCallExpression so BCL-shaped calls
+        // now carry real annotations on their BoundCallExpression.Type. Info
+        // severity in Phase A — promotes to Error at S5 gated on
+        // SemanticsVersion.Major>=2.
+        if (initializer != null
+            && bind.TypeName != null
+            && TryBuildStringTarget(bind.TypeName, out var stringTarget)
+            && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
+        {
+            _diagnostics.ReportInfo(
+                initializer.Span,
+                DiagnosticCode.NullableToNonNullableBinding,
+                $"Binding '{bind.Name}' declares non-nullable 'string' but its initializer " +
+                $"may be null (source annotation: '{DescribeAnnotation(initializer)}'). " +
+                "Change the target to '?string' or add an explicit non-null check at the interop boundary.");
+        }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
     }
+
+    private static bool TryBuildStringTarget(string bindTypeName, out BoundTypes.NominalBoundType? target)
+    {
+        target = null;
+        var trimmed = bindTypeName.Trim();
+        bool annotatedNullable = false;
+
+        // Parser's ExpandType normalizes surface forms:
+        //   :string / :str        -> "STRING"
+        //   :?string / :?str      -> "OPTION[inner=STRING]"
+        // Match both post-expansion forms plus the raw surface forms (in case
+        // callers construct BindStatementNode directly, bypassing ExpandType).
+        if (trimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+            && trimmed.EndsWith("]", StringComparison.Ordinal))
+        {
+            annotatedNullable = true;
+            trimmed = trimmed["OPTION[inner=".Length..^1];
+        }
+        else if (trimmed.StartsWith("?", StringComparison.Ordinal))
+        {
+            annotatedNullable = true;
+            trimmed = trimmed[1..];
+        }
+
+        if (trimmed is not ("STRING" or "string" or "str"))
+        {
+            return false;
+        }
+        target = new BoundTypes.NominalBoundType(
+            "STRING",
+            annotatedNullable
+                ? BoundTypes.NullableAnnotation.Annotated
+                : BoundTypes.NullableAnnotation.NotAnnotated);
+        return true;
+    }
+
+    private static string DescribeAnnotation(BoundExpression source) => source.Type switch
+    {
+        BoundTypes.NominalBoundType n => n.NullableAnnotation.ToString(),
+        BoundTypes.GenericInstantiationBoundType g => g.NullableAnnotation.ToString(),
+        BoundTypes.ArrayBoundType a => a.NullableAnnotation.ToString(),
+        _ => "unknown",
+    };
 
     private VariableSymbol? FindRebindTarget(string name)
     {
@@ -2258,6 +2384,11 @@ public sealed class Binder
             receiverSymbol,
             receiverTypeSymbol);
 
+        // v0.14 §S3b: enrich BCL-shaped calls with MetadataBinder-resolved
+        // Roslyn NullableAnnotation on the return type. Additive only —
+        // Binder's own string-based ResolveCall above still runs.
+        var annotatedReturn = TryResolveBclReturnType(callExpr.Target, args);
+
         return new BoundCallExpression(
             callExpr.Span,
             callExpr.Target,
@@ -2278,7 +2409,8 @@ public sealed class Binder
             calleeSpan: callExpr.CalleeSpan,
             receiverSpan: callExpr.ReceiverSpan,
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
-            receiverTypeSymbol: receiverTypeSymbol);
+            receiverTypeSymbol: receiverTypeSymbol,
+            annotatedReturnType: annotatedReturn);
     }
 
     private (string? TypeName, string? MethodName) GetResolvedCallIdentity(
