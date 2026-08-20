@@ -102,3 +102,12 @@ src/Calor.Compiler/Binding/BoundTypes/BoundType.cs
 # pinned corpus bar keys on. Calor cannot orchestrate Roslyn's SymbolInfo
 # API surface; same class as the S1 metadata entries above.
 src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs
+
+# v0.14 nullability workstream S3 (docs/plans/v0.14-nullability-enforcement-scoping.md
+# §S3 / D2). Compiler-internal nullability predicate — a single method
+# (IsPossiblyNullAssignedTo) that S3's Calor0272 emitter, S4's Calor0273/0274
+# emitters, and future consumers all reach through. F-5 pin (scoping doc)
+# asserts single-predicate invariant. Calor cannot inspect its own bound
+# tree's Type.NullableAnnotation field; same class as the S1-S7 metadata
+# entries above.
+src/Calor.Compiler/Binding/NullabilityChecker.cs
