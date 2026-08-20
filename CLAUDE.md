@@ -14,11 +14,19 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 - `TreatWarningsAsErrors` is enabled globally — fix all warnings before committing
 - GPG signing workaround (1Password agent): `git -c commit.gpgsign=false commit -m "message"`
 
-### Run tests locally
+### Run Tests Locally
 
-Three lanes, ordered fastest to slowest. See the "Corpus Submodules" section
-below for **which** projects touch `bench/corpus/` and why the fast lane is
-safe without submodules.
+Three lanes, ordered fastest to slowest. See the [Corpus Submodules](#corpus-submodules-round-trip-harness)
+section below for **which** projects touch `bench/corpus/`.
+
+**First-time setup (once per clone).** `Calor.Verification.Tests` links
+against `Microsoft.Z3` native binaries that are gitignored per platform.
+Any build that touches the compiler project hard-errors with
+`missing Z3 asset` until the download script runs:
+
+```bash
+src/Calor.Compiler/scripts/download-z3.sh    # or .ps1 on Windows
+```
 
 **Fast unit-test lane** (seconds; no submodules required):
 
@@ -30,17 +38,30 @@ dotnet test tests/Calor.Verification.Tests/ # Z3 contract verification
 dotnet test tests/Calor.Enforcement.Tests/  # effects/taint
 ```
 
-`BinderIncompleteRatchetTests` will silently skip on a bare clone (it uses
-`Skip.IfNot` when `bench/corpus/` is empty); everything else runs green
-without submodules. To iterate on a single class, use the CLAUDE-standard
-filter: `dotnet test --filter "FullyQualifiedName~ClassName"`.
+Other corpus-independent projects are also fast-lane candidates —
+`Calor.LanguageServer.Tests`, `Calor.Ids.Tests`, `Calor.Tasks.Tests`,
+`Calor.ILAnalysis.Tests`, `Calor.Experimental.Tests`, `Calor.Performance.Tests`
+— the five above are the routinely-touched core.
 
-**Full-corpus lane** (adds ~500 MB and a few minutes; needed for the
-`BinderIncompleteRatchetTests` corpus assertions):
+`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs` will
+silently skip on a bare clone (it uses `Skip.IfNot` when `bench/corpus/`
+is empty); everything else runs green without submodules. To iterate on a
+single class, use the CLAUDE-standard filter:
+`dotnet test --filter "FullyQualifiedName~ClassName"`.
+
+**Full-corpus lane** (adds ~500 MB and a few minutes; needed to unskip
+`BinderIncompleteRatchetTests`):
 
 ```bash
-git submodule update --init && dotnet test
+git submodule update --init
+dotnet test tests/Calor.Compiler.Tests/    # scope to the project that needs corpus
 ```
+
+`dotnet test` at repo root is much broader — it sweeps every test project
+the solution references (LSP, tasks, IL analysis, evaluation, etc.), which
+takes noticeably longer than the fast lane and covers surfaces most PRs
+don't need. Prefer scoped `dotnet test tests/<Project>/` invocations, or
+run everything at once when preparing a release.
 
 **Round-trip harness lane** (slowest — ~30 min end-to-end; matches the
 `roundtrip-verification` CI job):
@@ -51,6 +72,7 @@ dotnet run --project tools/Calor.RoundTrip.Harness -- run --all
 ```
 
 `run --all` iterates every project in `ProjectConfigs.KnownProjects`
+(`Synthetic`, `Synthetic2`, `MediatR`, `Serilog`, `FluentValidation`)
 against the vendored `bench/corpus/` corpus. Pass a single project name
 (`run MediatR`) to shrink the loop while debugging a specific regression.
 
