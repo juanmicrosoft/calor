@@ -285,6 +285,15 @@ public sealed class TestComparison
     public List<TestResult> Regressions { get; set; } = [];
     public int PreExistingFailures { get; set; }
     public List<string> NewPasses { get; set; } = [];
+
+    /// <summary>
+    /// Regressions that landed on tests listed in
+    /// <see cref="RoundTripConfig.ExpectedFlakyTestFullyQualifiedNames"/> and
+    /// were therefore excluded from <see cref="Regressions"/> and the
+    /// block/warn verdict. Kept in the report so the drift is visible even
+    /// when the gate treats it as expected.
+    /// </summary>
+    public List<TestResult> IgnoredFlakyRegressions { get; set; } = [];
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

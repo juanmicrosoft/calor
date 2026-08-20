@@ -184,6 +184,11 @@ async Task<int> RunCommand(string[] runArgs)
         Console.WriteLine($"   Baseline: {report.Baseline?.Passed}/{report.Baseline?.TotalTests} passing");
         Console.WriteLine($"   Round-trip: {report.RoundTripTests?.Passed ?? 0}/{report.RoundTripTests?.TotalTests ?? 0} passing");
         Console.WriteLine($"   Regressions: {report.Comparison?.Regressions.Count ?? -1}");
+        if ((report.Comparison?.IgnoredFlakyRegressions.Count ?? 0) > 0)
+        {
+            Console.WriteLine(
+                $"   Upstream flake regressions (not blocking): {report.Comparison!.IgnoredFlakyRegressions.Count}");
+        }
         var sourceCandidateCount = report.Fidelity?.Coverage.TotalConvertibleFiles
             ?? report.FileResults.Count + report.ExcludedFileCount;
         Console.WriteLine(
