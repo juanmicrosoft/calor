@@ -103,11 +103,14 @@ public class ParsePrettyRoundTripPropertyTests
     #region Sanity
 
     /// <summary>
-    /// Sanity check that the generator produces at least one input the
-    /// parser accepts — otherwise the properties above pass vacuously.
+    /// Sanity check that the generator's parseable-sample RATE is above a
+    /// minimum threshold — otherwise the properties below "pass" vacuously
+    /// by short-circuiting on parse failure. Adversarial review flagged
+    /// that the previous check (`parseable > 0`) was satisfied by 1-of-30,
+    /// which still allowed 96% of property samples to skip.
     /// </summary>
     [Fact]
-    public void Generator_ProducesAtLeastOneParseableInput()
+    public void Generator_ProducesMostlyParseableInputs()
     {
         var arb = SmallCalorPrograms();
         var samples = Gen.Sample(20, 30, arb.Generator);
@@ -117,7 +120,12 @@ public class ParsePrettyRoundTripPropertyTests
             var (module, diags) = TryParse(sample);
             if (module is not null && !diags.HasErrors) parseable++;
         }
-        Assert.True(parseable > 0, "generator produced zero parseable samples");
+        // Threshold is deliberately loose (half the samples). Tight enough
+        // that a generator regression that mostly emits garbage fails here
+        // instead of silently gutting the properties; loose enough to tolerate
+        // parser quirks the generator can't anticipate.
+        Assert.True(parseable >= samples.Count() / 2,
+            $"generator produced only {parseable}/{samples.Count()} parseable samples — the properties below would pass vacuously");
     }
 
     #endregion
@@ -137,7 +145,8 @@ public class ParsePrettyRoundTripPropertyTests
             // If our generator produced something the parser rejects, we
             // skip that sample — the property only holds for parseable
             // inputs. Report skips as passes so FsCheck's sample count is
-            // preserved.
+            // preserved. Generator_ProducesMostlyParseableInputs above
+            // guards against the vacuous-mass-skip failure mode.
             if (firstModule is null || firstDiags.HasErrors) return true;
 
             var reemitted = PrettyPrint(firstModule);
@@ -150,10 +159,13 @@ public class ParsePrettyRoundTripPropertyTests
     [Property(MaxTest = 50)]
     public Property Parse_Pretty_Parse_PreservesModuleShape()
     {
-        // Property: the round-trip preserves the module name and the number
-        // of top-level function declarations. Node-for-node AST equality is
-        // out of scope for this smoke test (see the class-level comment);
-        // this is the shape-level check that a regression would trip.
+        // Property: the round-trip preserves module name, function count,
+        // AND per-function body statement count. Node-for-node AST
+        // equality is out of scope for this smoke test (see the class-level
+        // comment). Body-count assertion added per adversarial review:
+        // without it, an emitter regression that dropped every §P
+        // statement, preserved the module and function shell, and returned
+        // an empty body would still pass.
         return Prop.ForAll(SmallCalorPrograms(), source =>
         {
             var (firstModule, firstDiags) = TryParse(source);
@@ -166,7 +178,20 @@ public class ParsePrettyRoundTripPropertyTests
             if (!string.Equals(firstModule.Name, secondModule.Name, StringComparison.Ordinal))
                 return false;
 
-            return firstModule.Functions.Count == secondModule.Functions.Count;
+            if (firstModule.Functions.Count != secondModule.Functions.Count)
+                return false;
+
+            // Zip functions in declaration order and require body-statement
+            // count to survive the round-trip. Any drop or duplicate at
+            // the statement level trips this.
+            for (var i = 0; i < firstModule.Functions.Count; i++)
+            {
+                var firstBody = firstModule.Functions[i].Body?.Count ?? 0;
+                var secondBody = secondModule.Functions[i].Body?.Count ?? 0;
+                if (firstBody != secondBody) return false;
+            }
+
+            return true;
         });
     }
 
