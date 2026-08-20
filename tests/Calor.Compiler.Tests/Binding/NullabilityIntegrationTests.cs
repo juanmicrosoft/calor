@@ -74,32 +74,11 @@ public class NullabilityIntegrationTests
             d.Code == DiagnosticCode.NullableToNonNullableBinding);
     }
 
-    /// <summary>
-    /// A pure-Calor string binding (no BCL involvement) has Oblivious source
-    /// annotation — S3b's D3 rule says Oblivious IS treated as possibly-null,
-    /// but only when the target is scalar STRING with NotAnnotated. Since
-    /// Calor's own string literals also default to Oblivious right now, and
-    /// this is the "would produce all-noise if we're not careful" case flagged
-    /// in S3's descope, verify that pure-Calor bindings from string literals
-    /// currently DO fire (documenting the current behavior — a follow-on slice
-    /// will refine literals to be NotAnnotated).
-    ///
-    /// The intent of this test is CURRENT-STATE DOCUMENTATION: if the noise
-    /// becomes unacceptable, the fix is to have BoundStringLiteral produce
-    /// NotAnnotated (not to change the predicate).
-    /// </summary>
-    [Fact(Skip = "Documents current-state noise on Calor literals; toggle in follow-on slice when BoundStringLiteral becomes NotAnnotated.")]
-    public void Calor0272_CurrentlyFiresFor_LocalLiteralBinding()
-    {
-        const string source = """
-            §M{m1:Local}
-              §F{f1:Test:pub} () -> void
-                §E{}
-                §B{greeting:string} STR:"hello"
-            """;
-
-        var (_, diagnostics) = BindSource(source);
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.NullableToNonNullableBinding);
-    }
 }
+
+// NOTE: A third test case ("Calor0272 currently fires for a local
+// §B{greeting:string} STR:"hello" binding, because BoundStringLiteral.Type
+// defaults to Oblivious") was intentionally NOT added here. That behavior IS
+// current-state noise on Calor literals; the fix is a follow-on slice that
+// refines BoundStringLiteral (and other Calor literals producing STRING) to
+// NotAnnotated. Tracked in the PR body and to be filed as a follow-up issue.
