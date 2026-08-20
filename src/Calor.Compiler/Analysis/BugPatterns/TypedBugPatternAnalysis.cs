@@ -847,7 +847,7 @@ internal sealed class TypedBugPatternAnalysis
                     GetArithmeticType(
                         compound.Target,
                         compound.Value,
-                        compound.Target.TypeName),
+                        compound.Target.Type.DisplayString),
                     valueState);
             }
             if (_enabled.HasFlag(TypedBugPatternKind.IntegerOverflow)
@@ -861,7 +861,7 @@ internal sealed class TypedBugPatternAnalysis
                     GetArithmeticType(
                         compound.Target,
                         compound.Value,
-                        compound.Target.TypeName),
+                        compound.Target.Type.DisplayString),
                     state,
                     valueState,
                     compound.Operator == CompoundAssignmentOperator.Divide
@@ -1091,7 +1091,7 @@ internal sealed class TypedBugPatternAnalysis
         var type = GetArithmeticType(
             division.Left,
             division.Right,
-            division.TypeName);
+            division.Type.DisplayString);
         CheckDivisor(division.Right, division.Span, type, rightState);
     }
 
@@ -1184,7 +1184,7 @@ internal sealed class TypedBugPatternAnalysis
                 GetArithmeticType(
                     binary.Left,
                     binary.Right,
-                    binary.TypeName),
+                    binary.Type.DisplayString),
                 state,
                 rightState,
                 binary.Operator == BinaryOperator.Divide
@@ -1203,11 +1203,11 @@ internal sealed class TypedBugPatternAnalysis
         }
 
         var targetType = binary.Operator == BinaryOperator.LeftShift
-            ? GetShiftResultType(binary.Left.TypeName)
+            ? GetShiftResultType(binary.Left.Type.DisplayString)
             : GetArithmeticType(
                 binary.Left,
                 binary.Right,
-                binary.TypeName);
+                binary.Type.DisplayString);
         if (!TryGetIntegralType(targetType, out var integral))
         {
             if (IsNumericType(targetType))
@@ -1317,7 +1317,7 @@ internal sealed class TypedBugPatternAnalysis
         if (unary.Operator != UnaryOperator.Negate)
             return;
 
-        var promotedType = GetUnaryArithmeticType(unary.Operand.TypeName);
+        var promotedType = GetUnaryArithmeticType(unary.Operand.Type.DisplayString);
         if (!TryGetIntegralType(promotedType, out var integral))
         {
             if (TypeIdentity.Canonicalize(promotedType) == "ULONG")
@@ -1389,7 +1389,7 @@ internal sealed class TypedBugPatternAnalysis
             return;
         }
 
-        if (IsNumericType(conversion.Operand.TypeName))
+        if (IsNumericType(conversion.Operand.Type.DisplayString))
         {
             ReportUnknown(
                 TypedBugPatternKind.IntegerOverflow,
@@ -2125,7 +2125,7 @@ internal sealed class TypedBugPatternAnalysis
             if (unary.Operator == UnaryOperator.Negate
                 && operand.Numeric is { } numeric
                 && TryGetIntegralType(
-                    GetUnaryArithmeticType(unary.Operand.TypeName),
+                    GetUnaryArithmeticType(unary.Operand.Type.DisplayString),
                     out var integral))
             {
                 return AbstractValue.NumericValue(
@@ -2202,15 +2202,15 @@ internal sealed class TypedBugPatternAnalysis
         var right = Evaluate(binary.Right, rightState);
         var type = binary.Operator is BinaryOperator.LeftShift
             or BinaryOperator.RightShift
-            ? GetShiftResultType(binary.Left.TypeName)
+            ? GetShiftResultType(binary.Left.Type.DisplayString)
             : GetArithmeticType(
                 binary.Left,
                 binary.Right,
-                binary.TypeName);
+                binary.Type.DisplayString);
         if (TypeIdentity.Canonicalize(type) == "DECIMAL")
         {
             if (left.Decimal == null || right.Decimal == null)
-                return AbstractValue.Unknown(binary.TypeName);
+                return AbstractValue.Unknown(binary.Type.DisplayString);
             var decimalDomain = binary.Operator == BinaryOperator.Subtract
                 && AreProvablySameValue(binary.Left, binary.Right)
                     ? DecimalDomain.Constant(0m)
@@ -2219,7 +2219,7 @@ internal sealed class TypedBugPatternAnalysis
                         left.Decimal.Value,
                         right.Decimal.Value);
             return decimalDomain == null
-                ? AbstractValue.Unknown(binary.TypeName)
+                ? AbstractValue.Unknown(binary.Type.DisplayString)
                 : AbstractValue.DecimalValue(type, decimalDomain.Value);
         }
 
@@ -2227,7 +2227,7 @@ internal sealed class TypedBugPatternAnalysis
             || right.Numeric == null
             || !TryGetIntegralType(type, out var integral))
         {
-            return AbstractValue.Unknown(binary.TypeName);
+            return AbstractValue.Unknown(binary.Type.DisplayString);
         }
 
         NumericDomain mathematical;
@@ -2263,7 +2263,7 @@ internal sealed class TypedBugPatternAnalysis
         }
         else
         {
-            return AbstractValue.Unknown(binary.TypeName);
+            return AbstractValue.Unknown(binary.Type.DisplayString);
         }
 
         return AbstractValue.NumericValue(type, Wrap(mathematical, integral));
@@ -2277,7 +2277,7 @@ internal sealed class TypedBugPatternAnalysis
             || !state.TryGet(target.Variable.Id, out var left)
             || left.Numeric == null)
         {
-            return AbstractValue.Unknown(compound.Target.TypeName);
+            return AbstractValue.Unknown(compound.Target.Type.DisplayString);
         }
 
         var right = Evaluate(compound.Value, state);
