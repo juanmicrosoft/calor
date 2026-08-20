@@ -4,7 +4,11 @@
   "measurement_command": "python3 /tmp/nullability_s1_baseline.py",
   "measured_at": "2026-08-20",
   "measured_at_git_sha": "a46f53c12704c1dfba7bd34bb2796fae90e7e0c4",
-  "phase": "A-pre-S3",
+  "phase": "A-S3-predicate-only",
+  "phase_history": [
+    {"phase": "A-pre-S3", "at": "s1-baseline-merge", "note": "Initial S1 measurement. No compiler emission yet."},
+    {"phase": "A-S3-predicate-only", "at": "s3-checker-merge", "note": "NullabilityChecker predicate + Calor0272 diagnostic code exist and are unit-tested. Production emission from BindBindStatement NOT wired: BoundCallExpression.Type is still Oblivious across the board (MetadataBinder-resolved annotations do not flow into the bound tree yet). Turning on Calor0272 pre-wiring would produce all-noise diagnostics on every string binding. Emission lands in the follow-on Binder→MetadataBinder integration slice."}
+  ],
   "total_bindings": 42,
   "by_shape": {
     "CALL_CALOR": 8,

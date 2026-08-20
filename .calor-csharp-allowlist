@@ -110,5 +110,4 @@ src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs
 # asserts single-predicate invariant. Calor cannot inspect its own bound
 # tree's Type.NullableAnnotation field; same class as the S1-S7 metadata
 # entries above.
-# pending: lands with the S3 checker+emitter PR
 src/Calor.Compiler/Binding/NullabilityChecker.cs
