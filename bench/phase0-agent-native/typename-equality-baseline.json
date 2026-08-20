@@ -4,7 +4,14 @@
   "baselineCount": 54,
   "measuredAt": "2026-08-19",
   "s7BatchHistory": [
-    {"batch": 1, "count": 56, "date": "2026-08-19", "sites": "BoundConditionalExpression whenTrue/whenFalse.TypeName == NEVER (2 sites in BoundNodes.cs)"}
+    {"batch": 1, "count": 56, "date": "2026-08-19", "sites": "BoundConditionalExpression whenTrue/whenFalse.TypeName == NEVER (2 sites in BoundNodes.cs)"},
+    {"batch": 2, "count": 54, "date": "2026-08-19", "sites": "TaintAnalysis.cs .TypeName reads (2 sites)"},
+    {"batch": 3, "count": 54, "date": "2026-08-19", "sites": "Binder.BindNullCoalesce left/right BoundExpression.TypeName reads (2 sites; count unchanged, reads only)"},
+    {"batch": 4, "count": 54, "date": "2026-08-19", "sites": "TaintAnalysis.cs .TypeName reads (3 sites; reads only)"},
+    {"batch": 5, "count": 54, "date": "2026-08-19", "sites": "TypedBugPatternAnalysis.cs .TypeName reads (16 sites; reads only)"},
+    {"batch": 6, "count": 54, "date": "2026-08-19", "sites": "Binder.cs + TypedBugPatternAnalysis.cs .TypeName reads (14 sites; reads only)"},
+    {"batch": 7, "count": 54, "date": "2026-08-19", "sites": "CallGraphAnalysis + BoundNodes.cs internal ctor reads (10 sites; reads only)"},
+    {"batch": "F-5", "count": 54, "date": "2026-08-19", "sites": "Deleted abstract string TypeName from BoundExpression base; 45 subclass overrides converted to Type overrides; TypeName kept as compatibility shim (TypeName => Type.DisplayString) for test call sites. Follow-up PR migrates test reads and deletes shim entirely."}
   ],
   "measurementCommand": "grep -rn 'TypeName ==\\|TypeName !=' src/ | wc -l",
   "note": "Count is over the whole src/ tree because F-3's scoping-doc text is `TypeName ==` / `!=` sites in src/ (not narrowed to BoundExpression.TypeName). Includes ContainingTypeName, ResolvedTypeName, and any other TypeName-named property with equality comparisons — S6/S7 lower ALL of them by removing the shim."

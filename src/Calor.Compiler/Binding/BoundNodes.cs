@@ -31,20 +31,20 @@ public abstract class BoundStatement : BoundNode
 /// </summary>
 public abstract class BoundExpression : BoundNode
 {
-    public abstract string TypeName { get; }
+    /// <summary>
+    /// v0.14 F-5 — ground-truth <see cref="BoundType"/> representation.
+    /// Every BoundExpression provides a non-null <c>Type</c>; string
+    /// spellings derive from <see cref="BoundType.DisplayString"/> so
+    /// there is a single source of truth for expression types.
+    /// </summary>
+    public abstract BoundType Type { get; }
 
     /// <summary>
-    /// v0.14 §D1 — ground-truth <see cref="BoundType"/> representation.
-    /// Default wraps the existing <see cref="TypeName"/> string in a
-    /// <see cref="NominalBoundType"/> so every <c>BoundExpression</c> has a
-    /// non-null <c>Type</c> without touching per-subclass constructors.
-    /// Subclasses will override in S3–S6 as they gain access to precise
-    /// metadata-backed shapes; <see cref="TypeName"/> is deleted at S7 (F-5).
+    /// v0.14 F-5 compatibility shim: forwards to <c>Type.DisplayString</c>.
+    /// External call sites should prefer <c>expression.Type.DisplayString</c>
+    /// directly. Slated for removal after test call sites migrate.
     /// </summary>
-    // TODO(S3): the default allocates on every get. Memoize (per-instance
-    // cache field) once analysis passes start reading .Type in hot loops.
-    // Deliberately unoptimized in S2 to keep the shim change zero-behaviour.
-    public virtual BoundType Type => new NominalBoundType(TypeName);
+    public string TypeName => Type.DisplayString;
 
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
@@ -176,7 +176,7 @@ public sealed class BoundVariableExpression : BoundExpression
     public IReadOnlyList<VariableSymbol> ResolvedSymbols { get; }
     public IReadOnlyList<SymbolId> ResolvedSymbolIds =>
         ResolvedSymbols.Select(symbol => symbol.Id).ToArray();
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundVariableExpression(
         TextSpan span,
@@ -191,7 +191,7 @@ public sealed class BoundVariableExpression : BoundExpression
             .Select(symbol => TypeIdentity.Canonicalize(symbol.TypeName))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        TypeName = resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT";
+        Type = new NominalBoundType(resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT");
     }
 }
 
@@ -400,7 +400,7 @@ public sealed class BoundBinaryExpression : BoundExpression
     public BinaryOperator Operator { get; }
     public BoundExpression Left { get; }
     public BoundExpression Right { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundBinaryExpression(
@@ -414,7 +414,7 @@ public sealed class BoundBinaryExpression : BoundExpression
         Operator = op;
         Left = left;
         Right = right;
-        TypeName = resultType;
+        Type = new NominalBoundType(resultType);
         Children = [left, right];
     }
 }
@@ -427,7 +427,7 @@ public sealed class BoundIntLiteral : BoundExpression
     public long Value { get; }
     public ulong UnsignedValue { get; }
     public bool IsUnsigned { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundIntLiteral(TextSpan span, long value)
         : this(
@@ -450,7 +450,7 @@ public sealed class BoundIntLiteral : BoundExpression
         Value = value;
         UnsignedValue = unsignedValue;
         IsUnsigned = isUnsigned;
-        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        Type = new NominalBoundType(typeName ?? throw new ArgumentNullException(nameof(typeName)));
     }
 }
 
@@ -462,7 +462,7 @@ public sealed class BoundStringLiteral : BoundExpression
     public string Value { get; }
     public bool IsMultiline { get; }
     public bool IsUtf8 { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundStringLiteral(TextSpan span, string value)
         : this(span, value, isMultiline: false, isUtf8: false)
@@ -479,7 +479,7 @@ public sealed class BoundStringLiteral : BoundExpression
         Value = value ?? throw new ArgumentNullException(nameof(value));
         IsMultiline = isMultiline;
         IsUtf8 = isUtf8;
-        TypeName = isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING";
+        Type = new NominalBoundType(isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING");
     }
 }
 
@@ -489,7 +489,7 @@ public sealed class BoundStringLiteral : BoundExpression
 public sealed class BoundBoolLiteral : BoundExpression
 {
     public bool Value { get; }
-    public override string TypeName => "BOOL";
+    public override BoundType Type { get; } = new NominalBoundType("BOOL");
 
     public BoundBoolLiteral(TextSpan span, bool value)
         : base(span)
@@ -504,7 +504,7 @@ public sealed class BoundBoolLiteral : BoundExpression
 public sealed class BoundFloatLiteral : BoundExpression
 {
     public double Value { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundFloatLiteral(TextSpan span, double value)
         : this(span, value, "FLOAT")
@@ -515,7 +515,7 @@ public sealed class BoundFloatLiteral : BoundExpression
         : base(span)
     {
         Value = value;
-        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        Type = new NominalBoundType(typeName ?? throw new ArgumentNullException(nameof(typeName)));
     }
 }
 
@@ -526,7 +526,7 @@ public sealed class BoundFloatLiteral : BoundExpression
 public sealed class BoundDecimalLiteral : BoundExpression
 {
     public decimal Value { get; }
-    public override string TypeName => "DECIMAL";
+    public override BoundType Type { get; } = new NominalBoundType("DECIMAL");
 
     public BoundDecimalLiteral(TextSpan span, decimal value)
         : base(span)
@@ -540,11 +540,11 @@ public sealed class BoundDecimalLiteral : BoundExpression
 /// </summary>
 public sealed class BoundNoneLiteral : BoundExpression
 {
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundNoneLiteral(TextSpan span, string? optionType = null) : base(span)
     {
-        TypeName = optionType ?? "NONE";
+        Type = new NominalBoundType(optionType ?? "NONE");
     }
 }
 
@@ -555,7 +555,7 @@ public sealed class BoundUnaryExpression : BoundExpression
 {
     public Ast.UnaryOperator Operator { get; }
     public BoundExpression Operand { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundUnaryExpression(TextSpan span, Ast.UnaryOperator op, BoundExpression operand, string resultType)
@@ -563,7 +563,7 @@ public sealed class BoundUnaryExpression : BoundExpression
     {
         Operator = op;
         Operand = operand;
-        TypeName = resultType;
+        Type = new NominalBoundType(resultType);
         Children = [operand];
     }
 }
@@ -585,7 +585,7 @@ public class BoundCallExpression : BoundExpression
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => Arguments;
 
     /// <summary>
@@ -639,7 +639,7 @@ public class BoundCallExpression : BoundExpression
         ResolvedSymbol = resolvedSymbol;
         ResolvedSymbols = resolvedSymbols
             ?? (resolvedSymbol == null ? Array.Empty<FunctionSymbol>() : [resolvedSymbol]);
-        TypeName = resultType;
+        Type = new NominalBoundType(resultType);
         ResolvedTypeName = resolvedTypeName;
         ResolvedMethodName = resolvedMethodName;
         ResolvedParameterTypes = resolvedParameterTypes;
@@ -700,15 +700,15 @@ public sealed class BoundGenericTypeExpression : BoundExpression
 {
     public string GenericTypeName { get; }
     public IReadOnlyList<string> TypeArguments { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public BoundGenericTypeExpression(TextSpan span, string genericTypeName,
         IReadOnlyList<string> typeArguments) : base(span)
     {
         GenericTypeName = genericTypeName;
         TypeArguments = typeArguments;
-        TypeName = typeArguments.Count == 0
+        Type = new NominalBoundType(typeArguments.Count == 0
             ? genericTypeName
-            : $"{genericTypeName}<{string.Join(",", typeArguments)}>";
+            : $"{genericTypeName}<{string.Join(",", typeArguments)}>");
     }
 }
 
@@ -733,13 +733,13 @@ public static class BoundChildren
 public sealed class BoundSomeExpression : BoundExpression
 {
     public BoundExpression Value { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Value];
 
     public BoundSomeExpression(TextSpan span, BoundExpression value) : base(span)
     {
         Value = value;
-        TypeName = $"Option<{value.Type.DisplayString}>";
+        Type = new NominalBoundType($"Option<{value.Type.DisplayString}>");
     }
 }
 
@@ -749,13 +749,13 @@ public sealed class BoundSomeExpression : BoundExpression
 public sealed class BoundOkExpression : BoundExpression
 {
     public BoundExpression Value { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Value];
 
     public BoundOkExpression(TextSpan span, BoundExpression value) : base(span)
     {
         Value = value;
-        TypeName = $"Result<{value.Type.DisplayString}, OBJECT>";
+        Type = new NominalBoundType($"Result<{value.Type.DisplayString}, OBJECT>");
     }
 }
 
@@ -763,13 +763,13 @@ public sealed class BoundOkExpression : BoundExpression
 public sealed class BoundErrExpression : BoundExpression
 {
     public BoundExpression Error { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Error];
 
     public BoundErrExpression(TextSpan span, BoundExpression error) : base(span)
     {
         Error = error;
-        TypeName = $"Result<OBJECT, {error.Type.DisplayString}>";
+        Type = new NominalBoundType($"Result<OBJECT, {error.Type.DisplayString}>");
     }
 }
 
@@ -779,7 +779,7 @@ public sealed class BoundExpressionCall : BoundExpression
 {
     public BoundExpression Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
-    public override string TypeName => "OBJECT";
+    public override BoundType Type { get; } = new NominalBoundType("OBJECT");
     public override IReadOnlyList<BoundExpression> Children => [Target, .. Arguments];
 
     public BoundExpressionCall(TextSpan span, BoundExpression target,
@@ -794,7 +794,7 @@ public sealed class BoundExpressionCall : BoundExpression
 public sealed class BoundAnonymousObjectCreation : BoundExpression
 {
     public IReadOnlyList<BoundNamedValue> Initializers { get; }
-    public override string TypeName => "OBJECT";
+    public override BoundType Type { get; } = new NominalBoundType("OBJECT");
     public override IReadOnlyList<BoundExpression> Children =>
         Initializers.Select(initializer => initializer.Value).ToArray();
 
@@ -806,14 +806,14 @@ public sealed class BoundAnonymousObjectCreation : BoundExpression
 public sealed class BoundRecordCreation : BoundExpression
 {
     public IReadOnlyList<BoundNamedValue> Fields { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children =>
         Fields.Select(item => item.Value).ToArray();
 
     public BoundRecordCreation(TextSpan span, string typeName, IReadOnlyList<BoundNamedValue> fields)
         : base(span)
     {
-        TypeName = typeName;
+        Type = new NominalBoundType(typeName);
         Fields = fields;
     }
 }
@@ -823,7 +823,7 @@ public sealed class BoundWithExpression : BoundExpression
 {
     public BoundExpression Target { get; }
     public IReadOnlyList<BoundNamedValue> Assignments { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children =>
         [Target, .. Assignments.Select(assignment => assignment.Value)];
 
@@ -832,7 +832,7 @@ public sealed class BoundWithExpression : BoundExpression
     {
         Target = target;
         Assignments = assignments;
-        TypeName = target.Type.DisplayString;
+        Type = new NominalBoundType(target.Type.DisplayString);
     }
 }
 
@@ -840,7 +840,7 @@ public sealed class BoundWithExpression : BoundExpression
 public sealed class BoundThrowExpression : BoundExpression
 {
     public BoundExpression Exception { get; }
-    public override string TypeName => "NEVER";
+    public override BoundType Type { get; } = new NominalBoundType("NEVER");
     public override IReadOnlyList<BoundExpression> Children => [Exception];
 
     public BoundThrowExpression(TextSpan span, BoundExpression exception) : base(span)
@@ -859,7 +859,7 @@ public sealed class BoundArrayCreation : BoundExpression
     public BoundExpression? Size { get; }
     public IReadOnlyList<BoundExpression> Initializer { get; }
     public AttributeCollection Attributes { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children =>
         Size == null ? Initializer : [Size, .. Initializer];
 
@@ -869,7 +869,7 @@ public sealed class BoundArrayCreation : BoundExpression
     {
         Id = id; Name = name; ElementType = elementType; Size = size; Initializer = initializer;
         Attributes = attributes ?? new AttributeCollection();
-        TypeName = $"{elementType}[]";
+        Type = new NominalBoundType($"{elementType}[]");
     }
 }
 
@@ -880,16 +880,16 @@ public sealed class BoundArrayAccess : BoundExpression
 {
     public BoundExpression Array { get; }
     public BoundExpression Index { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Array, Index];
 
     public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
     {
         Array = array; Index = index;
         var arrayTypeName = array.Type.DisplayString;
-        TypeName = arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
+        Type = new NominalBoundType(arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
             ? arrayTypeName[..^2]
-            : "OBJECT";
+            : "OBJECT");
     }
 }
 
@@ -897,7 +897,7 @@ public sealed class BoundArrayAccess : BoundExpression
 public sealed class BoundArrayLength : BoundExpression
 {
     public BoundExpression Array { get; }
-    public override string TypeName => "INT";
+    public override BoundType Type { get; } = new NominalBoundType("INT");
     public override IReadOnlyList<BoundExpression> Children => [Array];
 
     public BoundArrayLength(TextSpan span, BoundExpression array) : base(span) => Array = array;
@@ -914,7 +914,7 @@ public sealed class BoundMultiDimArrayCreation : BoundExpression
     /// <summary>Row structure RETAINED (B3 review M2): rectangularity/shape-vs-rank
     /// validation needs it; flattening happens only in BoundChildren.Of.</summary>
     public IReadOnlyList<IReadOnlyList<BoundExpression>> InitializerRows { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children =>
         [.. DimensionSizes, .. InitializerRows.SelectMany(row => row)];
 
@@ -925,7 +925,7 @@ public sealed class BoundMultiDimArrayCreation : BoundExpression
     {
         Id = id; Name = name; ElementType = elementType; Rank = rank;
         DimensionSizes = dimensionSizes; InitializerRows = initializerRows;
-        TypeName = $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
+        Type = new NominalBoundType($"{elementType}[{new string(',', Math.Max(0, rank - 1))}]");
     }
 }
 
@@ -934,7 +934,7 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
 {
     public BoundExpression Array { get; }
     public IReadOnlyList<BoundExpression> Indices { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Array, .. Indices];
 
     public BoundMultiDimArrayAccess(TextSpan span, BoundExpression array,
@@ -945,7 +945,7 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
         // everything before the TRAILING bracket group ("i32[]"), not "i32" (B3 review m5).
         var t = array.Type.DisplayString;
         var open = t.LastIndexOf('[');
-        TypeName = open > 0 ? t[..open] : "OBJECT";
+        Type = new NominalBoundType(open > 0 ? t[..open] : "OBJECT");
     }
 }
 
@@ -953,7 +953,7 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
 public sealed class BoundIndexFromEnd : BoundExpression
 {
     public BoundExpression Offset { get; }
-    public override string TypeName => "INDEX";
+    public override BoundType Type { get; } = new NominalBoundType("INDEX");
     public override IReadOnlyList<BoundExpression> Children => [Offset];
 
     public BoundIndexFromEnd(TextSpan span, BoundExpression offset) : base(span) => Offset = offset;
@@ -964,7 +964,7 @@ public sealed class BoundRangeExpression : BoundExpression
 {
     public BoundExpression? Start { get; }
     public BoundExpression? End { get; }
-    public override string TypeName => "RANGE";
+    public override BoundType Type { get; } = new NominalBoundType("RANGE");
     public override IReadOnlyList<BoundExpression> Children =>
         new[] { Start, End }.Where(expression => expression != null).Cast<BoundExpression>().ToArray();
 
@@ -981,7 +981,7 @@ public sealed class BoundListCreation : BoundExpression
     public string ElementType { get; }
     public IReadOnlyList<BoundExpression> Elements { get; }
     public AttributeCollection Attributes { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => Elements;
 
     public BoundListCreation(TextSpan span, string id, string name, string elementType,
@@ -991,7 +991,7 @@ public sealed class BoundListCreation : BoundExpression
         Attributes = attributes ?? new AttributeCollection();
         // Spelling matches the PARSER's own vocabulary for the same construct
         // (B3 review M3: the bind statement types §SET as "HashSet<T>").
-        TypeName = $"List<{elementType}>";
+        Type = new NominalBoundType($"List<{elementType}>");
     }
 }
 
@@ -1003,7 +1003,7 @@ public sealed class BoundSetCreation : BoundExpression
     public string ElementType { get; }
     public IReadOnlyList<BoundExpression> Elements { get; }
     public AttributeCollection Attributes { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => Elements;
 
     public BoundSetCreation(TextSpan span, string id, string name, string elementType,
@@ -1013,7 +1013,7 @@ public sealed class BoundSetCreation : BoundExpression
         Attributes = attributes ?? new AttributeCollection();
         // Spelling matches the PARSER's own vocabulary for the same construct
         // (B3 review M3: the bind statement types §SET as "HashSet<T>").
-        TypeName = $"HashSet<{elementType}>";
+        Type = new NominalBoundType($"HashSet<{elementType}>");
     }
 }
 
@@ -1025,7 +1025,7 @@ public sealed class BoundDictionaryCreation : BoundExpression
     public string ValueType { get; }
     public IReadOnlyList<BoundPair> Entries { get; }
     public AttributeCollection Attributes { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public string Id { get; }
     public override IReadOnlyList<BoundExpression> Children =>
         Entries.SelectMany(entry => new[] { entry.Key, entry.Value }).ToArray();
@@ -1037,7 +1037,7 @@ public sealed class BoundDictionaryCreation : BoundExpression
         Id = id; Name = name; KeyType = keyType; ValueType = valueType; Entries = entries;
         Attributes = attributes ?? new AttributeCollection();
         // No space: matches Parser.cs/RoslynSyntaxVisitor's "Dictionary<K,V>" (review M3).
-        TypeName = $"Dictionary<{keyType},{valueType}>";
+        Type = new NominalBoundType($"Dictionary<{keyType},{valueType}>");
     }
 }
 
@@ -1053,7 +1053,7 @@ public sealed class BoundCollectionContains : BoundExpression
     public Ast.ContainsMode Mode { get; }
     // The source stores the collection as a name. The binder also retains its resolved
     // expression when available so symbol-based liveness can see the receiver.
-    public override string TypeName => "BOOL";
+    public override BoundType Type { get; } = new NominalBoundType("BOOL");
     public override IReadOnlyList<BoundExpression> Children =>
         Collection == null ? [KeyOrValue] : [Collection, KeyOrValue];
 
@@ -1072,7 +1072,7 @@ public sealed class BoundCollectionContains : BoundExpression
 public sealed class BoundCollectionCount : BoundExpression
 {
     public BoundExpression Collection { get; }
-    public override string TypeName => "INT";
+    public override BoundType Type { get; } = new NominalBoundType("INT");
     public override IReadOnlyList<BoundExpression> Children => [Collection];
 
     public BoundCollectionCount(TextSpan span, BoundExpression collection) : base(span)
@@ -1083,14 +1083,14 @@ public sealed class BoundCollectionCount : BoundExpression
 public sealed class BoundTupleLiteral : BoundExpression
 {
     public IReadOnlyList<BoundExpression> Elements { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => Elements;
 
     public BoundTupleLiteral(TextSpan span, IReadOnlyList<BoundExpression> elements) : base(span)
     {
         Elements = elements;
         // Element types composed rather than discarded (review M3).
-        TypeName = $"Tuple<{string.Join(",", elements.Select(e => e.Type.DisplayString))}>";
+        Type = new NominalBoundType($"Tuple<{string.Join(",", elements.Select(e => e.Type.DisplayString))}>");
     }
 }
 
@@ -1471,11 +1471,11 @@ public sealed class BoundExpressionStatement : BoundStatement
 /// </summary>
 public sealed class BoundThisExpression : BoundExpression
 {
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundThisExpression(TextSpan span, string className) : base(span)
     {
-        TypeName = className ?? "UNKNOWN";
+        Type = new NominalBoundType(className ?? "UNKNOWN");
     }
 }
 
@@ -1484,11 +1484,11 @@ public sealed class BoundThisExpression : BoundExpression
 /// </summary>
 public sealed class BoundBaseExpression : BoundExpression
 {
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
 
     public BoundBaseExpression(TextSpan span, string typeName = "OBJECT") : base(span)
     {
-        TypeName = typeName;
+        Type = new NominalBoundType(typeName);
     }
 }
 
@@ -1503,7 +1503,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
     public VariableSymbol? ResolvedField { get; }
     public IReadOnlyList<VariableSymbol> ResolvedFields { get; }
     public SymbolId? ResolvedSymbolId => ResolvedField?.Id;
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundFieldAccessExpression(
@@ -1519,7 +1519,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         Target = target ?? throw new ArgumentNullException(nameof(target));
         FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
         FieldNameSpan = fieldNameSpan ?? span;
-        TypeName = typeName ?? "OBJECT";
+        Type = new NominalBoundType(typeName ?? "OBJECT");
         ResolvedField = resolvedField;
         ResolvedFields = resolvedFields
             ?? (resolvedField == null ? Array.Empty<VariableSymbol>() : [resolvedField]);
@@ -1567,7 +1567,7 @@ public sealed class BoundTypeReference
 /// </summary>
 public sealed class BoundNewExpression : BoundExpression
 {
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public TextSpan TypeNameSpan { get; }
     public BoundTypeReference TypeReference { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
@@ -1606,7 +1606,7 @@ public sealed class BoundNewExpression : BoundExpression
         BoundTypeReference? typeReference = null)
         : base(span)
     {
-        TypeName = typeName ?? "OBJECT";
+        Type = new NominalBoundType(typeName ?? "OBJECT");
         TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();
@@ -1637,7 +1637,7 @@ public sealed class BoundConditionalExpression : BoundExpression
     public BoundExpression Condition { get; }
     public BoundExpression WhenTrue { get; }
     public BoundExpression WhenFalse { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundConditionalExpression(TextSpan span, BoundExpression condition, BoundExpression whenTrue, BoundExpression whenFalse)
@@ -1671,7 +1671,7 @@ public sealed class BoundConditionalExpression : BoundExpression
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
         WhenTrue = whenTrue ?? throw new ArgumentNullException(nameof(whenTrue));
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
-        TypeName = resultType ?? throw new ArgumentNullException(nameof(resultType));
+        Type = new NominalBoundType(resultType ?? throw new ArgumentNullException(nameof(resultType)));
         Children = [condition, whenTrue, whenFalse];
     }
 }
@@ -1683,7 +1683,7 @@ public sealed class BoundConditionalExpression : BoundExpression
 public class BoundStructuralExpression : BoundExpression
 {
     public string NodeTypeName { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public IReadOnlyDictionary<string, object?> Metadata { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IReadOnlyList<BoundExpression> DeferredChildren { get; }
@@ -1698,7 +1698,7 @@ public class BoundStructuralExpression : BoundExpression
         : base(span)
     {
         NodeTypeName = nodeTypeName ?? throw new ArgumentNullException(nameof(nodeTypeName));
-        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        Type = new NominalBoundType(typeName ?? throw new ArgumentNullException(nameof(typeName)));
         Children = children ?? Array.Empty<BoundExpression>();
         Metadata = metadata ?? new Dictionary<string, object?>();
         DeferredChildren = deferredChildren ?? Array.Empty<BoundExpression>();
@@ -1755,7 +1755,7 @@ public sealed class BoundTypeOperationExpression : BoundExpression
     public TypeOp Operation { get; }
     public BoundExpression Operand { get; }
     public string TargetType { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundTypeOperationExpression(
@@ -1768,7 +1768,7 @@ public sealed class BoundTypeOperationExpression : BoundExpression
         Operation = operation;
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
-        TypeName = operation == TypeOp.Is ? "BOOL" : targetType;
+        Type = new NominalBoundType(operation == TypeOp.Is ? "BOOL" : targetType);
         Children = [operand];
     }
 }
@@ -1781,7 +1781,7 @@ public sealed class BoundIsPatternExpression : BoundExpression
     public BoundExpression Operand { get; }
     public string TargetType { get; }
     public string? VariableName { get; }
-    public override string TypeName => "BOOL";
+    public override BoundType Type { get; } = new NominalBoundType("BOOL");
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundIsPatternExpression(
@@ -1805,7 +1805,7 @@ public sealed class BoundArrayAccessExpression : BoundExpression
 {
     public BoundExpression Array { get; }
     public IReadOnlyList<BoundExpression> Indices { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 
     public BoundArrayAccessExpression(
@@ -1817,7 +1817,7 @@ public sealed class BoundArrayAccessExpression : BoundExpression
     {
         Array = array ?? throw new ArgumentNullException(nameof(array));
         Indices = indices ?? throw new ArgumentNullException(nameof(indices));
-        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        Type = new NominalBoundType(typeName ?? throw new ArgumentNullException(nameof(typeName)));
         Children = [array, .. indices];
     }
 }
@@ -1875,7 +1875,7 @@ public sealed class BoundInterpolatedStringPart : BoundNode
 public sealed class BoundInterpolatedStringExpression : BoundExpression
 {
     public IReadOnlyList<BoundInterpolatedStringPart> Parts { get; }
-    public override string TypeName => "STRING";
+    public override BoundType Type { get; } = new NominalBoundType("STRING");
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes => Parts;
 
@@ -1904,7 +1904,7 @@ public sealed class BoundLambdaExpression : BoundExpression
     public BoundExpression? ExpressionBody { get; }
     public IReadOnlyList<BoundStatement>? StatementBody { get; }
     public string ReturnTypeName { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IReadOnlyList<BoundExpression> DeferredChildren => Children;
     public override IEnumerable<BoundNode> ChildNodes
@@ -1946,7 +1946,7 @@ public sealed class BoundLambdaExpression : BoundExpression
         StatementBody = statementBody;
         ReturnTypeName = returnTypeName ?? throw new ArgumentNullException(nameof(returnTypeName));
         var signature = string.Join(",", parameters.Select(parameter => parameter.TypeName));
-        TypeName = $"{(isAsync ? "ASYNC_" : "")}LAMBDA({signature})->{returnTypeName}";
+        Type = new NominalBoundType($"{(isAsync ? "ASYNC_" : "")}LAMBDA({signature})->{returnTypeName}");
         Children = expressionBody != null ? [expressionBody] : Array.Empty<BoundExpression>();
     }
 }
@@ -1956,7 +1956,7 @@ public sealed class BoundQuantifierExpression : BoundExpression
     public string NodeTypeName { get; }
     public IReadOnlyList<VariableSymbol> BoundVariables { get; }
     public BoundExpression Body { get; }
-    public override string TypeName => "BOOL";
+    public override BoundType Type { get; } = new NominalBoundType("BOOL");
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IReadOnlyList<BoundExpression> DeferredChildren => Children;
 
@@ -1980,7 +1980,7 @@ public sealed class BoundMatchExpression : BoundExpression
     public BoundExpression Target { get; }
     public IReadOnlyList<BoundMatchCase> Cases { get; }
     public AttributeCollection Attributes { get; }
-    public override string TypeName { get; }
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IReadOnlyList<BoundExpression> DeferredChildren { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Target, .. Cases];
@@ -1998,7 +1998,7 @@ public sealed class BoundMatchExpression : BoundExpression
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Cases = cases ?? throw new ArgumentNullException(nameof(cases));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
-        TypeName = resultType ?? throw new ArgumentNullException(nameof(resultType));
+        Type = new NominalBoundType(resultType ?? throw new ArgumentNullException(nameof(resultType)));
         Children =
         [
             target,

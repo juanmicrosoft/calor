@@ -84,23 +84,16 @@ public class BoundTypeArchitectureTests
     }
 
     /// <summary>
-    /// v0.14 §S2 exit criterion — every concrete <see cref="BoundExpression"/>
-    /// subclass returns a non-null <c>Type</c>. Since the base virtual at
-    /// <c>BoundNodes.cs:44</c> is <c>Type => new NominalBoundType(TypeName)</c>
-    /// (which throws on null TypeName), non-null is guaranteed by
-    /// construction — provided <b>no subclass overrides <c>Type</c></b> in S2.
-    /// The pin below enforces "no S2 overrides" by reflecting the declaring
-    /// type of the <c>Type</c> getter for every concrete subclass; anything
-    /// other than <see cref="BoundExpression"/> means a subclass has taken
-    /// ownership and the base guarantee no longer holds.
-    ///
-    /// S3+ WILL introduce subclass overrides. When the first override lands,
-    /// this pin must be replaced with a per-subclass instance-level assertion
-    /// (constructor + <c>Assert.NotNull(instance.Type)</c>) — see the
-    /// scoping doc's §S3 exit-criterion notes.
+    /// v0.14 F-5 exit criterion — every concrete <see cref="BoundExpression"/>
+    /// subclass declares its own <c>Type</c> property override. Post-F-5 the
+    /// base class no longer stores type as a string (the <c>abstract string
+    /// TypeName</c> shim was deleted); each subclass provides its Type as a
+    /// <see cref="BoundType"/>. Reflection is used because the check is
+    /// declarative — we care that every subclass owns its Type source of
+    /// truth, not that any particular instance can be constructed.
     /// </summary>
     [Fact]
-    public void EveryConcreteBoundExpression_InheritsBaseTypeProperty_InS2()
+    public void EveryConcreteBoundExpression_DeclaresTypeOverride_PostF5()
     {
         var assembly = typeof(BoundExpression).Assembly;
         var concreteBoundExpressionTypes = assembly.GetTypes()
@@ -117,19 +110,16 @@ public class BoundTypeArchitectureTests
             Assert.NotNull(typeProperty!.GetMethod);
             Assert.False(typeProperty.GetMethod!.IsStatic);
 
-            // The strong pin: in S2 the getter's declaring type MUST be
-            // BoundExpression itself. Any subclass override changes the
-            // DeclaringType to the subclass — signalling the S2 → S3
-            // transition and requiring this test to be replaced with the
-            // per-instance non-null check documented above.
-            Assert.Same(typeof(BoundExpression), typeProperty.GetMethod.GetBaseDefinition().DeclaringType);
+            // F-5 pin: Type is abstract on BoundExpression, so every concrete
+            // subclass must provide its own override. The getter's declaring
+            // type must be the subclass itself (or an intermediate abstract
+            // base within the BoundExpression hierarchy that provides Type).
             var declaring = typeProperty.GetMethod.DeclaringType;
+            Assert.NotSame(typeof(BoundExpression), declaring);
             Assert.True(
-                declaring == typeof(BoundExpression) || declaring == t.BaseType || declaring == t,
-                $"Type getter for {t.Name} has declaringType={declaring?.Name}. " +
-                "If a subclass override was intentionally added in S3+, replace this test " +
-                "with the per-instance Assert.NotNull(instance.Type) check documented " +
-                "in the scoping doc.");
+                typeof(BoundExpression).IsAssignableFrom(declaring),
+                $"Type getter for {t.Name} has declaringType={declaring?.Name}, " +
+                "which is not in the BoundExpression hierarchy.");
         }
     }
 
