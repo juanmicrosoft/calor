@@ -340,4 +340,58 @@ internal readonly struct MetadataBinderResult
                 Calor.Compiler.Diagnostics.DiagnosticSeverity.Info);
         }
     }
+
+    /// <summary>
+    /// v0.14 §S2 (nullability workstream, task #9) — build a NominalBoundType
+    /// for the resolved return type, carrying the Roslyn NullableAnnotation
+    /// through to the bound-tree side. Callers that hold a resolved result
+    /// consume this instead of re-inspecting the raw Roslyn symbol.
+    ///
+    /// Returns null when the result is not resolved.
+    /// </summary>
+    public NominalBoundType? GetReturnBoundType()
+    {
+        if (!IsResolved) return null;
+        return ToNominalBoundType(Symbol!.ReturnType);
+    }
+
+    /// <summary>
+    /// Parameter BoundTypes for the resolved call, in declaration order,
+    /// each carrying its own NullableAnnotation. Empty when not resolved.
+    /// </summary>
+    public IReadOnlyList<NominalBoundType> GetParameterBoundTypes()
+    {
+        if (!IsResolved) return Array.Empty<NominalBoundType>();
+        return Symbol!.Parameters
+            .Select(p => ToNominalBoundType(p.Type))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Maps a Roslyn ITypeSymbol to a NominalBoundType, translating the
+    /// Roslyn NullableAnnotation to the BoundTypes NullableAnnotation enum.
+    /// The Roslyn back-reference is preserved on the resulting BoundType
+    /// when the type symbol is an INamedTypeSymbol.
+    /// </summary>
+    internal static NominalBoundType ToNominalBoundType(Microsoft.CodeAnalysis.ITypeSymbol typeSymbol)
+    {
+        return new NominalBoundType(
+            qualifiedName: typeSymbol.ToDisplayString(),
+            nullableAnnotation: MapAnnotation(typeSymbol.NullableAnnotation),
+            declaration: null,
+            roslynSymbol: typeSymbol as Microsoft.CodeAnalysis.INamedTypeSymbol);
+    }
+
+    /// <summary>Maps Roslyn's NullableAnnotation (None/NotAnnotated/Annotated)
+    /// to Calor's NullableAnnotation (Oblivious/NotAnnotated/Annotated).
+    /// Per D3 of docs/plans/v0.14-nullability-enforcement-scoping.md, Roslyn's
+    /// <c>None</c> maps to <c>Oblivious</c> and is treated conservatively
+    /// (possibly-null) at check time.</summary>
+    internal static Calor.Compiler.Binding.BoundTypes.NullableAnnotation MapAnnotation(Microsoft.CodeAnalysis.NullableAnnotation roslyn) =>
+        roslyn switch
+        {
+            Microsoft.CodeAnalysis.NullableAnnotation.Annotated => Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Annotated,
+            Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated => Calor.Compiler.Binding.BoundTypes.NullableAnnotation.NotAnnotated,
+            _ => Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious,
+        };
 }
