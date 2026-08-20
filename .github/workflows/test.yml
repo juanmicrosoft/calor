@@ -29,13 +29,20 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
-          # On push events (main), paths-filter compares against the previous
-          # commit; on pull_request, against the merge base. Either way, any
-          # file that is NOT under website/, docs/, or a root .md/.mdx makes
-          # `non_docs` true. On workflow_dispatch there is no diff, so the
-          # filter conservatively reports true.
+          # Detects whether the diff touches anything OTHER than docs.
+          # dorny/paths-filter requires a positive anchor combined with
+          # negative exclusions — the action's documented semantics are
+          # that "a filter consisting of negated patterns only never
+          # matches anything." The `- '**'` line is that anchor;
+          # `predicate-quantifier: 'every'` then requires each matched
+          # file to also survive every negative exclusion, so only
+          # non-docs files count toward `non_docs=true`.
+          #
+          # On push events (main), paths-filter compares against the
+          # previous commit; on pull_request, against the merge base.
           filters: |
             non_docs:
+              - '**'
               - '!website/**'
               - '!docs/**'
               - '!**/*.md'
@@ -738,11 +745,19 @@ jobs:
     # PRs. `detect-changes` sets `has_non_docs_changes=false` when the diff
     # touches only website/, docs/, or root markdown. GitHub still surfaces
     # skipped jobs on the PR check list, so the skip is visible, not silent.
+    #
+    # Gate semantics: `!= 'false'` (not `== 'true'`) fails SAFE. If
+    # `detect-changes` itself fails (network glitch, checkout error, etc.),
+    # its output is empty — `!= 'false'` is true, so the round-trip job
+    # runs anyway. We'd rather burn 30 min unnecessarily than silently drop
+    # a signal because a 30-second precheck failed.
+    #
     # The `always()` clause is preserved so the job runs even if
-    # conversion-scorecard fails — but only when there are non-docs changes.
+    # `conversion-scorecard` fails — but only when there are non-docs
+    # changes and the precheck did not explicitly veto.
     if: >-
       always() &&
-      needs.detect-changes.outputs.has_non_docs_changes == 'true'
+      needs.detect-changes.outputs.has_non_docs_changes != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [detect-changes, conversion-scorecard]
