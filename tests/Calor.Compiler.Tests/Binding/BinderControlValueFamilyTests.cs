@@ -49,7 +49,7 @@ public class BinderControlValueFamilyTests
         var (expr, diags) = BindReturn(new NullCoalesceNode(S,
             new IntLiteralNode(S, 1), new IntLiteralNode(S, 2)));
         var nc = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("INT", nc.TypeName);
+        Assert.Equal("INT", nc.Type.DisplayString);
         Assert.Equal(2, BoundChildren.Of(nc).Count());
         Assert.Equal([nc.Children[1]], BoundChildren.DeferredOf(nc));
         AssertComplete(diags);
@@ -127,14 +127,14 @@ public class BinderControlValueFamilyTests
         var (expr, diags) = BindReturn(new AwaitExpressionNode(S,
             new ReferenceNode(S, "t"), configureAwait: false), ("t", "Task<i32>"));
         var aw = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("i32", aw.TypeName);
+        Assert.Equal("i32", aw.Type.DisplayString);
         Assert.Equal(false, aw.Metadata["ConfigureAwait"]);
         AssertComplete(diags);
 
         var (voidAwait, _) = BindReturn(
             new AwaitExpressionNode(S, new ReferenceNode(S, "t")),
             ("t", "Task"));
-        Assert.Equal("VOID", voidAwait.TypeName);
+        Assert.Equal("VOID", voidAwait.Type.DisplayString);
     }
 
     [Fact]

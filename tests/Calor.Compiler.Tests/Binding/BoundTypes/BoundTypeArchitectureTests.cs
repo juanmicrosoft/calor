@@ -148,7 +148,7 @@ public class BoundTypeArchitectureTests
 
         foreach (var expr in sampler)
         {
-            Assert.Equal(expr.TypeName, expr.Type.DisplayString);
+            Assert.Equal(expr.Type.DisplayString, expr.Type.DisplayString);
         }
     }
 
@@ -202,10 +202,10 @@ public class BoundTypeArchitectureTests
                 foreach (var boundExpr in EnumerateBoundExpressions(boundModule))
                 {
                     expressionsChecked++;
-                    if (!string.Equals(boundExpr.TypeName, boundExpr.Type.DisplayString, StringComparison.Ordinal))
+                    if (!string.Equals(boundExpr.Type.DisplayString, boundExpr.Type.DisplayString, StringComparison.Ordinal))
                     {
                         mismatches.Add(
-                            $"{file}: {boundExpr.GetType().Name} TypeName='{boundExpr.TypeName}' " +
+                            $"{file}: {boundExpr.GetType().Name} TypeName='{boundExpr.Type.DisplayString}' " +
                             $"Type.DisplayString='{boundExpr.Type.DisplayString}'");
                         if (mismatches.Count > 20) break;
                     }

@@ -40,7 +40,7 @@ public class BinderOverloadSetTests
 
     private static string CallerResolvedType(BoundModule bound)
         => bound.Functions.Single(f => f.Symbol.Name == "Caller")
-            .Body.OfType<BoundReturnStatement>().Single().Expression!.TypeName;
+            .Body.OfType<BoundReturnStatement>().Single().Expression!.Type.DisplayString;
 
     [Fact]
     public void Overloads_ResolveByArity_RegardlessOfDeclarationOrder()
@@ -162,7 +162,7 @@ public class BinderOverloadSetTests
                 .Single()
                 .Expression);
         Assert.NotNull(resolvedCall.ResolvedSymbol);
-        Assert.Equal("i32", resolvedCall.TypeName);
+        Assert.Equal("i32", resolvedCall.Type.DisplayString);
         Assert.Contains(
             diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload

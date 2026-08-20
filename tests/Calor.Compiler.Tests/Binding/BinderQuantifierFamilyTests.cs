@@ -51,7 +51,7 @@ public class BinderQuantifierFamilyTests
         var (expr, diags) = BindReturn(Forall("i", "i32", GreaterThanZero("i")));
         var fa = Assert.IsType<BoundQuantifierExpression>(expr);
         Assert.Equal(nameof(ForallExpressionNode), fa.NodeTypeName);
-        Assert.Equal("BOOL", fa.TypeName);
+        Assert.Equal("BOOL", fa.Type.DisplayString);
         Assert.Single(fa.BoundVariables);
         Assert.Equal("i", fa.BoundVariables[0].Name);
         Assert.Equal("i32", fa.BoundVariables[0].TypeName);
@@ -71,7 +71,7 @@ public class BinderQuantifierFamilyTests
         var (expr, diags) = BindReturn(node);
         var ex = Assert.IsType<BoundQuantifierExpression>(expr);
         Assert.Equal(nameof(ExistsExpressionNode), ex.NodeTypeName);
-        Assert.Equal("BOOL", ex.TypeName);
+        Assert.Equal("BOOL", ex.Type.DisplayString);
         Assert.Equal([ex.Body], BoundChildren.Of(ex));
         Assert.Equal([ex.Body], BoundChildren.DeferredOf(ex));
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.UndefinedReference);
@@ -119,7 +119,7 @@ public class BinderQuantifierFamilyTests
             new BoolLiteralNode(S, true), new BoolLiteralNode(S, false));
         var (expr, diags) = BindReturn(node);
         var imp = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("BOOL", imp.TypeName);
+        Assert.Equal("BOOL", imp.Type.DisplayString);
         Assert.Equal(2, imp.Children.Count);
         Assert.Equal([imp.Children[1]], BoundChildren.DeferredOf(imp)); // !a || b short-circuits
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.AnalysisIncomplete);

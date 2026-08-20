@@ -45,7 +45,7 @@ public class BinderArrayCollectionFamilyTests
         var (expr, diags) = BindReturn(new ArrayCreationNode(S, "a1", "nums", "i32",
             Lit(3), new ExpressionNode[] { Lit(1), Lit(2), Lit(3) }, new AttributeCollection()));
         var arr = Assert.IsType<BoundArrayCreation>(expr);
-        Assert.Equal("i32[]", arr.TypeName);
+        Assert.Equal("i32[]", arr.Type.DisplayString);
         Assert.NotNull(arr.Size);
         Assert.Equal(3, arr.Initializer.Count);
         AssertComplete(diags);
@@ -58,7 +58,7 @@ public class BinderArrayCollectionFamilyTests
             null, new ExpressionNode[] { Lit(1) }, new AttributeCollection());
         var (expr, diags) = BindReturn(new ArrayAccessNode(S, creation, Lit(0)));
         var access = Assert.IsType<BoundArrayAccess>(expr);
-        Assert.Equal("i32", access.TypeName);
+        Assert.Equal("i32", access.Type.DisplayString);
         Assert.IsType<BoundArrayCreation>(access.Array);
         AssertComplete(diags);
     }
@@ -69,12 +69,12 @@ public class BinderArrayCollectionFamilyTests
         var creation = new ArrayCreationNode(S, "a1", "nums", "i32",
             null, new ExpressionNode[] { Lit(1) }, new AttributeCollection());
         var (len, d1) = BindReturn(new ArrayLengthNode(S, creation));
-        Assert.Equal("INT", Assert.IsType<BoundArrayLength>(len).TypeName);
+        Assert.Equal("INT", Assert.IsType<BoundArrayLength>(len).Type.DisplayString);
         AssertComplete(d1);
 
         var list = new ListCreationNode(S, "l1", "xs", "i32", new ExpressionNode[] { Lit(1) }, new AttributeCollection());
         var (cnt, d2) = BindReturn(new CollectionCountNode(S, list));
-        Assert.Equal("INT", Assert.IsType<BoundCollectionCount>(cnt).TypeName);
+        Assert.Equal("INT", Assert.IsType<BoundCollectionCount>(cnt).Type.DisplayString);
         AssertComplete(d2);
     }
 
@@ -86,7 +86,7 @@ public class BinderArrayCollectionFamilyTests
             new IReadOnlyList<ExpressionNode>[] { new ExpressionNode[] { Lit(1), Lit(2) } });
         var (expr, diags) = BindReturn(creation);
         var mc = Assert.IsType<BoundMultiDimArrayCreation>(expr);
-        Assert.Equal("i32[,]", mc.TypeName);
+        Assert.Equal("i32[,]", mc.Type.DisplayString);
         Assert.Equal(2, mc.DimensionSizes.Count);
         // Row STRUCTURE retained (review M2): one row of two, not a flattened two.
         Assert.Single(mc.InitializerRows);
@@ -96,7 +96,7 @@ public class BinderArrayCollectionFamilyTests
         var (acc, d2) = BindReturn(new MultiDimArrayAccessNode(S, creation,
             new ExpressionNode[] { Lit(0), Lit(1) }));
         var ma = Assert.IsType<BoundMultiDimArrayAccess>(acc);
-        Assert.Equal("i32", ma.TypeName);
+        Assert.Equal("i32", ma.Type.DisplayString);
         Assert.Equal(2, ma.Indices.Count);
         AssertComplete(d2);
     }
@@ -105,7 +105,7 @@ public class BinderArrayCollectionFamilyTests
     public void IndexFromEnd_And_Range_BindWithOptionalBounds()
     {
         var (idx, d1) = BindReturn(new IndexFromEndNode(S, Lit(1)));
-        Assert.Equal("INDEX", Assert.IsType<BoundIndexFromEnd>(idx).TypeName);
+        Assert.Equal("INDEX", Assert.IsType<BoundIndexFromEnd>(idx).Type.DisplayString);
         AssertComplete(d1);
 
         var (openRange, d2) = BindReturn(new RangeExpressionNode(S, Lit(1), null));
@@ -120,18 +120,18 @@ public class BinderArrayCollectionFamilyTests
     {
         var (list, d1) = BindReturn(new ListCreationNode(S, "l1", "xs", "i32",
             new ExpressionNode[] { Lit(1), Lit(2) }, new AttributeCollection()));
-        Assert.Equal("List<i32>", Assert.IsType<BoundListCreation>(list).TypeName);
+        Assert.Equal("List<i32>", Assert.IsType<BoundListCreation>(list).Type.DisplayString);
         AssertComplete(d1);
 
         var (set, d2) = BindReturn(new SetCreationNode(S, "s1", "ys", "str",
             new ExpressionNode[] { new StringLiteralNode(S, "a") }, new AttributeCollection()));
-        Assert.Equal("HashSet<str>", Assert.IsType<BoundSetCreation>(set).TypeName);
+        Assert.Equal("HashSet<str>", Assert.IsType<BoundSetCreation>(set).Type.DisplayString);
         AssertComplete(d2);
 
         var (dict, d3) = BindReturn(new DictionaryCreationNode(S, "d1", "map", "str", "i32",
             new[] { new KeyValuePairNode(S, new StringLiteralNode(S, "k"), Lit(1)) }, new AttributeCollection()));
         var bd = Assert.IsType<BoundDictionaryCreation>(dict);
-        Assert.Equal("Dictionary<str,i32>", bd.TypeName);
+        Assert.Equal("Dictionary<str,i32>", bd.Type.DisplayString);
         Assert.Single(bd.Entries);
         AssertComplete(d3);
     }
@@ -142,7 +142,7 @@ public class BinderArrayCollectionFamilyTests
         var (contains, d1) = BindReturn(new CollectionContainsNode(S, "xs", Lit(1),
             ContainsMode.Value));
         var cc = Assert.IsType<BoundCollectionContains>(contains);
-        Assert.Equal("BOOL", cc.TypeName);
+        Assert.Equal("BOOL", cc.Type.DisplayString);
         Assert.Equal("xs", cc.CollectionName);
         // The B3 review's CRITICAL: Mode distinguishes three different operations.
         Assert.Equal(ContainsMode.Value, cc.Mode);
@@ -152,7 +152,7 @@ public class BinderArrayCollectionFamilyTests
             new ExpressionNode[] { Lit(1), new StringLiteralNode(S, "a") }));
         var tl = Assert.IsType<BoundTupleLiteral>(tuple);
         Assert.Equal(2, tl.Elements.Count);
-        Assert.Equal("Tuple<INT,STRING>", tl.TypeName);
+        Assert.Equal("Tuple<INT,STRING>", tl.Type.DisplayString);
         AssertComplete(d2);
     }
 
@@ -188,8 +188,8 @@ public class BinderArrayCollectionFamilyTests
         // review m5: "i32[][]" element = "i32[]" (EndsWith route) and a multi-dim
         // access on a jagged-of-multidim type slices at the TRAILING bracket group.
         var jagged = new BoundArrayCreation(S, "j1", "js", "i32[]", null, []);
-        Assert.Equal("i32[][]", jagged.TypeName);
-        Assert.Equal("i32[]", new BoundArrayAccess(S, jagged, new BoundIntLiteral(S, 0)).TypeName);
+        Assert.Equal("i32[][]", jagged.Type.DisplayString);
+        Assert.Equal("i32[]", new BoundArrayAccess(S, jagged, new BoundIntLiteral(S, 0)).Type.DisplayString);
     }
 
     [Fact]

@@ -1134,7 +1134,7 @@ public sealed class WorkspaceState
             arguments.Select(argument =>
                     argument is BoundVariableExpression { Variable.Id.IsNone: true }
                         ? "<unresolved>"
-                        : argument.TypeName)
+                        : argument.Type.DisplayString)
                 .ToArray(),
             argumentNames,
             argumentModifiers,
@@ -1374,7 +1374,7 @@ public sealed class WorkspaceState
                 receiver = expression.ReceiverSymbol;
                 return true;
             case BoundNewExpression creation:
-                target = $"{creation.TypeName}..ctor";
+                target = $"{creation.Type.DisplayString}..ctor";
                 arguments = creation.Arguments;
                 argumentNames = null;
                 argumentModifiers = null;
@@ -2539,7 +2539,7 @@ public sealed class WorkspaceState
             return resolved;
 
         var callerContainingType = FindCallerContainingType(caller.Analysis, field);
-        var currentType = GetNominalTypeName(field.Target.TypeName);
+        var currentType = GetNominalTypeName(field.Target.Type.DisplayString);
         var visited = new HashSet<string>(StringComparer.Ordinal);
         while (currentType.Length > 0 && visited.Add(currentType))
         {

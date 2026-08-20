@@ -334,7 +334,7 @@ public class CompilerBugFixTests
         Assert.NotNull(bound);
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
         var option = Assert.IsType<BoundSomeExpression>(ret.Expression);
-        Assert.Equal("Option<INT>", option.TypeName);
+        Assert.Equal("Option<INT>", option.Type.DisplayString);
         Assert.IsType<BoundIntLiteral>(option.Value);
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
@@ -528,7 +528,7 @@ public class CompilerBugFixTests
         var boundCall = returnStmt!.Expression as BoundCallExpression;
         Assert.NotNull(boundCall);
         Assert.Equal("Helper", boundCall!.Target);
-        Assert.Equal("INT", boundCall.TypeName);
+        Assert.Equal("INT", boundCall.Type.DisplayString);
     }
 
     #endregion
