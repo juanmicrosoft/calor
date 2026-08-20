@@ -16,6 +16,23 @@ public static class Z3ContextFactory
     private static IntPtr _z3NativeHandle;
 
     /// <summary>
+    /// Optional key/value settings passed to <c>new Microsoft.Z3.Context(...)</c>
+    /// for every context this factory creates. Left <c>null</c> in production
+    /// (so behaviour is identical to a parameterless <c>Context()</c>).
+    ///
+    /// Origin: 2026-08-18 test-suite audit, finding F7 / recommendation R10
+    /// (`docs/plans/2026-08-18-test-suite-audit.md`, issue #1006). Test
+    /// assemblies use a <c>ModuleInitializer</c> to set
+    /// <c>random_seed = "42"</c> here so that if a Z3-backed test flakes,
+    /// solver non-determinism is one fewer axis to consider during triage.
+    ///
+    /// This is intentionally a mutable static — the seed applies to whichever
+    /// process sets it (i.e. only the xUnit test host), not to production
+    /// callers of <c>Calor.Compiler</c>.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string>? DefaultContextSettings { get; set; }
+
+    /// <summary>
     /// Registers a custom DLL import resolver and pre-loads the Z3 native library.
     /// Must be called before any Z3 types are accessed.
     /// </summary>
@@ -198,6 +215,26 @@ public static class Z3ContextFactory
     }
 
     /// <summary>
+    /// Creates a Z3 context with caller-supplied per-Context settings merged
+    /// on top of <see cref="DefaultContextSettings"/>. Use this instead of
+    /// <c>new Microsoft.Z3.Context(...)</c> when a caller needs domain-specific
+    /// options (e.g. <c>{"model","true"}</c> for KInduction) — the merge
+    /// guarantees the test-suite seed still flows through.
+    /// </summary>
+    /// <param name="extraSettings">Caller-specific settings. May override
+    /// keys present in <see cref="DefaultContextSettings"/>; the caller wins
+    /// on conflict.</param>
+    /// <exception cref="InvalidOperationException">Thrown when Z3 is not available.</exception>
+    public static Microsoft.Z3.Context Create(IReadOnlyDictionary<string, string> extraSettings)
+    {
+        if (!IsAvailable)
+            throw new InvalidOperationException(
+                "Z3 native library is not available. Install the Z3 solver or ensure the native library is in the system path.");
+
+        return CreateInternal(extraSettings);
+    }
+
+    /// <summary>
     /// Safe availability check that uses reflection to avoid JIT issues with Z3 types.
     /// </summary>
     private static bool CheckAvailabilitySafe()
@@ -239,7 +276,7 @@ public static class Z3ContextFactory
     {
         try
         {
-            return new Microsoft.Z3.Context();
+            return NewContext(extraSettings: null);
         }
         catch (Exception)
         {
@@ -250,7 +287,39 @@ public static class Z3ContextFactory
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Microsoft.Z3.Context CreateInternal()
     {
-        return new Microsoft.Z3.Context();
+        return NewContext(extraSettings: null);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Microsoft.Z3.Context CreateInternal(IReadOnlyDictionary<string, string> extraSettings)
+    {
+        return NewContext(extraSettings);
+    }
+
+    private static Microsoft.Z3.Context NewContext(IReadOnlyDictionary<string, string>? extraSettings)
+    {
+        // In production `DefaultContextSettings` is null and callers rarely
+        // pass extraSettings, so this collapses to the parameterless
+        // `new Context()` that Calor has always used. Tests opt in via a
+        // ModuleInitializer that sets `random_seed` — see the property's
+        // XML doc for background (issue #1006). Callers that need
+        // domain-specific settings (e.g. KInductionProver with
+        // {"model","true"}) pass them via extraSettings and this method
+        // merges them ON TOP of DefaultContextSettings so the test seed
+        // still applies.
+        var defaults = DefaultContextSettings;
+        if ((defaults == null || defaults.Count == 0)
+            && (extraSettings == null || extraSettings.Count == 0))
+            return new Microsoft.Z3.Context();
+
+        var dict = new Dictionary<string, string>();
+        if (defaults != null)
+            foreach (var kvp in defaults)
+                dict[kvp.Key] = kvp.Value;
+        if (extraSettings != null)
+            foreach (var kvp in extraSettings)
+                dict[kvp.Key] = kvp.Value;   // caller wins on conflict
+        return new Microsoft.Z3.Context(dict);
     }
 
     /// <summary>

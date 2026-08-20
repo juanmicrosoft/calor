@@ -49,4 +49,8 @@
           DestinationFolder="$(OutputPath)TestAssemblies" SkipUnchangedFiles="true" />
   </Target>
 
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
+  </ItemGroup>
 </Project>

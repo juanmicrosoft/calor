@@ -29,6 +29,8 @@
     <ProjectReference Include="..\Calor.Enforcement.Tests\Calor.Enforcement.Tests.csproj" />
   </ItemGroup>
 
+  <!-- Shared Z3 test-seeding ModuleInitializer (issue #1006). -->
+
   <ItemGroup>
     <!-- Include all test data files in the output directory -->
     <None Include="..\TestData\CSharpImport\**\*.*">
@@ -53,4 +55,8 @@
     </None>
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
+  </ItemGroup>
 </Project>
