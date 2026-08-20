@@ -26,7 +26,7 @@
       "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 204,
+      "expectedTotal": 206,
       "expectedSkipped": 0
     },
     {

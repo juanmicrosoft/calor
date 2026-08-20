@@ -470,7 +470,11 @@ public sealed class EffectDisciplineBenchmarkRunner : IDisposable
 
         if (options.SampleSize.HasValue && options.SampleSize.Value < result.Count)
         {
-            var random = new Random();
+            // Seed the shuffle Random so two developers with the same seed observe
+            // the same corpus order. See docs/plans/2026-08-18-test-suite-audit.md (R11).
+            var random = options.SampleSeed.HasValue
+                ? new Random(options.SampleSeed.Value)
+                : new Random();
             result = result.OrderBy(_ => random.Next()).Take(options.SampleSize.Value).ToList();
         }
 
@@ -551,6 +555,12 @@ public record EffectDisciplineOptions
     public List<string>? TaskFilter { get; init; }
     public string? CategoryFilter { get; init; }
     public int? SampleSize { get; init; }
+
+    /// <summary>
+    /// Random seed used to shuffle the corpus when sampling. Null means
+    /// non-deterministic (system time). See docs/plans/2026-08-18-test-suite-audit.md (R11).
+    /// </summary>
+    public int? SampleSeed { get; init; }
     public string? Model { get; init; }
     public bool EnableAnalyzers { get; init; } = false;
 }
