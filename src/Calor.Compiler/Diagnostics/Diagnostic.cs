@@ -289,6 +289,19 @@ public static class DiagnosticCode
     /// </summary>
     public const string SignatureResolvedNullableOblivious = "Calor0271";
 
+    /// <summary>
+    /// Info (S3 of v0.14 nullability workstream; promotes to Error at S5).
+    /// A <c>§B{x:string}</c> binding was initialized with a value whose
+    /// nullability annotation is Annotated (declared possibly-null) or
+    /// Oblivious (unannotated third-party surface, treated conservatively as
+    /// possibly-null per D3). The Calor <c>string</c> type is non-nullable
+    /// by contract; either change the target to <c>?string</c> or adapt the
+    /// interop boundary. #875 D3 is the canonical repro:
+    /// <c>§B{bad:string} §C{Environment.GetEnvironmentVariable} ...</c>.
+    /// See docs/plans/v0.14-nullability-enforcement-scoping.md §S3 / D2.
+    /// </summary>
+    public const string NullableToNonNullableBinding = "Calor0272";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

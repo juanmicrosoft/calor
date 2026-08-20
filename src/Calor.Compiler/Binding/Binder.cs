@@ -1161,6 +1161,21 @@ public sealed class Binder
                 $"Variable '{bind.Name}' is already defined");
         }
 
+        // v0.14 §S3 nullability check gate (issue #875, D2 predicate). The
+        // NullabilityChecker predicate is in place at
+        // src/Calor.Compiler/Binding/NullabilityChecker.cs and unit-tested,
+        // but production emission is intentionally not wired here: today's
+        // BoundCallExpression.Type is always Oblivious (the MetadataBinder-
+        // resolved Roslyn annotation from S2 does not yet flow into the
+        // BoundExpression tree). Turning the check on before that wiring
+        // lands would produce all-noise diagnostics on every string binding.
+        // Follow-on slice (S3b or S4 precursor) wires
+        // MetadataBinder→BindCallExpression and BindNewExpression so the
+        // annotation reaches the Type property; Calor0272 emission from
+        // BindBindStatement re-lands in that slice.
+        //
+        // The predicate is callable today for tests and downstream consumers.
+
         return new BoundBindStatement(bind.Span, variable, initializer);
     }
 
