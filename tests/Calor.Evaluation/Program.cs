@@ -179,6 +179,14 @@ public static class Program
             aliases: new[] { "--sample", "-s" },
             description: "Number of tasks to sample");
 
+        // Seed for the sampling shuffle. Fixed default (42) keeps corpus order
+        // reproducible across developers; pass a different value to explore variance.
+        // See docs/plans/2026-08-18-test-suite-audit.md (R11).
+        var seedOption = new Option<int>(
+            aliases: new[] { "--seed" },
+            description: "Random seed for the sample shuffle (reproducible corpus order)",
+            getDefaultValue: () => 42);
+
         var llmManifestOption = new Option<string>(
             aliases: new[] { "--manifest", "-m" },
             description: "Path to task manifest file");
@@ -196,6 +204,7 @@ public static class Program
         llmTasksCommand.AddOption(tasksOption);
         llmTasksCommand.AddOption(llmCategoryOption);
         llmTasksCommand.AddOption(sampleOption);
+        llmTasksCommand.AddOption(seedOption);
         llmTasksCommand.AddOption(llmManifestOption);
         llmTasksCommand.AddOption(llmVerboseOption);
 
@@ -210,10 +219,11 @@ public static class Program
             var tasks = context.ParseResult.GetValueForOption(tasksOption) ?? Array.Empty<string>();
             var llmCategory = context.ParseResult.GetValueForOption(llmCategoryOption);
             var sample = context.ParseResult.GetValueForOption(sampleOption);
+            var seed = context.ParseResult.GetValueForOption(seedOption);
             var llmManifest = context.ParseResult.GetValueForOption(llmManifestOption);
             var llmVerbose = context.ParseResult.GetValueForOption(llmVerboseOption);
 
-            await RunLlmTasksAsync(provider, model, budget, llmOutput, dryRun, refreshCache, tasks, llmCategory, sample, llmManifest, llmVerbose);
+            await RunLlmTasksAsync(provider, model, budget, llmOutput, dryRun, refreshCache, tasks, llmCategory, sample, seed, llmManifest, llmVerbose);
         });
 
         rootCommand.AddCommand(llmTasksCommand);
@@ -263,6 +273,11 @@ public static class Program
             aliases: new[] { "--sample", "-s" },
             description: "Number of tasks to sample");
 
+        var safetySeedOption = new Option<int>(
+            aliases: new[] { "--seed" },
+            description: "Random seed for the sample shuffle (reproducible corpus order)",
+            getDefaultValue: () => 42);
+
         var safetyManifestOption = new Option<string>(
             aliases: new[] { "--manifest", "-m" },
             description: "Path to task manifest file");
@@ -280,6 +295,7 @@ public static class Program
         safetyBenchmarkCommand.AddOption(safetyTasksOption);
         safetyBenchmarkCommand.AddOption(safetyCategoryOption);
         safetyBenchmarkCommand.AddOption(safetySampleOption);
+        safetyBenchmarkCommand.AddOption(safetySeedOption);
         safetyBenchmarkCommand.AddOption(safetyManifestOption);
         safetyBenchmarkCommand.AddOption(safetyVerboseOption);
 
@@ -294,10 +310,11 @@ public static class Program
             var tasks = context.ParseResult.GetValueForOption(safetyTasksOption) ?? Array.Empty<string>();
             var category = context.ParseResult.GetValueForOption(safetyCategoryOption);
             var sample = context.ParseResult.GetValueForOption(safetySampleOption);
+            var seed = context.ParseResult.GetValueForOption(safetySeedOption);
             var manifest = context.ParseResult.GetValueForOption(safetyManifestOption);
             var verbose = context.ParseResult.GetValueForOption(safetyVerboseOption);
 
-            await RunSafetyBenchmarkAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, manifest, verbose);
+            await RunSafetyBenchmarkAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, seed, manifest, verbose);
         });
 
         rootCommand.AddCommand(safetyBenchmarkCommand);
@@ -347,6 +364,11 @@ public static class Program
             aliases: new[] { "--sample", "-s" },
             description: "Number of tasks to sample");
 
+        var effectSeedOption = new Option<int>(
+            aliases: new[] { "--seed" },
+            description: "Random seed for the sample shuffle (reproducible corpus order)",
+            getDefaultValue: () => 42);
+
         var effectManifestOption = new Option<string>(
             aliases: new[] { "--manifest", "-m" },
             description: "Path to task manifest file");
@@ -368,6 +390,7 @@ public static class Program
         effectDisciplineCommand.AddOption(effectTasksOption);
         effectDisciplineCommand.AddOption(effectCategoryOption);
         effectDisciplineCommand.AddOption(effectSampleOption);
+        effectDisciplineCommand.AddOption(effectSeedOption);
         effectDisciplineCommand.AddOption(effectManifestOption);
         effectDisciplineCommand.AddOption(effectVerboseOption);
         effectDisciplineCommand.AddOption(effectEnableAnalyzersOption);
@@ -383,11 +406,12 @@ public static class Program
             var tasks = context.ParseResult.GetValueForOption(effectTasksOption) ?? Array.Empty<string>();
             var category = context.ParseResult.GetValueForOption(effectCategoryOption);
             var sample = context.ParseResult.GetValueForOption(effectSampleOption);
+            var seed = context.ParseResult.GetValueForOption(effectSeedOption);
             var manifest = context.ParseResult.GetValueForOption(effectManifestOption);
             var verbose = context.ParseResult.GetValueForOption(effectVerboseOption);
             var enableAnalyzers = context.ParseResult.GetValueForOption(effectEnableAnalyzersOption);
 
-            await RunEffectDisciplineAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, manifest, verbose, enableAnalyzers);
+            await RunEffectDisciplineAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, seed, manifest, verbose, enableAnalyzers);
         });
 
         rootCommand.AddCommand(effectDisciplineCommand);
@@ -437,6 +461,11 @@ public static class Program
             aliases: new[] { "--sample", "-s" },
             description: "Number of tasks to sample");
 
+        var correctnessSeedOption = new Option<int>(
+            aliases: new[] { "--seed" },
+            description: "Random seed for the sample shuffle (reproducible corpus order)",
+            getDefaultValue: () => 42);
+
         var correctnessManifestOption = new Option<string>(
             aliases: new[] { "--manifest", "-m" },
             description: "Path to task manifest file");
@@ -454,6 +483,7 @@ public static class Program
         correctnessCommand.AddOption(correctnessTasksOption);
         correctnessCommand.AddOption(correctnessCategoryOption);
         correctnessCommand.AddOption(correctnessSampleOption);
+        correctnessCommand.AddOption(correctnessSeedOption);
         correctnessCommand.AddOption(correctnessManifestOption);
         correctnessCommand.AddOption(correctnessVerboseOption);
 
@@ -468,10 +498,11 @@ public static class Program
             var tasks = context.ParseResult.GetValueForOption(correctnessTasksOption) ?? Array.Empty<string>();
             var category = context.ParseResult.GetValueForOption(correctnessCategoryOption);
             var sample = context.ParseResult.GetValueForOption(correctnessSampleOption);
+            var seed = context.ParseResult.GetValueForOption(correctnessSeedOption);
             var manifest = context.ParseResult.GetValueForOption(correctnessManifestOption);
             var verbose = context.ParseResult.GetValueForOption(correctnessVerboseOption);
 
-            await RunCorrectnessBenchmarkAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, manifest, verbose);
+            await RunCorrectnessBenchmarkAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, seed, manifest, verbose);
         });
 
         rootCommand.AddCommand(correctnessCommand);
@@ -951,6 +982,7 @@ public static class Program
         string[] tasks,
         string? category,
         int? sample,
+        int sampleSeed,
         string? manifestPath,
         bool verbose)
     {
@@ -1030,6 +1062,7 @@ public static class Program
             TaskFilter = tasks.Length > 0 ? tasks.ToList() : null,
             CategoryFilter = category,
             SampleSize = sample,
+            SampleSeed = sampleSeed,
             Model = model
         };
 
@@ -1162,6 +1195,7 @@ public static class Program
         string[] tasks,
         string? category,
         int? sample,
+        int sampleSeed,
         string? manifestPath,
         bool verbose)
     {
@@ -1245,6 +1279,7 @@ public static class Program
             TaskFilter = tasks.Length > 0 ? tasks.ToList() : null,
             CategoryFilter = category,
             SampleSize = sample,
+            SampleSeed = sampleSeed,
             Model = model
         };
 
@@ -1360,6 +1395,7 @@ public static class Program
         string[] tasks,
         string? category,
         int? sample,
+        int sampleSeed,
         string? manifestPath,
         bool verbose,
         bool enableAnalyzers)
@@ -1447,6 +1483,7 @@ public static class Program
             TaskFilter = tasks.Length > 0 ? tasks.ToList() : null,
             CategoryFilter = category,
             SampleSize = sample,
+            SampleSeed = sampleSeed,
             Model = model,
             EnableAnalyzers = enableAnalyzers
         };
@@ -1563,6 +1600,7 @@ public static class Program
         string[] tasks,
         string? category,
         int? sample,
+        int sampleSeed,
         string? manifestPath,
         bool verbose)
     {
@@ -1649,6 +1687,7 @@ public static class Program
             TaskFilter = tasks.Length > 0 ? tasks.ToList() : null,
             CategoryFilter = category,
             SampleSize = sample,
+            SampleSeed = sampleSeed,
             Model = model
         };
 

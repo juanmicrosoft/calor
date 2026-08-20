@@ -375,6 +375,7 @@ public class Test
         Assert.Null(options.TaskFilter);
         Assert.Null(options.CategoryFilter);
         Assert.Null(options.SampleSize);
+        Assert.Null(options.SampleSeed);
     }
 
     [Fact]
@@ -387,7 +388,8 @@ public class Test
             DryRun = true,
             Verbose = true,
             CategoryFilter = "null-handling",
-            SampleSize = 5
+            SampleSize = 5,
+            SampleSeed = 42
         };
 
         Assert.Equal(10.00m, options.BudgetLimit);
@@ -395,6 +397,7 @@ public class Test
         Assert.True(options.DryRun);
         Assert.Equal("null-handling", options.CategoryFilter);
         Assert.Equal(5, options.SampleSize);
+        Assert.Equal(42, options.SampleSeed);
     }
 
     #endregion
