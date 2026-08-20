@@ -400,6 +400,65 @@ public class Test
         Assert.Equal(42, options.SampleSeed);
     }
 
+    [Fact]
+    public void CorrectnessBenchmarkOptions_SameSeed_ProducesIdenticalSample()
+    {
+        // Reproducibility invariant: two FilterTasks calls with the same
+        // (SampleSize, SampleSeed) must return the same task IDs in the same
+        // order. Directly asserts the audit-R11 promise ("same seed → same
+        // corpus order across developers"). Without this, the option-record
+        // property tests above verify the setter but not the shuffle wiring.
+        var tasks = Enumerable.Range(0, 20)
+            .Select(i => new LlmTaskDefinition
+            {
+                Id = $"task-{i:D2}",
+                Name = $"Task {i}",
+                Category = "sampling",
+                Prompt = "generator",
+            })
+            .ToList();
+
+        var options = new CorrectnessBenchmarkOptions
+        {
+            SampleSize = 5,
+            SampleSeed = 42,
+        };
+
+        var first = CorrectnessBenchmarkRunner.FilterTasks(tasks, options)
+            .Select(t => t.Id).ToList();
+        var second = CorrectnessBenchmarkRunner.FilterTasks(tasks, options)
+            .Select(t => t.Id).ToList();
+
+        Assert.Equal(5, first.Count);
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void CorrectnessBenchmarkOptions_DifferentSeed_ProducesDifferentSample()
+    {
+        // Corollary of the reproducibility invariant: changing the seed must
+        // actually vary the sample. Guards against a bug where SampleSeed is
+        // accepted but not passed to the Random.
+        var tasks = Enumerable.Range(0, 20)
+            .Select(i => new LlmTaskDefinition
+            {
+                Id = $"task-{i:D2}",
+                Name = $"Task {i}",
+                Category = "sampling",
+                Prompt = "generator",
+            })
+            .ToList();
+
+        var seedA = CorrectnessBenchmarkRunner.FilterTasks(tasks,
+            new CorrectnessBenchmarkOptions { SampleSize = 5, SampleSeed = 42 })
+            .Select(t => t.Id).ToList();
+        var seedB = CorrectnessBenchmarkRunner.FilterTasks(tasks,
+            new CorrectnessBenchmarkOptions { SampleSize = 5, SampleSeed = 999 })
+            .Select(t => t.Id).ToList();
+
+        Assert.NotEqual(seedA, seedB);
+    }
+
     #endregion
 
     #region CorrectnessCalculator Tests

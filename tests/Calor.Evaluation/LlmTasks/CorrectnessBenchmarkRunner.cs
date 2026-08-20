@@ -450,7 +450,7 @@ public sealed class CorrectnessBenchmarkRunner : IDisposable
     private static string GetSystemPrompt(string language) =>
         LlmTaskRunner.GetSystemPromptForLanguage(language);
 
-    private static List<LlmTaskDefinition> FilterTasks(
+    internal static List<LlmTaskDefinition> FilterTasks(
         List<LlmTaskDefinition> tasks,
         CorrectnessBenchmarkOptions options)
     {
