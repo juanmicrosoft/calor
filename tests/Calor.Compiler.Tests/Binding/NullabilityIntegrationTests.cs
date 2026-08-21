@@ -74,11 +74,46 @@ public class NullabilityIntegrationTests
             d.Code == DiagnosticCode.NullableToNonNullableBinding);
     }
 
-}
+    /// <summary>
+    /// Calor-native string literals are provably non-null. Binding a
+    /// <c>STR:"..."</c> literal into <c>:string</c> must NOT fire Calor0272.
+    /// Before the BoundStringLiteral NotAnnotated fix this tripped D3's
+    /// conservative Oblivious=possibly-null rule and produced noise on
+    /// ordinary Calor-only code that touched no BCL surface at all.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_CalorNative_StringLiteral_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:LocalLiteral}
+              §F{f1:Ok:pub} () -> void
+                §B{greeting:string} STR:"hello"
+            """;
 
-// NOTE: A third test case ("Calor0272 currently fires for a local
-// §B{greeting:string} STR:"hello" binding, because BoundStringLiteral.Type
-// defaults to Oblivious") was intentionally NOT added here. That behavior IS
-// current-state noise on Calor literals; the fix is a follow-on slice that
-// refines BoundStringLiteral (and other Calor literals producing STRING) to
-// NotAnnotated. Tracked in the PR body and to be filed as a follow-up issue.
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// Interpolated strings share the same non-null guarantee as string
+    /// literals — binding a <c>$"..."</c>-shaped expression into
+    /// <c>:string</c> must not trip Calor0272.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_InterpolatedString_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:Interp}
+              §F{f1:Ok:pub} () -> void
+                §B{name:string} STR:"world"
+                §B{greeting:string} §INTERP "hello, " §EXP name §/INTERP
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+}

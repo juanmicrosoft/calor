@@ -472,7 +472,14 @@ public sealed class BoundStringLiteral : BoundExpression
         Value = value ?? throw new ArgumentNullException(nameof(value));
         IsMultiline = isMultiline;
         IsUtf8 = isUtf8;
-        Type = new NominalBoundType(isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING");
+        // v0.14 nullability workstream: Calor-native string literals (and
+        // BoundStringLiteral-shaped nodes like nameof) are provably non-null.
+        // Without NotAnnotated the default Oblivious annotation causes
+        // §B{x:string} STR:"hi" to trip Calor0272 (D3: Oblivious is treated
+        // as possibly-null). ReadOnlySpan<byte> literals are equally non-null.
+        Type = new NominalBoundType(
+            isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING",
+            NullableAnnotation.NotAnnotated);
     }
 }
 
@@ -1874,7 +1881,10 @@ public sealed class BoundInterpolatedStringPart : BoundNode
 public sealed class BoundInterpolatedStringExpression : BoundExpression
 {
     public IReadOnlyList<BoundInterpolatedStringPart> Parts { get; }
-    public override BoundType Type { get; } = new NominalBoundType("STRING");
+    // Interpolated strings are provably non-null (Calor-native literal).
+    // See BoundStringLiteral for the D3-motivated NotAnnotated default.
+    public override BoundType Type { get; } =
+        new NominalBoundType("STRING", NullableAnnotation.NotAnnotated);
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes => Parts;
 
