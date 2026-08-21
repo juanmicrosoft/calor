@@ -407,7 +407,15 @@ public sealed class BoundBinaryExpression : BoundExpression
         Operator = op;
         Left = left;
         Right = right;
-        Type = new NominalBoundType(resultType);
+        // v0.14 nullability: string concatenation is provably non-null per
+        // .NET spec (String.Concat substitutes "" for null operands).
+        // Without this, §B{joined:string} (+ a b) trips Calor0272 falsely
+        // for the same D3-Oblivious reason as string literals.
+        Type = new NominalBoundType(
+            resultType,
+            resultType == "STRING"
+                ? NullableAnnotation.NotAnnotated
+                : NullableAnnotation.Oblivious);
         Children = [left, right];
     }
 }
@@ -472,11 +480,16 @@ public sealed class BoundStringLiteral : BoundExpression
         Value = value ?? throw new ArgumentNullException(nameof(value));
         IsMultiline = isMultiline;
         IsUtf8 = isUtf8;
-        // v0.14 nullability workstream: Calor-native string literals (and
-        // BoundStringLiteral-shaped nodes like nameof) are provably non-null.
-        // Without NotAnnotated the default Oblivious annotation causes
-        // §B{x:string} STR:"hi" to trip Calor0272 (D3: Oblivious is treated
-        // as possibly-null). ReadOnlySpan<byte> literals are equally non-null.
+        // v0.14 nullability slice 1 of N: Calor-native string literals
+        // (and BoundStringLiteral-shaped emissions like nameof) are provably
+        // non-null. Without NotAnnotated the default Oblivious annotation
+        // causes §B{x:string} STR:"hi" to trip Calor0272 (D3: Oblivious is
+        // treated as possibly-null). BoundBinaryExpression string
+        // concatenation is fixed alongside; BoundStructuralExpression STRING
+        // results (Substring, Trim, StringBuilder.ToString, ...) and
+        // BoundConditionalExpression STRING results are still Oblivious and
+        // tracked separately as follow-up. ReadOnlySpan<byte> literals are
+        // equally non-null.
         Type = new NominalBoundType(
             isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING",
             NullableAnnotation.NotAnnotated);
