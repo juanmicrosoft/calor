@@ -859,4 +859,155 @@ public class NullabilityIntegrationTests
             d.Code == DiagnosticCode.NullableToNonNullableBinding
             && d.Message.Contains("'copy'"));
     }
+
+    // ================================================================
+    // v0.14 §S4 (call-site) — Calor0274 NullableArgumentToNonNullable
+    // Parameter. Mirrors the §S3b bind-site pattern at the argument/
+    // parameter boundary. MetadataBinder now surfaces parameter-side
+    // NullableAnnotation, so a BCL call receiving a possibly-null
+    // source into a declared non-null 'string' parameter fires
+    // Calor0274 [Info]. Scoped to scalar STRING parameters per D6;
+    // BCL-shaped receivers only (mirrors S3b's System.*/Microsoft.*
+    // narrowing).
+    // ================================================================
+
+    /// <summary>
+    /// Passing an Annotated-source string
+    /// (<c>Environment.GetEnvironmentVariable</c>) into a BCL API whose
+    /// parameter is declared non-null (<c>File.ReadAllText(string)</c>)
+    /// must emit Calor0274 [Info]. Canonical S4 repro at the call-site.
+    /// </summary>
+    [Fact]
+    public void Calor0274_FiresFor_PassingNullableBclString_To_NonNullableParameter()
+    {
+        const string source = """
+            §M{m1:S4Repro}
+              §F{f1:Bad:pub} () -> void
+                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && d.Severity == DiagnosticSeverity.Info);
+    }
+
+    /// <summary>
+    /// Same possibly-null source, but the callee's parameter is
+    /// <c>string?</c> (<c>System.IO.Path.GetFileName(string?)</c>):
+    /// accepts null by design, so Calor0274 must NOT fire.
+    /// </summary>
+    [Fact]
+    public void Calor0274_DoesNotFire_When_Parameter_IsNullableString()
+    {
+        const string source = """
+            §M{m1:S4NullableParam}
+              §F{f1:Ok:pub} () -> void
+                §E{env}
+                §B{path:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C
+                §B{name:?string} §C{System.IO.Path.GetFileName} §A path §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    /// <summary>
+    /// A Calor-native string literal is provably non-null (per PR #1055).
+    /// Passing <c>STR:"hello"</c> into a non-null <c>string</c> parameter
+    /// must NOT trip Calor0274.
+    /// </summary>
+    [Fact]
+    public void Calor0274_DoesNotFire_For_ProvablyNonNull_Literal_Argument()
+    {
+        const string source = """
+            §M{m1:S4LiteralOk}
+              §F{f1:Ok:pub} () -> void
+                §E{io}
+                §C{System.IO.File.WriteAllText} §A STR:"path.txt" §A STR:"contents" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    /// <summary>
+    /// D6 scope guard: non-string parameters are out of scope for S3/S4.
+    /// Passing an INT argument to a callee whose parameter is INT must
+    /// NOT fire Calor0274.
+    /// </summary>
+    [Fact]
+    public void Calor0274_DoesNotFire_For_NonString_Parameter()
+    {
+        const string source = """
+            §M{m1:S4IntParam}
+              §F{f1:Ok:pub} () -> void
+                §B{v:int} §C{System.Math.Abs} §A INT:-3 §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    /// <summary>
+    /// Direct-inspection guard: the diagnostic message pattern names the
+    /// parameter, discloses the source annotation, and prescribes the
+    /// fix (mirrors Calor0272's wording).
+    /// </summary>
+    [Fact]
+    public void Calor0274_Message_NamesParameter_And_SourceAnnotation()
+    {
+        const string source = """
+            §M{m1:S4Message}
+              §F{f1:Bad:pub} () -> void
+                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diag = diagnostics.FirstOrDefault(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.NotNull(diag);
+        Assert.Contains("'path'", diag!.Message);
+        Assert.Contains("'?string'", diag.Message);
+        Assert.Contains("source annotation", diag.Message);
+    }
+
+    /// <summary>
+    /// Review finding M1 from PR #1060: passing a Calor <c>:?string</c>
+    /// variable directly into a BCL non-null <c>:string</c> parameter is
+    /// the highest-value Calor0274 target — but before the argument-
+    /// mapping OPTION-unwrap + prefix-<c>?</c> trim,
+    /// <c>":?string"</c> mapped via <c>MapShortTypeNameToFullName</c> to
+    /// <c>Calor.Runtime.Option`1</c>, overload resolution failed against
+    /// <c>File.ReadAllText(string)</c>, and no diagnostic fired. This
+    /// test locks the fix in place.
+    /// </summary>
+    [Fact]
+    public void Calor0274_FiresFor_CalorNullableString_Var_Passed_To_NonNullableParameter()
+    {
+        // Wrap the ReadAllText call in a §B initializer so it routes
+        // through BindCallExpression (where the Calor0274 emitter lives).
+        const string source = """
+            §M{m1:S4NullableArg}
+              §F{f1:Bad:pub} () -> void
+                §E{env}
+                §B{path:?string} §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C
+                §B{contents:string} §C{System.IO.File.ReadAllText} §A path §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && d.Severity == DiagnosticSeverity.Info
+            && d.Message.Contains("'path'"));
+    }
 }

@@ -316,6 +316,19 @@ public static class DiagnosticCode
     /// </summary>
     public const string NullableReturnFromNonNullable = "Calor0273";
 
+    /// <summary>
+    /// Info (S4 of v0.14 nullability workstream; promotes to Error at S5).
+    /// A BCL-shaped call site passed an argument whose value may be null
+    /// (annotation Annotated or Oblivious) into a callee parameter declared
+    /// non-nullable <c>:string</c>. Scoped to scalar STRING parameters
+    /// per D6 — non-string parameters do not fire. Mirrors the pattern
+    /// of <see cref="NullableToNonNullableBinding"/> at the call-site
+    /// boundary. Fix: change the parameter type to <c>?string</c> or add
+    /// an explicit non-null check at the interop boundary.
+    /// See docs/plans/v0.14-nullability-enforcement-scoping.md §S4 / D2.
+    /// </summary>
+    public const string NullableArgumentToNonNullableParameter = "Calor0274";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";
