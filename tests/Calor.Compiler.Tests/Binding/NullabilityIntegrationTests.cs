@@ -772,4 +772,91 @@ public class NullabilityIntegrationTests
     // requires precise §LAM surface syntax that is easier to exercise
     // via a C#→Calor conversion test than a hand-written §M source.
     // Tracked as a follow-up.
+
+    // ================================================================
+    // Review-integration for PR #1059:
+    //   M1 — inferred-type locals (§B{x} STR:"hi") now inherit the
+    //        initializer's annotation.
+    //   M2 — postfix nullable form (§B{x:string?}) is now recognized
+    //        alongside the prefix :?string form.
+    //   N1 — parameters/fields/properties don't flow annotations yet;
+    //        pinned with a still-fires test so the follow-up slice
+    //        has an anchor.
+    // ================================================================
+
+    /// <summary>
+    /// Review finding M1: inferred-type local from a STRING literal
+    /// initializer must inherit NotAnnotated, so a subsequent binding
+    /// into <c>:string</c> doesn't trip Calor0272 falsely.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_InferredType_StringLocal_FromLiteral()
+    {
+        const string source = """
+            §M{m1:InferredOk}
+              §F{f1:Ok:pub} () -> void
+                §B{a} STR:"hi"
+                §B{b:string} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// Review finding M2: postfix nullable form <c>:string?</c> is a
+    /// legal Calor spelling and must flow Annotated (not silently
+    /// degrade to Oblivious). A subsequent binding into <c>:string</c>
+    /// MUST fire Calor0272 — before the fix this was a false-negative.
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_For_PostfixNullableString_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:PostfixNullable}
+              §F{f1:Bad:pub} () -> void
+                §E{env}
+                §B{a:string?} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+                §B{b:string} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'b'"));
+    }
+
+    /// <summary>
+    /// Pin for review finding N1: parameters do NOT flow annotations
+    /// yet — <c>CreateParameter</c> and its callers omit the
+    /// <c>nullableAnnotation</c> argument, so a parameter's Variable
+    /// Symbol stays Oblivious even when declared <c>:string</c>. This
+    /// test locks that behavior in: a parameter of type STRING passed
+    /// into a <c>:string</c> binding STILL trips Calor0272. When the
+    /// follow-up slice teaches parameter creation to flow annotations,
+    /// this test will flip red — that's the signal to remove it.
+    /// Analogous pin also applies to fields and properties (not tested
+    /// here).
+    /// </summary>
+    [Fact]
+    public void Calor0272_StillFires_For_ParameterReference_KnownLimitation()
+    {
+        const string source = """
+            §M{m1:ParamPin}
+              §F{f1:Bad:pub} (STRING:name) -> void
+                §B{copy:string} name
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        // If this Assert.Contains starts failing, the parameter-annotation
+        // flow follow-up has landed. Delete this test and update the
+        // PR body callout on parameters/fields/properties.
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'copy'"));
+    }
 }

@@ -1293,7 +1293,18 @@ public sealed class Binder
         // §B{x:string} and Annotated for §B{x:?string}. Scoped to STRING
         // targets per §D6; non-STRING targets keep the safe Oblivious
         // default and land in a follow-on slice.
-        var declaredAnnotation = TryReadDeclaredStringAnnotation(bind.TypeName);
+        // v0.14 nullability workstream — capture the declared annotation on
+        // the VariableSymbol so subsequent BoundVariableExpression reads
+        // inherit NotAnnotated for §B{x:string} and Annotated for
+        // §B{x:?string}. When the type is INFERRED (bind.TypeName is null),
+        // inherit the initializer's annotation instead — otherwise a
+        // §B{x} STR:"hi" (STRING literal, provably NotAnnotated) would
+        // stay Oblivious on the symbol and later §B{y:string} x would
+        // trip Calor0272 falsely (review finding from PR #1059).
+        var declaredAnnotation = TryReadDeclaredStringAnnotation(bind.TypeName)
+            is var explicitAnnotation && explicitAnnotation != BoundTypes.NullableAnnotation.Oblivious
+                ? explicitAnnotation
+                : InferAnnotationForStringBinding(bind.TypeName, typeName, initializer);
 
         var variable = CreateLocalVariable(
             bind.Name,
@@ -1358,6 +1369,15 @@ public sealed class Binder
             annotatedNullable = true;
             trimmed = trimmed[1..];
         }
+        // Postfix nullable form (§B{x:string?}) — parser passes through
+        // untouched, so recognize it here alongside the prefix form. Review
+        // finding from PR #1059: without this, :string? silently degrades
+        // to Oblivious and a subsequent §B{y:string} x MISSES Calor0272.
+        else if (trimmed.EndsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
+        {
+            annotatedNullable = true;
+            trimmed = trimmed[..^1];
+        }
 
         if (trimmed is not ("STRING" or "string" or "str"))
         {
@@ -1384,6 +1404,29 @@ public sealed class Binder
     // in BoundTypeArchitectureTests). Delegates to TryBuildStringTarget so
     // surface-form parsing (`:string`, `:?string`, `:str`,
     // `OPTION[inner=STRING]`) stays in one place.
+    // v0.14 nullability workstream — fallback for §B{x} STR:"hi" (inferred
+    // type). When bind.TypeName is null but the inferred typeName resolves
+    // to a scalar STRING, copy the initializer's annotation onto the
+    // symbol. This lets a subsequent §B{y:string} x see NotAnnotated for
+    // literal-initialized locals (which are provably non-null) rather
+    // than silently degrading to Oblivious and misfiring Calor0272.
+    // Non-STRING inferred types keep the safe Oblivious default per §D6.
+    private static BoundTypes.NullableAnnotation InferAnnotationForStringBinding(
+        string? bindTypeName,
+        string typeName,
+        BoundExpression? initializer)
+    {
+        if (bindTypeName != null) return BoundTypes.NullableAnnotation.Oblivious;
+        if (initializer is null) return BoundTypes.NullableAnnotation.Oblivious;
+        // Scope-gate to STRING targets (mirrors NullabilityChecker.IsScalarString).
+        var normalized = typeName?.Trim();
+        var isString = normalized is "STRING" or "string" or "str" or "System.String";
+        if (!isString) return BoundTypes.NullableAnnotation.Oblivious;
+        return initializer.Type is BoundTypes.NominalBoundType n
+            ? n.NullableAnnotation
+            : BoundTypes.NullableAnnotation.Oblivious;
+    }
+
     private static BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
     {
         if (bindTypeName is null) return BoundTypes.NullableAnnotation.Oblivious;
