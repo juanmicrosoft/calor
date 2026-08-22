@@ -276,12 +276,6 @@ public class NullabilityIntegrationTests
     /// Ternary result over two provably-non-null STRING branches (both
     /// literals here) is itself non-null. Binding into <c>:string</c>
     /// must not fire Calor0272.
-    ///
-    /// <para>Note: a common variant — one branch being a variable
-    /// reference into a declared <c>:string</c> local — currently still
-    /// trips Calor0272 because <c>BoundVariableExpression.Type</c>
-    /// defaults to <c>Oblivious</c>. Variable-annotation flow is a
-    /// separate slice from #1056 (see PR discussion / follow-up).</para>
     /// </summary>
     [Fact]
     public void Calor0272_DoesNotFire_For_Ternary_BothBranches_NotAnnotated_String()
@@ -456,39 +450,6 @@ public class NullabilityIntegrationTests
         Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
     }
 
-    /// <summary>
-    /// Pin for a known limitation surfaced by adversarial review of #1056:
-    /// <c>BoundVariableExpression</c> always constructs its <c>Type</c>
-    /// with default <c>Oblivious</c>, even when the variable was
-    /// declared as <c>:string</c>. So a ternary with a variable-reference
-    /// branch — e.g. <c>§B{r:string} (? cond someStringLocal STR:"safe")</c>
-    /// — still trips Calor0272 despite both operands being provably
-    /// non-null at the source level. When the follow-up slice teaches
-    /// <c>BoundVariableExpression</c> to inherit the variable's declared
-    /// nullability, THIS TEST WILL FLIP RED — that's the signal to
-    /// delete both this pin and the known-limitation callout on
-    /// <see cref="Calor0272_DoesNotFire_For_Ternary_BothBranches_NotAnnotated_String"/>.
-    /// </summary>
-    [Fact]
-    public void Calor0272_StillFires_For_Ternary_VariableBranch_KnownLimitation()
-    {
-        const string source = """
-            §M{m1:TernVar}
-              §F{f1:Bad:pub} () -> void
-                §B{a:string} STR:"yes"
-                §B{picked:string} (? BOOL:true a STR:"no")
-            """;
-
-        var (_, diagnostics) = BindSource(source);
-
-        // If this Assert.Contains starts failing, the variable-annotation
-        // flow follow-up has landed. Update the comment above and remove
-        // both this test and the callout on the sibling ternary test.
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.NullableToNonNullableBinding
-            && d.Message.Contains("'picked'"));
-    }
-
     [Fact]
     public void BoundConditionalExpression_NonString_Type_Stays_Oblivious()
     {
@@ -500,6 +461,151 @@ public class NullabilityIntegrationTests
         var ternary = new BoundConditionalExpression(
             default, cond, whenTrue, whenFalse, "INT");
         var nominal = Assert.IsType<NominalBoundType>(ternary.Type);
+        Assert.Equal("INT", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.Oblivious, nominal.NullableAnnotation);
+    }
+
+    // ================================================================
+    // Variable-annotation flow (follow-up to #1057) — reads of a
+    // declared-non-null local flow NotAnnotated into downstream
+    // nullability checks, unblocking cases the ternary slice could not
+    // reach because BoundVariableExpression.Type defaulted to Oblivious.
+    // ================================================================
+
+    /// <summary>
+    /// Declared-non-null local rebound into another <c>:string</c> target
+    /// via a variable reference must NOT trip Calor0272. Prior to the
+    /// variable-annotation flow slice the reference lowered to a
+    /// <c>BoundVariableExpression</c> with default Oblivious annotation,
+    /// which §D3 treats as possibly-null.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_When_NonNullStringVariable_BoundToNonNullString()
+    {
+        const string source = """
+            §M{m1:VarFlow}
+              §F{f1:Ok:pub} () -> void
+                §B{a:string} STR:"x"
+                §B{b:string} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// The mirror case: a <c>:?string</c> local IS possibly-null. Binding
+    /// its reference into a non-nullable <c>:string</c> target must fire
+    /// Calor0272, and the reported source annotation must be
+    /// <c>Annotated</c> (not <c>Oblivious</c>) — that precision is the
+    /// whole point of flowing the declared annotation through.
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_When_NullableStringVariable_BoundToNonNullString()
+    {
+        const string source = """
+            §M{m1:NullableVar}
+              §F{f1:Bad:pub} () -> void
+                §B{a:?string} STR:"x"
+                §B{b:string} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'b'")
+            && d.Message.Contains("'Annotated'"));
+    }
+
+    /// <summary>
+    /// The case the ternary slice (#1057) could not close: a ternary arm
+    /// that references a declared-non-null local. Both operands are now
+    /// provably non-null once the variable-annotation flow lands, so
+    /// binding the result into <c>:string</c> must NOT fire Calor0272.
+    /// (Was previously pinned by <c>Calor0272_StillFires_For_Ternary_VariableBranch_KnownLimitation</c>,
+    /// deleted alongside this fix.)
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_Ternary_VariableBranch_NonNullString()
+    {
+        const string source = """
+            §M{m1:TernVar}
+              §F{f1:Ok:pub} () -> void
+                §B{a:string} STR:"x"
+                §B{r:string} (? BOOL:true a STR:"safe")
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// Direct-inspection guard: constructing a <c>BoundVariableExpression</c>
+    /// for a <c>VariableSymbol</c> that declared <c>NotAnnotated</c> must
+    /// yield a STRING <c>NominalBoundType</c> whose
+    /// <c>NullableAnnotation</c> is also <c>NotAnnotated</c>. This is the
+    /// invariant the ternary/binding regressions above depend on and is
+    /// cheaper to diagnose here if the flow regresses.
+    /// </summary>
+    [Fact]
+    public void BoundVariableExpression_Inherits_NotAnnotated_From_StringSymbol()
+    {
+        var symbol = new VariableSymbol(
+            SymbolId.None,
+            name: "a",
+            typeName: "STRING",
+            isMutable: false,
+            nullableAnnotation: NullableAnnotation.NotAnnotated);
+        var reference = new BoundVariableExpression(default, symbol);
+        var nominal = Assert.IsType<NominalBoundType>(reference.Type);
+        Assert.Equal("STRING", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Symmetric guard: a <c>:?string</c> symbol yields an Annotated
+    /// STRING reference. Needed so Calor0272's source-annotation message
+    /// reports <c>Annotated</c> (informative) rather than <c>Oblivious</c>
+    /// (spurious).
+    /// </summary>
+    [Fact]
+    public void BoundVariableExpression_Inherits_Annotated_From_NullableStringSymbol()
+    {
+        var symbol = new VariableSymbol(
+            SymbolId.None,
+            name: "a",
+            typeName: "STRING",
+            isMutable: false,
+            nullableAnnotation: NullableAnnotation.Annotated);
+        var reference = new BoundVariableExpression(default, symbol);
+        var nominal = Assert.IsType<NominalBoundType>(reference.Type);
+        Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Scope guard (§D6): flow is restricted to STRING targets in S3.
+    /// A non-STRING symbol keeps the conservative Oblivious annotation on
+    /// its BoundVariableExpression, even if the symbol was constructed
+    /// with a non-Oblivious annotation. This preserves the S3 boundary
+    /// and matches the analogous non-STRING guards on
+    /// BoundBinaryExpression / BoundConditionalExpression.
+    /// </summary>
+    [Fact]
+    public void BoundVariableExpression_NonString_Type_Stays_Oblivious()
+    {
+        var symbol = new VariableSymbol(
+            SymbolId.None,
+            name: "n",
+            typeName: "INT",
+            isMutable: false,
+            nullableAnnotation: NullableAnnotation.NotAnnotated);
+        var reference = new BoundVariableExpression(default, symbol);
+        var nominal = Assert.IsType<NominalBoundType>(reference.Type);
         Assert.Equal("INT", nominal.QualifiedName);
         Assert.Equal(NullableAnnotation.Oblivious, nominal.NullableAnnotation);
     }
@@ -666,4 +772,91 @@ public class NullabilityIntegrationTests
     // requires precise §LAM surface syntax that is easier to exercise
     // via a C#→Calor conversion test than a hand-written §M source.
     // Tracked as a follow-up.
+
+    // ================================================================
+    // Review-integration for PR #1059:
+    //   M1 — inferred-type locals (§B{x} STR:"hi") now inherit the
+    //        initializer's annotation.
+    //   M2 — postfix nullable form (§B{x:string?}) is now recognized
+    //        alongside the prefix :?string form.
+    //   N1 — parameters/fields/properties don't flow annotations yet;
+    //        pinned with a still-fires test so the follow-up slice
+    //        has an anchor.
+    // ================================================================
+
+    /// <summary>
+    /// Review finding M1: inferred-type local from a STRING literal
+    /// initializer must inherit NotAnnotated, so a subsequent binding
+    /// into <c>:string</c> doesn't trip Calor0272 falsely.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_InferredType_StringLocal_FromLiteral()
+    {
+        const string source = """
+            §M{m1:InferredOk}
+              §F{f1:Ok:pub} () -> void
+                §B{a} STR:"hi"
+                §B{b:string} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// Review finding M2: postfix nullable form <c>:string?</c> is a
+    /// legal Calor spelling and must flow Annotated (not silently
+    /// degrade to Oblivious). A subsequent binding into <c>:string</c>
+    /// MUST fire Calor0272 — before the fix this was a false-negative.
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_For_PostfixNullableString_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:PostfixNullable}
+              §F{f1:Bad:pub} () -> void
+                §E{env}
+                §B{a:string?} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+                §B{b:string} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'b'"));
+    }
+
+    /// <summary>
+    /// Pin for review finding N1: parameters do NOT flow annotations
+    /// yet — <c>CreateParameter</c> and its callers omit the
+    /// <c>nullableAnnotation</c> argument, so a parameter's Variable
+    /// Symbol stays Oblivious even when declared <c>:string</c>. This
+    /// test locks that behavior in: a parameter of type STRING passed
+    /// into a <c>:string</c> binding STILL trips Calor0272. When the
+    /// follow-up slice teaches parameter creation to flow annotations,
+    /// this test will flip red — that's the signal to remove it.
+    /// Analogous pin also applies to fields and properties (not tested
+    /// here).
+    /// </summary>
+    [Fact]
+    public void Calor0272_StillFires_For_ParameterReference_KnownLimitation()
+    {
+        const string source = """
+            §M{m1:ParamPin}
+              §F{f1:Bad:pub} (STRING:name) -> void
+                §B{copy:string} name
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        // If this Assert.Contains starts failing, the parameter-annotation
+        // flow follow-up has landed. Delete this test and update the
+        // PR body callout on parameters/fields/properties.
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'copy'"));
+    }
 }
