@@ -1690,9 +1690,35 @@ public sealed class BoundConditionalExpression : BoundExpression
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
         WhenTrue = whenTrue ?? throw new ArgumentNullException(nameof(whenTrue));
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
-        Type = new NominalBoundType(resultType ?? throw new ArgumentNullException(nameof(resultType)));
+        if (resultType is null) throw new ArgumentNullException(nameof(resultType));
+        // v0.14 nullability follow-up (#1056): propagate STRING branch
+        // annotations. Both branches NotAnnotated → result NotAnnotated
+        // (safe). Either branch Annotated → result Annotated (definitely
+        // possibly-null). Mixed/Oblivious → default Oblivious (conservative).
+        Type = new NominalBoundType(
+            resultType,
+            resultType == "STRING"
+                ? PropagateStringBranchAnnotation(whenTrue.Type, whenFalse.Type)
+                : NullableAnnotation.Oblivious);
         Children = [condition, whenTrue, whenFalse];
     }
+
+    private static NullableAnnotation PropagateStringBranchAnnotation(BoundType left, BoundType right)
+    {
+        var la = ReadNominalAnnotation(left);
+        var ra = ReadNominalAnnotation(right);
+        if (la == NullableAnnotation.Annotated || ra == NullableAnnotation.Annotated)
+            return NullableAnnotation.Annotated;
+        if (la == NullableAnnotation.NotAnnotated && ra == NullableAnnotation.NotAnnotated)
+            return NullableAnnotation.NotAnnotated;
+        return NullableAnnotation.Oblivious;
+    }
+
+    private static NullableAnnotation ReadNominalAnnotation(BoundType type) => type switch
+    {
+        NominalBoundType n => n.NullableAnnotation,
+        _ => NullableAnnotation.Oblivious,
+    };
 }
 
 /// <summary>
@@ -1717,7 +1743,18 @@ public class BoundStructuralExpression : BoundExpression
         : base(span)
     {
         NodeTypeName = nodeTypeName ?? throw new ArgumentNullException(nameof(nodeTypeName));
-        Type = new NominalBoundType(typeName ?? throw new ArgumentNullException(nameof(typeName)));
+        if (typeName is null) throw new ArgumentNullException(nameof(typeName));
+        // v0.14 nullability follow-up (#1056): STRING-returning structural
+        // expressions in this codebase come from BindStringOperation
+        // (Substring, Trim, ToUpper, ToLower, Replace, PadLeft/Right, …) and
+        // BindStringBuilderOperation.ToString — all provably non-null per
+        // BCL contract. Mirrors the BoundBinaryExpression / BoundStringLiteral
+        // pattern from PR #1055.
+        Type = new NominalBoundType(
+            typeName,
+            typeName == "STRING"
+                ? NullableAnnotation.NotAnnotated
+                : NullableAnnotation.Oblivious);
         Children = children ?? Array.Empty<BoundExpression>();
         Metadata = metadata ?? new Dictionary<string, object?>();
         DeferredChildren = deferredChildren ?? Array.Empty<BoundExpression>();

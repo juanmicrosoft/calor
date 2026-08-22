@@ -226,4 +226,182 @@ public class NullabilityIntegrationTests
         Assert.Equal("INT", nominal.QualifiedName);
         Assert.Equal(NullableAnnotation.Oblivious, nominal.NullableAnnotation);
     }
+
+    // ================================================================
+    // #1056 — same-class follow-up: BoundStructuralExpression (Substring
+    // / Trim / …) and BoundConditionalExpression (ternary) STRING
+    // results now also carry NotAnnotated when the sources are provably
+    // non-null.
+    // ================================================================
+
+    /// <summary>
+    /// String operations routed through <c>BindStringOperation</c>
+    /// (Substring, Trim, ToUpper, ToLower, Replace, PadLeft/Right, …)
+    /// return non-null strings per BCL contract. Binding their result
+    /// into <c>:string</c> must not fire Calor0272.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_StringOperation_Trim_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:Trim}
+              §F{f1:Ok:pub} () -> void
+                §B{a:string} STR:"  hello  "
+                §B{trimmed:string} (trim a)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    [Fact]
+    public void Calor0272_DoesNotFire_For_StringOperation_Substr_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:Substr}
+              §F{f1:Ok:pub} () -> void
+                §B{a:string} STR:"hello"
+                §B{sub:string} (substr a INT:0 INT:3)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// Ternary result over two provably-non-null STRING branches (both
+    /// literals here) is itself non-null. Binding into <c>:string</c>
+    /// must not fire Calor0272.
+    ///
+    /// <para>Note: a common variant — one branch being a variable
+    /// reference into a declared <c>:string</c> local — currently still
+    /// trips Calor0272 because <c>BoundVariableExpression.Type</c>
+    /// defaults to <c>Oblivious</c>. Variable-annotation flow is a
+    /// separate slice from #1056 (see PR discussion / follow-up).</para>
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_Ternary_BothBranches_NotAnnotated_String()
+    {
+        const string source = """
+            §M{m1:Tern}
+              §F{f1:Ok:pub} () -> void
+                §B{picked:string} (? BOOL:true STR:"yes" STR:"no")
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    // ================================================================
+    // Direct-inspection unit tests (mirror the #1055 set).
+    // ================================================================
+
+    [Fact]
+    public void BoundStructuralExpression_String_Type_Is_NotAnnotated()
+    {
+        var s = new BoundStringLiteral(default, "hello");
+        var op = new BoundStructuralExpression(
+            default,
+            nodeTypeName: "StringOperationNode",
+            typeName: "STRING",
+            children: [s]);
+        var nominal = Assert.IsType<NominalBoundType>(op.Type);
+        Assert.Equal("STRING", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    [Fact]
+    public void BoundStructuralExpression_NonString_Type_Stays_Oblivious()
+    {
+        // Regression guard: propagation must not leak to non-STRING
+        // structural expressions (e.g. String.Length → INT, Contains → BOOL).
+        var s = new BoundStringLiteral(default, "hello");
+        var op = new BoundStructuralExpression(
+            default,
+            nodeTypeName: "StringOperationNode",
+            typeName: "INT",
+            children: [s]);
+        var nominal = Assert.IsType<NominalBoundType>(op.Type);
+        Assert.Equal("INT", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.Oblivious, nominal.NullableAnnotation);
+    }
+
+    [Fact]
+    public void BoundConditionalExpression_BothBranches_NotAnnotated_Yields_NotAnnotated_String()
+    {
+        var cond = new BoundBoolLiteral(default, true);
+        var whenTrue = new BoundStringLiteral(default, "a");
+        var whenFalse = new BoundStringLiteral(default, "b");
+        var ternary = new BoundConditionalExpression(
+            default, cond, whenTrue, whenFalse, "STRING");
+        var nominal = Assert.IsType<NominalBoundType>(ternary.Type);
+        Assert.Equal("STRING", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    [Fact]
+    public void BoundConditionalExpression_AnnotatedBranch_Yields_Annotated_String()
+    {
+        // Simulates §B{r:string} (? cond nullableSource "safe"):
+        // the ternary result IS possibly-null. Annotating explicitly
+        // preserves diagnostic precision so Calor0272's "source
+        // annotation" message shows 'Annotated' rather than 'Oblivious'.
+        var cond = new BoundBoolLiteral(default, true);
+        var whenTrue = new NullabilityTestExpr(
+            new NominalBoundType("STRING", NullableAnnotation.Annotated));
+        var whenFalse = new BoundStringLiteral(default, "safe");
+        var ternary = new BoundConditionalExpression(
+            default, cond, whenTrue, whenFalse, "STRING");
+        var nominal = Assert.IsType<NominalBoundType>(ternary.Type);
+        Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
+    }
+
+    [Fact]
+    public void BoundConditionalExpression_ObliviousBranch_Yields_Oblivious_String()
+    {
+        // Conservative fallback: a NotAnnotated + Oblivious mix cannot
+        // conclude non-null, so the result stays Oblivious (treated as
+        // possibly-null by NullabilityChecker per D3).
+        var cond = new BoundBoolLiteral(default, true);
+        var whenTrue = new NullabilityTestExpr(
+            new NominalBoundType("STRING", NullableAnnotation.Oblivious));
+        var whenFalse = new BoundStringLiteral(default, "safe");
+        var ternary = new BoundConditionalExpression(
+            default, cond, whenTrue, whenFalse, "STRING");
+        var nominal = Assert.IsType<NominalBoundType>(ternary.Type);
+        Assert.Equal(NullableAnnotation.Oblivious, nominal.NullableAnnotation);
+    }
+
+    [Fact]
+    public void BoundConditionalExpression_NonString_Type_Stays_Oblivious()
+    {
+        // Regression guard: propagation must not leak to non-STRING
+        // conditional results.
+        var cond = new BoundBoolLiteral(default, true);
+        var whenTrue = new BoundIntLiteral(default, 1, 1, false, "INT");
+        var whenFalse = new BoundIntLiteral(default, 2, 2, false, "INT");
+        var ternary = new BoundConditionalExpression(
+            default, cond, whenTrue, whenFalse, "INT");
+        var nominal = Assert.IsType<NominalBoundType>(ternary.Type);
+        Assert.Equal("INT", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.Oblivious, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Minimal test-only BoundExpression with a caller-controlled Type,
+    /// used to exercise annotation-propagation branches (Annotated,
+    /// Oblivious) that no production BoundExpression currently produces
+    /// as a scalar STRING.
+    /// </summary>
+    private sealed class NullabilityTestExpr : BoundExpression
+    {
+        public override BoundType Type { get; }
+        public NullabilityTestExpr(BoundType type) : base(default) { Type = type; }
+    }
 }
