@@ -246,8 +246,11 @@ public sealed class BoundVariableExpression : BoundExpression
     };
 
     // Matches the parser's expanded form (OPTION[inner=STRING]) and the
-    // canonicalized generic form (OPTION<STRING>). Kept narrow — only
-    // patterns Binder.TryBuildStringTarget already recognizes.
+    // canonicalized generic form (OPTION<STRING>), plus the raw surface
+    // prefix form (?string / ?str / ?STRING) that flows unexpanded through
+    // the inline-signature parameter path (TryParseInlineSignature calls
+    // ReadInlineTypeToken which does not apply ExpandType). Kept narrow —
+    // only patterns Binder.TryBuildStringTarget already recognizes.
     private static bool IsOptionOfStringType(string typeName)
     {
         var trimmed = typeName.Trim();
@@ -262,6 +265,20 @@ public sealed class BoundVariableExpression : BoundExpression
         {
             var inner = trimmed["OPTION<".Length..^1];
             return IsScalarStringType(inner);
+        }
+        // Surface prefix form: ?string, ?str, ?STRING (inline-signature
+        // parameters, field/property TypeNames — see Binder task #3).
+        if (trimmed.StartsWith("?", StringComparison.Ordinal)
+            && trimmed.Length > 1)
+        {
+            return IsScalarStringType(trimmed[1..]);
+        }
+        // Surface postfix form: string?, str?, STRING? (postfix-nullable
+        // spelling accepted by TryBuildStringTarget).
+        if (trimmed.EndsWith("?", StringComparison.Ordinal)
+            && trimmed.Length > 1)
+        {
+            return IsScalarStringType(trimmed[..^1]);
         }
         return false;
     }

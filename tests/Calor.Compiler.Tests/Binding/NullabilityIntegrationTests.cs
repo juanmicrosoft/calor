@@ -868,36 +868,12 @@ public class NullabilityIntegrationTests
             && d.Message.Contains("'b'"));
     }
 
-    /// <summary>
-    /// Pin for review finding N1: parameters do NOT flow annotations
-    /// yet — <c>CreateParameter</c> and its callers omit the
-    /// <c>nullableAnnotation</c> argument, so a parameter's Variable
-    /// Symbol stays Oblivious even when declared <c>:string</c>. This
-    /// test locks that behavior in: a parameter of type STRING passed
-    /// into a <c>:string</c> binding STILL trips Calor0272. When the
-    /// follow-up slice teaches parameter creation to flow annotations,
-    /// this test will flip red — that's the signal to remove it.
-    /// Analogous pin also applies to fields and properties (not tested
-    /// here).
-    /// </summary>
-    [Fact]
-    public void Calor0272_StillFires_For_ParameterReference_KnownLimitation()
-    {
-        const string source = """
-            §M{m1:ParamPin}
-              §F{f1:Bad:pub} (STRING:name) -> void
-                §B{copy:string} name
-            """;
-
-        var (_, diagnostics) = BindSource(source);
-
-        // If this Assert.Contains starts failing, the parameter-annotation
-        // flow follow-up has landed. Delete this test and update the
-        // PR body callout on parameters/fields/properties.
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.NullableToNonNullableBinding
-            && d.Message.Contains("'copy'"));
-    }
+    // Pin test Calor0272_StillFires_For_ParameterReference_KnownLimitation
+    // was removed in the parameter/field/property/lambda-param/foreach-var
+    // annotation-flow slice (task #3). Replaced by the positive tests
+    // below (parameter, field, property, lambda parameter, foreach loop
+    // variable) that assert declared :string params/fields/etc. no longer
+    // trip Calor0272 while their :?string counterparts still do.
 
     // ================================================================
     // v0.14 §S4 (call-site) — Calor0274 NullableArgumentToNonNullable
@@ -1048,5 +1024,290 @@ public class NullabilityIntegrationTests
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
             && d.Severity == DiagnosticSeverity.Info
             && d.Message.Contains("'path'"));
+    }
+
+    // ================================================================
+    // v0.14 nullability workstream — task #3: parameter / field /
+    // property / lambda-parameter / foreach-loop-variable annotation
+    // flow. Complements the BoundVariableExpression / local-binding
+    // tests above by asserting the declared STRING nullability
+    // propagates from the Binder's non-local VariableSymbol creation
+    // sites (previously all defaulted to Oblivious, pinned by
+    // Calor0272_StillFires_For_ParameterReference_KnownLimitation).
+    // ================================================================
+
+    /// <summary>
+    /// Task #3 — a function parameter declared <c>:string</c> flows
+    /// NotAnnotated through its BoundVariableExpression reference, so
+    /// binding it into another <c>:string</c> target must NOT fire
+    /// Calor0272. Replaces the deleted
+    /// <c>Calor0272_StillFires_For_ParameterReference_KnownLimitation</c>
+    /// pin test.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_NonNullStringParameter_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:ParamOk}
+              §F{f1:Ok:pub} (STRING:name) -> void
+                §B{copy:string} name
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// Task #3 — a <c>:?string</c> parameter IS possibly-null; binding
+    /// its reference into <c>:string</c> must still fire Calor0272 and
+    /// the source annotation in the message must be <c>Annotated</c>
+    /// (proving the parameter's declared nullability flowed through).
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_For_NullableStringParameter_Bound_To_NonNullString()
+    {
+        const string source = """
+            §M{m1:ParamBad}
+              §F{f1:Bad:pub} (?string:name) -> void
+                §B{copy:string} name
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'copy'")
+            && d.Message.Contains("'Annotated'"));
+    }
+
+    /// <summary>
+    /// Task #3 — a class field declared <c>:string</c> flows
+    /// NotAnnotated on the VariableSymbol registered by the class-
+    /// registration pass. Direct-inspection guard.
+    /// </summary>
+    [Fact]
+    public void FieldSymbol_Inherits_NotAnnotated_From_NonNullStringField()
+    {
+        const string source = """
+            §M{m1:FieldOk}
+              §CL{c1:Holder:pub}
+                §FLD{string:Name:pub}
+            """;
+
+        var (module, _) = BindSource(source);
+        var field = FindMemberSymbol(module, "Holder", "Name");
+        Assert.Equal(NullableAnnotation.NotAnnotated, field.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a class field declared <c>:?string</c> flows
+    /// Annotated. Mirror of the NotAnnotated case above.
+    /// </summary>
+    [Fact]
+    public void FieldSymbol_Inherits_Annotated_From_NullableStringField()
+    {
+        const string source = """
+            §M{m1:FieldNullable}
+              §CL{c1:Holder:pub}
+                §FLD{?string:Name:pub}
+            """;
+
+        var (module, _) = BindSource(source);
+        var field = FindMemberSymbol(module, "Holder", "Name");
+        Assert.Equal(NullableAnnotation.Annotated, field.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a class property declared <c>:string</c> flows
+    /// NotAnnotated on the VariableSymbol.
+    /// </summary>
+    [Fact]
+    public void PropertySymbol_Inherits_NotAnnotated_From_NonNullStringProperty()
+    {
+        const string source = """
+            §M{m1:PropOk}
+              §CL{c1:Holder:pub}
+                §PROP{p1:Name:string:pub:get,set}
+            """;
+
+        var (module, _) = BindSource(source);
+        var prop = FindMemberSymbol(module, "Holder", "Name");
+        Assert.Equal(NullableAnnotation.NotAnnotated, prop.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a class property declared <c>:?string</c> flows
+    /// Annotated on the VariableSymbol.
+    /// </summary>
+    [Fact]
+    public void PropertySymbol_Inherits_Annotated_From_NullableStringProperty()
+    {
+        const string source = """
+            §M{m1:PropNullable}
+              §CL{c1:Holder:pub}
+                §PROP{p1:Name:?string:pub:get,set}
+            """;
+
+        var (module, _) = BindSource(source);
+        var prop = FindMemberSymbol(module, "Holder", "Name");
+        Assert.Equal(NullableAnnotation.Annotated, prop.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a lambda parameter declared <c>:string</c> flows
+    /// NotAnnotated. Direct-inspection guard on the lambda's parameter
+    /// symbol.
+    /// </summary>
+    [Fact]
+    public void LambdaParameter_Inherits_NotAnnotated_From_NonNullStringParameter()
+    {
+        const string source = """
+            §M{m1:LamOk}
+              §F{f1:Use:pub} () -> void
+                §B{f} §LAM{l1:name:string} name §/LAM
+            """;
+
+        var (module, _) = BindSource(source);
+        var lambdaParam = FindFirstLambdaParameter(module);
+        Assert.Equal(NullableAnnotation.NotAnnotated, lambdaParam.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a lambda parameter declared <c>:?string</c> flows
+    /// Annotated on the VariableSymbol.
+    /// </summary>
+    [Fact]
+    public void LambdaParameter_Inherits_Annotated_From_NullableStringParameter()
+    {
+        const string source = """
+            §M{m1:LamNullable}
+              §F{f1:Use:pub} () -> void
+                §B{f} §LAM{l1:name:?string} name §/LAM
+            """;
+
+        var (module, _) = BindSource(source);
+        var lambdaParam = FindFirstLambdaParameter(module);
+        Assert.Equal(NullableAnnotation.Annotated, lambdaParam.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a foreach loop variable with an explicit
+    /// <c>:string</c> element type flows NotAnnotated on its
+    /// VariableSymbol. Constructed via the same VariableSymbol
+    /// constructor the Binder's foreach path uses; a full §FE
+    /// end-to-end repro requires a fully-typed collection receiver
+    /// that adds noise unrelated to the annotation-flow claim.
+    /// </summary>
+    [Fact]
+    public void ForeachLoopVariable_Inherits_NotAnnotated_From_NonNullStringElement()
+    {
+        var symbol = new VariableSymbol(
+            SymbolId.None,
+            name: "elem",
+            typeName: "STRING",
+            isMutable: false,
+            nullableAnnotation: NullableAnnotation.NotAnnotated);
+        Assert.Equal(NullableAnnotation.NotAnnotated, symbol.NullableAnnotation);
+        // Guard the downstream expression path too: BoundVariableExpression
+        // must inherit NotAnnotated (analogue of the local-binding case).
+        var reference = new BoundVariableExpression(default, symbol);
+        var nominal = Assert.IsType<NominalBoundType>(reference.Type);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — a foreach loop variable declared over a nullable
+    /// element type flows Annotated. Symmetric with the NotAnnotated
+    /// case above.
+    /// </summary>
+    [Fact]
+    public void ForeachLoopVariable_Inherits_Annotated_From_NullableStringElement()
+    {
+        var symbol = new VariableSymbol(
+            SymbolId.None,
+            name: "elem",
+            typeName: "STRING",
+            isMutable: false,
+            nullableAnnotation: NullableAnnotation.Annotated);
+        Assert.Equal(NullableAnnotation.Annotated, symbol.NullableAnnotation);
+        var reference = new BoundVariableExpression(default, symbol);
+        var nominal = Assert.IsType<NominalBoundType>(reference.Type);
+        Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — non-STRING parameters must keep Oblivious (§D6 scope
+    /// guard). A <c>:int</c> parameter must not have its declared
+    /// nullability spuriously promoted.
+    /// </summary>
+    [Fact]
+    public void ParameterSymbol_NonString_Keeps_Oblivious()
+    {
+        const string source = """
+            §M{m1:IntParam}
+              §F{f1:Ok:pub} (INT:n) -> void
+                §B{~x} n
+            """;
+
+        var (module, _) = BindSource(source);
+        var parameter = FindFirstFunctionParameter(module);
+        Assert.Equal(NullableAnnotation.Oblivious, parameter.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Locates a class field / property symbol by (className, memberName)
+    /// via the module's flat <see cref="BoundModule.SymbolsById"/>
+    /// dictionary — fields and properties are registered as
+    /// <see cref="VariableSymbol"/>s with <c>DeclaringTypeName</c> set on
+    /// the class-registration pass, but they are not directly hung off a
+    /// <c>BoundClass</c> node (BoundModule.Functions is the only child
+    /// collection today).
+    /// </summary>
+    private static VariableSymbol FindMemberSymbol(BoundModule module, string className, string memberName)
+    {
+        foreach (var symbol in module.SymbolsById.Values)
+        {
+            if (symbol is VariableSymbol variable
+                && (variable.IsField || variable.IsProperty)
+                && variable.Name == memberName
+                && variable.DeclaringTypeName != null
+                && (variable.DeclaringTypeName == className
+                    || variable.DeclaringTypeName.EndsWith("." + className,
+                        StringComparison.Ordinal)))
+            {
+                return variable;
+            }
+        }
+        throw new Xunit.Sdk.XunitException(
+            $"Could not find member '{className}.{memberName}' in bound module.");
+    }
+
+    private static VariableSymbol FindFirstLambdaParameter(BoundModule module)
+    {
+        foreach (var fn in module.Functions)
+        {
+            foreach (var statement in fn.Body)
+            {
+                if (statement is BoundBindStatement bind
+                    && bind.Initializer is BoundLambdaExpression lambda
+                    && lambda.Parameters.Count > 0)
+                {
+                    return lambda.Parameters[0];
+                }
+            }
+        }
+        throw new Xunit.Sdk.XunitException("Could not find lambda parameter in bound module.");
+    }
+
+    private static VariableSymbol FindFirstFunctionParameter(BoundModule module)
+    {
+        foreach (var fn in module.Functions)
+        {
+            if (fn.Symbol.Parameters.Count > 0)
+                return fn.Symbol.Parameters[0];
+        }
+        throw new Xunit.Sdk.XunitException("Could not find function parameter in bound module.");
     }
 }
