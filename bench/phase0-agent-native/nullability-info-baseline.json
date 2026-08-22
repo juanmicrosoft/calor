@@ -1,14 +1,28 @@
 {
-  "$description": "S1 baseline for v0.14 nullability enforcement (issue #875). Enumerates every \u00a7B{...:string} binding in samples/ + benchmarks/ .calr files, classified by initializer shape. Projected-diagnostic-candidates is an over-approximation of the Info-level Calor0272 count that S3 will emit \u2014 real count will be measured against actual binder output at S3 and used as the F-1 ratchet baseline.",
+  "$description": "S1 baseline for v0.14 nullability enforcement (issue #875). Enumerates every §B{...:string} binding in samples/ + benchmarks/ .calr files, classified by initializer shape. Projected-diagnostic-candidates is an over-approximation of the Info-level Calor0272 count that S3 will emit — real count will be measured against actual binder output at S3 and used as the F-1 ratchet baseline.",
   "$rule": "Additive PRs cannot raise total_bindings without a supersession entry. Phase B (S5) exit criterion is annotated_nullable = 0 (this file tracks total_bindings by shape; the annotated_nullable / oblivious_irremediable split lives on the runtime baseline once S3 lights up).",
-  "measurement_command": "python3 /tmp/nullability_s1_baseline.py",
+  "measurement_command": "python3 bench/phase0-agent-native/nullability_s1_baseline.py",
   "measured_at": "2026-08-20",
   "measured_at_git_sha": "a46f53c12704c1dfba7bd34bb2796fae90e7e0c4",
-  "phase": "A-S3-predicate-only",
+  "phase": "A-S3-S4-emission-live-but-corpus-parse-errors-block-diagnostics",
   "phase_history": [
-    {"phase": "A-pre-S3", "at": "s1-baseline-merge", "note": "Initial S1 measurement. No compiler emission yet."},
-    {"phase": "A-S3-predicate-only", "at": "s3-checker-merge", "note": "NullabilityChecker predicate + Calor0272 diagnostic code exist and are unit-tested. Production emission from BindBindStatement NOT wired: BoundCallExpression.Type is still Oblivious across the board (MetadataBinder-resolved annotations do not flow into the bound tree yet). Turning on Calor0272 pre-wiring would produce all-noise diagnostics on every string binding. Emission lands in the follow-on Binder→MetadataBinder integration slice."}
+    {
+      "phase": "A-pre-S3",
+      "at": "s1-baseline-merge",
+      "note": "Initial S1 measurement. No compiler emission yet."
+    },
+    {
+      "phase": "A-S3-predicate-only",
+      "at": "s3-checker-merge",
+      "note": "NullabilityChecker predicate + Calor0272 diagnostic code exist and are unit-tested. Production emission from BindBindStatement NOT wired: BoundCallExpression.Type is still Oblivious across the board (MetadataBinder-resolved annotations do not flow into the bound tree yet). Turning on Calor0272 pre-wiring would produce all-noise diagnostics on every string binding. Emission lands in the follow-on Binder→MetadataBinder integration slice."
+    },
+    {
+      "phase": "A-S3-S4-emission-live-but-corpus-parse-errors-block-diagnostics",
+      "at": "s4-call-site-merge (post #1060)",
+      "note": "S3b + S4 return/call-site emission is live: Calor0272 (bind), Calor0273 (return), Calor0274 (arg) fire at bind time on well-formed input. However, the .calr files under benchmarks/security/ and benchmarks/null-safety/ that produce this file's 42 shape count currently emit parse errors (Calor0006/0100/0102) and never reach the binder, so live diagnostic counts against this corpus are 0. The shape count of 42 remains authoritative for the F-1 ratchet; a follow-up will either fix the corpus parse errors or add nullability-focused samples that do parse."
+    }
   ],
+  "notes": "Live-diagnostic count is currently 0 because corpus files under benchmarks/security and benchmarks/null-safety contain parse errors (Calor0006/0100/0102). Shape count of 42 is still authoritative for F-1 ratchet.",
   "total_bindings": 42,
   "by_shape": {
     "CALL_CALOR": 8,
@@ -18,7 +32,7 @@
     "VARIABLE_REF": 2
   },
   "projected_diagnostic_candidates_count": 17,
-  "note": "projected_diagnostic_candidates_count is an over-approximation \u2014 actual S3 diagnostic count will replace it once MetadataBinder-annotated nullability flows. This baseline exists to detect surprise regressions in the shape distribution, not to gate anything.",
+  "note": "projected_diagnostic_candidates_count is an over-approximation — actual S3 diagnostic count will replace it once MetadataBinder-annotated nullability flows. This baseline exists to detect surprise regressions in the shape distribution, not to gate anything.",
   "by_file": {
     "benchmarks/null-safety/null-deref.calr": [
       {
