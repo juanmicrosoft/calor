@@ -515,4 +515,155 @@ public class NullabilityIntegrationTests
         public override BoundType Type { get; }
         public NullabilityTestExpr(BoundType type) : base(default) { Type = type; }
     }
+
+    // ================================================================
+    // v0.14 §S4 return-site tests (Calor0273 NullableReturnFromNonNullable).
+    // Return-site sibling of the §S3b bind-time Calor0272 check. Reuses
+    // the same NullabilityChecker.IsPossiblyNullAssignedTo predicate but
+    // fires from BindReturnStatement against the current function's
+    // declared return type. Scope (per D6): scalar STRING only.
+    // ================================================================
+
+    /// <summary>
+    /// A function declared <c>-> string</c> that returns
+    /// <c>Environment.GetEnvironmentVariable</c>'s Annotated string must
+    /// emit Calor0273 at Info severity. This is the return-site analogue
+    /// of the S3b canonical D3 repro on <c>§B{x:string}</c>.
+    /// </summary>
+    [Fact]
+    public void Calor0273_FiresFor_ReturningBcl_NullableString_FromNonNullReturn()
+    {
+        const string source = """
+            §M{m1:S4Repro}
+              §F{f1:GetEnv:pub} () -> string
+                §E{env}
+                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable
+            && d.Severity == DiagnosticSeverity.Info);
+    }
+
+    /// <summary>
+    /// Change the return type to <c>-> ?string</c> — the same
+    /// possibly-null return source is now safe, and Calor0273 must NOT
+    /// fire. This mirrors the S3b <c>:?string</c> target test.
+    /// </summary>
+    [Fact]
+    public void Calor0273_DoesNotFire_When_ReturnType_IsNullableString()
+    {
+        const string source = """
+            §M{m1:S4Ok}
+              §F{f1:GetEnv:pub} () -> ?string
+                §E{env}
+                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    /// <summary>
+    /// A function declared <c>-> string</c> returning a Calor-native
+    /// string literal (<c>STR:"hello"</c>) is provably non-null; the
+    /// literal's BoundType is NotAnnotated. Calor0273 must NOT fire —
+    /// mirrors the equivalent §B{x:string} STR:"..." case from #1055.
+    /// </summary>
+    [Fact]
+    public void Calor0273_DoesNotFire_For_ProvablyNonNull_StringLiteral()
+    {
+        const string source = """
+            §M{m1:S4Literal}
+              §F{f1:Hi:pub} () -> string
+                §R STR:"hello"
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    /// <summary>
+    /// Non-STRING return types are out of scope for S3 (per D6).
+    /// A function <c>-> int</c> returning <c>INT:42</c> must NOT fire
+    /// Calor0273 regardless of source annotation. Regression guard
+    /// against scope creep.
+    /// </summary>
+    [Fact]
+    public void Calor0273_DoesNotFire_For_NonString_Return()
+    {
+        const string source = """
+            §M{m1:S4Int}
+              §F{f1:Answer:pub} () -> int
+                §R INT:42
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    /// <summary>
+    /// Direct-inspection guard: the emitted diagnostic must carry the
+    /// exact Calor0273 code + Info severity, mentioning the source's
+    /// nullability annotation. Ratchets against future refactors that
+    /// keep the count right but change the code or severity.
+    /// </summary>
+    [Fact]
+    public void Calor0273_Diagnostic_Message_MentionsSourceAnnotation()
+    {
+        const string source = """
+            §M{m1:S4Msg}
+              §F{f1:GetEnv:pub} () -> string
+                §E{env}
+                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diag = Assert.Single(diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(DiagnosticSeverity.Info, diag.Severity);
+        Assert.Contains("non-nullable 'string'", diag.Message);
+        Assert.Contains("source annotation", diag.Message);
+    }
+
+    /// <summary>
+    /// Entry-point coverage: return-type context is pushed at every
+    /// function-binding entry point. A method inside a class is bound via
+    /// <c>BindMethod</c>, NOT <c>BindFunction</c>. If the PushReturnTypeContext
+    /// call is dropped from BindMethod, THIS test flips red — otherwise
+    /// the earlier tests only exercise the free-function entry point.
+    /// </summary>
+    [Fact]
+    public void Calor0273_FiresFor_ReturningBcl_NullableString_FromMethod()
+    {
+        const string source = """
+            §M{m1:S4Method}
+              §CL{c1:Bad:pub}
+                §MT{f1:GetEnv:pub} () -> string
+                  §E{env}
+                  §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable
+            && d.Severity == DiagnosticSeverity.Info);
+    }
+
+    // NOTE: The lambda-inherits-enclosing-context claim in the PR body
+    // (BindLambdaExpression intentionally does NOT push its own return-
+    // type context) is not covered by a test here — a proper repro
+    // requires precise §LAM surface syntax that is easier to exercise
+    // via a C#→Calor conversion test than a hand-written §M source.
+    // Tracked as a follow-up.
 }
