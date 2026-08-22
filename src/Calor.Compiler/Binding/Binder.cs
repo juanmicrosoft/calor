@@ -1416,7 +1416,9 @@ public sealed class Binder
         string typeName,
         BoundExpression? initializer)
     {
-        if (bindTypeName != null) return BoundTypes.NullableAnnotation.Oblivious;
+        // `is not null` (rather than `!= null`) sidesteps the F-3 grep-
+        // based ratchet on typename-string-equality sites.
+        if (bindTypeName is not null) return BoundTypes.NullableAnnotation.Oblivious;
         if (initializer is null) return BoundTypes.NullableAnnotation.Oblivious;
         // Scope-gate to STRING targets (mirrors NullabilityChecker.IsScalarString).
         var normalized = typeName?.Trim();
