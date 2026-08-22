@@ -208,9 +208,31 @@ public sealed class Binder
         for (var i = 0; i < args.Count; i++)
         {
             var display = args[i].Type.DisplayString;
-            var trimmed = display.EndsWith("?", StringComparison.Ordinal) && display.Length > 1
-                ? display[..^1]
-                : display;
+            // Nullability markers on the argument are irrelevant for
+            // overload resolution — strip them so the metadata name is
+            // unannotated. Three surface forms to handle:
+            //   - Roslyn suffix "?" (e.g. "string?" from
+            //     GetEnvironmentVariable's return type)
+            //   - Calor surface prefix "?" (e.g. "?string" if a caller
+            //     bypasses ExpandType)
+            //   - Parser-expanded OPTION wrapper (e.g.
+            //     "OPTION[inner=STRING]" from :?string variables)
+            // Review finding M1 from PR #1060: before the OPTION unwrap
+            // and prefix trim, :?string arguments mapped to
+            // Calor.Runtime.Option`1, overload resolution failed, and
+            // Calor0274 silently didn't fire on the highest-value case
+            // (a Calor :?string variable passed into a BCL :string
+            // parameter).
+            var trimmed = display;
+            while (trimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+                   && trimmed.EndsWith("]", StringComparison.Ordinal))
+            {
+                trimmed = trimmed["OPTION[inner=".Length..^1];
+            }
+            if (trimmed.EndsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
+                trimmed = trimmed[..^1];
+            if (trimmed.StartsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
+                trimmed = trimmed[1..];
             var mapped = Effects.EffectEnforcementPass.MapShortTypeNameToFullName(trimmed);
             var t = ctx.TryResolveType(mapped)
                     ?? ctx.TryResolveType(trimmed)
