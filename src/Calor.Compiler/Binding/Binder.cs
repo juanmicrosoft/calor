@@ -762,7 +762,8 @@ public sealed class Binder
         bool isField = false,
         bool isProperty = false,
         bool isStatic = false,
-        ConditionalAlternative? conditionalAlternative = null)
+        ConditionalAlternative? conditionalAlternative = null,
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
     {
         var symbol = new VariableSymbol(
             id,
@@ -778,7 +779,8 @@ public sealed class Binder
             isField,
             isProperty,
             isStatic,
-            conditionalAlternative);
+            conditionalAlternative,
+            nullableAnnotation);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -791,7 +793,8 @@ public sealed class Binder
         ParameterModifier modifier,
         Parsing.TextSpan declarationSpan,
         string kind,
-        ExpressionNode? defaultValue = null)
+        ExpressionNode? defaultValue = null,
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
@@ -802,7 +805,8 @@ public sealed class Binder
             isParameter,
             modifier,
             declarationSpan,
-            defaultValue);
+            defaultValue,
+            nullableAnnotation: nullableAnnotation);
     }
 
     private SymbolId CreateDeclarationId(
@@ -1283,6 +1287,14 @@ public sealed class Binder
             return new BoundBindStatement(bind.Span, rebindTarget, initializer);
         }
 
+        // v0.14 nullability workstream (follow-up to #1057) — capture the
+        // declared nullability on the VariableSymbol so subsequent
+        // BoundVariableExpression reads inherit NotAnnotated for
+        // §B{x:string} and Annotated for §B{x:?string}. Scoped to STRING
+        // targets per §D6; non-STRING targets keep the safe Oblivious
+        // default and land in a follow-on slice.
+        var declaredAnnotation = TryReadDeclaredStringAnnotation(bind.TypeName);
+
         var variable = CreateLocalVariable(
             bind.Name,
             typeName,
@@ -1290,7 +1302,8 @@ public sealed class Binder
             isParameter: false,
             ParameterModifier.None,
             bind.IdentifierSpan,
-            "local");
+            "local",
+            nullableAnnotation: declaredAnnotation);
 
         if (!_scope.TryDeclare(variable))
         {
@@ -1365,6 +1378,19 @@ public sealed class Binder
         BoundTypes.ArrayBoundType a => a.NullableAnnotation.ToString(),
         _ => "unknown",
     };
+
+    // v0.14 nullability workstream — helper for BindBindStatement to keep
+    // the source-count of TypeName string-equality sites flat (F-3 ratchet
+    // in BoundTypeArchitectureTests). Delegates to TryBuildStringTarget so
+    // surface-form parsing (`:string`, `:?string`, `:str`,
+    // `OPTION[inner=STRING]`) stays in one place.
+    private static BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
+    {
+        if (bindTypeName is null) return BoundTypes.NullableAnnotation.Oblivious;
+        return TryBuildStringTarget(bindTypeName, out var target)
+            ? target!.NullableAnnotation
+            : BoundTypes.NullableAnnotation.Oblivious;
+    }
 
     private VariableSymbol? FindRebindTarget(string name)
     {

@@ -611,6 +611,20 @@ public sealed class VariableSymbol : Symbol
     public Visibility Visibility { get; }
     public string? DeclaringTypeName { get; }
 
+    /// <summary>
+    /// v0.14 nullability workstream — declared nullability of the variable's
+    /// type, captured at binding time from the surface syntax (e.g. <c>:string</c>
+    /// vs <c>:?string</c>). Consumed by <see cref="BoundVariableExpression.Type"/>
+    /// so that reads of a declared-non-null local flow the <c>NotAnnotated</c>
+    /// annotation into downstream nullability checks (Calor0272 and siblings).
+    ///
+    /// <para>Defaults to <see cref="BoundTypes.NullableAnnotation.Oblivious"/>
+    /// so pre-existing symbol construction paths keep their conservative
+    /// behavior. S3-scoped: today only STRING-target bind statements populate
+    /// a non-<c>Oblivious</c> value; other targets stay Oblivious per §D6.</para>
+    /// </summary>
+    public BoundTypes.NullableAnnotation NullableAnnotation { get; }
+
     public VariableSymbol(
         SymbolId id,
         string name,
@@ -625,7 +639,8 @@ public sealed class VariableSymbol : Symbol
         bool isField = false,
         bool isProperty = false,
         bool isStatic = false,
-        ConditionalAlternative? conditionalAlternative = null)
+        ConditionalAlternative? conditionalAlternative = null,
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
         : base(id, name, declarationSpan, conditionalAlternative: conditionalAlternative)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -638,6 +653,7 @@ public sealed class VariableSymbol : Symbol
         DefaultValue = defaultValue;
         Visibility = visibility;
         DeclaringTypeName = declaringTypeName;
+        NullableAnnotation = nullableAnnotation;
     }
 
     public VariableSymbol(

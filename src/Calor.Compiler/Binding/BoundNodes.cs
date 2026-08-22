@@ -184,7 +184,86 @@ public sealed class BoundVariableExpression : BoundExpression
             .Select(symbol => TypeIdentity.Canonicalize(symbol.TypeName))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        Type = new NominalBoundType(resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT");
+        var resolvedTypeName = resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT";
+        // v0.14 nullability workstream (follow-up to #1057) — flow the
+        // variable's declared nullability into the reference expression's
+        // type. Without this, §B{r:string} someStringLocal trips Calor0272
+        // because the default Oblivious annotation is treated as
+        // possibly-null (§D3). Scope gate mirrors NullabilityChecker (§D6):
+        // only stamp when the resolved type is a scalar STRING, so
+        // non-STRING targets retain the conservative Oblivious default
+        // until later slices touch them. When resolution disagrees
+        // (resolvedTypes.Length > 1, falling through to "OBJECT"), also
+        // stay Oblivious since the declared annotation no longer maps to
+        // a single ground type.
+        Type = resolvedTypes.Length == 1
+            ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
+            : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
+    }
+
+    // S3 scope (§D6): flow the STRING annotation only. Handles both the
+    // canonical bare STRING form (§B{a:string}) and the parser's expanded
+    // OPTION-of-STRING form (§B{a:?string} → OPTION[inner=STRING]).
+    //
+    // For OPTION-of-STRING the surface DisplayString is preserved as-is
+    // (many callsites read .Type.DisplayString and expect the OPTION
+    // spelling), but the NullableAnnotation is stamped Annotated so
+    // NullabilityChecker.GetAnnotation and Binder.DescribeAnnotation
+    // observe the declared nullability. This is deliberately narrow —
+    // downstream Option-shaped consumers keep their existing behavior;
+    // only the annotation channel changes.
+    //
+    // Non-STRING and non-OPTION-of-STRING targets keep the conservative
+    // Oblivious default until later slices touch them.
+    private static NominalBoundType BuildStringAnnotatedTypeOrDefault(
+        VariableSymbol variable,
+        string resolvedTypeName)
+    {
+        if (IsScalarStringType(resolvedTypeName))
+        {
+            return new NominalBoundType(resolvedTypeName, variable.NullableAnnotation);
+        }
+
+        if (IsOptionOfStringType(resolvedTypeName)
+            && variable.NullableAnnotation == NullableAnnotation.Annotated)
+        {
+            return new NominalBoundType(resolvedTypeName, NullableAnnotation.Annotated);
+        }
+
+        return new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
+    }
+
+    // Kept intentionally in sync with NullabilityChecker.IsScalarString
+    // (see src/Calor.Compiler/Binding/NullabilityChecker.cs) and with the
+    // canonicalized aliases produced by Binder.TryBuildStringTarget.
+    private static bool IsScalarStringType(string typeName) => typeName switch
+    {
+        "STRING" => true,
+        "string" => true,
+        "str" => true,
+        "System.String" => true,
+        _ => false,
+    };
+
+    // Matches the parser's expanded form (OPTION[inner=STRING]) and the
+    // canonicalized generic form (OPTION<STRING>). Kept narrow — only
+    // patterns Binder.TryBuildStringTarget already recognizes.
+    private static bool IsOptionOfStringType(string typeName)
+    {
+        var trimmed = typeName.Trim();
+        if (trimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+            && trimmed.EndsWith("]", StringComparison.Ordinal))
+        {
+            var inner = trimmed["OPTION[inner=".Length..^1];
+            return IsScalarStringType(inner);
+        }
+        if (trimmed.StartsWith("OPTION<", StringComparison.Ordinal)
+            && trimmed.EndsWith(">", StringComparison.Ordinal))
+        {
+            var inner = trimmed["OPTION<".Length..^1];
+            return IsScalarStringType(inner);
+        }
+        return false;
     }
 }
 
