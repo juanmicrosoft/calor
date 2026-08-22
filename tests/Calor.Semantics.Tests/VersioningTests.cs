@@ -35,15 +35,22 @@ public class VersioningTests
     }
 
     /// <summary>
-    /// Current semantics version is 1.0.0.
+    /// Current semantics version is 2.0.0.
     /// </summary>
+    /// <remarks>
+    /// Ratchet test locking in the version bump from task #14 (v0.14 nullability
+    /// S5 precursor). Any future bump must update this test in the same PR — this
+    /// mirrors the allowlist/ratchet discipline used by prior precursor PRs
+    /// (e.g., #1049 F-1 corpus baseline, #1051 NullabilityChecker allowlist).
+    /// See <c>docs/plans/v0.14-nullability-enforcement-scoping.md</c> D7.
+    /// </remarks>
     [Fact]
-    public void CurrentVersion_Is_1_0_0()
+    public void CurrentVersion_Is_2_0_0()
     {
-        Assert.Equal(1, SemanticsVersion.Major);
+        Assert.Equal(2, SemanticsVersion.Major);
         Assert.Equal(0, SemanticsVersion.Minor);
         Assert.Equal(0, SemanticsVersion.Patch);
-        Assert.Equal("1.0.0", SemanticsVersion.VersionString);
+        Assert.Equal("2.0.0", SemanticsVersion.VersionString);
     }
 
     /// <summary>
@@ -52,15 +59,17 @@ public class VersioningTests
     [Fact]
     public void CompatibleVersions_CorrectlyIdentified()
     {
-        // All 1.0.x versions are compatible
+        // All 2.0.x versions are compatible with a 2.0.x compiler
+        Assert.Equal(VersionCompatibility.Compatible,
+            SemanticsVersion.CheckCompatibility(new Version(2, 0, 0)));
+        Assert.Equal(VersionCompatibility.Compatible,
+            SemanticsVersion.CheckCompatibility(new Version(2, 0, 1)));
+        Assert.Equal(VersionCompatibility.Compatible,
+            SemanticsVersion.CheckCompatibility(new Version(2, 0, 99)));
+
+        // Older major (1.x, 0.x) is accepted (backward compatible per CheckCompatibility)
         Assert.Equal(VersionCompatibility.Compatible,
             SemanticsVersion.CheckCompatibility(new Version(1, 0, 0)));
-        Assert.Equal(VersionCompatibility.Compatible,
-            SemanticsVersion.CheckCompatibility(new Version(1, 0, 1)));
-        Assert.Equal(VersionCompatibility.Compatible,
-            SemanticsVersion.CheckCompatibility(new Version(1, 0, 99)));
-
-        // 0.x versions are also compatible (older)
         Assert.Equal(VersionCompatibility.Compatible,
             SemanticsVersion.CheckCompatibility(new Version(0, 9, 0)));
     }
@@ -81,7 +90,7 @@ public class VersioningTests
     [Fact]
     public void VersionString_Parsing()
     {
-        var result = SemanticsVersion.CheckCompatibility("1.0.0");
+        var result = SemanticsVersion.CheckCompatibility("2.0.0");
         Assert.NotNull(result);
         Assert.Equal(VersionCompatibility.Compatible, result.Value);
 
@@ -96,18 +105,18 @@ public class VersioningTests
     [Fact]
     public void MinorVersionIncrement_ForwardCompatible()
     {
-        // Code written for 1.0.0 can run on 1.1.0 (compatible)
-        // But 1.1.0 code on 1.0.0 compiler is PossiblyIncompatible
+        // Code written for 2.0.0 can run on 2.1.0 (compatible)
+        // But 2.1.0 code on 2.0.0 compiler is PossiblyIncompatible
 
         // Older code on newer compiler
         Assert.Equal(VersionCompatibility.Compatible,
-            SemanticsVersion.CheckCompatibility(new Version(1, 0, 0)));
+            SemanticsVersion.CheckCompatibility(new Version(2, 0, 0)));
 
         // Newer code on this compiler (if minor is 0)
         if (SemanticsVersion.Minor == 0)
         {
             Assert.Equal(VersionCompatibility.PossiblyIncompatible,
-                SemanticsVersion.CheckCompatibility(new Version(1, 1, 0)));
+                SemanticsVersion.CheckCompatibility(new Version(SemanticsVersion.Major, 1, 0)));
         }
     }
 
@@ -117,16 +126,47 @@ public class VersioningTests
     [Fact]
     public void MajorVersionChange_Breaking()
     {
-        // Version 2.0.0 is incompatible with 1.x compiler
+        // Version (Major+1).0.0 is incompatible with this compiler
         Assert.Equal(VersionCompatibility.Incompatible,
-            SemanticsVersion.CheckCompatibility(new Version(2, 0, 0)));
+            SemanticsVersion.CheckCompatibility(new Version(SemanticsVersion.Major + 1, 0, 0)));
 
-        // Any 2.x version
+        // Any (Major+1).x version
         Assert.Equal(VersionCompatibility.Incompatible,
-            SemanticsVersion.CheckCompatibility(new Version(2, 5, 0)));
+            SemanticsVersion.CheckCompatibility(new Version(SemanticsVersion.Major + 1, 5, 0)));
 
-        // Future versions
+        // Far-future versions
         Assert.Equal(VersionCompatibility.Incompatible,
             SemanticsVersion.CheckCompatibility(new Version(99, 0, 0)));
+    }
+
+    /// <summary>
+    /// Task #14 ratchet: SemanticsVersion.Major must be exactly 2, unblocking the
+    /// v0.14 nullability S5 severity flip (Calor0272/0273/0274 → Error).
+    /// </summary>
+    /// <remarks>
+    /// If this test fails because Major moved past 2, the S5 severity-flip gate
+    /// (<c>SemanticsVersion.Major &gt;= 2</c>) still holds — but the ratchet must
+    /// be updated in the PR performing the bump. Locking to an exact value (not
+    /// <c>&gt;= 2</c>) forces a deliberate PR-level acknowledgement of every
+    /// semantics-version movement, matching prior allowlist/precursor discipline.
+    /// </remarks>
+    [Fact]
+    public void SemanticsVersion_Major_RatchetAt_2()
+    {
+        Assert.Equal(2, SemanticsVersion.Major);
+    }
+
+    /// <summary>
+    /// Task #14 ratchet: The S5 severity-flip gate predicate
+    /// (<c>SemanticsVersion.Major &gt;= 2</c>) is now true. When S5 lands, its
+    /// gated Error emission for Calor0272/0273/0274 becomes active.
+    /// </summary>
+    [Fact]
+    public void SemanticsVersion_S5_SeverityGate_IsOpen()
+    {
+        // The gate S5 will consult. This test observes that Task #14's bump
+        // actually satisfies the S5 precondition documented in D7 / F-3 of
+        // docs/plans/v0.14-nullability-enforcement-scoping.md.
+        Assert.True(SemanticsVersion.Major >= 2);
     }
 }
