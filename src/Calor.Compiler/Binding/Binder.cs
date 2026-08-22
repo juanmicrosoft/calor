@@ -158,12 +158,19 @@ public sealed class Binder
 
     /// <summary>
     /// Best-effort BCL-shaped call resolution via MetadataBinder. Returns
-    /// the annotated NominalBoundType for the resolved return type, or null
-    /// when the receiver is not BCL-shaped, MetadataBinder is unavailable,
-    /// or resolution fails. Additive: never subtracts from Binder's own
-    /// string-based resolve.
+    /// both the annotated return type and the annotated parameter types
+    /// (return type in <c>Return</c>, parameters in <c>Parameters</c>, plus
+    /// the resolved Roslyn <c>ParameterNames</c>), or null when the receiver
+    /// is not BCL-shaped, MetadataBinder is unavailable, or resolution
+    /// fails. Additive: never subtracts from Binder's own string-based
+    /// resolve.
+    ///
+    /// <para>v0.14 §S4: parameter annotations feed the Calor0274 call-site
+    /// check in <see cref="BindCallExpression"/>. §S3b previously returned
+    /// only the return type; the parameter list is the incremental extension
+    /// this slice needs.</para>
     /// </summary>
-    private BoundTypes.NominalBoundType? TryResolveBclReturnType(string callTarget, IReadOnlyList<BoundExpression> args)
+    private BclCallResolution? TryResolveBclCall(string callTarget, IReadOnlyList<BoundExpression> args)
     {
         // BCL-shape heuristic: receiver contains at least one dot AND starts
         // with System./Microsoft. or a capitalized identifier followed by a dot.
@@ -187,19 +194,51 @@ public sealed class Binder
         if (receiverType is null) return null;
 
         // Argument types: use each BoundExpression's Type.DisplayString to
-        // find a Roslyn type. Falling back to System.Object when unknown so
-        // MetadataBinder can at least attempt overload resolution.
+        // find a Roslyn type. The Calor short names (STRING/INT/BOOL/…) are
+        // mapped to their BCL equivalents (System.String/System.Int32/…) via
+        // EffectEnforcementPass.MapShortTypeNameToFullName — otherwise
+        // GetTypeByMetadataName ("STRING") returns null and overload
+        // resolution silently degrades to System.Object placeholders. A
+        // trailing '?' (Roslyn's Annotated display, e.g. "string?" from
+        // GetEnvironmentVariable's return type) is trimmed before mapping —
+        // the metadata name is unannotated. Falling back to System.Object
+        // when unknown so MetadataBinder can at least attempt overload
+        // resolution.
         var metaArgs = new Metadata.MetadataArgument[args.Count];
         for (var i = 0; i < args.Count; i++)
         {
-            var t = ctx.TryResolveType(args[i].Type.DisplayString) ?? ctx.TryResolveType("System.Object");
+            var display = args[i].Type.DisplayString;
+            var trimmed = display.EndsWith("?", StringComparison.Ordinal) && display.Length > 1
+                ? display[..^1]
+                : display;
+            var mapped = Effects.EffectEnforcementPass.MapShortTypeNameToFullName(trimmed);
+            var t = ctx.TryResolveType(mapped)
+                    ?? ctx.TryResolveType(trimmed)
+                    ?? ctx.TryResolveType("System.Object");
             if (t is null) return null;
             metaArgs[i] = new Metadata.MetadataArgument(t);
         }
 
         var result = binder.ResolveCall(receiverType, methodName, metaArgs);
-        return result.GetReturnBoundType();
+        if (!result.IsResolved) return null;
+
+        var returnType = result.GetReturnBoundType();
+        var paramTypes = result.GetParameterBoundTypes();
+        var paramNames = result.Symbol!.Parameters.Select(p => p.Name).ToArray();
+        return new BclCallResolution(returnType, paramTypes, paramNames);
     }
+
+    /// <summary>
+    /// v0.14 §S4 helper — the aggregate of a resolved BCL call's annotated
+    /// return type plus its resolved parameter types (each annotated) and
+    /// parameter names. Return-side flows to
+    /// <c>BoundCallExpression.Type</c>; parameter-side feeds the Calor0274
+    /// argument-nullability check.
+    /// </summary>
+    private readonly record struct BclCallResolution(
+        BoundTypes.NominalBoundType? Return,
+        IReadOnlyList<BoundTypes.NominalBoundType> Parameters,
+        IReadOnlyList<string> ParameterNames);
 
     private IDisposable PushScope(Scope newScope)
     {
@@ -1391,6 +1430,42 @@ public sealed class Binder
         return true;
     }
 
+    /// <summary>
+    /// v0.14 §S4 helper — reshapes a resolved callee parameter's
+    /// NominalBoundType into the target the <see cref="NullabilityChecker"/>
+    /// consumes for scalar STRING checks. Returns null when the parameter
+    /// is NOT a scalar STRING (out of scope per D6: arrays, generics,
+    /// user reference types) OR when the parameter is already declared
+    /// nullable (:?string — accepting null is by design). Callers use
+    /// null as "skip this argument, do not fire Calor0274".
+    /// </summary>
+    private static BoundTypes.NominalBoundType? TryBuildScalarStringTarget(BoundTypes.NominalBoundType parameterType)
+    {
+        if (parameterType is null) return null;
+
+        // Roslyn STRING types round-trip through NominalBoundType as either
+        // "System.String" (fully-qualified) or "string" (short display).
+        // Match both — NullabilityChecker.IsScalarString also accepts either,
+        // but we build the target with the canonical "STRING" spelling to
+        // mirror the S3 bind-side helper.
+        var isScalarString = parameterType.QualifiedName switch
+        {
+            "STRING" => true,
+            "string" => true,
+            "str" => true,
+            "System.String" => true,
+            _ => false,
+        };
+        if (!isScalarString) return null;
+
+        // Parameter already declared nullable — accepting null is intended.
+        if (parameterType.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) return null;
+
+        return new BoundTypes.NominalBoundType(
+            "STRING",
+            BoundTypes.NullableAnnotation.NotAnnotated);
+    }
+
     private static string DescribeAnnotation(BoundExpression source) => source.Type switch
     {
         BoundTypes.NominalBoundType n => n.NullableAnnotation.ToString(),
@@ -2534,8 +2609,42 @@ public sealed class Binder
 
         // v0.14 §S3b: enrich BCL-shaped calls with MetadataBinder-resolved
         // Roslyn NullableAnnotation on the return type. Additive only —
-        // Binder's own string-based ResolveCall above still runs.
-        var annotatedReturn = TryResolveBclReturnType(callExpr.Target, args);
+        // Binder's own string-based ResolveCall above still runs. §S4
+        // additionally consumes the parameter-side annotations from the same
+        // resolution to fire Calor0274 for possibly-null strings passed into
+        // non-nullable :string parameters.
+        var bclResolution = TryResolveBclCall(callExpr.Target, args);
+        var annotatedReturn = bclResolution?.Return;
+
+        // v0.14 §S4 nullability check (issue #875, D2 predicate at the
+        // call-site boundary). Scoped to scalar STRING parameters per D6 —
+        // arrays / generics / user reference types land in a follow-on
+        // slice. BCL-only for now (mirrors S3b's System.*/Microsoft.*
+        // narrowing): the parameter-side annotation flow requires a
+        // resolved Roslyn IMethodSymbol, and non-BCL Calor callees do not
+        // yet carry annotated parameter BoundTypes.
+        if (bclResolution is { } bcl)
+        {
+            var paramTypes = bcl.Parameters;
+            var paramNames = bcl.ParameterNames;
+            for (var i = 0; i < args.Count && i < paramTypes.Count; i++)
+            {
+                var paramType = paramTypes[i];
+                var stringTarget = TryBuildScalarStringTarget(paramType);
+                if (stringTarget is null) continue;
+                if (!NullabilityChecker.IsPossiblyNullAssignedTo(args[i], stringTarget)) continue;
+
+                var paramName = i < paramNames.Count && !string.IsNullOrEmpty(paramNames[i])
+                    ? paramNames[i]
+                    : $"arg{i}";
+                _diagnostics.ReportInfo(
+                    args[i].Span,
+                    DiagnosticCode.NullableArgumentToNonNullableParameter,
+                    $"Argument to parameter '{paramName}' declares non-nullable 'string' " +
+                    $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
+                    "Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.");
+            }
+        }
 
         return new BoundCallExpression(
             callExpr.Span,
