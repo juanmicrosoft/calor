@@ -634,4 +634,36 @@ public class NullabilityIntegrationTests
         Assert.Contains("non-nullable 'string'", diag.Message);
         Assert.Contains("source annotation", diag.Message);
     }
+
+    /// <summary>
+    /// Entry-point coverage: return-type context is pushed at every
+    /// function-binding entry point. A method inside a class is bound via
+    /// <c>BindMethod</c>, NOT <c>BindFunction</c>. If the PushReturnTypeContext
+    /// call is dropped from BindMethod, THIS test flips red — otherwise
+    /// the earlier tests only exercise the free-function entry point.
+    /// </summary>
+    [Fact]
+    public void Calor0273_FiresFor_ReturningBcl_NullableString_FromMethod()
+    {
+        const string source = """
+            §M{m1:S4Method}
+              §CL{c1:Bad:pub}
+                §MT{f1:GetEnv:pub} () -> string
+                  §E{env}
+                  §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable
+            && d.Severity == DiagnosticSeverity.Info);
+    }
+
+    // NOTE: The lambda-inherits-enclosing-context claim in the PR body
+    // (BindLambdaExpression intentionally does NOT push its own return-
+    // type context) is not covered by a test here — a proper repro
+    // requires precise §LAM surface syntax that is easier to exercise
+    // via a C#→Calor conversion test than a hand-written §M source.
+    // Tracked as a follow-up.
 }
