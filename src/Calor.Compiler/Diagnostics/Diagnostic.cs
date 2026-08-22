@@ -302,6 +302,20 @@ public static class DiagnosticCode
     /// </summary>
     public const string NullableToNonNullableBinding = "Calor0272";
 
+    /// <summary>
+    /// Info (S4 of v0.14 nullability workstream; promotes to Error at S5).
+    /// A function declared with a non-nullable <c>string</c> return type
+    /// returned a value whose nullability annotation is Annotated (declared
+    /// possibly-null) or Oblivious (unannotated third-party surface, treated
+    /// conservatively as possibly-null per D3). Either change the return
+    /// type to <c>?string</c> or add an explicit non-null check at the
+    /// interop boundary. Reuses the same <see cref="NullabilityChecker"/>
+    /// predicate as <see cref="NullableToNonNullableBinding"/> (Calor0272);
+    /// only scalar STRING return types are in-scope for S3 (per D6).
+    /// See docs/plans/v0.14-nullability-enforcement-scoping.md §S4 / D2.
+    /// </summary>
+    public const string NullableReturnFromNonNullable = "Calor0273";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

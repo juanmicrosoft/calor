@@ -114,6 +114,19 @@ public sealed class Binder
     /// </summary>
     private Metadata.MetadataBinder? _metadataBinder;
 
+    /// <summary>
+    /// v0.14 §S4 (nullability workstream / issue #875) — declared return
+    /// type of the currently-binding function/method/accessor, or null when
+    /// we're not inside a function body. Read by <see cref="BindReturnStatement"/>
+    /// to feed the same <see cref="NullabilityChecker.IsPossiblyNullAssignedTo"/>
+    /// predicate S3b uses at <c>§B</c> sites. Set via
+    /// <see cref="PushReturnTypeContext"/> at every function-binding entry
+    /// point (BindFunction / BindMethod / BindConstructor / BindPropertyAccessor
+    /// / BindOperator / BindIndexerAccessor). Lambdas don't set this — their
+    /// return type is inferred, not declared.
+    /// </summary>
+    private string? _currentFunctionReturnType;
+
     public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
@@ -242,6 +255,29 @@ public sealed class Binder
         {
             _binder._declarationContext = _previousContext;
         }
+    }
+
+    /// <summary>
+    /// v0.14 §S4 — set <see cref="_currentFunctionReturnType"/> for the
+    /// scope of a function/method/accessor body, restoring the previous
+    /// value on dispose. Nested lambdas keep their enclosing function's
+    /// return-type context intact (BindLambdaExpression does not push);
+    /// yield-return statements share the same context by design (they still
+    /// contribute to the enclosing function's return-type contract).
+    /// </summary>
+    private IDisposable PushReturnTypeContext(string? returnTypeName)
+    {
+        var previous = _currentFunctionReturnType;
+        _currentFunctionReturnType = returnTypeName;
+        return new ReturnTypeContextRestorer(this, previous);
+    }
+
+    private sealed class ReturnTypeContextRestorer : IDisposable
+    {
+        private readonly Binder _binder;
+        private readonly string? _previous;
+        public ReturnTypeContextRestorer(Binder binder, string? previous) { _binder = binder; _previous = previous; }
+        public void Dispose() => _binder._currentFunctionReturnType = _previous;
     }
 
     public BoundModule Bind(ModuleNode module)
@@ -895,6 +931,8 @@ public sealed class Binder
         using var _ = PushScope(functionScope);
         var functionSymbol = _functionSymbols[func];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
+        // v0.14 §S4 — expose the declared return type to BindReturnStatement.
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
         var previousNamespaceIdentity = _currentNamespaceIdentity;
         _currentNamespaceIdentity = func.NamespaceIdentity;
 
@@ -1071,6 +1109,29 @@ public sealed class Binder
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
     {
         var expr = ret.Expression != null ? BindExpression(ret.Expression) : null;
+
+        // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
+        // sibling of the §S3b BindBindStatement check. Fires when the current
+        // function's declared return type is a non-nullable :string / :str
+        // and the returned expression's BoundType.NullableAnnotation is
+        // Annotated or Oblivious (per D3, Oblivious is treated conservatively
+        // as possibly-null). Same TryBuildStringTarget filter — only scalar
+        // STRING return types are in-scope for S3 (per D6); non-string
+        // returns silently pass. Info severity in Phase A — promotes to
+        // Error at S5 gated on SemanticsVersion.Major>=2.
+        if (expr != null
+            && _currentFunctionReturnType != null
+            && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
+            && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
+        {
+            _diagnostics.ReportInfo(
+                expr.Span,
+                DiagnosticCode.NullableReturnFromNonNullable,
+                "Return declares non-nullable 'string' but the returned value may be null " +
+                $"(source annotation: '{DescribeAnnotation(expr)}'). " +
+                "Change the return type to '?string' or add an explicit non-null check at the interop boundary.");
+        }
+
         return new BoundReturnStatement(ret.Span, expr);
     }
 
@@ -3675,6 +3736,8 @@ public sealed class Binder
         using var _c = PushStaticContext(method.IsStatic);
         var functionSymbol = _functionSymbols[method];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
+        // v0.14 §S4 — expose the declared return type to BindReturnStatement.
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
 
         DeclareParameters(functionSymbol.Parameters, method.Parameters);
         var boundBody = BindStatements(method.Body);
@@ -3690,6 +3753,9 @@ public sealed class Binder
         using var _c = PushStaticContext(ctor.IsStatic);
         var functionSymbol = _functionSymbols[ctor];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
+        // v0.14 §S4 — ctors return VOID; TryBuildStringTarget filters them out
+        // in BindReturnStatement, but push for consistency + resetting outer ctx.
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
 
         DeclareParameters(functionSymbol.Parameters, ctor.Parameters);
 
@@ -3775,6 +3841,8 @@ public sealed class Binder
             containingTypeName: className,
             definitionSpan: accessor.Span);
         TrackSymbol(functionSymbol);
+        // v0.14 §S4 — property getters that return :string flow through here.
+        using var _returnCtx = PushReturnTypeContext(returnType);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(), memberKind, className);
@@ -3808,6 +3876,8 @@ public sealed class Binder
             containingTypeName: className,
             definitionSpan: op.Span);
         TrackSymbol(functionSymbol);
+        // v0.14 §S4 — operator overloads with a declared return type.
+        using var _returnCtx = PushReturnTypeContext(returnType);
         var boundBody = BindStatements(op.Body);
         // OperatorOverloadNode has no Effects field — mark as unknown
         var declaredEffects = new List<string> { "*:*" };
@@ -3859,6 +3929,8 @@ public sealed class Binder
             containingTypeName: className,
             definitionSpan: accessor.Span);
         TrackSymbol(functionSymbol);
+        // v0.14 §S4 — indexer getters that return :string flow through here.
+        using var _returnCtx = PushReturnTypeContext(returnType);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(), memberKind, className);
