@@ -2128,7 +2128,18 @@ public sealed class Binder
             {
                 ["Operation"] = operation.Operation,
                 ["ComparisonMode"] = operation.ComparisonMode,
-            });
+            },
+            // v0.14 nullability (#1056): the string ops that produce a
+            // STRING result — Substring, SubstringFrom, Trim, ToUpper,
+            // ToLower, Replace, PadLeft, PadRight, Insert, Remove, Format,
+            // Join, Concat, RegexReplace — are provably non-null per BCL
+            // contract. StringOp.ToString (object.ToString) is technically
+            // string? per modern BCL and is a known false-negative risk,
+            // but overrides returning null are vanishingly rare in
+            // practice; leave that as a follow-up if it surfaces.
+            typeAnnotation: resultType == "STRING"
+                ? BoundTypes.NullableAnnotation.NotAnnotated
+                : BoundTypes.NullableAnnotation.Oblivious);
     }
 
     private BoundExpression BindCharOperation(CharOperationNode operation)
@@ -2159,7 +2170,12 @@ public sealed class Binder
             operation,
             resultType,
             BindExpressions(operation.Arguments),
-            new Dictionary<string, object?> { ["Operation"] = operation.Operation });
+            new Dictionary<string, object?> { ["Operation"] = operation.Operation },
+            // v0.14 nullability (#1056): StringBuilder.ToString() returns
+            // non-null per BCL contract.
+            typeAnnotation: resultType == "STRING"
+                ? BoundTypes.NullableAnnotation.NotAnnotated
+                : BoundTypes.NullableAnnotation.Oblivious);
     }
 
     private BoundExpression BindStackAlloc(StackAllocNode stackAlloc)
@@ -2956,7 +2972,8 @@ public sealed class Binder
         string typeName,
         IReadOnlyList<BoundExpression>? children = null,
         IReadOnlyDictionary<string, object?>? metadata = null,
-        IReadOnlyList<BoundExpression>? deferredChildren = null)
+        IReadOnlyList<BoundExpression>? deferredChildren = null,
+        BoundTypes.NullableAnnotation typeAnnotation = BoundTypes.NullableAnnotation.Oblivious)
     {
         return new BoundStructuralExpression(
             expression.Span,
@@ -2964,7 +2981,8 @@ public sealed class Binder
             typeName,
             children,
             metadata,
-            deferredChildren);
+            deferredChildren,
+            typeAnnotation);
     }
 
     private BoundUnsupportedExpression BindUnsupportedExpression(
