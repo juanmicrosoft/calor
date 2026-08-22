@@ -7,7 +7,14 @@ namespace Calor.Compiler;
 public static class SemanticsVersion
 {
     /// <summary>Major version - breaking semantic changes.</summary>
-    public const int Major = 1;
+    /// <remarks>
+    /// Bumped 1 → 2 as the v0.14 nullability workstream precursor (task #14).
+    /// Unblocks S5 severity flip: Calor0272/0273/0274 emit at Error when
+    /// <c>SemanticsVersion.Major &gt;= 2</c> (or no <c>§SEMVER</c> directive).
+    /// See <c>docs/plans/v0.14-nullability-enforcement-scoping.md</c> D7/F-3
+    /// and <c>docs/plans/v0.14-metadata-binding-scoping.md</c> F-7.
+    /// </remarks>
+    public const int Major = 2;
 
     /// <summary>Minor version - backward-compatible semantic additions.</summary>
     public const int Minor = 0;

@@ -75,7 +75,7 @@
       "path": "tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 37,
+      "expectedTotal": 39,
       "expectedSkipped": 0
     },
     {

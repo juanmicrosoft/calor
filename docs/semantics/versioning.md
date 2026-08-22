@@ -1,6 +1,6 @@
 # Calor Semantics Versioning Specification
 
-Version: 1.0.0
+Version: 2.0.0
 
 This document specifies how Calor semantics are versioned and how version compatibility is managed.
 
@@ -40,9 +40,13 @@ MAJOR.MINOR.PATCH
 
 ## 2. Current Version
 
-**Semantics Version: 1.0.0**
+**Semantics Version: 2.0.0**
 
-This is the initial formal semantics version for Calor.
+Bumped from `1.0.0` as the v0.14 nullability workstream precursor (task #14) —
+required to unlock the S5 severity flip that promotes `Calor0272/0273/0274`
+from Info to Error under `SemanticsVersion.Major >= 2`. See
+`docs/plans/v0.14-nullability-enforcement-scoping.md` §D7/F-3 and
+`docs/plans/v0.14-metadata-binding-scoping.md` §F-7.
 
 ---
 
@@ -117,7 +121,7 @@ The compiler checks declared versions against its supported semantics:
 // src/Calor.Compiler/SemanticsVersion.cs
 public static class SemanticsVersion
 {
-    public const int Major = 1;
+    public const int Major = 2;
     public const int Minor = 0;
     public const int Patch = 0;
     public static readonly Version Current = new(Major, Minor, Patch);
@@ -157,7 +161,18 @@ public static void CheckSemanticsVersion(Version declared, Version compiler)
 
 ## 6. Version History
 
-### Version 1.0.0 (Current)
+### Version 2.0.0 (Current)
+
+Precursor bump for the v0.14 nullability enforcement workstream (task #14).
+No semantic-behavior change ships with this bump on its own — it unblocks the
+S5 severity flip (`Calor0272/0273/0274` Info → Error) that lands in the
+following PR, gated on `SemanticsVersion.Major >= 2`.
+
+Retains all `1.0.0` semantics; the `CheckCompatibility` predicate now maps
+`§SEMVER{1.x}`-declared files to `Compatible` (older-major is accepted), while
+`§SEMVER{3.x}` and beyond map to `Incompatible`.
+
+### Version 1.0.0
 
 Initial formal semantics specification including:
 
@@ -258,7 +273,7 @@ namespace Calor.Compiler;
 public static class SemanticsVersion
 {
     /// <summary>Major version - breaking changes.</summary>
-    public const int Major = 1;
+    public const int Major = 2;
 
     /// <summary>Minor version - backward-compatible additions.</summary>
     public const int Minor = 0;
