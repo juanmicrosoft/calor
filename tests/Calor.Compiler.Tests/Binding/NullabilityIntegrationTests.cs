@@ -1238,6 +1238,50 @@ public class NullabilityIntegrationTests
     }
 
     /// <summary>
+    /// Task #3 — end-to-end binder-path guard: a §EACH with an
+    /// explicit <c>:string</c> element type registers a foreach loop
+    /// variable whose VariableSymbol carries NotAnnotated. This
+    /// complements the direct-inspection tests above by proving the
+    /// annotation flow is threaded through <c>BindForeachStatement</c>
+    /// (not just <c>VariableSymbol</c>'s constructor).
+    /// </summary>
+    [Fact]
+    public void ForeachLoopVariable_BinderPath_Inherits_NotAnnotated_From_NonNullString()
+    {
+        const string source = """
+            §M{m1:ForeachStr}
+              §F{f1:Use:pub} () -> void
+                §EACH{e1:s:string} STR:"unused"
+                  §P s
+                §/EACH{e1}
+            """;
+
+        var (module, _) = BindSource(source);
+        var loopVar = FindFirstForeachLoopVariable(module);
+        Assert.Equal(NullableAnnotation.NotAnnotated, loopVar.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// Task #3 — mirror of the NotAnnotated case: <c>:?string</c>
+    /// element type flows Annotated.
+    /// </summary>
+    [Fact]
+    public void ForeachLoopVariable_BinderPath_Inherits_Annotated_From_NullableString()
+    {
+        const string source = """
+            §M{m1:ForeachNullStr}
+              §F{f1:Use:pub} () -> void
+                §EACH{e1:s:?string} STR:"unused"
+                  §P s
+                §/EACH{e1}
+            """;
+
+        var (module, _) = BindSource(source);
+        var loopVar = FindFirstForeachLoopVariable(module);
+        Assert.Equal(NullableAnnotation.Annotated, loopVar.NullableAnnotation);
+    }
+
+    /// <summary>
     /// Task #3 — non-STRING parameters must keep Oblivious (§D6 scope
     /// guard). A <c>:int</c> parameter must not have its declared
     /// nullability spuriously promoted.
@@ -1309,5 +1353,18 @@ public class NullabilityIntegrationTests
                 return fn.Symbol.Parameters[0];
         }
         throw new Xunit.Sdk.XunitException("Could not find function parameter in bound module.");
+    }
+
+    private static VariableSymbol FindFirstForeachLoopVariable(BoundModule module)
+    {
+        foreach (var fn in module.Functions)
+        {
+            foreach (var statement in fn.Body)
+            {
+                if (statement is BoundForeachStatement fe)
+                    return fe.LoopVariable;
+            }
+        }
+        throw new Xunit.Sdk.XunitException("Could not find foreach loop variable in bound module.");
     }
 }
