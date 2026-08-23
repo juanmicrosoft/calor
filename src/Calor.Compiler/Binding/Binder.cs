@@ -528,7 +528,13 @@ public sealed class Binder
                 declaringTypeName: qualifiedClassName,
                 isField: true,
                 isStatic: field.IsStatic,
-                conditionalAlternative: conditionalAlternative);
+                conditionalAlternative: conditionalAlternative,
+                // v0.14 nullability workstream (task #3) — inherit declared
+                // STRING nullability on fields so subsequent references
+                // through BoundVariableExpression carry the correct
+                // annotation. Scoped to STRING per §D6; non-STRING keeps
+                // the safe Oblivious default.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(field.TypeName));
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -554,7 +560,12 @@ public sealed class Binder
                 declaringTypeName: qualifiedClassName,
                 isProperty: true,
                 isStatic: property.IsStatic,
-                conditionalAlternative: conditionalAlternative);
+                conditionalAlternative: conditionalAlternative,
+                // v0.14 nullability workstream (task #3) — inherit declared
+                // STRING nullability on properties so subsequent references
+                // through BoundVariableExpression carry the correct
+                // annotation. Scoped to STRING per §D6.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(property.TypeName));
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -792,7 +803,17 @@ public sealed class Binder
                 isParameter: true,
                 parameter.Modifier,
                 parameter.IdentifierSpan,
-                parameter.DefaultValue))
+                parameter.DefaultValue,
+                // v0.14 nullability workstream (task #3) — inherit the
+                // declared STRING nullability on function parameters so
+                // that BoundVariableExpression reads of the parameter
+                // flow the correct annotation into downstream checks
+                // (unblocks the pin test
+                // Calor0272_StillFires_For_ParameterReference_KnownLimitation).
+                // parameter.TypeName is already ExpandType'd by the
+                // parser (?string → OPTION[inner=STRING]); the helper
+                // handles both forms. Scoped to STRING per §D6.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName)))
             .ToArray();
         var symbol = new FunctionSymbol(
             id,
@@ -1050,7 +1071,12 @@ public sealed class Binder
                 parameter.Modifier,
                 parameter.IdentifierSpan,
                 "parameter",
-                parameter.DefaultValue);
+                parameter.DefaultValue,
+                // v0.14 nullability workstream (task #3) — mirror the
+                // top-level function-parameter site so constructor /
+                // operator / indexer / etc. parameters also inherit
+                // their declared STRING nullability. Scoped per §D6.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName));
             if (!_scope.TryDeclare(symbol))
             {
                 var suggestedName = GenerateUniqueName(parameter.Name);
@@ -2084,7 +2110,11 @@ public sealed class Binder
                 isParameter: true,
                 ParameterModifier.None,
                 parameter.IdentifierSpan,
-                "parameter");
+                "parameter",
+                // v0.14 nullability workstream (task #3) — inherit
+                // declared STRING nullability on lambda parameters.
+                // Scoped to STRING per §D6; non-STRING keeps Oblivious.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName));
             if (!_scope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -3639,7 +3669,11 @@ public sealed class Binder
             isParameter: false,
             ParameterModifier.None,
             forEach.VariableSpan,
-            "foreach");
+            "foreach",
+            // v0.14 nullability workstream (task #3) — inherit declared
+            // STRING nullability on foreach loop variables. Scoped to
+            // STRING per §D6; INT/other keep Oblivious.
+            nullableAnnotation: TryReadDeclaredStringAnnotation(variableType));
         _scope.TryDeclare(loopVar);
 
         if (forEach.IndexVariableName != null)
@@ -4029,7 +4063,12 @@ public sealed class Binder
                 isParameter: true,
                 ParameterModifier.None,
                 Parsing.TextSpan.Empty,
-                "parameter");
+                "parameter",
+                // v0.14 nullability workstream (task #3) — the synthetic
+                // `value` parameter of a property setter/initer inherits
+                // the property's declared STRING nullability. Scoped to
+                // STRING per §D6.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(propType));
             _scope.TryDeclare(valueParam);
             parameters.Add(valueParam);
             memberKind = accessor.Kind == PropertyAccessorNode.AccessorKind.Set
@@ -4118,7 +4157,11 @@ public sealed class Binder
                 isParameter: true,
                 ParameterModifier.None,
                 Parsing.TextSpan.Empty,
-                "parameter");
+                "parameter",
+                // v0.14 nullability workstream (task #3) — synthetic
+                // indexer setter `value` parameter inherits the
+                // indexer's declared STRING nullability. Scoped per §D6.
+                nullableAnnotation: TryReadDeclaredStringAnnotation(indexerType));
             _scope.TryDeclare(valueParam);
             parameters.Add(valueParam);
             memberKind = BoundMemberKind.IndexerSetter;
@@ -4164,7 +4207,12 @@ public sealed class Binder
             isParameter: true,
             ParameterModifier.None,
             Parsing.TextSpan.Empty,
-            "parameter");
+            "parameter",
+            // v0.14 nullability workstream (task #3) — synthetic event
+            // add/remove accessor `value` parameter. Delegate types are
+            // not STRING, so the helper returns Oblivious here — kept
+            // for uniformity across all synthetic value-parameter sites.
+            nullableAnnotation: TryReadDeclaredStringAnnotation(delegateType));
         _scope.TryDeclare(valueParam);
         var parameters = new List<VariableSymbol> { valueParam };
 
