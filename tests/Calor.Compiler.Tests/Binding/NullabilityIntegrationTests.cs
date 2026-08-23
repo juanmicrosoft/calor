@@ -1367,4 +1367,164 @@ public class NullabilityIntegrationTests
         }
         throw new Xunit.Sdk.XunitException("Could not find foreach loop variable in bound module.");
     }
+
+    // ================================================================
+    // v0.14 §S5 severity flip — Calor0272/0273/0274 promote from Info
+    // to Error once SemanticsVersion.Major crosses the >=2 gate.
+    // The gate is documented in D7 / F-3 of
+    // docs/plans/v0.14-nullability-enforcement-scoping.md and is
+    // consulted by SemanticsVersion.NullabilitySeverityFor. Task #14
+    // bumped Major to 2, so the emit sites now yield Error by default.
+    // ================================================================
+
+    /// <summary>
+    /// The S5 gate helper returns <see cref="DiagnosticSeverity.Error"/>
+    /// when the effective SemVer.Major is at or past 2. This is the
+    /// precise condition Task #4 introduced; changing the threshold
+    /// silently would demote the three nullability diagnostics.
+    /// </summary>
+    [Fact]
+    public void NullabilitySeverity_S5Gate_Error_At_Major2()
+    {
+        Assert.Equal(DiagnosticSeverity.Error, SemanticsVersion.NullabilitySeverityFor(2));
+        // Ratchet against a future Major bump — anything >= 2 must
+        // remain Error to preserve the S5 contract.
+        Assert.Equal(DiagnosticSeverity.Error, SemanticsVersion.NullabilitySeverityFor(3));
+    }
+
+    /// <summary>
+    /// Legacy-SemVer branch: modules declaring <c>§SEMVER[1.0.0]</c>
+    /// (or any effective Major &lt; 2) must still see the diagnostics
+    /// at <see cref="DiagnosticSeverity.Info"/>. This test guards the
+    /// legacy fall-through the moment the SEMVER directive is threaded
+    /// through the binder in a follow-up slice; today the callers pass
+    /// the compiler's <see cref="SemanticsVersion.Major"/> instead.
+    /// </summary>
+    [Fact]
+    public void NullabilitySeverity_S5Gate_Info_At_LegacyMajor()
+    {
+        Assert.Equal(DiagnosticSeverity.Info, SemanticsVersion.NullabilitySeverityFor(1));
+        Assert.Equal(DiagnosticSeverity.Info, SemanticsVersion.NullabilitySeverityFor(0));
+    }
+
+    /// <summary>
+    /// End-to-end: Calor0272 fires at Error under the current compiler
+    /// <see cref="SemanticsVersion.Major"/> (= 2). Observes the actual
+    /// severity carried on the emitted diagnostic, not just the helper's
+    /// return value — a regression that miswires the emit site (e.g.
+    /// reverts to <c>ReportInfo</c>) would flip THIS test red even if
+    /// the helper stays correct.
+    /// </summary>
+    [Fact]
+    public void S5_Calor0272_IsError_Under_CurrentSemVer()
+    {
+        Assert.True(SemanticsVersion.Major >= 2,
+            "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
+
+        const string source = """
+            §M{m1:S5Bind}
+              §F{f1:Bad:pub} () -> void
+                §E{env}
+                §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diag = Assert.Single(diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
+    }
+
+    /// <summary>
+    /// End-to-end: Calor0273 fires at Error under the current compiler
+    /// <see cref="SemanticsVersion.Major"/> (= 2).
+    /// </summary>
+    [Fact]
+    public void S5_Calor0273_IsError_Under_CurrentSemVer()
+    {
+        Assert.True(SemanticsVersion.Major >= 2,
+            "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
+
+        const string source = """
+            §M{m1:S5Return}
+              §F{f1:GetEnv:pub} () -> string
+                §E{env}
+                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diag = Assert.Single(diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
+    }
+
+    /// <summary>
+    /// End-to-end: Calor0274 fires at Error under the current compiler
+    /// <see cref="SemanticsVersion.Major"/> (= 2).
+    /// </summary>
+    [Fact]
+    public void S5_Calor0274_IsError_Under_CurrentSemVer()
+    {
+        Assert.True(SemanticsVersion.Major >= 2,
+            "This test only exercises the S5 Error branch; if Major reverts below 2 the assertion below is invalid.");
+
+        const string source = """
+            §M{m1:S5Call}
+              §F{f1:Bad:pub} () -> void
+                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diag = Assert.Single(diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
+    }
+
+    /// <summary>
+    /// Symmetry guard: all three diagnostics share the same S5 gate and
+    /// must therefore emit at the same severity end-to-end. If a future
+    /// change accidentally wires one code to a different gate (e.g. a
+    /// literal <see cref="DiagnosticSeverity.Warning"/> at the call
+    /// site), this test flips red. Complements the per-code checks
+    /// above by pinning the invariant across the three sites.
+    /// </summary>
+    [Fact]
+    public void S5_AllThreeCodes_ShareSameGatedSeverity()
+    {
+        const string bindSource = """
+            §M{m1:S5Bind}
+              §F{f1:Bad:pub} () -> void
+                §E{env}
+                §B{bad:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+        const string returnSource = """
+            §M{m1:S5Return}
+              §F{f1:GetEnv:pub} () -> string
+                §E{env}
+                §R §C{System.Environment.GetEnvironmentVariable} §A STR:"MISSING" §/C
+            """;
+        const string callSource = """
+            §M{m1:S5Call}
+              §F{f1:Bad:pub} () -> void
+                §B{contents:string} §C{System.IO.File.ReadAllText} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            """;
+
+        var (_, bindDiags) = BindSource(bindSource);
+        var (_, returnDiags) = BindSource(returnSource);
+        var (_, callDiags) = BindSource(callSource);
+
+        var gated = SemanticsVersion.NullabilitySeverityFor();
+        var bindDiag = Assert.Single(bindDiags.Where(d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        var returnDiag = Assert.Single(returnDiags.Where(d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        var callDiag = Assert.Single(callDiags.Where(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+
+        Assert.Equal(gated, bindDiag.Severity);
+        Assert.Equal(gated, returnDiag.Severity);
+        Assert.Equal(gated, callDiag.Severity);
+    }
 }

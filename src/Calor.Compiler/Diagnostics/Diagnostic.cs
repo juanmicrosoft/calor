@@ -290,7 +290,9 @@ public static class DiagnosticCode
     public const string SignatureResolvedNullableOblivious = "Calor0271";
 
     /// <summary>
-    /// Info (S3 of v0.14 nullability workstream; promotes to Error at S5).
+    /// Severity is <see cref="DiagnosticSeverity.Error"/> when
+    /// <see cref="SemanticsVersion.Major"/> is >= 2 (v0.14 §S5; current default
+    /// post task #14 bump) and <see cref="DiagnosticSeverity.Info"/> otherwise.
     /// A <c>§B{x:string}</c> binding was initialized with a value whose
     /// nullability annotation is Annotated (declared possibly-null) or
     /// Oblivious (unannotated third-party surface, treated conservatively as
@@ -303,7 +305,9 @@ public static class DiagnosticCode
     public const string NullableToNonNullableBinding = "Calor0272";
 
     /// <summary>
-    /// Info (S4 of v0.14 nullability workstream; promotes to Error at S5).
+    /// Severity is <see cref="DiagnosticSeverity.Error"/> when
+    /// <see cref="SemanticsVersion.Major"/> is >= 2 (v0.14 §S5; current default
+    /// post task #14 bump) and <see cref="DiagnosticSeverity.Info"/> otherwise.
     /// A function declared with a non-nullable <c>string</c> return type
     /// returned a value whose nullability annotation is Annotated (declared
     /// possibly-null) or Oblivious (unannotated third-party surface, treated
@@ -317,7 +321,9 @@ public static class DiagnosticCode
     public const string NullableReturnFromNonNullable = "Calor0273";
 
     /// <summary>
-    /// Info (S4 of v0.14 nullability workstream; promotes to Error at S5).
+    /// Severity is <see cref="DiagnosticSeverity.Error"/> when
+    /// <see cref="SemanticsVersion.Major"/> is >= 2 (v0.14 §S5; current default
+    /// post task #14 bump) and <see cref="DiagnosticSeverity.Info"/> otherwise.
     /// A BCL-shaped call site passed an argument whose value may be null
     /// (annotation Annotated or Oblivious) into a callee parameter declared
     /// non-nullable <c>:string</c>. Scoped to scalar STRING parameters
