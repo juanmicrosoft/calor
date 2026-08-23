@@ -216,4 +216,69 @@ public class MetadataBinderNullabilityTests
         // The Roslyn back-ref should be the concrete return type symbol.
         Assert.Equal("String", returnType.RoslynSymbol!.Name);
     }
+
+    // ================================================================
+    // v0.14 §S6 (task #7 Phase-C): array-return BoundType plumbing —
+    // GetReturnBoundTypeEx surfaces IArrayTypeSymbol returns as
+    // ArrayBoundType (element-annotation preserved).
+    // ================================================================
+
+    /// <summary>
+    /// A BCL call whose return type is <c>string[]</c>
+    /// (e.g. <c>Environment.GetCommandLineArgs()</c>) must surface as an
+    /// <see cref="ArrayBoundType"/> whose element is a STRING
+    /// NominalBoundType carrying the Roslyn-declared element annotation.
+    /// Before §S6, GetReturnBoundType flattened arrays into a nominal
+    /// <c>"string[]"</c> and downstream checks lost the element shape.
+    /// </summary>
+    [Fact]
+    public void GetReturnBoundTypeEx_StringArrayReturn_Surfaces_As_ArrayBoundType()
+    {
+        var envType = _ctx.TryResolveType("System.Environment");
+        Assert.NotNull(envType);
+
+        var result = _binder.ResolveCall(envType!, "GetCommandLineArgs",
+            Array.Empty<MetadataArgument>());
+        Assert.True(result.IsResolved);
+
+        var returnType = result.GetReturnBoundTypeEx();
+        var array = Assert.IsType<ArrayBoundType>(returnType);
+        var element = Assert.IsType<NominalBoundType>(array.ElementType);
+        // Roslyn reports "string" (not "System.String") through
+        // ToDisplayString by default. Match the observable spelling.
+        Assert.Equal("string", element.QualifiedName);
+    }
+
+    /// <summary>
+    /// A non-array return still flows through
+    /// <see cref="MetadataBinderResult.GetReturnBoundTypeEx"/> as a
+    /// <see cref="NominalBoundType"/> — S6 widens the return shape
+    /// discretely on arrays only, leaving the scalar path unchanged.
+    /// </summary>
+    [Fact]
+    public void GetReturnBoundTypeEx_ScalarReturn_Surfaces_As_NominalBoundType()
+    {
+        var envType = _ctx.TryResolveType("System.Environment");
+        var stringType = _ctx.TryResolveType("System.String");
+        Assert.NotNull(envType);
+        Assert.NotNull(stringType);
+
+        var result = _binder.ResolveCall(envType!, "GetEnvironmentVariable",
+            new[] { new MetadataArgument(stringType!) });
+        Assert.True(result.IsResolved);
+
+        var returnType = result.GetReturnBoundTypeEx();
+        Assert.IsType<NominalBoundType>(returnType);
+    }
+
+    /// <summary>
+    /// Unresolved results yield null from the extended API too — matches
+    /// <see cref="MetadataBinderResult.GetReturnBoundType"/>'s contract.
+    /// </summary>
+    [Fact]
+    public void GetReturnBoundTypeEx_UnresolvedResult_ReturnsNull()
+    {
+        var unresolved = MetadataBinderResult.CreateUnresolved("no such method");
+        Assert.Null(unresolved.GetReturnBoundTypeEx());
+    }
 }
