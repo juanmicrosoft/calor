@@ -52,7 +52,7 @@ public class NullabilityIntegrationTests
 
         Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullableToNonNullableBinding
-            && d.Severity == DiagnosticSeverity.Info);
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor());
     }
 
     /// <summary>
@@ -689,7 +689,7 @@ public class NullabilityIntegrationTests
 
         Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullableReturnFromNonNullable
-            && d.Severity == DiagnosticSeverity.Info);
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor());
     }
 
     /// <summary>
@@ -775,7 +775,7 @@ public class NullabilityIntegrationTests
 
         var diag = Assert.Single(diagnostics.Where(d =>
             d.Code == DiagnosticCode.NullableReturnFromNonNullable));
-        Assert.Equal(DiagnosticSeverity.Info, diag.Severity);
+        Assert.Equal(SemanticsVersion.NullabilitySeverityFor(), diag.Severity);
         Assert.Contains("non-nullable 'string'", diag.Message);
         Assert.Contains("source annotation", diag.Message);
     }
@@ -802,7 +802,7 @@ public class NullabilityIntegrationTests
 
         Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullableReturnFromNonNullable
-            && d.Severity == DiagnosticSeverity.Info);
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor());
     }
 
     // NOTE: The lambda-inherits-enclosing-context claim in the PR body
@@ -905,7 +905,7 @@ public class NullabilityIntegrationTests
 
         Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
-            && d.Severity == DiagnosticSeverity.Info);
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor());
     }
 
     /// <summary>
@@ -1022,7 +1022,7 @@ public class NullabilityIntegrationTests
 
         Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
-            && d.Severity == DiagnosticSeverity.Info
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor()
             && d.Message.Contains("'path'"));
     }
 
