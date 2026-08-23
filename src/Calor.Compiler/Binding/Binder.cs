@@ -2349,6 +2349,19 @@ public sealed class Binder
             StringOp.RegexMatch => "OBJECT",
             _ => "STRING",
         };
+        // v0.14 nullability (#1056, #1061): the STRING-returning string
+        // ops split into two soundness buckets:
+        //   * Non-null per BCL contract — Substring, SubstringFrom, Trim,
+        //     TrimStart, TrimEnd, ToUpper, ToLower, Replace, PadLeft,
+        //     PadRight, Format, Join, Concat, RegexReplace — stamped
+        //     NotAnnotated.
+        //   * StringOp.ToString maps to object.ToString(), which the
+        //     modern BCL annotates as string? because overrides may
+        //     return null. Stamp Annotated so downstream flow requires
+        //     an explicit null-check / .unwrap before non-null uses.
+        var stringAnnotation = operation.Operation == StringOp.ToString
+            ? BoundTypes.NullableAnnotation.Annotated
+            : BoundTypes.NullableAnnotation.NotAnnotated;
         return Structural(
             operation,
             resultType,
@@ -2358,16 +2371,8 @@ public sealed class Binder
                 ["Operation"] = operation.Operation,
                 ["ComparisonMode"] = operation.ComparisonMode,
             },
-            // v0.14 nullability (#1056): the string ops that produce a
-            // STRING result — Substring, SubstringFrom, Trim, ToUpper,
-            // ToLower, Replace, PadLeft, PadRight, Insert, Remove, Format,
-            // Join, Concat, RegexReplace — are provably non-null per BCL
-            // contract. StringOp.ToString (object.ToString) is technically
-            // string? per modern BCL and is a known false-negative risk,
-            // but overrides returning null are vanishingly rare in
-            // practice; leave that as a follow-up if it surfaces.
             typeAnnotation: resultType == "STRING"
-                ? BoundTypes.NullableAnnotation.NotAnnotated
+                ? stringAnnotation
                 : BoundTypes.NullableAnnotation.Oblivious);
     }
 

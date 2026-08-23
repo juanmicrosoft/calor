@@ -273,6 +273,45 @@ public class NullabilityIntegrationTests
     }
 
     /// <summary>
+    /// v0.14 §S3b task #5 (#1061): <c>StringOp.ToString</c> maps to
+    /// <c>object.ToString()</c>, which the modern BCL annotates as
+    /// <c>string?</c> — overrides may legitimately return null. Sound
+    /// analysis stamps the result <c>Annotated</c>, so binding <c>(str x)</c>
+    /// into a non-nullable <c>:string</c> target must fire Calor0272 and
+    /// name the source annotation as <c>Annotated</c> (not <c>Oblivious</c>,
+    /// which would misdiagnose the reason and misrepresent the risk).
+    /// This is the inverse of the Trim/Substring assertions above: those
+    /// STRING-returning ops are contract-non-null; ToString is not.
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_For_StringOperation_ToString_Bound_To_NonNullString()
+    {
+        // (str x) is StringOp.ToString — the BCL object.ToString() shape.
+        const string source = """
+            §M{m1:ToStr}
+              §F{f1:Bad:pub} () -> void
+                §B{n:int} INT:42
+                §B{s:string} (str n)
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        // Belt-and-braces: pin the annotation on the bound tree so a
+        // future refactor cannot silently drop the diagnostic by moving
+        // the stamp back to NotAnnotated.
+        var initializer = bound.Functions.Single().Body.OfType<BoundBindStatement>()
+            .Last().Initializer!;
+        var initType = Assert.IsType<NominalBoundType>(initializer.Type);
+        Assert.Equal("STRING", initType.QualifiedName);
+        Assert.Equal(NullableAnnotation.Annotated, initType.NullableAnnotation);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Message.Contains("'s'")
+            && d.Message.Contains("'Annotated'"));
+    }
+
+    /// <summary>
     /// Ternary result over two provably-non-null STRING branches (both
     /// literals here) is itself non-null. Binding into <c>:string</c>
     /// must not fire Calor0272.
