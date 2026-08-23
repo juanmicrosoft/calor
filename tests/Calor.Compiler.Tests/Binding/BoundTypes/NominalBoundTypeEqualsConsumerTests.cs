@@ -1,3 +1,4 @@
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Parsing;
@@ -91,6 +92,33 @@ public class NominalBoundTypeEqualsConsumerTests
                 "FLOAT",
                 NullableAnnotation.Oblivious,
                 () => new BoundFloatLiteral(new TextSpan(0, 0, 0, 0), 1.5)
+            },
+            // String concat via BoundBinaryExpression emits NotAnnotated
+            // (String.Concat substitutes "" for null operands; #1055 fix).
+            // Included so adversarial-review coverage isn't limited to
+            // the literal path.
+            {
+                "STRING",
+                NullableAnnotation.NotAnnotated,
+                () => new BoundBinaryExpression(
+                    new TextSpan(0, 0, 0, 0),
+                    BinaryOperator.Add,
+                    new BoundStringLiteral(new TextSpan(0, 0, 0, 0), "a", isMultiline: false, isUtf8: false),
+                    new BoundStringLiteral(new TextSpan(0, 0, 0, 0), "b", isMultiline: false, isUtf8: false),
+                    "STRING")
+            },
+            // Non-STRING BoundBinaryExpression stays at Oblivious — pinned
+            // so a future refactor that flips the default doesn't silently
+            // change semantics for the arithmetic path.
+            {
+                "INT",
+                NullableAnnotation.Oblivious,
+                () => new BoundBinaryExpression(
+                    new TextSpan(0, 0, 0, 0),
+                    BinaryOperator.Add,
+                    new BoundIntLiteral(new TextSpan(0, 0, 0, 0), 1),
+                    new BoundIntLiteral(new TextSpan(0, 0, 0, 0), 2),
+                    "INT")
             },
         };
 
