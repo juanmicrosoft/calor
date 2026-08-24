@@ -92,11 +92,24 @@ internal static class NullabilityChecker
         // assignments (e.g. Annotated Foo source assigned to non-null
         // Bar target is a type error, not a nullability error, and
         // out-of-scope for S8).
+        //
+        // §S8 D3 narrowing: unlike the scalar STRING path, user-ref
+        // sources fire ONLY when the source annotation is Annotated
+        // (explicitly `?Foo`). Oblivious sources — the default for
+        // any user-typed binding that has not yet been annotated —
+        // do NOT fire, because that would trip every legitimate
+        // §B{x:Foo} someUnannotatedCall pattern in existing corpora
+        // (LSP RenameHandler fixtures + compiler tests demonstrated
+        // this concretely on PR #1074 CI). Widening to Oblivious is a
+        // separate follow-on that needs coordinated annotation flow
+        // through Calor-native calls; until then, S8's semantics are
+        // "the user explicitly said the source might be null, and
+        // the target refuses null".
         if (isUserRef)
         {
             if (sourceType is not NominalBoundType sourceNominal) return false;
             if (!ShortNameEquals(sourceNominal.QualifiedName, nominalTarget.QualifiedName)) return false;
-            return sourceNominal.NullableAnnotation != NullableAnnotation.NotAnnotated;
+            return sourceNominal.NullableAnnotation == NullableAnnotation.Annotated;
         }
 
         // Scalar STRING path (S3/S4/S5) — unchanged.
