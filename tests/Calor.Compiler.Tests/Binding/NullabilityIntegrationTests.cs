@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
@@ -1661,6 +1662,168 @@ public class NullabilityIntegrationTests
                 new NominalBoundType("STRING", NullableAnnotation.Annotated)));
         var parameterTarget = new ArrayBoundType(
             new NominalBoundType("STRING", NullableAnnotation.NotAnnotated));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
+    }
+
+    // ================================================================
+    // v0.14 §S7 whitelisted-generic tests (Phase-C scope widening).
+    // Widens the string-scope nullability gate from scalar STRING (S3)
+    // and array-of-STRING elements (S6) to a whitelisted set of generic
+    // instantiations: Option<T>, List<T>, IList<T>, IEnumerable<T>,
+    // IReadOnlyList<T>, ICollection<T>, IReadOnlyCollection<T> — where
+    // T is STRING. The container's own annotation is orthogonal; only
+    // the position-0 payload/element mismatch trips the predicate.
+    // Non-whitelisted definitions (e.g. Dictionary) are out-of-scope
+    // per the D6 discipline that ships each widening slice-by-slice.
+    // ================================================================
+
+    /// <summary>
+    /// S7 predicate — Option payload widening: an
+    /// <c>Option&lt;Annotated STRING&gt;</c> source assigned to a declared
+    /// non-null-payload <c>Option&lt;NotAnnotated STRING&gt;</c> target
+    /// trips <see cref="NullabilityChecker.IsPossiblyNullAssignedTo"/>.
+    /// Mirrors the S6 array-element check on the payload axis rather
+    /// than the element axis.
+    /// </summary>
+    [Fact]
+    public void S7_Calor0272_Fires_When_NullableOption_Bound_To_NonNullOption()
+    {
+        var optionDef = new NominalBoundType("Option", NullableAnnotation.Oblivious);
+        var source = new NullabilityTestExpr(
+            new GenericInstantiationBoundType(
+                optionDef,
+                ImmutableArray.Create<BoundType>(
+                    new NominalBoundType("STRING", NullableAnnotation.Annotated))));
+        var target = new GenericInstantiationBoundType(
+            optionDef,
+            ImmutableArray.Create<BoundType>(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S7 predicate — round-trip guard: an <c>Option&lt;NotAnnotated STRING&gt;</c>
+    /// source assigned to a <c>Option&lt;NotAnnotated STRING&gt;</c> target
+    /// must NOT fire. Prevents the widened check from becoming a false-
+    /// positive on the ordinary safe round-trip.
+    /// </summary>
+    [Fact]
+    public void S7_Calor0272_DoesNotFire_For_NonNullOption_Roundtrip()
+    {
+        var optionDef = new NominalBoundType("Option", NullableAnnotation.Oblivious);
+        var source = new NullabilityTestExpr(
+            new GenericInstantiationBoundType(
+                optionDef,
+                ImmutableArray.Create<BoundType>(
+                    new NominalBoundType("STRING", NullableAnnotation.NotAnnotated))));
+        var target = new GenericInstantiationBoundType(
+            optionDef,
+            ImmutableArray.Create<BoundType>(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S7 predicate — List element widening: a
+    /// <c>List&lt;Annotated STRING&gt;</c> source assigned to a declared
+    /// non-null-element <c>List&lt;NotAnnotated STRING&gt;</c> target
+    /// trips the predicate. Same shape gate as Option but for one of the
+    /// five whitelisted collection containers.
+    /// </summary>
+    [Fact]
+    public void S7_Calor0272_Fires_When_NullableListElement_Bound_To_NonNullListElement()
+    {
+        var listDef = new NominalBoundType("List", NullableAnnotation.Oblivious);
+        var source = new NullabilityTestExpr(
+            new GenericInstantiationBoundType(
+                listDef,
+                ImmutableArray.Create<BoundType>(
+                    new NominalBoundType("STRING", NullableAnnotation.Annotated))));
+        var target = new GenericInstantiationBoundType(
+            listDef,
+            ImmutableArray.Create<BoundType>(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S7 scope guard: a non-whitelisted generic container
+    /// (<c>Dictionary&lt;string, string&gt;</c>) is out-of-scope per D6
+    /// even under the S7 widening. The predicate must not fire when the
+    /// definition is not one of the six whitelisted containers, proving
+    /// scope stays narrow.
+    /// </summary>
+    [Fact]
+    public void S7_Calor0272_DoesNotFire_For_NonWhitelistedContainer()
+    {
+        // Construct a Dictionary<STRING, STRING> shape directly. Even if a
+        // predicate implementation naively "walked into" the type arguments,
+        // Dictionary is not on the S7 whitelist, so the widened target
+        // gate must reject it and return false.
+        var dictDef = new NominalBoundType("Dictionary", NullableAnnotation.Oblivious);
+        var source = new NullabilityTestExpr(
+            new GenericInstantiationBoundType(
+                dictDef,
+                ImmutableArray.Create<BoundType>(
+                    new NominalBoundType("STRING", NullableAnnotation.Annotated),
+                    new NominalBoundType("STRING", NullableAnnotation.Annotated))));
+        var target = new GenericInstantiationBoundType(
+            dictDef,
+            ImmutableArray.Create<BoundType>(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated),
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S7 return-site predicate check: an Option-of-Annotated-STRING
+    /// source returned from a function whose declared return type is
+    /// <c>Option&lt;string&gt;</c> (non-null payload) trips the same
+    /// predicate — this is what <c>BindReturnStatement</c> composes
+    /// once <c>_currentFunctionReturnType</c> resolves through
+    /// <see cref="Binder"/>'s widened <c>TryBuildStringTarget</c>.
+    /// </summary>
+    [Fact]
+    public void S7_Calor0273_Fires_For_NullableOption_Return_Into_NonNullDeclared()
+    {
+        var optionDef = new NominalBoundType("Option", NullableAnnotation.Oblivious);
+        var source = new NullabilityTestExpr(
+            new GenericInstantiationBoundType(
+                optionDef,
+                ImmutableArray.Create<BoundType>(
+                    new NominalBoundType("STRING", NullableAnnotation.Annotated))));
+        var returnTarget = new GenericInstantiationBoundType(
+            optionDef,
+            ImmutableArray.Create<BoundType>(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, returnTarget));
+    }
+
+    /// <summary>
+    /// S7 call-site predicate check: same predicate wiring, argument →
+    /// parameter direction. Passing an Option-of-Annotated-STRING source
+    /// into a parameter declared <c>Option&lt;string&gt;</c> (non-null
+    /// payload) fires Calor0274. Mirrors the S6 array-argument test.
+    /// </summary>
+    [Fact]
+    public void S7_Calor0274_Fires_For_NullableOption_Passed_To_NonNullParam()
+    {
+        var optionDef = new NominalBoundType("Option", NullableAnnotation.Oblivious);
+        var source = new NullabilityTestExpr(
+            new GenericInstantiationBoundType(
+                optionDef,
+                ImmutableArray.Create<BoundType>(
+                    new NominalBoundType("STRING", NullableAnnotation.Annotated))));
+        var parameterTarget = new GenericInstantiationBoundType(
+            optionDef,
+            ImmutableArray.Create<BoundType>(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
 
         Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
     }

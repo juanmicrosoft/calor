@@ -56,6 +56,13 @@ internal static class NullabilityChecker
             // mismatch); a possibly-null-elements source assigned to a
             // non-null-elements array target trips the same predicate.
             ArrayBoundType array => CheckArrayStringElementTarget(source, array),
+            // S7 — whitelisted generic-instantiation STRING nullability
+            // (Option<T>, List<T>, IList<T>, IEnumerable<T>,
+            // IReadOnlyList<T>, ICollection<T>, IReadOnlyCollection<T>).
+            // Container's own annotation is orthogonal — only the
+            // position-0 type argument (payload / element) mismatch
+            // matters, symmetric to the S6 array shape.
+            GenericInstantiationBoundType generic => CheckGenericStringArgumentTarget(source, generic),
             _ => false,
         };
     }
@@ -97,6 +104,49 @@ internal static class NullabilityChecker
 
         // Source element must be provably non-null (NotAnnotated) to pass.
         return sourceElement.NullableAnnotation != NullableAnnotation.NotAnnotated;
+    }
+
+    /// <summary>
+    /// S7 shape gate: target is a whitelisted generic instantiation whose
+    /// position-0 type argument is a non-nullable STRING. The Binder
+    /// (<see cref="Binder.TryParseGenericStringTarget"/>) is the only site
+    /// that builds this target shape today, so the whitelist is already
+    /// enforced upstream — this method only performs the source vs. target
+    /// symmetry check. Non-generic sources or generic sources whose
+    /// definition or payload shape don't match yield false (S7 does not
+    /// widen the check to unrelated shapes).
+    /// </summary>
+    private static bool CheckGenericStringArgumentTarget(BoundExpression source, GenericInstantiationBoundType genericTarget)
+    {
+        if (genericTarget.TypeArguments.Length != 1) return false;
+        if (genericTarget.TypeArguments[0] is not NominalBoundType targetInner) return false;
+        if (!IsScalarString(targetInner)) return false;
+
+        // Target payload declared nullable — accepting null payloads is by design.
+        if (targetInner.NullableAnnotation == NullableAnnotation.Annotated) return false;
+
+        // Source must be the SAME whitelisted generic definition (compared
+        // by short name — the Binder builds the target with the surface
+        // spelling, e.g. "List", so we match on the trailing dotted
+        // segment to bridge Roslyn's "System.Collections.Generic.List").
+        if (source.Type is not GenericInstantiationBoundType sourceGeneric) return false;
+        if (sourceGeneric.TypeArguments.Length != 1) return false;
+        if (!ShortNameEquals(sourceGeneric.Definition.QualifiedName, genericTarget.Definition.QualifiedName)) return false;
+        if (sourceGeneric.TypeArguments[0] is not NominalBoundType sourceInner) return false;
+        if (!IsScalarString(sourceInner)) return false;
+
+        // Source payload must be provably non-null (NotAnnotated) to pass.
+        return sourceInner.NullableAnnotation != NullableAnnotation.NotAnnotated;
+    }
+
+    private static bool ShortNameEquals(string a, string b)
+    {
+        static string Short(string s)
+        {
+            var lastDot = s.LastIndexOf('.');
+            return lastDot < 0 ? s : s[(lastDot + 1)..];
+        }
+        return string.Equals(Short(a), Short(b), System.StringComparison.Ordinal);
     }
 
     /// <summary>
