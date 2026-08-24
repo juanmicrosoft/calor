@@ -2302,6 +2302,125 @@ public class NullabilityIntegrationTests
         Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
     }
 
+    // ================================================================
+    // v0.14 nullability §NEW annotation flow — a `§NEW{Foo}` bound
+    // expression carries `NotAnnotated` on its Type. `new Foo()` is
+    // provably non-null by construction (.NET/Calor semantics), so
+    // the annotation channel must not degrade to Oblivious. Unblocks
+    // LSP RenameHandler fixtures where `§R §NEW{WidgetException}`
+    // used to trip Calor0273 spuriously. Precursor for S8-Oblivious.
+    // ================================================================
+
+    /// <summary>
+    /// A bare <c>§NEW{Foo}</c> constructor expression (no arguments) must
+    /// produce a <see cref="BoundNewExpression"/> whose <c>.Type</c> is a
+    /// <see cref="NominalBoundType"/> for <c>Foo</c> with
+    /// <see cref="NullableAnnotation.NotAnnotated"/>. Prior to this slice
+    /// the default was <see cref="NullableAnnotation.Oblivious"/>, which
+    /// tripped Calor0272/Calor0273 on <c>§B{b:Foo} §NEW{Foo}</c>.
+    /// </summary>
+    [Fact]
+    public void New_Expression_Has_NotAnnotated_Type()
+    {
+        const string source = """
+            §M{m1:NewNoArgs}
+              §CL{c1:Foo:pub}
+                §MT{m1:Make:pub:static} () -> Foo
+                  §R §NEW{Foo}
+            """;
+
+        var (bound, _) = BindSource(source);
+        var creation = FindFirstBoundNewInFunction(bound, "Make");
+        var nominal = Assert.IsType<NominalBoundType>(creation.Type);
+        Assert.Equal("Foo", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// The same guarantee holds when constructor arguments are supplied
+    /// (<c>§NEW{Foo} §A x §/C</c>). Constructor dispatch and overload
+    /// resolution are unaffected — only the top-level
+    /// <c>BoundNewExpression.Type.NullableAnnotation</c> flips from
+    /// Oblivious to NotAnnotated.
+    /// </summary>
+    [Fact]
+    public void New_Expression_With_Args_Has_NotAnnotated_Type()
+    {
+        const string source = """
+            §M{m1:NewWithArgs}
+              §CL{c1:Foo:pub}
+                §CT{c1:pub} (int:x) -> void
+                §MT{m1:Make:pub:static} () -> Foo
+                  §R §NEW{Foo} §A INT:1 §/C
+            """;
+
+        var (bound, _) = BindSource(source);
+        var creation = FindFirstBoundNewInFunction(bound, "Make");
+        var nominal = Assert.IsType<NominalBoundType>(creation.Type);
+        Assert.Equal("Foo", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// End-to-end guard: binding a <c>§NEW{Foo}</c> into a non-nullable
+    /// <c>:Foo</c> target must NOT fire Calor0272
+    /// (<see cref="DiagnosticCode.NullableToNonNullableBinding"/>). Before
+    /// this slice the §NEW result was Oblivious and D3's conservative
+    /// possibly-null rule produced the false positive that blasted every
+    /// user-ref creation site in the S8-Oblivious fixture set.
+    /// </summary>
+    [Fact]
+    public void New_Expression_Result_Assigned_To_NonNull_UserRef_DoesNotFire_Calor0272()
+    {
+        const string source = """
+            §M{m1:NewIntoNonNull}
+              §CL{c1:Foo:pub}
+                §MT{m1:Make:pub:static} () -> void
+                  §B{b:Foo} §NEW{Foo}
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// §NEW analogue of <see cref="FindFirstBoundCallInFunction"/> —
+    /// locates the first <see cref="BoundNewExpression"/> under a
+    /// function's body, whether it surfaces as the initializer of a
+    /// <see cref="BoundBindStatement"/> or the operand of a
+    /// <see cref="BoundReturnStatement"/>.
+    /// </summary>
+    private static BoundNewExpression FindFirstBoundNewInFunction(BoundModule module, string functionName)
+    {
+        foreach (var fn in module.Functions)
+        {
+            var matches = fn.Symbol.Name == functionName
+                || fn.Symbol.Name.EndsWith("." + functionName, StringComparison.Ordinal);
+            if (!matches) continue;
+            foreach (var statement in fn.Body)
+            {
+                switch (statement)
+                {
+                    case BoundBindStatement bind
+                        when bind.Initializer is BoundNewExpression bindNew:
+                        return bindNew;
+                    case BoundReturnStatement ret
+                        when ret.Expression is BoundNewExpression retNew:
+                        return retNew;
+                }
+            }
+        }
+        var available = string.Join(
+            ", ",
+            module.Functions.Select(f =>
+                $"{f.Symbol.Name}({f.Body.Count} stmts, container={f.ContainingTypeName})"));
+        throw new Xunit.Sdk.XunitException(
+            $"Could not find BoundNewExpression under function '{functionName}' in bound module. "
+            + $"Available functions: [{available}]");
+    }
+
     /// <summary>
     /// F-3B helper — locate the first <see cref="BoundCallExpression"/>
     /// under a function's body. Prefers the initializer of the first

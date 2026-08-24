@@ -1771,7 +1771,15 @@ public sealed class BoundNewExpression : BoundExpression
         BoundTypeReference? typeReference = null)
         : base(span)
     {
-        Type = new NominalBoundType(typeName ?? "OBJECT");
+        // v0.14 nullability §NEW annotation flow — a `§NEW{Foo}` expression
+        // returns a freshly-constructed instance and is provably non-null by
+        // .NET/Calor semantics. Stamp `NotAnnotated` here rather than the
+        // default `Oblivious` so downstream Calor0272/Calor0273/Calor0274
+        // checks recognize `§B{b:Foo} §NEW{Foo}` as safe. DisplayString is
+        // preserved (F-3B discipline): the raw `typeName` string flows
+        // through unchanged. This does NOT affect constructor dispatch or
+        // overload resolution — it is a type-annotation-channel-only change.
+        Type = new NominalBoundType(typeName ?? "OBJECT", NullableAnnotation.NotAnnotated);
         TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();
