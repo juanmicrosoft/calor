@@ -10,6 +10,14 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-08-24
+
+Small fix — `§NEW{Type}` constructor expressions now correctly reflect that `new Foo()` is non-null. Improves downstream nullability checks without changing any observable behavior on well-annotated code.
+
+### Fixed
+
+- **`§NEW{Type}` constructor expressions carry `NotAnnotated`, not `Oblivious`.** A `new Foo()` is provably non-null by construction, so the `BoundType` returned by `BoundNewExpression` now reflects that. Applies to bare `§NEW{Foo}`, `§NEW{Foo} §A x §/C` (with constructor arguments), and generic forms like `§NEW{List<int>}`.
+
 ## [0.14.2] - 2026-08-24
 
 Threads Calor-native call-site annotations through the binder. Pure-Calor callees now behave symmetrically with BCL calls for the two 0.14 diagnostics that used to skip them: `Calor0274` on the argument side, and `BoundCallExpression.Type` picking up the declared return annotation. Downstream consumers see byte-identical `DisplayString` for pure-Calor calls; only the annotation channel changes.

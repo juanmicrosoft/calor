@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-08-24
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension (StructuralClarity): 1.84x (Calor)
+  - ErrorDetection (DetectionCapability): 1.49x (Calor)
+  - TokenEconomics (CompositeTokenEconomics): 1.42x (Calor)
+- **Benchmarks Evaluated**: 217
+
+### Fixed
+- **`§NEW{Type}` constructor expressions carry `NotAnnotated`, not
+  `Oblivious`.** A `new Foo()` is provably non-null by construction, so
+  the `BoundType` returned by `BoundNewExpression` now reflects that.
+  Applies to bare `§NEW{Foo}`, `§NEW{Foo} §A x §/C` (with constructor
+  arguments), and generic forms like `§NEW{List<int>}`. Downstream
+  nullability checks that read the expression's annotation now see the
+  correct non-null claim instead of degrading to Oblivious.
+
 ## [0.14.2] - 2026-08-24
 
 ### Benchmark Results (Statistical: 30 runs)
