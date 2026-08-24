@@ -71,9 +71,17 @@ Update these files with the new version:
 |------|----------------|
 | `Directory.Build.props` | `<Version>X.Y.Z</Version>` |
 | `website/package.json` | `"version": "X.Y.Z"` |
+| `website/src/lib/version.ts` | `SITE_VERSION = 'X.Y.Z'` — this is the pill next to "calor" in the site header; if you skip it, the header keeps showing the previous version even after CHANGELOG and banner update |
 | `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add benchmark summary |
 | `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format, no benchmark stats) |
 | `website/src/components/landing/WhatsNewBanner.tsx` | Update version number and one-line description of the release |
+
+**How to verify you got all the version spots**: after editing, run
+`grep -rn "$OLD_VERSION" website/src website/package.json Directory.Build.props`
+— the only remaining match should be `changelog.mdx` and prose references in
+`website/content/**` describing what shipped in that version (those are historical
+and stay). Any live component or config still pointing at the old version means
+you missed it.
 
 When updating CHANGELOG.md:
 1. Find the line `## [Unreleased]`

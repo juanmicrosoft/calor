@@ -4,4 +4,4 @@
  * "bump the docs pill" a grep-friendly, one-line change in the release
  * script alongside Directory.Build.props.
  */
-export const SITE_VERSION = '0.13.2';
+export const SITE_VERSION = '0.14.0';
