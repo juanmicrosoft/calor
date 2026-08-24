@@ -1530,12 +1530,22 @@ public sealed class Binder
         // caught by the S6/S7/scalar paths first — this branch reaches only
         // bare identifiers after prefix/postfix '?' peel.
         // Value types (INT/BOOL/…) return false because they can never be
-        // null. Names containing `[` or `.` are excluded — they are either
-        // post-expansion residue or dotted namespace-qualified forms we do
-        // not yet classify (defer to a future D6 follow-on).
+        // null. Names containing `[`, `.`, or `<` are excluded — `[` is
+        // post-expansion residue (ARRAY[…]/OPTION[…]), `.` is a dotted
+        // namespace-qualified form we do not yet classify, and `<` is a
+        // generic instantiation whose S7 whitelist above already ran and
+        // declined (only Option/List/... with STRING payload participate).
+        // Widening the user-ref path to `<`-bearing names would misroute
+        // shapes like `Option<i32>` — a generic that S7 correctly ignores —
+        // into the nominal user-ref gate and spuriously fire against the
+        // Oblivious `Option<INT>` type of BoundSomeExpression (surfaced by
+        // F-3C's S8-Oblivious widening, previously masked by the
+        // Annotated-only narrowing). Defer to a future D6 follow-on that
+        // widens the S7 generic path to non-STRING payloads.
         if (trimmed.Length > 0
             && !trimmed.Contains('[', System.StringComparison.Ordinal)
             && !trimmed.Contains('.', System.StringComparison.Ordinal)
+            && !trimmed.Contains('<', System.StringComparison.Ordinal)
             && !IsBuiltInValueTypeName(trimmed))
         {
             target = new BoundTypes.NominalBoundType(

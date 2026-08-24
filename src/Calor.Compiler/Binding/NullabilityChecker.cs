@@ -93,23 +93,24 @@ internal static class NullabilityChecker
         // Bar target is a type error, not a nullability error, and
         // out-of-scope for S8).
         //
-        // §S8 D3 narrowing: unlike the scalar STRING path, user-ref
-        // sources fire ONLY when the source annotation is Annotated
-        // (explicitly `?Foo`). Oblivious sources — the default for
-        // any user-typed binding that has not yet been annotated —
-        // do NOT fire, because that would trip every legitimate
-        // §B{x:Foo} someUnannotatedCall pattern in existing corpora
-        // (LSP RenameHandler fixtures + compiler tests demonstrated
-        // this concretely on PR #1074 CI). Widening to Oblivious is a
-        // separate follow-on that needs coordinated annotation flow
-        // through Calor-native calls; until then, S8's semantics are
-        // "the user explicitly said the source might be null, and
-        // the target refuses null".
+        // §F-3C — S8-Oblivious widening: user-ref sources now fire on
+        // BOTH Annotated AND Oblivious source annotations, matching the
+        // scalar STRING D3 discipline below (only NotAnnotated is safe).
+        // This was previously narrowed to Annotated-only because pure-
+        // Calor callees returned Oblivious by default, tripping every
+        // legitimate §B{x:Foo} someUnannotatedCall pattern in existing
+        // corpora. F-3A (call-site parameter check, SHA 284470b7) and
+        // F-3B (return-site annotation flow, SHA 321baf1f) thread real
+        // annotations through pure-Calor call sites, so an unannotated
+        // `someCall() -> Foo` now returns `NotAnnotated Foo` rather than
+        // Oblivious. Oblivious now genuinely means "unknown-nullable-BCL
+        // surface" for user-ref types too — exactly the case S8 was
+        // designed to surface.
         if (isUserRef)
         {
             if (sourceType is not NominalBoundType sourceNominal) return false;
             if (!ShortNameEquals(sourceNominal.QualifiedName, nominalTarget.QualifiedName)) return false;
-            return sourceNominal.NullableAnnotation == NullableAnnotation.Annotated;
+            return sourceNominal.NullableAnnotation != NullableAnnotation.NotAnnotated;
         }
 
         // Scalar STRING path (S3/S4/S5) — unchanged.
