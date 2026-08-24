@@ -3113,6 +3113,46 @@ public sealed class Binder
                     SemanticsVersion.NullabilitySeverityFor());
             }
         }
+        else if (resolution.Kind == OverloadResolutionKind.Resolved
+            && resolution.Function is { } calorCallee)
+        {
+            // v0.14 §F-3A — Calor-native call-site widening (unblocks S8-
+            // Oblivious). Symmetric with the BCL branch above but reads the
+            // declared parameter TypeName off the resolved Calor FunctionSymbol
+            // and routes through the same TryBuildStringTarget shape gate +
+            // NullabilityChecker.IsPossiblyNullAssignedTo predicate. Parameter
+            // TypeName may be either the raw surface form (":?string", "Foo")
+            // or post-expansion ("OPTION[inner=STRING]"); TryBuildStringTarget
+            // accepts both. When the target-shape gate yields Annotated the
+            // parameter accepts null by design and we skip. Overload resolution
+            // that did not converge to a single Function (Ambiguous / NoMatch /
+            // Inaccessible) is skipped — that is a separate slice.
+            var parameters = calorCallee.Parameters;
+            for (var i = 0; i < args.Count && i < parameters.Count; i++)
+            {
+                var paramSymbol = parameters[i];
+                if (!TryBuildStringTarget(paramSymbol.TypeName, out var stringTarget)) continue;
+                if (stringTarget is BoundTypes.NominalBoundType nominal
+                    && nominal.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
+                if (stringTarget is BoundTypes.ArrayBoundType array
+                    && array.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
+                if (stringTarget is BoundTypes.GenericInstantiationBoundType generic
+                    && generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
+                if (!NullabilityChecker.IsPossiblyNullAssignedTo(args[i], stringTarget!)) continue;
+
+                var paramName = !string.IsNullOrEmpty(paramSymbol.Name)
+                    ? paramSymbol.Name
+                    : $"arg{i}";
+                var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
+                _diagnostics.Report(
+                    args[i].Span,
+                    DiagnosticCode.NullableArgumentToNonNullableParameter,
+                    $"Argument to parameter '{paramName}' declares non-nullable {targetShapeLabel} " +
+                    $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
+                    $"Change the parameter type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
+                    SemanticsVersion.NullabilitySeverityFor());
+            }
+        }
 
         return new BoundCallExpression(
             callExpr.Span,
