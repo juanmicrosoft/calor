@@ -3076,6 +3076,33 @@ public sealed class Binder
         var bclResolution = TryResolveBclCall(callExpr.Target, args);
         var annotatedReturn = bclResolution?.Return;
 
+        // v0.14 §F-3B (nullability): thread the declared return-type
+        // annotation from a resolved pure-Calor callee onto BoundCallExpression.Type.
+        // Prior to this slice a call to a pure-Calor function returned an
+        // Oblivious NominalBoundType regardless of whether the declaration
+        // said `-> string` (NotAnnotated) or `-> ?string` / `-> ?Foo`
+        // (Annotated). Reuses TryReadDeclaredStringAnnotation (which
+        // recognizes scalar STRING, whitelisted generic, and user-ref
+        // shapes — the same set §S3/S7/S8 target-side gates handle) to
+        // extract the annotation, then wraps the ALREADY-COMPUTED
+        // `returnType` string so BoundCallExpression.Type.DisplayString
+        // stays byte-identical to today (e.g. "str", "OPTION[inner=STRING]",
+        // "Foo"). We deliberately do NOT swap in TryBuildStringTarget's
+        // canonicalized target ("STRING") — that would break every
+        // downstream consumer (BinderOverloadSetTests, etc.) that reads
+        // DisplayString for pure-Calor calls. BCL-resolved returns still
+        // take priority (bclResolution?.Return already carries Roslyn's
+        // annotation on its own DisplayString shape).
+        if (annotatedReturn is null
+            && resolution.Function is { } calorReturnee)
+        {
+            var declaredAnnotation = TryReadDeclaredStringAnnotation(calorReturnee.ReturnType);
+            if (declaredAnnotation != BoundTypes.NullableAnnotation.Oblivious)
+            {
+                annotatedReturn = new BoundTypes.NominalBoundType(returnType, declaredAnnotation);
+            }
+        }
+
         // v0.14 §S4 nullability check (issue #875, D2 predicate at the
         // call-site boundary). §S6 widens the target-shape gate to include
         // array-of-STRING parameters — the same predicate now fires when
