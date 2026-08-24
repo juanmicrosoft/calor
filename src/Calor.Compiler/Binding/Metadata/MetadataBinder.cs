@@ -422,6 +422,31 @@ internal readonly struct MetadataBinderResult
                 rank: arraySymbol.Rank,
                 nullableAnnotation: MapAnnotation(arraySymbol.NullableAnnotation));
         }
+
+        // v0.14 §S7 — preserve per-argument NullableAnnotation on generic
+        // instantiations so a BCL return of e.g. List<string?> flows to the
+        // nullability checker as GenericInstantiationBoundType(Definition=List,
+        // TypeArguments=[NominalBoundType(STRING, Annotated)]). Mirrors what
+        // the IArrayTypeSymbol branch does for arrays. Non-generic named
+        // types fall through to the flat NominalBoundType shape unchanged.
+        if (typeSymbol is Microsoft.CodeAnalysis.INamedTypeSymbol named
+            && named.IsGenericType
+            && !named.TypeArguments.IsDefaultOrEmpty)
+        {
+            var definition = new NominalBoundType(
+                qualifiedName: named.ConstructedFrom.ToDisplayString(),
+                nullableAnnotation: Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious,
+                declaration: null,
+                roslynSymbol: named.ConstructedFrom);
+            var args = named.TypeArguments
+                .Select(ToBoundType)
+                .ToImmutableArray();
+            return new GenericInstantiationBoundType(
+                definition,
+                args,
+                MapAnnotation(named.NullableAnnotation));
+        }
+
         return ToNominalBoundType(typeSymbol);
     }
 

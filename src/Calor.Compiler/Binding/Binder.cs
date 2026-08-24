@@ -1222,8 +1222,7 @@ public sealed class Binder
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
         {
-            var targetShapeLabel = stringTarget is BoundTypes.ArrayBoundType ? "'string[]'" : "'string'";
-            var fixHintTargetLabel = stringTarget is BoundTypes.ArrayBoundType ? "'[?string]'" : "'?string'";
+            var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
             _diagnostics.Report(
                 expr.Span,
                 DiagnosticCode.NullableReturnFromNonNullable,
@@ -1435,8 +1434,7 @@ public sealed class Binder
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
         {
-            var targetShapeLabel = stringTarget is BoundTypes.ArrayBoundType ? "'string[]'" : "'string'";
-            var fixHintTargetLabel = stringTarget is BoundTypes.ArrayBoundType ? "'[?string]'" : "'?string'";
+            var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
             _diagnostics.Report(
                 initializer.Span,
                 DiagnosticCode.NullableToNonNullableBinding,
@@ -1468,6 +1466,21 @@ public sealed class Binder
         if (TryParseArrayStringTarget(trimmed, out var arrayTarget))
         {
             target = arrayTarget;
+            return true;
+        }
+
+        // v0.14 §S7 (task #7 Phase-C) — whitelisted generic instantiations
+        // whose relevant type argument is STRING. Recognizes:
+        //   Option<string> / ?string-in-Option    (T=payload)
+        //   List<T>, IList<T>, IEnumerable<T>, IReadOnlyList<T>,
+        //   ICollection<T>, IReadOnlyCollection<T>  (T=element)
+        // For each, position 0 of TypeArguments is the meaningful slot; the
+        // container's own annotation is orthogonal (per D6 same as arrays).
+        // Anything outside this whitelist (Dictionary, Task, custom generic)
+        // stays out-of-scope and falls through to the scalar path below.
+        if (TryParseGenericStringTarget(trimmed, out var genericTarget))
+        {
+            target = genericTarget;
             return true;
         }
 
@@ -1578,6 +1591,123 @@ public sealed class Binder
         return true;
     }
 
+    // v0.14 §S7 whitelist — the six generic containers that participate in
+    // the string-scope nullability gate. Keys cover both the Calor surface
+    // spelling (e.g. "Option", "List") and Roslyn's fully-qualified
+    // display-name (e.g. "System.Collections.Generic.List") so the same
+    // whitelist works for both bind-site (surface strings) and metadata-
+    // resolved (BCL) call/return-site parameter types. Everything not in
+    // this set is deliberately out-of-scope; extending the set is a
+    // scoping decision (D6 discipline).
+    private static readonly HashSet<string> GenericStringContainerWhitelist =
+        new(StringComparer.Ordinal)
+        {
+            "Option",           "OPTION",
+            "List",             "System.Collections.Generic.List",
+            "IList",            "System.Collections.Generic.IList",
+            "IEnumerable",      "System.Collections.Generic.IEnumerable",
+            "IReadOnlyList",    "System.Collections.Generic.IReadOnlyList",
+            "ICollection",      "System.Collections.Generic.ICollection",
+            "IReadOnlyCollection", "System.Collections.Generic.IReadOnlyCollection",
+        };
+
+    /// <summary>
+    /// v0.14 §S7 helper — recognizes a whitelisted generic instantiation
+    /// whose position-0 type argument is a scalar STRING. Accepts both
+    /// the Calor surface form (<c>Option&lt;string&gt;</c>,
+    /// <c>List&lt;?string&gt;</c>) and the post-ExpandType form where the
+    /// argument is normalized (<c>List&lt;STRING&gt;</c>,
+    /// <c>Option&lt;OPTION[inner=STRING]&gt;</c>). Returns a
+    /// <see cref="BoundTypes.GenericInstantiationBoundType"/> whose
+    /// single argument is a STRING <see cref="BoundTypes.NominalBoundType"/>
+    /// carrying the declared inner annotation, so
+    /// <see cref="NullabilityChecker.IsPossiblyNullAssignedTo"/> can compare
+    /// symmetrically against a source generic. Returns false for
+    /// non-whitelisted definitions or non-STRING type arguments.
+    /// </summary>
+    private static bool TryParseGenericStringTarget(string trimmed, out BoundTypes.GenericInstantiationBoundType? target)
+    {
+        target = null;
+
+        var open = trimmed.IndexOf('<');
+        if (open <= 0) return false;
+        if (!trimmed.EndsWith(">", StringComparison.Ordinal)) return false;
+
+        var baseName = trimmed[..open];
+        var argsSection = trimmed[(open + 1)..^1];
+
+        // S7 scope narrow: whitelist gate first — anything else is
+        // out-of-scope per D6 and must not construct a target.
+        if (!GenericStringContainerWhitelist.Contains(baseName)) return false;
+
+        // Position-0 argument only: none of the six whitelisted containers
+        // use multi-arg like Dictionary yet. If the argument list contains
+        // a top-level comma, we conservatively reject rather than guess.
+        if (ContainsTopLevelComma(argsSection)) return false;
+
+        var innerRaw = argsSection.Trim();
+        var innerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+
+        if (innerRaw.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+            && innerRaw.EndsWith("]", StringComparison.Ordinal))
+        {
+            innerAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            innerRaw = innerRaw["OPTION[inner=".Length..^1];
+        }
+        else if (innerRaw.StartsWith("?", StringComparison.Ordinal) && innerRaw.Length > 1)
+        {
+            innerAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            innerRaw = innerRaw[1..];
+        }
+        else if (innerRaw.EndsWith("?", StringComparison.Ordinal) && innerRaw.Length > 1)
+        {
+            innerAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            innerRaw = innerRaw[..^1];
+        }
+
+        if (innerRaw is not ("STRING" or "string" or "str" or "System.String"))
+        {
+            return false;
+        }
+
+        var innerBound = new BoundTypes.NominalBoundType("STRING", innerAnnotation);
+        var definition = new BoundTypes.NominalBoundType(baseName, BoundTypes.NullableAnnotation.Oblivious);
+        target = new BoundTypes.GenericInstantiationBoundType(
+            definition,
+            System.Collections.Immutable.ImmutableArray.Create<BoundTypes.BoundType>(innerBound));
+        return true;
+    }
+
+    /// <summary>
+    /// Helper for <see cref="TryParseGenericStringTarget"/> — returns true
+    /// when the generic argument list contains a comma at the top level
+    /// (i.e. a multi-argument generic). Nested angle brackets and square
+    /// brackets are respected so <c>Dictionary&lt;string, List&lt;int&gt;&gt;</c>
+    /// is detected as multi-arg while <c>List&lt;OPTION[inner=STRING]&gt;</c>
+    /// is not.
+    /// </summary>
+    private static bool ContainsTopLevelComma(string argsSection)
+    {
+        var depth = 0;
+        foreach (var c in argsSection)
+        {
+            switch (c)
+            {
+                case '<':
+                case '[':
+                    depth++;
+                    break;
+                case '>':
+                case ']':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    return true;
+            }
+        }
+        return false;
+    }
+
     /// <summary>
     /// v0.14 §S4 helper — reshapes a resolved callee parameter's
     /// NominalBoundType into the target the <see cref="NullabilityChecker"/>
@@ -1619,7 +1749,16 @@ public sealed class Binder
         // whose QualifiedName is "string[]" / "System.String[]". Parse
         // that surface here so Calor0274 fires when a possibly-null-
         // element array is passed into a non-null-element parameter.
-        return TryBuildArrayStringParameterTarget(parameterType);
+        var arrayShape = TryBuildArrayStringParameterTarget(parameterType);
+        if (arrayShape is not null) return arrayShape;
+
+        // v0.14 §S7 — whitelisted generic instantiation parameter shape.
+        // MetadataBinder currently flattens INamedTypeSymbol into a
+        // NominalBoundType whose QualifiedName reads as e.g.
+        // "System.Collections.Generic.List<string>". Parse that surface
+        // here so Calor0274 fires when a possibly-null-elements generic
+        // is passed into a non-nullable-elements parameter.
+        return TryBuildGenericStringParameterTarget(parameterType);
     }
 
     /// <summary>
@@ -1653,6 +1792,31 @@ public sealed class Binder
             new BoundTypes.NominalBoundType("STRING", BoundTypes.NullableAnnotation.NotAnnotated));
     }
 
+    /// <summary>
+    /// v0.14 §S7 helper — recognizes a whitelisted generic instantiation
+    /// parameter shape encoded by MetadataBinder as a flat
+    /// <see cref="BoundTypes.NominalBoundType"/> with QualifiedName like
+    /// <c>System.Collections.Generic.List&lt;string&gt;</c>. Reuses
+    /// <see cref="TryParseGenericStringTarget"/> to preserve the same
+    /// whitelist + inner-annotation parsing. Returns null when the
+    /// parameter is not a whitelisted generic-of-STRING. Roslyn's per-
+    /// argument nullability is not yet observable through the flat
+    /// QualifiedName encoding, so the parameter is conservatively treated
+    /// as expecting a NotAnnotated inner — matching how S6 treats array
+    /// parameters.
+    /// </summary>
+    private static BoundTypes.BoundType? TryBuildGenericStringParameterTarget(BoundTypes.NominalBoundType parameterType)
+    {
+        // Delegate all parsing to the surface-form helper so the whitelist
+        // and inner-annotation parsing stay in one place. The flat
+        // QualifiedName format Roslyn emits ("List<string>",
+        // "System.Collections.Generic.List<string>") is a subset of what
+        // TryParseGenericStringTarget already accepts.
+        return TryParseGenericStringTarget(parameterType.QualifiedName, out var target)
+            ? target
+            : null;
+    }
+
     private static string DescribeAnnotation(BoundExpression source) => source.Type switch
     {
         BoundTypes.NominalBoundType n => n.NullableAnnotation.ToString(),
@@ -1660,6 +1824,40 @@ public sealed class Binder
         BoundTypes.ArrayBoundType a => a.NullableAnnotation.ToString(),
         _ => "unknown",
     };
+
+    /// <summary>
+    /// v0.14 §S7 — shape-labels for the three Calor027X diagnostics.
+    /// Returns a pair (declared-shape label, fix-hint label) that mirrors
+    /// the target's actual shape so messages read naturally at each of
+    /// the three emit sites (S3 bind, S4 return, S4 call). Scalar STRING
+    /// yields <c>'string'</c> / <c>'?string'</c>, array yields
+    /// <c>'string[]'</c> / <c>'[?string]'</c>, generic yields
+    /// <c>'Option&lt;string&gt;'</c> / <c>'Option&lt;?string&gt;'</c>
+    /// (spelled with the definition's short name so it matches what the
+    /// user wrote).
+    /// </summary>
+    private static (string TargetShapeLabel, string FixHintLabel) DescribeStringTargetShape(BoundTypes.BoundType stringTarget)
+    {
+        return stringTarget switch
+        {
+            BoundTypes.ArrayBoundType => ("'string[]'", "'[?string]'"),
+            BoundTypes.GenericInstantiationBoundType g =>
+                (
+                    $"'{ShortGenericName(g.Definition.QualifiedName)}<string>'",
+                    $"'{ShortGenericName(g.Definition.QualifiedName)}<?string>'"
+                ),
+            _ => ("'string'", "'?string'"),
+        };
+    }
+
+    /// <summary>Trims a possibly fully-qualified container name to its
+    /// last dotted segment so diagnostic labels read as the user wrote
+    /// them (e.g. <c>System.Collections.Generic.List</c> → <c>List</c>).</summary>
+    private static string ShortGenericName(string qualifiedName)
+    {
+        var lastDot = qualifiedName.LastIndexOf('.');
+        return lastDot < 0 ? qualifiedName : qualifiedName[(lastDot + 1)..];
+    }
 
     // v0.14 nullability workstream — helper for BindBindStatement to keep
     // the source-count of TypeName string-equality sites flat (F-3 ratchet
@@ -2848,8 +3046,7 @@ public sealed class Binder
                 var paramName = i < paramNames.Count && !string.IsNullOrEmpty(paramNames[i])
                     ? paramNames[i]
                     : $"arg{i}";
-                var targetShapeLabel = stringTarget is BoundTypes.ArrayBoundType ? "'string[]'" : "'string'";
-                var fixHintTargetLabel = stringTarget is BoundTypes.ArrayBoundType ? "'[?string]'" : "'?string'";
+                var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget);
                 _diagnostics.Report(
                     args[i].Span,
                     DiagnosticCode.NullableArgumentToNonNullableParameter,
