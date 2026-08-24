@@ -4,6 +4,71 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-08-24
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension (StructuralClarity): 1.84x (Calor)
+  - ErrorDetection (DetectionCapability): 1.49x (Calor)
+  - TokenEconomics (CompositeTokenEconomics): 1.42x (Calor)
+- **Benchmarks Evaluated**: 217
+
+### Added
+- **Nullability enforcement widens to whitelisted generic instantiations
+  (`Option<T>`, `List<T>`, `IList<T>`, `IEnumerable<T>`, `IReadOnlyList<T>`,
+  `ICollection<T>`, `IReadOnlyCollection<T>` over `string`).** A source
+  whose payload/element carries `?string` assigned into a target whose
+  same-shape container declares `string` now trips the three nullability
+  diagnostics symmetrically with the scalar STRING gate. Container
+  annotation stays orthogonal — only the position-0 type-argument
+  mismatch is diagnosed.
+- **Nullability enforcement widens to user-declared reference types.**
+  `§B{b:Foo} a` where `a` is `:?Foo` now trips `Calor0272` (and the
+  return-site analog trips `Calor0273`). Fires only when the source
+  is explicitly `Annotated` — `Oblivious` sources (the default for
+  any Calor-native value that has not yet been annotated) do NOT
+  fire, so ordinary `§B{x:Foo} someCall` patterns keep working
+  until Calor-native call-site annotation flow lands as a follow-on.
+
+### Changed
+- **`MetadataBinder` constructs `GenericInstantiationBoundType` from
+  Roslyn's `INamedTypeSymbol.IsGenericType`.** Mirrors the array-type
+  handling added in 0.14.0 so BCL calls returning generic-of-STRING
+  surface with correct payload/element annotations at the emit site.
+- **Reference-expression type flows the declared nullability for
+  user-declared reference types.** A `§MT{...} (?Foo:a)` parameter
+  reference now reads as `Annotated Foo` at its use site instead of
+  degrading to `Oblivious`. Leading/trailing `?` is stripped from
+  the `QualifiedName` so downstream short-name comparisons work
+  without double-encoding the annotation.
+- **Diagnostic messages echo the target shape.** `'Option<string>'` /
+  `'List<string>'` / `'Foo'` labels replace the scalar `'string'`
+  boilerplate when the target is a generic or user-declared type.
+
+### Fixed
+- **Site-header "v0.13.2" pill lingered after 0.14.0.**
+  `website/src/lib/version.ts` was not in the release skill's
+  version-file checklist. Added to the skill so future releases catch it.
+- **Performance-test synthetic fixtures now filter nullability
+  diagnostics.** After the 0.14.0 severity flip promoted `Calor0272/3/4`
+  to Error under SemVer.Major≥2, the taint-analysis performance tests'
+  `RequireParsedAndBound` blanket `HasErrors` assertion rejected the
+  synthetic modules. Nullability findings on synthetic taint fixtures
+  are now allowed through — the perf tests exercise timings, not
+  nullability enforcement.
+
+### Added — infrastructure
+- **`verify-release.yml`** — on-demand `workflow_dispatch`
+  workflow that installs the `calor` global tool from nuget.org
+  (linux-x64 / osx-arm64 / win-x64) and asserts
+  `calor verify samples/Verification/proven-contracts.calr` prints
+  `Proven: 14, Skipped: 0`. Reusable per release:
+  `gh workflow run verify-release.yml -f version=X.Y.Z`. Fills the
+  install-and-verify gap that the create-release skill's local check
+  cannot cover from networks whose dotnet routes through a proxy.
+
 ## [0.14.0] - 2026-08-23
 
 ### Benchmark Results (Statistical: 30 runs)

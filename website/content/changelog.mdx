@@ -10,6 +10,26 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-08-24
+
+Widens the 0.14 nullability gate along two axes: whitelisted generic containers over `string`, and user-declared reference types. The core three diagnostics (`Calor0272`/`0273`/`0274`) fire symmetrically whenever a possibly-null value is funneled into a target that refuses null — now covering `Option<T>`, `List<T>`, `IEnumerable<T>` (and their read-only / interface siblings), and any `§CL`-declared class. Also fixes a header-pill stale-version follow-up and adds an on-demand `verify-release` CI workflow that installs the shipped tool from nuget.org and exercises Z3.
+
+### Added
+
+- **Whitelisted generic-instantiation nullability.** `Option<string>`, `List<string>`, `IList<string>`, `IEnumerable<string>`, `IReadOnlyList<string>`, `ICollection<string>`, `IReadOnlyCollection<string>` now participate. A source whose payload/element is `?string` assigned into a same-shape target whose payload/element is `string` trips the three diagnostics. Container annotation is orthogonal — only the position-0 argument mismatch is diagnosed.
+- **User-declared reference-type nullability.** `§B{b:Foo} a` where `a` is `:?Foo` trips `Calor0272`; the return-site variant trips `Calor0273`. Fires only when the source is explicitly `Annotated` — `Oblivious` sources (the default for any Calor-native value that has not yet been annotated) do not fire, so existing `§B{x:Foo} someCall` patterns keep working until Calor-native call-site annotation flow lands as a follow-on.
+- **On-demand `verify-release` CI workflow.** `gh workflow run verify-release.yml -f version=X.Y.Z` installs the `calor` global tool from nuget.org on three OS/arch runners and asserts `calor verify samples/Verification/proven-contracts.calr` prints `Proven: 14, Skipped: 0`. Reusable per release from environments whose local `dotnet` cannot reach `api.nuget.org` directly.
+
+### Changed
+
+- **Reference-expression type flows the declared nullability for user-declared reference types.** A `§MT{...} (?Foo:a)` parameter reference now reads as `Annotated Foo` at its use site instead of falling through as `Oblivious`. Leading/trailing `?` is stripped from the internal `QualifiedName` so short-name comparisons work without double-encoding the annotation.
+- **Diagnostic messages echo the target shape.** `'Option<string>'` / `'List<string>'` / `'Foo'` labels replace the scalar `'string'` boilerplate when the target is a generic instantiation or a user-declared type.
+
+### Fixed
+
+- **Site-header pill lingered at `v0.13.2` after v0.14.0.** `website/src/lib/version.ts` was not in the release skill's version-file checklist. Now it is.
+- **Performance-test synthetic fixtures no longer misfire on nullability findings.** After the 0.14.0 severity flip promoted the three nullability codes to `Error`, the taint-analysis performance tests' blanket `HasErrors` assertion rejected the synthetic modules. Nullability findings on synthetic fixtures are now allowed through — the perf tests exercise timings, not nullability enforcement.
+
 ## [0.14.0] - 2026-08-23
 
 Nullability enforcement lands for scalar `:string` values and their arrays. The binder now flags possibly-null values funneled into non-nullable `:string` targets at three sites: variable bindings (`Calor0272`), function returns (`Calor0273`), and call-site arguments (`Calor0274`). Severity is `Error` by default under the bumped `SemanticsVersion.Major = 2`; legacy modules keep `Info` once the module-level `§SEMVER` directive is threaded through.
