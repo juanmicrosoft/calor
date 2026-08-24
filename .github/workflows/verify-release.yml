@@ -1,0 +1,86 @@
+name: Verify Release (installed tool)
+
+# On-demand end-to-end verification of a shipped release: install the `calor`
+# tool from nuget.org as a downstream consumer would, then exercise the Z3
+# verifier against a known-proven sample. Mirrors the manual check the
+# create-release skill spells out ("dotnet tool install --tool-path
+# /tmp/calorcheck calor --version $VER && calor verify …"), so releases can be
+# formally verified from environments where developers cannot reach
+# api.nuget.org directly (e.g. corporate proxies that mirror nuget.org with
+# lag and reject non-mirrored source overrides).
+#
+# Independent of publish-nuget.yml's sdk-consumer matrix: that one exercises
+# Calor.Sdk (MSBuild integration) via a local feed built during the publish
+# run. This one exercises the `calor` global tool via the public nuget.org
+# feed, which is what a user actually types after a release lands.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version to verify (e.g. 0.14.0)'
+        required: true
+        type: string
+
+jobs:
+  install-and-verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rid: linux-x64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+    runs-on: ${{ matrix.runner }}
+    name: install-and-verify (${{ matrix.rid }})
+
+    steps:
+      - name: Checkout sample
+        uses: actions/checkout@v4
+        with:
+          # Only need samples/Verification/proven-contracts.calr for the check.
+          # Sparse-checkout keeps the runner light and avoids submodule cost.
+          sparse-checkout: |
+            samples/Verification
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install calor ${{ inputs.version }} from nuget.org
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Explicit --add-source pins the install to nuget.org and bypasses
+          # any user/machine nuget.config that would route through a mirror.
+          # Fresh --tool-path per run so a stale install can't mask a real
+          # 'not found' — matches the create-release skill's guidance.
+          rm -rf "$RUNNER_TEMP/calorcheck"
+          dotnet tool install \
+            --tool-path "$RUNNER_TEMP/calorcheck" \
+            calor \
+            --version "${{ inputs.version }}" \
+            --add-source https://api.nuget.org/v3/index.json
+
+      - name: Print installed version
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/calorcheck/calor" --version
+
+      - name: Verify proven-contracts sample
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$("$RUNNER_TEMP/calorcheck/calor" verify samples/Verification/proven-contracts.calr)"
+          echo "$OUT"
+          # Guard against a shipped-but-broken Z3 that reports Calor0710
+          # ("Static contract verification skipped: Z3 SMT solver is not
+          # available") — those cases print Skipped>0 and non-zero exit.
+          # The proven sample must land Proven: 14, Skipped: 0.
+          echo "$OUT" | grep -q "Proven: 14"
+          echo "$OUT" | grep -q "Skipped: 0"
