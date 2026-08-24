@@ -10,6 +10,27 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-23
+
+Nullability enforcement lands for scalar `:string` values and their arrays. The binder now flags possibly-null values funneled into non-nullable `:string` targets at three sites: variable bindings (`Calor0272`), function returns (`Calor0273`), and call-site arguments (`Calor0274`). Severity is `Error` by default under the bumped `SemanticsVersion.Major = 2`; legacy modules keep `Info` once the module-level `§SEMVER` directive is threaded through.
+
+### Added
+
+- **Three nullability diagnostics.** `Calor0272 NullableToNonNullableBinding` for `§B{x:string}` from a possibly-null value; `Calor0273 NullableReturnFromNonNullable` for a non-null `-> string` returning a possibly-null value; `Calor0274 NullableArgumentToNonNullableParameter` for a possibly-null argument passed into a `:string` parameter.
+- **Array element types participate.** `[]string` is a non-null-element array; `[]?string` element annotations trip the same three codes when the container annotation is orthogonal to the element mismatch.
+- **Declared nullability flows through parameters, fields, properties, lambda parameters, and foreach loop variables.** All `VariableSymbol` creation sites now inherit the declared annotation, so references at their use sites report the correct source annotation.
+
+### Changed
+
+- **`SemanticsVersion.Major` bumped from 1 to 2.** Signals the new default nullability contract. Existing Z3 verification caches invalidate cleanly under the new version.
+- **BCL call signatures carry Roslyn `NullableAnnotation`.** The binder consults the metadata resolution to compute the source annotation for the three diagnostics above.
+- **`object.ToString()` is narrowed to `Annotated`.** Overrides can return `null`, so the previously `NotAnnotated` result was theoretically unsound.
+
+### Fixed
+
+- **`BoundVariableExpression` inherits declared nullability from its `VariableSymbol`.** Previously local references silently degraded to `Oblivious`.
+- **`NominalBoundType.Equals` includes the `NullableAnnotation` field.** An architecture test now guards against annotation-agnostic construction anti-patterns.
+
 ## [0.13.2] - 2026-08-12
 
 Hardening release. The compiler's control-flow and dataflow foundation is rebuilt on explicit semantics, and the build and release chain becomes hermetic and supply-chain verified.

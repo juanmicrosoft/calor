@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-12T23:02:47.835676Z",
-  "commit": "17d253df",
+  "timestamp": "2026-08-24T00:44:18.234629Z",
+  "commit": "14411aff",
   "frameworkVersion": "1.0.0",
   "summary": {
     "overallAdvantage": 1.32,
@@ -16,8 +16,8 @@
       "ratio": 1.42,
       "winner": "calor",
       "ci95": [
-        1.416,
-        1.416
+        1.417,
+        1.417
       ],
       "significant": true,
       "pValue": 0.0001,
@@ -4410,9 +4410,9 @@
       ],
       "calorSuccess": true,
       "cSharpSuccess": true,
-      "advantage": 1.388,
+      "advantage": 1.391,
       "metrics": {
-        "TokenEconomics": 1.072,
+        "TokenEconomics": 1.097,
         "GenerationAccuracy": 1.136,
         "Comprehension": 2.002,
         "EditPrecision": 1.405,
@@ -5335,8 +5335,8 @@
     ],
     "categoryDetails": {
       "TokenEconomics": {
-        "mean": 1.416,
-        "stdDev": 24.598,
+        "mean": 1.417,
+        "stdDev": 24.597,
         "ci95Lower": 1.403,
         "ci95Upper": 1.43,
         "cohensD": -0.431,
