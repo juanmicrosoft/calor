@@ -82,5 +82,7 @@ jobs:
           # ("Static contract verification skipped: Z3 SMT solver is not
           # available") — those cases print Skipped>0 and non-zero exit.
           # The proven sample must land Proven: 14, Skipped: 0.
-          echo "$OUT" | grep -q "Proven: 14"
-          echo "$OUT" | grep -q "Skipped: 0"
+          # Use \s+ (any whitespace run) in the pattern because the CLI
+          # aligns numbers with padding, e.g. "  Proven:      14".
+          echo "$OUT" | grep -Eq "Proven:\s+14\b"
+          echo "$OUT" | grep -Eq "Skipped:\s+0\b"
