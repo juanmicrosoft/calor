@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.14.2</span>
+            <span className="font-semibold text-calor-cerulean">v0.14.3</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Nullability threads through pure-Calor call sites: <code>Calor0274</code> now fires on non-BCL callees, and <code>BoundCallExpression.Type</code> inherits the declared return annotation instead of degrading to Oblivious.</span>
+            <span className="text-foreground">Small nullability fix: <code>§NEW&#123;Type&#125;</code> constructor expressions now carry the correct non-null annotation, tightening every downstream nullability check that reads the expression's type.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
