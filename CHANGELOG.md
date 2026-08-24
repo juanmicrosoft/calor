@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-08-24
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension (StructuralClarity): 1.84x (Calor)
+  - ErrorDetection (DetectionCapability): 1.49x (Calor)
+  - TokenEconomics (CompositeTokenEconomics): 1.42x (Calor)
+- **Benchmarks Evaluated**: 217
+
+### Added
+- **`Calor0274 NullableArgumentToNonNullableParameter` now fires on pure-Calor
+  call sites**, not only BCL-resolved ones. `BindCallExpression` was
+  previously scoped to `TryResolveBclCall` per the S4 comment; it now
+  additionally checks `resolution.Function.Parameters` (which carry
+  `NullableAnnotation` from the parameter-annotation flow that landed in
+  0.14) and routes through the same `NullabilityChecker.IsPossiblyNullAssignedTo`
+  predicate. `?Foo` argument into `:Foo` parameter on a `§C{this.Take}` call
+  now surfaces the diagnostic symmetrically with the BCL path. Scalar STRING
+  Calor-native fire is still blocked by a separate scope gap in `ResolveCall`
+  (does not OPTION-unwrap arg types on the Calor-native branch); pinned as a
+  known-limitation follow-on.
+- **`BoundCallExpression.Type` on pure-Calor calls now carries the declared
+  return-type annotation**, not `Oblivious`. A call to `-> ?string` /
+  `-> ?Foo` surfaces as `Annotated`; `-> string` / `-> Foo` as `NotAnnotated`.
+  BCL-resolved returns retain priority (`MetadataBinder` still wins). Uses
+  `TryReadDeclaredStringAnnotation` and wraps the raw `returnType` string
+  so `DisplayString` stays byte-identical for downstream consumers
+  (`BinderOverloadSetTests`, `IdScanner`, LSP hover).
+
+### Not in this release
+- **S8-Oblivious widening** — extending S8 to fire on `Oblivious` user-ref
+  sources depends on `§NEW` constructor annotation flow and BCL user-ref
+  return-type annotation flow, which aren't yet in place. Draft PR #1078
+  documents the 100+ real-world corpus regressions and the missing
+  precursors.
+
 ## [0.14.1] - 2026-08-24
 
 ### Benchmark Results (Statistical: 30 runs)
