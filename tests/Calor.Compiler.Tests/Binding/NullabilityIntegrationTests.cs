@@ -2155,4 +2155,178 @@ public class NullabilityIntegrationTests
             && d.Severity == SemanticsVersion.NullabilitySeverityFor()
             && d.Message.Contains("'a'"));
     }
+
+    // ================================================================
+    // v0.14 F-3B (nullability) — Calor-native return-site annotation
+    // flow: BoundCallExpression.Type carries the declared return
+    // annotation for a resolved pure-Calor callee. Prior to this slice
+    // pure-Calor callees produced an Oblivious BoundCallExpression.Type
+    // regardless of `-> string` vs `-> ?string` / `-> Foo` vs `-> ?Foo`.
+    // This is the S8-Oblivious precursor — once the return-side
+    // annotation flows, S8 can widen call-site emission from BCL-only
+    // to include pure-Calor callees without re-deriving the shape gate.
+    // BCL-resolved returns take priority (MetadataBinder still wins).
+    // ================================================================
+
+    /// <summary>
+    /// F-3B — a pure-Calor callee declared <c>-> ?string</c> must
+    /// produce a <c>BoundCallExpression</c> whose <c>.Type</c> is a
+    /// STRING <see cref="NominalBoundType"/> with <see cref="NullableAnnotation.Annotated"/>.
+    /// Prior to the F-3B slice this stayed <see cref="NullableAnnotation.Oblivious"/>.
+    /// </summary>
+    [Fact]
+    public void F3B_BoundCall_Type_Inherits_Declared_ReturnAnnotation_ForCalorFunction()
+    {
+        const string source = """
+            §M{m1:F3BNullableStringReturn}
+              §F{f1:GetFoo:pub} () -> ?string
+                §R STR:"hi"
+              §F{f2:Use:pub} () -> void
+                §B{tmp:?string} §C{GetFoo} §/C
+            """;
+
+        var (bound, _) = BindSource(source);
+        var call = FindFirstBoundCallInFunction(bound, "Use");
+        var nominal = Assert.IsType<NominalBoundType>(call.Type);
+        // QualifiedName preserves the declared surface form (matches
+        // BinderOverloadSetTests contract of not canonicalizing raw types
+        // on BoundCallExpression.Type). The annotation is the F-3B payload.
+        Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// F-3B — a pure-Calor callee declared <c>-> string</c> must
+    /// produce a <c>BoundCallExpression</c> whose <c>.Type</c> is a
+    /// STRING <see cref="NominalBoundType"/> with
+    /// <see cref="NullableAnnotation.NotAnnotated"/> — not Oblivious.
+    /// This is what unblocks S8-Oblivious: a downstream widening can
+    /// diff NotAnnotated-vs-Annotated on Calor-native returns.
+    /// </summary>
+    [Fact]
+    public void F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableCalorReturn()
+    {
+        const string source = """
+            §M{m1:F3BNonNullStringReturn}
+              §F{f1:GetFoo:pub} () -> string
+                §R STR:"hi"
+              §F{f2:Use:pub} () -> void
+                §B{tmp:string} §C{GetFoo} §/C
+            """;
+
+        var (bound, _) = BindSource(source);
+        var call = FindFirstBoundCallInFunction(bound, "Use");
+        var nominal = Assert.IsType<NominalBoundType>(call.Type);
+        // The annotation is the F-3B payload: previously Oblivious, now
+        // NotAnnotated so a future S8-Oblivious widening on pure-Calor
+        // call-sites can diff NotAnnotated-vs-Annotated correctly.
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// F-3B user-ref channel — a pure-Calor callee declared
+    /// <c>-> ?Foo</c> (where Foo is a Calor user class) must produce a
+    /// <c>BoundCallExpression</c> whose <c>.Type</c> is a
+    /// <see cref="NominalBoundType"/> for <c>Foo</c> with
+    /// <see cref="NullableAnnotation.Annotated"/>. Mirrors the scalar
+    /// STRING case on the user-ref channel the §S8 target-side gate
+    /// already handles.
+    /// </summary>
+    [Fact]
+    public void F3B_BoundCall_Type_Inherits_Annotated_For_NullableUserClassReturn()
+    {
+        // Foo defined as a §CL then used both as parameter/return type of
+        // sibling §MT methods. Static Foo.GetFoo call from Use exercises
+        // the same user-ref channel §S8's target-side gate already handles.
+        const string source = """
+            §M{m1:F3BNullableUserClassReturn}
+              §CL{c1:Foo:pub}
+                §MT{m1:GetFoo:pub:static} (?Foo:x) -> ?Foo
+                  §R x
+                §MT{m2:Use:pub:static} (?Foo:y) -> void
+                  §B{tmp:?Foo} §C{Foo.GetFoo} §A y §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+        var call = FindFirstBoundCallInFunction(bound, "Use");
+        Assert.True(
+            call.ResolvedSymbol is not null,
+            "GetFoo callee failed to resolve. Diagnostics: "
+            + string.Join(", ", diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        var nominal = Assert.IsType<NominalBoundType>(call.Type);
+        // The annotation is the F-3B payload — user-ref channel mirrors
+        // the scalar STRING case. Raw declared form (?Foo) is preserved
+        // in the QualifiedName to keep DisplayString byte-identical to
+        // pre-F-3B behavior for pure-Calor calls.
+        Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// F-3B user-ref roundtrip — a pure-Calor callee declared
+    /// <c>-> Foo</c> must produce a <c>BoundCallExpression</c> whose
+    /// <c>.Type</c> is a <see cref="NominalBoundType"/> for <c>Foo</c>
+    /// with <see cref="NullableAnnotation.NotAnnotated"/>. Guards
+    /// against the widened channel collapsing every user-ref return
+    /// to Annotated.
+    /// </summary>
+    [Fact]
+    public void F3B_BoundCall_Type_Inherits_NotAnnotated_For_NonNullableUserClassReturn()
+    {
+        const string source = """
+            §M{m1:F3BNonNullUserClassReturn}
+              §CL{c1:Foo:pub}
+                §MT{m1:GetFoo:pub:static} (Foo:x) -> Foo
+                  §R x
+                §MT{m2:Use:pub:static} (Foo:y) -> void
+                  §B{tmp:Foo} §C{Foo.GetFoo} §A y §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+        var call = FindFirstBoundCallInFunction(bound, "Use");
+        Assert.True(
+            call.ResolvedSymbol is not null,
+            "GetFoo callee failed to resolve. Diagnostics: "
+            + string.Join(", ", diagnostics.Select(d => $"{d.Code}: {d.Message}")));
+        var nominal = Assert.IsType<NominalBoundType>(call.Type);
+        // Non-nullable Foo roundtrip: annotation flips from Oblivious
+        // (pre-F-3B) to NotAnnotated. Raw QualifiedName ("Foo") is
+        // preserved via the declared return-type string, not
+        // TryBuildStringTarget's canonicalized shape.
+        Assert.Equal("Foo", nominal.QualifiedName);
+        Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
+    }
+
+    /// <summary>
+    /// F-3B helper — locate the first <see cref="BoundCallExpression"/>
+    /// under a function's body. Prefers the initializer of the first
+    /// <see cref="BoundBindStatement"/> so tests can co-locate the
+    /// callee (<c>GetFoo</c>) and the exercising binding
+    /// (<c>§B{tmp:...} §C{GetFoo} …</c>) in the same module.
+    /// </summary>
+    private static BoundCallExpression FindFirstBoundCallInFunction(BoundModule module, string functionName)
+    {
+        foreach (var fn in module.Functions)
+        {
+            // Class methods surface as "Foo.Use"; top-level functions as
+            // bare "Use". Match either by exact name OR by trailing
+            // ".<functionName>" so the same helper works for both shapes.
+            var matches = fn.Symbol.Name == functionName
+                || fn.Symbol.Name.EndsWith("." + functionName, StringComparison.Ordinal);
+            if (!matches) continue;
+            foreach (var statement in fn.Body)
+            {
+                if (statement is BoundBindStatement bind
+                    && bind.Initializer is BoundCallExpression call)
+                {
+                    return call;
+                }
+            }
+        }
+        var available = string.Join(
+            ", ",
+            module.Functions.Select(f =>
+                $"{f.Symbol.Name}({f.Body.Count} stmts, container={f.ContainingTypeName})"));
+        throw new Xunit.Sdk.XunitException(
+            $"Could not find BoundCallExpression under function '{functionName}' in bound module. "
+            + $"Available functions: [{available}]");
+    }
 }
