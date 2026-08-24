@@ -2190,7 +2190,11 @@ public class NullabilityIntegrationTests
         var nominal = Assert.IsType<NominalBoundType>(call.Type);
         // QualifiedName preserves the declared surface form (matches
         // BinderOverloadSetTests contract of not canonicalizing raw types
-        // on BoundCallExpression.Type). The annotation is the F-3B payload.
+        // on BoundCallExpression.Type). Locked here so a future
+        // refactor that swaps in TryBuildStringTarget's canonicalized
+        // target ("STRING") flips this test red — downstream consumers
+        // read .Type.DisplayString for overload keying, ID scanning, etc.
+        Assert.Equal("?string", nominal.QualifiedName);
         Assert.Equal(NullableAnnotation.Annotated, nominal.NullableAnnotation);
     }
 
@@ -2216,9 +2220,12 @@ public class NullabilityIntegrationTests
         var (bound, _) = BindSource(source);
         var call = FindFirstBoundCallInFunction(bound, "Use");
         var nominal = Assert.IsType<NominalBoundType>(call.Type);
-        // The annotation is the F-3B payload: previously Oblivious, now
-        // NotAnnotated so a future S8-Oblivious widening on pure-Calor
-        // call-sites can diff NotAnnotated-vs-Annotated correctly.
+        // QualifiedName preserved (see paired nullable-STRING test above
+        // for rationale). The annotation is the F-3B payload: previously
+        // Oblivious, now NotAnnotated so a future S8-Oblivious widening
+        // on pure-Calor call-sites can diff NotAnnotated-vs-Annotated
+        // correctly.
+        Assert.Equal("string", nominal.QualifiedName);
         Assert.Equal(NullableAnnotation.NotAnnotated, nominal.NullableAnnotation);
     }
 
