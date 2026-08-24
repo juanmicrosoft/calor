@@ -4,7 +4,54 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-23
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension (StructuralClarity): 1.84x (Calor)
+  - ErrorDetection (DetectionCapability): 1.49x (Calor)
+  - TokenEconomics (CompositeTokenEconomics): 1.42x (Calor)
+- **Benchmarks Evaluated**: 217
+
+### Added
+- **Nullability enforcement for `:string` values.** The binder now checks whether a
+  possibly-null value (Roslyn `Annotated` or `Oblivious`, per D3) is being funneled into
+  a Calor `:string` target and emits diagnostics with codes `Calor0272`, `Calor0273`,
+  and `Calor0274`:
+  - `Calor0272 NullableToNonNullableBinding` — a `§B{x:string}` binding is initialized
+    from a possibly-null value. Example: `§B{s:string} §C{System.Environment.GetEnvironmentVariable} §A STR:"HOME" §/C`.
+  - `Calor0273 NullableReturnFromNonNullable` — a function declared `-> string` returns
+    a possibly-null value.
+  - `Calor0274 NullableArgumentToNonNullableParameter` — a call passes a possibly-null
+    argument into a `:string` parameter.
+- **Severity is gated on `SemanticsVersion.Major`.** The three diagnostics emit at
+  `Error` when Major is `>= 2` (the current default after this release's bump) and
+  `Info` otherwise. Legacy modules declaring `§SEMVER[1.0.0]` will keep the pre-flip
+  Info severity once the module-level `§SEMVER` directive is threaded through the
+  binder in a follow-on slice.
+- **Array element types participate in the check.** `[]string` targets are non-null-element
+  arrays; a source with `[]?string` element annotation trips the same three codes when
+  the container annotation is orthogonal to the element mismatch.
+- **Declared nullability flows through parameters, fields, properties, lambda
+  parameters, and foreach loop variables.** Where previously only local `§B` bindings
+  carried the annotation, all `VariableSymbol` creation sites now inherit the declared
+  `NullableAnnotation` — so `§F{f1:Ok:pub} (?string:name)` references correctly report
+  as `Annotated` at their use sites.
+
 ### Changed
+- **`SemanticsVersion.Major` bumped from 1 to 2.** Signals the new default nullability
+  contract described above. Compilation-time telemetry and cache validity carry the new
+  version so existing Z3 verification caches invalidate cleanly.
+- **BCL call signatures now carry Roslyn `NullableAnnotation`.** `MetadataBinder` returns
+  a `BclCallResolution` record with return + parameter types + parameter names, and the
+  binder consults it to compute the source annotation for the three diagnostics above.
+- **`BoundStringLiteral`, `BoundInterpolatedStringExpression`, `BoundBinaryExpression`
+  (STRING result), `BoundStructuralExpression`, `BoundConditionalExpression`, and the
+  `object.ToString()` result are stamped with the correct annotation** — literals are
+  `NotAnnotated`, conditional expressions fold NEVER branches, and `ToString` is
+  narrowed to `Annotated` because overrides can return `null`.
 - **Local functions now fail safe during C# migration (#777).** Any containing member is preserved
   verbatim as counted C# interop instead of hoisting nested functions and breaking captures,
   recursion, generic constraints, modifiers, or ref semantics. Feature scorecards now report this
@@ -16,6 +63,23 @@ All notable changes to this project will be documented in this file.
   generates visitor interfaces, centralized exhaustive dispatch, and structural metadata;
   aggregate transforms use metadata-preserving `ModuleNode.With` copies; emitter reuse and
   compiler component dependency contracts are enforced by architecture tests.
+
+### Fixed
+- **`BoundVariableExpression` inherits declared nullability from its `VariableSymbol`.**
+  Previously local references silently degraded to `Oblivious`, causing follow-on
+  bindings to miss `Calor0272`. Handles `:string`, `:?string` (prefix), `:string?`
+  (postfix), and inferred-type locals.
+- **`NominalBoundType.Equals` includes the `NullableAnnotation` field.** An architecture
+  test guards against callers constructing `new NominalBoundType("STRING")` and
+  comparing against a literal-derived Type — those silently mismatched under the
+  previous annotation-agnostic equality.
+
+### Not in this release
+- **S7 (generic instantiations) and S8 (user-declared reference types)** are deferred
+  to a follow-on. The `GenericInstantiationBoundType` infrastructure already carries
+  annotations on type arguments, but the binder does not yet consult it for well-known
+  containers (`Option<T>`, `List<T>`, etc.); user-declared classes need declaration-site
+  annotation propagation.
 
 ## [0.13.2] - 2026-08-12
 
