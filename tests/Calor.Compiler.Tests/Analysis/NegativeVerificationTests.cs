@@ -160,14 +160,20 @@ public class NegativeVerificationTests
     [SkippableFact]
     public void SafeCode_SanitizedInput_NoWarning()
     {
+        // §B target + §O return relaxed :string → :?string to stay under
+        // the v0.14 §S5 gate: parameters do not yet flow annotations
+        // (task 3 / PR #1063), so a §B{...:string} initialized from a
+        // param-derived (CALL ...) trips Calor0272 at Error under
+        // Major>=2 and the §R query trips Calor0273 — either would send
+        // this test silently through Skip.If. Preserves the taint intent.
         var source = @"
 §M{m001:Test}
   §F{f001:SafeSanitized:pub}
       §I{string:user_input}
-      §O{string}
+      §O{?string}
       §E{db:w}
-      §B{sanitized:string} (CALL sql_escape user_input)
-      §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" sanitized)
+      §B{sanitized:?string} (CALL sql_escape user_input)
+      §B{query:?string} (+ STR:""SELECT * FROM users WHERE name = '"" sanitized)
       §C{db.execute}
         §A query
       §/C
@@ -180,13 +186,14 @@ public class NegativeVerificationTests
     [SkippableFact]
     public void SafeCode_EncodedHtmlOutput_NoWarning()
     {
+        // §B target + §O relaxed :string → :?string; see SafeCode_SanitizedInput.
         var source = @"
 §M{m001:Test}
   §F{f001:SafeHtml:pub}
       §I{string:user_input}
-      §O{string}
+      §O{?string}
       §E{net:w}
-      §B{encoded:string} (CALL html_escape user_input)
+      §B{encoded:?string} (CALL html_escape user_input)
       §C{response.write}
         §A encoded
       §/C
@@ -385,12 +392,13 @@ public class NegativeVerificationTests
     [SkippableFact]
     public void SafeCode_DefaultValueProvided_NoWarning()
     {
+        // §B target + §O relaxed :string → :?string; see SafeCode_SanitizedInput.
         var source = @"
 §M{m001:Test}
   §F{f001:SafeDefaultValue:pub}
       §I{string:input}
-      §O{string}
-      §B{result:string} (CALL coalesce input STR:""default"")
+      §O{?string}
+      §B{result:?string} (CALL coalesce input STR:""default"")
       §R result";
 
         // Coalesce function provides a default, making result non-null

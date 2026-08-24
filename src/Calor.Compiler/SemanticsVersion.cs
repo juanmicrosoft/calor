@@ -1,3 +1,5 @@
+using Calor.Compiler.Diagnostics;
+
 namespace Calor.Compiler;
 
 /// <summary>
@@ -57,6 +59,43 @@ public static class SemanticsVersion
         }
         return null;
     }
+
+    /// <summary>
+    /// v0.14 nullability §S5 severity gate for Calor0272 (NullableToNonNullableBinding),
+    /// Calor0273 (NullableReturnFromNonNullable), and Calor0274
+    /// (NullableArgumentToNonNullableParameter): the three checks emit
+    /// <see cref="DiagnosticSeverity.Error"/> once the effective SemVer.Major is at
+    /// or past 2, and <see cref="DiagnosticSeverity.Info"/> for legacy §SEMVER[1.0.0]
+    /// modules (Phase A behavior). Task #14 bumped <see cref="Major"/> to 2, so the
+    /// gate is open by default now; the parameter overload exists to receive a
+    /// per-module effective major once the <c>§SEMVER</c> directive is threaded
+    /// through the binder in a follow-up slice.
+    /// </summary>
+    /// <remarks>
+    /// See <c>docs/plans/v0.14-nullability-enforcement-scoping.md</c> D7 / F-3
+    /// for the gate design and <c>docs/plans/v0.14-metadata-binding-scoping.md</c>
+    /// F-7 for the SemVer coupling.
+    /// </remarks>
+    /// <param name="effectiveMajor">The effective SemVer major of the module under
+    /// analysis (from a <c>§SEMVER</c> directive when present, otherwise
+    /// <see cref="Major"/>).</param>
+    /// <returns><see cref="DiagnosticSeverity.Error"/> when <paramref name="effectiveMajor"/>
+    /// is at least 2, otherwise <see cref="DiagnosticSeverity.Info"/>.</returns>
+    public static DiagnosticSeverity NullabilitySeverityFor(int effectiveMajor)
+        => effectiveMajor >= 2
+            ? DiagnosticSeverity.Error
+            : DiagnosticSeverity.Info;
+
+    /// <summary>
+    /// Convenience overload of <see cref="NullabilitySeverityFor(int)"/> that reads
+    /// the current compiler's <see cref="Major"/>. Callers that have not yet been
+    /// wired to the per-module effective SemVer use this overload; the binder emit
+    /// sites for Calor0272/0273/0274 route through here today.
+    /// </summary>
+    /// <returns>The severity for nullability diagnostics under the current
+    /// compiler <see cref="Major"/>.</returns>
+    public static DiagnosticSeverity NullabilitySeverityFor()
+        => NullabilitySeverityFor(Major);
 }
 
 /// <summary>

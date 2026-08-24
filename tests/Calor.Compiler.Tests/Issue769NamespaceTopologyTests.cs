@@ -1459,7 +1459,7 @@ public class Issue769NamespaceTopologyTests
                   §R INT:1
               §CL{c2:Box:pub}<TFirst,TSecond>
                 §CTOR{ctor2:pub} (str:value)
-                  §B{copy2:str} value
+                  §B{copy2:?str} value
                 §MT{m2:Pick:pub} () -> i32
                   §R INT:2
               §F{f1:UseOne:pub} (Box<i32>:box) -> i32
@@ -1532,7 +1532,7 @@ public class Issue769NamespaceTopologyTests
               §NS{ns1:Alpha}
                 §CL{c2:Box:pub}<T>
                   §MT{m2:Danger:pub} (str:value) -> void
-                    §B{copy:str} value
+                    §B{copy:?str} value
               §NS{ns2:Beta}
                 §F{f2:Use:pub} (Alpha.Box<i32>:box, str:user_input) -> void
                   §C{box.Danger} §A user_input §/C

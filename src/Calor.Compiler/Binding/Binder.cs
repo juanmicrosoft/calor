@@ -1208,19 +1208,22 @@ public sealed class Binder
         // Annotated or Oblivious (per D3, Oblivious is treated conservatively
         // as possibly-null). Same TryBuildStringTarget filter — only scalar
         // STRING return types are in-scope for S3 (per D6); non-string
-        // returns silently pass. Info severity in Phase A — promotes to
-        // Error at S5 gated on SemanticsVersion.Major>=2.
+        // returns silently pass. Severity is gated at S5 via
+        // SemanticsVersion.NullabilitySeverityFor: Error when Major>=2 (post
+        // task #14 bump), Info otherwise (legacy §SEMVER[1.0.0] modules once
+        // the SEMVER directive is threaded through the binder).
         if (expr != null
             && _currentFunctionReturnType != null
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
         {
-            _diagnostics.ReportInfo(
+            _diagnostics.Report(
                 expr.Span,
                 DiagnosticCode.NullableReturnFromNonNullable,
                 "Return declares non-nullable 'string' but the returned value may be null " +
                 $"(source annotation: '{DescribeAnnotation(expr)}'). " +
-                "Change the return type to '?string' or add an explicit non-null check at the interop boundary.");
+                "Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+                SemanticsVersion.NullabilitySeverityFor());
         }
 
         return new BoundReturnStatement(ret.Span, expr);
@@ -1415,20 +1418,23 @@ public sealed class Binder
         // Oblivious is treated conservatively as possibly-null).
         //
         // S3b wired MetadataBinder into BindCallExpression so BCL-shaped calls
-        // now carry real annotations on their BoundCallExpression.Type. Info
-        // severity in Phase A — promotes to Error at S5 gated on
-        // SemanticsVersion.Major>=2.
+        // now carry real annotations on their BoundCallExpression.Type.
+        // Severity is gated at S5 via SemanticsVersion.NullabilitySeverityFor:
+        // Error when Major>=2 (post task #14 bump), Info otherwise (legacy
+        // §SEMVER[1.0.0] modules once the SEMVER directive is threaded
+        // through the binder).
         if (initializer != null
             && bind.TypeName != null
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
         {
-            _diagnostics.ReportInfo(
+            _diagnostics.Report(
                 initializer.Span,
                 DiagnosticCode.NullableToNonNullableBinding,
                 $"Binding '{bind.Name}' declares non-nullable 'string' but its initializer " +
                 $"may be null (source annotation: '{DescribeAnnotation(initializer)}'). " +
-                "Change the target to '?string' or add an explicit non-null check at the interop boundary.");
+                "Change the target to '?string' or add an explicit non-null check at the interop boundary.",
+                SemanticsVersion.NullabilitySeverityFor());
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
@@ -2679,7 +2685,11 @@ public sealed class Binder
         // slice. BCL-only for now (mirrors S3b's System.*/Microsoft.*
         // narrowing): the parameter-side annotation flow requires a
         // resolved Roslyn IMethodSymbol, and non-BCL Calor callees do not
-        // yet carry annotated parameter BoundTypes.
+        // yet carry annotated parameter BoundTypes. Severity is gated at
+        // S5 via SemanticsVersion.NullabilitySeverityFor: Error when
+        // Major>=2 (post task #14 bump), Info otherwise (legacy
+        // §SEMVER[1.0.0] modules once the SEMVER directive is threaded
+        // through the binder).
         if (bclResolution is { } bcl)
         {
             var paramTypes = bcl.Parameters;
@@ -2694,12 +2704,13 @@ public sealed class Binder
                 var paramName = i < paramNames.Count && !string.IsNullOrEmpty(paramNames[i])
                     ? paramNames[i]
                     : $"arg{i}";
-                _diagnostics.ReportInfo(
+                _diagnostics.Report(
                     args[i].Span,
                     DiagnosticCode.NullableArgumentToNonNullableParameter,
                     $"Argument to parameter '{paramName}' declares non-nullable 'string' " +
                     $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
-                    "Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.");
+                    "Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+                    SemanticsVersion.NullabilitySeverityFor());
             }
         }
 
