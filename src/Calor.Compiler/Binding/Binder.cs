@@ -1512,17 +1512,68 @@ public sealed class Binder
             trimmed = trimmed[..^1];
         }
 
-        if (trimmed is not ("STRING" or "string" or "str"))
+        if (trimmed is ("STRING" or "string" or "str"))
         {
-            return false;
+            target = new BoundTypes.NominalBoundType(
+                "STRING",
+                annotatedNullable
+                    ? BoundTypes.NullableAnnotation.Annotated
+                    : BoundTypes.NullableAnnotation.NotAnnotated);
+            return true;
         }
-        target = new BoundTypes.NominalBoundType(
-            "STRING",
-            annotatedNullable
-                ? BoundTypes.NullableAnnotation.Annotated
-                : BoundTypes.NullableAnnotation.NotAnnotated);
-        return true;
+
+        // v0.14 §S8 (task #7 Phase-C) — user-declared reference-type targets.
+        // Any nominal type name that is neither STRING (handled above) nor a
+        // built-in value type participates: :Foo (non-null) vs :?Foo (nullable)
+        // trips Calor0272/0273/0274 symmetrically with the scalar STRING gate.
+        // Runs LAST so post-expansion shapes (ARRAY[…], OPTION[inner=…]) are
+        // caught by the S6/S7/scalar paths first — this branch reaches only
+        // bare identifiers after prefix/postfix '?' peel.
+        // Value types (INT/BOOL/…) return false because they can never be
+        // null. Names containing `[` or `.` are excluded — they are either
+        // post-expansion residue or dotted namespace-qualified forms we do
+        // not yet classify (defer to a future D6 follow-on).
+        if (trimmed.Length > 0
+            && !trimmed.Contains('[', System.StringComparison.Ordinal)
+            && !trimmed.Contains('.', System.StringComparison.Ordinal)
+            && !IsBuiltInValueTypeName(trimmed))
+        {
+            target = new BoundTypes.NominalBoundType(
+                trimmed,
+                annotatedNullable
+                    ? BoundTypes.NullableAnnotation.Annotated
+                    : BoundTypes.NullableAnnotation.NotAnnotated);
+            return true;
+        }
+        return false;
     }
+
+    /// <summary>
+    /// v0.14 §S8 helper — Calor built-in value type names that must NOT
+    /// participate in the widened user-ref nullability gate. Value types
+    /// can never be null, so a <c>:INT</c> target has no meaningful
+    /// mismatch with an Annotated source. Names are matched exactly (case-
+    /// sensitive) to keep the gate narrow; typos like <c>:inT</c> fall
+    /// through to the user-ref path where they will later fail resolution.
+    /// </summary>
+    private static bool IsBuiltInValueTypeName(string name) => name switch
+    {
+        "INT" or "int" or "i32" => true,
+        "LONG" or "long" or "i64" => true,
+        "SHORT" or "short" or "i16" => true,
+        "BYTE" or "byte" or "i8" => true,
+        "UINT" or "uint" or "u32" => true,
+        "ULONG" or "ulong" or "u64" => true,
+        "USHORT" or "ushort" or "u16" => true,
+        "UBYTE" or "ubyte" or "u8" => true,
+        "FLOAT" or "float" or "f32" => true,
+        "DOUBLE" or "double" or "f64" => true,
+        "DECIMAL" or "decimal" => true,
+        "BOOL" or "bool" => true,
+        "CHAR" or "char" => true,
+        "VOID" or "void" => true,
+        _ => false,
+    };
 
     /// <summary>
     /// v0.14 §S6 helper — recognize array-of-STRING targets (both the
@@ -1846,6 +1897,12 @@ public sealed class Binder
                     $"'{ShortGenericName(g.Definition.QualifiedName)}<string>'",
                     $"'{ShortGenericName(g.Definition.QualifiedName)}<?string>'"
                 ),
+            // v0.14 §S8 — user-declared reference types echo their own name
+            // in the message so users see 'Foo' / '?Foo' rather than the
+            // scalar-STRING boilerplate. Distinguished by QualifiedName not
+            // matching the STRING aliases.
+            BoundTypes.NominalBoundType n when n.QualifiedName is not ("STRING" or "string" or "str" or "System.String") =>
+                ($"'{n.QualifiedName}'", $"'?{n.QualifiedName}'"),
             _ => ("'string'", "'?string'"),
         };
     }

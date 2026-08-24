@@ -1827,4 +1827,176 @@ public class NullabilityIntegrationTests
 
         Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
     }
+
+    // ================================================================
+    // v0.14 §S8 — task #7 Phase-C follow-on: user-declared reference
+    // types. `:Foo` is non-null; `:?Foo` is nullable. Trips Calor0272
+    // (bind) and Calor0273 (return) when a possibly-null user-class
+    // source is funneled into a non-null user-class target. Call-site
+    // emission (Calor0274) for pure-Calor callees is still BCL-only per
+    // the S4 scoping comment in BindCallExpression — this test slice
+    // locks the predicate wiring so the future widening only threads
+    // annotations, not re-derives the user-ref shape gate.
+    // ================================================================
+
+    /// <summary>
+    /// S8 bind-site — a §B{b:Foo} initialized from a :?Foo parameter
+    /// reference fires Calor0272 at the S5-gated severity.
+    /// </summary>
+    [Fact]
+    public void S8_Calor0272_Fires_When_NullableUserClass_Bound_To_NonNullUserClass()
+    {
+        const string source = """
+            §M{m1:S8Bind}
+              §CL{c1:Foo:pub}
+                §MT{m1:Use:pub} (?Foo:a) -> void
+                  §B{b:Foo} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor());
+    }
+
+    /// <summary>
+    /// S8 round-trip guard — a non-null user-class local bound into a
+    /// non-null user-class target must NOT fire Calor0272. Guards
+    /// against the widened target-shape gate becoming a false-positive
+    /// on ordinary Foo → Foo assignments.
+    /// </summary>
+    [Fact]
+    public void S8_Calor0272_DoesNotFire_For_NonNullUserClass_Roundtrip()
+    {
+        const string source = """
+            §M{m1:S8Roundtrip}
+              §CL{c1:Foo:pub}
+                §MT{m1:Use:pub} (Foo:a) -> void
+                  §B{b:Foo} a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    /// <summary>
+    /// S8 return-site — a function declared -> Foo that returns a
+    /// possibly-null :?Foo-typed local must emit Calor0273 at the
+    /// S5-gated severity. Symmetric with the S4 return-site test on
+    /// scalar STRING.
+    /// </summary>
+    [Fact]
+    public void S8_Calor0273_Fires_For_NullableUserClass_Return_Into_NonNullDeclared()
+    {
+        const string source = """
+            §M{m1:S8Return}
+              §CL{c1:Foo:pub}
+                §MT{m1:Get:pub} (?Foo:a) -> Foo
+                  §R a
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor());
+    }
+
+    /// <summary>
+    /// S8 call-site direct-predicate — an Annotated user-class source
+    /// assigned into a NotAnnotated user-class target fires the same
+    /// predicate the S4 call-site consumes on BCL calls. Predicate
+    /// form (mirrors S6 and S7) because pure-Calor call-site emission
+    /// still runs BCL-only ("the parameter-side annotation flow
+    /// requires a resolved Roslyn IMethodSymbol, and non-BCL Calor
+    /// callees do not yet carry annotated parameter BoundTypes"; see
+    /// BindCallExpression scoping comment). This test locks the
+    /// predicate wiring so the pure-Calor widening only needs to
+    /// thread annotations, not re-derive the user-ref shape gate.
+    /// </summary>
+    [Fact]
+    public void S8_Calor0274_Predicate_Fires_For_NullableUserClass_Argument()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("Bar", NullableAnnotation.Annotated));
+        var parameterTarget = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated);
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
+    }
+
+    /// <summary>
+    /// S8 primitive guard — value-type primitives (INT, BOOL, …) are
+    /// never null and must not participate in the widened check. A
+    /// synthetic Annotated INT source assigned to a NotAnnotated INT
+    /// target must NOT fire. Direct-predicate test — no source-level
+    /// repro because INT already lacks a nullable-declaration syntax.
+    /// </summary>
+    [Fact]
+    public void S8_Does_Not_Fire_For_PrimitiveType_INT()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("INT", NullableAnnotation.Annotated));
+        var target = new NominalBoundType("INT", NullableAnnotation.NotAnnotated);
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S8 unresolved-type guard — an UnresolvedBoundType source (e.g. a
+    /// callee whose type resolution failed) must NOT crash the
+    /// predicate and must NOT fire against a user-ref target. The
+    /// syntactic user-ref-shape gate is the whole point: we return
+    /// false rather than propagating a resolution failure as a
+    /// nullability diagnostic.
+    /// </summary>
+    [Fact]
+    public void S8_Does_Not_Fire_For_UnresolvedType()
+    {
+        var source = new NullabilityTestExpr(
+            new UnresolvedBoundType("test-unresolved"));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S8 dotted-namespace bridge — <see cref="NullabilityChecker"/>'s
+    /// short-name comparator (<c>ShortNameEquals</c>) treats
+    /// <c>My.Custom.Foo</c> and <c>Foo</c> as equivalent for the purpose
+    /// of source-vs-target shape matching. A Roslyn-resolved BCL type
+    /// (fully qualified) assigned into a Calor target (bare identifier)
+    /// must therefore fire the same predicate. Guards against a future
+    /// change that drops the dotted-name bridging and silently breaks
+    /// BCL-source / Calor-target user-ref cases.
+    /// </summary>
+    [Fact]
+    public void S8_Bridges_Dotted_Namespace_On_ShortName_Match()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S8 dotted-namespace mismatch — different short-name segments
+    /// (<c>My.Custom.Foo</c> vs <c>Bar</c>) must NOT fire. Complements
+    /// the bridge test above: the widened check accepts the SAME
+    /// user-ref type on both sides, not any pair of nominal types.
+    /// Type-mismatch is a different diagnostic family (out-of-scope
+    /// for S8).
+    /// </summary>
+    [Fact]
+    public void S8_Does_Not_Fire_For_DifferentShortName_Nominals()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated));
+        var target = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated);
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
 }
