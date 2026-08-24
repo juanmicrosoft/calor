@@ -244,7 +244,12 @@ public sealed class Binder
         var result = binder.ResolveCall(receiverType, methodName, metaArgs);
         if (!result.IsResolved) return null;
 
-        var returnType = result.GetReturnBoundType();
+        // v0.14 §S6 — prefer the element-annotation-preserving
+        // GetReturnBoundTypeEx so IArrayTypeSymbol returns surface as
+        // ArrayBoundType(elementType with real annotation). Non-array
+        // returns fall through to the same NominalBoundType shape as
+        // GetReturnBoundType, so BCL callers observe no change.
+        var returnType = result.GetReturnBoundTypeEx();
         var paramTypes = result.GetParameterBoundTypes();
         var paramNames = result.Symbol!.Parameters.Select(p => p.Name).ToArray();
         return new BclCallResolution(returnType, paramTypes, paramNames);
@@ -258,7 +263,7 @@ public sealed class Binder
     /// argument-nullability check.
     /// </summary>
     private readonly record struct BclCallResolution(
-        BoundTypes.NominalBoundType? Return,
+        BoundTypes.BoundType? Return,
         IReadOnlyList<BoundTypes.NominalBoundType> Parameters,
         IReadOnlyList<string> ParameterNames);
 
@@ -1217,12 +1222,14 @@ public sealed class Binder
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
         {
+            var targetShapeLabel = stringTarget is BoundTypes.ArrayBoundType ? "'string[]'" : "'string'";
+            var fixHintTargetLabel = stringTarget is BoundTypes.ArrayBoundType ? "'[?string]'" : "'?string'";
             _diagnostics.Report(
                 expr.Span,
                 DiagnosticCode.NullableReturnFromNonNullable,
-                "Return declares non-nullable 'string' but the returned value may be null " +
+                $"Return declares non-nullable {targetShapeLabel} but the returned value may be null " +
                 $"(source annotation: '{DescribeAnnotation(expr)}'). " +
-                "Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+                $"Change the return type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
                 SemanticsVersion.NullabilitySeverityFor());
         }
 
@@ -1428,22 +1435,42 @@ public sealed class Binder
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
         {
+            var targetShapeLabel = stringTarget is BoundTypes.ArrayBoundType ? "'string[]'" : "'string'";
+            var fixHintTargetLabel = stringTarget is BoundTypes.ArrayBoundType ? "'[?string]'" : "'?string'";
             _diagnostics.Report(
                 initializer.Span,
                 DiagnosticCode.NullableToNonNullableBinding,
-                $"Binding '{bind.Name}' declares non-nullable 'string' but its initializer " +
+                $"Binding '{bind.Name}' declares non-nullable {targetShapeLabel} but its initializer " +
                 $"may be null (source annotation: '{DescribeAnnotation(initializer)}'). " +
-                "Change the target to '?string' or add an explicit non-null check at the interop boundary.",
+                $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
                 SemanticsVersion.NullabilitySeverityFor());
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
     }
 
-    private static bool TryBuildStringTarget(string bindTypeName, out BoundTypes.NominalBoundType? target)
+    private static bool TryBuildStringTarget(string bindTypeName, out BoundTypes.BoundType? target)
     {
         target = null;
         var trimmed = bindTypeName.Trim();
+
+        // v0.14 §S6 (task #7 Phase-C) — array-shape targets. Surface forms
+        // accepted here mirror what ExpandType and IsLikelyType emit:
+        //   :[str] / :[string]                 -> "ARRAY[element=STRING]"    (non-null elements)
+        //   :[?str] / :[?string]               -> "ARRAY[element=OPTION[inner=STRING]]" (nullable elements)
+        //   :str[] / :string[]                 -> "STRING[]"                 (postfix; non-null elements)
+        //   :?str[] / :?string[]               -> "?STRING[]"                (nullable elements)
+        // Recognize both post-expansion and raw surface forms because
+        // some code paths construct BindStatementNode without going
+        // through ExpandType. Prefix "?" on the ELEMENT indicates nullable
+        // elements; the array container itself is orthogonal (S6 diagnoses
+        // element mismatch only, per the D6 follow-on scope).
+        if (TryParseArrayStringTarget(trimmed, out var arrayTarget))
+        {
+            target = arrayTarget;
+            return true;
+        }
+
         bool annotatedNullable = false;
 
         // Parser's ExpandType normalizes surface forms:
@@ -1485,6 +1512,73 @@ public sealed class Binder
     }
 
     /// <summary>
+    /// v0.14 §S6 helper — recognize array-of-STRING targets (both the
+    /// bracket-prefix Calor form <c>[str]</c>/<c>[?str]</c> and the
+    /// postfix <c>str[]</c>/<c>?str[]</c>, plus their post-ExpandType
+    /// normalizations). Builds an <see cref="BoundTypes.ArrayBoundType"/>
+    /// whose element is a STRING <see cref="BoundTypes.NominalBoundType"/>
+    /// carrying the declared element annotation. Returns false for
+    /// non-array or non-STRING-element shapes, keeping the S6 scope
+    /// narrow (D6 follow-on).
+    /// </summary>
+    private static bool TryParseArrayStringTarget(string trimmed, out BoundTypes.ArrayBoundType? target)
+    {
+        target = null;
+        string? innerType = null;
+
+        // Post-expansion form: ARRAY[element=<inner>]
+        if (trimmed.StartsWith("ARRAY[element=", StringComparison.Ordinal)
+            && trimmed.EndsWith("]", StringComparison.Ordinal))
+        {
+            innerType = trimmed["ARRAY[element=".Length..^1];
+        }
+        // Postfix bracket form: <inner>[] (post-ExpandType) or str[]/string[] (raw)
+        else if (trimmed.EndsWith("[]", StringComparison.Ordinal) && trimmed.Length > 2)
+        {
+            innerType = trimmed[..^2];
+        }
+        // Raw Calor bracket-prefix form: [<inner>]
+        else if (trimmed.StartsWith("[", StringComparison.Ordinal)
+                 && trimmed.EndsWith("]", StringComparison.Ordinal)
+                 && trimmed.Length > 2
+                 && !trimmed.Contains(',')) // Multi-dim arrays not in S6 scope
+        {
+            innerType = trimmed[1..^1];
+        }
+
+        if (innerType is null) return false;
+
+        var elementAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var elementTrimmed = innerType.Trim();
+
+        if (elementTrimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+            && elementTrimmed.EndsWith("]", StringComparison.Ordinal))
+        {
+            elementAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            elementTrimmed = elementTrimmed["OPTION[inner=".Length..^1];
+        }
+        else if (elementTrimmed.StartsWith("?", StringComparison.Ordinal))
+        {
+            elementAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            elementTrimmed = elementTrimmed[1..];
+        }
+        else if (elementTrimmed.EndsWith("?", StringComparison.Ordinal) && elementTrimmed.Length > 1)
+        {
+            elementAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            elementTrimmed = elementTrimmed[..^1];
+        }
+
+        if (elementTrimmed is not ("STRING" or "string" or "str" or "System.String"))
+        {
+            return false;
+        }
+
+        var elementBound = new BoundTypes.NominalBoundType("STRING", elementAnnotation);
+        target = new BoundTypes.ArrayBoundType(elementBound);
+        return true;
+    }
+
+    /// <summary>
     /// v0.14 §S4 helper — reshapes a resolved callee parameter's
     /// NominalBoundType into the target the <see cref="NullabilityChecker"/>
     /// consumes for scalar STRING checks. Returns null when the parameter
@@ -1493,7 +1587,7 @@ public sealed class Binder
     /// nullable (:?string — accepting null is by design). Callers use
     /// null as "skip this argument, do not fire Calor0274".
     /// </summary>
-    private static BoundTypes.NominalBoundType? TryBuildScalarStringTarget(BoundTypes.NominalBoundType parameterType)
+    private static BoundTypes.BoundType? TryBuildScalarStringTarget(BoundTypes.NominalBoundType parameterType)
     {
         if (parameterType is null) return null;
 
@@ -1510,14 +1604,53 @@ public sealed class Binder
             "System.String" => true,
             _ => false,
         };
-        if (!isScalarString) return null;
+        if (isScalarString)
+        {
+            // Parameter already declared nullable — accepting null is intended.
+            if (parameterType.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) return null;
 
-        // Parameter already declared nullable — accepting null is intended.
-        if (parameterType.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) return null;
+            return new BoundTypes.NominalBoundType(
+                "STRING",
+                BoundTypes.NullableAnnotation.NotAnnotated);
+        }
 
-        return new BoundTypes.NominalBoundType(
-            "STRING",
-            BoundTypes.NullableAnnotation.NotAnnotated);
+        // v0.14 §S6 — array-of-STRING parameter shape. MetadataBinder
+        // currently flattens Roslyn IArrayTypeSymbol into a NominalBoundType
+        // whose QualifiedName is "string[]" / "System.String[]". Parse
+        // that surface here so Calor0274 fires when a possibly-null-
+        // element array is passed into a non-null-element parameter.
+        return TryBuildArrayStringParameterTarget(parameterType);
+    }
+
+    /// <summary>
+    /// v0.14 §S6 helper — recognizes an array-of-STRING parameter shape
+    /// encoded by MetadataBinder as a flat <see cref="BoundTypes.NominalBoundType"/>
+    /// with QualifiedName like <c>string[]</c> / <c>System.String[]</c>.
+    /// Returns an <see cref="BoundTypes.ArrayBoundType"/> target with a
+    /// STRING element carrying NotAnnotated so the checker will fire on
+    /// possibly-null-element sources. Returns null when the parameter is
+    /// not a string-element array. Element-level nullability from the
+    /// Roslyn side is not yet observable through the flat encoding, so
+    /// this helper conservatively treats the parameter as expecting
+    /// non-null elements — the same conservative default as scalar STRING.
+    /// </summary>
+    private static BoundTypes.BoundType? TryBuildArrayStringParameterTarget(BoundTypes.NominalBoundType parameterType)
+    {
+        var qn = parameterType.QualifiedName;
+        if (!qn.EndsWith("[]", StringComparison.Ordinal)) return null;
+        var element = qn[..^2];
+        var isStringElement = element switch
+        {
+            "STRING" => true,
+            "string" => true,
+            "str" => true,
+            "System.String" => true,
+            _ => false,
+        };
+        if (!isStringElement) return null;
+
+        return new BoundTypes.ArrayBoundType(
+            new BoundTypes.NominalBoundType("STRING", BoundTypes.NullableAnnotation.NotAnnotated));
     }
 
     private static string DescribeAnnotation(BoundExpression source) => source.Type switch
@@ -1561,9 +1694,18 @@ public sealed class Binder
     private static BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
     {
         if (bindTypeName is null) return BoundTypes.NullableAnnotation.Oblivious;
-        return TryBuildStringTarget(bindTypeName, out var target)
-            ? target!.NullableAnnotation
-            : BoundTypes.NullableAnnotation.Oblivious;
+        if (!TryBuildStringTarget(bindTypeName, out var target)) return BoundTypes.NullableAnnotation.Oblivious;
+        // This helper feeds the scalar VariableSymbol.NullableAnnotation
+        // for downstream BoundVariableExpression reads. Only scalar STRING
+        // targets contribute — array-shape (§S6) VariableSymbols do not
+        // yet carry a per-element annotation, so array targets fall
+        // through as Oblivious. When S6 threads element annotations onto
+        // array VariableSymbols this helper widens.
+        return target switch
+        {
+            BoundTypes.NominalBoundType n => n.NullableAnnotation,
+            _ => BoundTypes.NullableAnnotation.Oblivious,
+        };
     }
 
     private VariableSymbol? FindRebindTarget(string name)
@@ -2680,16 +2822,18 @@ public sealed class Binder
         var annotatedReturn = bclResolution?.Return;
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate at the
-        // call-site boundary). Scoped to scalar STRING parameters per D6 —
-        // arrays / generics / user reference types land in a follow-on
-        // slice. BCL-only for now (mirrors S3b's System.*/Microsoft.*
-        // narrowing): the parameter-side annotation flow requires a
-        // resolved Roslyn IMethodSymbol, and non-BCL Calor callees do not
-        // yet carry annotated parameter BoundTypes. Severity is gated at
-        // S5 via SemanticsVersion.NullabilitySeverityFor: Error when
-        // Major>=2 (post task #14 bump), Info otherwise (legacy
-        // §SEMVER[1.0.0] modules once the SEMVER directive is threaded
-        // through the binder).
+        // call-site boundary). §S6 widens the target-shape gate to include
+        // array-of-STRING parameters — the same predicate now fires when
+        // a possibly-null-element array is passed into a non-null-element
+        // parameter (e.g. String.Join(string, string[])). BCL-only for now
+        // (mirrors S3b's System.*/Microsoft.* narrowing): the parameter-
+        // side annotation flow requires a resolved Roslyn IMethodSymbol,
+        // and non-BCL Calor callees do not yet carry annotated parameter
+        // BoundTypes. Severity is gated at S5 via
+        // SemanticsVersion.NullabilitySeverityFor: Error when Major>=2
+        // (post task #14 bump), Info otherwise (legacy §SEMVER[1.0.0]
+        // modules once the SEMVER directive is threaded through the
+        // binder).
         if (bclResolution is { } bcl)
         {
             var paramTypes = bcl.Parameters;
@@ -2704,12 +2848,14 @@ public sealed class Binder
                 var paramName = i < paramNames.Count && !string.IsNullOrEmpty(paramNames[i])
                     ? paramNames[i]
                     : $"arg{i}";
+                var targetShapeLabel = stringTarget is BoundTypes.ArrayBoundType ? "'string[]'" : "'string'";
+                var fixHintTargetLabel = stringTarget is BoundTypes.ArrayBoundType ? "'[?string]'" : "'?string'";
                 _diagnostics.Report(
                     args[i].Span,
                     DiagnosticCode.NullableArgumentToNonNullableParameter,
-                    $"Argument to parameter '{paramName}' declares non-nullable 'string' " +
+                    $"Argument to parameter '{paramName}' declares non-nullable {targetShapeLabel} " +
                     $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
-                    "Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+                    $"Change the parameter type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
                     SemanticsVersion.NullabilitySeverityFor());
             }
         }

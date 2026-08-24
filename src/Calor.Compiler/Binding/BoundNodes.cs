@@ -741,7 +741,7 @@ public class BoundCallExpression : BoundExpression
         TextSpan? receiverSpan = null,
         bool isInaccessibleCall = false,
         TypeSymbol? receiverTypeSymbol = null,
-        NominalBoundType? annotatedReturnType = null)
+        BoundType? annotatedReturnType = null)
         : base(span)
     {
         Target = target;
@@ -750,10 +750,13 @@ public class BoundCallExpression : BoundExpression
         ResolvedSymbols = resolvedSymbols
             ?? (resolvedSymbol == null ? Array.Empty<FunctionSymbol>() : [resolvedSymbol]);
         // v0.14 §S3b (nullability workstream): when MetadataBinder resolved a
-        // BCL-shaped call, it hands back an annotated NominalBoundType. Prefer
-        // that over the plain resultType-string wrap so downstream consumers
-        // (Calor0272 emitter, S8's typed CFG null-state slice) see real
-        // nullability annotations instead of the always-Oblivious default.
+        // BCL-shaped call, it hands back an annotated BoundType. Prefer that
+        // over the plain resultType-string wrap so downstream consumers
+        // (Calor0272 emitter, §S6 array-element checks, S8's typed CFG
+        // null-state slice) see real nullability annotations instead of the
+        // always-Oblivious default. §S6 broadens the accepted shape from
+        // NominalBoundType to BoundType so IArrayTypeSymbol returns surface
+        // as element-annotation-preserving ArrayBoundType.
         Type = annotatedReturnType ?? new NominalBoundType(resultType);
         ResolvedTypeName = resolvedTypeName;
         ResolvedMethodName = resolvedMethodName;

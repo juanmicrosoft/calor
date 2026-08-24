@@ -347,12 +347,34 @@ internal readonly struct MetadataBinderResult
     /// through to the bound-tree side. Callers that hold a resolved result
     /// consume this instead of re-inspecting the raw Roslyn symbol.
     ///
-    /// Returns null when the result is not resolved.
+    /// Returns null when the result is not resolved. Array-typed returns
+    /// (task #7 §S6) are surfaced through <see cref="GetReturnBoundTypeEx"/>
+    /// for callers that need the element-annotation-aware
+    /// <see cref="ArrayBoundType"/> shape; this method keeps the flat
+    /// NominalBoundType shim in place for backward compatibility (drops an
+    /// IArrayTypeSymbol return into <c>NominalBoundType("string[]")</c>).
     /// </summary>
     public NominalBoundType? GetReturnBoundType()
     {
         if (!IsResolved) return null;
         return ToNominalBoundType(Symbol!.ReturnType);
+    }
+
+    /// <summary>
+    /// v0.14 §S6 (task #7 Phase-C) — element-annotation-preserving
+    /// counterpart to <see cref="GetReturnBoundType"/>. When the Roslyn
+    /// return type is an array symbol, this returns an
+    /// <see cref="ArrayBoundType"/> wrapping the element's own
+    /// NullableAnnotation (so an <c>IEnumerable&lt;string?&gt;.ToArray()</c>
+    /// or an <c>string?[]</c> return surface as
+    /// <c>ArrayBoundType(NominalBoundType(STRING, Annotated))</c>).
+    /// Non-array types fall through to the same NominalBoundType shape as
+    /// <see cref="GetReturnBoundType"/>. Returns null when unresolved.
+    /// </summary>
+    public BoundType? GetReturnBoundTypeEx()
+    {
+        if (!IsResolved) return null;
+        return ToBoundType(Symbol!.ReturnType);
     }
 
     /// <summary>
@@ -380,6 +402,27 @@ internal readonly struct MetadataBinderResult
             nullableAnnotation: MapAnnotation(typeSymbol.NullableAnnotation),
             declaration: null,
             roslynSymbol: typeSymbol as Microsoft.CodeAnalysis.INamedTypeSymbol);
+    }
+
+    /// <summary>
+    /// v0.14 §S6 helper — element-annotation-preserving BoundType
+    /// construction. Widens <see cref="ToNominalBoundType"/> to recognize
+    /// <see cref="Microsoft.CodeAnalysis.IArrayTypeSymbol"/> and preserve
+    /// the element's NullableAnnotation on an <see cref="ArrayBoundType"/>
+    /// wrapper. Non-array types fall through to the flat NominalBoundType
+    /// shape unchanged.
+    /// </summary>
+    internal static BoundType ToBoundType(Microsoft.CodeAnalysis.ITypeSymbol typeSymbol)
+    {
+        if (typeSymbol is Microsoft.CodeAnalysis.IArrayTypeSymbol arraySymbol)
+        {
+            var elementBound = ToBoundType(arraySymbol.ElementType);
+            return new ArrayBoundType(
+                elementType: elementBound,
+                rank: arraySymbol.Rank,
+                nullableAnnotation: MapAnnotation(arraySymbol.NullableAnnotation));
+        }
+        return ToNominalBoundType(typeSymbol);
     }
 
     /// <summary>Maps Roslyn's NullableAnnotation (None/NotAnnotated/Annotated)

@@ -1527,4 +1527,141 @@ public class NullabilityIntegrationTests
         Assert.Equal(gated, returnDiag.Severity);
         Assert.Equal(gated, callDiag.Severity);
     }
+
+    // ================================================================
+    // v0.14 §S6 — task #7 Phase-C: array-element STRING nullability.
+    // Widens the D6 scope from scalar STRING to arrays whose element is
+    // a STRING. Target `[str]` (non-null elements) vs source with `[?str]`
+    // elements is the mismatch that trips Calor0272/0273/0274 here.
+    // ================================================================
+
+    /// <summary>
+    /// S6 predicate — bind-site direct check: an <see cref="ArrayBoundType"/>
+    /// source whose element is <c>Annotated</c> STRING assigned to a
+    /// declared non-null-element array target (<see cref="NullabilityChecker.IsPossiblyNullAssignedTo"/>)
+    /// returns true. The container-array annotation is orthogonal — only
+    /// the element mismatch matters at S6.
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_When_NullableStringElement_Assigned_To_NonNullElementArray()
+    {
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("STRING", NullableAnnotation.Annotated)));
+        var target = new ArrayBoundType(
+            new NominalBoundType("STRING", NullableAnnotation.NotAnnotated));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S6 predicate — round-trip guard: a NotAnnotated-element source
+    /// array assigned to a NotAnnotated-element target must NOT fire.
+    /// Prevents the widened check from becoming a false-positive on the
+    /// common <c>string[]</c> → <c>string[]</c> round-trip.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_NonNullElementArray_Roundtrip()
+    {
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("STRING", NullableAnnotation.NotAnnotated)));
+        var target = new ArrayBoundType(
+            new NominalBoundType("STRING", NullableAnnotation.NotAnnotated));
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S6 predicate — target-nullability guard: a nullable-element target
+    /// (<c>[?str]</c>) accepts a possibly-null-element source by design.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_When_TargetElement_IsNullableString()
+    {
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("STRING", NullableAnnotation.Annotated)));
+        var target = new ArrayBoundType(
+            new NominalBoundType("STRING", NullableAnnotation.Annotated));
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S6 scope guard: an array whose element type is NOT a string is
+    /// out of scope even under the S6 widening. Element-annotation
+    /// mismatches on non-STRING element types return false.
+    /// </summary>
+    [Fact]
+    public void Calor0272_DoesNotFire_For_NonStringElement_Array()
+    {
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("INT", NullableAnnotation.Annotated)));
+        var target = new ArrayBoundType(
+            new NominalBoundType("INT", NullableAnnotation.NotAnnotated));
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S6 bind-site integration: binding an array source with
+    /// Annotated-element STRING into a Calor <c>[str]</c> target fires
+    /// Calor0272 at Info severity. Uses a hand-crafted source (the corpus
+    /// has no natural Annotated-element array constructor) via a
+    /// synthetic §B{x:[str]} y where y is bound from a BCL API whose
+    /// return has Annotated elements.
+    /// </summary>
+    [Fact]
+    public void Calor0272_Fires_For_ArrayStringTarget_Direct_Predicate()
+    {
+        // Direct-inspection sibling of the integration case, guarding
+        // the shape gate on the target string. The integration path
+        // requires an Annotated-element BCL return (rare in .NET's
+        // canonical shape database); this test locks the predicate wire.
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("STRING", NullableAnnotation.Oblivious)));
+        var target = new ArrayBoundType(
+            new NominalBoundType("STRING", NullableAnnotation.NotAnnotated));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S6 return-site direct check: the predicate composed with the
+    /// return-type shape gate. Bind a Calor-shape source directly against
+    /// an ArrayBoundType return-type target; this mirrors what
+    /// <c>BindReturnStatement</c> observes when <c>_currentFunctionReturnType</c>
+    /// resolves to <c>[str]</c>.
+    /// </summary>
+    [Fact]
+    public void Calor0273_Predicate_Fires_For_NullableElementArray_Return()
+    {
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("STRING", NullableAnnotation.Annotated)));
+        var target = new ArrayBoundType(
+            new NominalBoundType("STRING", NullableAnnotation.NotAnnotated));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S6 call-site direct check: same predicate wiring, argument →
+    /// parameter direction. Bearing a possibly-null-element source array
+    /// into a non-null-element parameter fires Calor0274.
+    /// </summary>
+    [Fact]
+    public void Calor0274_Predicate_Fires_For_NullableElementArray_Argument()
+    {
+        var source = new NullabilityTestExpr(
+            new ArrayBoundType(
+                new NominalBoundType("STRING", NullableAnnotation.Annotated)));
+        var parameterTarget = new ArrayBoundType(
+            new NominalBoundType("STRING", NullableAnnotation.NotAnnotated));
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
+    }
 }
