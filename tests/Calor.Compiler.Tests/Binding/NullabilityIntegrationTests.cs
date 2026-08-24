@@ -1961,4 +1961,42 @@ public class NullabilityIntegrationTests
 
         Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
     }
+
+    /// <summary>
+    /// S8 dotted-namespace bridge — <see cref="NullabilityChecker"/>'s
+    /// short-name comparator (<c>ShortNameEquals</c>) treats
+    /// <c>My.Custom.Foo</c> and <c>Foo</c> as equivalent for the purpose
+    /// of source-vs-target shape matching. A Roslyn-resolved BCL type
+    /// (fully qualified) assigned into a Calor target (bare identifier)
+    /// must therefore fire the same predicate. Guards against a future
+    /// change that drops the dotted-name bridging and silently breaks
+    /// BCL-source / Calor-target user-ref cases.
+    /// </summary>
+    [Fact]
+    public void S8_Bridges_Dotted_Namespace_On_ShortName_Match()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// S8 dotted-namespace mismatch — different short-name segments
+    /// (<c>My.Custom.Foo</c> vs <c>Bar</c>) must NOT fire. Complements
+    /// the bridge test above: the widened check accepts the SAME
+    /// user-ref type on both sides, not any pair of nominal types.
+    /// Type-mismatch is a different diagnostic family (out-of-scope
+    /// for S8).
+    /// </summary>
+    [Fact]
+    public void S8_Does_Not_Fire_For_DifferentShortName_Nominals()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated));
+        var target = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated);
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
 }
