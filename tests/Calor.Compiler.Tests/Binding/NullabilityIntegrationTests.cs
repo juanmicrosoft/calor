@@ -1999,4 +1999,160 @@ public class NullabilityIntegrationTests
 
         Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
     }
+
+    // ================================================================
+    // v0.14 §F-3A — Calor-native call-site parameter check. Widens
+    // Calor0274 emission (previously BCL-only per the §S4 scoping
+    // comment in BindCallExpression) to fire when a pure-Calor callee's
+    // declared parameter TypeName runs through TryBuildStringTarget and
+    // yields a NotAnnotated shape. Reuses the same predicate
+    // (NullabilityChecker.IsPossiblyNullAssignedTo) as the BCL branch —
+    // this slice threads the resolved FunctionSymbol.Parameters, it
+    // does NOT re-derive the shape gate. Precursor to S8-Oblivious.
+    // ================================================================
+
+    /// <summary>
+    /// F-3A scope-surprise pin (fire path blocked by overload gap).
+    /// The natural repro — a <c>:?string</c> local or an inline
+    /// <c>Environment.GetEnvironmentVariable</c> call passed into a
+    /// Calor-native <c>:string</c> parameter — cannot fire Calor0274
+    /// today because pure-Calor <see cref="Binder.ResolveCall"/> does
+    /// not OPTION-unwrap argument types before overload matching
+    /// (only the BCL branch's <c>TryResolveBclCall</c> does that
+    /// stripping, per PR #1060 review finding M1). The call therefore
+    /// fails resolution with <c>Calor0208 NoMatchingOverload</c> and
+    /// my widening — which only fires on <c>Kind == Resolved</c> —
+    /// never gets a chance to fire.
+    ///
+    /// This test pins that behavior. A future slice (either PR B
+    /// threading Calor-native return-type annotation flow so an
+    /// inline call can surface a matching DisplayString, or a
+    /// dedicated widening of <see cref="Binder.ResolveCall"/> to
+    /// treat OPTION as an implicit conversion) will flip the
+    /// assertion. The <c>S8_Calor0274_Predicate_Fires_For_NullableUserClass_Argument</c>
+    /// direct-predicate test above already locks the predicate
+    /// wiring — this fixture guards the emission path so a future
+    /// widening doesn't accidentally regress.
+    /// </summary>
+    [Fact]
+    public void F3A_Calor0274_ScopeBlocked_When_NullableArg_Fails_CalorOverload()
+    {
+        const string source = """
+            §M{m1:F3ANativeBlocked}
+              §F{f1:Take:pub} (string:name) -> void
+                §E{env}
+              §F{f2:Caller:pub} () -> void
+                §E{env}
+                §C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        // Current behavior: overload resolution fails (Calor0208)
+        // before Calor0274 can fire. Flip both asserts in the follow-on
+        // slice that widens ResolveCall or threads Calor-native return
+        // annotations to matching-DisplayString shapes.
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    /// <summary>
+    /// F-3A round-trip guard — passing a non-null user-ref parameter
+    /// reference to a Calor-native user-ref parameter must NOT fire
+    /// Calor0274. Complements the fire-case below so the widened
+    /// emission does not become a false-positive on ordinary
+    /// non-null Calor→Calor user-ref calls. Routes through
+    /// <see cref="Binder.BindCallExpression"/> via <c>§R</c> so the
+    /// widening code path is actually exercised (statement-form
+    /// <c>§C{...}</c> uses BindCallStatement which does not carry
+    /// the check — mirrors the BCL path).
+    /// </summary>
+    [Fact]
+    public void F3A_Calor0274_DoesNotFire_For_NonNullArg_To_NonNullable_CalorParameter()
+    {
+        const string source = """
+            §M{m1:F3AUserRefOk}
+              §CL{c1:Bar:pub}
+                §MT{m1:Take:pub} (Bar:a) -> Bar
+                  §R a
+                §MT{m2:Caller:pub} (Bar:x) -> Bar
+                  §R §C{this.Take} §A x §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    /// <summary>
+    /// F-3A parameter-declared-nullable guard — when the Calor-native
+    /// user-ref parameter is <c>:?Bar</c> the callee accepts null by
+    /// design. Passing a possibly-null <c>:?Bar</c> parameter reference
+    /// to it must NOT fire Calor0274 (parallels
+    /// <c>Calor0274_DoesNotFire_When_Parameter_IsNullableString</c>
+    /// for the BCL branch). Routes through
+    /// <see cref="Binder.BindCallExpression"/> via <c>§R</c>.
+    /// </summary>
+    [Fact]
+    public void F3A_Calor0274_DoesNotFire_When_TargetParameter_IsNullable()
+    {
+        const string source = """
+            §M{m1:F3AUserRefNullableParam}
+              §CL{c1:Bar:pub}
+                §MT{m1:Take:pub} (?Bar:a) -> Bar
+                  §R a
+                §MT{m2:Caller:pub} (?Bar:x) -> Bar
+                  §R §C{this.Take} §A x §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    /// <summary>
+    /// F-3A canonical fire — user-ref variant. A <c>:?Foo</c>
+    /// parameter reference passed into a <c>:Foo</c> parameter of a
+    /// peer method fires Calor0274 at the S5-gated severity. Routes
+    /// through <see cref="Binder.BindCallExpression"/> via the <c>§R</c>
+    /// return so the widened emission is exercised (statement-form
+    /// <c>§C{...}</c> goes through <see cref="Binder.BindCallStatement"/>
+    /// which does not carry the Calor0274 emitter — parallels the BCL
+    /// path which also only fires from <c>BindCallExpression</c>).
+    ///
+    /// User-ref works end-to-end today because
+    /// <see cref="BoundVariableExpression.BuildStringAnnotatedTypeOrDefault"/>
+    /// strips the leading '?' from the QualifiedName on user-ref
+    /// references (per PR #1074's dotted-namespace bridge), so the
+    /// argument's DisplayString "Foo" canonicalizes cleanly and
+    /// overload resolution succeeds. The scalar STRING variant does
+    /// NOT have that stripping (STRING's OPTION-of-STRING branch keeps
+    /// "?string" on the QualifiedName so downstream Option-shaped
+    /// consumers stay unchanged), so the STRING fire path stays
+    /// blocked pending a follow-on slice — see the scope-blocked pin
+    /// above.
+    /// </summary>
+    [Fact]
+    public void F3A_Calor0274_Fires_For_NullableUserRefArg_To_NonNullable_CalorParameter()
+    {
+        const string source = """
+            §M{m1:F3AUserRef}
+              §CL{c1:Bar:pub}
+                §MT{m1:Take:pub} (Bar:a) -> Bar
+                  §R a
+                §MT{m2:Caller:pub} (?Bar:x) -> Bar
+                  §R §C{this.Take} §A x §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && d.Severity == SemanticsVersion.NullabilitySeverityFor()
+            && d.Message.Contains("'a'"));
+    }
 }
