@@ -230,8 +230,55 @@ public sealed class BoundVariableExpression : BoundExpression
             return new NominalBoundType(resolvedTypeName, NullableAnnotation.Annotated);
         }
 
+        // v0.14 §S8 (task #7 Phase-C) — user-declared reference-type
+        // references also flow the declared annotation, so a §MT{...}
+        // (:?Foo:a) parameter reference at its use site reports as
+        // Annotated (and a :Foo parameter reports as NotAnnotated).
+        // Value types (INT/BOOL/…) fall through as Oblivious since they
+        // cannot carry a nullable annotation. The is-user-ref
+        // classification mirrors NullabilityChecker.IsUserReferenceType.
+        //
+        // Strip a leading/trailing '?' from the QualifiedName so the
+        // predicate's short-name compare (`?Foo` source vs `Foo` target)
+        // matches — the nullability channel already carries the annotation,
+        // so leaving `?` in the QualifiedName would double-encode it and
+        // break every user-ref shape check downstream.
+        var canonical = resolvedTypeName;
+        if (canonical.StartsWith('?')) canonical = canonical[1..];
+        else if (canonical.EndsWith('?') && canonical.Length > 1) canonical = canonical[..^1];
+        if (IsUserReferenceTypeName(canonical))
+        {
+            return new NominalBoundType(canonical, variable.NullableAnnotation);
+        }
+
         return new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
     }
+
+    // Kept in sync with NullabilityChecker.IsUserReferenceType — anything
+    // that is not a known Calor value-type primitive is treated as a
+    // reference type carrying a meaningful annotation. STRING/string/str
+    // are handled by IsScalarStringType above.
+    private static bool IsUserReferenceTypeName(string name) => name switch
+    {
+        "INT" or "int" or "i32" => false,
+        "LONG" or "long" or "i64" => false,
+        "SHORT" or "short" or "i16" => false,
+        "BYTE" or "byte" or "i8" => false,
+        "UINT" or "uint" or "u32" => false,
+        "ULONG" or "ulong" or "u64" => false,
+        "USHORT" or "ushort" or "u16" => false,
+        "UBYTE" or "ubyte" or "u8" => false,
+        "FLOAT" or "float" or "f32" => false,
+        "DOUBLE" or "double" or "f64" => false,
+        "DECIMAL" or "decimal" => false,
+        "BOOL" or "bool" => false,
+        "CHAR" or "char" => false,
+        "VOID" or "void" => false,
+        "OBJECT" or "object" => false,  // OBJECT is the multi-resolve sentinel — not a real user type
+        "" => false,
+        var n when n.Contains('[', StringComparison.Ordinal) => false, // ARRAY[…] / OPTION[…]
+        _ => true,
+    };
 
     // Kept intentionally in sync with NullabilityChecker.IsScalarString
     // (see src/Calor.Compiler/Binding/NullabilityChecker.cs) and with the
