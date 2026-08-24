@@ -2336,4 +2336,71 @@ public class NullabilityIntegrationTests
             $"Could not find BoundCallExpression under function '{functionName}' in bound module. "
             + $"Available functions: [{available}]");
     }
+
+    // ================================================================
+    // v0.14 §F-3C — S8-Oblivious widening. F-3A (SHA 284470b7) and
+    // F-3B (SHA 321baf1f) thread real annotations through pure-Calor
+    // call sites, so an unannotated `someCall() -> Foo` now returns
+    // `NotAnnotated Foo` rather than Oblivious. This slice removes the
+    // §S8 D3 narrowing in CheckScalarStringTarget so user-ref sources
+    // fire on Annotated OR Oblivious (only NotAnnotated is safe) —
+    // matching the scalar STRING D3 discipline. Direct-predicate tests
+    // (like the S8_Calor0274_Predicate_* siblings) lock the widened
+    // behavior at the checker, independent of source-level emission
+    // paths that may still be gated by overload-resolution scope gaps.
+    // ================================================================
+
+    /// <summary>
+    /// F-3C widened fire — an Oblivious user-ref source assigned into
+    /// a NotAnnotated user-ref target now fires the same predicate,
+    /// matching the scalar STRING behavior (D3). Before F-3C the check
+    /// required Annotated on the source, silently dropping Oblivious
+    /// user-ref values (e.g. legacy BCL-shaped surfaces or unresolved
+    /// callees). With F-3A/F-3B threading NotAnnotated through pure-
+    /// Calor callees, an Oblivious source is genuinely "unknown-
+    /// nullable BCL" and warrants Calor0272/0273/0274.
+    /// </summary>
+    [Fact]
+    public void F3C_S8_Calor0272_Fires_On_Oblivious_UserRef_Source()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("Foo", NullableAnnotation.Oblivious));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// F-3C regression guard — a nullable user-ref target (`:?Foo`)
+    /// still accepts any user-ref source, including Oblivious. The
+    /// widening only affects the source-annotation side; target-
+    /// accepts-null continues to short-circuit the check at line 73
+    /// of NullabilityChecker.
+    /// </summary>
+    [Fact]
+    public void F3C_S8_Still_DoesNotFire_When_Target_Is_Annotated()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("Foo", NullableAnnotation.Oblivious));
+        var target = new NominalBoundType("Foo", NullableAnnotation.Annotated);
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
+
+    /// <summary>
+    /// F-3C round-trip guard — a NotAnnotated user-ref source assigned
+    /// into a NotAnnotated user-ref target must NOT fire. This is the
+    /// F-3A/F-3B payoff shape: pure-Calor callees now yield
+    /// NotAnnotated on their return types, and Calor-native locals
+    /// initialized from them must round-trip cleanly.
+    /// </summary>
+    [Fact]
+    public void F3C_S8_Still_DoesNotFire_When_Source_And_Target_Both_NotAnnotated()
+    {
+        var source = new NullabilityTestExpr(
+            new NominalBoundType("Foo", NullableAnnotation.NotAnnotated));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+
+        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
+    }
 }
