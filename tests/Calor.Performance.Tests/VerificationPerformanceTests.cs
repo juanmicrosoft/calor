@@ -51,7 +51,19 @@ public class VerificationPerformanceTests
     private static BoundModule RequireParsedAndBound(string source)
     {
         var module = ParseAndBind(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        // Nullability diagnostics (Calor0272/0273/0274) promoted to Error under
+        // SemanticsVersion.Major >= 2 (v0.14 §S5) are out-of-scope for these
+        // performance tests — they exercise taint/verifier/CFG timings against
+        // synthetically-generated modules that intentionally use ':string'
+        // targets. Filter them here so the perf-timing assertions are not
+        // silently blocked by a nullability finding on the fixture.
+        var nonNullability = diagnostics
+            .Where(d => d.Severity == DiagnosticSeverity.Error
+                && d.Code != DiagnosticCode.NullableToNonNullableBinding
+                && d.Code != DiagnosticCode.NullableReturnFromNonNullable
+                && d.Code != DiagnosticCode.NullableArgumentToNonNullableParameter)
+            .ToArray();
+        Assert.True(nonNullability.Length == 0, string.Join("\n", nonNullability.Select(d => d.Message)));
         return Assert.IsType<BoundModule>(module);
     }
 
