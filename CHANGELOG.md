@@ -85,6 +85,16 @@ All notable changes to this project will be documented in this file.
   scanning shortcut is gone and a test blocks it from coming back.
 
 ### Fixed
+- **Benchmark cost metric no longer under-counts agent output tokens (#881).**
+  The agent-loop benchmark scripts used to read a number from the agent's
+  result file that only covered its final turn. A run that handed work to a
+  helper agent, or that resumed after its context was compacted, therefore
+  looked far cheaper than it was: one archived run recorded 543 tokens when
+  the model had actually generated 30,084 (55x). Both scripts now use one
+  shared helper (`bench/phase0-agent-native/token-usage.py`) that adds up
+  every model's output across the whole run, keeps the old number next to
+  the corrected one so the fix can be audited, warns when the two disagree,
+  and is covered by a test that reproduces the 55x case.
 - The round-trip check no longer fails a pull request because of a test that
   MediatR's own test suite is known to flake on. The known-flake list was being
   dropped on the way into the check, and a flaky failure could still trip the

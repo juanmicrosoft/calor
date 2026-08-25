@@ -1,0 +1,1 @@
+{"type":"result","subtype":"success","num_turns":5,"result":"(synthetic) epoch pinned to the model the default exclusion matches: its own output must still count","total_cost_usd":0.01,"usage":{"input_tokens":50,"output_tokens":1200},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":900,"outputTokens":1214,"costUSD":0.01}},"origin":null}

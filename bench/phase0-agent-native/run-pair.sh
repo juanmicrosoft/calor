@@ -232,6 +232,9 @@ OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 # `dotnet build src/Calor.Compiler -c Release`.
 # ---------------------------------------------------------------------------
 TELEMETRY_HELPERS="$SCRIPT_DIR/telemetry-helpers.py"
+# #881: the ONE derivation of the cost-leg token figure (shared with run-bundle.sh).
+# shellcheck source=token-usage.sh
+source "$SCRIPT_DIR/token-usage.sh"
 CALOR_CLI_DLL=""
 if [[ -n "$CALOR_DLL_OVERRIDE" ]]; then
     # Per-arm build-pin (loop plan M5). Pins the calor CLI / MCP-server /
@@ -914,11 +917,15 @@ extract_metrics() {
         iters_to_green=$((ITERATION_BUDGET + 1)); censored=true
     fi
 
-    local tokens_in=0 tokens_out=0
-    if [[ -f "$ws_out/agent.json" ]] && jq -e '.usage' "$ws_out/agent.json" >/dev/null 2>&1; then
-        tokens_in=$(jq -r '.usage.input_tokens // 0' "$ws_out/agent.json")
-        tokens_out=$(jq -r '.usage.output_tokens // 0' "$ws_out/agent.json")
-    fi
+    # Tokens via token-usage.py (#881): usage.output_tokens covers only the
+    # final top-level turn and under-counted 55x on a subagent-delegating run
+    # (w5-parity-002 N1-001 treatment run-4); the helper sums modelUsage[*]
+    # and reports both figures so the correction is auditable in result.json.
+    # token-usage.sh gates on file presence only and lets the helper decide;
+    # a helper failure falls back to the naive read, never a silent 0.
+    local tokens_in tokens_out token_usage
+    token_usage_collect "$ws_out/agent.json" "$PAIR_ID/$ARM_LABEL/run-$run_idx"
+    tokens_in=$TOKENS_IN; tokens_out=$TOKENS_OUT; token_usage=$TOKEN_USAGE_JSON
 
     # WS5 defect probe (loop plan D5.1, Annex A-1.2 M-W1): pass/fail of the
     # per-defect held-out probe test at declared-done. caught=true iff the
@@ -1005,6 +1012,7 @@ extract_metrics() {
         --argjson iterations "$iterations" --argjson itg "$iters_to_green" \
         --argjson censored "$censored" \
         --argjson tin "$tokens_in" --argjson tout "$tokens_out" \
+        --argjson token_usage "$token_usage" \
         --argjson null_agent "$NULL_AGENT" \
         --argjson mean_lat "$mean_lat" --argjson env_all "$envelope_valid_all" \
         --argjson mcp_writes "$mcp_writes" \
@@ -1018,7 +1026,8 @@ extract_metrics() {
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
           mcpWrites:$mcp_writes, defect:$defect,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
-          tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
+          tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
+          nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
 }
@@ -1041,7 +1050,8 @@ write_invalid_result() {
           iterations:0, iterationsToGreen:$itg, censored:true,
           invalid:true, defect:null,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
-          tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \
+          tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
+          nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
 }
