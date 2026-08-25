@@ -386,23 +386,14 @@ public sealed class ExternalCallCollector
     /// capitalized identifier — the shape of a namespace/type reference written
     /// in source. Variables, fields, <c>this</c>, and member chains through them
     /// fail this test.
+    ///
+    /// <para>v0.15 E1 slice 2b — the predicate itself now lives in
+    /// <see cref="TypeIdentity"/> so <c>Binding/</c> can use it without
+    /// referencing <c>Effects/</c> (PR #1095 review finding 10). This forwarder
+    /// keeps the collector's own call site and its tests on the current name.</para>
     /// </summary>
-    internal static bool IsTypeQualifiedReference(string receiver)
-    {
-        if (string.IsNullOrEmpty(receiver))
-            return false;
-        foreach (var segment in receiver.Split('.'))
-        {
-            if (segment.Length == 0 || !char.IsUpper(segment[0]))
-                return false;
-            for (var i = 1; i < segment.Length; i++)
-            {
-                if (!(char.IsLetterOrDigit(segment[i]) || segment[i] == '_' || segment[i] == '`'))
-                    return false;
-            }
-        }
-        return true;
-    }
+    internal static bool IsTypeQualifiedReference(string receiver) =>
+        TypeIdentity.IsTypeQualifiedReference(receiver);
 
     /// <summary>
     /// Classifies a receiver's <see cref="BoundType"/>.

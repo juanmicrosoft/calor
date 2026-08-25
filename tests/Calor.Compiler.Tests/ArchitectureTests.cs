@@ -440,6 +440,67 @@ public class ArchitectureTests
         Assert.Equal(knownCycles, actualCycles);
     }
 
+    /// <summary>
+    /// v0.15 E1 slice 2b: <c>Binding/</c> must not reference <c>Effects/</c>.
+    /// The binder is upstream of effect enforcement — a call in the other
+    /// direction makes the pass's string tables load-bearing inside binding and
+    /// is what PR #1095 review round 1 finding 10 flagged.
+    ///
+    /// <para><see cref="CompilerComponents_MatchDeclaredDependencyContract"/>
+    /// already declares Binding's allowed dependencies (Ast, CodeGen, Parsing —
+    /// Effects is absent), but it matches the fully-qualified spelling
+    /// <c>Calor.Compiler.Effects</c> only, so a namespace-relative
+    /// <c>Effects.EffectEnforcementPass</c> slipped past it. This pin closes
+    /// that by working on tokens: an <c>Effects</c> identifier that starts a
+    /// qualified name, plus any using directive naming the namespace.</para>
+    /// </summary>
+    [Fact]
+    public void BindingLayer_HasNoReferenceToEffectsNamespace()
+    {
+        var bindingRoot = Path.Combine(RepoRoot(), "src", "Calor.Compiler", "Binding");
+        var offenders = new List<string>();
+        var filesScanned = 0;
+
+        foreach (var file in Directory.EnumerateFiles(
+                     bindingRoot,
+                     "*.cs",
+                     SearchOption.AllDirectories))
+        {
+            filesScanned++;
+            var root = CSharpSyntaxTree.ParseText(File.ReadAllText(file)).GetRoot();
+            var relative = Path.GetRelativePath(bindingRoot, file).Replace('\\', '/');
+
+            foreach (var directive in root.DescendantNodes().OfType<UsingDirectiveSyntax>())
+            {
+                if (directive.Name?.ToString().Contains("Effects", StringComparison.Ordinal) == true)
+                    offenders.Add($"{relative}: using {directive.Name}");
+            }
+
+            // An "Effects" identifier that BEGINS a qualified reference — the
+            // Effects.X shape. `effectsNode.Effects.Count` is preceded by a dot
+            // and is a member on an AST node, not the namespace.
+            foreach (var token in root.DescendantTokens())
+            {
+                if (!token.IsKind(SyntaxKind.IdentifierToken)
+                    || token.ValueText != "Effects")
+                {
+                    continue;
+                }
+                var previous = token.GetPreviousToken();
+                var next = token.GetNextToken();
+                if (previous.IsKind(SyntaxKind.DotToken))
+                    continue;
+                if (!next.IsKind(SyntaxKind.DotToken))
+                    continue;
+                var line = token.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                offenders.Add($"{relative}:{line}: Effects.{next.GetNextToken().ValueText}");
+            }
+        }
+
+        Assert.True(filesScanned >= 5, $"anti-vacuity: only {filesScanned} Binding/ files scanned");
+        Assert.Equal(Array.Empty<string>(), offenders.Order().ToArray());
+    }
+
     [Fact]
     public void ParserOnlyKeywordArgument_IsNotAnAstNode()
     {
