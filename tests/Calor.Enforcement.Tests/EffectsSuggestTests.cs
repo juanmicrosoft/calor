@@ -139,6 +139,139 @@ public class EffectsSuggestTests
                 && call.MethodName == "Next");
     }
 
+    // ========================================================================
+    // v0.15 E1 exit pins (roadmap §4.2 E1; metadata-binding scoping §3 S6 / D5)
+    // ========================================================================
+
+    /// <summary>
+    /// E1 exit pin (a): the AST-side variable-type map is deleted, not
+    /// bypassed. No identifier <c>_variableTypeMap</c> may occur anywhere
+    /// under <c>src/Calor.Compiler/Effects/</c>.
+    /// </summary>
+    [Fact]
+    public void E1_ExitPin_EffectsDirectory_HasNoVariableTypeMapIdentifier()
+    {
+        var effectsDir = Path.Combine(RepoRoot(), "src", "Calor.Compiler", "Effects");
+        Assert.True(Directory.Exists(effectsDir), $"Effects directory not found at {effectsDir}");
+
+        var identifier = new System.Text.RegularExpressions.Regex(@"\b_variableTypeMap\b");
+        var offenders = Directory
+            .EnumerateFiles(effectsDir, "*.cs", SearchOption.AllDirectories)
+            .Where(file => identifier.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(effectsDir, file))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "The _variableTypeMap string path was deleted in v0.15 E1; it must not be reintroduced " +
+            "under src/Calor.Compiler/Effects/. Offending files: " + string.Join(", ", offenders));
+    }
+
+    /// <summary>
+    /// E1 exit pin (b), the original S6 behavioural criterion: a receiver whose
+    /// type is available ONLY through metadata resolves. Nothing in the module
+    /// names <c>System.Guid</c> or <c>System.String</c> as the type of
+    /// <c>g</c> / <c>line</c>; the binder learns them from MetadataBinder's
+    /// Roslyn return types for <c>System.Guid.NewGuid()</c> and
+    /// <c>System.Console.ReadLine()</c>.
+    /// </summary>
+    [Fact]
+    public void E1_ExitPin_ReceiverTypeKnownOnlyThroughMetadata_Resolves()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{g} §C{System.Guid.NewGuid} §/C
+      §C{g.ToString} §/C
+      §B{line} §C{System.Console.ReadLine} §/C
+      §C{line.Trim} §/C
+";
+        var module = Parse(source);
+        var calls = ExternalCallCollector.Collect(module);
+
+        var toString = Assert.Single(calls, c => c.MethodName == "ToString");
+        Assert.Equal("System.Guid", toString.TypeName);
+        Assert.True(toString.ReceiverResolved);
+
+        var trim = Assert.Single(calls, c => c.MethodName == "Trim");
+        Assert.Equal("System.String", trim.TypeName);
+        Assert.True(trim.ReceiverResolved);
+    }
+
+    /// <summary>
+    /// An inferred binding (<c>§B{sb}</c> with no type annotation) resolves
+    /// its receiver through the bound tree — the <c>BoundType</c> of the
+    /// variable — not by scanning §NEW initializers in the AST.
+    /// </summary>
+    [Fact]
+    public void Collector_InferredBinding_ResolvesReceiverFromBoundType()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
+      §C{sb.Append} §A STR:""x"" §/C
+";
+        var module = Parse(source);
+        var calls = ExternalCallCollector.Collect(module);
+
+        var append = Assert.Single(calls, c => c.MethodName == "Append");
+        Assert.Equal("System.Text.StringBuilder", append.TypeName);
+        Assert.True(append.ReceiverResolved);
+
+        // A dotted §NEW target is one type, not a "System.Text" receiver with a
+        // "StringBuilder" method.
+        var ctor = Assert.Single(calls, c => c.Kind == CallKind.Constructor);
+        Assert.Equal("System.Text.StringBuilder", ctor.TypeName);
+        Assert.Equal(".ctor", ctor.MethodName);
+        Assert.DoesNotContain(calls, c => c.TypeName == "System.Text");
+    }
+
+    /// <summary>
+    /// A receiver the binder cannot type is reported as unresolved and never
+    /// given a guessed type: <c>x</c> is bound from an unknown callee (the
+    /// binder's OBJECT fallback) and <c>a.b</c> is a member chain the bound
+    /// tree does not type. Neither may surface as <c>OBJECT</c>,
+    /// <c>System.Object</c>, or the type of <c>a</c>.
+    /// </summary>
+    [Fact]
+    public void Collector_UnresolvedReceiver_IsReportedWithoutGuessedType()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{x} §C{Unknown.Make} §/C
+      §C{x.Run} §/C
+      §B{a} §NEW{Random} §/NEW
+      §C{a.b.Chain} §/C
+";
+        var module = Parse(source);
+        var calls = ExternalCallCollector.Collect(module);
+
+        var run = Assert.Single(calls, c => c.MethodName == "Run");
+        Assert.False(run.ReceiverResolved);
+        Assert.Equal("x", run.TypeName);
+
+        var chain = Assert.Single(calls, c => c.MethodName == "Chain");
+        Assert.False(chain.ReceiverResolved);
+        Assert.Equal("a.b", chain.TypeName);
+
+        Assert.DoesNotContain(calls, c => c.TypeName is "OBJECT" or "System.Object");
+        Assert.DoesNotContain(calls, c => c.TypeName == "System.Random" && c.MethodName == "Chain");
+
+        // The unresolved call is still visible to the resolver as Unknown — never silently pure.
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(run.TypeName, run.MethodName).Status);
+    }
+
+    private static string RepoRoot() =>
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+
     [Fact]
     public void Collector_TagsConstructors()
     {

@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Effects;
@@ -18,8 +19,21 @@ public enum CallKind
 
 /// <summary>
 /// A collected external call with its resolved type, method, and kind.
+///
+/// <para><see cref="ReceiverResolved"/> is false when the bound tree could not
+/// type the receiver (an <see cref="UnresolvedBoundType"/>, the binder's
+/// <c>OBJECT</c> fallback for an expression it could not type, a member chain
+/// the bound tree does not type, or a function-typed value). In that case
+/// <see cref="TypeName"/> is the receiver exactly as written in source — never
+/// a guessed type — and consumers must report the call as unresolved rather
+/// than key a manifest entry on it. v0.15 E1 (roadmap §4.2), metadata-binding
+/// scoping §3 S6 / D5.</para>
 /// </summary>
-public sealed record CollectedCall(string TypeName, string MethodName, CallKind Kind);
+public sealed record CollectedCall(
+    string TypeName,
+    string MethodName,
+    CallKind Kind,
+    bool ReceiverResolved = true);
 
 /// <summary>
 /// A call target collected per-function, preserving the caller identity and
@@ -33,8 +47,25 @@ public sealed record RawCall(string CallerName, string Target, bool IsConstructo
 /// <summary>
 /// Walks the Calor AST to collect external method invocations.
 /// Covers top-level functions, class methods, and constructors.
-/// Resolves receiver types from bound SymbolId identities first, with §NEW
-/// initializer scanning retained for AST-only compatibility.
+///
+/// Receiver types come from the bound tree (v0.15 E1, metadata-binding S6):
+///
+///   1. A receiver that is a bound variable resolves through the
+///      <see cref="BoundType"/> a read of that variable carries
+///      (<see cref="BoundVariableExpression.Type"/>) — this is where a type
+///      known only through binding or metadata (an inferred <c>§B</c>, a BCL
+///      return type resolved by <c>MetadataBinder</c>) reaches the effect system.
+///   2. A receiver that is a Calor-declared type used statically resolves to
+///      <see cref="TypeSymbol.QualifiedName"/>.
+///   3. A type-qualified receiver written in source (<c>System.Console</c>,
+///      <c>Console</c>) takes the identity the binder assigned it
+///      (<see cref="BoundCallExpression.ResolvedTypeName"/>).
+///
+/// A receiver the binder could not type is reported with
+/// <see cref="CollectedCall.ReceiverResolved"/> == false and never receives a
+/// guessed type. There is no AST-side variable-type map: when binding is
+/// unavailable altogether, only the source-literal receiver text (with short
+/// BCL names expanded) is reported.
 ///
 /// Two collection modes share the traversal logic:
 ///
@@ -55,8 +86,7 @@ public sealed class ExternalCallCollector
 {
     private readonly List<CollectedCall> _calls = new();
     private readonly List<RawCall> _rawCalls = new();
-    private readonly Dictionary<string, string> _variableTypeMap = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<(int Start, int End, string Target), string> _boundReceiverTypes = new();
+    private readonly Dictionary<(int Start, int End, string Target), BoundReceiver> _boundReceiverTypes = new();
 
     // Set by CollectPerFunctionWithBareNames before visiting each function's body,
     // so TryAddCall can tag RawCalls with the enclosing caller identity.
@@ -131,33 +161,7 @@ public sealed class ExternalCallCollector
 
     private void CollectFromFunctionBody(IReadOnlyList<StatementNode> body)
     {
-        // Build variable type map from bind statements in this function
-        _variableTypeMap.Clear();
-        ScanVariableTypes(body);
-
-        // Collect calls
         CollectFromStatements(body);
-    }
-
-    private void ScanVariableTypes(IEnumerable<StatementNode> statements)
-    {
-        foreach (var stmt in statements)
-            ScanVariableTypes(stmt);
-    }
-
-    private void ScanVariableTypes(AstNode node)
-    {
-        if (node is BindStatementNode
-            {
-                Initializer: NewExpressionNode creation,
-            } bind)
-        {
-            _variableTypeMap[bind.Name] =
-                EffectEnforcementPass.MapShortTypeNameToFullName(creation.TypeName);
-        }
-
-        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-            ScanVariableTypes(child);
     }
 
     private void CollectFromStatements(IEnumerable<StatementNode> statements)
@@ -197,22 +201,24 @@ public sealed class ExternalCallCollector
             _rawCalls.Add(new RawCall(_currentCaller, target, defaultKind == CallKind.Constructor));
         }
 
+        if (defaultKind == CallKind.Constructor)
+        {
+            // §NEW{Type}: the whole target is the constructed type, dotted
+            // (System.Text.StringBuilder) or bare (Random, expanded here).
+            var resolvedType = EffectEnforcementPass.MapShortTypeNameToFullName(target);
+            _calls.Add(new CollectedCall(resolvedType, ".ctor", CallKind.Constructor));
+            return;
+        }
+
         var lastDot = target.LastIndexOf('.');
         if (lastDot <= 0)
         {
-            // No dot — could be a constructor call (from NewExpressionNode)
-            if (defaultKind == CallKind.Constructor)
-            {
-                var resolvedType = EffectEnforcementPass.MapShortTypeNameToFullName(target);
-                _calls.Add(new CollectedCall(resolvedType, ".ctor", CallKind.Constructor));
-            }
+            // Bare-name call (a Calor function): no receiver to resolve.
             return;
         }
 
         var methodName = target[(lastDot + 1)..];
         var typePart = target[..lastDot];
-        var boundReceiverType = _boundReceiverTypes.GetValueOrDefault(
-            (span.Start, span.End, target));
 
         // Detect call kind from method name patterns
         var kind = defaultKind;
@@ -227,39 +233,28 @@ public sealed class ExternalCallCollector
             methodName = methodName[4..]; // strip set_ prefix
         }
 
-        // Prefer the exact bound receiver symbol. The AST name map remains a
-        // compatibility fallback for source shapes the Binder cannot represent.
-        if (boundReceiverType != null)
+        var receiverResolved = true;
+        if (_boundReceiverTypes.TryGetValue((span.Start, span.End, target), out var boundReceiver))
         {
-            typePart = EffectEnforcementPass.MapShortTypeNameToFullName(
-                GetNominalTypeName(boundReceiverType));
+            // The bound tree is the authority. An unresolved receiver keeps its
+            // source text and is flagged — it is never given a guessed type.
+            if (boundReceiver.IsResolved)
+                typePart = boundReceiver.TypeName!;
+            else
+                receiverResolved = false;
         }
         else if (!typePart.Contains('.'))
         {
-            var mapped = EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
-            if (mapped != typePart)
-            {
-                typePart = mapped;
-            }
-            else if (_variableTypeMap.TryGetValue(typePart, out var resolvedType))
-            {
-                typePart = resolvedType;
-            }
-        }
-        else
-        {
-            // Chained call: try resolving first segment as variable
-            var firstDot = typePart.IndexOf('.');
-            var receiverName = firstDot > 0 ? typePart[..firstDot] : typePart;
-            if (_variableTypeMap.TryGetValue(receiverName, out var resolvedType))
-            {
-                typePart = resolvedType;
-            }
+            // No bound call site (binding unavailable for this module or this
+            // node shape): the bare receiver is taken as a type name written in
+            // source, with short BCL names expanded. Dotted receivers are kept
+            // verbatim.
+            typePart = EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
         }
 
         if (!string.IsNullOrEmpty(typePart) && !string.IsNullOrEmpty(methodName))
         {
-            _calls.Add(new CollectedCall(typePart, methodName, kind));
+            _calls.Add(new CollectedCall(typePart, methodName, kind, receiverResolved));
         }
     }
 
@@ -272,23 +267,135 @@ public sealed class ExternalCallCollector
             {
                 switch (node)
                 {
-                    case BoundCallStatement { ReceiverSymbol: not null } statement:
+                    case BoundCallStatement statement when HasReceiver(statement.Target):
                         _boundReceiverTypes[
                             (statement.Span.Start, statement.Span.End, statement.Target)] =
-                            statement.ReceiverSymbol.TypeName;
+                            ResolveBoundReceiver(
+                                statement.Span,
+                                statement.Target,
+                                statement.ReceiverSymbol,
+                                statement.ReceiverTypeSymbol,
+                                statement.ResolvedTypeName);
                         break;
-                    case BoundCallExpression { ReceiverSymbol: not null } expression:
+                    case BoundCallExpression expression when HasReceiver(expression.Target):
                         _boundReceiverTypes[
                             (expression.Span.Start, expression.Span.End, expression.Target)] =
-                            expression.ReceiverSymbol.TypeName;
+                            ResolveBoundReceiver(
+                                expression.Span,
+                                expression.Target,
+                                expression.ReceiverSymbol,
+                                expression.ReceiverTypeSymbol,
+                                expression.ResolvedTypeName);
                         break;
                 }
             }
         }
         catch
         {
-            // Raw per-function mode still keeps the unresolved target explicit.
+            // Binding is an enrichment here: without it, TryAddCall reports the
+            // source-literal receiver text, and raw per-function mode still
+            // keeps the unresolved target explicit.
         }
+    }
+
+    private static bool HasReceiver(string target) => target.LastIndexOf('.') > 0;
+
+    /// <summary>
+    /// Receiver identity for one bound call site. <see cref="TypeName"/> is the
+    /// fully-qualified receiver type when the bound tree resolves it and null
+    /// when it does not; an unresolved receiver is reported as such, never
+    /// guessed.
+    /// </summary>
+    private readonly record struct BoundReceiver(string? TypeName)
+    {
+        public static readonly BoundReceiver Unresolved = new((string?)null);
+        public bool IsResolved => TypeName is not null;
+    }
+
+    /// <summary>
+    /// Resolution order (v0.15 E1): the receiver variable's bound type, then a
+    /// Calor-declared receiver type, then the binder's identity for a
+    /// type-qualified receiver written in source.
+    /// </summary>
+    private static BoundReceiver ResolveBoundReceiver(
+        TextSpan span,
+        string target,
+        VariableSymbol? receiverSymbol,
+        TypeSymbol? receiverTypeSymbol,
+        string? resolvedTypeName)
+    {
+        var receiverPath = target[..target.LastIndexOf('.')];
+
+        if (receiverSymbol != null)
+        {
+            // The binder resolves the FIRST segment of the target as a variable.
+            // For a member chain (a.b.Method) the bound tree types `a` only;
+            // `a.b` has no bound type, so the receiver is unresolved rather than
+            // attributed to `a`'s type.
+            if (receiverPath.Contains('.'))
+                return BoundReceiver.Unresolved;
+
+            // The BoundType a read of this variable carries — the same shape a
+            // BoundVariableExpression for the receiver would expose.
+            return FromBoundType(new BoundVariableExpression(span, receiverSymbol).Type);
+        }
+
+        if (receiverTypeSymbol != null)
+            return new BoundReceiver(receiverTypeSymbol.QualifiedName);
+
+        // A type-qualified receiver written in source (System.Console, Console):
+        // the binder's identity for it, which is the source text with short BCL
+        // names expanded — not a variable-type guess.
+        return resolvedTypeName is { } sourceQualifiedType
+            ? new BoundReceiver(sourceQualifiedType)
+            : BoundReceiver.Unresolved;
+    }
+
+    private static BoundReceiver FromBoundType(BoundType type)
+    {
+        switch (type)
+        {
+            case UnresolvedBoundType:
+                return BoundReceiver.Unresolved;
+            case FunctionBoundType:
+                // Invoking a function-typed value: the callee is not a nominal
+                // receiver; effect rows on function types are E2/E4.
+                return BoundReceiver.Unresolved;
+            case NominalBoundType { QualifiedName: "OBJECT" }:
+                // The binder's fallback for an expression it could not type
+                // (unknown callee return, disagreeing conditional resolutions).
+                // Until the binder emits UnresolvedBoundType (scoping §D6) this
+                // sentinel is its unresolved marker; do not read it as
+                // System.Object.
+                return BoundReceiver.Unresolved;
+            case NominalBoundType nominal:
+                return FromTypeName(nominal.FullyQualifiedName);
+            case GenericInstantiationBoundType generic:
+                return FromTypeName(generic.Definition.FullyQualifiedName);
+            case ArrayBoundType:
+                return new BoundReceiver("System.Array");
+            case PrimitiveBoundType primitive:
+                return FromTypeName(primitive.Name);
+            default:
+                return BoundReceiver.Unresolved;
+        }
+    }
+
+    private static BoundReceiver FromTypeName(string typeName)
+    {
+        var trimmed = typeName.Trim().TrimStart('?').TrimEnd('?');
+        var bracket = trimmed.IndexOf('[');
+        if (bracket > 0 && trimmed.EndsWith(']')
+            && trimmed[bracket..].All(c => c is '[' or ']' or ','))
+        {
+            // Array-typed variable (i32[], string[,]): members live on System.Array.
+            return new BoundReceiver("System.Array");
+        }
+
+        var nominal = GetNominalTypeName(typeName);
+        return string.IsNullOrEmpty(nominal)
+            ? BoundReceiver.Unresolved
+            : new BoundReceiver(EffectEnforcementPass.MapShortTypeNameToFullName(nominal));
     }
 
     private static IEnumerable<BoundNode> Descendants(BoundNode node)

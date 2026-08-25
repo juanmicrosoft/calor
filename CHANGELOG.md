@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### v0.15 foundation
+- **`calor effects suggest` now learns what type a variable is from the
+  compiler's own type information instead of guessing from the source text.**
+  A variable whose type is only known through .NET metadata (for example
+  `§B{g} §C{System.Guid.NewGuid} §/C` followed by `§C{g.ToString} §/C`)
+  now resolves to the right type. When the compiler cannot work out a
+  receiver's type, the call is reported as unresolved with a warning instead of
+  being written into the manifest under a made-up name. The old text-scanning
+  shortcut (`_variableTypeMap`) is gone and a test now blocks it from coming
+  back.
+
 ## [0.14.3] - 2026-08-24
 
 ### Benchmark Results (Statistical: 30 runs)

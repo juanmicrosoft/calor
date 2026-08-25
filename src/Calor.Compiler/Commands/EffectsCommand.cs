@@ -485,13 +485,43 @@ public static class EffectsCommand
             .Distinct()
             .ToList();
 
+        // v0.15 E1: a call whose receiver the binder could not type carries the
+        // receiver's source text, not a type. It is reported, never turned into
+        // a manifest entry keyed on a variable name.
+        var untypedReceiverCalls = unresolvedCalls
+            .Where(call => !call.ReceiverResolved)
+            .ToList();
+        unresolvedCalls = unresolvedCalls
+            .Where(call => call.ReceiverResolved)
+            .ToList();
+        foreach (var call in untypedReceiverCalls.OrderBy(c => c.TypeName).ThenBy(c => c.MethodName))
+        {
+            Console.Error.WriteLine(
+                $"warning: receiver '{call.TypeName}' of call '{call.TypeName}.{call.MethodName}' has no " +
+                "resolved type; the call is unresolved and was not added to the manifest. " +
+                "Add a type annotation to the binding so its effects can be looked up.");
+        }
+
         // Handle "all resolved" case
         if (unresolvedCalls.Count == 0)
         {
             if (!json)
-                Console.WriteLine("All external calls are resolved. No supplemental manifest needed.");
+            {
+                Console.WriteLine(untypedReceiverCalls.Count == 0
+                    ? "All external calls are resolved. No supplemental manifest needed."
+                    : "All typed external calls are resolved. No supplemental manifest needed " +
+                      $"({untypedReceiverCalls.Count} call{(untypedReceiverCalls.Count != 1 ? "s" : "")} " +
+                      "on receivers with no resolved type — see warnings above).");
+            }
             else
-                Console.WriteLine(EnvelopeWriter.Serialize("effects", new { unresolved = 0, types = Array.Empty<object>() }));
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("effects", new
+                {
+                    unresolved = 0,
+                    types = Array.Empty<object>(),
+                    untypedReceivers = untypedReceiverCalls.Count,
+                }));
+            }
             return 0;
         }
 
@@ -526,6 +556,12 @@ public static class EffectsCommand
         var totalMethods = unresolvedCalls.Count;
         var totalTypes = groupedByType.Count();
         Console.WriteLine($"Found {totalMethods} unresolved external call{(totalMethods != 1 ? "s" : "")} across {totalTypes} type{(totalTypes != 1 ? "s" : "")}:");
+        if (untypedReceiverCalls.Count > 0)
+        {
+            Console.WriteLine(
+                $"  (+{untypedReceiverCalls.Count} call{(untypedReceiverCalls.Count != 1 ? "s" : "")} " +
+                "on receivers with no resolved type — see warnings above; not in the manifest)");
+        }
         Console.WriteLine();
 
         foreach (var group in groupedByType)
