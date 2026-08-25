@@ -232,6 +232,8 @@ OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 # `dotnet build src/Calor.Compiler -c Release`.
 # ---------------------------------------------------------------------------
 TELEMETRY_HELPERS="$SCRIPT_DIR/telemetry-helpers.py"
+# #881: the ONE derivation of the cost-leg token figure (shared with run-bundle.sh).
+TOKEN_USAGE="$SCRIPT_DIR/token-usage.py"
 CALOR_CLI_DLL=""
 if [[ -n "$CALOR_DLL_OVERRIDE" ]]; then
     # Per-arm build-pin (loop plan M5). Pins the calor CLI / MCP-server /
@@ -914,10 +916,18 @@ extract_metrics() {
         iters_to_green=$((ITERATION_BUDGET + 1)); censored=true
     fi
 
-    local tokens_in=0 tokens_out=0
+    # Tokens via token-usage.py (#881): usage.output_tokens covers only the
+    # final top-level turn and under-counted 55x on a subagent-delegating run
+    # (w5-parity-002 N1-001 treatment run-4); the helper sums modelUsage[*]
+    # and reports both figures so the correction is auditable in result.json.
+    local tokens_in=0 tokens_out=0 token_usage='{}'
     if [[ -f "$ws_out/agent.json" ]] && jq -e '.usage' "$ws_out/agent.json" >/dev/null 2>&1; then
-        tokens_in=$(jq -r '.usage.input_tokens // 0' "$ws_out/agent.json")
-        tokens_out=$(jq -r '.usage.output_tokens // 0' "$ws_out/agent.json")
+        token_usage=$(python3 "$TOKEN_USAGE" "$ws_out/agent.json" 2>/dev/null || echo '{}')
+        tokens_in=$(jq -r '.input_tokens_corrected // 0' <<<"$token_usage")
+        tokens_out=$(jq -r '.output_tokens_corrected // 0' <<<"$token_usage")
+        if [[ "$(jq -r '.undercount_flagged // false' <<<"$token_usage")" == "true" ]]; then
+            echo "WARN (#881): agent.json usage.output_tokens=$(jq -r '.output_tokens_naive' <<<"$token_usage") under-counts; modelUsage total=$tokens_out (origin=$(jq -r '.origin_kind // "none"' <<<"$token_usage")). Recording the corrected figure." >&2
+        fi
     fi
 
     # WS5 defect probe (loop plan D5.1, Annex A-1.2 M-W1): pass/fail of the
@@ -1005,6 +1015,7 @@ extract_metrics() {
         --argjson iterations "$iterations" --argjson itg "$iters_to_green" \
         --argjson censored "$censored" \
         --argjson tin "$tokens_in" --argjson tout "$tokens_out" \
+        --argjson token_usage "$token_usage" \
         --argjson null_agent "$NULL_AGENT" \
         --argjson mean_lat "$mean_lat" --argjson env_all "$envelope_valid_all" \
         --argjson mcp_writes "$mcp_writes" \
@@ -1018,7 +1029,8 @@ extract_metrics() {
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
           mcpWrites:$mcp_writes, defect:$defect,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
-          tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
+          tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
+          nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
 }
