@@ -397,3 +397,413 @@ It carries `ParameterTypes`, `ReturnType`, and a structural `DisplayString`
   depends on that staying true.
 - `!` lexes to `TokenKind.Exclamation` (`Lexer.cs:725-734`), currently only produced for the
   unary-not/`!=` path. §7 uses it.
+
+---
+
+## 3. Decision 1 — Row syntax
+
+> **Decision.** An effect row is written with the **existing `§E{…}` tag, placed immediately
+> after the type it annotates**. No new token, no new punctuation, no new AST node class, no
+> new `IAstVisitor` method. `§E` on a function declaration **is** the row of that function's
+> own type. An omitted row means *pure* on a declaration, *inferred* on a lambda literal, and
+> *Unknown* on a function-typed parameter, binding, or return.
+
+### 3.1 Why not `Int !{db:w, throw}`
+
+The direction doc sketches `Int !{db:w, throw}` (`calor-direction.md:23`) and calls it a
+placeholder. It is rejected for three reasons, all mechanical:
+
+1. **Types are strings in the parser.** `ReadInlineTypeToken` (`Parser.cs:13637`) accumulates a
+   `StringBuilder` and hands back a type *name*; a row spelled inside the type would have to be
+   parsed out of that string again downstream, in `ParameterNode.TypeName`,
+   `OutputNode.TypeName`, `VariableSymbol.TypeName`, and every consumer of them. That is the
+   `_variableTypeMap` mistake E1 just finished deleting.
+2. **Braces collide with attributes.** `!{…}` inside a `§B{…}` / `§I{…}` group would be read by
+   `ParsePositionalAttributes` (`Parser.cs:5610-5633`), which splits on `:` — so `!{db:w}`
+   arrives as two positional slots and CLAUDE.md's "never re-split `attrs["_pos0"]` on `:`"
+   rule is violated by construction. `§E` already owns the one place that legitimately
+   re-joins colon-split codes (`AttributeHelper.cs:337-339`); putting rows anywhere else
+   duplicates that machinery.
+3. **`§E` already parses in three of the six positions.** `§F`/`§MT` (`Parser.cs:1377-1380`),
+   `§LAM` (`:11392-11397`), `§DEL` (`:11574-11577`). Reusing the tag makes three of six sites
+   a no-op at the lexer and parser, and makes the other three one `if (Check(TokenKind.Effects))`
+   each.
+
+The cost of the decision is that a function type written in a signature is *two tokens*, not
+one — `Func<i32,i32> §E{cw}` rather than `Func<i32,i32>!{cw}`. That is accepted. Calor's whole
+surface is tag-prefixed; a tag is the idiomatic spelling.
+
+### 3.2 The six positions
+
+All grammar below is stated against the existing production it extends.
+
+| # | Position | Spelling | Parser change |
+|---|---|---|---|
+| 1 | Function / method declaration | `§F{id:name:vis} (…) -> T` then `§E{…}` on its own line | **none** — `Parser.cs:1377-1380` |
+| 2 | Lambda literal | `§LAM{id:x:i32} §E{…}` then body | **none** — `Parser.cs:11392-11397` (today parsed and discarded; §5 makes it load-bearing) |
+| 3 | Delegate declaration | `§DEL{id:Name}` … `§E{…}` | **none** — `Parser.cs:11574-11577` |
+| 4 | Parameter, tag form | `§I{Func<i32,i32>:f} §E{…}` | one `if (Check(TokenKind.Effects))` after `ParseParameter()` returns, at each `§I` dispatch arm (`Parser.cs:1369-1372` and its four siblings) |
+| 5 | Parameter, inline form | `(Func<i32,i32>:f §E{…}, i32:v) -> i32` | one `if (Check(TokenKind.Effects))` in `TryParseInlineSignature`, after the modifier slot (`Parser.cs:13567`) and before the `= default` check (`:13576`) |
+| 6 | Return / binding | `§O{Func<i32>} §E{…}` · `-> Func<i32> §E{…}` · `§B{f:Func<i32,i32>} §E{…} <init>` | one check after `ParseOutput()` (`Parser.cs:1373-1376`), one after the arrow's `ReadInlineTypeToken` (`:13620`), one after the binding's attribute group |
+
+**Row storage.** `EffectsNode? Row` becomes a field on `ParameterNode`, `OutputNode`, and
+`BindingNode` — three existing classes. `LambdaExpressionNode.Effects`
+(`Ast/LambdaNodes.cs:41`) and `DelegateDefinitionNode`'s effects field already exist. **Zero
+new AST node types, therefore zero of the 184 `IAstVisitor` methods and zero of the five
+implementers change** (§9).
+
+**Why position 6 is unambiguous.** `TokenKind.Effects` is not in `ExpressionParsers`
+(`Parser.cs:15-65`, 47 entries, no `Effects` key), so `IsExpressionStart()` (`:2466-2469`) is
+false for it. A `§B{f:Func<i32,i32>} §E{cw} <init>` therefore cannot have its row swallowed by
+the initializer's `ParseExpression()`: the row is consumed first, deterministically, and the
+initializer parse starts at the token after `}`. **This property is load-bearing and gets a
+pin** (§13): adding `TokenKind.Effects` to `ExpressionParsers` must break a test.
+
+### 3.3 Composition with declaration-level `§E{…}`
+
+**`§E` on a function declaration is the row of that function's own type. Yes.** One tag, one
+meaning: *the effects this callable may perform.* Consequences, stated so they are checkable:
+
+- The declared row of `§F{f001:Log:pub} (str:m) -> void` with `§E{cw}` is `{cw}`, and the
+  `FunctionBoundType` the binder gives that symbol carries `Row = {cw}` (§8).
+- Passing `Log` as a method-group argument no longer needs the special case at
+  `EffectEnforcementPass.cs:1272-1278`; the argument's *type* carries the row and §6's
+  argument rule checks it. That special case's behaviour is preserved (it charges the callee's
+  declared effects, which is what "the row fits or does not fit" reduces to for a monomorphic
+  destination), so no pin changes — but the mechanism moves from an ad-hoc name lookup to the
+  type system, which is the whole point of TIER2D.
+- The body-vs-declaration check is **unchanged and still Calor0410** (`:410-443`). Rows do not
+  replace it. Calor0424/0425 are about *two rows meeting at a binding site*; Calor0410 is
+  about a body exceeding its own declaration. Keeping them distinct keeps existing Calor0410
+  corpus behaviour byte-stable, which gate 5 requires.
+
+### 3.4 What an omitted row means, per site
+
+This is the one genuinely asymmetric rule in the design, so it is stated as a table with its
+reason.
+
+| Site | Omitted row means | Why |
+|---|---|---|
+| Function / method / delegate **declaration** | **Pure** (`EffectSet.Empty`) | Unchanged from today (`EffectEnforcementPass.cs:473-478`). 496 of the 886 committed `.calr` files contain a `§E{`; the other 390 rely on this default. Changing it breaks the corpus and gate 5. |
+| **Lambda literal** | **Inferred from the body** | The body is present and already walked (`InferFromLambda`, `:2942-2954`). Inference is sound and needs no annotation. Defaulting to pure would be *unsound* (today's `InferFromLambda` charges the body precisely because it must); defaulting to Unknown would be gratuitously lossy. |
+| Function-typed **parameter, binding, or return** | **Unknown** | There is no body to infer from and no declaration to trust. Defaulting to pure would silently re-open the laundering hole PR #968 closed. This is a *new* syntactic position, so nothing in the corpus regresses: the 886-file corpus contains 4 occurrences of `Func<`/`Action<` in `.calr` in total. |
+
+The asymmetry is defensible precisely because the three rows are three different epistemic
+situations: *a promise the author made*, *a fact the compiler can compute*, and *a fact nobody
+supplied*. Collapsing them to one default would have to pick pure (unsound) or Unknown
+(breaks 390 files).
+
+### 3.5 Six worked examples with their exact diagnostics
+
+All examples are future syntax and are deliberately in `text` fences, which
+`calor self-check docs` never scans (`docs/cli/self-check.md:80-86`).
+
+**E-1 — a function-typed parameter with a row, invoked. Today: Calor0418. After: compiles.**
+
+```text
+§M{m001:Ex1}
+  §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+    §E{cw}
+    §R §C{transform} §A value §/C
+```
+
+*Today* (`82338e37`): `Calor0418` Error at the `§C{transform}` span —
+`InferFromBareNameTarget` (`EffectEnforcementPass.cs:1452-1472`) sees `transform` resolve to a
+parameter of declared type `Func<i32,i32>`, which `IsFunctionTypeName` (`:1939-1955`) accepts,
+and reports *"Invocation of function-typed value 'transform' (type 'Func<i32,i32>') is an error
+under effect enforcement…"*. Pinned by `StrictnessBatchTests.cs:29`.
+
+*After:* no diagnostic. The invocation charges the parameter's row `{cw}` to `Apply`, whose
+declared row is `{cw}`, so the Calor0410 check at `:410-443` passes.
+
+**E-2 — the row does not fit the enclosing declaration. New charging path, unchanged code.**
+
+```text
+§M{m001:Ex2}
+  §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+    §E{}
+    §R §C{transform} §A value §/C
+```
+
+*After:* `Calor0410 ForbiddenEffect` Error at the `§E{}` span —
+`"Function 'Apply' performs effect(s) [cw] not declared in its effect set"`. This is today's
+Calor0410 path (`:410-443`) reached through a new charging rule, **not** a new code. Deliberate:
+"the body does more than the declaration allows" already has a code and a corpus of
+expectations.
+
+**E-3 — an argument whose row is wider than the parameter's. New: Calor0424.**
+
+```text
+§M{m001:Ex3}
+  §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+    §E{}
+    §R §C{transform} §A value §/C
+
+  §F{f002:Shout:pub} (i32:x) -> i32
+    §E{cw}
+    §P x
+    §R x
+
+  §F{f003:Main:pub} () -> i32
+    §E{cw}
+    §R §C{Apply} §A Shout §A INT:1 §/C
+```
+
+*After:* `Calor0424 EffectRowMismatch` Error at the `Shout` argument span:
+
+```
+Argument 'Shout' has effect row [cw], which does not fit parameter 'transform'
+of 'Apply' (declared row: [pure]). Extra effect(s): cw. Widen 'transform''s row
+to §E{cw}, or pass a function whose row fits. An effect row that does not fit is
+never waived by --permissive-effects.
+```
+
+*Today:* no diagnostic at the argument site at all. `InferFromCallArguments`
+(`:1272-1278`) charges `Shout`'s declared `{cw}` to `Main`, which declares `{cw}`, so the
+program compiles and the laundering is invisible — `Apply` is documented pure and calls an
+impure callback. **This is the class E3 closes and gate 1 counts.**
+
+**E-4 — an argument whose row is unknown. New: Calor0425, waivable.**
+
+```text
+§M{m001:Ex4}
+  §F{f001:Run:pub} (Func<i32>:make) -> i32
+    §E{}
+    §R §C{make} §/C
+```
+
+*After:* `Calor0425 EffectRowUnknown` Warning (Error under `--strict-effects`) at the `make`
+parameter span:
+
+```
+Parameter 'make' of 'Run' is function-typed with no effect row, so its effects
+are Unknown. Add §E{…} after the type to state what callers may pass, or compile
+with --permissive-effects to waive this. Invoking a value whose row is Unknown
+charges Unknown to 'Run'.
+```
+
+…followed by `Calor0410` at `§E{}`, because Unknown fits no declared set — the fail-closed
+behaviour of `EffectSet.cs:101`, now reached through the row. Under `--permissive-effects`,
+Calor0425 is suppressed and the Unknown charge is short-circuited to `Empty` exactly as
+`:1427-1430` does today.
+
+**E-5 — a lambda literal with a declared row that its body exceeds. New: Calor0410 on `§LAM`.**
+
+```text
+§M{m001:Ex5}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §B{f:Func<i32,i32>} §E{} §LAM{lam1:x:i32}
+      §P x
+      §R x
+    §/LAM{lam1}
+```
+
+*After:* `Calor0410 ForbiddenEffect` Error at the `§LAM`'s `§E{}` span —
+`"Lambda 'lam1' performs effect(s) [cw] not declared in its effect set"`. *Today:* silence —
+`lambda.Effects` is parsed (`Parser.cs:11392-11397`), stored
+(`Ast/LambdaNodes.cs:41`, `Binding/BoundNodes.cs:2128-2129`) and never read (`InferFromLambda`,
+`:2942-2954`). §5 is the decision that ends that.
+
+**E-6 — an override broadening its base's row. Unchanged: Calor0420.**
+
+```text
+§M{m001:Ex6}
+  §CL{c001:Base:pub}
+    §MT{mt001:Render:pub:virt} () -> void
+      §E{}
+  §CL{c002:Derived:Base:pub}
+    §MT{mt002:Render:pub:over} () -> void
+      §E{cw}
+      §P "laundered"
+```
+
+*After:* `Calor0420 OverrideEffectVariance` Error, **same code, same message shape as today**
+(`EffectEnforcementPass.cs:537-545`), now computed by the shared row-fit relation instead of a
+bespoke `IsSubsetOf` call. Pinned unchanged at `StrictnessBatchTests.cs:132`. §6 is the
+decision to keep the code.
+
+### 3.6 Lexing and parsing, against CLAUDE.md's rules
+
+- *"`ParseAttributes()` already splits on `:` … never re-split `attrs["_pos0"]` on `:`"* — no
+  row is ever inside a brace group except `§E{…}`'s own, where `InterpretEffectsAttributes`
+  (`AttributeHelper.cs:329` onward) already owns the colon rejoin via `EffectCodes.ColonPrefixes`
+  (`EffectTypes.cs:142-148`). No new re-splitting is introduced anywhere.
+- *"`IsExpressionStart()` must include all new expression token kinds"* — no new expression
+  token kind is introduced. `TokenKind.Effects` must stay *out* of `ExpressionParsers`
+  (§3.2); that is the inverse of the usual failure and gets its own pin.
+- *"Closing tags with IDs need `ParseAttributes()` after `Advance()`"* — no new closing tag.
+  The only closers Calor authors write are `§/C` and `§/LAM`, both unchanged.
+- *"`ParseValue()` handles `*` for pointer types and `[,]` for multi-dimensional array types"*
+  — untouched; rows never reach `ParseValue`.
+- **Lexer:** no new token kind, no change to `IsKeyword`'s range in `Parsing/Token.cs`, no new
+  keyword-dictionary entry in `Parsing/Lexer.cs`. §7's effect variables reuse
+  `TokenKind.Exclamation` (`Lexer.cs:725-734`), which the lexer already produces.
+
+---
+
+## 4. Decision 2 — The row lattice
+
+> **Decision.** A row is one of `Concrete(S)`, `Assumed(S, reasons)`, or `Unknown`, where `S`
+> is a set over `EffectCodes.Registry` closed under `EffectSubtyping`. Inference uses a join
+> `⊔` with `Unknown` as ⊤. Checking uses a **separate three-valued relation** `fits`, whose
+> third value is what distinguishes Calor0425 from Calor0424. `EffectSet.IsSubsetOf` is *not*
+> reused as `fits`.
+
+### 4.1 The carrier
+
+`S` ranges over the 31-entry `EffectCodes.Registry` (`EffectTypes.cs:65-109`), 26 documented
+plus 5 legacy aliases. The order on individual effects is `EffectSubtyping.Encompasses`
+(`EffectSubtyping.cs:52-66`) — today a four-entry table (`:14-43`) relating each `*_readwrite`
+to its `*_read` and `*_write`.
+
+**Sub-decision: the family/narrow gap is closed, and it is closed in E2's PR, not later.**
+§2.3 established that `db` does not encompass `db:r` today, because `Subtypes` has an entry for
+`database_readwrite` but none for `database`. Under rows this becomes visible at every binding
+site rather than only at a declaration, so the gap stops being academic. E2 adds entries to the
+same table for the three bare family codes that have narrow siblings — `database`, `network`,
+`environment` — so that e.g. `("io","database")` encompasses `database_read`, `database_write`
+and `database_readwrite`. `filesystem` has no bare code (§2.3), so `fs:rw` remains the
+filesystem top and needs nothing. `process` (`proc`) and `http` have no narrow siblings and are
+untouched.
+
+This is a **widening** of what compiles, never a narrowing: a program that satisfied
+`§E{db:r} ⊆ §E{db}` before did so only by declaring `db:r` explicitly, and still does. Gate 5's
+"E1-attributable changes separated" discipline extends to it: any Calor0410 that *disappears*
+because of this table change is listed by name in the E2 PR body.
+
+The roadmap's shorthand `fs:w ⊂ fs` remains wrong even after this change, because there is no
+`fs` code. §14 records the correction.
+
+### 4.2 The three row forms
+
+```
+Row ::= Concrete(S)              -- S a closed set of registry effects; Concrete(∅) is "pure"
+      | Assumed(S, R)            -- S as above; R a non-empty list of assumption reasons
+      | Unknown
+```
+
+`Assumed` is promoted from today's side table (`_assumedEffects`,
+`EffectEnforcementPass.cs:34`) to a first-class row form. That promotion is the entire point:
+an assumption attached to a *function id* cannot survive being passed as an argument, and an
+assumption attached to a *row* can. `EffectResolutionStatus`
+(`EffectResolver.cs:596-608`) gains no member — it describes manifest lookup, not rows; the
+`Assumed` row is produced by the pass from an `Unknown`-or-interop resolution plus a reason,
+exactly as `AddAssumption` does today.
+
+`Unknown` replaces the `(EffectKind.Unknown, "*")` sentinel (`EffectSet.cs:20`, `:200-203`) *at
+the row level*. `EffectSet.Unknown` itself stays, because `EffectSet` remains the type the
+Calor0410 body-vs-declaration check uses, and changing it would move that check's behaviour.
+
+### 4.3 The join `⊔` — used by inference
+
+```
+Concrete(A)      ⊔ Concrete(B)      = Concrete(A ∪ B)
+Concrete(A)      ⊔ Assumed(B, R)    = Assumed(A ∪ B, R)
+Assumed(A, R₁)   ⊔ Assumed(B, R₂)   = Assumed(A ∪ B, R₁ ++ R₂)
+X                ⊔ Unknown          = Unknown          (absorbing, either side)
+```
+
+Set union is `EffectSet.Union` (`EffectSet.cs:83-91`), which is already absorbing on Unknown
+(`:86`). Reason lists concatenate and dedupe, preserving the existing "first three shown, then
+`; and N more`" presentation (`:453-455`). `⊔` is associative, commutative, idempotent, with
+identity `Concrete(∅)` and top `Unknown` — a genuine join-semilattice.
+
+### 4.4 The relation `fits` — used by checking
+
+`fits(src, dst)` is **three-valued**: `Fits | DoesNotFit | CannotTell`.
+
+```
+fits(Concrete(A),    Concrete(B))  = Fits          if A ⊆_enc B
+                                   = DoesNotFit    otherwise
+fits(Assumed(A, R),  Concrete(B))  = Fits          if A ⊆_enc B   [carries R → Calor0425]
+                                   = DoesNotFit    otherwise      [Calor0424 wins over 0425]
+fits(Unknown,        Concrete(B))  = CannotTell                   [Calor0425]
+fits(X,              Unknown)      = CannotTell                   [Calor0425 at the dst site]
+fits(Unknown,        Unknown)      = CannotTell
+```
+
+`⊆_enc` is subset-modulo-`Encompasses`, i.e. exactly `EffectSet.IsSubsetOf`'s loop body
+(`EffectSet.cs:103-118`) **without** its two Unknown special cases at `:100-101`. Restating the
+three properties the design needs, each as a sentence:
+
+- **A concrete row never fits into a narrower one.** `Concrete({cw})` into `Concrete(∅)` is
+  `DoesNotFit`, because `⊆_enc` fails. That is E-3.
+- **Unknown fits nothing and is fitted by nothing except Unknown, and even then only as
+  `CannotTell`.** There is no rule producing `Fits` with `Unknown` on either side. In
+  particular the `if (other.IsUnknown) return true` rule of `EffectSet.cs:100` — "everything is
+  a subset of unknown" — is **not** carried into `fits`. That rule is sound for its caller
+  (a *computed* set checked against a *declared* set that can never be Unknown, because
+  `§E{unknown}` is not writable: `unknown` is not in `EffectCodes.Registry` and
+  `ParseEffects` reports Calor0403 for it, `Parser.cs:1778-1781`). It is not sound for rows,
+  where a *destination* row can be Unknown by omission (§3.4).
+- **Assumed fits like its underlying row and propagates Calor0425.** The assumption travels
+  with the value; a `Fits` verdict on an `Assumed` row is a conditional acceptance, and
+  Calor0425 is what makes the condition visible. A `DoesNotFit` verdict on an `Assumed` row is
+  a hard Calor0424: if the assumed set already exceeds the destination, no further assumption
+  could rescue it.
+
+Two relations, not one, is itself a decision. `⊑` is not defined as a single order because
+`Unknown` has to be ⊤ for inference (an unresolved callee poisons the join) and ⊥-incomparable
+for checking (an unresolved callee proves nothing). Forcing both into one order is where a
+single-relation design would silently re-admit laundering.
+
+### 4.5 `--permissive-effects`
+
+> **Decision.** `--permissive-effects` waives **Calor0425 only**. **Calor0424 is never
+> waived — by any flag.**
+
+This executes roadmap §4.5's row for the flag verbatim. Mechanically: the `CannotTell` verdict
+is suppressed and the row is treated as `Concrete(∅)` for charging (mirroring
+`EffectEnforcementPass.cs:1427-1430`, which already returns `EffectSet.Empty` under
+`UnknownCallPolicy.Permissive`); the `DoesNotFit` verdict reports at Error severity regardless
+of policy. The flag remains `--permissive-effects` (`src/Calor.Compiler/Program.cs:81`) and
+keeps its existing effect on Calor0410 and Calor0411.
+
+One consequence is worth naming: **`--permissive-effects` becomes strictly less powerful in
+0.15 than in 0.14.** Today it demotes Calor0418 to a warning
+(`EffectEnforcementPass.cs:1457-1459`, pinned at `StrictnessBatchTests.cs:64`) and thereby lets
+any higher-order code through. After E4 there is no Calor0418, and the rows that used to hide
+behind the waiver split: the ones that are Unknown stay waivable, the ones that genuinely
+mismatch stop being. That is intentional — a waiver for "we don't know" is honest, a waiver for
+"we know it's wrong" is not — and it is a behaviour change the release notes must carry.
+
+### 4.6 Subtyping for function types
+
+> **Decision.** Rows on function types are **covariant in the callee's own effects**;
+> parameters' rows are **contravariant**; parameter *types* and the return *type* stay
+> **invariant** in 0.15.
+
+For `F₁ = (P₁ᵢ !ρ₁ᵢ …) -> T₁ !ρ₁` and `F₂ = (P₂ᵢ !ρ₂ᵢ …) -> T₂ !ρ₂` (writing `!ρ` for a row):
+
+```
+fits(F₁, F₂) = Fits   iff   arity(F₁) = arity(F₂)
+                      and   P₁ᵢ ≡ P₂ᵢ for all i          (parameter types invariant)
+                      and   T₁ ≡ T₂                       (return type invariant)
+                      and   fits(ρ₁,  ρ₂)  = Fits         (own row: COvariant)
+                      and   fits(ρ₂ᵢ, ρ₁ᵢ) = Fits ∀ i     (parameter rows: CONTRAvariant)
+```
+
+with `CannotTell` propagating (any `CannotTell` conjunct makes the whole verdict
+`CannotTell`) and `DoesNotFit` dominating `CannotTell`.
+
+**Why parameter types stay invariant.** `FunctionBoundType.Equals` is structural equality over
+`ParameterTypes` and `ReturnType` (`Binding/BoundTypes/BoundType.cs:228-231`). Making parameter
+types contravariant is a *generics* change — variance, constraints, higher-rank — which
+`calor-direction.md:57-60` explicitly defers ("Generics with constraints, variance,
+higher-rank … Deferred because the type-system work for effect rows is more foundational").
+0.15 changes what rows do, not what types do.
+
+**Contravariant parameter rows, worked.** Destination:
+
+```text
+§F{f001:RunTwice:pub} (Func<i32,i32>:g §E{cw}) -> void
+```
+
+`RunTwice` promises its caller: *I will hand you a `g` that is allowed to print.* A source
+value whose own parameter row is `§E{}` — a `RunTwice` variant that only accepts pure `g` —
+**does not fit**, because it accepts strictly fewer functions than the destination promises to
+supply. A source whose parameter row is `§E{cw,fs:w}` **does** fit: it accepts everything the
+destination will hand it, and more. Formally `fits(ρ₂ᵢ, ρ₁ᵢ)`: the *destination's* parameter
+row must fit into the *source's*. That is the flip, and it is the one place where reading the
+rule aloud is worth the ink.
