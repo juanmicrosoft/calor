@@ -54,26 +54,35 @@ from Info to Error under `SemanticsVersion.Major >= 2`. See
 
 ### 3.1 Module Declaration
 
-Modules can declare their required semantics version:
+A module declares the semantics version it was written for with a
+`§SEMVER` directive, conventionally the first line of the module body:
 
 ```calor
 §M{m001:MyModule}
-  §SEMVER{1.0.0}
-  ...
+  §SEMVER{2.0.0}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §R
 ```
 
-### 3.2 Syntax Variants
+### 3.2 Syntax
 
-```calor
-// Exact version
-§SEMVER{1.0.0}
+Exactly one form is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` with three
+numeric components.
 
-// Minimum version (any 1.x.x compatible)
-§SEMVER{^1.0.0}
-
-// Range
-§SEMVER{>=1.0.0 <2.0.0}
 ```
+§SEMVER{2.0.0}
+```
+
+Caret (`^2.0.0`), range (`>=2.0.0 <3.0.0`), and shortened (`2`, `2.0`)
+forms are **not** supported and are rejected with `Calor0702`. A module may
+contain at most one `§SEMVER`; a second one is also `Calor0702`.
+
+### 3.3 Modules That Declare Nothing
+
+A module without `§SEMVER` takes the compiler's own version (currently
+2.0.0). No diagnostic is emitted for a missing declaration; the only nudge
+is the `calor hook` write-time reminder, which suggests `§SEMVER{2.0.0}`.
 
 ---
 
@@ -86,7 +95,7 @@ Modules can declare their required semantics version:
 - Specification bug fixes
 - Test additions
 
-**Example:** 1.0.0 → 1.0.1 is safe.
+**Example:** 2.0.0 → 2.0.1 is safe.
 
 ### 4.2 Minor Version Changes (x.Y.z)
 
@@ -96,18 +105,19 @@ Modules can declare their required semantics version:
 - New optional behaviors
 - Extended standard library
 
-**Example:** Code written for 1.0.0 will compile and run correctly under 1.1.0.
+**Example:** Code written for 2.0.0 will compile and run correctly under 2.1.0.
 
 ### 4.3 Major Version Changes (X.y.z)
 
-**May be incompatible.** Changes may include:
+**Incompatible by definition.** Changes may include:
 - Evaluation order changes
 - Operator precedence changes
-- Type system changes
+- Type system changes (2.0.0: non-nullable `string` and the
+  `Calor0272/0273/0274` nullability errors)
 - Default behavior changes
 - Removed constructs
 
-**Example:** Code written for 1.x may not work correctly under 2.0.
+**Example:** Code written for 1.x is refused by a 2.x compiler (see §5).
 
 ---
 
@@ -115,7 +125,10 @@ Modules can declare their required semantics version:
 
 ### 5.1 Version Checking
 
-The compiler checks declared versions against its supported semantics:
+The compiler checks the declared version against its supported semantics
+while parsing the module, so every consumer of the parser — `calor build`,
+the language server, `calor self-check docs`, the MCP tools — reaches the
+same verdict:
 
 ```csharp
 // src/Calor.Compiler/SemanticsVersion.cs
@@ -132,30 +145,36 @@ public static class SemanticsVersion
 
 | Code | Severity | Condition |
 |------|----------|-----------|
-| Calor0700 | Warning | Module version newer than compiler (might work) |
-| Calor0701 | Error | Module version incompatible (major mismatch) |
+| Calor0700 | Warning | Same major, declared minor newer than the compiler's (might work) |
+| Calor0701 | Error | Declared major differs from the compiler's — older **or** newer |
+| Calor0702 | Error | `§SEMVER` is not `MAJOR.MINOR.PATCH`, or appears more than once |
 
 ### 5.3 Checking Logic
 
+The major must match exactly. A declared major **older** than the
+compiler's (for example `§SEMVER{1.0.0}` on the 2.0.0 compiler) is refused
+rather than silently reinterpreted under the newer rules — this is roadmap
+§3.3 decision 1 ("fail-closed; no silent reinterpretation, and no
+dual-semantics mode to maintain"), tracked as
+[#1084](https://github.com/juanmicrosoft/calor/issues/1084) item 1. The
+error message carries the migration pointer: migrate the module and declare
+`§SEMVER{2.0.0}` after reviewing nullability semantics
+(`Calor0272/0273/0274`).
+
 ```csharp
-public static void CheckSemanticsVersion(Version declared, Version compiler)
+public static VersionCompatibility CheckCompatibility(Version declared)
 {
-    if (declared.Major > compiler.Major)
-    {
-        // Error: Incompatible major version
-        Emit(DiagnosticCode.SemanticsVersionIncompatible,
-             $"Module requires semantics v{declared} but compiler supports v{compiler}");
-    }
-    else if (declared.Major == compiler.Major &&
-             declared.Minor > compiler.Minor)
-    {
-        // Warning: Module may use features not in this compiler
-        Emit(DiagnosticCode.SemanticsVersionMismatch,
-             $"Module targets semantics v{declared}, compiler supports v{compiler}");
-    }
+    if (declared.Major != Major)
+        return VersionCompatibility.Incompatible;       // Calor0701
+    if (declared.Minor > Minor)
+        return VersionCompatibility.PossiblyIncompatible; // Calor0700
+    return VersionCompatibility.Compatible;
     // Patch differences are always compatible
 }
 ```
+
+`SemanticsVersion.ReportDeclaredVersion` turns that verdict into the
+diagnostics above; the parser calls it when it meets `§SEMVER`.
 
 ---
 
@@ -164,13 +183,14 @@ public static void CheckSemanticsVersion(Version declared, Version compiler)
 ### Version 2.0.0 (Current)
 
 Precursor bump for the v0.14 nullability enforcement workstream (task #14).
-No semantic-behavior change ships with this bump on its own — it unblocks the
-S5 severity flip (`Calor0272/0273/0274` Info → Error) that lands in the
-following PR, gated on `SemanticsVersion.Major >= 2`.
+Unblocked the S5 severity flip (`Calor0272/0273/0274` Info → Error), gated
+on `SemanticsVersion.Major >= 2`.
 
-Retains all `1.0.0` semantics; the `CheckCompatibility` predicate now maps
-`§SEMVER{1.x}`-declared files to `Compatible` (older-major is accepted), while
-`§SEMVER{3.x}` and beyond map to `Incompatible`.
+Since v0.15.0 the `§SEMVER` directive is parsed and checked: files declaring
+`1.x` (or `0.x`) are refused with `Calor0701` and a migration pointer
+(#1084 item 1); no committed `.calr` in this repository declared a version,
+so the change broke nothing in-tree. Automated 1.x → 2.0.0 migration is
+demand-driven (#1084 item 3).
 
 ### Version 1.0.0
 
@@ -240,22 +260,17 @@ When upgrading a module to a new semantics version:
 3. **Update §SEMVER** declaration
 4. **Test edge cases** related to changed semantics
 
-### 8.2 Multi-Version Projects
+For 1.x → 2.0.0 specifically: review every `string`-typed binding, return,
+and argument for possibly-null values (`Calor0272/0273/0274` become errors),
+then change the declaration to `§SEMVER{2.0.0}`. Until you do, the 2.x
+compiler refuses the file with `Calor0701`.
 
-Projects can contain modules targeting different semantics versions:
+### 8.2 Mixed-Version Projects
 
-```
-project/
-├── legacy/
-│   └── old_module.calr  // §SEMVER{1.0.0}
-└── modern/
-    └── new_module.calr  // §SEMVER{1.1.0}
-```
-
-The compiler will:
-1. Check each module against its declared version
-2. Emit warnings if version mismatches exist
-3. Use the highest required version for cross-module calls
+There is no dual-semantics mode: every module in a compilation must declare
+the compiler's major (or declare nothing). A project cannot keep a
+`§SEMVER{1.0.0}` module alongside `§SEMVER{2.0.0}` ones on a 2.x compiler —
+the 1.x module is refused until it is migrated.
 
 ---
 
@@ -267,80 +282,86 @@ The compiler will:
 // src/Calor.Compiler/SemanticsVersion.cs
 namespace Calor.Compiler;
 
-/// <summary>
-/// Defines the current semantics version supported by this compiler.
-/// </summary>
 public static class SemanticsVersion
 {
-    /// <summary>Major version - breaking changes.</summary>
     public const int Major = 2;
-
-    /// <summary>Minor version - backward-compatible additions.</summary>
     public const int Minor = 0;
-
-    /// <summary>Patch version - clarifications and fixes.</summary>
     public const int Patch = 0;
-
-    /// <summary>Full version object.</summary>
     public static readonly Version Current = new(Major, Minor, Patch);
-
-    /// <summary>Version string for display.</summary>
     public static string VersionString => $"{Major}.{Minor}.{Patch}";
 
-    /// <summary>
-    /// Checks if a declared version is compatible with this compiler.
-    /// </summary>
     public static VersionCompatibility CheckCompatibility(Version declared)
     {
-        if (declared.Major > Major)
+        if (declared.Major != Major)
             return VersionCompatibility.Incompatible;
-        if (declared.Major == Major && declared.Minor > Minor)
+        if (declared.Minor > Minor)
             return VersionCompatibility.PossiblyIncompatible;
         return VersionCompatibility.Compatible;
     }
+
+    // Parses the §SEMVER text, applies CheckCompatibility, and reports
+    // Calor0700 / Calor0701 / Calor0702 into the diagnostic bag.
+    public static bool ReportDeclaredVersion(
+        DiagnosticBag diagnostics, TextSpan span, string? versionText);
 }
 
 public enum VersionCompatibility
 {
     Compatible,
-    PossiblyIncompatible,  // Warning
-    Incompatible           // Error
+    PossiblyIncompatible,  // Warning (Calor0700)
+    Incompatible           // Error (Calor0701)
 }
 ```
 
 ### 9.2 Diagnostic Codes
 
-Add to `src/Calor.Compiler/Diagnostics/Diagnostic.cs`:
+In `src/Calor.Compiler/Diagnostics/Diagnostic.cs`:
 
 ```csharp
-// Semantics version (Calor0700-0709; contract-verification results live in 0710-0715)
-public const string SemanticsVersionMismatch = "Calor0700";     // Warning
-public const string SemanticsVersionIncompatible = "Calor0701"; // Error
+// Semantics version (Calor0700-0709; contract-verification results live in 0710-0729)
+public const string SemanticsVersionMismatch = "Calor0700";           // Warning
+public const string SemanticsVersionIncompatible = "Calor0701";       // Error
+public const string SemanticsVersionInvalidDeclaration = "Calor0702"; // Error
 ```
+
+### 9.3 Where the Directive Lives
+
+- `Parsing/Lexer.cs` — `§SEMVER{...}` lexes as one `TokenKind.SemVer`
+  token whose value is the raw brace content.
+- `Parsing/Parser.cs` (`ParseModule`) — accepts the directive at module
+  level, calls `SemanticsVersion.ReportDeclaredVersion`, and stores the
+  text on `ModuleNode.DeclaredSemanticsVersion`.
+- `Migration/CalorEmitter.cs` — re-emits the directive so Calor → Calor
+  round-trips preserve it.
 
 ---
 
 ## 10. Test Cases
 
-### S11: SemanticsVersionMismatch_EmitsDiagnostic
+`tests/Calor.Semantics.Tests/VersioningTests.cs` pins the behaviour end to
+end. The matrix below is for the 2.0.0 compiler:
 
+| Module declares | Result |
+|-----------------|--------|
+| (nothing) | Compatible — takes 2.0.0, no diagnostic |
+| 2.0.0, 2.0.5 | Compatible |
+| 2.1.0 | Warning (Calor0700), compiles |
+| 1.0.0, 1.9.9, 0.9.0 | Error (Calor0701) with migration pointer to #1084 |
+| 3.0.0, 99.0.0 | Error (Calor0701), "upgrade the compiler" |
+| `^1.0.0`, `2`, `2.0`, second `§SEMVER` | Error (Calor0702) |
+
+Example — refused legacy module:
+
+<!-- drift:ignore -->
 ```calor
-// Test: Module declares newer version than compiler supports
-§M{m1:Test}
-  §SEMVER{99.0.0}  // Future version
+§M{m1:Legacy}
+  §SEMVER{1.0.0}
 ```
 
-Expected: Diagnostic `Calor0701` (Error)
-
-### Version Compatibility Matrix
-
-| Module Version | Compiler Version | Result |
-|----------------|------------------|--------|
-| 1.0.0 | 1.0.0 | Compatible |
-| 1.0.0 | 1.1.0 | Compatible |
-| 1.0.0 | 2.0.0 | Compatible |
-| 1.1.0 | 1.0.0 | Warning (Calor0700) |
-| 2.0.0 | 1.0.0 | Error (Calor0701) |
+Expected: `Calor0701` (Error) — "Module declares semantics version 1.0.0,
+but this compiler implements 2.0.0 and refuses files written for an older
+major. ... declare §SEMVER{2.0.0} after reviewing nullability semantics
+(Calor0272/0273/0274). See https://github.com/juanmicrosoft/calor/issues/1084."
 
 ---
 
@@ -349,3 +370,5 @@ Expected: Diagnostic `Calor0701` (Error)
 - Semantic Versioning: https://semver.org/
 - Core Semantics: `docs/semantics/core.md`
 - Implementation: `src/Calor.Compiler/SemanticsVersion.cs`
+- Roadmap: `docs/plans/roadmap-v0.13-v0.15.md` §3.3 decision 1, §4.5 row 2
+- Tracking issue: https://github.com/juanmicrosoft/calor/issues/1084

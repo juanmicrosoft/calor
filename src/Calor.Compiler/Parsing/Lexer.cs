@@ -66,6 +66,7 @@ public sealed class Lexer
         ["CN"] = TokenKind.Continue,        // §CN = Continue
         ["GOTO"] = TokenKind.Goto,          // §GOTO{label} = Goto
         ["LABEL"] = TokenKind.Label,        // §LABEL{label} = Label
+        ["SEMVER"] = TokenKind.SemVer,      // §SEMVER{MAJOR.MINOR.PATCH} = semantics-version declaration
         ["BODY"] = TokenKind.Body,          // §BODY - explicit body start (optional)
         ["END_BODY"] = TokenKind.EndBody,   // §END_BODY - explicit body end (optional)
 
@@ -1005,6 +1006,13 @@ public sealed class Lexer
         if (fullKeyword.Equals("LABEL", StringComparison.Ordinal) && Current == '{')
         {
             return ScanBraceContent(TokenKind.Label);
+        }
+
+        // Special handling for §SEMVER{MAJOR.MINOR.PATCH}: capture the version text
+        // verbatim (a dotted triple would otherwise lex as float/int fragments).
+        if (fullKeyword.Equals("SEMVER", StringComparison.Ordinal) && Current == '{')
+        {
+            return ScanBraceContent(TokenKind.SemVer);
         }
 
         // Special handling for §PP{CONDITION}: preprocessor conditional start

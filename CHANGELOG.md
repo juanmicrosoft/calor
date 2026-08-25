@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Files that declare `§SEMVER{1.x}` (or `0.x`) are now refused with an error
+  pointing at #1084.** The compiler implements semantics version 2.0.0. Before
+  this change a module that said `§SEMVER{1.0.0}` was not checked at all — the
+  `§SEMVER` line did not even lex, and the compatibility check in
+  `SemanticsVersion.CheckCompatibility` had no caller — so nothing stopped a
+  1.x file from being quietly read under 2.0.0 rules. Now `§SEMVER{MAJOR.MINOR.PATCH}`
+  is a real module-level directive, and the check runs on every parse:
+  - An older major (`§SEMVER{1.0.0}`) stops the build with `Calor0701`. The
+    message tells you what to do: migrate the module and declare
+    `§SEMVER{2.0.0}` after reviewing the nullability rules
+    (`Calor0272`/`0273`/`0274`). It links to
+    [#1084](https://github.com/juanmicrosoft/calor/issues/1084).
+  - A newer major (`§SEMVER{3.0.0}`) still stops the build with `Calor0701`
+    ("upgrade the compiler").
+  - A higher minor (`§SEMVER{2.1.0}`) compiles with a `Calor0700` warning.
+  - A version that is not exactly `MAJOR.MINOR.PATCH` (for example `^1.0.0` or
+    `2.0`), or a second `§SEMVER` in the same module, is a new `Calor0702` error.
+  - Files that declare nothing are unchanged: they take the compiler's version
+    and get no new diagnostic.
+  No committed `.calr` file declared a version, so nothing in the repo breaks.
+  This is roadmap §3.3 decision 1 (fail-closed) and item 1 of #1084. The
+  write-hook reminder now suggests `§SEMVER{2.0.0}` instead of `§SEMVER[1.0.0]`.
+
 ## [0.14.3] - 2026-08-24
 
 ### Benchmark Results (Statistical: 30 runs)

@@ -28,7 +28,8 @@ public class VersioningTests
         var compat2 = SemanticsVersion.CheckCompatibility(higherMajor);
         Assert.Equal(VersionCompatibility.Incompatible, compat2);
 
-        // Same or lower version = compatible
+        // Same version = compatible (an older major is Incompatible; see
+        // CompatibleVersions_CorrectlyIdentified)
         var sameVersion = new Version(currentVersion.Major, currentVersion.Minor, currentVersion.Build);
         var compat3 = SemanticsVersion.CheckCompatibility(sameVersion);
         Assert.Equal(VersionCompatibility.Compatible, compat3);
@@ -67,11 +68,142 @@ public class VersioningTests
         Assert.Equal(VersionCompatibility.Compatible,
             SemanticsVersion.CheckCompatibility(new Version(2, 0, 99)));
 
-        // Older major (1.x, 0.x) is accepted (backward compatible per CheckCompatibility)
-        Assert.Equal(VersionCompatibility.Compatible,
+        // Older major (1.x, 0.x) is REFUSED — roadmap §3.3 decision 1 / #1084 item 1:
+        // a file written for retired semantics is never silently reinterpreted.
+        Assert.Equal(VersionCompatibility.Incompatible,
             SemanticsVersion.CheckCompatibility(new Version(1, 0, 0)));
-        Assert.Equal(VersionCompatibility.Compatible,
+        Assert.Equal(VersionCompatibility.Incompatible,
+            SemanticsVersion.CheckCompatibility(new Version(1, 9, 9)));
+        Assert.Equal(VersionCompatibility.Incompatible,
             SemanticsVersion.CheckCompatibility(new Version(0, 9, 0)));
+    }
+
+    private static CompilationResult CompileModule(string semverLine)
+    {
+        var source = $$"""
+            §M{m001:Test}
+            {{semverLine}}
+              §F{f001:Answer:pub} () -> int
+                §E{}
+                §R INT:42
+            """;
+        return Program.Compile(source, "test.calr", new CompilationOptions { EnforceEffects = false });
+    }
+
+    /// <summary>
+    /// End-to-end (#1084 item 1): a module declaring <c>§SEMVER{1.0.0}</c> is refused with
+    /// Calor0701 at Error severity, and the message carries the migration pointer.
+    /// </summary>
+    [Fact]
+    public void Compile_Semver1x_IsRefused_Calor0701_WithMigrationPointer()
+    {
+        var result = CompileModule("  §SEMVER{1.0.0}");
+
+        Assert.True(result.HasErrors);
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionIncompatible, diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("1.0.0", diagnostic.Message);
+        Assert.Contains("2.0.0", diagnostic.Message);
+        Assert.Contains("issues/1084", diagnostic.Message);
+        Assert.Contains("declare §SEMVER{2.0.0} after reviewing nullability semantics (Calor0272/0273/0274)", diagnostic.Message);
+        Assert.Equal(2, diagnostic.Span.Line);
+        Assert.Empty(result.GeneratedCode);
+    }
+
+    /// <summary>0.x is a retired major too — refused the same way as 1.x.</summary>
+    [Fact]
+    public void Compile_Semver0x_IsRefused_Calor0701()
+    {
+        var result = CompileModule("  §SEMVER{0.9.0}");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionIncompatible, diagnostic.Code);
+        Assert.Contains(SemanticsVersion.LegacyMajorMigrationHint, diagnostic.Message);
+    }
+
+    /// <summary>A module declaring the compiler's own version compiles clean.</summary>
+    [Fact]
+    public void Compile_Semver2_0_0_CompilesClean()
+    {
+        var result = CompileModule("  §SEMVER{2.0.0}");
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code.StartsWith("Calor070", StringComparison.Ordinal));
+        Assert.NotNull(result.Ast);
+        Assert.Equal("2.0.0", result.Ast.DeclaredSemanticsVersion);
+        Assert.Contains("42", result.GeneratedCode);
+    }
+
+    /// <summary>
+    /// A declared minor ahead of the compiler's is PossiblyIncompatible: Calor0700 at
+    /// Warning severity, and compilation still succeeds.
+    /// </summary>
+    [Fact]
+    public void Compile_SemverHigherMinor_Warns_Calor0700_AndCompiles()
+    {
+        var result = CompileModule($"  §SEMVER{{{SemanticsVersion.Major}.{SemanticsVersion.Minor + 1}.0}}");
+
+        Assert.False(result.HasErrors);
+        var warning = Assert.Single(result.Diagnostics.Warnings, d => d.Code == DiagnosticCode.SemanticsVersionMismatch);
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("42", result.GeneratedCode);
+    }
+
+    /// <summary>The pre-existing direction still holds: a newer major is refused with Calor0701.</summary>
+    [Fact]
+    public void Compile_SemverNewerMajor_IsRefused_Calor0701()
+    {
+        var result = CompileModule($"  §SEMVER{{{SemanticsVersion.Major + 1}.0.0}}");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionIncompatible, diagnostic.Code);
+        Assert.Contains("Upgrade the compiler", diagnostic.Message);
+        Assert.DoesNotContain("issues/1084", diagnostic.Message);
+    }
+
+    /// <summary>
+    /// Only exact MAJOR.MINOR.PATCH is accepted; caret/range forms and bare majors are
+    /// Calor0702 errors rather than silently accepted.
+    /// </summary>
+    [Fact]
+    public void Compile_MalformedSemver_IsError_Calor0702()
+    {
+        foreach (var malformed in new[] { "^1.0.0", ">=2.0.0 <3.0.0", "2", "2.0", "" })
+        {
+            var result = CompileModule($"  §SEMVER{{{malformed}}}");
+
+            var diagnostic = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
+            Assert.Contains("MAJOR.MINOR.PATCH", diagnostic.Message);
+        }
+    }
+
+    /// <summary>A second §SEMVER in the same module is a Calor0702 error.</summary>
+    [Fact]
+    public void Compile_DuplicateSemver_IsError_Calor0702()
+    {
+        var result = CompileModule("  §SEMVER{2.0.0}\n  §SEMVER{2.0.0}");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
+        Assert.Contains("only once", diagnostic.Message);
+    }
+
+    /// <summary>
+    /// Files that declare nothing keep today's behaviour: they take the compiler's
+    /// major and no semantics-version diagnostic is emitted (there is no compile-time
+    /// nudge; the only nudge is the write-hook reminder in HookCommand).
+    /// </summary>
+    [Fact]
+    public void Compile_NoSemver_CompilesClean_WithoutVersionDiagnostics()
+    {
+        var result = CompileModule("");
+
+        Assert.False(result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code.StartsWith("Calor070", StringComparison.Ordinal));
+        Assert.NotNull(result.Ast);
+        Assert.Null(result.Ast.DeclaredSemanticsVersion);
     }
 
     /// <summary>
@@ -82,6 +214,7 @@ public class VersioningTests
     {
         Assert.Equal("Calor0700", DiagnosticCode.SemanticsVersionMismatch);
         Assert.Equal("Calor0701", DiagnosticCode.SemanticsVersionIncompatible);
+        Assert.Equal("Calor0702", DiagnosticCode.SemanticsVersionInvalidDeclaration);
     }
 
     /// <summary>

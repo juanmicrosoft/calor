@@ -700,6 +700,7 @@ public sealed class Parser
         var typePreprocessorBlocks = new List<TypePreprocessorBlockNode>();
         var moduleItems = new List<AstNode>();
         var namespaceScopes = new List<NamespaceScopeInfo>();
+        string? declaredSemanticsVersion = null;
 
         while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndModule, startToken))
         {
@@ -707,7 +708,27 @@ public sealed class Parser
             {
                 continue;
             }
-            if (Check(TokenKind.Using))
+            if (Check(TokenKind.SemVer))
+            {
+                // §SEMVER{MAJOR.MINOR.PATCH} — the module's declared semantics
+                // version. Compatibility against SemanticsVersion.Current is
+                // decided here, at parse time, so every consumer of the parser
+                // (compile, LSP, self-check, MCP) refuses a retired-major file
+                // (roadmap §3.3 decision 1, #1084 item 1).
+                var semverToken = Advance();
+                var versionText = semverToken.Value as string;
+                if (declaredSemanticsVersion != null)
+                {
+                    _diagnostics.ReportError(semverToken.Span,
+                        DiagnosticCode.SemanticsVersionInvalidDeclaration,
+                        "§SEMVER may be declared only once per module.");
+                }
+                else if (SemanticsVersion.ReportDeclaredVersion(_diagnostics, semverToken.Span, versionText))
+                {
+                    declaredSemanticsVersion = versionText!.Trim();
+                }
+            }
+            else if (Check(TokenKind.Using))
             {
                 var node = ParseUsingDirective();
                 usings.Add(node);
@@ -839,7 +860,7 @@ public sealed class Parser
             }
             else
             {
-                _diagnostics.ReportUnexpectedToken(Current.Span, "USING, NS, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE", Current.Kind);
+                _diagnostics.ReportUnexpectedToken(Current.Span, "SEMVER, USING, NS, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE", Current.Kind);
                 Advance();
             }
         }
@@ -896,7 +917,8 @@ public sealed class Parser
             typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null,
             GetIdentifierSpan(attrs, moduleNameKey, moduleName),
             moduleItems,
-            namespaceScopes);
+            namespaceScopes,
+            declaredSemanticsVersion);
     }
 
     private void ParseNamespaceScope(

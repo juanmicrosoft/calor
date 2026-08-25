@@ -65,6 +65,11 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<IndexedTypeNode> IndexedTypes { get; }
     // Lexical C# namespace declarations preserved during migration.
     public IReadOnlyList<NamespaceScopeInfo> NamespaceScopes { get; }
+    // §SEMVER{MAJOR.MINOR.PATCH} directive text as written, or null when the
+    // module declares nothing (and therefore takes the compiler's own version).
+    // Compatibility is checked at parse time (Calor0700/0701/0702); the value
+    // is kept on the node so Calor→Calor emission round-trips it.
+    public string? DeclaredSemanticsVersion { get; }
 
     public ModuleNode(
         TextSpan span,
@@ -205,9 +210,11 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null,
         TextSpan? identifierSpan = null,
         IReadOnlyList<AstNode>? items = null,
-        IReadOnlyList<NamespaceScopeInfo>? namespaceScopes = null)
+        IReadOnlyList<NamespaceScopeInfo>? namespaceScopes = null,
+        string? declaredSemanticsVersion = null)
         : base(span)
     {
+        DeclaredSemanticsVersion = declaredSemanticsVersion;
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
@@ -272,6 +279,7 @@ public sealed class ModuleNode : AstNode
             RefinementTypes = source.RefinementTypes;
             IndexedTypes = source.IndexedTypes;
             NamespaceScopes = source.NamespaceScopes;
+            DeclaredSemanticsVersion = source.DeclaredSemanticsVersion;
         }
 
         public TextSpan Span { get; set; }
@@ -297,6 +305,7 @@ public sealed class ModuleNode : AstNode
         public IReadOnlyList<RefinementTypeNode> RefinementTypes { get; set; }
         public IReadOnlyList<IndexedTypeNode> IndexedTypes { get; set; }
         public IReadOnlyList<NamespaceScopeInfo> NamespaceScopes { get; set; }
+        public string? DeclaredSemanticsVersion { get; set; }
 
         internal ModuleNode Build() =>
             new(
@@ -322,7 +331,8 @@ public sealed class ModuleNode : AstNode
                 TypePreprocessorBlocks,
                 IdentifierSpan,
                 Items,
-                NamespaceScopes);
+                NamespaceScopes,
+                DeclaredSemanticsVersion);
     }
 
     /// <summary>

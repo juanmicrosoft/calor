@@ -66,6 +66,14 @@ Modules are like C# namespaces. They group related functions.
 ### Rules
 
 - `name` becomes the C# namespace
+- A module may declare the semantics version it was written for with
+  `§SEMVER{MAJOR.MINOR.PATCH}` as its first line (for example `§SEMVER{2.0.0}`).
+  The major must match the compiler's: an older major (`§SEMVER{1.0.0}`) is
+  refused with `Calor0701` and a migration pointer, a newer major is refused
+  with `Calor0701`, a higher minor warns with `Calor0700`, and anything that is
+  not exactly `MAJOR.MINOR.PATCH` (or a second `§SEMVER`) is a `Calor0702`
+  error. Modules that declare nothing take the compiler's version. See
+  `docs/semantics/versioning.md`.
 - Each namespace segment is emitted as a valid C# identifier; keyword segments
   are escaped independently (for example, `namespace.class` becomes
   `@namespace.@class`)
