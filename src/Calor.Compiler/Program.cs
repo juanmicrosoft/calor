@@ -674,6 +674,13 @@ public class Program
     }
 
     /// <summary>
+    /// Verbose status line written once the effect enforcement pass has run. Tests that
+    /// need an exact witness that the pass was reached (diagnostic code bands overlap
+    /// across phases, so they are not one) match on this constant.
+    /// </summary>
+    internal const string EffectEnforcementCompletedStatus = "Effect enforcement completed";
+
+    /// <summary>
     /// Compile Calor source with full options.
     /// </summary>
     public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
@@ -864,7 +871,7 @@ public class Program
 
             if (options.Verbose)
             {
-                status.WriteLine("Effect enforcement completed");
+                status.WriteLine(EffectEnforcementCompletedStatus);
             }
         }
 
