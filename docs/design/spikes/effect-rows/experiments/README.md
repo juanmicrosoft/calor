@@ -38,7 +38,12 @@ re-runs this and the diff is gate 5's evidence.
 
 `transcripts/` — the canonical stdout of each script. **These are the pinned artifact.**
 
-Generated `.calr` and `.g.cs` files are written next to the scripts and are gitignored.
+Generated `.calr` and `.g.cs` files are written to a **temp directory outside the repository**
+(override with `CALOR_EXPERIMENT_WORKDIR`), never next to the scripts. This is not tidiness:
+`HigherOrderDemandLedgerTests` enumerates every `.calr` under the repo root by **walking the
+filesystem**, not `git ls-files`, so scratch files here are counted as corpus and its
+exact-equality assertion goes red (observed: 941 files vs the ledger's 886). Gitignoring them is
+not enough.
 
 ## This is a test, not a convenience
 

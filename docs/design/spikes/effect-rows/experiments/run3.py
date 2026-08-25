@@ -5,7 +5,7 @@ consistency lens raised, plus the non-function-typed-position cases N5 needs.
 Every case here is quoted in docs/design/effect-rows-in-the-type-system.md.
 Run: python3 run3.py [substring ...]
 """
-import os, subprocess, sys, textwrap
+import os, subprocess, sys, tempfile, textwrap
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
 def _find_dll():
@@ -22,6 +22,17 @@ def _find_dll():
 
 
 DLL = _find_dll()
+
+
+# --- scratch directory ----------------------------------------------------
+# Generated .calr/.g.cs MUST NOT land inside the repository. The demand ledger
+# (HigherOrderDemandLedgerTests) enumerates every .calr under the repo root by
+# walking the FILESYSTEM, not `git ls-files`, so scratch files here are counted
+# as corpus and the ledger's exact-equality assertion goes red (observed: 941
+# vs 886). Gitignoring them is not enough.
+WORK = os.environ.get("CALOR_EXPERIMENT_WORKDIR") or tempfile.mkdtemp(
+    prefix="calor-effect-rows-")
+os.makedirs(WORK, exist_ok=True)
 EXP = os.path.dirname(os.path.abspath(__file__))
 
 CASES = {}
@@ -187,18 +198,18 @@ case("Z11-fallible-brace-form-full-output", """
 
 
 def run(name, src, args):
-    path = os.path.join(EXP, name + ".calr")
+    path = os.path.join(WORK, name + ".calr")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(src)
-    out = os.path.join(EXP, name + ".g.cs")
+    out = os.path.join(WORK, name + ".g.cs")
     proc = subprocess.run(["dotnet", DLL, "-i", path, "-o", out] + args,
-                          capture_output=True, text=True, cwd=EXP)
+                          capture_output=True, text=True, cwd=WORK)
     print("=" * 78)
     print("CASE", name, " args:", " ".join(args) or "(none)", " exit:", proc.returncode)
     print("-" * 78)
     print(src.rstrip())
     print("-" * 78)
-    body = (proc.stdout + proc.stderr).strip().replace(EXP + "/", "")
+    body = (proc.stdout + proc.stderr).strip().replace(WORK + "/", "")
     print(body if body else "(no output)")
     print()
 

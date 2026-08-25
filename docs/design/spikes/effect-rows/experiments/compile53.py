@@ -2,7 +2,7 @@
 """Compile every committed .calr that contains a two-line §O / §E pair — the
 54 occurrences in 23 files that Decision 1 must not disturb. Records today's
 verdict per file as the baseline the E2 PR re-runs."""
-import os, subprocess, os, re, json
+import os, subprocess, re, json, tempfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
 def _find_dll():
     override = os.environ.get("CALOR_DLL")
@@ -18,6 +18,17 @@ def _find_dll():
 
 
 DLL = _find_dll()
+
+
+# --- scratch directory ----------------------------------------------------
+# Generated .calr/.g.cs MUST NOT land inside the repository. The demand ledger
+# (HigherOrderDemandLedgerTests) enumerates every .calr under the repo root by
+# walking the FILESYSTEM, not `git ls-files`, so scratch files here are counted
+# as corpus and the ledger's exact-equality assertion goes red (observed: 941
+# vs 886). Gitignoring them is not enough.
+WORK = os.environ.get("CALOR_EXPERIMENT_WORKDIR") or tempfile.mkdtemp(
+    prefix="calor-effect-rows-")
+os.makedirs(WORK, exist_ok=True)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "o53")
 os.makedirs(OUT, exist_ok=True)
 os.chdir(ROOT)
@@ -31,7 +42,7 @@ for f in files:
 
 results=[]
 for f,n in sorted(hits):
-    out = os.path.join(OUT, os.path.basename(os.path.dirname(f)) + "_" + os.path.basename(f) + ".g.cs")
+    out = os.path.join(WORK, os.path.basename(os.path.dirname(f)) + "_" + os.path.basename(f) + ".g.cs")
     p = subprocess.run(["dotnet", DLL, "-i", f, "-o", out], capture_output=True, text=True)
     body = (p.stdout + p.stderr).strip()
     codes = sorted(set(re.findall(r"Calor\d{4}", body)))
