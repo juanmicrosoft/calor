@@ -517,11 +517,15 @@ public class EffectsSuggestTests
         var receiver = ReceiverOf(bound, "x.Run");
         var unresolved = Assert.IsType<UnresolvedBoundType>(
             Assert.IsType<BoundVariableExpression>(receiver).Type);
-        Assert.Contains("x", unresolved.Reason, StringComparison.Ordinal);
+        Assert.Equal(
+            "receiver 'x' is an inferred local whose type the binder could not determine",
+            unresolved.Reason);
 
         var reported = diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved).ToList();
         var single = Assert.Single(reported);
         Assert.Equal(DiagnosticSeverity.Info, single.Severity);
+        // The receiver path appears once in the message, not twice.
+        Assert.Equal(1, single.Message.Split("'x'").Length - 1);
 
         var run = Assert.Single(ExternalCallCollector.Collect(module), c => c.MethodName == "Run");
         Assert.False(run.ReceiverResolved);
@@ -577,10 +581,161 @@ public class EffectsSuggestTests
         // 4. unbound head → nothing.
         Assert.Null(ReceiverOf(bound, "foo.Bar"));
 
-        // One diagnostic for the whole three-segment chain, not one per segment.
+        // Marking is not reporting: every unresolved receiver above is MARKED
+        // UnresolvedBoundType, but a member chain is a binder limitation the
+        // author cannot act on, so it is silent. No shape in this fixture is
+        // reportable, so the whole module produces zero Calor0270.
+        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+    }
+
+    /// <summary>
+    /// Review round 1, finding 2: the two shapes an author can act on report, and
+    /// the two they cannot are silent — while all four are still marked
+    /// <see cref="UnresolvedBoundType"/>. Delete the
+    /// <c>ShouldReportUnresolvedReceiver</c> gate and the chain/temporary arms
+    /// start firing again (875 Info diagnostics on the converted corpus; see the
+    /// ledger pinned by
+    /// <c>Calor.Compiler.Tests.Calor0270CorpusVolumeTests</c>).
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_Calor0270_FiresOnlyForActionableReceiverShapes()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{x} §C{Unknown.Make} §/C
+      §C{x.Run} §/C
+      §B{a} §NEW{Random} §/NEW
+      §C{a.b.Chain} §/C
+      §B{_chainIsValid042} §C{Unknown.Make} §/C
+      §C{_chainIsValid042.Run} §/C
+";
+        var module = Parse(source);
+        var (bound, diagnostics) = Bind(module);
+
+        // All three receivers are marked unresolved — silence is about the
+        // editor, never about what the type system claims.
+        foreach (var target in new[] { "x.Run", "a.b.Chain", "_chainIsValid042.Run" })
+        {
+            Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, target)!.Type);
+        }
+
+        // Only the inferred local the author actually wrote is reported.
         var single = Assert.Single(
             diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
-        Assert.Contains("a.b.c", single.Message, StringComparison.Ordinal);
+        Assert.Contains("'x'", single.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("a.b", single.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("_chain", single.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Review round 1, finding 3: a direct pin for the
+    /// <c>catch (ArgumentException)</c> path. The C# → Calor converter emits a
+    /// bare <c>?</c> as a lambda parameter's type when it cannot infer one
+    /// (<c>TryInferLambdaParameterType</c>,
+    /// <c>Migration/RoslynSyntaxVisitor.cs:11774-11794</c>, called at <c>:11877</c>
+    /// and <c>:11885</c>, returns Roslyn's error-type spelling). <c>?</c> is not a
+    /// type <c>TypeIdentity.Canonicalize</c> can parse, so building the receiver
+    /// throws — and this slice must turn that into an unresolved receiver, not
+    /// into an internal-error diagnostic that abandons the rest of the member.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_UninferredLambdaParameterReceiver_IsUnresolvedNotAnIce()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{f} §LAM{l1:ctx:?}
+          §C{ctx.Trim} §/C
+      §/LAM{l1}
+";
+        var module = Parse(source);
+        var (bound, diagnostics) = Bind(module);
+
+        var unresolved = Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, "ctx.Trim")!.Type);
+        // The catch-path reason, not the inferred-local one — this fixture must
+        // exercise the canonicalization failure specifically.
+        Assert.Equal(
+            "receiver 'ctx' carries a type string the binder cannot resolve to a type",
+            unresolved.Reason);
+
+        var single = Assert.Single(
+            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        Assert.Contains("'ctx'", single.Message, StringComparison.Ordinal);
+
+        // The throw never surfaces as an internal error, which is what would
+        // abandon the rest of the member.
+        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.AnalysisICE));
+    }
+
+    /// <summary>
+    /// Review round 1, finding 9: <c>Receiver</c> and <c>ReceiverSymbol</c> are two
+    /// channels describing the same receiver, and they must not drift apart in a
+    /// later slice. When the receiver is a bound variable the two agree on the
+    /// symbol; when the binder attached no receiver there is no receiver symbol
+    /// either; and a type-reference receiver never carries a variable symbol.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_ReceiverAndReceiverSymbol_DoNotDrift()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
+      §C{sb.Append} §A STR:""x"" §/C
+      §B{x} §C{Unknown.Make} §/C
+      §C{x.Run} §/C
+      §B{a} §NEW{Random} §/NEW
+      §C{a.b.Chain} §/C
+      §C{System.Console.WriteLine} §A STR:""y"" §/C
+      §C{foo.Bar} §/C
+      §C{Helper} §/C
+";
+        var module = Parse(source);
+        var (bound, _) = Bind(module);
+
+        var checkedCalls = 0;
+        foreach (var node in Descendants(bound))
+        {
+            var (receiver, symbol, target) = node switch
+            {
+                BoundCallStatement s => (s.Receiver, s.ReceiverSymbol, s.Target),
+                BoundCallExpression e => (e.Receiver, e.ReceiverSymbol, e.Target),
+                _ => (null, null, null),
+            };
+            if (target is null)
+                continue;
+            checkedCalls++;
+
+            switch (receiver)
+            {
+                case BoundVariableExpression variable:
+                    Assert.Same(symbol, variable.Variable);
+                    break;
+                case BoundFieldAccessExpression chain:
+                    // The chain's head is the receiver symbol.
+                    var head = chain.Target;
+                    while (head is BoundFieldAccessExpression inner)
+                        head = inner.Target;
+                    Assert.Same(symbol, Assert.IsType<BoundVariableExpression>(head).Variable);
+                    break;
+                case BoundTypeReferenceExpression:
+                    Assert.Null(symbol);
+                    break;
+                case null:
+                    Assert.Null(symbol);
+                    break;
+                default:
+                    Assert.Fail($"Unexpected receiver shape {receiver.GetType().Name} for '{target}'.");
+                    break;
+            }
+        }
+
+        // Guard against the loop silently checking nothing.
+        Assert.True(checkedCalls >= 6, $"Only {checkedCalls} call nodes were checked.");
     }
 
     private static string RepoRoot() =>
