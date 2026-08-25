@@ -86,19 +86,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Benchmark cost metric no longer under-counts agent output tokens (#881).**
-  The agent-loop harness (`bench/phase0-agent-native/run-pair.sh` and
-  `run-bundle.sh`) read `usage.output_tokens` from the Claude result envelope.
-  That number only covers the agent's final turn, so a run that handed work to
-  a subagent or resumed after context compaction looked far cheaper than it
-  was — one archived run recorded 543 tokens for 30,084 actually generated
-  (55x). Both scripts now call one shared helper, `token-usage.py`, which sums
-  `modelUsage[*].outputTokens` (the whole run, every model except the
-  side-model topic detector). `result.json` `tokens.output` is now the
-  corrected figure, a new `tokenUsage` block keeps the naive and corrected
-  numbers side by side for audit, and the runner prints a warning whenever
-  the two disagree. A pinned test
-  (`bench/phase0-agent-native/tests/test_token_usage.py`) reproduces the 55x
-  case so the defect cannot return silently.
+  The agent-loop benchmark scripts used to read a number from the agent's
+  result file that only covered its final turn. A run that handed work to a
+  helper agent, or that resumed after its context was compacted, therefore
+  looked far cheaper than it was: one archived run recorded 543 tokens when
+  the model had actually generated 30,084 (55x). Both scripts now use one
+  shared helper (`bench/phase0-agent-native/token-usage.py`) that adds up
+  every model's output across the whole run, keeps the old number next to
+  the corrected one so the fix can be audited, warns when the two disagree,
+  and is covered by a test that reproduces the 55x case.
 - The round-trip check no longer fails a pull request because of a test that
   MediatR's own test suite is known to flake on. The known-flake list was being
   dropped on the way into the check, and a flaky failure could still trip the

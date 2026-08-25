@@ -424,7 +424,7 @@ higher-order code instead of rejecting it.
 - **Null classes 0.14 did ship**, cited so §7 has a source: `str` scalars, arrays of `str`,
   whitelisted generic instantiations over `str`, and user reference types from Annotated sources
   only (CHANGELOG 0.14.0–0.14.3; S8-Oblivious widening held in draft PR #1078; epic #1082).
-- **Measurement prerequisites unstarted.** No real Calor arm
+- **Measurement prerequisites partly landed.** No real Calor arm
   (`tools/Calor.RoundTrip.Harness/TaskGen/TaskGenReportWriter.cs:76-86`: "the runner never
   invokes the Calor compiler"); #881 is corrected (`run-bundle.sh` /
   `run-pair.sh` now read the cost-leg figure from the shared `token-usage.py`, which sums
@@ -546,7 +546,8 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   `function.Name` / `"Class.Method"` keys at `:68,75` gone) ships with E5, since gate 7 observes
   the facet's correctness but not the old store's deletion.
 - **M1 — Measurement prerequisites that block E2's merge** (moved here from §4.3 so the chain is
-  visible): PR #944 dispositioned; #881 corrected or the cost leg re-registered; the 0.15 PP
+  visible): PR #944 dispositioned; ~~#881 corrected or the cost leg re-registered~~ **done** (PR #1092:
+  `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); the 0.15 PP
   registered in the A-annex (A-1.10). **No effect-row implementation (E2) merges before M1 is
   done** — §4.3 (i).
 
@@ -576,10 +577,13 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
 - **A real Calor arm, as product** (M2): Option 1 from Call S — Calor0410 enforcement genuinely
   in the agent loop — gets built regardless of any epoch. Today's harness ships round-tripped C#
   in both arms and never invokes the compiler (§4.0).
-- **#881 is a scheduled slice (M1), not a footnote.** The probe's cost leg reads `output_tokens`
-  from `agent.json`, which under-counts 55× on subagent/compaction runs. Either the counter is
-  corrected in `run-bundle.sh` / `run-pair.sh` with a pinned reproduction, or the cost leg is
-  re-registered on a metric that does not depend on it. Lands before the PP registers.
+- **#881 was a scheduled slice (M1), not a footnote — landed (PR #1092).** The probe's cost leg
+  read `output_tokens` from `agent.json`, which under-counted 55× on subagent/compaction runs.
+  The counter was corrected in `run-bundle.sh` / `run-pair.sh` through the shared
+  `bench/phase0-agent-native/token-usage.py` (sums `modelUsage[*].outputTokens`; naive figure
+  retained in `result.json` `tokenUsage` for audit; runner warns on disagreement) with a pinned
+  reproduction in `bench/phase0-agent-native/tests/` and annex entry A-1.9.1. It landed before
+  the PP registers, as required.
 - **The pre-registered fixture-scale probe**, under a NEW PP id, with the full discipline:
   **(i)** freeze event named — the PP registers in the A-annex (`docs/plans/agent-native-gates.md`,
   currently A-1.9; **the A-1.10 bump is the freeze event**) before any effect-row implementation
@@ -753,7 +757,7 @@ plan's history is legible; where the closing PR is known it is named, otherwise 
 | #859, #884 (Z3 CI flake) | **Open** — Draft v3 dispositioned them to 0.13; both survived 0.13 and 0.14. 0.15.x instrument debt (§4.5) |
 | #874, #879, #883 | Closed (0.13 MUST) |
 | #875 (non-null `str`) | **Open** — `str` scope shipped across 0.14.0–0.14.3; remainder tracked by #1082 (§4.5) |
-| #881 (agent token metrics 55× under-count) | **Corrected** — `bench/phase0-agent-native/token-usage.py` is the single derivation for both runners; `result.json` `tokens.output` = `modelUsage[*].outputTokens` sum, `tokenUsage.output_tokens_naive` retained for audit; pinned test `tests/test_token_usage.py` (§4.2 M1) |
+| #881 (agent token metrics 55× under-count) | **Corrected (PR #1092, annex A-1.9.1)** — `bench/phase0-agent-native/token-usage.py` is the single derivation for both runners; `result.json` `tokens.output` = `modelUsage[*].outputTokens` sum, `tokenUsage.output_tokens_naive` retained for audit; pinned test `tests/test_token_usage.py` (§4.2 M1, done). Build-state archiving follow-up: https://github.com/juanmicrosoft/calor/issues/1094 |
 | #1082 (v0.14 nullability follow-ons epic) | **Open** — sequenced after §4.2 E1 (§4.5) |
 | #1084 (§3.3 self-migration residue) | **Open** — filed by this draft; §4.5 row 2 |
 | #1011 (test-suite audit epic) | Open; continuous, not release-gated |
