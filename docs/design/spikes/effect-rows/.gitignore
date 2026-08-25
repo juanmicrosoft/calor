@@ -1,0 +1,12 @@
+# The emitted-C# evidence is committed as `*.g.cs.txt`, never `*.g.cs`.
+#
+# Two reasons, and both matter:
+#   1. the Calor-first guard rejects a NEW `.cs` path anywhere in the tree, and
+#      these files are transcripts of compiler output, not sources;
+#   2. an older copy of `experiments/spike_artifacts.py` wrote `.g.cs`, so a
+#      stale checkout can still drop one of these next to the real evidence.
+#
+# Ignoring the bare form means such a stray can never be committed, and the
+# committed `.txt` evidence stays the only thing a reviewer sees.
+before/*.g.cs
+after/*.g.cs
