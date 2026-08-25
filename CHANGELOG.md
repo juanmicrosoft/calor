@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **The test that will judge the next release's effects feature was written down
+  before the feature was built.** It is called `PP-E1`, and it lives in the
+  project's proof-point registry (`docs/plans/agent-native-gates.md`, entry
+  A-1.11). Writing it down first is the point: the pass mark, the exact files it
+  runs on, and the ten deliberate bugs it will inject into them are all fixed now,
+  so the result cannot be argued into a success later. It has four possible
+  answers — pass, fail, too-noisy-to-tell, and cannot-be-judged — and the rules
+  for each are set in advance. The entry also says plainly that the files it uses
+  were written by the same people, a few days earlier, in an earlier experiment.
+  No product code changes; this is a record, not a feature. One test comes with
+  it: a check that the five files it names are still byte-for-byte the files it
+  froze, so they cannot drift out from under the record.
 - **CI now refuses any pull request that edits or deletes an already-frozen
   line in the project's proof-point registry; only additions are allowed.**
   The registry is the A-annex of `docs/plans/agent-native-gates.md`. The
