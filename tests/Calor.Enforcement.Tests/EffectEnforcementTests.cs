@@ -931,9 +931,7 @@ public class EffectEnforcementTests
     // ---------------------------------------------------------------
 
     /// <summary>
-    /// EQUIVALENCE pin, not a discriminating one — stated plainly because the
-    /// scope asked for a discriminating one and it could not be built. An
-    /// inferred <c>§B</c> whose
+    /// THE discriminating pin for slice 2b. An inferred <c>§B</c> whose
     /// initializer is a BCL call has NO type string anywhere in the AST: the
     /// binding declares none and <c>FindLocalDeclarationType</c> only
     /// understands an explicit type or a <c>§NEW</c> initializer. The bound
@@ -941,11 +939,15 @@ public class EffectEnforcementTests
     /// <c>Receiver.Type</c> on the following call is
     /// <c>NominalBoundType("System.Guid")</c>.
     ///
-    /// <para>MEASURED: this passes on <c>main</c> too. The AST path reaches the
-    /// same answer for this shape by a different route, so the bound path
-    /// resolves nothing new here — the same honest headline slice 2a carried.
-    /// The pin's job is to hold the answer STILL while the resolver order
-    /// changes underneath it.</para>
+    /// <para>MEASURED against a clean checkout of <c>main</c> (f7cd1c46) in its
+    /// own worktree: FAILS there with
+    /// <c>Calor0410: Function 'Go' uses effect 'unknown' but does not declare
+    /// it</c> — the receiver is unresolvable, the callee is unknown, and
+    /// fail-closed turns that into <c>EffectSet.Unknown</c>. Passes here.</para>
+    ///
+    /// <para>Discriminates: delete the <c>AskBoundTree</c> call at the head of
+    /// <c>ResolveLocalValueType</c> and this test fails with that diagnostic.
+    /// </para>
     /// </summary>
     [Fact]
     public void E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee()
@@ -976,9 +978,11 @@ public class EffectEnforcementTests
     /// <c>Random</c> — the wrong scope. The binder types the local from its
     /// initializer, so the bound receiver is <c>System.Guid</c>.
     ///
-    /// <para>MEASURED: also passes on <c>main</c> — the string path's wrong
-    /// answer does not change the outcome for this pair of types. Equivalence
-    /// pin, not a discriminating one.</para>
+    /// <para>MEASURED against a clean <c>main</c> worktree: FAILS there with
+    /// <c>Calor0411: Unknown external call to 'x.ToString'</c> plus the
+    /// resulting <c>Calor0410 ... effect 'unknown'</c> — i.e. the string path's
+    /// <c>Random</c> answer does not resolve <c>ToString</c>. Passes here,
+    /// because the bound receiver is <c>System.Guid</c>.</para>
     /// </summary>
     [Fact]
     public void E1Slice2b_LocalShadowsFieldAndTheStringPathIsWrong_TheBoundTypeWins()
@@ -1009,10 +1013,17 @@ public class EffectEnforcementTests
     /// the AST string search does not get to supply a guess in its place: the
     /// call reaches <c>ReportUnknownCall</c> / <c>EffectSet.Unknown</c>.
     ///
-    /// <para>MEASURED: passes on <c>main</c> as well — on this compiler the AST
+    /// <para>MEASURED: passes on a clean <c>main</c> worktree as well — the AST
     /// search finds nothing for that receiver either, so both routes fail
-    /// closed. What the slice changes is WHY: a typed decision instead of an
-    /// absent string.</para>
+    /// closed. Equivalence pin: what the slice changes is WHY — a typed
+    /// decision instead of an absent string.</para>
+    ///
+    /// <para>The veto is scoped to REPORTED unresolvedness
+    /// (<c>UnresolvedBoundType.Reported</c>). Applying it to every unresolved
+    /// receiver was tried and measurably deleted resolution: the
+    /// converter-synthesized <c>_chainNNN</c> temporaries in
+    /// <c>05-02</c>/<c>05-03.approved.calr</c> went from clean to Calor0411 +
+    /// Calor0410, failing <c>LosslessFormattingTests</c>.</para>
     /// </summary>
     [Fact]
     public void E1Slice2b_UnresolvedBoundReceiver_FailsClosed()

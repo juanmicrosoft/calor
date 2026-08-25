@@ -3401,7 +3401,13 @@ public sealed class Binder
                 "give the binding an explicit type, or call through the declaring type.");
         }
 
-        return new BoundTypes.UnresolvedBoundType($"receiver '{receiverPath}' {reason}");
+        // E1 slice 2b: carry the report decision onto the type. A consumer that
+        // fails closed on "the binder looked and could not name this" needs to
+        // tell an authoritative answer from a binder limitation, and `report` is
+        // exactly that split.
+        return new BoundTypes.UnresolvedBoundType(
+            $"receiver '{receiverPath}' {reason}",
+            reported: report);
     }
 
     /// <summary>

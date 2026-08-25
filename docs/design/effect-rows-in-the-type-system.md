@@ -1005,10 +1005,69 @@ Roadmap §4.1: *"`UnresolvedBoundType` → `Unknown` row, `FunctionBoundType`'s 
 symbol-identity keying are E1 decisions, made in §4.2, not design-doc decisions."* Status:
 receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed** (#1089);
 receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
-**executed** (#1095 — E1 slice 2a); the `Unknown`-row contribution, symbol-identity keying in
-`EffectResolver`/manifests/IL summaries, and `BoundLambdaExpression`'s `FunctionBoundType` all
-**pending** (evidence in §2.2). E2 consumes all six; roadmap §4.2's cut line already prices the
-risk.
+**executed** (#1095 — E1 slice 2a); the enforcement pass's string resolvers reading receivers
+from the bound tree, `BoundLambdaExpression`'s `FunctionBoundType`, and the
+`Binder` → `Effects` layering hole all **executed** (PR #1098 — E1 slice 2b, below);
+symbol-identity keying in `EffectResolver`/manifests/IL summaries **pending** (slice 2c —
+`EffectResolver.cs:48` intact, so roadmap §4.2's E1 exit pin (c) is still unmet). E2 consumes
+all six; roadmap §4.2's cut line already prices the risk.
+
+**What slice 2b did.** Unlike 2a, it **does** resolve receivers that did not resolve before —
+measured against a clean `main` worktree (f7cd1c46), not asserted. Two of the four behavioural
+pins added in `EffectEnforcementTests.cs` FAIL there and pass here:
+
+- `E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee` — an inferred `§B`
+  whose initializer is a BCL call (`§B{g} §C{System.Guid.NewGuid}`) has no type string anywhere
+  in the AST. On `main` the following `g.ToString` is an unknown call and fail-closed produces
+  `Calor0410: Function 'Go' uses effect 'unknown'`. Here the bound receiver is `System.Guid` and
+  the manifest resolves it.
+- `E1Slice2b_LocalShadowsFieldAndTheStringPathIsWrong_TheBoundTypeWins` — a local shadowing a
+  field of a different type. The AST search misses the local and falls through to the FIELD, so
+  the string path answers with the wrong scope's type; `main` emits `Calor0411` on `x.ToString`.
+  The bound receiver is the local's real type.
+
+The remaining two are equivalence pins and say so. **Ceiling unchanged:** gate 6's ledger
+(817/1248, aggregate and per subject) is byte-identical, the D-A demand ledger is unmoved at 3,
+the Calor0270 volume ledger is unmoved, and the P29 transcripts are untouched — the newly
+resolved receivers are Calor-side, not new `MetadataBinder` resolutions.
+
+- `CallGraphAnalysis.ResolveBoundCallSites` returns, per legacy caller id, the bound
+  `BoundType` of the **receiver** of every call site, keyed by the receiver path as the target
+  spells it. `ResolveLocalValueType` / `ResolveVariableType` / `ResolveReceiverChain`
+  (`EEP:1719-1744` and its callers, pre-slice numbering) consult it first; the AST string
+  searches survive as fallbacks, each with a comment naming the shape it covers.
+- Fail-closed, scoped to **reported** unresolvedness. `UnresolvedBoundType` gains a `Reported`
+  bit carrying #1095's existing marking-vs-reporting split (`ShouldReportUnresolvedReceiver`).
+  Where the binder told the author it could not name the type (Calor0270), the pass ends the
+  lookup with null and the call reaches `ReportUnknownCall` / `EffectSet.Unknown` rather than a
+  guessed nominal type. Where it marked silently — member chains, converter-synthesized
+  `_chainNNN` temporaries — the AST fallback still decides.
+
+  **This scoping is measured, not stylistic.** An unconditional veto was implemented first and
+  deleted resolution the fallback still performs: `tests/Calor.Conversion.Tests/Snapshots/
+  05-02.approved.calr` and `05-03` went from clean to `Calor0411` + `Calor0410` on
+  `_chainWhere005.ToList`, failing `LosslessFormattingTests` (which passes on `main`). The
+  `Reported` bit is the discriminator #1095 already computes, so no new judgement was invented.
+- **Receivers only.** An earlier revision recorded every bound name; that made the side channel
+  answer in non-receiver positions and regressed the method-group-argument charging arm
+  (`StrictnessBatchTests` C2/C4). Names outside receiver positions keep resolving through the
+  AST, because the string the pass gets back is quoted verbatim in Calor0418's message.
+- `BoundLambdaExpression.Type` is a `FunctionBoundType` carrying real parameter and return
+  `BoundType`s. Its `DisplayString` is deliberately **unchanged** (`LAMBDA(i32)->INT`):
+  `Binder.cs:1320` infers an untyped `§B`'s `TypeName` from the initializer's `DisplayString`, so
+  the lambda's string escapes into other expressions' types, the verifier cache and the LSP
+  call-graph key. `FunctionBoundType` gains an optional `displayOverride` for exactly that;
+  §8.3's canonical `(p1, p2) -> ret` stays the default for every other construction, and
+  `BoundTypeTests.cs:139`/`:150` are untouched.
+- Function-typedness is asked of the bound type first (`EffectEnforcementPass.IsFunctionBoundType`
+  — a `FunctionBoundType`, or a `NominalBoundType` whose declaration is a `§DEL`, marked by the
+  new `TypeSymbol.IsDelegate`). The prefix-string test survives as the fallback for types that
+  reach a consumer only as text, which is what keeps Calor0418 byte-stable.
+- `MapShortTypeNameToFullName` and `IsTypeQualifiedReference` moved to `Binding/TypeIdentity`
+  (`Binding/Scope.cs`), with forwarders left in `Effects/`. `Binding/` no longer references
+  `Effects/`, pinned by `ArchitectureTests.BindingLayer_HasNoReferenceToEffectsNamespace` — the
+  existing `compiler-components.json` contract matched only the fully-qualified spelling and was
+  blind to the namespace-relative `Effects.EffectEnforcementPass` reference in `Binder.cs`.
 
 **What slice 2a did and did not do — stated so E2 does not over-read it.** The slice moved a
 decision and added structure. It resolved **no** receiver that did not resolve before.

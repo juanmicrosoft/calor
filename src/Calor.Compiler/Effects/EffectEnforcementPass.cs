@@ -1639,8 +1639,18 @@ public sealed class EffectEnforcementPass
             if (!BoundValueTypes.TryGetValue(name, out var type))
                 return BoundValueAnswerKind.NoAnswer;
 
-            if (type is Binding.BoundTypes.UnresolvedBoundType)
-                return BoundValueAnswerKind.Unresolved;
+            // Authoritative only when the binder REPORTED it (Calor0270). An
+            // unreported UnresolvedBoundType is a binder limitation — a member
+            // chain, or a converter-synthesized _chainNNN temporary — and
+            // suppressing the AST fallback for those deletes resolution the
+            // fallback still performs. Measured: 05-02/05-03.approved.calr go
+            // from clean to Calor0411 + Calor0410 on '_chainWhere005.ToList'.
+            if (type is Binding.BoundTypes.UnresolvedBoundType unresolved)
+            {
+                return unresolved.Reported
+                    ? BoundValueAnswerKind.Unresolved
+                    : BoundValueAnswerKind.NoAnswer;
+            }
 
             var display = type.DisplayString;
             if (IsFunctionBoundType(type)

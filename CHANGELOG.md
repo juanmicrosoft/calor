@@ -29,6 +29,20 @@ All notable changes to this project will be documented in this file.
   sign, and any whitespace inside the braces.
 
 ### Changed
+- **The effect checker now asks the type checker what a method call is being
+  made on, instead of hunting through the source text for a type name.** When
+  the compiler works out the effects of `sb.AppendLine(...)`, it needs to know
+  what `sb` is. It used to search the surrounding code for a written-down type
+  and, failing that, guess from the name. Now it takes the answer the type
+  checker already produced, and only falls back to the text search for shapes
+  the type checker does not cover. If the type checker looked and could not
+  name the type, the effect checker no longer substitutes a guess — the call is
+  treated as unknown, which is the safe answer. Nothing you compile changes as
+  a result: the same code produces the same messages, because the two routes
+  agree today. What changes is that the type checker's answer is now the one
+  that counts. Lambdas also get a proper function type internally, so
+  "is this a function value?" is answered by the type rather than by matching
+  text like `Func<`.
 - **When the compiler cannot work out the type of the thing you are calling a
   method on, it now records that as a fact instead of leaving a placeholder.**
   Take `x.Run`, where `x` came from a call the compiler could not identify.

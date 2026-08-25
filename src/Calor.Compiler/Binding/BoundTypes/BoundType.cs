@@ -267,9 +267,33 @@ public sealed class UnresolvedBoundType : BoundType
     public string Reason { get; }
     public override string DisplayString { get; }
 
-    public UnresolvedBoundType(string reason)
+    /// <summary>
+    /// v0.15 E1 slice 2b — true when the binder REPORTED this unresolvedness to
+    /// the author (Calor0270). PR #1095 already split marking from reporting:
+    /// every unresolved receiver is marked, but only the shapes an author can
+    /// act on — an inferred local with no explicit type, a type string that
+    /// cannot be canonicalized — are reported. Member chains and
+    /// converter-synthesized <c>_chainNNN</c> temporaries are marked silently,
+    /// because they are binder LIMITATIONS rather than facts about the program.
+    ///
+    /// <para>Consumers that want to fail closed on "the binder looked and could
+    /// not name this" must key on this flag, not on the type alone. Measured:
+    /// treating every <c>UnresolvedBoundType</c> as authoritative and
+    /// suppressing the effect pass's AST fallback deletes resolution the
+    /// fallback still performs — <c>tests/Calor.Conversion.Tests/Snapshots/05-02
+    /// .approved.calr</c> and <c>05-03</c> go from clean to Calor0411 +
+    /// Calor0410 on <c>_chainWhere005.ToList</c>.</para>
+    ///
+    /// <para>Deliberately NOT part of <see cref="Equals"/>: two unresolved types
+    /// with the same reason are the same type whether or not one of them was
+    /// also reported. Reporting is a diagnostic decision, not type identity.</para>
+    /// </summary>
+    public bool Reported { get; }
+
+    public UnresolvedBoundType(string reason, bool reported = false)
     {
         Reason = reason ?? throw new ArgumentNullException(nameof(reason));
+        Reported = reported;
         DisplayString = $"<unresolved: {reason}>";
     }
 
