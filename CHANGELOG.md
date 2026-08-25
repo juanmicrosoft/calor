@@ -29,6 +29,16 @@ All notable changes to this project will be documented in this file.
   sign, and any whitespace inside the braces.
 
 ### Changed
+- **When the compiler cannot work out the type of the thing you are calling a
+  method on, it now says so instead of quietly guessing.** Writing something
+  like `x.Run` where `x` came from a call the compiler could not identify used
+  to leave it filling in a placeholder type behind the scenes. It now records
+  "I do not know this type", notes it as an informational `Calor0270` message,
+  and every tool that reads it — effect checking, `calor effects suggest` —
+  treats the call as unknown rather than pretending it resolved. Nothing that
+  already resolved changes, and a variable you genuinely declared as `object`
+  is still an `object`.
+
 - **Files that declare `§SEMVER{1.x}` (or `0.x`) are now refused with an error
   pointing at #1084.** The compiler implements semantics version 2.0.0. Before
   this change a module that said `§SEMVER{1.0.0}` was not checked at all — the

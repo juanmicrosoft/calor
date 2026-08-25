@@ -999,8 +999,11 @@ the interface, rank-1 rows do not compose with external interfaces. §14 Q2.
 Roadmap §4.1: *"`UnresolvedBoundType` → `Unknown` row, `FunctionBoundType`'s effect slot, and
 symbol-identity keying are E1 decisions, made in §4.2, not design-doc decisions."* Status:
 receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed** (#1089);
-receiver `BoundExpression` on the call nodes, binder-emitted `UnresolvedBoundType`, the
-`Unknown`-row contribution, symbol-identity keying in `EffectResolver`/manifests/IL summaries, and
+receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
+**executed** (#1094 — E1 slice 2a: `BoundCallStatement.Receiver` / `BoundCallExpression.Receiver`
+with four shapes, `UnresolvedBoundType(reason)` + `Calor0270` at receivers the binder cannot type,
+and `ExternalCallCollector` reading `Receiver.Type` as step 1); the `Unknown`-row contribution,
+symbol-identity keying in `EffectResolver`/manifests/IL summaries, and
 `BoundLambdaExpression`'s `FunctionBoundType` all **pending** (evidence in §2.2). E2 consumes all
 six; roadmap §4.2's cut line already prices the risk.
 
