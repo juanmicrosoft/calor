@@ -548,7 +548,8 @@ renegotiation; DEFERRED items are named so their absence is a decision.
 - **M1 — Measurement prerequisites that block E2's merge** (moved here from §4.3 so the chain is
   visible): PR #944 dispositioned; ~~#881 corrected or the cost leg re-registered~~ **done** (PR #1092:
   `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); the 0.15 PP
-  registered in the A-annex (A-1.10). **No effect-row implementation (E2) merges before M1 is
+  registered in the A-annex (the PP-registration entry, A-1.11 or later; A-1.10 is the guard
+  half, PR #1091). **No effect-row implementation (E2) merges before M1 is
   done** — §4.3 (i).
 
 **SHOULD** (0.13 §2.2 leftovers this bullet used to hide inside "the agent workflow completes")
@@ -586,11 +587,12 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   the PP registers, as required.
 - **The pre-registered fixture-scale probe**, under a NEW PP id, with the full discipline:
   **(i)** freeze event named — the PP registers in the A-annex (`docs/plans/agent-native-gates.md`,
-  currently A-1.9; **the A-1.10 bump is the freeze event**) before any effect-row implementation
+  A-1.10 is the guard half, PR #1091; **the PP-registration entry — A-1.11 or later — is the
+  freeze event**) before any effect-row implementation
   merges; the empty `docs/experiments/registry.json` is the TIER1A-hypothesis registry and is not
-  where this goes. **The annex has no mechanical tamper guard today** — the append-only check
-  (`experiment-registry-tamper-check.yml`) covers only `registry.json`. The A-1.10 PR extends that
-  workflow's `paths` to the annex with an append-only check on its revision log, so the freeze
+  where this goes. **The annex had no mechanical tamper guard until A-1.10** — the append-only check
+  (`experiment-registry-tamper-check.yml`) covered only `registry.json`. The A-1.10 PR (#1091) extends that
+  workflow to the annex with an append-only check on its frozen rows and revision log, so the freeze
   is enforced by the same instrument that guards the other registry rather than by discipline
   alone. **(ii)** fixture and defect classes frozen in the same annex entry, with honest-timing
   disclosure if authoring is concurrent (A-1.2 pattern); **(iii)** the four-valued outcome (hit /
@@ -646,7 +648,8 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    surface's default and the equivalence test fails; drop ES-08 from the id list and
    `RegisteredScriptIdsAreStable` fails.
 4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome.
-   *Instrument/denominator/freeze:* the A-1.10 annex entry (PP id, fixture, defect classes,
+   *Instrument/denominator/freeze:* the PP-registration annex entry (A-1.11 or later; A-1.10 is
+   the guard half, PR #1091 — PP id, fixture, defect classes,
    margin). *Discriminating pin:* the annex append-only check rejects an edit to the frozen row.
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
    migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
@@ -904,12 +907,13 @@ UNVERIFIED). All applied in the second revision:
 - **Gate 3 overstated its instrument by three surfaces (test-lens load-bearing)** →
   clean-vs-incremental only as it exists; CLI/SDK legs to build; MCP conditional.
 - **Gate 5 named no job (test-lens load-bearing)** → two legs; the 886-vs-covered gap disclosed.
-- **A-annex has no tamper guard (test-lens load-bearing)** → stated; A-1.10 PR extends the
+- **A-annex has no tamper guard (test-lens load-bearing)** → stated; A-1.10 PR (#1091) extends the
   existing workflow to the annex.
 - **E1 "grep-pinned" cited a pin that does not exist (test-lens load-bearing)** → three named
   pins to be added in the E1 PR; E5 gains a second-store deletion pin.
 - **§6 discipline (consistency Major)** — no gate named a discriminating pin; freeze events
-  vague. → one pin per gate; freeze events named (design-doc merge, ledger PR, ES-08 PR, A-1.10,
+  vague. → one pin per gate; freeze events named (design-doc merge, ledger PR, ES-08 PR, the
+  PP-registration annex entry (A-1.11 or later; A-1.10 is the guard half, PR #1091),
   E5 PR).
 - **Schedule abort missing (consistency Major)** → cut line 2: E1-only release under a renamed
   theme if E1 misses the branch cut.
