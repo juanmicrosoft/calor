@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.9 (additive A-1.9, 2026-08-06 — PP-W5 adjudicated PASS on epoch w5-parity-002 (w5-parity-001 VOID: both arms shared a compiler), point 1.098 recorded / 1.0016 after a metric erratum; registered as "no large tax detected", explicitly not parity and with the earlier heterogeneity claim withdrawn; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.10 (additive A-1.10, 2026-08-25 — mechanical freeze guard, first half of the 0.15 amendment: `scripts/check-annex-freeze.py`, run by `experiment-registry-tamper-check.yml`, byte-freezes every A.2 PP row and every A.3 entry against `main`, additions only, every annex change logged; no PP registered — the 0.15 PP row is the pending second half; additive A-1.9, 2026-08-06 — PP-W5 adjudicated PASS on epoch w5-parity-002 (w5-parity-001 VOID: both arms shared a compiler), point 1.098 recorded / 1.0016 after a metric erratum; registered as "no large tax detected", explicitly not parity and with the earlier heterogeneity claim withdrawn; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -295,6 +295,8 @@ pairing, and censoring follow §2 of this document.
 
 ### A.2 Frozen instrument proof-point thresholds
 
+<!-- annex-freeze (A-1.10): every table row in this section whose first cell names a PP id is byte-frozen against main by scripts/check-annex-freeze.py (CI: experiment-registry-tamper-check.yml). Rows may be added, never edited or removed. -->
+
 | Proof point | Threshold (frozen) | Basis |
 |:---|:---|:---|
 | PP-L1 (warm latency) | P50 ≤ 300 ms, P99 ≤ 1 s on the D3.3 fixture | unchanged from the loop plan; toolchain metric, not epoch-dependent |
@@ -323,6 +325,42 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+<!-- annex-freeze (A-1.10): each entry starting with **A-1.N is byte-frozen against main by scripts/check-annex-freeze.py, keyed by its first line; newest first. Add a new entry for every annex change and update the Annex version pointer; never edit or remove an existing entry. -->
+
+**A-1.10 — mechanical freeze guard (2026-08-25); first half of the 0.15 amendment.** Additive;
+registers no proof point and alters no frozen row. Roadmap `roadmap-v0.13-v0.15.md` §4.3 (i)
+records that this annex had no tamper guard — `experiment-registry-tamper-check.yml` covered only
+`docs/experiments/registry.json` — so every "frozen" claim above rested on discipline alone. From
+this revision the same workflow runs `scripts/check-annex-freeze.py` on every PR that touches this
+file and fails the PR unless: **(1)** every §A.2 table row whose first cell names a PP id
+(`PP-L1` … `PP-S4`, thirteen today) is byte-identical to `main`; **(2)** every §A.3 entry — split
+at each line beginning `**A-1.` and keyed by that first line, fourteen today — is byte-identical
+to `main` (trailing blank lines aside), and no new entry carries a version counter below the
+newest already on `main` (history cannot be back-filled); **(3)** any byte change in the annex
+region (`## Annex A` to end of file) is accompanied by a new §A.3 entry; **(4)** the Annex version
+pointer at the head of Annex A names the highest `A-1.N` present in §A.3; **(5)** the parse fails
+closed — a missing `## Annex A` / `### A.2` / `### A.3` heading, a missing or duplicated pointer,
+or a duplicate PP key rejects the PR. Rows and entries may be ADDED, never edited or removed; a
+correction to an adjudicated entry is a new entry that says so (the A-1.9 withdrawal pattern),
+never an in-place edit. **Consequence for authors:** an entry's first line is its identity —
+write it once; wrapped continuation lines must not begin with `**A-1.`. **Not guarded, stated so
+the instrument is not overread:** the main document (§0–§8; its §7 supersession rule remains a
+written-analysis discipline), §A.1 prose, §A.2 prose and table headers (all editable, but only
+with a new entry), and the *honesty* of what a new row or entry says — that stays with review.
+The guard's own discriminating pins run first on every invocation (`--self-test`: 17 pins,
+including a mutated frozen row, a removed row, an edited entry, a back-filled entry, a new row
+with no log entry, and a pointer/entry mismatch), and the real document is parsed as a shape pin
+(13 rows, 14 entries, pointer = newest entry). The two `<!-- annex-freeze -->` comment lines under
+the §A.2 and §A.3 headings are this revision's only insertions outside this entry, plus the
+pointer update every prior revision also made; diff vs `main` is insert-only except that pointer.
+**Second half pending:** the 0.15 proof point — the fixture-scale probe under a NEW PP id, with
+roadmap §4.3 (i)–(iv) in full (freeze event named, fixture and defect classes frozen with
+honest-timing disclosure, the four-valued outcome with a decidability fallback, the PP-W5-derived
+"no large loop tax" margin) — registers in a later entry once
+`docs/design/effect-rows-in-the-type-system.md` (roadmap §4.1) is merged; per roadmap M1 no
+effect-row implementation (E2) merges before it does. The roadmap's "the A-1.10 bump is the
+freeze event" refers to that registration; this guard-half does not satisfy it, and says so.
 
 **A-1.9 — PP-W5 adjudicated. PASS on `w5-parity-002` (2026-08-06); the first attempt is
 recorded VOID.** Additive; registers the outcome against the row frozen at A-1.4 tranche 1,
