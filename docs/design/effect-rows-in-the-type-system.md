@@ -1089,7 +1089,7 @@ Binder symbols BEFORE: `onChange` is a `VariableSymbol` whose `TypeName` is the 
 field by **name** on the owner class (`EEP:1738-1741`) and string-matches `Action<`
 (`:1946`).
 
-AFTER — `§FLD{Action<i32>:onChange:pri} §E{cw}` (position 7; **X9b** shows this does not parse
+AFTER — `§FLD{Action<i32>:onChange:pri} §E{cw}` (position 8; **X9b** shows this does not parse
 today) and `§E{cw}` on `Bump`. `onChange`'s `BoundType` becomes
 `FunctionBoundType([i32], void, ParameterRows: [Unknown], Row: Concrete({cw}))`;
 `DisplayString` is `"(i32) -> void"` — unchanged per §8.3 — and `RowDisplayString` is `"cw"`. No
@@ -1436,7 +1436,7 @@ before E2 rather than after.
 | Calor0410 path at `EEP:410-443` | Draft v1 | the subset test is `:377`, demotion `:381-383`, message `:427`, reports `:433`/`:441` |
 | `BindingNode` | Draft v1 §3.2, §9 | no such class (`grep -rn "\bBindingNode\b" src/` → 0). It is **`BindStatementNode`** (`Ast/ControlFlowNodes.cs:161`) |
 | The Calor0410 message shape quoted four times | Draft v1 §3.5, §5.3, §10.1, §10.3 | Fabricated. Real text: `Function '{name}' uses effect '{code}' but does not declare it`, once per effect (`EEP:427`, loop `:421`) — executed as **X12b** |
-| `§FLD{…} §E{…}` already parses (Draft v1 §14 Q4) | Draft v1's own reasoning from `ParseClassField:8709-8719` | **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects`. It does not parse; position 7 is new syntax |
+| `§FLD{…} §E{…}` already parses (Draft v1 §14 Q4) | Draft v1's own reasoning from `ParseClassField:8709-8719` | **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects`. It does not parse; position 8 is new syntax |
 | `§E{!e, alloc}` fails at `Expect(CloseBrace)` | consistency lens C2 | **X3b**: it reaches `Calor0403: Unknown effect code '! e'`. The lens's conclusion (reject `!`) is right; the mechanism differs |
 | MediatR `RequestPreProcessorBehavior.cs` is **28** lines | **Draft v2 §12.1 / §14.1** — v2's own regression | **29**. `awk 'END{print NR}'`, `grep -c ''` and `cat -n` all say 29; `wc -l` says 28 because the last line is unterminated (`tail -c1` is `}`). **Draft v1 was right**; v2 accepted a lens finding without executing it and wrote the error into its corrections table. Restored in §12.1 with the measuring command named. Recorded here as the clearest instance of the failure mode this document's evidence discipline exists to prevent — including when the unexecuted claim comes from a reviewer |
 | Roadmap §4.5's `--permissive-effects` inventory: *"Waives Calor0410/0411/0418 today"* | roadmap §4.5, the waiver row | Incomplete: it **also** demotes **Calor0420/0421** (`EEP:517-519`), executed as **Y8a** vs **Y8b**. The omission matters because that row is what §4.5 executes, and its "a row that does not fit is never waived" clause is unsatisfiable for two of the six sites unless the demotion is removed — which §4.5 now does |
@@ -1470,7 +1470,7 @@ neither the finding counts nor the rows below; recounted here from the tables th
 | 5 | §6.4's site-5 sample is re-worded, not merely re-coded | **applied** — §6.4 says so explicitly |
 | 6 | `BindingNode` does not exist | **applied** — `BindStatementNode` (`Ast/ControlFlowNodes.cs:161`); §3.3, §9, §14.1 |
 | 7 | 9 `§I` arms + 7 `§O` arms, not 5 | **applied** — §3.3 moves the check **inside** `ParseParameter`/`ParseOutput`, so **six** insertion points cover all 16 arms |
-| 8, m1 | "six positions" vs seven rows vs "position 7" | **applied** — seven throughout (§3.3) |
+| 8, m1 | "six positions" vs seven rows vs "position 7" | **applied in v2, completed in v3** — v2 said "seven" over eight rows; v3 renumbers to **eight** (round-2 residual) |
 | 9 | `tests/TestData` golden bucket is 0, not ≤8 | **applied** — §9 (`0 of 359`, measured) |
 | 10 | Conversion tests never run the effect pass; four more snapshots gain diagnostics | **applied** — §9: **0 texts, 0 assertions**, `TestHelpers.cs:40-70` cited; the 7 function-typed snapshots enumerated |
 | 11 | MediatR module exercises **one** §6 site, not four | **applied** — §12.1; artifact **A3** added to carry R1/R3 |
@@ -1528,7 +1528,7 @@ neither the finding counts nor the rows below; recounted here from the tables th
 | X-1 | No freeze point for any pin | **applied** — §13.2's **Freeze** column, every row |
 | X-2 | No home file for any pin | **applied** — §13.2's **Home** column, every row |
 | X-3 | Message text never pinned | **applied** — **P22** pins the four new clauses in full |
-| 3.3 | No test parses `§LAM … §E` or `§DEL … §E` (0 hits in `tests/`) | **applied** — **P3** covers all seven positions, including the three that already parse |
+| 3.3 | No test parses `§LAM … §E` or `§DEL … §E` (0 hits in `tests/`) | **applied** — **P3** covers all **eight** positions, including the three that already parse |
 | 3.13 | No pin on "no lexer change" | **applied** — §9 states 0 lexer files; P5 and P18 observe the token surface |
 | 4.4 | "widening, never narrowing" is prose | **applied** — §13.3 gate 5 counts the disappearing Calor0410s |
 | 4.5 | No structural pin that `EffectResolutionStatus` gains no member | **declined, with rationale** — the enum is explicitly **not** changing (§4.2); a pin asserting the absence of a change nobody is making is maintenance with no discriminating revert. P21 pins the *mapping* from its three members to rows, which is the behaviour that matters |
