@@ -1,0 +1,1 @@
+{"type":"result","subtype":"success","num_turns":3,"result":"(synthetic) envelope without modelUsage: naive is the best available and must be reported as such","total_cost_usd":0.2,"usage":{"input_tokens":10,"output_tokens":2500}}
