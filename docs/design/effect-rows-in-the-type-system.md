@@ -1,7 +1,7 @@
 # Effect Rows in the Type System (TIER2D)
 
-**Status:** Draft v3
-**Date:** 2026-08-25 (v1 and v2 same day; review rounds 1 and 2 applied — §15)
+**Status:** Draft v4
+**Date:** 2026-08-25 (v1–v3 same day; review rounds 1, 2 and 3 applied — §15)
 **Measured against:** `main` @ `82338e37` (v0.14.3 + PR #1089 E1 slice 1 + PR #1090)
 **Governing inputs:** `docs/design/calor-direction.md` (`:23` TIER2D, `:33` generics deferral,
 `:57` the three worked examples, `:90-120` the postscript); `docs/plans/roadmap-v0.13-v0.15.md`
@@ -1522,7 +1522,7 @@ or every declined finding is recorded here with its rationale.
 | 1 | Draft v1 | NEEDS-FIXES 92% | NEEDS-FIXES 88% | NEEDS-FIXES 88% |
 | 2 | Draft v2 | **APPROVE 94%** | NEEDS-FIXES 85% | NEEDS-FIXES 91% |
 | 3 | Draft v3 | **APPROVE 95%** | **APPROVE 88%** (one open Major, carried — blocks the spike PR, not this merge) | NEEDS-FIXES 93% |
-| 4 | Draft v4 | pending | pending | pending |
+| 4 | Draft v4 (this revision) | pending | pending | pending |
 
 **Round 1 (on Draft v1). 87 disposition rows** — 22 evidence + 22 consistency + 43 test-lens —
 **= 81 applied + 4 declined + 1 partly declined (M13) + 1 superseded (test-lens 8.9)**. One of the
@@ -1686,7 +1686,7 @@ round-2 finding was a sentence-plus-pin fix; none re-opened a decision.
 | N6 | §7.1 mixes verbatim output with paraphrase | **applied** — the Y2a paraphrase replaced by **Z11**'s verbatim `Calor1002 (CS0029)`, which supports the claim more strongly than the paraphrase did |
 | r1-res | "seven positions" over eight labelled rows; `:767`/`:656` point at `Assert.Contains(` rather than the predicate | **applied** — renumbered to **eight positions** throughout (6 simply has two spellings); the two citations moved to `:768`/`:657` |
 
-### Round 3 (on Draft v3)
+### Round 3 (on Draft v3 — produced this revision, v4)
 
 **Evidence: APPROVE 95%.** **Consistency: APPROVE 88%**, with one open Major recorded rather than
 closed — it blocks the **spike PR**, not this merge, and is carried in §12.1 and §7.3 so it is
