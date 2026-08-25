@@ -1,6 +1,6 @@
 # Effect Rows in the Type System (TIER2D)
 
-**Status:** Draft v4
+**Status:** Draft v4 + emitter-spike results (roadmap §4.1 term 1 executed — §12.4, §13.5, §15 round 4)
 **Date:** 2026-08-25 (v1–v3 same day; review rounds 1, 2 and 3 applied — §15)
 **Measured against:** `main` @ `82338e37` (v0.14.3 + PR #1089 E1 slice 1 + PR #1090)
 **Governing inputs:** `docs/design/calor-direction.md` (`:23` TIER2D, `:33` generics deferral,
@@ -34,7 +34,7 @@ recorded in §14.1.
 
 | # | Term | Status |
 |---|---|---|
-| 1 | **Emitter spike producing actual compiler output** on named, frozen artifacts | **NOT MET AT THIS DOC'S MERGE, and honestly so.** §12 freezes the artifacts, the schema, and the verdict format. The spike output lands in a **follow-up PR that MUST merge before E2**; if it does not, E2 does not merge. This doc's merge still freezes gate 1's class list and gate 2's ledger, exactly as roadmap §4.4 specifies — the spike PR adjudicates only the §7.5 ramp. |
+| 1 | **Emitter spike producing actual compiler output** on named, frozen artifacts | **MET by the spike PR** (the follow-up §12 required). Artifacts, emitted C# and diagnostic lists are committed under `docs/design/spikes/effect-rows/{before,after}/`; the verdict is `spike-verdict.json`; P27/P28/P31 pin it. **G-CODEGEN PASS; ramp VALIDATED (R1 ∧ R2 ∧ R3); A3's middleware spelling decided MEMBER-LEVEL.** §12.4 carries the executed table and the three caveats. The prototype that produced the AFTER artifacts is **throwaway and unmerged** (branch `spike/effect-rows-emitter`); the spike PR carries no `src/` change. E2 still does not merge until this PR does. |
 | 2 | **External critique cycle with a pass bar** | **Round 1 complete** — evidence 92%, consistency 88%, test-lens 88%, all NEEDS-FIXES. Every finding is dispositioned in §15. Round 2 pending; the bar is APPROVE from the evidence and consistency lenses. |
 | 3 | **Priced blast radius in the doc** | **§9**, one table, each row with the command that produced its number. |
 | — | **Demand denominator registered before the doc opens** | **DONE** (PR #1086). D-A **3**, D-B **3121**, total **3124**, floor **25**. §1. |
@@ -842,9 +842,14 @@ v2's permitted/forbidden lists left positions 2 and 3 unmentioned. The complete 
 | **6** return row | **forbidden** | a returned function mentioning the caller's variable is rank-2 |
 | **7** binding · **8** field | **forbidden** | nothing binds a variable there |
 | — inside a generic argument (`List<Func<i32,i32> §E{e}>`) | **forbidden** | types are strings in the parser (§3.1) |
-| — **class / interface-level** (`§CL{…}<T, eff e>`, `§IFACE{…}<T, eff e>`) | **forbidden in E2** | the cell v2 left blank while §7.4's middleware form used it — see below |
+| — **class / interface-level** (`§CL{…}<T, eff e>`, `§IFACE{…}<T, eff e>`) | **forbidden in E2 — CONFIRMED** | the cell v2 left blank while §7.4's middleware form used it — see below. **The spike chose member-level (§12.4), so this row does NOT flip and §9's seventh insertion point stays conditional at zero cost** |
 
-**Class/interface-level `eff` is forbidden in E2, and the spike decides whether that holds.**
+**Class/interface-level `eff` is forbidden in E2, and the spike decided that it holds.** The
+sequencing below ran as written: member-level was tried first, it expressed R2, and
+class-level therefore does not ship. `after/A3-middleware-alpha.calr` is the executed proof
+that `fits` identifies the interface's variable with the implementation's even when they are
+spelled differently — the half **W1c did not settle**. Kept in the past tense below because it
+is the record of what the spike was told to do.
 The partition above must be total, because **R1 is recomputed by P27 and requires all four A3
 fixtures to compile with zero Calor0404** — so a middleware fixture that binds `eff e` at
 `§IFACE<…, eff e>` would fail R1 *by this document's own rule*, and the ramp would fire for a
@@ -1003,6 +1008,11 @@ receiver `BoundExpression` on the call nodes, binder-emitted `UnresolvedBoundTyp
 `Unknown`-row contribution, symbol-identity keying in `EffectResolver`/manifests/IL summaries, and
 `BoundLambdaExpression`'s `FunctionBoundType` all **pending** (evidence in §2.2). E2 consumes all
 six; roadmap §4.2's cut line already prices the risk.
+
+**The spike did not discharge any of the six, and says so.** Its prototype reads rows off the
+**AST**, because the effect pass is an AST walk (§2) and the bound tree is not on that path. So
+§8.2's `FunctionBoundType.Row` / `ParameterRows` is **still owed by E2** — the spike is evidence
+that rank-1 rows *type-check* and *erase at codegen*, not that the representation work is done.
 
 ### 8.2 `FunctionBoundType`
 
@@ -1332,18 +1342,65 @@ in-repo. The skip is registered in `eng/test-manifest.json`'s `expectedSkipped` 
 skip trips the count. Home: `tests/Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs`; the
 `compiler` shard already opts into submodules.
 
-### 12.4 Pass/fail, per criterion per artifact
+### 12.4 Pass/fail, per criterion per artifact — **EXECUTED**
+
+The spike ran. `docs/design/spikes/effect-rows/spike-verdict.json` is the machine-readable
+result; this table is its summary, and where the two disagree the JSON wins.
 
 | | A1 | A2 | A3 |
 |---|---|---|---|
-| **G-CODEGEN** (blocking, feature-wide) | required — P28 | required — P28 (skips without submodules) | n/a |
-| **R1** four combinators clean | n/a | n/a | required — recomputed by P27 |
-| **R2** interface/impl, no carve-out | n/a | required — **recorded**, reviewed in the spike PR | n/a |
-| **R3** one-line instantiation solve | n/a | n/a | required — **recorded**, reviewed in the spike PR |
+| **G-CODEGEN** (blocking, feature-wide) | **PASS** — byte-identical, `diffBytes: 0` | **PASS modulo `#line`** — every differing byte is inside a `#line` directive and the files are the same length; **0** emitted C# lines differ otherwise | **PASS** — all four fixtures byte-identical |
+| **R1** four combinators clean | n/a | n/a | **PASS** — each AFTER form compiles `exit: 0`, `diagnostics: 0`, no flag, no `§CSHARP` |
+| **R2** interface/impl, no carve-out | n/a | **PASS** — recorded | n/a |
+| **R3** one-line instantiation solve | n/a | n/a | **PASS** — recorded |
 | artifacts present and well-formed | P31 | P31 | P31 |
+
+**Ramp verdict: `VALIDATED`.** R1 ∧ R2 ∧ R3, so §7.5's ramp does **not** fire: site 6 stays,
+gate 1's denominator stays at **six** classes, Calor0404 stays allocated, and the `eff` branch
+ships. **G-CODEGEN does not block.**
+
+**A3's middleware spelling is decided: MEMBER-LEVEL** (`§MT{mt001:Handle}<eff e> (…)`), the
+open Major §12.1 carried. Consequently **§7.3's last table row stands** — class/interface-level
+`eff` remains forbidden in E2 — and **§9's seventh parser insertion point stays conditional at
+zero cost**, because position 1 needed no new insertion point. The proof §12.1 said W1c did not
+supply is executed: `after/A3-middleware-alpha.calr` binds `eff e` on the interface and `eff f`
+on the implementation and **compiles**, because a row carries binder **indices**, not names.
+Its residual is recorded rather than closed: the interface must itself be Calor for a row to
+exist on it (§14 Q1).
+
+**Three caveats the verdict states in full and this table must not soften.**
+
+1. The prototype is **additive by construction** — every new code path is gated on a row being
+   *present* — so §3.5's "row-less function-typed position ⇒ Calor0425" is **not implemented**;
+   such a position still reaches today's Calor0418. R1's bar is the *absence* of three codes, so
+   it is weaker evidence than its wording suggests.
+2. The prototype does **not** put rows in the bound tree. §8.2's `FunctionBoundType.Row` /
+   `ParameterRows` is still owed by E2; the spike reads rows off the AST, which is where the
+   effect pass already walks (§2).
+3. The prototype is **throwaway** and is **not** merged. It lives on branch
+   `spike/effect-rows-emitter`; `spike-verdict.json` records its commit. This PR carries the
+   artifacts and no `src/` change, so **P29 stays green here** — with the prototype in the build
+   it is red on three cases, listed as E2 obligations in §13.5.
 
 The verdict is **read off `spike-verdict.json`**, not argued from prose. The spike PR must merge
 before E2; if it does not, E2 does not merge (§0 term 1).
+
+### 12.5 What P27/P28/P31 verify on main, and what waits for E2
+
+The AFTER forms carry rows, which main's compiler does not parse. The pins split accordingly,
+and the split is asserted rather than assumed:
+
+| Leg | On main today | After E2 |
+|---|---|---|
+| **P28** BEFORE side | **recomputed** — `before/A1.calr` and `before/A2.calr` are re-emitted with the current compiler and diffed against the committed `before/*.g.cs` | unchanged, and it becomes A1's real question: *did the row feature move codegen for a row-less program?* |
+| **P28** before/after pair | **compared** — the committed `.g.cs` pairs are diffed under the `#line`-normalisation rule. Needs no compiler, so it is a real assertion now | unchanged |
+| **P27** shape | **asserted** — `schemaVersion`, 40-hex `measuredCommit` **and** `prototype.commit`, `prototype.throwaway`, and that every `before/…`/`after/…` path cited as evidence exists | unchanged |
+| **P27** R1 | **recorded** — the four diagnostic lists are read and asserted to contain none of Calor0404/0424/0425. `ramp.R1.recomputedBy` is `"P27 once E2 lands; recorded until then"`, and the test asserts that deferral string, so it cannot be left recorded silently | **recomputed** by compiling each A3 fixture |
+| **P27** R2, R3 | **recorded** — judgements a test cannot re-derive (§12.3) | unchanged |
+| **P31** manifest | **asserted** — every artifact's three files exist, are non-empty, and the diagnostic list's header count matches its body | unchanged |
+
+No leg is skipped and no leg fakes a pass. The A2 **corpus-subject** leg is the only skip, and
+it skips only without submodules — registered in `eng/test-manifest.json`.
 
 ---
 
@@ -1449,6 +1506,40 @@ hundreds, rows are ergonomically *worse* than Calor0418 for converted code and
 `--permissive-effects` becomes mandatory rather than exceptional — which would make §4.5's
 "strictly less powerful waiver" decision land badly. Registering the ledger makes that visible
 before E2 rather than after.
+
+### 13.5 E2 obligations the spike created
+
+The spike PR carries **no `src/` change**, so nothing below is red today. Each item is a
+commitment E2 inherits, stated here so it cannot be discovered late.
+
+**(a) Exactly three transcript regenerations, and no others.** With the prototype in the build
+`ExperimentTranscripts_MatchARerun` (**P29**) is red on three cases and only three. They were
+**recorded, not regenerated** — the transcripts are E2's frozen evidence base and a throwaway
+prototype does not rewrite them.
+
+| Script / case | Committed | With rows | Why |
+|---|---|---|---|
+| `run.py` **X6a** (`§F{…}<T, U, eff e>`) | `Calor0100: Expected Greater but found Identifier` | parses; the case's own `§E{}` then under-declares `alloc` → `Calor0410` | **Intended.** X6a exists to show `eff e` is new syntax *today*; E2 is what makes it parse. E2 must **re-author** X6a into a positive case, not merely regenerate it |
+| `run3.py` **Z1** (`§FLD{i32:x:pri}` ⏎ `§E{cw}`) | four `Calor0100` cascade lines | one `Calor0405` | **Intended** — §3.1's row-aware recovery. The 4→1 collapse is exactly the claim **P2(b)** makes |
+| `facts.py` line 6 | `Ast/FunctionNode.cs:252` | `Ast/FunctionNode.cs:283` | **Unavoidable.** `facts.py` pins `file:line` structural facts; adding `ParameterNode.Row` moves the line |
+
+**If E2's regeneration moves any other line, that is a behaviour change the spike did not make,
+and it needs its own justification in the E2 PR body.** `spike-verdict.json`'s
+`transcriptDivergences.e2Obligation` carries the same sentence in machine-readable form.
+
+**(b) Spike artifacts are not corpus.** Committing `.calr` fixtures under
+`docs/design/spikes/` collided with **three** frozen instruments that enumerate `.calr`
+repo-wide — `HigherOrderDemandLedgerTests` (filesystem walk), `LosslessFormattingTests`
+(`git ls-files`), and the harness's own `facts.py` (`git ls-files`). All three now exclude
+`docs/design/spikes/` by path, and **none of their counts changed**, because those files were
+never part of the 886. Round 3 solved the same problem for *scratch* files by moving them
+outside the repository; committed artifacts cannot move, so they are excluded instead. Any
+future spike that commits `.calr` under `docs/` inherits this.
+
+**(c) One message text was protected, not changed.** An early prototype draft trimmed the
+unknown-effect-code string and moved **X5a** from `' ^ e'` to `'^ e'`. That is a gratuitous
+change on a path rows do not own; it was fixed rather than recorded. E2 should keep the
+untrimmed code in `Calor0403`.
 
 ---
 
@@ -1716,6 +1807,25 @@ it cannot be carried silently: **A3's middleware spelling**. It blocks freezing 
 spike PR does; it does not block this document merging, because §7.3 now makes the E2 rule total
 (forbidden) and §9's conditional cost contingent on a named, testable outcome.
 
-#### Round 4
+#### Round 4 — the emitter spike (roadmap §4.1 term 1)
 
-Pending, if required. Bar: APPROVE from the evidence and consistency lenses.
+Not a review round: an **execution** round. The spike PR ran §12's plan against a throwaway
+prototype and reports back. Six dispositions, all applied to this document.
+
+| # | Finding | Disposition |
+|---|---|---|
+| S1 | **The open Major is closed.** §7.3/§12.1 carried A3's middleware spelling as an open Major that blocked freezing A3. Member-level was tried first, as sequenced, and **expressed R2** | **applied** — §12.4 records **MEMBER-LEVEL**. §7.3's last row does **not** flip (class/interface-level stays forbidden in E2); §9's seventh insertion point stays **conditional at zero cost**; P18 keeps `Rejected_ClassOrInterfaceLevel` |
+| S2 | **The half W1c did not settle is now executed.** §12.1 said W1c was evidence about member *matching*, not row *unification* | **applied** — `after/A3-middleware-alpha.calr` binds `eff e` on the interface and `eff f` on the implementation and compiles. Rows carry binder **indices**, not names, so `fits` is alpha-equivalent by construction. §7.3, §12.4 |
+| S3 | **R2 needed no carve-out.** The two `IsSubsetOf` calls in `CheckEffectVariance` became two calls to the shared `EffectRow.Fits`; there is no `if (row.IsPolymorphic)` branch anywhere in that method | **applied** — §12.4. This is §6.3's "three codes express one relation", executed |
+| S4 | **G-CODEGEN does not block, and A2's caveat is named rather than smoothed over.** Five of six artifacts are byte-identical; A2 differs only inside `#line` directives, because its two rows sit on their own added lines | **applied** — §12.4's table gives both readings. All four A3 fixtures are strictly byte-identical because an inline row is written on the **same** line as its type, so nothing shifts |
+| S5 | **The prototype's additivity bounds what R1 proves.** Every new code path is gated on a row being *present*, so §3.5's Calor0425-on-omission is unimplemented and a row-less function-typed position still reaches Calor0418 | **applied** — §12.4 caveat 1 states it. R1's bar is the *absence* of three codes, so it is weaker evidence than its wording suggests, and the doc now says so rather than letting a reader infer it |
+| S6 | **Committing `.calr` artifacts under `docs/` collides with three frozen corpus instruments** — the demand ledger's filesystem walk, the formatter baseline's `git ls-files`, and `facts.py`'s own sweep. Found by running them, not by reading them | **applied** — §13.5(b). All three exclude `docs/design/spikes/` by path; **no count changed**, because those files were never in the 886. Round 3 solved the same problem for scratch files by moving them out of the repository; committed artifacts cannot move |
+
+**What the spike did NOT settle**, recorded so it is not read as more than it is: §8.1's six E1
+items are untouched (the prototype reads rows off the **AST**, not the bound tree, so §8.2 is
+still owed); §14 Q1's residual stands — member-level `eff` works when **both** sides are Calor,
+and a C#-declared interface still has no row to check against.
+
+**Bar for a further review round.** Unchanged: APPROVE from the evidence and consistency lenses.
+The spike PR's own diff is where R2 and R3 are reviewed, because §12.3 says plainly that a test
+cannot re-derive them.
