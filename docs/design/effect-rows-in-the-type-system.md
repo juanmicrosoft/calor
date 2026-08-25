@@ -1293,11 +1293,11 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | `:60` (`:47` `_LambdaBoundLocal_IsError`) | Calor0418 | **rewrite** → `_ChargesInferredRow`: compiles; Calor0410 when `§E` is narrowed. Baseline **Y9a** |
 | `:77-80` (`:64` `_UnderPermissiveEffects_IsWaivedToWarning`) | 0418 demoted | **rewrite** → Calor0425 suppressed under the flag **+ a new sibling** asserting Calor0424 is not |
 | `:745` (`:728` `M1_ExpressionCallSpelling_DelegateValue_IsError`) | Calor0418 | **rewrite** → row of the invoked value is charged; 0425 when Unknown. *Orphaned in Draft v1* |
-| `:767` (`:749` `M1_ReturnedDelegateInvocation_IsError`) | Calor0418 | **rewrite** → returned value's row charged; 0425 when the `§O` carries no row |
+| `:768` (`:749` `M1_ReturnedDelegateInvocation_IsError`) | Calor0418 | **rewrite** → returned value's row charged; 0425 when the `§O` carries no row |
 | `:502` (`:472` `C2_DecoyNamedDelegateParameter_ShadowsFunction_IsError`) | Calor0418 | **rewrite** → the decoy parameter's row governs, not the shadowed function's. *Orphaned in Draft v1* |
 | `:260` (`:245` `OverrideOfExternalBase_RoutesToAssumedChannel`) | Calor0419 | **rewrite** → Calor0425 (§6.2 retires the 0419). *Orphaned in Draft v1* |
 | `:607` (`:587` `C3_ExternalInheritedImplementation_RoutesToAssumed`) | Calor0419 | **rewrite** → Calor0425. *Orphaned in Draft v1* |
-| `:656` (`:640` `C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption`) | Calor0419 warning | **rewrite** → Calor0424/0425 at the argument per §10.2. *Orphaned in Draft v1* |
+| `:657` (`:640` `C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption`) | Calor0419 warning | **rewrite** → Calor0424/0425 at the argument per §10.2. *Orphaned in Draft v1* |
 | `:152`, `:172`, `:219`, `:582` (0420/0421 `_IsError`) | as today | **unchanged** (§6.3) |
 | `:177`, `:223` (0420/0421 `_Compiles`) | as today | **unchanged** |
 | `:612` `C4_MethodGroupArgument_ChargesCalleeDeclaredEffects` | charges callee | **unchanged** (§3.4) |
@@ -1446,12 +1446,20 @@ before E2 rather than after.
 
 ## 15. Review record
 
-**Round 1 (2026-08-25) on Draft v1 (PR #1093).** Three lenses, all NEEDS-FIXES: evidence 92%,
-internal-consistency 88%, test-lens 88%. Exit criterion (roadmap §4.1 term 2): evidence **and**
-consistency return APPROVE on a revision, or every declined finding is recorded here with its
-rationale. Below: every finding, its disposition, and where it landed. **62 applied, 4 declined.**
+Exit criterion (roadmap §4.1 term 2): evidence **and** consistency return APPROVE on a revision,
+or every declined finding is recorded here with its rationale.
 
-### Evidence lens (23 findings)
+| Round | Doc | evidence | consistency | test-lens |
+|---|---|---|---|---|
+| 1 | Draft v1 | NEEDS-FIXES 92% | NEEDS-FIXES 88% | NEEDS-FIXES 88% |
+| 2 | Draft v2 | **APPROVE 94%** | NEEDS-FIXES 85% | NEEDS-FIXES 91% |
+| 3 | Draft v3 | pending | pending | pending |
+
+**Round 1 (on Draft v1).** **80 dispositions: 74 applied, 4 declined, 1 partly declined (M13),
+1 superseded (test-lens 8.9).** (v2's summary line said "62 applied, 4 declined", which matched
+neither the finding counts nor the rows below; recounted here from the tables themselves.)
+
+### Evidence lens, round 1 (22 findings; ids run 1–23 with 4 and 22 merged)
 
 | # | Finding | Disposition |
 |---|---|---|
@@ -1478,7 +1486,7 @@ rationale. Below: every finding, its disposition, and where it landed. **62 appl
 | 21 | §5.4's `§LAM` site arithmetic | **applied** — §5: 9 occurrences in 7 files, enumerated |
 | 23 | `§MT` has its own `§E` arm at `:8836-8840` | **applied** — §3.3 position 1 |
 
-### Internal-consistency lens (3 critical, 13 major, 7 minor)
+### Internal-consistency lens, round 1 (3 critical, 13 major, 7 minor)
 
 | # | Finding | Disposition |
 |---|---|---|
@@ -1505,7 +1513,7 @@ rationale. Below: every finding, its disposition, and where it landed. **62 appl
 | m6 | `§E` swallowed as a type name when written *before* its type (`Token.cs:384` `IsKeyword` includes `Effects`; `ReadInlineTypeToken` accepts `IsKeyword`) | **declined, with rationale** — a `§E` written where a type is expected is malformed source that already produces a type diagnostic, the shape has **0 corpus occurrences**, and a special case costs a branch in the shared type reader for no observed benefit. The *correct* orders are pinned positively by P3 and P5 |
 | m7 | ~600–750 duplicated lines | **applied** — v2 is **≈1300 lines**: §9 collapsed to one table, §2 to a cited table, one `Map` example kept, `Match`/callbacks reduced to a sentence each |
 
-### Test lens (8 hard defects, 3 cross-cutting, ~25 claim-table gaps)
+### Test lens, round 1 (8 hard defects, 3 cross-cutting, ~25 claim-table gaps)
 
 | # | Finding | Disposition |
 |---|---|---|
@@ -1553,13 +1561,55 @@ rationale. Below: every finding, its disposition, and where it landed. **62 appl
 | G-3 | CLI leg, SDK leg, default-`UnknownCallPolicy` equivalence, F-3 supersession | **applied** — §13.3 gate 3; the supersession **already merged** as `b5d61e18` (PR #1085) |
 | G-5 | No gate-5 row at all | **applied** — §13.3 gate 5, with legs (a)/(b), the E1-attributable separation, and three 0.15-specific additions |
 
-### Round 2
+## Round 2 (on Draft v2)
+
+**Evidence: APPROVE 94%** — the lens re-executed all 36 committed cases and reported *"No
+committed experiment output diverged from my re-run"*, plus independent re-measurement of the
+corpus counts, `o53/baseline.json`, and every structural citation in §2–§14. Six Minors, all
+applied below. **Consistency: NEEDS-FIXES 85%** — all three round-1 CRITICALs closed; five new
+Majors, all on decisions v2 introduced. **Test-lens: NEEDS-FIXES 91%** — 12 of 13 round-1
+load-bearing gaps closed; four blockers, all applied.
+
+**24 dispositions: 24 applied, 0 declined.** Every round-2 finding was a sentence-plus-pin fix;
+none re-opened a decision.
+
+### Consistency lens, round 2 (5 majors, 4 minors)
+
+| # | Finding | Disposition |
+|---|---|---|
+| N1 | The line rule's second branch ("later line ⇒ declaration row") is **false at four positions** — `§FLD`, `§B`, a wrapped inline signature and the inline parameter form have no `§E` arm to fall through to, and cascade 4–11× Calor0100 with no mention of effects (**Z1**, **Z2**, **Z3**; **Z5** shows wrapped parameter lists are a real authoring shape) | **applied** — Decision 1 restated as *same line ⇒ that type's row; otherwise the token is not consumed at that position*, with **Calor0405 `EffectRowMisplaced`** as a row-aware recovery replacing the cascade (§3.1). **P2** extended to all four positions against their executed baselines |
+| N2 | An `eff` name can shadow a live effect code: `<T, cw>` compiles today (**Z6**) and §7.2 resolves variables before codes, making the real `cw` unwritable | **applied** — §7.2(c): an `eff` name in `EffectCodes.Registry` or `ColonPrefixes` is **Calor0404**. Ordinary type parameters named `cw`/`fs` keep working (Z6/Z6b stay green). **P18** gains `EffectVariableNamedLikeACode_IsCalor0404` |
+| N3 | §7.3's scope lists don't partition the positions — `§LAM` and `§DEL` are in neither, and `§DEL` has no type-parameter list at all (**Z8**) | **applied** — §7.3 is now a full partition table over all eight positions; `§LAM` and `§DEL` are **forbidden**, anchored on **Z8b** and **Z8**. Six rejection sites in **P18**, not five |
+| N4 | R2's middleware AFTER spelling was deleted in the v1→v2 cut, yet A3 is "the four §7.4 AFTER forms" and only `Map`'s existed | **applied** — all three restored to §7.4 (`Match`, middleware/`next`, callback field). The middleware spelling needs an `eff` variable on a **class/interface** read by a member row — a scope rule §7.3 does not grant; **Z7**/**Z7b** show class and interface type parameters do reach members, so it is bounded, and §9 prices it as a conditional seventh insertion point scheduled only if R2 needs it. Named as this document's own most-likely ramp trigger |
+| N5 | A row on a non-function-typed position has no stated meaning — `-> void §E{cw}` compiles today (**Z9**) and becomes `void`'s row under the new rule | **applied** — §3.5: **Calor0405**, the same code as N1's recovery (one code, two situations, both "a row where a row cannot go"). **P6** gains one case per position against Z9/Z9b/Z9c |
+| M5-res | The declaration boundary still converts `Assumed`→`Concrete` and is not one of the six sites; P10's fixture passes with that hop open | **applied** — §5 states the conversion is deliberate because Calor0419 already reports the assumption at that boundary, names it a seventh place a row changes form, and explains why the alternative (an `Assumed` row escaping every annotated function) is the noise §13.4 exists to avoid. **P10** gains it as case (c) |
+| N6 | The round-1 decline of test-lens 12.3 was unsound; P27's "recomputation" undefined | **applied** — decline **reversed**. §12.3 defines exactly what P27 recomputes (`gCodegen` via P28, the R1 leg) versus what it only records (R2, R3 — judgements a test cannot re-derive, said plainly). **P31** adds the artifact manifest; submodule skip behaviour stated |
+| N7 | The `eff` / `in`-`out` shape-parity claim is overstated | **applied** — §7.2 softened: `in`/`out` have **no** lookahead and are **rejected** on `§F` (`Calor0119`, **X6b**), so `eff` reuses the shape, not a working path. §9 prices its own branch, lookahead and per-form enablement; §14.1 records the overstatement |
+| N8 | Roadmap §4.2's **M1** is absent from the doc's before-E2 chain | **applied** — §13.3 gains an M1 row: a merge precondition, not a gate. Status recorded — PRs #1090/#1091/#1092 merged, A-1.10 is the annex guard half, the 0.15 PP row registers at A-1.11+; E2's PR body must cite it |
+| N9 | §14.1 still omits the roadmap §4.5 permissive-inventory correction | **applied** — §14.1 row added: §4.5's inventory says "0410/0411/0418" and omits the **0420/0421** demotion, which is exactly what makes its own "never waived" clause unsatisfiable until §4.5 removes it |
+
+### Test lens, round 2 (4 blockers)
+
+| # | Finding | Disposition |
+|---|---|---|
+| T1 | **The harness is not a test.** ~26 executed cases are the evidentiary base of nine sections and are observed by nothing; the generated outputs are gitignored, so there is nothing to diff even by hand. *"This is the exact failure mode v2 criticises v1 for."* | **applied, in this PR** — canonical `transcripts/` committed; `regenerate-transcripts.py` added; every script made deterministic and Debug/Release-agnostic; **P29** (`EffectRowExperimentHarnessTests.ExperimentTranscripts_MatchARerun`) re-runs all six and diffs, naming the script and first differing line on drift. **Never skips** — a missing compiler build is a hard failure, because a skipped evidence pin is how v1's fabricated quotations survived. Frozen now, ahead of E2 |
+| T2 | `o53/baseline.json` is gate 5's named instrument but meets none of the three bars §12.3 sets for `spike-verdict.json` | **applied, in this PR** — the ledger gains `schemaVersion`, `measuredCommit` and `scope`, and **P30** asserts 23 files / 54 occurrences / 1 green / 22 red **and the 18+3+1 breakdown**. `measuredCommit` is shape-checked, not compared to HEAD, per `HigherOrderDemandLedgerTests.cs:480-498` |
+| T3 | **G-CODEGEN has no pin**, though §12.2 makes it feature-wide blocking and §9/§8.5 lean on it | **applied** — **P28** `GCodegen_BeforeAfterEmittedCSharpIsByteIdentical`, re-emitting A1/A2 and diffing the `.g.cs`. P27's recomputation defined so it is falsifiable |
+| T4 | §14 Q4 is in flux while P6/P15 freeze at design-doc merge | **applied** — resolved twice over: **span is explicitly outside gate 1's frozen denominator** (the gate observes which classes are closed, by code and polarity), and span is pinned by **P22**, which freezes with **E3**. §13.4's ledger gains a fourth split — "declared but never invoked" vs "invoked" — for exactly this question |
+| T5 | §13.4's ledger test is unnamed and homeless — the only instrument without a P-number | **applied** — **P32** `Calor0425CorpusLedgerMatchesRecomputation`, home `tests/Calor.Compiler.Tests/Effects/Calor0425CorpusLedgerTests.cs`, `compiler` shard, `Skip.IfNot` on submodules registered in `eng/test-manifest.json` |
+
+### Evidence lens, round 2 (6 minors + 1 round-1 residual)
+
+| # | Finding | Disposition |
+|---|---|---|
+| N1 | The "22 of 23 red" breakdown is 15+3+1=19, but the ledger says **18** bench/mcp | **applied** — 18+3+1 in §3.2 and in `experiments/README.md`, and **P30 asserts the breakdown** so the arithmetic cannot drift again |
+| N2 | `RequestPreProcessorBehavior.cs` is **29** lines; v2 "corrected" v1's 29 to 28 from a lens finding without executing, and enshrined it in §14.1 | **applied** — 29 restored in §12.1 with the measuring command named (`wc -l` undercounts an unterminated last line). §14.1 records it as the clearest instance of the failure mode this doc's discipline exists to prevent — *including when the unexecuted claim comes from a reviewer* |
+| N3 | A1 is built at `test.yml:174` and run at `:176`, not `:181` | **applied** — §12.1 |
+| N4 | P7's home path does not exist; `:29`/`:38` are network, not `fs`; and they are `[Fact]` lines | **applied** — home corrected to `tests/Calor.Enforcement.Tests/EffectSubtypingTests.cs`, `:20` identified as the `fs` case, and the `[Fact]`-line exception called out explicitly against the doc's own assertion-line convention |
+| N5 | §15's arithmetic reconciles with nothing | **applied** — round-1 recounted from its own tables: **80 dispositions, 74 applied, 4 declined, 1 partly declined (M13), 1 superseded (8.9)**; the evidence header now says 22 findings, not 23 |
+| N6 | §7.1 mixes verbatim output with paraphrase | **applied** — the Y2a paraphrase replaced by **Z11**'s verbatim `Calor1002 (CS0029)`, which supports the claim more strongly than the paraphrase did |
+| r1-res | "seven positions" over eight labelled rows; `:767`/`:656` point at `Assert.Contains(` rather than the predicate | **applied** — renumbered to **eight positions** throughout (6 simply has two spellings); the two citations moved to `:768`/`:657` |
+
+### Round 3
 
 Pending. Bar: APPROVE from the evidence and consistency lenses.
-
-| Round | Date | Lens | Verdict |
-|---|---|---|---|
-| 1 | 2026-08-25 | evidence / consistency / test | NEEDS-FIXES (92% / 88% / 88%) — all dispositioned above |
-| 2 | — | evidence | pending |
-| 2 | — | internal consistency | pending |
-| 2 | — | test | pending |
