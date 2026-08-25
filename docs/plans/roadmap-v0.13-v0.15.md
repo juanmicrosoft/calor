@@ -503,9 +503,14 @@ keying are E1 decisions, made in §4.2, not design-doc decisions.)
 
 **Exit ramp (pre-registered), and what it changes downstream:** if rank-1 polymorphism fails to
 validate on the named combinator set, 0.15 ships monomorphic rows with explicit Unknown/Assumed
-propagation and defers polymorphism. When the ramp fires, **E3's rank-1 leg and gate 1's fifth
-class are removed with it** — gate 1's denominator becomes four classes and the release notes say
-so. Still a shippable release that removes the first-order ceiling for the common case.
+propagation and defers polymorphism. When the ramp fires, **E3's rank-1 leg and gate 1's
+rank-1-instantiation class are removed with it** — gate 1's denominator becomes **five** classes
+(of six) and the release notes say so. *(Count reconciled 2026-08-25 with annex A-1.11: the
+laundering classes are the **six** compatibility-checking sites design doc §6.2 tabulates —
+assignment, argument, return, override, interface implementation, rank-1 instantiation — so the
+ramp takes the denominator from six to five. Earlier drafts of this section and of §4.4 gate 1
+said five-to-four by folding override and interface implementation into one row; §10's round-3
+review record preserves that earlier wording as written.)* Still a shippable release that removes the first-order ceiling for the common case.
 
 ### 4.2 Ship — tiered, with the cut lines stated
 
@@ -606,29 +611,36 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   **(iv)** the
   "no large loop tax" margin stated numerically via the PP-W5 derivation (existing-epoch
   variance → null-simulation p95 → bootstrap-bound conjunction) — **done**: re-derived on
-  `w5-parity-002` with corrected tokens (within-cell CV median 0.439, null p95 1.321) to a
-  **1.35** point margin conjoined with a bootstrap lower bound above 1.0; measured null
-  false-fail 2.3 %, power 0.24 / 0.52 / 0.75 at 1.25× / 1.4× / 1.6×.
-- **Register-then-merge has a precedent to repair first (M1):** PR #944 (the §3.1
-  pre-registration) is still open while its spike shipped. It is merged as the historical record
-  or closed with the discrepancy noted before the 0.15 PP registers — otherwise the discipline is
-  aspirational.
+  `w5-parity-002` with corrected tokens (within-cell CV median 0.4392, null p95 1.3302) to a
+  **1.35** point margin — the null p95 rounded up to the 0.05 grid — conjoined with a bootstrap
+  lower bound above 1.0; measured null false-fail 1.7 % (point test alone 3.7 %), power
+  0.22 / 0.48 / 0.77 at 1.25× / 1.4× / 1.6×. Script and full output committed at
+  `bench/phase0-agent-native/ppe1-margin-derivation.py` / `…-derivation.txt`.
+- **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
+  pre-registration) was still open while its spike shipped; it is now **closed with the
+  discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.
 - **No real-scale epoch** unless both registered re-entry conditions hold (≥70 evaluable tasks;
   a real Calor arm). Unchanged.
 
 ### 4.4 Release gates — instrument, denominator, freeze point, discriminating pin
 
 Conditional (they move with their SHOULD-tier deliverable): gate 3's MCP leg (E7), gate 7's E6/E7
-legs. Conditional on the §4.1 ramp *not* firing: gate 1's fifth class. Unconditional: everything
+legs. Conditional on the §4.1 ramp *not* firing: gate 1's rank-1-instantiation class (its sixth).
+Unconditional: everything
 else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
 
 1. **Effect laundering, closed classes.** *Instrument:* one adversarial pin per class, the
    `DelegateInvocation_*` pattern, positive and negative (`_IsError` / `_Compiles` pairs as
-   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* five classes —
-   virtual override and interface implementation (already closed by Calor0420/0421; **re-pinned
-   under rows**, since folding them into E3 could silently reopen them), delegate/function-value
-   *assignment*, *argument*, and *return* (closed by E3's typing rule, not by E4's rejection), and
-   rank-1 generic instantiation (four classes if the ramp fires). *Freeze point:* the class list
+   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* **six classes —
+   the six compatibility-checking sites design doc §6.2 tabulates** (count reconciled 2026-08-25
+   with annex A-1.11; earlier drafts said five by folding the first two into one row): virtual
+   override **and** interface implementation, counted separately (already closed by
+   Calor0420/0421; **re-pinned under rows**, since folding them into E3 could silently reopen
+   them), delegate/function-value *assignment*, *argument*, and *return* (closed by E3's typing
+   rule, not by E4's rejection), and rank-1 generic instantiation (**five classes if the ramp
+   fires**). A-1.11's PP-E1 covers two of these six on its fixture set — interface implementation
+   and rank-1 instantiation — plus E4's row-erasure class, which this gate does not enumerate;
+   the other four are this gate's alone. *Freeze point:* the class list
    and the residual list freeze at **design-doc merge**; the residual (reflection,
    `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates) is
    named in the release notes as "not closed", never "no callback can". *Discriminating pin:*
@@ -665,9 +677,14 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    (`tests/Calor.Compiler.Tests/Effects/EffectRowsProbeLedgerTests.cs`, `compiler` shard), with
    the cost leg adjudicated by `bench/phase0-agent-native/ppe1-analyze.py` into
    `epochs/e1-rows-parity-001/ppe1-analysis.json`. *Denominator:* the ten frozen mutations over
-   the five frozen fixtures (7 if the §4.1 ramp fires and the `L6` cells drop), plus leg B's four
-   N1 pairs × 5 runs/arm. *Bar:* 10/10 detected with a clean negative control, and a cost leg
-   that does not fail (point > 1.35 **and** bootstrap lower bound > 1.0 is the failure).
+   the five frozen fixtures (7 if the ramp of §4.1 — design doc §7.5, the same ramp — fires and
+   the `L6` cells drop), plus leg B's four
+   N1 pairs × 5 runs/arm. *Bar:* 10/10 detected **with the registered code at the registered
+   declaration** (`Calor0418` is explicitly not detection; drift is bounded to the row family)
+   and a clean negative control, plus a cost leg that does not fail (point > 1.35 **and**
+   bootstrap lower bound > 1.0 is the failure). The four values are a strict partition evaluated
+   in the precedence NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT, and a not-adjudicated route
+   caused by this workstream's own change is adjudicated MISS.
    *Freeze point:* A-1.11, before E2 merges. *Discriminating pin:* the annex append-only check
    rejects an edit to the frozen row; and dropping any one registered mutation from the ledger
    fails the exact-equality test.
@@ -719,7 +736,7 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
 | #859, #884 (Z3 CI flake) | **Still open** after 0.13 and 0.14 shipped (§5.2 previously dispositioned them to 0.13) | 0.15.x instrument debt; re-adjudicated at the 0.15.0 retro with the flake rate over the 0.15 cycle attached |
 | #970 residual (verified / heuristic / incomplete tri-state) | Shipped as the analyzers' published residual | Unchanged in 0.15; the tri-state counts are published per release |
 | `--permissive-effects` waiver under rows | Waives Calor0410/0411/0418 today | Survives as the waiver for Calor0425 (Unknown/Assumed rows) only; a row that does not fit (Calor0424) is never waived. Pinned in E4 |
-| PR #944 (§3.1 pre-registration) | Open after the spike shipped | M1 — resolved before the 0.15 PP registers (§4.3) |
+| PR #944 (§3.1 pre-registration) | **Closed** with the discrepancy noted, before the 0.15 PP registered | M1 — **done** (§4.3); the PP registered at annex A-1.11 |
 | PR #982 (§2.5 gate 7 CLI leg), #981, #976 | Open docs/CI PRs | Merged or closed in the 0.15 kickoff sweep; none gates 0.15 |
 
 ## 5. Explicitly not in these three releases — and the backlog dispositioned

@@ -102,7 +102,8 @@ After freezing, this document may be superseded only for a **documented empirica
 **Annex version: A-1.11 (additive A-1.11, 2026-08-25 — registers **PP-E1**, the 0.15 effect-rows
 fixture-scale probe: freeze event named, five spike fixtures and ten injectable mutations frozen
 with an honest-timing disclosure, a four-valued outcome with an exhaustive decidability fallback,
-and a cost-leg margin re-derived from `w5-parity-002` (null p95 1.321 → point margin 1.35,
+and a cost-leg margin re-derived from `w5-parity-002` (null p95 1.3302 → point margin 1.35 by
+the round-up-to-the-0.05-grid rule,
 conjoined with bootstrap lower bound > 1.0); with it roadmap M1 is complete and E2 may merge;
 additive A-1.10, 2026-08-25 — mechanical freeze guard, first half of the 0.15 amendment: `scripts/check-annex-freeze.py`, run by `experiment-registry-tamper-check.yml`, byte-freezes every A.2 PP row and table header and every A.3 entry against `main`, additions only, every annex change logged, the guard run from `main` not from the PR; no PP registered — the 0.15 PP row is the pending second half; additive A-1.9, 2026-08-06 — PP-W5 adjudicated PASS on epoch w5-parity-002 (w5-parity-001 VOID: both arms shared a compiler), point 1.098 recorded / 1.0016 after a metric erratum; registered as "no large tax detected", explicitly not parity and with the earlier heterogeneity claim withdrawn; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
