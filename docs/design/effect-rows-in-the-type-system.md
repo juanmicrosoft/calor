@@ -993,7 +993,7 @@ Calor0404 is not allocated, and the `eff` branch does not ship. The release note
 
 **R2 is the most likely trigger.** MediatR's `IPipelineBehavior` is *someone else's* interface: a
 Calor implementation cannot widen it, so if the only spelling that type-checks requires editing
-the interface, rank-1 rows do not compose with external interfaces. §14 Q2.
+the interface, rank-1 rows do not compose with external interfaces. §14 Q1.
 
 ---
 
@@ -1102,7 +1102,7 @@ Every row measured at `82338e37`; the command is named where it is not a plain `
 | …but `CalorEmitter.cs` **does** change | **1** | round-trip fidelity: `calor fmt` and the harness must re-emit the row (§13.2 pins parse→emit→parse per position) |
 | AST node classes | **4** | `ParameterNode` (`Ast/FunctionNode.cs:252`), `OutputNode` (`Ast/FunctionNode.cs:21`), `BindStatementNode` (`Ast/ControlFlowNodes.cs:161`), `ClassFieldNode` (`Ast/ClassNodes.cs:554`) |
 | **`eng/ast-schema.json`** | **1** | forced by `tests/Calor.Compiler.Tests/ArchitectureTests.cs:158` `AstSchema_CoversEveryNodeDispatchAndChildRelation`; **this is also the existing "zero visitor churn" pin** — Draft v1 counted 0 here |
-| Parser | **1** | `Parsing/Parser.cs`: **6** row insertion points covering all eight positions (§3.3), each also carrying the Calor0405 recovery; **1** `eff` branch in `ParseOptionalTypeParameterList` (`:7596-7639`) with its own lookahead and per-declaration-form enablement (§7.2 — `in`/`out` are *not* a working precedent, only a shape one); **+1 conditional** — a seventh insertion point in the `§CL`/`§IFACE` type-parameter lists plus scope threading into member row resolution. **Contingent on one named outcome**: it is scheduled **only if the spike PR proves the member-level `§MT{…}<eff e>` spelling cannot express R2** (§7.3, §12.1). If member-level works — which **W1a**/**W1b** make plausible, since interface and implementing-class members already carry their own type-parameter lists — this line is **zero**, because position 1 is already permitted and needs no new insertion point |
+| Parser | **1** | `Parsing/Parser.cs`: **6** row insertion points covering all eight positions (§3.3), each also carrying the Calor0405 recovery; **1** `eff` branch in `ParseOptionalTypeParameterList` (`:7596-7639`) with its own lookahead and per-declaration-form enablement (§7.2 — `in`/`out` are *not* a working precedent, only a shape one); **+0 — RESOLVED BY THE SPIKE.** The seventh insertion point (a binder in the `§CL`/`§IFACE` type-parameter lists, plus scope threading into member row resolution) was contingent on the spike proving that member-level `§MT{…}<eff e>` **cannot** express R2. It can (§12.4), so this line is **zero**: position 1 was already permitted and needed no new insertion point. `§9`'s parser cost is therefore **6 insertion points + 1 `eff` branch**, full stop |
 | Lexer / `Token.cs` | **0** | no new token kind, no `IsKeyword` change (§7.2) |
 | Effects subsystem | **10 existing + 1 new** | `ls src/Calor.Compiler/Effects/*.cs` → 10, all touched (incl. both `CrossModuleEffect*.cs`, §6.2), plus new `EffectRow.cs` |
 | Binder | **2** | `Binding/BoundTypes/BoundType.cs`, `Binding/BoundNodes.cs` |
@@ -1368,7 +1368,7 @@ on the implementation and **compiles**, because a row carries binder **indices**
 Its residual is recorded rather than closed: the interface must itself be Calor for a row to
 exist on it (§14 Q1).
 
-**Three caveats the verdict states in full and this table must not soften.**
+**Six caveats the verdict states in full and this table must not soften.**
 
 1. The prototype is **additive by construction** — every new code path is gated on a row being
    *present* — so §3.5's "row-less function-typed position ⇒ Calor0425" is **not implemented**;
@@ -1380,7 +1380,31 @@ exist on it (§14 Q1).
 3. The prototype is **throwaway** and is **not** merged. It lives on branch
    `spike/effect-rows-emitter`; `spike-verdict.json` records its commit. This PR carries the
    artifacts and no `src/` change, so **P29 stays green here** — with the prototype in the build
-   it is red on three cases, listed as E2 obligations in §13.5.
+   it is red on **seven** cases, listed as E2 obligations in §13.5.
+4. **A2's AFTER form still exits 1, and rows are not what is left.** The `Calor0418` on
+   `§C{next}` is **gone** — that is the row doing its job — but `Calor0410: Function 'Handle'
+   uses effect 'unknown' but does not declare it` remains, because `processor.Process` and
+   `Task.ConfigureAwait` do not resolve and the unknown-call channel then dominates the total.
+   That is §2.2's resolution ceiling (431 of 1248 BCL sites), which rows do not address and
+   §13.4's ledger exists to measure. G-CODEGEN is unaffected: the artifact still emits under the
+   waiver, and the emitted C# is what §12.4's table compares.
+5. **Calor0404 is allocated but under-reached.** §7.3 forbids seven positions; the prototype
+   wires Calor0404 to exactly two of them (a class/interface-level `eff` binder, and an `eff`
+   name colliding with the taxonomy). The rest — including a `§CL{…}<eff e>` written where the
+   scope is never established, and an out-of-scope `§E{e}` — come out as
+   `Calor0403: Unknown effect code 'e'`. They are still *forbidden*, so the prototype is not
+   unsound; it forbids them **incidentally**, by never binding the name, and the author is told
+   about the effect *taxonomy* for what is really a *scope* error. **E2 obligation:** make all
+   seven rejection sites report Calor0404 with the scope message, which is what P18's
+   `Rejected_*` cases assert.
+6. **Calor0421's message renders a polymorphic interface row as `[pure]`.** On
+   `after/A3-middleware-broadening.calr` the interface declares `§E{e}` and the diagnostic reads
+   *"(interface declares: `[pure]`)"*, because the message is built from
+   `EffectSet.ToDisplayString()`, which knows only the concrete part. The **verdict** is right —
+   the implementation's extra `[cw]` is correctly rejected — but the text tells the author the
+   interface promised purity when it promised *"whatever the caller's function does"*.
+   **E2 obligation:** render the row, not the set, at both variance sites. §8.3 already reserves
+   `EffectRow.ToDisplayString()` for exactly this, and **P22** is where the text is pinned.
 
 The verdict is **read off `spike-verdict.json`**, not argued from prose. The spike PR must merge
 before E2; if it does not, E2 does not merge (§0 term 1).
@@ -1395,7 +1419,7 @@ and the split is asserted rather than assumed:
 | **P28** BEFORE side | **recomputed** — `before/A1.calr` and `before/A2.calr` are re-emitted with the current compiler and diffed against the committed `before/*.g.cs` | unchanged, and it becomes A1's real question: *did the row feature move codegen for a row-less program?* |
 | **P28** before/after pair | **compared** — the committed `.g.cs` pairs are diffed under the `#line`-normalisation rule. Needs no compiler, so it is a real assertion now | unchanged |
 | **P27** shape | **asserted** — `schemaVersion`, 40-hex `measuredCommit` **and** `prototype.commit`, `prototype.throwaway`, and that every `before/…`/`after/…` path cited as evidence exists | unchanged |
-| **P27** R1 | **recorded** — the four diagnostic lists are read and asserted to contain none of Calor0404/0424/0425. `ramp.R1.recomputedBy` is `"P27 once E2 lands; recorded until then"`, and the test asserts that deferral string, so it cannot be left recorded silently | **recomputed** by compiling each A3 fixture |
+| **P27** R1 | **recorded** — the four diagnostic lists are read and asserted to contain none of Calor0404/0424/0425. `ramp.R1.recomputedBy` is `"P27 once E2 lands; recorded until then"`, and the test asserts that **exact string** (an earlier version asserted only that it contained "E2", which a joke string satisfied), so it cannot be left recorded silently | **recomputed** by compiling each A3 fixture |
 | **P27** R2, R3 | **recorded** — judgements a test cannot re-derive (§12.3) | unchanged |
 | **P31** manifest | **asserted** — every artifact's three files exist, are non-empty, and the diagnostic list's header count matches its body | unchanged |
 
@@ -1512,20 +1536,34 @@ before E2 rather than after.
 The spike PR carries **no `src/` change**, so nothing below is red today. Each item is a
 commitment E2 inherits, stated here so it cannot be discovered late.
 
-**(a) Exactly three transcript regenerations, and no others.** With the prototype in the build
-`ExperimentTranscripts_MatchARerun` (**P29**) is red on three cases and only three. They were
-**recorded, not regenerated** — the transcripts are E2's frozen evidence base and a throwaway
-prototype does not rewrite them.
+**(a) Exactly SEVEN transcript regenerations, and no others.** With the prototype in the build
+`ExperimentTranscripts_MatchARerun` (**P29**) is red on seven cases across three scripts;
+`run2.py`, `facts2.py` and `compile53.py` are clean. They were **recorded, not regenerated** —
+the transcripts are E2's frozen evidence base and a throwaway prototype does not rewrite them.
 
-| Script / case | Committed | With rows | Why |
-|---|---|---|---|
-| `run.py` **X6a** (`§F{…}<T, U, eff e>`) | `Calor0100: Expected Greater but found Identifier` | parses; the case's own `§E{}` then under-declares `alloc` → `Calor0410` | **Intended.** X6a exists to show `eff e` is new syntax *today*; E2 is what makes it parse. E2 must **re-author** X6a into a positive case, not merely regenerate it |
-| `run3.py` **Z1** (`§FLD{i32:x:pri}` ⏎ `§E{cw}`) | four `Calor0100` cascade lines | one `Calor0405` | **Intended** — §3.1's row-aware recovery. The 4→1 collapse is exactly the claim **P2(b)** makes |
-| `facts.py` line 6 | `Ast/FunctionNode.cs:252` | `Ast/FunctionNode.cs:283` | **Unavoidable.** `facts.py` pins `file:line` structural facts; adding `ParameterNode.Row` moves the line |
+| # | Script / case | Committed | With rows | Why |
+|---|---|---|---|---|
+| 1 | `run.py` **X6a** (`§F{…}<T, U, eff e>`) | exit 1; a **14-line** `Calor0100`/`Calor0114` cascade from `Expected Greater but found Identifier` | the type-parameter list parses; the case's own `§E{}` then under-declares its body → one `Calor0410 … uses effect 'alloc'` | **Intended.** X6a exists to show `eff e` is new syntax *today* (§7.2). E2 must **re-author** it as a positive case, not merely regenerate it |
+| 2 | `run.py` **X9b** (`§FLD{Action<i32>:onChange:pri} §E{cw}`) | exit 1; **4×** `Calor0100 … but found Effects` | **exit 0**, `Compilation successful` | **Intended** — **position 8** doing what §3.3 promises. X9b is the case §14.1 cites to disprove Draft v1's claim that `§FLD` already parsed a row; once position 8 lands it *must* compile |
+| 3 | `run.py` **X9c** (`(Func<i32,i32>:transform §E{cw}, i32:value)`) | exit 1; **12×** `Calor0100` from `Expected CloseParen but found Effects` | **exit 0**, `Compilation successful` | **Intended** — **position 5**, §3.3. Same disposition as X9b |
+| 4 | `run3.py` **Z1** (`§FLD{i32:x:pri}` ⏎ `§E{cw}`) | **4×** `Calor0100` cascade | one `Calor0405` naming the `x` field line | **Intended** — §3.1's row-aware recovery. The 4→1 collapse is exactly the claim **P2(b)** makes |
+| 5 | `run3.py` **Z3** (wrapped inline signature) | **8×** `Calor0100` through the rest of the signature and body | one `Calor0405` naming the `transform` parameter line | **Intended**, and the strongest Calor0405 case: §3.1 calls Z3 *not hypothetical* because **Z5** shows wrapped parameter lists really are written. 8→1 |
+| 6 | `facts.py` line 6 | `Ast/FunctionNode.cs:252` | `Ast/FunctionNode.cs:283` | **Unavoidable.** `facts.py` pins `file:line` structural facts; adding `ParameterNode.Row` moves the line, and any E2 implementation moves it too |
+| 7 | `facts.py` — the `IsSubsetOf` compatibility-site sweep | `EffectEnforcementPass.cs:533` and `:571` are listed | both **vanish**; five `EffectSet.cs` lines appear instead | **Intended, and it is R2's own evidence moving a pinned fact.** §6.3 says those two calls "become calls to the shared `EffectRow.Fits`"; this sweep is the instrument that observes it, so when the claim comes true the transcript *must* change |
 
 **If E2's regeneration moves any other line, that is a behaviour change the spike did not make,
 and it needs its own justification in the E2 PR body.** `spike-verdict.json`'s
-`transcriptDivergences.e2Obligation` carries the same sentence in machine-readable form.
+`transcriptDivergences.e2Obligation` carries the same sentence in machine-readable form, and
+P27 asserts that the case list holds exactly seven rows.
+
+> **How the count was wrong the first time, and why that matters.** The spike PR first recorded
+> **three**. They had been read off P29's failure message, which prints the **first** difference
+> per script and hides the rest — so three scripts drifting looked like three cases. Review
+> round 1 caught it by diffing every script in full. The correction is recorded rather than
+> quietly applied because it is the same failure mode §1's evidence discipline exists for: a
+> number taken from a summary instead of from the measurement. Both `facts.py` rows in
+> particular were invisible that way, and row 7 is **the spike's own headline claim** moving a
+> fact the harness pins.
 
 **(b) Spike artifacts are not corpus.** Committing `.calr` fixtures under
 `docs/design/spikes/` collided with **three** frozen instruments that enumerate `.calr`
@@ -1545,10 +1583,29 @@ untrimmed code in `Calor0403`.
 
 ## 14. Open questions
 
-1. **Does §7.5's R2 have a usable spelling for a foreign interface?** MediatR's
-   `IPipelineBehavior` is someone else's; a Calor implementation cannot widen it. If the only
-   type-checking spelling requires editing the interface, rank-1 rows do not compose with external
-   interfaces. *Evidence needed:* A2's spike output. **Most likely ramp trigger.**
+1. **Does §7.5's R2 have a usable spelling for a foreign interface?** — **ANSWERED IN PART BY
+   THE SPIKE. The ramp did not fire.** This was named *"most likely ramp trigger"*; A2's spike
+   output is now in, and the honest reading is narrower than either a pass or a fail.
+
+   **What is settled.** When the interface **is** Calor, the member-level spelling works and
+   needs no carve-out: `after/A3-middleware.calr` and `after/A2.calr` are accepted,
+   `after/A3-middleware-broadening.calr` and `after/A2-broadening.calr` are rejected as
+   Calor0421 by the ordinary `fits` relation, and `after/A3-middleware-alpha.calr` shows the
+   interface's `eff e` and the implementation's `eff f` are identified — rows carry binder
+   **indices**, not names. Crucially, a Calor implementation **does not have to widen** the
+   interface: it declares the *same* variable, so `IPipelineBehavior` is left alone. That is the
+   part of the question that read "requires editing the interface", and the answer is **no**.
+
+   **What is not settled, and is now the sharper question.** A2's `IPipelineBehavior` is
+   *converted* Calor, not the C# assembly. For an interface that stays **C#-declared** there is
+   no row on the interface member at all, so there is nothing for the implementation's row to be
+   checked *against*: §6.2 site 5 routes to the assumed/unknown channel, exactly as it does for
+   an external base today (`EEP:596-611`). Rank-1 rows compose with a *Calor* interface; whether
+   they compose with a *metadata* one is a **manifest** question — can an effect manifest carry a
+   row on an interface member? — and §8.4 explicitly gives the 0.15 manifest schema **no**
+   row-on-return field. *Evidence needed:* the §13.4 Calor0425 corpus ledger, which counts how
+   often this actually bites on converted code. **No longer a ramp trigger; it is a scope
+   boundary, and it is E2's to state in the release notes.**
 2. **Is `eff` safe against a type parameter literally named `eff`?** Half executed: **Z4** shows
    `§F{f001:M:pub}<eff> (eff:x) -> void` compiles **today**, so the compatibility obligation is
    real and measured. What cannot be executed is the *other* half — that §7.2's one-token
@@ -1829,3 +1886,26 @@ and a C#-declared interface still has no row to check against.
 **Bar for a further review round.** Unchanged: APPROVE from the evidence and consistency lenses.
 The spike PR's own diff is where R2 and R3 are reviewed, because §12.3 says plainly that a test
 cannot re-derive them.
+
+#### Round 4, review 1 — adversarial review of the spike PR
+
+**NEEDS-FIXES (80%).** The verdict itself was **EARNED**: the reviewer recomputed all 29
+artifacts byte-exact from the prototype commit, and G-CODEGEN (modulo `#line`), R1, R2, R3 and
+R3's counter-example all reproduced, with the spike's own caveats holding. Every finding below
+is therefore a **correctness-of-record** fix, not a re-adjudication. Twelve findings, **12
+applied, 0 declined.**
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| 1 | **Critical** | **Seven transcript divergences, not three.** Unrecorded: `run.py` X9b and X9c (both go from a Calor0100 cascade to a clean compile — positions 8 and 5 doing what §3.3 promises), `run3.py` Z3 (8× Calor0100 → 1× Calor0405), and `facts.py`'s `IsSubsetOf` sweep (`EEP:533`/`:571` vanish, five `EffectSet.cs` lines appear) | **applied** — §13.5(a) is a seven-row table; the JSON carries all seven with verdicts; "exactly these three" → **SEVEN** everywhere; **P27 asserts the count and the case list agree**. The root cause is recorded in-line: the first record was read off P29's failure message, which prints the *first* difference per script and hides the rest. Confirmed by diffing all six scripts in full — `run2.py`, `facts2.py`, `compile53.py` are clean. **Row 7 is the spike's own headline claim moving a fact the harness pins**, which is exactly the kind of thing that must not be discovered by E2 |
+| 2 | Major | `spike_artifacts.py` still wrote `.g.cs` after the guard rename, so it emitted untracked files beside the committed `.txt`, never refreshed the evidence, and mis-targeted its stale-file `os.remove` — while P31's failure message told the reader to run it | **applied** — the generator writes `.g.cs.txt`; re-run against the prototype it regenerates **all 29 committed files byte-identically** and leaves nothing untracked. A `.gitignore` at the spike root now ignores the bare `before/*.g.cs`/`after/*.g.cs` form so a stale copy can never commit one — which also protects the Calor-first guard |
+| 3 | Major | `gCodegen.A2.diffBytes: 0` while 7 bytes differ — the field was a **length** delta, and no test read it (A1 passed with `99999`) | **applied** — split into `strictDiffBytes` (A2 = **7**, `cmp -l`) and `nonLineDirectiveDiffBytes` (0), **both asserted by P27 for every artifact**. Verified discriminating: mutating A2's value to 0 turns P27 red |
+| 4 | Major | §14 Q1 was untouched though the PR body claimed it was narrowed | **applied** — Q1 rewritten to record the outcome: the ramp did not fire; a Calor implementation does **not** have to widen the interface, because it declares the *same* variable; the residual is a **C#-declared** interface, which has no row to check against, making it a manifest question (§8.4 gives the 0.15 schema no such field). No longer a ramp trigger — a scope boundary, and E2's to put in the release notes |
+| 5 | Major | `ramp.R1.claim` dropped §7.5's precondition *"when every participating row is concrete and every callee resolves"* | **applied** — restored verbatim, with a note on why it matters (it is what makes R1 a claim about the four combinators rather than about the resolution ceiling) and why every A3 fixture satisfies it. **P27 asserts the clause is present** |
+| 6 | Minor | P27 asserted only `Contains("E2")` on the deferral string — a joke string passed | **applied** — asserts the **exact** string; §12.5 says so |
+| 7 | Minor | P31 did not cover the after-only fixtures, so `A3-middleware-alpha.g.cs.txt` could be deleted with every test green | **applied** — P31 covers all three, **and** asserts that `A3-middleware-broadening` does **not** emit, because being rejected is its evidence |
+| 8 | Minor | A2's deviations omitted the dropped `where TRequest : notnull` and the three XML doc-comment blocks | **applied** — both added, with the reason: this artifact is `calor convert`'s output recorded as-is, and hand-editing it back would make it *less* faithful |
+| 9 | Minor | The prototype routes `§CL{…}<eff e>` and an unbound `§E{e}` to **Calor0403**, not Calor0404 | **applied** — §12.4 caveat 5. Both are still forbidden, so it is not unsound; the prototype forbids them *incidentally* and reports a **taxonomy** error for a **scope** defect. E2 obligation: all seven §7.3 sites report Calor0404, which is what P18 asserts |
+| 10 | Minor | Calor0421 prints *"interface declares: `[pure]`"* for an interface declaring `{e}` | **applied** — §12.4 caveat 6. The verdict is right, the text is not: the message is built from `EffectSet.ToDisplayString()`, which knows only the concrete part. E2 obligation: render the **row** at both variance sites — §8.3 already reserves `EffectRow.ToDisplayString()` and **P22** pins the text |
+| 11 | Minor | §9's parser row still said "+1 conditional … only if the spike PR proves"; §7.5 cross-referenced "§14 Q2" | **applied** — the row resolves to **+0**, so §9's parser cost is **6 insertion points + 1 `eff` branch**; the cross-reference is now **Q1** |
+| 12 | Minor | Nothing said A2's AFTER form still exits 1 | **applied** — §12.4 caveat 4: the row **removes** the Calor0418 on `§C{next}`, and the residual `Calor0410 … effect 'unknown'` is §2.2's resolution ceiling, which rows do not address |
