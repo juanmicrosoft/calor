@@ -43,7 +43,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HELPERS="$SCRIPT_DIR/bundle-helpers.py"
 # #881: the ONE derivation of the cost-leg token figure (shared with run-pair.sh).
-TOKEN_USAGE="$SCRIPT_DIR/token-usage.py"
+# shellcheck source=token-usage.sh
+source "$SCRIPT_DIR/token-usage.sh"
 
 MAX_INVALID_RETRIES=2
 INVALID_MARKERS=("hit your session limit" "rate limit" "overloaded" "api error")
@@ -488,16 +489,14 @@ extract_metrics() {
     # top-level usage.output_tokens covers only the final turn and under-counts
     # up to 55x on subagent-delegating / compaction-resumed runs; the helper
     # sums modelUsage[*] instead and reports both figures for audit.
-    local cost=0 tin=0 tout=0 token_usage='{}'
+    local cost=0 tin=0 tout=0 token_usage='{"source":"missing"}'
     if [[ -f "$ws_out/agent.json" ]] && jq -e . "$ws_out/agent.json" >/dev/null 2>&1; then
         cost=$(jq -s 'map(.total_cost_usd // 0) | add // 0' "$ws_out/agent.json" 2>/dev/null || echo 0)
-        token_usage=$(python3 "$TOKEN_USAGE" "$ws_out/agent.json" 2>/dev/null || echo '{}')
-        tin=$(jq -r '.input_tokens_corrected // 0' <<<"$token_usage")
-        tout=$(jq -r '.output_tokens_corrected // 0' <<<"$token_usage")
-        if [[ "$(jq -r '.undercount_flagged // false' <<<"$token_usage")" == "true" ]]; then
-            echo "WARN (#881): agent.json usage.output_tokens=$(jq -r '.output_tokens_naive' <<<"$token_usage") under-counts; modelUsage total=$tout (origin=$(jq -r '.origin_kind // "none"' <<<"$token_usage")). Recording the corrected figure." >&2
-        fi
     fi
+    # token-usage.sh gates on file presence only and lets the helper decide;
+    # a helper failure falls back to the naive read, never a silent 0.
+    token_usage_collect "$ws_out/agent.json" "$BUNDLE_ID/$ARM_LABEL/run-$run_idx"
+    tin=$TOKENS_IN; tout=$TOKENS_OUT; token_usage=$TOKEN_USAGE_JSON
 
     jq -n \
         --arg bundle "$BUNDLE_ID" --arg project "$PROJECT" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
@@ -532,7 +531,8 @@ write_invalid_result() {
         '{bundle:$bundle, project:$project, arm:$arm, run:$run, outcome:"invalid",
           finalBuildOk:false, heldoutFail:$escaped, escapedBugs:$escaped,
           iterations:0, iterationsToDeclaredDone:0,
-          costUsd:0, tokens:{input:0, output:0}, wallClockSeconds:0,
+          costUsd:0, tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
+          wallClockSeconds:0,
           invalid:true, nullAgent:($null_agent==1), nullAgentNoop:($noop==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
