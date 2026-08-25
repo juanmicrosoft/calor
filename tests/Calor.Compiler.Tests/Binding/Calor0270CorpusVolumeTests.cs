@@ -100,7 +100,7 @@ public class Calor0270CorpusVolumeTests
         var regenerate = string.Equals(
             Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0270_LEDGER"),
             "1", StringComparison.Ordinal);
-        if (regenerate || !File.Exists(ledgerPath))
+        if (regenerate)
         {
             File.WriteAllText(ledgerPath, JsonSerializer.Serialize(
                 measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
@@ -108,6 +108,9 @@ public class Calor0270CorpusVolumeTests
             return;
         }
 
+        // A missing ledger is a failure, never a silent regeneration (R2-A).
+        Assert.True(File.Exists(ledgerPath),
+            $"Calor0270 corpus ledger missing at {ledgerPath} — run once with CALOR_REGENERATE_CALOR0270_LEDGER=1");
         var committed = JsonSerializer.Deserialize<Ledger>(File.ReadAllText(ledgerPath))!;
 
         // Anti-vacuity: a ledger that measured nothing would pass every equality

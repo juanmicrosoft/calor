@@ -246,8 +246,7 @@ public class BoundTypeArchitectureTests
 
         if (string.Equals(
                 Environment.GetEnvironmentVariable("CALOR_REGENERATE_DISPLAYSTRING_GOLDEN"),
-                "1", StringComparison.Ordinal)
-            || !File.Exists(goldenPath))
+                "1", StringComparison.Ordinal))
         {
             File.WriteAllText(goldenPath, System.Text.Json.JsonSerializer.Serialize(
                 histogram, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n");
@@ -255,6 +254,10 @@ public class BoundTypeArchitectureTests
             return;
         }
 
+        // A missing golden is a failure, never a silent regeneration (R2-A: the
+        // BinderIncompleteRatchetTests pattern). Regenerate only via the env var.
+        Assert.True(File.Exists(goldenPath),
+            $"DisplayString corpus golden missing at {goldenPath} — run once with CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1");
         var golden = System.Text.Json.JsonSerializer
             .Deserialize<SortedDictionary<string, int>>(File.ReadAllText(goldenPath))!;
 
