@@ -171,10 +171,18 @@ public sealed class BoundVariableExpression : BoundExpression
         ResolvedSymbols.Select(symbol => symbol.Id).ToArray();
     public override BoundType Type { get; }
 
+    /// <param name="typeOverride">v0.15 E1 slice 2a. When the binder knows the
+    /// symbol's type string is not a type it can vouch for — today only the
+    /// <c>OBJECT</c> inference fallback on an inferred local used as a call
+    /// receiver — it stamps an <see cref="UnresolvedBoundType"/> here instead of
+    /// letting the symbol string through as a nominal type. Null (the default)
+    /// keeps the historical computation byte-for-byte, so every pre-existing
+    /// construction of this node keeps its exact <see cref="BoundType.DisplayString"/>.</param>
     public BoundVariableExpression(
         TextSpan span,
         VariableSymbol variable,
-        IReadOnlyList<VariableSymbol>? resolvedSymbols = null)
+        IReadOnlyList<VariableSymbol>? resolvedSymbols = null,
+        BoundType? typeOverride = null)
         : base(span)
     {
         Variable = variable;
@@ -196,9 +204,10 @@ public sealed class BoundVariableExpression : BoundExpression
         // (resolvedTypes.Length > 1, falling through to "OBJECT"), also
         // stay Oblivious since the declared annotation no longer maps to
         // a single ground type.
-        Type = resolvedTypes.Length == 1
-            ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
-            : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
+        Type = typeOverride
+            ?? (resolvedTypes.Length == 1
+                ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
+                : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious));
     }
 
     // S3 scope (§D6): flow the STRING annotation only. Handles both the
@@ -345,6 +354,8 @@ public sealed class BoundCallStatement : BoundStatement
     public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
     public TypeSymbol? ReceiverTypeSymbol { get; }
     public SymbolId? ReceiverTypeSymbolId => ReceiverTypeSymbol?.Id;
+    /// <inheritdoc cref="BoundCallExpression.Receiver"/>
+    public BoundExpression? Receiver { get; }
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
@@ -375,7 +386,8 @@ public sealed class BoundCallStatement : BoundStatement
         TypeSymbol? receiverTypeSymbol = null,
         string? resolvedTypeName = null,
         string? resolvedMethodName = null,
-        IReadOnlyList<string>? resolvedParameterTypes = null)
+        IReadOnlyList<string>? resolvedParameterTypes = null,
+        BoundExpression? receiver = null)
         : base(span)
     {
         Target = target;
@@ -388,6 +400,7 @@ public sealed class BoundCallStatement : BoundStatement
         TypeArguments = typeArguments;
         ReceiverSymbol = receiverSymbol;
         ReceiverTypeSymbol = receiverTypeSymbol;
+        Receiver = receiver;
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
         IsInaccessibleCall = isInaccessibleCall;
@@ -738,6 +751,35 @@ public class BoundCallExpression : BoundExpression
     public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
     public TypeSymbol? ReceiverTypeSymbol { get; }
     public SymbolId? ReceiverTypeSymbolId => ReceiverTypeSymbol?.Id;
+
+    /// <summary>
+    /// v0.15 E1 slice 2a — the bound receiver of a dotted call, as a real
+    /// <see cref="BoundExpression"/> carrying a real <see cref="BoundType"/>.
+    /// Four shapes, and no fifth:
+    /// <list type="bullet">
+    /// <item><c>x.M</c>, <c>x</c> a bound local/parameter/field →
+    /// <see cref="BoundVariableExpression"/>. Its <c>Type</c> is the symbol's,
+    /// except that the binder's <c>OBJECT</c> inference fallback on an inferred
+    /// local becomes <see cref="UnresolvedBoundType"/>.</item>
+    /// <item><c>a.b.M</c> → a <see cref="BoundFieldAccessExpression"/> chain over
+    /// the bound head, typed <see cref="UnresolvedBoundType"/> because the binder
+    /// does not type members of the head today.</item>
+    /// <item><c>System.Console.M</c>, <c>OrderRepo.M</c> →
+    /// <see cref="BoundTypeReferenceExpression"/>.</item>
+    /// <item>anything else — a bare call, or a dotted head that is neither bound
+    /// nor written as a type reference (<c>foo.Bar</c>, <c>this.sb.Append</c>) →
+    /// <c>null</c>. Null means "the binder has nothing to say", never
+    /// "no receiver exists".</item>
+    /// </list>
+    ///
+    /// <para>Deliberately NOT part of <see cref="Children"/>/<c>ChildNodes</c>:
+    /// it is a side-band view of the receiver, like <see cref="ReceiverSymbol"/>
+    /// and <see cref="ReceiverSpan"/> already are. Putting it in the child
+    /// enumeration would change every existing bound-tree walk (dataflow, taint,
+    /// nullability, the effect collector's own <c>Descendants</c>), which this
+    /// slice does not do.</para>
+    /// </summary>
+    public BoundExpression? Receiver { get; }
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
@@ -788,7 +830,8 @@ public class BoundCallExpression : BoundExpression
         TextSpan? receiverSpan = null,
         bool isInaccessibleCall = false,
         TypeSymbol? receiverTypeSymbol = null,
-        BoundType? annotatedReturnType = null)
+        BoundType? annotatedReturnType = null,
+        BoundExpression? receiver = null)
         : base(span)
     {
         Target = target;
@@ -813,6 +856,7 @@ public class BoundCallExpression : BoundExpression
         TypeArguments = typeArguments;
         ReceiverSymbol = receiverSymbol;
         ReceiverTypeSymbol = receiverTypeSymbol;
+        Receiver = receiver;
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
         IsInaccessibleCall = isInaccessibleCall;
@@ -1678,17 +1722,56 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         string typeName,
         VariableSymbol? resolvedField = null,
         TextSpan? fieldNameSpan = null,
-        IReadOnlyList<VariableSymbol>? resolvedFields = null)
+        IReadOnlyList<VariableSymbol>? resolvedFields = null,
+        BoundType? resolvedType = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
         FieldNameSpan = fieldNameSpan ?? span;
-        Type = new NominalBoundType(typeName ?? "OBJECT");
+        // v0.15 E1 slice 2a: resolvedType lets the binder say "I cannot type this
+        // member" with an UnresolvedBoundType instead of the OBJECT guess. Null
+        // (the default) keeps every pre-existing construction byte-identical.
+        Type = resolvedType ?? new NominalBoundType(typeName ?? "OBJECT");
         ResolvedField = resolvedField;
         ResolvedFields = resolvedFields
             ?? (resolvedField == null ? Array.Empty<VariableSymbol>() : [resolvedField]);
         Children = [target];
+    }
+}
+
+/// <summary>
+/// v0.15 E1 slice 2a — a receiver written as a *type*, not a value:
+/// <c>System.Console.WriteLine</c>, <c>OrderRepo.Create</c>. It exists so
+/// <see cref="BoundCallStatement.Receiver"/> / <see cref="BoundCallExpression.Receiver"/>
+/// can be a real <see cref="BoundExpression"/> for every dotted shape the binder
+/// vouches for, instead of consumers re-deriving the distinction from
+/// <c>ReceiverTypeSymbol</c> / <c>ResolvedTypeName</c> strings.
+///
+/// <para><see cref="Type"/> is the receiver *type itself* (there is no value of
+/// that type here), or an <see cref="UnresolvedBoundType"/> when the binder could
+/// not name it. <see cref="BoundType.FullyQualifiedName"/> is the identity
+/// downstream analyses key on — deliberately not re-normalized, so it is
+/// exactly the name the binder assigned.</para>
+/// </summary>
+public sealed class BoundTypeReferenceExpression : BoundExpression
+{
+    /// <summary>The receiver exactly as written in source (<c>System.IO.File</c>).</summary>
+    public string Name { get; }
+    public TypeSymbol? ResolvedType { get; }
+    public SymbolId? ResolvedTypeSymbolId => ResolvedType?.Id;
+    public override BoundType Type { get; }
+
+    public BoundTypeReferenceExpression(
+        TextSpan span,
+        string name,
+        BoundType type,
+        TypeSymbol? resolvedType = null)
+        : base(span)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Type = type ?? throw new ArgumentNullException(nameof(type));
+        ResolvedType = resolvedType;
     }
 }
 
