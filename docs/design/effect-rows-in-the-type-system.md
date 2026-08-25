@@ -1090,7 +1090,7 @@ resolved receivers are Calor-side, not new `MetadataBinder` resolutions.
   that the branch is unobservable, which is the inference round 1 got wrong.
 
   **Slice-2c debt.** `ResolveVariableType` guards `declared == "?"`; the other
-  `ResolveLocalValueType` call sites do not. Adding that guard keeps every suite green (measured)
+  `ResolveLocalValueType` call sites do not. Adding that guard kept every pre-existing suite green (measured before the control existed)
   but **subsumes** the veto — the pin above then passes with the branch deleted, because the guard
   and the veto answer the same question at two layers. Unifying them is a deliberate slice-2c
   change, not a drive-by that silently un-pins the test.

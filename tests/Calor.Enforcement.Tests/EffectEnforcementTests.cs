@@ -1112,7 +1112,7 @@ public class EffectEnforcementTests
     ///
     /// <para>This also records why the <c>"?"</c> sentinel is NOT guarded at
     /// this call site the way <c>ResolveVariableType</c> guards it (round 2,
-    /// item 4). Adding <c>valueType != "?"</c> keeps every suite green —
+    /// item 4). Adding <c>valueType != "?"</c> kept every pre-existing suite green —
     /// measured — but it turns this control into Calor0411 as well, and with it
     /// the veto's only observable path disappears: the pin above then passes
     /// with the veto deleted. The sentinel guard and the veto answer the same

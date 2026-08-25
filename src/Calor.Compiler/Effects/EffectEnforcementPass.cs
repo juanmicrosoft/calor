@@ -1690,7 +1690,7 @@ public sealed class EffectEnforcementPass
             //
             // ResolveVariableType guards `declared == "?"`; the other
             // ResolveLocalValueType call sites do not. Adding that guard here
-            // keeps every suite green but SUBSUMES this branch — the pin above
+            // kept every pre-existing suite green but SUBSUMES this branch — the pin above
             // then passes with the branch deleted, because both answer the same
             // question at different layers. Unifying them is slice-2c work, not
             // a drive-by. Recorded as debt in design doc §8.1.
