@@ -124,42 +124,60 @@ public class BoundTypeArchitectureTests
     }
 
     /// <summary>
-    /// v0.14 §S2 cache-invariance smoke — the shim (<c>Type.DisplayString</c>
-    /// wraps <c>TypeName</c>) preserves the byte-identical string that
-    /// verifier caches and effect-resolver dictionaries key on. Assert this
-    /// on a representative sampler that covers the primitive/nominal common
-    /// cases.
+    /// Cache-invariance pin — <c>Type.DisplayString</c> is the string that
+    /// verifier caches and effect-resolver dictionaries key on, so it must not
+    /// drift silently. Each sampler entry names the exact expected string.
+    ///
+    /// <para>Until v0.15 E1 slice 2a this compared <c>DisplayString</c> to
+    /// itself: the assertion was written against the removed <c>TypeName</c>
+    /// shim, and the F-5 shim deletion rewrote both sides of the comparison
+    /// into the same expression, leaving a tautology that could not fail.
+    /// The expected strings below are the committed golden that replaces it.</para>
     /// </summary>
     [Fact]
     public void BoundExpressionType_DisplayString_ByteIdenticalToTypeName_OnCommonSampler()
     {
-        var sampler = new BoundExpression[]
+        var span = new TextSpan(0, 0, 0, 0);
+        var sampler = new (BoundExpression Expression, string ExpectedDisplayString)[]
         {
-            new BoundBoolLiteral(new TextSpan(0, 0, 0, 0), true),
-            new BoundIntLiteral(new TextSpan(0, 0, 0, 0), 42),
-            new BoundStringLiteral(new TextSpan(0, 0, 0, 0), "hello", isMultiline: false, isUtf8: false),
-            // UTF-8 branch: TypeName is "ReadOnlySpan<BYTE>" per BoundNodes.cs:479 —
-            // the load-bearing non-primitive shim case (contains generic-angle
-            // brackets that a naive normalization might trim).
-            new BoundStringLiteral(new TextSpan(0, 0, 0, 0), "hello", isMultiline: false, isUtf8: true),
-            new BoundDecimalLiteral(new TextSpan(0, 0, 0, 0), 1.5m),
-            new BoundNoneLiteral(new TextSpan(0, 0, 0, 0)),
+            (new BoundBoolLiteral(span, true), "BOOL"),
+            (new BoundIntLiteral(span, 42), "INT"),
+            (new BoundStringLiteral(span, "hello", isMultiline: false, isUtf8: false), "STRING"),
+            // UTF-8 branch: the load-bearing non-primitive case — generic-angle
+            // brackets that a naive normalization might trim.
+            (new BoundStringLiteral(span, "hello", isMultiline: false, isUtf8: true),
+                "ReadOnlySpan<BYTE>"),
+            (new BoundDecimalLiteral(span, 1.5m), "DECIMAL"),
+            (new BoundNoneLiteral(span), "NONE"),
         };
 
-        foreach (var expr in sampler)
+        foreach (var (expression, expected) in sampler)
         {
-            Assert.Equal(expr.Type.DisplayString, expr.Type.DisplayString);
+            Assert.Equal(expected, expression.Type.DisplayString);
         }
     }
 
     /// <summary>
-    /// V-1 gap #25 fix — §S2 R7 corpus cache-invariance. Binds every Calor
-    /// source file under <c>samples/</c> and <c>benchmarks/</c> and asserts
-    /// <c>Type.DisplayString == TypeName</c> for every bound expression in
-    /// every module. This is what makes the S2 shim's byte-identity claim
-    /// actually verified: if any subclass's Type override ever diverges
-    /// from TypeName's string, the verifier cache silently invalidates —
-    /// this test catches that first.
+    /// V-1 gap #25 — corpus cache-invariance. Binds every Calor source file
+    /// under <c>samples/</c> and <c>benchmarks/</c> and compares the resulting
+    /// <c>DisplayString</c> distribution — every distinct
+    /// (bound-node type, DisplayString) pair with its count — against a
+    /// committed golden. If any node's <c>Type</c> ever starts producing a
+    /// different string, the verifier cache and the effect resolver's
+    /// dictionaries silently invalidate; this is what catches that first.
+    ///
+    /// <para>Until v0.15 E1 slice 2a this asserted
+    /// <c>DisplayString == DisplayString</c>. It was written against the
+    /// <c>TypeName</c> shim, and the F-5 shim deletion rewrote both sides into
+    /// the same expression — leaving a corpus walk that bound hundreds of
+    /// modules and could not fail. v0.15 E1 slice 2a's scope limitation
+    /// (<c>UnresolvedBoundType</c> confined to receiver positions, so no
+    /// existing expression's <c>DisplayString</c> moves) rests on this pin, so
+    /// the pin had to become real before the limitation could be claimed.</para>
+    ///
+    /// <para>Regenerate: <c>CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1 dotnet test
+    /// --filter AcrossCalorSourceCorpus</c>. A moved row is a decision — record
+    /// what moved and why in the PR that regenerates it.</para>
     /// </summary>
     [Fact]
     public void BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus()
@@ -178,7 +196,7 @@ public class BoundTypeArchitectureTests
 
         Assert.NotEmpty(files);
 
-        var mismatches = new List<string>();
+        var histogram = new SortedDictionary<string, int>(StringComparer.Ordinal);
         var modulesBound = 0;
         var expressionsChecked = 0;
 
@@ -202,15 +220,9 @@ public class BoundTypeArchitectureTests
                 foreach (var boundExpr in EnumerateBoundExpressions(boundModule))
                 {
                     expressionsChecked++;
-                    if (!string.Equals(boundExpr.Type.DisplayString, boundExpr.Type.DisplayString, StringComparison.Ordinal))
-                    {
-                        mismatches.Add(
-                            $"{file}: {boundExpr.GetType().Name} TypeName='{boundExpr.Type.DisplayString}' " +
-                            $"Type.DisplayString='{boundExpr.Type.DisplayString}'");
-                        if (mismatches.Count > 20) break;
-                    }
+                    var key = $"{boundExpr.GetType().Name}|{boundExpr.Type.DisplayString}";
+                    histogram[key] = histogram.GetValueOrDefault(key) + 1;
                 }
-                if (mismatches.Count > 20) break;
             }
             catch (Exception)
             {
@@ -221,11 +233,48 @@ public class BoundTypeArchitectureTests
             }
         }
 
+        // Anti-vacuity: without a real denominator every comparison below passes.
         Assert.True(modulesBound > 0,
             $"No .calr modules bound cleanly. Corpus roots: {string.Join(", ", corpusRoots)}");
-        Assert.True(expressionsChecked > 0,
-            "No bound expressions checked; corpus binding produced empty trees.");
-        Assert.Empty(mismatches);
+        Assert.True(expressionsChecked > 400,
+            $"Only {expressionsChecked} bound expressions checked; the corpus denominator "
+            + "collapsed, so the golden comparison would be vacuous.");
+
+        var goldenPath = Path.Combine(
+            repoRoot, "tests", "TestData", "BoundTypes", "displaystring-corpus-golden.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(goldenPath)!);
+
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("CALOR_REGENERATE_DISPLAYSTRING_GOLDEN"),
+                "1", StringComparison.Ordinal))
+        {
+            File.WriteAllText(goldenPath, System.Text.Json.JsonSerializer.Serialize(
+                histogram, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n");
+            Console.WriteLine($"DisplayString corpus golden regenerated: {goldenPath}");
+            return;
+        }
+
+        // A missing golden is a failure, never a silent regeneration (R2-A: the
+        // BinderIncompleteRatchetTests pattern). Regenerate only via the env var.
+        Assert.True(File.Exists(goldenPath),
+            $"DisplayString corpus golden missing at {goldenPath} — run once with CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1");
+        var golden = System.Text.Json.JsonSerializer
+            .Deserialize<SortedDictionary<string, int>>(File.ReadAllText(goldenPath))!;
+
+        var drifted = new List<string>();
+        foreach (var key in golden.Keys.Union(histogram.Keys).OrderBy(k => k, StringComparer.Ordinal))
+        {
+            var expected = golden.GetValueOrDefault(key);
+            var actual = histogram.GetValueOrDefault(key);
+            if (expected != actual)
+                drifted.Add($"{key}: golden {expected}, measured {actual}");
+        }
+
+        Assert.True(drifted.Count == 0,
+            "Bound-expression DisplayString distribution drifted over the committed corpus — "
+            + "the verifier cache and the effect resolver key on these exact strings. "
+            + "Regenerate with CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1 in the PR that moves them, "
+            + "naming what moved:\n  " + string.Join("\n  ", drifted.Take(25)));
     }
 
     private static IEnumerable<BoundExpression> EnumerateBoundExpressions(BoundNode node)

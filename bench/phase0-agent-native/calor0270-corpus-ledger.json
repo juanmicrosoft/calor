@@ -1,0 +1,29 @@
+{
+  "Scope": "Calor0270 (SignatureUnresolved) emitted by Binder.Bind over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols; modules that fail conversion or whose converted output fails to parse are excluded from the denominator and counted separately",
+  "AggregateDiagnostics": 193,
+  "AggregateModulesWithDiagnostics": 38,
+  "AggregateModulesBound": 305,
+  "PerSubject": [
+    {
+      "Subject": "MediatR",
+      "Diagnostics": 11,
+      "ModulesWithDiagnostics": 4,
+      "ModulesBound": 33,
+      "ModulesNotMeasured": 3
+    },
+    {
+      "Subject": "serilog",
+      "Diagnostics": 18,
+      "ModulesWithDiagnostics": 7,
+      "ModulesBound": 104,
+      "ModulesNotMeasured": 8
+    },
+    {
+      "Subject": "FluentValidation",
+      "Diagnostics": 164,
+      "ModulesWithDiagnostics": 27,
+      "ModulesBound": 168,
+      "ModulesNotMeasured": 48
+    }
+  ]
+}

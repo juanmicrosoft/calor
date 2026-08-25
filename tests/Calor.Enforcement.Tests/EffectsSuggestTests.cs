@@ -1,4 +1,6 @@
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
@@ -368,6 +370,372 @@ public class EffectsSuggestTests
         var save = Assert.Single(calls, c => c.MethodName == "Save");
         Assert.True(save.ReceiverResolved);
         Assert.Equal("OrderRepo", save.TypeName);
+    }
+
+    // ========================================================================
+    // v0.15 E1 slice 2a pins — receiver BoundExpression on the call nodes,
+    // binder-emitted UnresolvedBoundType (scoping §D6, roadmap §4.2 E1)
+    // ========================================================================
+
+    private static (BoundModule Bound, DiagnosticBag Diagnostics) Bind(ModuleNode module)
+    {
+        var bag = new DiagnosticBag();
+        return (new Binder(bag).Bind(module), bag);
+    }
+
+    private static IEnumerable<BoundNode> Descendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+        }
+    }
+
+    /// <summary>The receiver the binder attached to the call whose target is
+    /// <paramref name="target"/>. Fails the test if no such call node exists, so
+    /// a null return means "the binder attached no receiver", never "not found".</summary>
+    private static BoundExpression? ReceiverOf(BoundNode root, string target)
+    {
+        foreach (var node in Descendants(root))
+        {
+            switch (node)
+            {
+                case BoundCallStatement statement when statement.Target == target:
+                    return statement.Receiver;
+                case BoundCallExpression expression when expression.Target == target:
+                    return expression.Receiver;
+            }
+        }
+
+        Assert.Fail($"No bound call node with target '{target}'.");
+        return null;
+    }
+
+    /// <summary>
+    /// E1 slice 2a pin (a): a dotted head the binder cannot bind gets NO receiver
+    /// expression at all — the binder says nothing rather than guessing — and the
+    /// collector reports the call unresolved. <c>foo</c> is not a bound variable
+    /// and is not written as a type reference; <c>this.sb</c> is a chain through
+    /// <c>this</c>, which is not a bound variable either.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_UnboundDottedHead_YieldsNullReceiverAndUnresolvedCall()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{foo.Bar} §/C
+  §CL{c001:Holder:pub}
+      §MT{mt001:Write:pub}
+          §O{void}
+          §C{this.sb.Append} §A STR:""x"" §/C
+";
+        var module = Parse(source);
+        var (bound, _) = Bind(module);
+
+        Assert.Null(ReceiverOf(bound, "foo.Bar"));
+        Assert.Null(ReceiverOf(bound, "this.sb.Append"));
+
+        var calls = ExternalCallCollector.Collect(module);
+        Assert.False(Assert.Single(calls, c => c.MethodName == "Bar").ReceiverResolved);
+        Assert.False(Assert.Single(calls, c => c.MethodName == "Append").ReceiverResolved);
+    }
+
+    /// <summary>
+    /// E1 slice 2a pin (b): a receiver whose type is available ONLY through
+    /// metadata carries a real <see cref="NominalBoundType"/> on
+    /// <c>Receiver.Type</c>. Nothing in the module names <c>Guid</c> as the type
+    /// of <c>g</c> — the binder learned it from MetadataBinder's Roslyn return
+    /// type for <c>System.Guid.NewGuid()</c>. This is the discriminator against
+    /// the deleted slice-1 path: the type is read off the receiver expression,
+    /// not reconstructed from a symbol string at the collector.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_MetadataOnlyReceiver_CarriesNominalBoundTypeOnReceiver()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{g} §C{System.Guid.NewGuid} §/C
+      §C{g.ToString} §/C
+";
+        var module = Parse(source);
+        var (bound, _) = Bind(module);
+
+        var receiver = ReceiverOf(bound, "g.ToString");
+        var variable = Assert.IsType<BoundVariableExpression>(receiver);
+        var nominal = Assert.IsType<NominalBoundType>(variable.Type);
+        Assert.Equal("System.Guid", nominal.QualifiedName);
+    }
+
+    /// <summary>
+    /// E1 slice 2a pin (b), structural half: the collector no longer builds a
+    /// receiver expression of its own. Slice 1 reconstructed one
+    /// (<c>new BoundVariableExpression(span, symbol).Type</c>) because the call
+    /// nodes carried no receiver; slice 2a deleted that, and reintroducing it
+    /// would mean the collector is second-guessing the binder again.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_Collector_ConstructsNoReceiverExpressionOfItsOwn()
+    {
+        var collector = Path.Combine(
+            RepoRoot(), "src", "Calor.Compiler", "Effects", "ExternalCallCollector.cs");
+        Assert.True(File.Exists(collector), $"Collector not found at {collector}");
+
+        var text = File.ReadAllText(collector);
+        Assert.DoesNotContain("new BoundVariableExpression", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("new BoundFieldAccessExpression", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("new BoundTypeReferenceExpression", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// E1 slice 2a pin (c): a receiver the binder cannot type carries an
+    /// <see cref="UnresolvedBoundType"/> and reports Calor0270 exactly once at
+    /// that site — not once per consumer, not once per segment of a chain. The
+    /// call never becomes a resolved manifest row; the end-to-end half of that
+    /// claim is pinned by
+    /// <c>Calor.Compiler.Tests.EffectsSuggestCliTests.Suggest_Text_UntypedReceiver_IsWarnedAndKeptOutOfManifest</c>,
+    /// which runs the same <c>x.Run</c> shape through <c>calor effects suggest</c>.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_UnresolvedReceiver_ReportsCalor0270OnceAndIsNeverResolved()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{x} §C{Unknown.Make} §/C
+      §C{x.Run} §/C
+";
+        var module = Parse(source);
+        var (bound, diagnostics) = Bind(module);
+
+        var receiver = ReceiverOf(bound, "x.Run");
+        var unresolved = Assert.IsType<UnresolvedBoundType>(
+            Assert.IsType<BoundVariableExpression>(receiver).Type);
+        Assert.Equal(
+            "receiver 'x' is an inferred local whose type the binder could not determine",
+            unresolved.Reason);
+
+        var reported = diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved).ToList();
+        var single = Assert.Single(reported);
+        Assert.Equal(DiagnosticSeverity.Info, single.Severity);
+        // The receiver path appears once in the message, not twice.
+        Assert.Equal(1, single.Message.Split("'x'").Length - 1);
+
+        var run = Assert.Single(ExternalCallCollector.Collect(module), c => c.MethodName == "Run");
+        Assert.False(run.ReceiverResolved);
+        Assert.Equal("x", run.TypeName);
+    }
+
+    /// <summary>
+    /// E1 slice 2a: the receiver is one of exactly four shapes, and each carries
+    /// the type the binder will stand behind — a bound variable, a member-access
+    /// chain the binder does not type, a type reference, or nothing at all.
+    /// A member chain reports ONE Calor0270 for the whole chain, not one per
+    /// segment.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_ReceiverShapes_AreTheFourDocumentedOnes()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
+      §C{sb.Append} §A STR:""x"" §/C
+      §B{a} §NEW{Random} §/NEW
+      §C{a.b.c.Chain} §/C
+      §C{System.Console.WriteLine} §A STR:""y"" §/C
+      §C{foo.Bar} §/C
+";
+        var module = Parse(source);
+        var (bound, diagnostics) = Bind(module);
+
+        // 1. bound local → BoundVariableExpression carrying the symbol's type.
+        var local = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, "sb.Append"));
+        Assert.Equal("System.Text.StringBuilder", local.Type.DisplayString);
+
+        // 2. member chain → a field-access chain over the typed head, unresolved.
+        var chain = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, "a.b.c.Chain"));
+        Assert.IsType<UnresolvedBoundType>(chain.Type);
+        Assert.Equal("c", chain.FieldName);
+        var inner = Assert.IsType<BoundFieldAccessExpression>(chain.Target);
+        Assert.Equal("b", inner.FieldName);
+        var chainHead = Assert.IsType<BoundVariableExpression>(inner.Target);
+        // The head keeps the binder's own spelling — short-BCL-name expansion is
+        // the collector's step, not the binder's, and the binder must not be
+        // read as having claimed "System.Random" here.
+        Assert.Equal("Random", chainHead.Type.DisplayString);
+
+        // 3. static type receiver → BoundTypeReferenceExpression naming the type.
+        var typeRef = Assert.IsType<BoundTypeReferenceExpression>(
+            ReceiverOf(bound, "System.Console.WriteLine"));
+        Assert.Equal("System.Console", typeRef.Name);
+        Assert.Equal("System.Console", typeRef.Type.DisplayString);
+
+        // 4. unbound head → nothing.
+        Assert.Null(ReceiverOf(bound, "foo.Bar"));
+
+        // Marking is not reporting: every unresolved receiver above is MARKED
+        // UnresolvedBoundType, but a member chain is a binder limitation the
+        // author cannot act on, so it is silent. No shape in this fixture is
+        // reportable, so the whole module produces zero Calor0270.
+        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+    }
+
+    /// <summary>
+    /// Review round 1, finding 2: the two shapes an author can act on report, and
+    /// the two they cannot are silent — while all four are still marked
+    /// <see cref="UnresolvedBoundType"/>. Delete the
+    /// <c>ShouldReportUnresolvedReceiver</c> gate and the chain/temporary arms
+    /// start firing again (875 Info diagnostics on the converted corpus; see the
+    /// ledger pinned by
+    /// <c>Calor.Compiler.Tests.Calor0270CorpusVolumeTests</c>).
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_Calor0270_FiresOnlyForActionableReceiverShapes()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{x} §C{Unknown.Make} §/C
+      §C{x.Run} §/C
+      §B{a} §NEW{Random} §/NEW
+      §C{a.b.Chain} §/C
+      §B{_chainIsValid042} §C{Unknown.Make} §/C
+      §C{_chainIsValid042.Run} §/C
+";
+        var module = Parse(source);
+        var (bound, diagnostics) = Bind(module);
+
+        // All three receivers are marked unresolved — silence is about the
+        // editor, never about what the type system claims.
+        foreach (var target in new[] { "x.Run", "a.b.Chain", "_chainIsValid042.Run" })
+        {
+            Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, target)!.Type);
+        }
+
+        // Only the inferred local the author actually wrote is reported.
+        var single = Assert.Single(
+            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        Assert.Contains("'x'", single.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("a.b", single.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("_chain", single.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Review round 1, finding 3: a direct pin for the
+    /// <c>catch (ArgumentException)</c> path. The C# → Calor converter emits a
+    /// bare <c>?</c> as a lambda parameter's type when it cannot infer one
+    /// (<c>TryInferLambdaParameterType</c>,
+    /// <c>Migration/RoslynSyntaxVisitor.cs:11774-11794</c>, called at <c>:11877</c>
+    /// and <c>:11885</c>, returns Roslyn's error-type spelling). <c>?</c> is not a
+    /// type <c>TypeIdentity.Canonicalize</c> can parse, so building the receiver
+    /// throws — and this slice must turn that into an unresolved receiver, not
+    /// into an internal-error diagnostic that abandons the rest of the member.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_UninferredLambdaParameterReceiver_IsUnresolvedNotAnIce()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{f} §LAM{l1:ctx:?}
+          §C{ctx.Trim} §/C
+      §/LAM{l1}
+";
+        var module = Parse(source);
+        var (bound, diagnostics) = Bind(module);
+
+        var unresolved = Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, "ctx.Trim")!.Type);
+        // The catch-path reason, not the inferred-local one — this fixture must
+        // exercise the canonicalization failure specifically.
+        Assert.Equal(
+            "receiver 'ctx' carries a type string the binder cannot resolve to a type",
+            unresolved.Reason);
+
+        var single = Assert.Single(
+            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        Assert.Contains("'ctx'", single.Message, StringComparison.Ordinal);
+
+        // The throw never surfaces as an internal error, which is what would
+        // abandon the rest of the member.
+        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.AnalysisICE));
+    }
+
+    /// <summary>
+    /// Review round 1, finding 9: <c>Receiver</c> and <c>ReceiverSymbol</c> are two
+    /// channels describing the same receiver, and they must not drift apart in a
+    /// later slice. When the receiver is a bound variable the two agree on the
+    /// symbol; when the binder attached no receiver there is no receiver symbol
+    /// either; and a type-reference receiver never carries a variable symbol.
+    /// </summary>
+    [Fact]
+    public void E1_Slice2a_ReceiverAndReceiverSymbol_DoNotDrift()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
+      §C{sb.Append} §A STR:""x"" §/C
+      §B{x} §C{Unknown.Make} §/C
+      §C{x.Run} §/C
+      §B{a} §NEW{Random} §/NEW
+      §C{a.b.Chain} §/C
+      §C{System.Console.WriteLine} §A STR:""y"" §/C
+      §C{foo.Bar} §/C
+      §C{Helper} §/C
+";
+        var module = Parse(source);
+        var (bound, _) = Bind(module);
+
+        var checkedCalls = 0;
+        foreach (var node in Descendants(bound))
+        {
+            var (receiver, symbol, target) = node switch
+            {
+                BoundCallStatement s => (s.Receiver, s.ReceiverSymbol, s.Target),
+                BoundCallExpression e => (e.Receiver, e.ReceiverSymbol, e.Target),
+                _ => (null, null, null),
+            };
+            if (target is null)
+                continue;
+            checkedCalls++;
+
+            switch (receiver)
+            {
+                case BoundVariableExpression variable:
+                    Assert.Same(symbol, variable.Variable);
+                    break;
+                case BoundFieldAccessExpression chain:
+                    // The chain's head is the receiver symbol.
+                    var head = chain.Target;
+                    while (head is BoundFieldAccessExpression inner)
+                        head = inner.Target;
+                    Assert.Same(symbol, Assert.IsType<BoundVariableExpression>(head).Variable);
+                    break;
+                case BoundTypeReferenceExpression:
+                    Assert.Null(symbol);
+                    break;
+                case null:
+                    Assert.Null(symbol);
+                    break;
+                default:
+                    Assert.Fail($"Unexpected receiver shape {receiver.GetType().Name} for '{target}'.");
+                    break;
+            }
+        }
+
+        // Guard against the loop silently checking nothing.
+        Assert.True(checkedCalls >= 6, $"Only {checkedCalls} call nodes were checked.");
     }
 
     private static string RepoRoot() =>

@@ -1179,6 +1179,12 @@ public sealed class Binder
             call.Target,
             receiverSymbol,
             receiverTypeSymbol);
+        var receiver = BuildCallReceiver(
+            call.Target,
+            call.ReceiverSpan ?? call.CalleeSpan,
+            receiverSymbol,
+            receiverTypeSymbol,
+            resolvedTypeName);
 
         return new BoundCallStatement(
             call.Span,
@@ -1199,7 +1205,8 @@ public sealed class Binder
             (resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
-                .ToArray());
+                .ToArray(),
+            receiver);
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -3066,6 +3073,12 @@ public sealed class Binder
             callExpr.Target,
             receiverSymbol,
             receiverTypeSymbol);
+        var receiver = BuildCallReceiver(
+            callExpr.Target,
+            callExpr.ReceiverSpan ?? callExpr.CalleeSpan,
+            receiverSymbol,
+            receiverTypeSymbol,
+            resolvedTypeName);
 
         // v0.14 §S3b: enrich BCL-shaped calls with MetadataBinder-resolved
         // Roslyn NullableAnnotation on the return type. Additive only —
@@ -3202,7 +3215,237 @@ public sealed class Binder
             receiverSpan: callExpr.ReceiverSpan,
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
             receiverTypeSymbol: receiverTypeSymbol,
-            annotatedReturnType: annotatedReturn);
+            annotatedReturnType: annotatedReturn,
+            receiver: receiver);
+    }
+
+    /// <summary>
+    /// v0.15 E1 slice 2a (roadmap §4.2; scoping doc §D6) — build the receiver of a
+    /// dotted call as a real <see cref="BoundExpression"/> with a real
+    /// <see cref="BoundType"/>, so consumers read a type the binder vouches for
+    /// instead of re-deriving one from symbol strings.
+    ///
+    /// <para>Where the binder cannot name the receiver's type it says so with
+    /// <see cref="BoundTypes.UnresolvedBoundType"/> and reports <c>Calor0270</c>
+    /// (SignatureUnresolved, Info — §F-4's promotion path owns the severity)
+    /// exactly once at the receiver span. Two such cases exist today: the
+    /// <c>OBJECT</c> inference fallback on an inferred local, and a member chain
+    /// (<c>a.b.M</c>) whose intermediate members the binder does not type.
+    /// A declared <c>object</c>/<c>OBJECT</c> parameter, field or property is a
+    /// genuine type and is left alone.</para>
+    ///
+    /// <para>Returns null when there is nothing to say: a bare call, or a dotted
+    /// head that is neither a bound variable nor written as a type reference.
+    /// Null is never "no receiver" — it is "not vouched for".</para>
+    /// </summary>
+    private BoundExpression? BuildCallReceiver(
+        string target,
+        Parsing.TextSpan receiverSpan,
+        VariableSymbol? receiverSymbol,
+        TypeSymbol? receiverTypeSymbol,
+        string? resolvedTypeName)
+    {
+        var lastDot = target.LastIndexOf('.');
+        if (lastDot <= 0)
+            return null;
+
+        var receiverPath = target[..lastDot];
+
+        if (receiverSymbol != null)
+        {
+            // Constructing the reference node canonicalizes the symbol's type
+            // string, and TypeIdentity.Canonicalize (Binding/Scope.cs:316) throws
+            // on a string it cannot parse — an empty one, or a bare "?".
+            //
+            // A bare "?" is not hypothetical: the C# → Calor converter emits it
+            // for a lambda parameter whose type it could not infer.
+            // TryInferLambdaParameterType (Migration/RoslynSyntaxVisitor.cs:11774-11794,
+            // called at :11877 and :11885) hands back Roslyn's display spelling of
+            // the parameter's type, and for an error type that spelling is "?" —
+            // which the emitter then writes as `§LAM{l1:ctx:?}`. That is a
+            // converter defect (root cause: issue #1097, 72 pre-existing ICEs over the
+            // converted corpus, unchanged by this slice); the binder's job here is not
+            // to amplify it.
+            //
+            // A receiver whose type string the binder cannot even canonicalize is
+            // precisely an unresolved receiver, so it is caught and marked as one
+            // here rather than escaping as an internal-error diagnostic that would
+            // abandon the rest of the member. Constructions below that pass
+            // typeOverride do not canonicalize and cannot throw.
+            BoundVariableExpression? typedHead;
+            try
+            {
+                typedHead = new BoundVariableExpression(receiverSpan, receiverSymbol);
+            }
+            catch (ArgumentException)
+            {
+                typedHead = null;
+            }
+
+            var firstDot = receiverPath.IndexOf('.');
+            if (firstDot > 0)
+            {
+                // a.b.M — the binder resolves `a` only. `a.b` has no bound type,
+                // so the chain is built over the head and reported unresolved
+                // rather than attributed to `a`'s type. One Calor0270 for the
+                // whole chain, and the head shares its reason when it is itself
+                // untyped.
+                var unresolved = UnresolvedReceiver(
+                    receiverSpan,
+                    receiverPath,
+                    "is a member chain the binder does not type",
+                    report: ShouldReportUnresolvedReceiver(receiverPath));
+                BoundExpression chain = typedHead
+                    ?? new BoundVariableExpression(
+                        receiverSpan, receiverSymbol, typeOverride: unresolved);
+                foreach (var segment in receiverPath[(firstDot + 1)..].Split('.'))
+                {
+                    chain = new BoundFieldAccessExpression(
+                        receiverSpan, chain, segment, typeName: null, resolvedType: unresolved);
+                }
+                return chain;
+            }
+
+            if (typedHead is null)
+            {
+                return new BoundVariableExpression(
+                    receiverSpan,
+                    receiverSymbol,
+                    typeOverride: UnresolvedReceiver(
+                        receiverSpan,
+                        receiverPath,
+                        "carries a type string the binder cannot resolve to a type",
+                        report: ShouldReportUnresolvedReceiver(receiverPath)));
+            }
+
+            // The binder's OBJECT fallback on an inferred local it could not type
+            // (unknown callee return, disagreeing conditional resolutions). A
+            // parameter, field or property always carries a declared type, so its
+            // OBJECT is a real `object` and is honoured. A local explicitly
+            // declared `§B{o:OBJECT}` (uppercase; the surface `object` keyword
+            // stays lowercase and is unaffected) is conflated with the fallback —
+            // documented, not distinguished, exactly as slice 1 had it.
+            if (typedHead.Type is BoundTypes.NominalBoundType { QualifiedName: "OBJECT" }
+                && !(receiverSymbol.IsParameter || receiverSymbol.IsField || receiverSymbol.IsProperty))
+            {
+                return new BoundVariableExpression(
+                    receiverSpan,
+                    receiverSymbol,
+                    typeOverride: UnresolvedReceiver(
+                        receiverSpan,
+                        receiverPath,
+                        "is an inferred local whose type the binder could not determine",
+                        report: ShouldReportUnresolvedReceiver(receiverPath)));
+            }
+
+            return typedHead;
+        }
+
+        if (receiverTypeSymbol != null)
+        {
+            return new BoundTypeReferenceExpression(
+                receiverSpan,
+                receiverPath,
+                new BoundTypes.NominalBoundType(receiverTypeSymbol.QualifiedName, declaration: receiverTypeSymbol),
+                receiverTypeSymbol);
+        }
+
+        // NOTE (review round 1, finding 10 — deferred to slice 2b): reaching into
+        // Effects.ExternalCallCollector from Binding/ widens an existing layering
+        // hole (GetResolvedCallIdentity already calls into
+        // Effects.EffectEnforcementPass). IsTypeQualifiedReference is a pure
+        // string predicate with no Effects dependency and belongs in Binding/,
+        // but moving it also means moving its callers' expectations, so it is
+        // slice-2b work rather than an unreviewed drive-by here.
+        //
+        // Not a bound variable and not a Calor-declared type. GetResolvedCallIdentity's
+        // name for this shape is the source text with short BCL names expanded, so it
+        // only counts when the receiver is WRITTEN as a type reference — Console,
+        // System.IO.File, OrderRepo. A lowercase head (foo.Bar, this.sb.Append,
+        // _items.Add) is not vouched for and yields null.
+        return Effects.ExternalCallCollector.IsTypeQualifiedReference(receiverPath)
+               && resolvedTypeName is { } sourceQualifiedType
+            ? new BoundTypeReferenceExpression(
+                receiverSpan, receiverPath, new BoundTypes.NominalBoundType(sourceQualifiedType))
+            : null;
+    }
+
+    /// <summary>
+    /// The <see cref="BoundTypes.UnresolvedBoundType"/> for a receiver the binder
+    /// cannot type, and — only when <paramref name="report"/> — one Calor0270 at
+    /// the receiver span.
+    ///
+    /// <para><b>Marking and reporting are separate decisions.</b> Every receiver
+    /// the binder cannot type is marked, always, because downstream analyses must
+    /// never read an unresolved receiver as resolved. Only the shapes an author
+    /// can actually act on are reported, because a diagnostic nobody can act on
+    /// is noise in the editor. <see cref="ShouldReportUnresolvedReceiver"/> owns
+    /// that split and states the evidence behind it.</para>
+    /// </summary>
+    private BoundTypes.UnresolvedBoundType UnresolvedReceiver(
+        Parsing.TextSpan span,
+        string receiverPath,
+        string reason,
+        bool report)
+    {
+        if (report)
+        {
+            _diagnostics.ReportInfo(
+                span,
+                DiagnosticCode.SignatureUnresolved,
+                $"Receiver '{receiverPath}' {reason}, so the call's receiver type is unresolved. " +
+                "Analyses that need the type report the call as unresolved rather than guess one; " +
+                "give the binding an explicit type, or call through the declaring type.");
+        }
+
+        return new BoundTypes.UnresolvedBoundType($"receiver '{receiverPath}' {reason}");
+    }
+
+    /// <summary>
+    /// Whether an unresolved receiver is worth telling the author about.
+    ///
+    /// <para>Measured on the converted corpus (see the ledger registered at
+    /// <c>bench/phase0-agent-native/calor0270-corpus-ledger.json</c>): reporting
+    /// every unresolved receiver produced 875 Info diagnostics across 76 of 305
+    /// modules, overwhelmingly of two shapes an author cannot act on —</para>
+    /// <list type="number">
+    /// <item><b>member chains</b> (<c>result.IsValid.ToString</c>): the binder
+    /// does not type members of a receiver yet. That is a binder limitation, not
+    /// anything wrong with the code, and "give the binding an explicit type" is
+    /// not advice the author can follow.</item>
+    /// <item><b>converter-synthesized temporaries</b> (<c>_chainIsValid042</c>):
+    /// the author never wrote the binding, so they cannot annotate it.</item>
+    /// </list>
+    /// <para>Both are still <i>marked</i> <see cref="BoundTypes.UnresolvedBoundType"/> —
+    /// silence here is about the editor, never about what the type system claims.
+    /// The two shapes that remain reportable are the ones an explicit type
+    /// annotation fixes: an inferred local the binder could not type, and a
+    /// declared type string it cannot resolve to a type.</para>
+    /// </summary>
+    private static bool ShouldReportUnresolvedReceiver(string receiverPath) =>
+        !receiverPath.Contains('.', StringComparison.Ordinal)
+        && !IsConverterSynthesizedName(receiverPath);
+
+    /// <summary>
+    /// A binding the C# → Calor converter generated rather than the author.
+    /// <c>ConversionContext.GenerateId</c> (<c>Migration/ConversionContext.cs:424-429</c>)
+    /// spells them <c>_{prefix}{Hint}{NNN}</c> — a leading underscore and a
+    /// three-digit counter — across ~23 prefixes (<c>_chain</c>, <c>_cast</c>,
+    /// <c>_tern</c>, …). Matching the shape rather than enumerating the prefixes
+    /// keeps this from silently going stale when a prefix is added; the cost is
+    /// that a hand-written <c>_foo001</c> is also treated as synthesized, which
+    /// only ever means one fewer Info diagnostic.
+    /// </summary>
+    private static bool IsConverterSynthesizedName(string name)
+    {
+        if (name.Length < 5 || name[0] != '_')
+            return false;
+        for (var i = name.Length - 3; i < name.Length; i++)
+        {
+            if (!char.IsAsciiDigit(name[i]))
+                return false;
+        }
+        return char.IsAsciiLetter(name[name.Length - 4]);
     }
 
     private (string? TypeName, string? MethodName) GetResolvedCallIdentity(
