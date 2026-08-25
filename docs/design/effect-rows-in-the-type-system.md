@@ -120,7 +120,7 @@ X12b.calr(3,5): error Calor0410: Function 'Log' uses effect 'fs:w' but does not 
 ```
 
 One diagnostic **per forbidden effect** (`foreach` at `EEP:421`, message at `:427`), optionally
-followed by a call-chain line. §3.5, §5.3 and §10 quote this shape; where they show a *new*
+followed by a call-chain line. §3.6, §5 and §10 quote this shape; where they show a *new*
 sentence, §3.3 says so and §13.2 pins it.
 
 ### 2.2 What E1 slice 1 changed (PR #1089), and what slice 2 owes
