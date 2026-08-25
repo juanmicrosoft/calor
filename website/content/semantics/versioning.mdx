@@ -5,7 +5,7 @@ order: 2
 ---
 
 
-Version: 1.0.0
+Version: 2.0.0
 
 This document specifies how Calor semantics are versioned and how version compatibility is managed.
 
@@ -45,34 +45,39 @@ MAJOR.MINOR.PATCH
 
 ## Current Version
 
-**Semantics Version: 1.0.0**
+**Semantics Version: 2.0.0**
 
-This is the initial formal semantics specification.
+Bumped from 1.0.0 for the v0.14 nullability work: `string` values are
+non-nullable by default and the `Calor0272`/`0273`/`0274` nullability checks
+are errors.
 
 ---
 
 ## Version Declaration
 
-Modules can declare their required semantics version:
+A module declares the semantics version it was written for with a `§SEMVER`
+directive, usually the first line of the module body:
 
 ```
 §M{m001:MyModule}
-  §SEMVER{1.0.0}
+  §SEMVER{2.0.0}
   ...
 ```
 
-### Syntax Variants
+### Syntax
 
-```
-// Exact version
-§SEMVER{1.0.0}
+Exactly one spelling is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` with three
+numeric parts and nothing else between the braces, for example
+`§SEMVER{2.0.0}`. Caret (`^2.0.0`), range (`>=2.0.0 <3.0.0`), and shortened
+(`2`, `2.0`) forms are rejected with `Calor0702`; so are a leading sign or any
+whitespace (`+2.0.0`, `{ 2.0.0 }`), the bracket form `§SEMVER[2.0.0]`, a `{`
+not closed on its line, and a second `§SEMVER` in the same module.
 
-// Minimum version (any 1.x.x compatible)
-§SEMVER{^1.0.0}
+### Modules That Declare Nothing
 
-// Range
-§SEMVER{>=1.0.0 <2.0.0}
-```
+A module without `§SEMVER` takes the compiler's own version (currently 2.0.0)
+and gets no diagnostic. The `calor hook` write-time reminder suggests adding
+`§SEMVER{2.0.0}`.
 
 ---
 
@@ -85,7 +90,7 @@ Modules can declare their required semantics version:
 - Specification bug fixes
 - Test additions
 
-**Example:** 1.0.0 to 1.0.1 is safe.
+**Example:** 2.0.0 to 2.0.1 is safe.
 
 ### Minor Version Changes (x.Y.z)
 
@@ -95,45 +100,61 @@ Modules can declare their required semantics version:
 - New optional behaviors
 - Extended standard library
 
-**Example:** Code written for 1.0.0 will compile and run correctly under 1.1.0.
+**Example:** Code written for 2.0.0 will compile and run correctly under 2.1.0.
 
 ### Major Version Changes (X.y.z)
 
-**May be incompatible.** Changes may include:
+**Incompatible by definition.** Changes may include:
 - Evaluation order changes
 - Operator precedence changes
-- Type system changes
+- Type system changes (2.0.0: non-nullable `string`)
 - Default behavior changes
 - Removed constructs
 
-**Example:** Code written for 1.x may not work correctly under 2.0.
+**Example:** Code written for 1.x is refused by a 2.x compiler.
 
 ---
 
 ## Compiler Behavior
 
+The major must match exactly. A module that declares an **older** major (for
+example `§SEMVER{1.0.0}` on the 2.0.0 compiler) is refused rather than quietly
+read under the newer rules. The error tells you what to do: migrate the module
+and declare `§SEMVER{2.0.0}` after reviewing nullability semantics
+(`Calor0272/0273/0274`). See
+[#1084](https://github.com/juanmicrosoft/calor/issues/1084).
+
 ### Diagnostic Codes
 
 | Code | Severity | Condition |
 |:-----|:---------|:----------|
-| Calor0700 | Warning | Module version newer than compiler (might work) |
-| Calor0701 | Error | Module version incompatible (major mismatch) |
+| Calor0700 | Warning | Same major, declared minor newer than the compiler's (might work) |
+| Calor0701 | Error | Declared major differs from the compiler's — older or newer |
+| Calor0702 | Error | `§SEMVER` is not `MAJOR.MINOR.PATCH`, or appears more than once |
 
-### Compatibility Matrix
+### Compatibility Matrix (2.0.0 compiler)
 
-| Module Version | Compiler Version | Result |
-|:---------------|:-----------------|:-------|
-| 1.0.0 | 1.0.0 | Compatible |
-| 1.0.0 | 1.1.0 | Compatible |
-| 1.0.0 | 2.0.0 | Compatible |
-| 1.1.0 | 1.0.0 | Warning (Calor0700) |
-| 2.0.0 | 1.0.0 | Error (Calor0701) |
+| Module declares | Result |
+|:----------------|:-------|
+| (nothing) | Compatible — takes 2.0.0, no diagnostic |
+| 2.0.0, 2.0.5 | Compatible |
+| 2.1.0 | Warning (Calor0700), compiles |
+| 1.0.0, 1.9.9, 0.9.0 | Error (Calor0701) with migration pointer to #1084 |
+| 3.0.0 | Error (Calor0701), "upgrade the compiler" |
+| `^1.0.0`, `2`, `2.0`, second `§SEMVER` | Error (Calor0702) |
 
 ---
 
 ## Version History
 
-### Version 1.0.0 (Current)
+### Version 2.0.0 (Current)
+
+Precursor bump for the v0.14 nullability enforcement work: `string` is
+non-nullable and `Calor0272/0273/0274` are errors. Unreleased (next release):
+the `§SEMVER` directive is now lexed, parsed and checked (it did not exist in
+the lexer before), and files declaring 1.x are refused with `Calor0701`.
+
+### Version 1.0.0
 
 Initial formal semantics specification including:
 
@@ -197,13 +218,16 @@ When upgrading a module to a new semantics version:
 3. **Update `§SEMVER`** declaration
 4. **Test edge cases** related to changed semantics
 
-### Multi-Version Projects
+For 1.x to 2.0.0: review every `string`-typed binding, return, and argument
+for possibly-null values (`Calor0272/0273/0274` become errors), then change
+the declaration to `§SEMVER{2.0.0}`. Until you do, the 2.x compiler refuses
+the file with `Calor0701`.
 
-Projects can contain modules targeting different semantics versions. The compiler will:
+### Mixed-Version Projects
 
-1. Check each module against its declared version
-2. Emit warnings if version mismatches exist
-3. Use the highest required version for cross-module calls
+There is no dual-semantics mode. Every module in a compilation must declare
+the compiler's major (or declare nothing); a `§SEMVER{1.0.0}` module is
+refused until it is migrated.
 
 ---
 

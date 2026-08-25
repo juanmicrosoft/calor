@@ -84,7 +84,7 @@ public class GeminiFormatTests
         var json = """
             {
                 "file_path": "test.calr",
-                "content": "module Test §SEMVER[1.0.0] { fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; } }"
+                "content": "module Test §SEMVER{1.0.0} { fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; } }"
             }
             """;
 
@@ -102,7 +102,7 @@ public class GeminiFormatTests
         var json = """
             {
                 "file_path": "test.calr",
-                "content": "module Test §SEMVER[1.0.0] {\n    fn Foo f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; }\n    fn Bar f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 2; }\n}"
+                "content": "module Test §SEMVER{1.0.0} {\n    fn Foo f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; }\n    fn Bar f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 2; }\n}"
             }
             """;
 
@@ -219,7 +219,7 @@ public class GeminiFormatTests
     public void ValidateCalrContent_AlwaysReturnsZeroExitCode()
     {
         // validate-calr-content never blocks, only warns
-        var jsonWithSemver = """{"file_path": "test.calr", "content": "module Test §SEMVER[1.0.0] {}"}""";
+        var jsonWithSemver = """{"file_path": "test.calr", "content": "module Test §SEMVER{1.0.0} {}"}""";
         var jsonWithoutSemver = """{"file_path": "test.calr", "content": "module Test {}"}""";
 
         var (exitCode1, _) = HookCommand.ValidateCalrContent(jsonWithSemver);

@@ -48,6 +48,50 @@ public class DocumentStateTests
         Assert.True(state.Diagnostics.HasErrors);
     }
 
+    /// <summary>
+    /// The §SEMVER compatibility check runs at parse time, so the language server
+    /// surfaces the fail-closed refusal of a retired-major file as Calor0701 with the
+    /// migration pointer (#1084 item 1 / #1087) — not only `calor build`.
+    /// </summary>
+    [Fact]
+    public void Reanalyze_LegacySemver_ReportsCalor0701()
+    {
+        var source = """
+            §M{m001:Legacy}
+              §SEMVER{1.0.0}
+              §F{f001:Test:pub} () -> i32
+                §R 0
+            """;
+
+        var state = LspTestHarness.CreateDocument(source);
+
+        Assert.True(state.Diagnostics.HasErrors);
+        var refusal = Assert.Single(
+            state.Diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.SemanticsVersionIncompatible);
+        Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Error, refusal.Severity);
+        Assert.Contains("issues/1084", refusal.Message);
+        Assert.Equal(2, refusal.Span.Line);
+    }
+
+    /// <summary>Same document at the compiler's own major is clean in the language server.</summary>
+    [Fact]
+    public void Reanalyze_CurrentSemver_NoVersionDiagnostics()
+    {
+        var source = $$"""
+            §M{m001:Modern}
+              §SEMVER{{{Compiler.SemanticsVersion.VersionString}}}
+              §F{f001:Test:pub} () -> i32
+                §R 0
+            """;
+
+        var state = LspTestHarness.CreateDocument(source);
+
+        Assert.False(state.Diagnostics.HasErrors);
+        Assert.DoesNotContain(state.Diagnostics, d => d.Code.StartsWith("Calor070", StringComparison.Ordinal));
+        Assert.Equal(Compiler.SemanticsVersion.VersionString, state.Ast?.DeclaredSemanticsVersion);
+    }
+
     [Theory]
     [InlineData("§NEW{}")]
     [InlineData("§NEW{   }")]
