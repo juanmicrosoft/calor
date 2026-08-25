@@ -206,7 +206,7 @@ public sealed class SpikeVerdictTests
         // Leg 1 — recompute the BEFORE side with this compiler.
         foreach (var artifact in BlockingArtifacts)
         {
-            var committed = Path.Combine(SpikeDirectory(), "before", artifact + ".g.cs");
+            var committed = Path.Combine(SpikeDirectory(), "before", artifact + ".g.cs.txt");
             Assert.True(File.Exists(committed), $"Missing before/{artifact}.g.cs");
 
             var reEmitted = ReEmit(Path.Combine(SpikeDirectory(), "before", artifact + ".calr"));
@@ -266,7 +266,7 @@ public sealed class SpikeVerdictTests
         {
             foreach (var side in new[] { "before", "after" })
             {
-                foreach (var extension in new[] { ".calr", ".g.cs", ".diagnostics.txt" })
+                foreach (var extension in new[] { ".calr", ".g.cs.txt", ".diagnostics.txt" })
                 {
                     var path = Path.Combine(spike, side, artifact + extension);
                     if (!File.Exists(path))
@@ -404,8 +404,8 @@ public sealed class SpikeVerdictTests
         string artifact)
     {
         var spike = SpikeDirectory();
-        var before = Path.Combine(spike, "before", artifact + ".g.cs");
-        var after = Path.Combine(spike, "after", artifact + ".g.cs");
+        var before = Path.Combine(spike, "before", artifact + ".g.cs.txt");
+        var after = Path.Combine(spike, "after", artifact + ".g.cs.txt");
 
         Assert.True(File.Exists(before), $"Missing before/{artifact}.g.cs");
         Assert.True(File.Exists(after), $"Missing after/{artifact}.g.cs");

@@ -16,7 +16,7 @@
       "before": "before/A2.calr",
       "after": "after/A2.calr",
       "deviations": [
-        "The file's three MediatR dependencies (RequestHandlerDelegate, IPipelineBehavior, IRequestPreProcessor) are inlined into before/A2.source.cs before conversion, because `calor convert` validates the round-tripped C# and fails with four CS0246 errors on the file alone. The class body is the corpus file's, verbatim.",
+        "The file's three MediatR dependencies (RequestHandlerDelegate, IPipelineBehavior, IRequestPreProcessor) are inlined into before/A2.source.cs.txt before conversion, because `calor convert` validates the round-tripped C# and fails with four CS0246 errors on the file alone. The class body is the corpus file's, verbatim.",
         "async is modelled as a sync-shaped row over a Task-returning function, exactly as design-doc S11 says the spike should."
       ]
     },
