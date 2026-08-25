@@ -547,10 +547,11 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   the facet's correctness but not the old store's deletion.
 - **M1 — Measurement prerequisites that block E2's merge** (moved here from §4.3 so the chain is
   visible): PR #944 dispositioned; ~~#881 corrected or the cost leg re-registered~~ **done** (PR #1092:
-  `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); the 0.15 PP
-  registered in the A-annex (the PP-registration entry, A-1.11 or later; A-1.10 is the guard
-  half, PR #1091). **No effect-row implementation (E2) merges before M1 is
-  done** — §4.3 (i).
+  `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); ~~the 0.15 PP
+  registered in the A-annex~~ **done — registered as PP-E1 at annex entry A-1.11, 2026-08-25**
+  (A-1.10 is the guard half, PR #1091; A-1.11 is the freeze event). **No effect-row
+  implementation (E2) merges before M1 is done** — §4.3 (i). **M1 is now COMPLETE**: all three
+  items are done, so E2 may merge, and its PR body cites A-1.11 (design §13.3's M1 row).
 
 **SHOULD** (0.13 §2.2 leftovers this bullet used to hide inside "the agent workflow completes")
 
@@ -585,20 +586,29 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   retained in `result.json` `tokenUsage` for audit; runner warns on disagreement) with a pinned
   reproduction in `bench/phase0-agent-native/tests/` and annex entry A-1.9.1. It landed before
   the PP registers, as required.
-- **The pre-registered fixture-scale probe**, under a NEW PP id, with the full discipline:
+- **The pre-registered fixture-scale probe — REGISTERED as `PP-E1` at annex entry **A-1.11** on
+  2026-08-25**, with the full discipline:
   **(i)** freeze event named — the PP registers in the A-annex (`docs/plans/agent-native-gates.md`,
-  A-1.10 is the guard half, PR #1091; **the PP-registration entry — A-1.11 or later — is the
+  A-1.10 is the guard half, PR #1091; **the PP-registration entry — A-1.11 — is the
   freeze event**) before any effect-row implementation
-  merges; the empty `docs/experiments/registry.json` is the TIER1A-hypothesis registry and is not
+  merges, which A-1.11 verified by `grep -rn "Calor0424" src/` returning empty at `f7cd1c46`;
+  the empty `docs/experiments/registry.json` is the TIER1A-hypothesis registry and is not
   where this goes. **The annex had no mechanical tamper guard until A-1.10** — the append-only check
   (`experiment-registry-tamper-check.yml`) covered only `registry.json`. The A-1.10 PR (#1091) extends that
   workflow to the annex with an append-only check on its frozen rows and revision log, so the freeze
   is enforced by the same instrument that guards the other registry rather than by discipline
   alone. **(ii)** fixture and defect classes frozen in the same annex entry, with honest-timing
-  disclosure if authoring is concurrent (A-1.2 pattern); **(iii)** the four-valued outcome (hit /
-  miss / underpowered / not-adjudicated) with a pre-registered decidability fallback; **(iv)** the
+  disclosure if authoring is concurrent (A-1.2 pattern) — **done**: the five spike artifacts by
+  blob SHA and ten injectable mutations over three classes, with the disclosure that PR #1096
+  authored the fixtures first; **(iii)** the four-valued outcome (hit /
+  miss / underpowered / not-adjudicated) with a pre-registered decidability fallback — **done**,
+  HIT = 10/10 mutations detected with a clean negative control and no cost-leg failure;
+  **(iv)** the
   "no large loop tax" margin stated numerically via the PP-W5 derivation (existing-epoch
-  variance → null-simulation p95 → bootstrap-bound conjunction).
+  variance → null-simulation p95 → bootstrap-bound conjunction) — **done**: re-derived on
+  `w5-parity-002` with corrected tokens (within-cell CV median 0.439, null p95 1.321) to a
+  **1.35** point margin conjoined with a bootstrap lower bound above 1.0; measured null
+  false-fail 2.3 %, power 0.24 / 0.52 / 0.75 at 1.25× / 1.4× / 1.6×.
 - **Register-then-merge has a precedent to repair first (M1):** PR #944 (the §3.1
   pre-registration) is still open while its spike shipped. It is merged as the historical record
   or closed with the discrepancy noted before the 0.15 PP registers — otherwise the discipline is
@@ -647,10 +657,20 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    enumerates the four entry points' default `UnknownCallPolicy`. *Discriminating pin:* flip one
    surface's default and the equivalence test fails; drop ES-08 from the id list and
    `RegisteredScriptIdsAreStable` fails.
-4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome.
-   *Instrument/denominator/freeze:* the PP-registration annex entry (A-1.11 or later; A-1.10 is
-   the guard half, PR #1091 — PP id, fixture, defect classes,
-   margin). *Discriminating pin:* the annex append-only check rejects an edit to the frozen row.
+4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome, at the
+   0.15.0 release commit. *Instrument:* **`PP-E1`**, frozen at annex entry **A-1.11**
+   (2026-08-25; A-1.10 is the guard half, PR #1091) — read from
+   `bench/phase0-agent-native/effect-rows-probe-ledger.json` by the exact-equality test
+   `EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation`
+   (`tests/Calor.Compiler.Tests/Effects/EffectRowsProbeLedgerTests.cs`, `compiler` shard), with
+   the cost leg adjudicated by `bench/phase0-agent-native/ppe1-analyze.py` into
+   `epochs/e1-rows-parity-001/ppe1-analysis.json`. *Denominator:* the ten frozen mutations over
+   the five frozen fixtures (7 if the §4.1 ramp fires and the `L6` cells drop), plus leg B's four
+   N1 pairs × 5 runs/arm. *Bar:* 10/10 detected with a clean negative control, and a cost leg
+   that does not fail (point > 1.35 **and** bootstrap lower bound > 1.0 is the failure).
+   *Freeze point:* A-1.11, before E2 merges. *Discriminating pin:* the annex append-only check
+   rejects an edit to the frozen row; and dropping any one registered mutation from the ledger
+   fails the exact-equality test.
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
    migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
    version (§4.0). *Denominator:* the committed `.calr` corpus at the 0.15 branch-cut commit, in
