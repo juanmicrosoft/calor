@@ -503,9 +503,14 @@ keying are E1 decisions, made in §4.2, not design-doc decisions.)
 
 **Exit ramp (pre-registered), and what it changes downstream:** if rank-1 polymorphism fails to
 validate on the named combinator set, 0.15 ships monomorphic rows with explicit Unknown/Assumed
-propagation and defers polymorphism. When the ramp fires, **E3's rank-1 leg and gate 1's fifth
-class are removed with it** — gate 1's denominator becomes four classes and the release notes say
-so. Still a shippable release that removes the first-order ceiling for the common case.
+propagation and defers polymorphism. When the ramp fires, **E3's rank-1 leg and gate 1's
+rank-1-instantiation class are removed with it** — gate 1's denominator becomes **five** classes
+(of six) and the release notes say so. *(Count reconciled 2026-08-25 with annex A-1.11: the
+laundering classes are the **six** compatibility-checking sites design doc §6.2 tabulates —
+assignment, argument, return, override, interface implementation, rank-1 instantiation — so the
+ramp takes the denominator from six to five. Earlier drafts of this section and of §4.4 gate 1
+said five-to-four by folding override and interface implementation into one row; §10's round-3
+review record preserves that earlier wording as written.)* Still a shippable release that removes the first-order ceiling for the common case.
 
 ### 4.2 Ship — tiered, with the cut lines stated
 
@@ -547,10 +552,11 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   the facet's correctness but not the old store's deletion.
 - **M1 — Measurement prerequisites that block E2's merge** (moved here from §4.3 so the chain is
   visible): PR #944 dispositioned; ~~#881 corrected or the cost leg re-registered~~ **done** (PR #1092:
-  `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); the 0.15 PP
-  registered in the A-annex (the PP-registration entry, A-1.11 or later; A-1.10 is the guard
-  half, PR #1091). **No effect-row implementation (E2) merges before M1 is
-  done** — §4.3 (i).
+  `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); ~~the 0.15 PP
+  registered in the A-annex~~ **done — registered as PP-E1 at annex entry A-1.11, 2026-08-25**
+  (A-1.10 is the guard half, PR #1091; A-1.11 is the freeze event). **No effect-row
+  implementation (E2) merges before M1 is done** — §4.3 (i). **M1 is now COMPLETE**: all three
+  items are done, so E2 may merge, and its PR body cites A-1.11 (design §13.3's M1 row).
 
 **SHOULD** (0.13 §2.2 leftovers this bullet used to hide inside "the agent workflow completes")
 
@@ -585,40 +591,56 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   retained in `result.json` `tokenUsage` for audit; runner warns on disagreement) with a pinned
   reproduction in `bench/phase0-agent-native/tests/` and annex entry A-1.9.1. It landed before
   the PP registers, as required.
-- **The pre-registered fixture-scale probe**, under a NEW PP id, with the full discipline:
+- **The pre-registered fixture-scale probe — REGISTERED as `PP-E1` at annex entry **A-1.11** on
+  2026-08-25**, with the full discipline:
   **(i)** freeze event named — the PP registers in the A-annex (`docs/plans/agent-native-gates.md`,
-  A-1.10 is the guard half, PR #1091; **the PP-registration entry — A-1.11 or later — is the
+  A-1.10 is the guard half, PR #1091; **the PP-registration entry — A-1.11 — is the
   freeze event**) before any effect-row implementation
-  merges; the empty `docs/experiments/registry.json` is the TIER1A-hypothesis registry and is not
+  merges, which A-1.11 verified by `grep -rn "Calor0424" src/` returning empty at `f7cd1c46`;
+  the empty `docs/experiments/registry.json` is the TIER1A-hypothesis registry and is not
   where this goes. **The annex had no mechanical tamper guard until A-1.10** — the append-only check
   (`experiment-registry-tamper-check.yml`) covered only `registry.json`. The A-1.10 PR (#1091) extends that
   workflow to the annex with an append-only check on its frozen rows and revision log, so the freeze
   is enforced by the same instrument that guards the other registry rather than by discipline
   alone. **(ii)** fixture and defect classes frozen in the same annex entry, with honest-timing
-  disclosure if authoring is concurrent (A-1.2 pattern); **(iii)** the four-valued outcome (hit /
-  miss / underpowered / not-adjudicated) with a pre-registered decidability fallback; **(iv)** the
+  disclosure if authoring is concurrent (A-1.2 pattern) — **done**: the five spike artifacts by
+  blob SHA and ten injectable mutations over three classes, with the disclosure that PR #1096
+  authored the fixtures first; **(iii)** the four-valued outcome (hit /
+  miss / underpowered / not-adjudicated) with a pre-registered decidability fallback — **done**,
+  HIT = 10/10 mutations detected with a clean negative control and no cost-leg failure;
+  **(iv)** the
   "no large loop tax" margin stated numerically via the PP-W5 derivation (existing-epoch
-  variance → null-simulation p95 → bootstrap-bound conjunction).
-- **Register-then-merge has a precedent to repair first (M1):** PR #944 (the §3.1
-  pre-registration) is still open while its spike shipped. It is merged as the historical record
-  or closed with the discrepancy noted before the 0.15 PP registers — otherwise the discipline is
-  aspirational.
+  variance → null-simulation p95 → bootstrap-bound conjunction) — **done**: re-derived on
+  `w5-parity-002` with corrected tokens (within-cell CV median 0.4392, null p95 1.3302) to a
+  **1.35** point margin — the null p95 rounded up to the 0.05 grid — conjoined with a bootstrap
+  lower bound above 1.0; measured null false-fail 1.7 % (point test alone 3.7 %), power
+  0.22 / 0.48 / 0.77 at 1.25× / 1.4× / 1.6×. Script and full output committed at
+  `bench/phase0-agent-native/ppe1-margin-derivation.py` / `…-derivation.txt`.
+- **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
+  pre-registration) was still open while its spike shipped; it is now **closed with the
+  discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.
 - **No real-scale epoch** unless both registered re-entry conditions hold (≥70 evaluable tasks;
   a real Calor arm). Unchanged.
 
 ### 4.4 Release gates — instrument, denominator, freeze point, discriminating pin
 
 Conditional (they move with their SHOULD-tier deliverable): gate 3's MCP leg (E7), gate 7's E6/E7
-legs. Conditional on the §4.1 ramp *not* firing: gate 1's fifth class. Unconditional: everything
+legs. Conditional on the §4.1 ramp *not* firing: gate 1's rank-1-instantiation class (its sixth).
+Unconditional: everything
 else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
 
 1. **Effect laundering, closed classes.** *Instrument:* one adversarial pin per class, the
    `DelegateInvocation_*` pattern, positive and negative (`_IsError` / `_Compiles` pairs as
-   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* five classes —
-   virtual override and interface implementation (already closed by Calor0420/0421; **re-pinned
-   under rows**, since folding them into E3 could silently reopen them), delegate/function-value
-   *assignment*, *argument*, and *return* (closed by E3's typing rule, not by E4's rejection), and
-   rank-1 generic instantiation (four classes if the ramp fires). *Freeze point:* the class list
+   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* **six classes —
+   the six compatibility-checking sites design doc §6.2 tabulates** (count reconciled 2026-08-25
+   with annex A-1.11; earlier drafts said five by folding the first two into one row): virtual
+   override **and** interface implementation, counted separately (already closed by
+   Calor0420/0421; **re-pinned under rows**, since folding them into E3 could silently reopen
+   them), delegate/function-value *assignment*, *argument*, and *return* (closed by E3's typing
+   rule, not by E4's rejection), and rank-1 generic instantiation (**five classes if the ramp
+   fires**). A-1.11's PP-E1 covers two of these six on its fixture set — interface implementation
+   and rank-1 instantiation — plus E4's row-erasure class, which this gate does not enumerate;
+   the other four are this gate's alone. *Freeze point:* the class list
    and the residual list freeze at **design-doc merge**; the residual (reflection,
    `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates) is
    named in the release notes as "not closed", never "no callback can". *Discriminating pin:*
@@ -647,10 +669,25 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    enumerates the four entry points' default `UnknownCallPolicy`. *Discriminating pin:* flip one
    surface's default and the equivalence test fails; drop ES-08 from the id list and
    `RegisteredScriptIdsAreStable` fails.
-4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome.
-   *Instrument/denominator/freeze:* the PP-registration annex entry (A-1.11 or later; A-1.10 is
-   the guard half, PR #1091 — PP id, fixture, defect classes,
-   margin). *Discriminating pin:* the annex append-only check rejects an edit to the frozen row.
+4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome, at the
+   0.15.0 release commit. *Instrument:* **`PP-E1`**, frozen at annex entry **A-1.11**
+   (2026-08-25; A-1.10 is the guard half, PR #1091) — read from
+   `bench/phase0-agent-native/effect-rows-probe-ledger.json` by the exact-equality test
+   `EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation`
+   (`tests/Calor.Compiler.Tests/Effects/EffectRowsProbeLedgerTests.cs`, `compiler` shard), with
+   the cost leg adjudicated by `bench/phase0-agent-native/ppe1-analyze.py` into
+   `epochs/e1-rows-parity-001/ppe1-analysis.json`. *Denominator:* the ten frozen mutations over
+   the five frozen fixtures (7 if the ramp of §4.1 — design doc §7.5, the same ramp — fires and
+   the `L6` cells drop), plus leg B's four
+   N1 pairs × 5 runs/arm. *Bar:* 10/10 detected **with the registered code at the registered
+   declaration** (`Calor0418` is explicitly not detection; drift is bounded to the row family)
+   and a clean negative control, plus a cost leg that does not fail (point > 1.35 **and**
+   bootstrap lower bound > 1.0 is the failure). The four values are a strict partition evaluated
+   in the precedence NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT, and a not-adjudicated route
+   caused by this workstream's own change is adjudicated MISS.
+   *Freeze point:* A-1.11, before E2 merges. *Discriminating pin:* the annex append-only check
+   rejects an edit to the frozen row; and dropping any one registered mutation from the ledger
+   fails the exact-equality test.
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
    migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
    version (§4.0). *Denominator:* the committed `.calr` corpus at the 0.15 branch-cut commit, in
@@ -699,7 +736,7 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
 | #859, #884 (Z3 CI flake) | **Still open** after 0.13 and 0.14 shipped (§5.2 previously dispositioned them to 0.13) | 0.15.x instrument debt; re-adjudicated at the 0.15.0 retro with the flake rate over the 0.15 cycle attached |
 | #970 residual (verified / heuristic / incomplete tri-state) | Shipped as the analyzers' published residual | Unchanged in 0.15; the tri-state counts are published per release |
 | `--permissive-effects` waiver under rows | Waives Calor0410/0411/0418 today | Survives as the waiver for Calor0425 (Unknown/Assumed rows) only; a row that does not fit (Calor0424) is never waived. Pinned in E4 |
-| PR #944 (§3.1 pre-registration) | Open after the spike shipped | M1 — resolved before the 0.15 PP registers (§4.3) |
+| PR #944 (§3.1 pre-registration) | **Closed** with the discrepancy noted, before the 0.15 PP registered | M1 — **done** (§4.3); the PP registered at annex A-1.11 |
 | PR #982 (§2.5 gate 7 CLI leg), #981, #976 | Open docs/CI PRs | Merged or closed in the 0.15 kickoff sweep; none gates 0.15 |
 
 ## 5. Explicitly not in these three releases — and the backlog dispositioned

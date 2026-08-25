@@ -34,11 +34,16 @@
 ### roadmap gate 1 text
 1. **Effect laundering, closed classes.** *Instrument:* one adversarial pin per class, the
    `DelegateInvocation_*` pattern, positive and negative (`_IsError` / `_Compiles` pairs as
-   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* five classes —
-   virtual override and interface implementation (already closed by Calor0420/0421; **re-pinned
-   under rows**, since folding them into E3 could silently reopen them), delegate/function-value
-   *assignment*, *argument*, and *return* (closed by E3's typing rule, not by E4's rejection), and
-   rank-1 generic instantiation (four classes if the ramp fires). *Freeze point:* the class list
+   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* **six classes —
+   the six compatibility-checking sites design doc §6.2 tabulates** (count reconciled 2026-08-25
+   with annex A-1.11; earlier drafts said five by folding the first two into one row): virtual
+   override **and** interface implementation, counted separately (already closed by
+   Calor0420/0421; **re-pinned under rows**, since folding them into E3 could silently reopen
+   them), delegate/function-value *assignment*, *argument*, and *return* (closed by E3's typing
+   rule, not by E4's rejection), and rank-1 generic instantiation (**five classes if the ramp
+   fires**). A-1.11's PP-E1 covers two of these six on its fixture set — interface implementation
+   and rank-1 instantiation — plus E4's row-erasure class, which this gate does not enumerate;
+   the other four are this gate's alone. *Freeze point:* the class list
    and the residual list freeze at **design-doc merge**; the residual (reflection,
    `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates) is
    named in the release notes as "not closed", never "no callback can". *Discriminating pin:*
