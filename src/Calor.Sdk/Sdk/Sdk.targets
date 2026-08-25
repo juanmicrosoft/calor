@@ -11,6 +11,9 @@
     <!-- Type checking: default true, matching CompilationOptions.EnableTypeChecking (v0.12) -->
     <CalorTypeCheck Condition="'$(CalorTypeCheck)' == ''">true</CalorTypeCheck>
     <CalorTranspileOnly Condition="'$(CalorTranspileOnly)' == ''">false</CalorTranspileOnly>
+    <!-- Proof-based guard elision: default true (v0.15), matching CompilationOptions.ElideProvenGuards.
+         Set false to keep every runtime contract guard even on a Proven verdict. Only matters with CalorVerify=true. -->
+    <CalorElideProvenGuards Condition="'$(CalorElideProvenGuards)' == ''">true</CalorElideProvenGuards>
   </PropertyGroup>
 
   <!-- When consumed from the Calor.Sdk package, the bundled Calor.Runtime.dll

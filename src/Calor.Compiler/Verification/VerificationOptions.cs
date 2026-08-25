@@ -24,11 +24,12 @@ public sealed class VerificationOptions
     public bool Verbose { get; init; }
 
     /// <summary>
-    /// Mirrors <see cref="Calor.Compiler.CompilationOptions"/>' elision opt-in so verbose
-    /// diagnostics can state the check's actual disposition (kept vs elided) truthfully.
-    /// Verification itself never acts on this — only the emitter does.
+    /// Mirrors <see cref="Calor.Compiler.CompilationOptions"/>' elision setting (default
+    /// on since v0.15) so verbose diagnostics can state the check's actual disposition
+    /// (kept vs elided) truthfully. Verification itself never acts on this — only the
+    /// emitter does.
     /// </summary>
-    public bool ElideProvenGuards { get; init; }
+    public bool ElideProvenGuards { get; init; } = true;
 
     /// <summary>
     /// Cache options for verification results.

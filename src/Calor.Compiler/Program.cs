@@ -93,7 +93,12 @@ public class Program
 
         var elideProvenGuardsOption = new Option<bool>(
             aliases: ["--elide-proven-guards"],
-            description: "Opt in to deleting runtime contract guards on Proven verdicts (v0.13 flips the old default: verification is diagnostic unless this is set)",
+            description: "Drop runtime contract guards on clean Proven verdicts (default since v0.15 — roadmap §4.5; accepted for compatibility). Use --keep-proven-guards to opt out.",
+            getDefaultValue: () => true);
+
+        var keepProvenGuardsOption = new Option<bool>(
+            aliases: ["--keep-proven-guards", "--no-elide-proven-guards"],
+            description: "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; verification stays diagnostic)",
             getDefaultValue: () => false);
 
         var cacheOption = new Option<bool>(
@@ -176,6 +181,7 @@ public class Program
             contractModeOption,
             verifyOption,
             elideProvenGuardsOption,
+            keepProvenGuardsOption,
             cacheOption,
             noCacheOption,
             clearCacheOption,
@@ -221,7 +227,16 @@ public class Program
             var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
-            var elideProvenGuards = ctx.ParseResult.GetValueForOption(elideProvenGuardsOption);
+            // v0.15 (roadmap §4.5): elision is the default. --keep-proven-guards is the
+            // opt-out; --elide-proven-guards is still accepted (a no-op default) so
+            // v0.13/v0.14 command lines keep working.
+            var keepProvenGuards = ctx.ParseResult.GetValueForOption(keepProvenGuardsOption);
+            var elideProvenGuards = ctx.ParseResult.GetValueForOption(elideProvenGuardsOption) && !keepProvenGuards;
+            var elisionFlagGiven = ctx.ParseResult.FindResultFor(keepProvenGuardsOption) is { IsImplicit: false }
+                ? "--keep-proven-guards"
+                : ctx.ParseResult.FindResultFor(elideProvenGuardsOption) is { IsImplicit: false }
+                    ? "--elide-proven-guards"
+                    : null;
             var cache = ctx.ParseResult.GetValueForOption(cacheOption);
             var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
             var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
@@ -254,7 +269,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards);
+                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven);
             }
             catch (Exception ex)
             {
@@ -332,10 +347,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = false)
-        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null)
+        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards, elisionFlagGiven));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = false)
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null)
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -345,10 +360,12 @@ public class Program
         var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
         var declarationIds = structuredOutput ? new Ids.DeclarationIdResolver() : null;
 
-        if (elideProvenGuards && !verify)
+        // Only an explicitly written flag earns the warning: elision is the default
+        // (v0.15), so a bare `calor compile` without --verify must stay quiet.
+        if (elisionFlagGiven is not null && !verify)
         {
             Console.Error.WriteLine(
-                "warning: --elide-proven-guards has no effect without --verify " +
+                $"warning: {elisionFlagGiven} has no effect without --verify " +
                 "(there are no verification verdicts to elide on).");
         }
         var structuredEmitted = false;
@@ -1267,13 +1284,18 @@ public sealed class CompilationOptions
     public bool VerifyContracts { get; init; }
 
     /// <summary>
-    /// Opt IN to deleting runtime contract guards on a Proven verdict (roadmap v0.13
-    /// §2.1: elision is opt-in; verification is diagnostic by default). Off, a Proven
-    /// postcondition or Discharged §PROOF obligation keeps its runtime check — the
-    /// verdict is reported, never silently acted on. The zero-mismatch differential
-    /// gate (freeze registration F-4) is the bar for flipping this default back on.
+    /// Delete runtime contract guards on a clean Proven verdict. Default <c>true</c>
+    /// since v0.15 (roadmap §4.5): the re-enable condition registered in v0.13 §2.1 —
+    /// the verifier/runtime differential suite at 0 mismatches over the pinned
+    /// modeled-forms denominator (coverage 40/65) — is met. Set <c>false</c>
+    /// (CLI <c>--keep-proven-guards</c>, MSBuild <c>CalorElideProvenGuards=false</c>)
+    /// to keep every guard: the verdict is then reported, never acted on. Vacuous
+    /// proofs, Assumed/Timeout/Refuted verdicts and preconditions never elide.
+    /// This default must stay equal across CLI, <see cref="CompilationOptions"/>,
+    /// the MSBuild task and Sdk.targets (pinned by
+    /// <c>EffectDefaultEquivalenceTests</c>).
     /// </summary>
-    public bool ElideProvenGuards { get; init; }
+    public bool ElideProvenGuards { get; init; } = true;
 
     /// <summary>
     /// Options for verification result caching.

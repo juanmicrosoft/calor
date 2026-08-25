@@ -9,7 +9,7 @@ const features = [
   {
     name: 'Rules That Enforce Themselves',
     description:
-      'Contracts you write are proved by Z3 and guarded at runtime by default. Opt in to --elide-proven-guards to drop the guard when the verdict is Proven.',
+      'Contracts you write are proved by Z3; a clean Proven verdict drops its runtime guard, everything else stays guarded. Pass --keep-proven-guards to keep every guard.',
     icon: Shield,
     code: '§Q (>= x 0)\n§S (>= result 0)',
     href: '/docs/philosophy/effects-contracts-enforcement/',

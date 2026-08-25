@@ -33,6 +33,55 @@ public class CompileToolTests
         Assert.True(props.TryGetProperty("source", out _));
     }
 
+    // v0.15 (PR #1088): the MCP compile tool inherits default-on elision and must
+    // expose the same opt-out the CLI has (`keepProvenGuards` ⇔ --keep-proven-guards).
+    private const string ProvenSquareSource =
+        "§M{m001:Test}\n  §CL{c001:Calc:pub}\n    §MT{mt001:Square:pub}\n      §I{i32:x}\n      §O{i32}\n" +
+        "      §Q (>= x 0)\n      §Q (<= x 46340)\n      §S (>= result 0)\n      §R (* x x)\n";
+
+    private async Task<string> CompileProvenSquare(string options)
+    {
+        var args = JsonDocument.Parse(
+            "{\"source\": " + JsonSerializer.Serialize(ProvenSquareSource) + ", \"options\": " + options + "}").RootElement;
+        var result = await _tool.ExecuteAsync(args);
+        Assert.False(result.IsError);
+        var text = result.Content[0].Text;
+        Assert.NotNull(text);
+        return text;
+    }
+
+    [SkippableFact]
+    public async Task ExecuteAsync_Verify_DefaultElidesProvenPostcondition()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var text = await CompileProvenSquare("""{"verify": true}""");
+
+        Assert.Contains("PROVEN: Postcondition", text);
+        Assert.DoesNotContain("ContractKind.Ensures", text);
+    }
+
+    [SkippableFact]
+    public async Task ExecuteAsync_Verify_KeepProvenGuards_KeepsGuard()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var text = await CompileProvenSquare("""{"verify": true, "keepProvenGuards": true}""");
+
+        Assert.DoesNotContain("PROVEN: Postcondition", text);
+        Assert.Contains("ContractKind.Ensures", text);
+    }
+
+    [Fact]
+    public void GetInputSchema_ExposesKeepProvenGuardsOptOut()
+    {
+        var schema = _tool.GetInputSchema();
+        Assert.True(schema.GetProperty("properties").GetProperty("options").GetProperty("properties")
+            .TryGetProperty("keepProvenGuards", out var keep));
+        Assert.Equal("boolean", keep.GetProperty("type").GetString());
+        Assert.False(keep.GetProperty("default").GetBoolean());
+    }
+
     [Fact]
     public async Task ExecuteAsync_WithValidSource_ReturnsSuccess()
     {

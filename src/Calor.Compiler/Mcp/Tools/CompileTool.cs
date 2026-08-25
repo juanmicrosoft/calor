@@ -55,6 +55,11 @@ public sealed class CompileTool : McpToolBase
                             "default": false,
                             "description": "Enable Z3 contract verification"
                         },
+                        "keepProvenGuards": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; only matters with verify=true)"
+                        },
                         "analyze": {
                             "type": "boolean",
                             "default": false,
@@ -159,6 +164,7 @@ public sealed class CompileTool : McpToolBase
         var options = GetOptions(arguments);
 
         var verify = GetBool(options, "verify");
+        var keepProvenGuards = GetBool(options, "keepProvenGuards");
         var analyze = GetBool(options, "analyze");
         var autoFix = GetBool(options, "autoFix", defaultValue: true);
         var contractModeStr = GetString(options, "contractMode") ?? "debug";
@@ -186,6 +192,7 @@ public sealed class CompileTool : McpToolBase
                 UnknownCallPolicy = unknownCallPolicy,
                 StrictEffects = strictEffects,
                 VerifyContracts = verify,
+                ElideProvenGuards = !keepProvenGuards,
                 EnableVerificationAnalyses = analyze,
                 VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
                 CancellationToken = cancellationToken
