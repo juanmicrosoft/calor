@@ -1,0 +1,8 @@
+# docs/design/spikes/effect-rows/before/A3-match.calr
+# exit: 1
+# emitted: yes
+# emit args: --permissive-effects
+# diagnostics: 2
+
+docs/design/spikes/effect-rows/before/A3-match.calr(5,10): error Calor0418: Invocation of function-typed value 'onSome' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+docs/design/spikes/effect-rows/before/A3-match.calr(6,8): error Calor0418: Invocation of function-typed value 'onNone' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).

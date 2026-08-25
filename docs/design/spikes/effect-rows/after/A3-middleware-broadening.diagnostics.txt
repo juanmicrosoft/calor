@@ -1,0 +1,7 @@
+# docs/design/spikes/effect-rows/after/A3-middleware-broadening.calr
+# exit: 1
+# emitted: no
+# emit args: (none)
+# diagnostics: 1
+
+docs/design/spikes/effect-rows/after/A3-middleware-broadening.calr(9,7): error Calor0421: Implementation 'LoggingBehavior.Handle' of interface method 'IPipelineBehavior.Handle' on class 'LoggingBehavior' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.

@@ -63,8 +63,15 @@ print("\n### tests/TestData function-typed .calr")
 print("count:", sh("grep -rlE 'Func<|Action<|Action[}:]|Predicate<|§DEL|§LAM' tests/TestData --include='*.calr' | wc -l"))
 
 print("\n### whole-corpus function-typed positions (IsFunctionTypeName shapes)")
-print(sh("git ls-files '*.calr' | xargs grep -hoE 'Func<|Action<|Action[}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null | wc -l"))
-print(sh_sorted("git ls-files '*.calr' | xargs grep -lE 'Func<|Action<|Action[}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))
+# `docs/design/spikes/` is excluded: the emitter spike commits before/after .calr
+# fixtures as EVIDENCE, and they are deliberately full of Func<>/Action<>. They
+# are artifacts, not corpus, so counting them would make the design doc's "5
+# shapes in 5 files, all conversion snapshots" (§1) false by self-reference.
+# HigherOrderDemandLedgerTests and LosslessFormattingTests exclude the same path
+# for the same reason. This line does not change the count.
+CORPUS = "git ls-files '*.calr' | grep -v '^docs/design/spikes/'"
+print(sh(f"{CORPUS} | xargs grep -hoE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null | wc -l"))
+print(sh_sorted(f"{CORPUS} | xargs grep -lE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))
 
 print("\n### Conversion tests: effect pass?")
 print(sh("sed -n '38,72p' tests/Calor.Conversion.Tests/TestHelpers.cs"))

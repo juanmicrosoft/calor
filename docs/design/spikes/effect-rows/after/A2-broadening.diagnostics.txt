@@ -1,0 +1,11 @@
+# docs/design/spikes/effect-rows/after/A2-broadening.calr
+# exit: 1
+# emitted: yes
+# emit args: --permissive-effects
+# diagnostics: 5
+
+docs/design/spikes/effect-rows/after/A2-broadening.calr(23,9): error Calor0410: Function 'Handle' uses effect 'unknown' but does not declare it
+docs/design/spikes/effect-rows/after/A2-broadening.calr(23,9): error Calor0421: Implementation 'RequestPreProcessorBehavior.Handle' of interface method 'IPipelineBehavior.Handle' on class 'RequestPreProcessorBehavior' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+docs/design/spikes/effect-rows/after/A2-broadening.calr(26,32): warning Calor0411: Unknown external call to 'processor.Process'. Add effect declaration in a .calor-effects.json manifest.
+docs/design/spikes/effect-rows/after/A2-broadening.calr(27,24): warning Calor0411: Unknown external call to '_chainProcess010.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest.
+docs/design/spikes/effect-rows/after/A2-broadening.calr(29,19): warning Calor0411: Unknown external call to '_chainNext011.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest.
