@@ -42,6 +42,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HELPERS="$SCRIPT_DIR/bundle-helpers.py"
+# #881: the ONE derivation of the cost-leg token figure (shared with run-pair.sh).
+# shellcheck source=token-usage.sh
+source "$SCRIPT_DIR/token-usage.sh"
 
 MAX_INVALID_RETRIES=2
 INVALID_MARKERS=("hit your session limit" "rate limit" "overloaded" "api error")
@@ -482,13 +485,18 @@ extract_metrics() {
     iterations=$(jq -s '[.[] | select(.edited==true)] | length' "$journal")
 
     # Cost + tokens from the agent envelope. Cost = summed total_cost_usd; NEVER
-    # hand-price tokens.
-    local cost=0 tin=0 tout=0
+    # hand-price tokens. Tokens come from token-usage.py (#881): the envelope's
+    # top-level usage.output_tokens covers only the final turn and under-counts
+    # up to 55x on subagent-delegating / compaction-resumed runs; the helper
+    # sums modelUsage[*] instead and reports both figures for audit.
+    local cost=0 tin=0 tout=0 token_usage='{"source":"missing"}'
     if [[ -f "$ws_out/agent.json" ]] && jq -e . "$ws_out/agent.json" >/dev/null 2>&1; then
         cost=$(jq -s 'map(.total_cost_usd // 0) | add // 0' "$ws_out/agent.json" 2>/dev/null || echo 0)
-        tin=$(jq -r '(.usage.input_tokens // 0)' "$ws_out/agent.json" 2>/dev/null || echo 0)
-        tout=$(jq -r '(.usage.output_tokens // 0)' "$ws_out/agent.json" 2>/dev/null || echo 0)
     fi
+    # token-usage.sh gates on file presence only and lets the helper decide;
+    # a helper failure falls back to the naive read, never a silent 0.
+    token_usage_collect "$ws_out/agent.json" "$BUNDLE_ID/$ARM_LABEL/run-$run_idx"
+    tin=$TOKENS_IN; tout=$TOKENS_OUT; token_usage=$TOKEN_USAGE_JSON
 
     jq -n \
         --arg bundle "$BUNDLE_ID" --arg project "$PROJECT" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
@@ -498,6 +506,7 @@ extract_metrics() {
         --argjson basevf "$base_vf" --argjson escaped "$fhf" \
         --argjson iterations "$iterations" \
         --argjson cost "$cost" --argjson tin "$tin" --argjson tout "$tout" \
+        --argjson token_usage "$token_usage" \
         --argjson wall "$wall" \
         --argjson null_agent "$NULL_AGENT" --argjson noop "$NULL_AGENT_NOOP" \
         --arg mutfile "$(jq -r '.Provenance.MutatedFileRelPath' "$BUNDLE_DIR/provenance.json")" \
@@ -505,7 +514,8 @@ extract_metrics() {
           finalBuildOk:$fbuild, heldoutPass:$hp, heldoutFail:$hf,
           visiblePass:$vp, visibleFail:$vf, visibleFailBaseline:$basevf,
           escapedBugs:$escaped, iterations:$iterations, iterationsToDeclaredDone:$iterations,
-          costUsd:$cost, tokens:{input:$tin, output:$tout}, wallClockSeconds:$wall,
+          costUsd:$cost, tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
+          wallClockSeconds:$wall,
           invalid:false, nullAgent:($null_agent==1), nullAgentNoop:($noop==1),
           mutatedFile:$mutfile,
           presentationAsymmetry:"Calor arm = machine-converted round-tripped C#; C# arm = idiomatic original. Bias is against Calor."}' \
@@ -521,7 +531,8 @@ write_invalid_result() {
         '{bundle:$bundle, project:$project, arm:$arm, run:$run, outcome:"invalid",
           finalBuildOk:false, heldoutFail:$escaped, escapedBugs:$escaped,
           iterations:0, iterationsToDeclaredDone:0,
-          costUsd:0, tokens:{input:0, output:0}, wallClockSeconds:0,
+          costUsd:0, tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
+          wallClockSeconds:0,
           invalid:true, nullAgent:($null_agent==1), nullAgentNoop:($noop==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
