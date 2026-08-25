@@ -426,8 +426,9 @@ higher-order code instead of rejecting it.
   only (CHANGELOG 0.14.0–0.14.3; S8-Oblivious widening held in draft PR #1078; epic #1082).
 - **Measurement prerequisites unstarted.** No real Calor arm
   (`tools/Calor.RoundTrip.Harness/TaskGen/TaskGenReportWriter.cs:76-86`: "the runner never
-  invokes the Calor compiler"); #881 has no code or doc work (`run-bundle.sh:490` /
-  `run-pair.sh:920` read `.usage.output_tokens` uncorrected); PR #944 — the §3.1 spike's
+  invokes the Calor compiler"); #881 is corrected (`run-bundle.sh` /
+  `run-pair.sh` now read the cost-leg figure from the shared `token-usage.py`, which sums
+  `modelUsage[*].outputTokens`; pinned reproduction in `bench/phase0-agent-native/tests/`); PR #944 — the §3.1 spike's
   pre-registration — is still open after S1–S5 shipped, which is the register-then-merge
   discipline breached once already. The only append-only tamper guard in the repo
   (`experiment-registry-tamper-check.yml`) covers `docs/experiments/registry.json`, **not** the
@@ -752,7 +753,7 @@ plan's history is legible; where the closing PR is known it is named, otherwise 
 | #859, #884 (Z3 CI flake) | **Open** — Draft v3 dispositioned them to 0.13; both survived 0.13 and 0.14. 0.15.x instrument debt (§4.5) |
 | #874, #879, #883 | Closed (0.13 MUST) |
 | #875 (non-null `str`) | **Open** — `str` scope shipped across 0.14.0–0.14.3; remainder tracked by #1082 (§4.5) |
-| #881 (agent token metrics 55× under-count) | **Open, no work yet** — §4.2 M1, blocking E2's merge (§4.3) |
+| #881 (agent token metrics 55× under-count) | **Corrected** — `bench/phase0-agent-native/token-usage.py` is the single derivation for both runners; `result.json` `tokens.output` = `modelUsage[*].outputTokens` sum, `tokenUsage.output_tokens_naive` retained for audit; pinned test `tests/test_token_usage.py` (§4.2 M1) |
 | #1082 (v0.14 nullability follow-ons epic) | **Open** — sequenced after §4.2 E1 (§4.5) |
 | #1084 (§3.3 self-migration residue) | **Open** — filed by this draft; §4.5 row 2 |
 | #1011 (test-suite audit epic) | Open; continuous, not release-gated |

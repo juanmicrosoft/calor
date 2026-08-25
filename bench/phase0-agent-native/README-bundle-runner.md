@@ -98,7 +98,14 @@ pre-existing red.
 
 - `outcome`, `escapedBugs` (held-out fail count)
 - `costUsd` — **summed `total_cost_usd`** from the agent envelope (never
-  hand-priced from tokens), `tokens.{input,output}`
+  hand-priced from tokens), `tokens.{input,output}` — derived by
+  `token-usage.py` from `modelUsage[*]` (whole run: main conversation,
+  subagent turns, compaction segments), **not** the envelope's top-level
+  `usage.output_tokens`, which covers only the final turn and under-counted
+  55x on a subagent-delegating run (#881). `tokenUsage` carries the audit
+  trail: `output_tokens_naive` (the old figure), `output_tokens_corrected`,
+  `models_counted`, `models_excluded`, `origin_kind`, `undercount_ratio`,
+  `undercount_flagged`
 - `iterations` / `iterationsToDeclaredDone` (edited build/test cycles),
   `wallClockSeconds`
 - **D-W4.4 ceiling-recurrence signal**: the C#-arm escaped incidence across the

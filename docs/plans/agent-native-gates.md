@@ -349,6 +349,21 @@ ratios are 0.953 / 0.938 / 1.622 / 1.051 and the point estimate is **1.0016** �
 PASS on either basis, and robust across 200 bootstrap seeds. Future epochs should pin
 `modelUsage[*].outputTokens` or disallow subagent spawning.
 
+**Correction landed (#881, roadmap §4.2 M1).** Both runners now take the cost-leg figure from
+the shared `bench/phase0-agent-native/token-usage.py`, which sums `modelUsage[*].outputTokens`
+over every model except the side-model topic detector (default exclusion `haiku`, ~15 tokens,
+never applied when it would exclude every model). `result.json` `tokens.output` is that
+corrected figure; a `tokenUsage` block records `output_tokens_naive` (the old
+`usage.output_tokens`), `output_tokens_corrected`, `models_counted`, `models_excluded`,
+`origin_kind`, `undercount_ratio` and `undercount_flagged`, and the runner prints a
+collection-time warning whenever the two disagree by more than 5 % — the guard that would have
+caught all four cases above. The archived `w5-parity-001`/`-002` `result.json` files are NOT
+rewritten: they carry the naive figure the frozen row named, and the corrected ratios quoted
+above were recomputed from the archived `agent.json` envelopes. Any row registered after this
+date that names a per-run output-token metric means `tokens.output` as derived by
+`token-usage.py`. Pinned reproduction: `bench/phase0-agent-native/tests/test_token_usage.py`
+(synthetic fixtures shaped like the 55× run plus the archived run itself).
+
 **Two claims from an earlier revision of this entry are WITHDRAWN**, both artifacts of that
 defect. (a) *"One task cost the treatment half the tokens"* — the 0.470 does not exist; that run
 was the most expensive in its cell, not the least. (b) *"A genuine contrast multiplied the

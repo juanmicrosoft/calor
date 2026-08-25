@@ -86,6 +86,11 @@ jobs:
           python3 scripts/sync-self-test-resources.py --check
           python3 scripts/test_supply_chain.py
 
+      # #881 pinned reproduction: the epoch cost metric must count subagent
+      # and compaction-segment output tokens. Pure Python, no build needed.
+      - name: Test bench token-usage helper (#881)
+        run: python3 bench/phase0-agent-native/tests/test_token_usage.py
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
