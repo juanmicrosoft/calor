@@ -1,0 +1,10 @@
+# docs/design/spikes/effect-rows/after/A2.calr
+# exit: 1
+# emitted: yes
+# emit args: --permissive-effects
+# diagnostics: 4
+
+docs/design/spikes/effect-rows/after/A2.calr(23,9): error Calor0410: Function 'Handle' uses effect 'unknown' but does not declare it
+docs/design/spikes/effect-rows/after/A2.calr(25,32): warning Calor0411: Unknown external call to 'processor.Process'. Add effect declaration in a .calor-effects.json manifest.
+docs/design/spikes/effect-rows/after/A2.calr(26,24): warning Calor0411: Unknown external call to '_chainProcess010.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest.
+docs/design/spikes/effect-rows/after/A2.calr(28,19): warning Calor0411: Unknown external call to '_chainNext011.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest.

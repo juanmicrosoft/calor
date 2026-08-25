@@ -286,7 +286,14 @@ public class HigherOrderDemandLedgerTests
                 var segments = rel.Split('/');
                 var directories = segments.Take(segments.Length - 1).ToList();
                 return !directories.Any(d => d is "bin" or "obj" or ".git" or ".claude" or "node_modules")
-                    && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal);
+                    && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
+                    // Design-spike ARTIFACTS are not corpus. Round 3 moved the
+                    // harness's scratch .calr outside the repository for exactly
+                    // this reason; the emitter spike's before/after fixtures are
+                    // committed on purpose, so they cannot be moved and must be
+                    // excluded by path instead. The ledger's counts are unchanged
+                    // by this line — these files were never part of the 886.
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

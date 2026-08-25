@@ -938,6 +938,14 @@ public sealed class LosslessFormattingTests : IDisposable
 
         return output
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            // Design-spike ARTIFACTS are not corpus. The emitter spike commits
+            // before/after .calr pairs under docs/design/spikes/ as evidence;
+            // they are deliberately frozen inputs, not source the formatter
+            // baseline speaks for. Excluding them by path keeps
+            // formatter-corpus-baseline.json's trackedFileCount meaningful —
+            // and this line does not change it, because those files were never
+            // among the 886.
+            .Where(path => !path.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToArray();
     }

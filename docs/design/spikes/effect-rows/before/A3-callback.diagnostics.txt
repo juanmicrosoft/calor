@@ -1,0 +1,7 @@
+# docs/design/spikes/effect-rows/before/A3-callback.calr
+# exit: 1
+# emitted: yes
+# emit args: --permissive-effects
+# diagnostics: 1
+
+docs/design/spikes/effect-rows/before/A3-callback.calr(6,7): error Calor0418: Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
