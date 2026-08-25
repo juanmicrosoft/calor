@@ -73,6 +73,8 @@ public class InteropEffectCoverageCalculator : IMetricCalculator
     }
 
     // External call collection delegated to shared ExternalCallCollector
-    // in Calor.Compiler.Effects namespace (covers class methods, constructors,
-    // and resolves variable types via §NEW initializer scanning).
+    // in Calor.Compiler.Effects namespace (covers class methods and
+    // constructors; receiver types come from the bound tree — v0.15 E1 —
+    // and a receiver the binder cannot vouch for is counted as unknown
+    // here, never as covered).
 }

@@ -1275,6 +1275,17 @@ public static class DiagnosticCode
     /// typo) is surfaced loudly.
     /// </summary>
     public const string ReviewPacketUnknownChangedDeclaration = "Calor1358";
+
+    // `calor effects suggest` command diagnostics (Calor1360-1364)
+
+    /// <summary>
+    /// Warning (effects suggest): a call's receiver has no resolved type — an
+    /// inferred local the binder could not type, a member chain, a function
+    /// value, or a plain object — so the call was reported but not written into
+    /// the suggested manifest (v0.15 E1: a receiver is never given a guessed
+    /// type).
+    /// </summary>
+    public const string EffectsSuggestUntypedReceiver = "Calor1360";
 }
 
 /// <summary>
