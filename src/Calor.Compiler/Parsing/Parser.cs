@@ -1812,10 +1812,14 @@ public sealed class Parser
                     return;
                 }
 
+                // NOTE: the UNTRIMMED code is reported, byte-for-byte as today.
+                // The harness pins this message (case X5a quotes `' ^ e'`, with
+                // the leading space the attribute round-trip inserts), so
+                // trimming it here would be a gratuitous message change.
                 _diagnostics.Report(
                     startToken.Span,
                     DiagnosticCode.UnknownEffectCode,
-                    $"Unknown effect code '{trimmed}'. Use a code from the authoritative effect taxonomy.");
+                    $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy.");
             });
 
         if (variableIndices.Count > 0)
