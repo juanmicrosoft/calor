@@ -37,6 +37,16 @@ public sealed class OutputNode : AstNode
 /// </summary>
 public sealed class EffectsNode : AstNode
 {
+    /// <summary>
+    /// EMITTER SPIKE (effect-rows design doc §7.2). Reserved category key under
+    /// which rank-1 effect variables are recorded in <see cref="Effects"/>, as a
+    /// comma-separated ascending list of BINDER INDICES. It is not an
+    /// <c>EffectKind</c> category, so every existing consumer that maps
+    /// categories to kinds must skip it — see
+    /// <c>EffectEnforcementPass.GetDeclaredEffects</c>.
+    /// </summary>
+    public const string EffectVariableCategory = "__effvar";
+
     public IReadOnlyDictionary<string, string> Effects { get; }
 
     public EffectsNode(TextSpan span, IReadOnlyDictionary<string, string> effects) : base(span)
@@ -44,7 +54,28 @@ public sealed class EffectsNode : AstNode
         Effects = effects ?? throw new ArgumentNullException(nameof(effects));
     }
 
+    /// <summary>
+    /// EMITTER SPIKE. The binder indices of the rank-1 effect variables this row
+    /// mentions, ascending. Empty for every row written before 0.15.
+    /// </summary>
+    public IReadOnlyList<int> EffectVariableIndices
+    {
+        get
+        {
+            if (!Effects.TryGetValue(EffectVariableCategory, out var packed)
+                || string.IsNullOrEmpty(packed))
+            {
+                return Array.Empty<int>();
+            }
 
+            return packed
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => int.Parse(part, System.Globalization.CultureInfo.InvariantCulture))
+                .Distinct()
+                .OrderBy(i => i)
+                .ToArray();
+        }
+    }
 }
 
 /// <summary>
@@ -273,6 +304,15 @@ public sealed class ParameterNode : AstNode
     /// Parsed from §I{baseType:name | (predicate using #)}.
     /// </summary>
     public InlineRefinementInfo? InlineRefinement { get; }
+
+    /// <summary>
+    /// EMITTER SPIKE (effect-rows design doc §3.3, position 4/5). The effect row
+    /// annotating this parameter's type, written as a §E{…} on the SAME SOURCE
+    /// LINE as the last token of the type. Null when the source omits it, which
+    /// per §3.5 means the row is Unknown, never pure.
+    /// Settable so the parser can attach the row after the node is built.
+    /// </summary>
+    public EffectsNode? Row { get; set; }
 
     public ParameterNode(
         TextSpan span,

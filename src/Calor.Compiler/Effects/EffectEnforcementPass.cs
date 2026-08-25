@@ -487,6 +487,11 @@ public sealed class EffectEnforcementPass
         var effects = new List<(EffectKind Kind, string Value)>();
         foreach (var kv in effectsNode.Effects)
         {
+            // EMITTER SPIKE: the reserved rank-1 effect-variable key is not an
+            // EffectKind category. It is carried by the ROW, not by the concrete
+            // effect set, and is resolved at the instantiation site (§7.4).
+            if (kv.Key == EffectsNode.EffectVariableCategory) continue;
+
             var kind = ParseEffectCategory(kv.Key);
             var values = kv.Value.Split(',');
             foreach (var value in values)
