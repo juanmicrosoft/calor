@@ -185,6 +185,47 @@ Z10-E-inside-call-arguments.calr(7,33): error Calor0100: Expected statement but 
 Z10-E-inside-call-arguments.calr(7,35): error Calor0100: Expected statement but found EndCall
 
 ==============================================================================
+CASE W1a-IFACE-member-typeparams  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:W1}
+  §IFACE{i001:IP}
+    §MT{mt001:Handle}<T> (T:r) -> T
+      §E{}
+------------------------------------------------------------------------------
+Compilation successful: W1a-IFACE-member-typeparams.g.cs
+
+==============================================================================
+CASE W1b-IFACE-and-impl-member-typeparams  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:W1}
+  §IFACE{i001:IP}
+    §MT{mt001:Handle}<T> (T:r) -> T
+      §E{}
+  §CL{c001:Logging:pub}
+    §IMPL{IP}
+    §MT{mt001:Handle:pub}<T> (T:r) -> T
+      §E{}
+      §R r
+------------------------------------------------------------------------------
+Compilation successful: W1b-IFACE-and-impl-member-typeparams.g.cs
+
+==============================================================================
+CASE W1c-IFACE-impl-member-typeparams-renamed  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:W1}
+  §IFACE{i001:IP}
+    §MT{mt001:Handle}<T> (T:r) -> T
+      §E{}
+  §CL{c001:Logging:pub}
+    §IMPL{IP}
+    §MT{mt001:Handle:pub}<U> (U:r) -> U
+      §E{cw}
+      §P r
+      §R r
+------------------------------------------------------------------------------
+W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementation 'Logging.Handle' of interface method 'IP.Handle' on class 'Logging' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+
+==============================================================================
 CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Z11}

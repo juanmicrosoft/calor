@@ -91,4 +91,4 @@ total files: 23  total occurrences: 54
   tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr  §LAM=1 §DEL=0
 
 ### PR #1085 / F-3 supersession
-docs(freeze): F-3 supersession — re-register the edit-script corpus as it exists (ES-01..07) (#1085)
+b5d61e18 reachable in this checkout: True (shallow clones report False; the doc cites the SHA, not the subject)

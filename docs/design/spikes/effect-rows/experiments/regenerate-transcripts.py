@@ -12,8 +12,12 @@ OUT = os.path.join(EXP, "transcripts")
 
 os.makedirs(OUT, exist_ok=True)
 for s in SCRIPTS:
+    env = {**os.environ, "LC_ALL": "C", "LANG": "C"}
+    if s == "compile53.py":
+        # regenerating transcripts is also when the gate-5 ledger is refreshed
+        env["CALOR_WRITE_O53_BASELINE"] = "1"
     proc = subprocess.run([sys.executable, os.path.join(EXP, s)],
-                          capture_output=True, text=True, cwd=EXP)
+                          capture_output=True, text=True, cwd=EXP, env=env)
     body = proc.stdout + proc.stderr
     path = os.path.join(OUT, s.replace(".py", ".txt"))
     with open(path, "w", encoding="utf-8") as fh:

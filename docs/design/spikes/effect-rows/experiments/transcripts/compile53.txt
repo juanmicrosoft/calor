@@ -47,3 +47,5 @@ red files and their first code:
     benchmarks/security/path-traversal.calr ['Calor0100']
     benchmarks/security/sql-injection.calr ['Calor0100']
     tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr ['Calor0002']
+
+baseline.json verified: 23 files / 54 occurrences / 1 green / 22 red

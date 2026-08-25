@@ -46,22 +46,50 @@ print("red files and their first code:")
 for r in results:
     if r["exit"] != 0:
         print("   ", r["file"], r["codes"][:1])
-sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-ledger = {
-    "schemaVersion": 1,
-    "measuredCommit": sha,
-    "scope": (
-        "Every committed .calr containing a line matching §O{...} at end-of-line immediately "
-        "followed by a line matching §E{, compiled one file at a time via the CLI default "
-        "(EnforceEffects on, UnknownCallPolicy.Strict, no --permissive-effects). "
-        "twoLineOE is the occurrence count in that file; exit and codes are the compiler's "
-        "verdict at measuredCommit. Design-doc Decision 1 must not disturb any of these."),
+# --- the ledger: regenerate vs verify -------------------------------------
+# P29 runs this script on every test run, so writing unconditionally would
+# dirty a committed gate-5 instrument and make P30's "measuredCommit is a
+# 40-hex SHA" leg self-fulfilling (its sibling would have just written a fresh
+# one). Same discipline as CALOR_REGENERATE_S5_LEDGER: opt in to write.
+#
+# Both modes print the SAME lines, so the transcript is mode-independent.
+LEDGER = os.path.join(OUT, "baseline.json")
+SCOPE = (
+    "Every committed .calr containing a line matching \u00a7O{...} at end-of-line immediately "
+    "followed by a line matching \u00a7E{, compiled one file at a time via the CLI default "
+    "(EnforceEffects on, UnknownCallPolicy.Strict, no --permissive-effects). "
+    "twoLineOE is the occurrence count in that file; exit and codes are the compiler's "
+    "verdict at measuredCommit. Design-doc Decision 1 must not disturb any of these.")
+
+recomputed = {
     "fileCount": len(results),
     "occurrenceCount": sum(r["twoLineOE"] for r in results),
     "compileGreen": len(green),
     "compileRed": len(results) - len(green),
     "files": results,
 }
-with open(os.path.join(OUT, "baseline.json"), "w") as fh:
-    json.dump(ledger, fh, indent=2)
-    fh.write("\n")
+
+if os.environ.get("CALOR_WRITE_O53_BASELINE") == "1":
+    sha = subprocess.run(["git", "rev-parse", "HEAD"],
+                         capture_output=True, text=True).stdout.strip()
+    with open(LEDGER, "w", encoding="utf-8") as fh:
+        json.dump({"schemaVersion": 1, "measuredCommit": sha, "scope": SCOPE,
+                   **recomputed}, fh, indent=2)
+        fh.write("\n")
+
+# Verify in BOTH modes: after a regenerate this is a read-back check, and in
+# the default (test) mode it is the actual comparison against the committed
+# instrument. The printed verdict is identical either way.
+with open(LEDGER, encoding="utf-8") as fh:
+    committed = json.load(fh)
+
+mismatches = [k for k in ("fileCount", "occurrenceCount", "compileGreen", "compileRed", "files")
+              if committed.get(k) != recomputed[k]]
+print()
+if mismatches:
+    print("baseline.json MISMATCH on: " + ", ".join(mismatches))
+    print("Regenerate with CALOR_WRITE_O53_BASELINE=1 and review the diff.")
+else:
+    print(f"baseline.json verified: {recomputed['fileCount']} files / "
+          f"{recomputed['occurrenceCount']} occurrences / "
+          f"{recomputed['compileGreen']} green / {recomputed['compileRed']} red")

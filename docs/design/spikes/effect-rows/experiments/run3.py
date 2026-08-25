@@ -138,6 +138,43 @@ case("Z10-E-inside-call-arguments", """
         §E{}
         §R §C{Helper} §A INT:1 §E{cw} §/C
 """)
+# --- W1 (round 3): can a MEMBER carry its own type-parameter list on an
+# interface and on the implementing class? If so, R2's middleware spelling can
+# bind `eff e` at position 1 (already permitted by §7.3) instead of needing a
+# class/interface-level binder that §7.3 forbids.
+case("W1a-IFACE-member-typeparams", """
+    §M{m001:W1}
+      §IFACE{i001:IP}
+        §MT{mt001:Handle}<T> (T:r) -> T
+          §E{}
+""")
+case("W1b-IFACE-and-impl-member-typeparams", """
+    §M{m001:W1}
+      §IFACE{i001:IP}
+        §MT{mt001:Handle}<T> (T:r) -> T
+          §E{}
+      §CL{c001:Logging:pub}
+        §IMPL{IP}
+        §MT{mt001:Handle:pub}<T> (T:r) -> T
+          §E{}
+          §R r
+""")
+# W1c: alpha-equivalence of member type parameters across the interface
+# boundary -- the property `fits` will need for a member-level `eff`.
+# StrictnessBatchTests.cs:172 pins the analogous property for OVERRIDES.
+case("W1c-IFACE-impl-member-typeparams-renamed", """
+    §M{m001:W1}
+      §IFACE{i001:IP}
+        §MT{mt001:Handle}<T> (T:r) -> T
+          §E{}
+      §CL{c001:Logging:pub}
+        §IMPL{IP}
+        §MT{mt001:Handle:pub}<U> (U:r) -> U
+          §E{cw}
+          §P r
+          §R r
+""")
+
 # --- Y2a re-run, so the doc can quote the REAL output rather than a paraphrase ---
 case("Z11-fallible-brace-form-full-output", """
     §M{m001:Z11}

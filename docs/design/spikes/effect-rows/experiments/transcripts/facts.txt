@@ -121,24 +121,24 @@ string.Join(", ", measuredFailing.Except(recordedFailing)) +
     }
 
 ### BoundTypeTests DisplayString pins
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:9:/// Covers constructor invariants, equality, and DisplayString formatting.
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:16:    public void PrimitiveBoundType_Bare_ProducesSimpleDisplayString()
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:19:        Assert.Equal("INT", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:26:        Assert.Equal("INT[bits=16]", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:33:        Assert.Equal("INT[bits=16][signed=true]", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:56:    public void NominalBoundType_DisplayString_MatchesQualifiedName()
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:59:        Assert.Equal("System.Console", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:66:        // S2 discipline: DisplayString stays byte-identical to the existing
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:72:        Assert.Equal("System.String", annotated.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:73:        Assert.Equal("System.String", notAnnotated.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:92:        Assert.Equal("System.Collections.Generic.List<INT>", listOfInt.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:105:        Assert.Equal("Dictionary<STRING, List<INT>>", dictType.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:114:        Assert.Equal("INT[]", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:121:        Assert.Equal("INT[,,]", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:139:        Assert.Equal("() -> VOID", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:150:        Assert.Equal("(INT, STRING) -> BOOL", t.DisplayString);
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:156:    public void UnresolvedBoundType_Reason_AppearsInDisplayString()
-tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:159:        Assert.Equal("<unresolved: no method group>", t.DisplayString);
+105:        Assert.Equal("Dictionary<STRING, List<INT>>", dictType.DisplayString);
+114:        Assert.Equal("INT[]", t.DisplayString);
+121:        Assert.Equal("INT[,,]", t.DisplayString);
+139:        Assert.Equal("() -> VOID", t.DisplayString);
+150:        Assert.Equal("(INT, STRING) -> BOOL", t.DisplayString);
+156:    public void UnresolvedBoundType_Reason_AppearsInDisplayString()
+159:        Assert.Equal("<unresolved: no method group>", t.DisplayString);
+16:    public void PrimitiveBoundType_Bare_ProducesSimpleDisplayString()
+19:        Assert.Equal("INT", t.DisplayString);
+26:        Assert.Equal("INT[bits=16]", t.DisplayString);
+33:        Assert.Equal("INT[bits=16][signed=true]", t.DisplayString);
+56:    public void NominalBoundType_DisplayString_MatchesQualifiedName()
+59:        Assert.Equal("System.Console", t.DisplayString);
+66:        // S2 discipline: DisplayString stays byte-identical to the existing
+72:        Assert.Equal("System.String", annotated.DisplayString);
+73:        Assert.Equal("System.String", notAnnotated.DisplayString);
+92:        Assert.Equal("System.Collections.Generic.List<INT>", listOfInt.DisplayString);
+9:/// Covers constructor invariants, equality, and DisplayString formatting.
 
 ### calor-direction.md lines 33, 57, 112
 :33: 2. **Generics with constraints, variance, higher-rank.** Moving generic type reasoning into the Calor binder rather than passing through to C#. Deferr

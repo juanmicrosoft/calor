@@ -1,17 +1,48 @@
 #!/usr/bin/env python3
 """Re-measure every number the three review lenses disputed, at the worktree HEAD."""
-import os, subprocess, re, os, json, glob
+import os, subprocess, re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
 os.chdir(ROOT)
 
+# --- determinism ---------------------------------------------------------
+# CI runs Linux, the doc was authored on macOS. Three things differ and all
+# three broke the first version of this harness:
+#   * recursive grep / glob results come back in FILESYSTEM order, which is
+#     not the same on APFS and ext4  -> every multi-file result is sorted;
+#   * collation depends on the locale                 -> LC_ALL=C everywhere;
+#   * a shallow CI checkout has no git history        -> no fact is derived
+#     from `git log`; see the F-3 probe at the end of facts2.py.
+_ENV = {**os.environ, "LC_ALL": "C", "LANG": "C"}
+
+
 def sh(cmd):
-    return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout.strip()
+    """Run a shell probe with a fixed locale. Output is NOT reordered."""
+    return subprocess.run(
+        cmd, shell=True, capture_output=True, text=True, env=_ENV).stdout.strip()
+
+
+def sh_sorted(cmd):
+    """Run a shell probe and sort the lines deterministically.
+
+    Lines shaped `path:line:text` sort by path then by NUMERIC line, so the
+    output is stable regardless of the order the filesystem handed the files
+    to grep. Anything else sorts bytewise.
+    """
+    lines = [line for line in sh(cmd).split("\n") if line != ""]
+
+    def key(line):
+        parts = line.split(":", 2)
+        if len(parts) >= 2 and parts[1].isdigit():
+            return (parts[0], int(parts[1]), line)
+        return (line, 0, line)
+
+    return "\n".join(sorted(lines, key=key))
 
 print("### BindStatementNode / BindingNode")
 print("BindingNode hits:", sh("grep -rn '\\bBindingNode\\b' src/ | wc -l"))
-print(sh("grep -rn 'class BindStatementNode' src/"))
-print(sh("grep -rn 'class ParameterNode\\|class OutputNode\\|class ClassFieldNode' src/"))
+print(sh_sorted("grep -rn 'class BindStatementNode' src/"))
+print(sh_sorted("grep -rn 'class ParameterNode\\|class OutputNode\\|class ClassFieldNode' src/"))
 
 print("\n### ast-schema / ArchitectureTests")
 print("eng/ast-schema.json exists:", os.path.exists(os.path.join(ROOT, "eng/ast-schema.json")))
@@ -19,21 +50,21 @@ print(sh("grep -n 'AstSchema_CoversEveryNodeDispatchAndChildRelation' tests/Calo
 print(sh("grep -c 'BindStatementNode' eng/ast-schema.json"))
 
 print("\n### cross-module IsSubsetOf site")
-print(sh("grep -n 'IsSubsetOf' src/Calor.Compiler/Effects/*.cs"))
+print(sh_sorted("grep -n 'IsSubsetOf' src/Calor.Compiler/Effects/*.cs"))
 
 print("\n### ProjectIndex references outside Commands/")
-print(sh("grep -rln 'ProjectIndex' src/ --include='*.cs' | sort"))
+print(sh_sorted("grep -rln 'ProjectIndex' src/ --include='*.cs' | sort"))
 
 print("\n### Effects/*.cs file count")
 print(sh("ls src/Calor.Compiler/Effects/*.cs | wc -l"))
-print(sh("ls src/Calor.Compiler/Effects/*.cs"))
+print(sh_sorted("ls src/Calor.Compiler/Effects/*.cs"))
 
 print("\n### tests/TestData function-typed .calr")
 print("count:", sh("grep -rlE 'Func<|Action<|Action[}:]|Predicate<|§DEL|§LAM' tests/TestData --include='*.calr' | wc -l"))
 
 print("\n### whole-corpus function-typed positions (IsFunctionTypeName shapes)")
 print(sh("git ls-files '*.calr' | xargs grep -hoE 'Func<|Action<|Action[}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null | wc -l"))
-print(sh("git ls-files '*.calr' | xargs grep -lE 'Func<|Action<|Action[}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))
+print(sh_sorted("git ls-files '*.calr' | xargs grep -lE 'Func<|Action<|Action[}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))
 
 print("\n### Conversion tests: effect pass?")
 print(sh("sed -n '38,72p' tests/Calor.Conversion.Tests/TestHelpers.cs"))
@@ -46,7 +77,7 @@ print("\n### demand ledger test exact-equality")
 print(sh("sed -n '186,200p' tests/Calor.Compiler.Tests/Effects/HigherOrderDemandLedgerTests.cs"))
 
 print("\n### BoundTypeTests DisplayString pins")
-print(sh("sed -n '130,148p' tests/Calor.Compiler.Tests/Binding/BoundTypeTests.cs 2>/dev/null || grep -rn 'DisplayString' tests/ --include='BoundTypeTests.cs'"))
+print(sh_sorted("grep -n 'DisplayString' tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs"))
 
 print("\n### calor-direction.md lines 33, 57, 112")
 for ln in [33, 57, 112]:
