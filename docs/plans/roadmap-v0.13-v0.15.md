@@ -2,8 +2,9 @@
 
 **Date:** 2026-08-10
 **Status:** Draft v4 — Draft v3 (2026-08-10, two adversarial rounds, §8–§9) with §4 rebuilt and
-§5.2 refreshed against the source at v0.14.3 on 2026-08-24 (review round 3, §10). §2 and §3 are the
-historical record of 0.13/0.14 as planned; §4.0 is the measured inventory of what they left.
+§5.2 refreshed against the source at v0.14.3 on 2026-08-24, then revised under three adversarial
+lenses (evidence, consistency, test-lens) — review round 3, §10. §1–§3 are the historical record of
+0.13/0.14 as planned; §4.0 is the measured inventory of what they left; §4.5 names what §4 supersedes.
 **Governing inputs:** `call-s-adjudication.md` (the v0.12 → v0.13 gate: "v0.13 leads with product, not
 measurement"; quantitative re-entry conditions), `calor-direction.md` (safety direction commitment,
 including its TIER2D design-doc requirement), `substrate-plan-v0.12.md` §9 (semantic index flagged at
@@ -56,6 +57,11 @@ foundation.
 The deliberate ordering of the 0.14 semantic break *before* the 0.15 adoption push is a choice, not
 an accident: break the language while its only users are this repo and its dogfooded utility, then
 invite adopters onto 2.0.0 semantics.
+
+**Draft v4 amendment to §1 (2026-08-24).** The 0.14 row's "self-migration workstream" did not
+execute (no committed `.calr` declares a version; §4.0, §4.5, #1084), and the load-bearing chain for
+0.15 is not only #762 + SymbolIds: effect rows additionally stand on the never-merged metadata-binding
+S6, now §4.2 E1. The rest of this section is left as written.
 
 ---
 
@@ -323,9 +329,9 @@ completion of the 0.13 program).
 ## 4. v0.15 — Composable Effects
 
 **Draft v4 note (2026-08-24).** This section was rewritten against the source at v0.14.3 (review
-round 3, §10). §2 and §3 stand as the historical record of what was planned; §4.0 is the measured
+round 3, §10). §1–§3 stand as the historical record of what was planned; §4.0 is the measured
 inventory of what they actually left behind, and everything below builds on §4.0 rather than on
-§2/§3's forward-looking text.
+§1–§3's forward-looking text. Where §4 supersedes a numbered decision in §3 it says so by name.
 
 **Thesis (unchanged):** effects become part of function types, so Calor safely expresses
 higher-order code instead of rejecting it.
@@ -335,31 +341,44 @@ higher-order code instead of rejecting it.
 **Shipped — no longer 0.15 work.**
 
 - **Analysis re-platform is done.** Typed CFG (#783, PR #960), CFG-based symbol-resolved taint
-  (#784, PR #969), and bug-pattern analyzers on the typed CFG (#786, PR #970 —
-  `Analysis/BugPatterns/TypedBugPatternAnalysis.cs`; the five `Patterns/*Checker.cs` are shims).
-  Residual carried forward: `Patterns/PreconditionSuggester.cs` is the one remaining AST walker,
-  and #970's three-way split (verified finding / heuristic hint / explicit incomplete) is the
-  analyzers' published residual.
+  (#784, PR #969), bug-pattern analyzers on the typed CFG (#786, PR #970 —
+  `Analysis/BugPatterns/TypedBugPatternAnalysis.cs`; the five `Patterns/*Checker.cs` are shims),
+  structural control-flow codegen (#763, PR #972). Residual carried forward:
+  `Patterns/PreconditionSuggester.cs` is the one checker still walking the bound tree rather than
+  the typed CFG, and #970's three-way split (verified finding / heuristic hint / explicit
+  incomplete) is the analyzers' published residual (§4.5).
 - **Effect enforcement is fail-closed** (#785, PR #968, 2026-08-13). An unresolved callee yields
-  `EffectSet.Unknown` (`Effects/EffectEnforcementPass.cs:1671-1673`), which fits no declared set
-  (`Effects/EffectSet.cs:101`) and so forces Calor0410; `--permissive-effects` is the explicit
-  waiver. Two of the laundering classes §4.4 gate 1 names are already typing rules at the
-  declaration: virtual override → Calor0420 (`EffectEnforcementPass.cs:539`), interface
-  implementation → Calor0421 (`:586`). Invoking a function-typed value is *rejected* — Calor0418
-  (`:1465` for parameters/bindings/fields, `:2690` for returned delegates; pins
-  `tests/Calor.Enforcement.Tests/StrictnessBatchTests.cs:29,47,64,749`). That rejection is the
-  first-order ceiling this version removes.
+  `EffectSet.Unknown` (`Effects/EffectEnforcementPass.cs:1432-1434`, `:2933-2939`), which fits no
+  declared set (`Effects/EffectSet.cs:101`) and so forces Calor0410; `--permissive-effects` is the
+  explicit waiver. Two of the laundering classes §4.4 gate 1 names are already typing rules at the
+  declaration: virtual override → Calor0420 (`EffectEnforcementPass.cs:539`; pins
+  `tests/Calor.Enforcement.Tests/StrictnessBatchTests.cs:132` error / `:176` compiles), interface
+  implementation → Calor0421 (`:586`; pins `StrictnessBatchTests.cs:198` / `:221`). Invoking a
+  function-typed value is *rejected* — Calor0418 (`:1465` for parameters/bindings/fields, `:2690`
+  for returned delegates; rejection pins `StrictnessBatchTests.cs:29,47,749`, waiver pin `:64`).
+  That rejection is the first-order ceiling this version removes.
 - **Project-model spine exists.** `Indexing/ProjectIndex.cs` (format 3.0) under `obj/calor`;
   `calor query` facets `symbol | callers | callees | impact | contracts | assumptions`
   (`Commands/QueryCommand.cs:26-34`); the edit-script identity corpus
-  (`tests/TestData/EditScripts/`, 7 members, CI-blocking via `EditScriptIdentityTests`); the
-  golden query corpus (`tests/TestData/QueryCorpus/`); `calor rename`; LSP on `SymbolId`
-  (#765/#767); the gate-8 performance envelope (nightly, `performance.yml`).
+  (`tests/TestData/EditScripts/`, ES-01…ES-07, CI-blocking via `EditScriptIdentityTests` —
+  but see the F-3 supersession in gate 3); the golden query corpus (`tests/TestData/QueryCorpus/`);
+  `calor rename`; LSP on `SymbolId` (#765/#767); the gate-8 performance envelope (nightly,
+  `performance.yml`).
 - **`FunctionBoundType` exists** (`Binding/BoundTypes/BoundType.cs:212-241`) with parameter and
   return types only; its doc comment reserves the effect-row slot for 0.15.
-- **`MetadataBinder` is unflagged and always on** — a best-effort enrichment inside `Binder`
-  (`Binding/Binder.cs:143-215`; failures swallowed, never a hard gate) — and the
-  `BoundExpression.TypeName` shim is gone (F-5). The metadata-binding spike's S7 intent landed.
+- **`MetadataBinder` is always on** — a best-effort enrichment inside `Binder`
+  (`Binding/Binder.cs:143-215`; failures swallowed, never a hard gate). The
+  `--enable-metadata-binding` flag that the scoping doc's D7 planned was never implemented (no
+  commit outside the scoping doc mentions it), so "unflagged" is the state the spike shipped in,
+  not the result of S6's flag retirement. The `BoundExpression.TypeName` shim is gone (F-5); the
+  spike's S7 intent landed.
+- **The S5 anti-tautology pin exists and blocks CI.**
+  `tests/Calor.Compiler.Tests/Binding/Metadata/MetadataBinderCorpusMeasurementTests.cs:37-118`
+  re-executes the corpus measurement and asserts **exact equality** — aggregate and per-subject —
+  against `bench/phase0-agent-native/metadata-binding-corpus-ledger.json`; it runs on the
+  `compiler` shard with submodules (`test.yml:368,383`), and a silent skip would trip the
+  `expectedSkipped` count in `eng/test-manifest.json`. Only the scoping doc's PR-body-parsing leg
+  was never built. (Draft v4's first revision said the pin did not exist; §10.)
 
 **Not shipped — Draft v3 assumed these from 0.14.**
 
@@ -367,12 +386,12 @@ higher-order code instead of rejecting it.
   resolver reads `Type`; `_variableTypeMap` deleted") has no PR; the nullability workstream
   reused the S6/S7 labels (PRs #1067, #1073 are different slices). `Effects/ExternalCallCollector.cs`
   still carries `_variableTypeMap` (`:58,244,254`) — receivers resolve from
-  `ReceiverSymbol.TypeName` *strings* first, the map second. `EffectResolver.Resolve(string type,
-  string method, string[] params)` (`Effects/EffectResolver.cs:48`) is string-keyed end to end,
-  and nothing under `src/Calor.Compiler/Effects/` references `MetadataBinder`. Effect manifests
-  and IL-derived effects feed that string lookup, beside the binder, not through it.
+  `ReceiverSymbol.TypeName` *strings* first (`:278,283`), the map second. `EffectResolver.Resolve(string
+  type, string method, string[] params)` (`Effects/EffectResolver.cs:48`) is string-keyed end to
+  end, and nothing under `src/Calor.Compiler/Effects/` references `MetadataBinder`. Effect
+  manifests and IL-derived effects feed that string lookup, beside the binder, not through it.
 - **Lambdas are not function-typed yet.** `BoundLambdaExpression.Type` is a stringly
-  `NominalBoundType("LAMBDA(...)")` (`Binding/BoundNodes.cs:2179`), not a `FunctionBoundType`.
+  `NominalBoundType("LAMBDA(...)")` (`Binding/BoundNodes.cs:2178`), not a `FunctionBoundType`.
   `§LAM` already parses a `§E` annotation (`Ast/LambdaNodes.cs:41`,
   `BoundLambdaExpression.DeclaredEffects`) that enforcement discards — `InferFromLambda`
   (`EffectEnforcementPass.cs:2942`) charges the body and ignores the declaration.
@@ -380,82 +399,112 @@ higher-order code instead of rejecting it.
   (`EffectEnforcementPass.cs:451-462`); `EffectResolutionStatus` is `Resolved | PureExplicit |
   Unknown`. `EffectSet.Unknown` is the only sentinel.
 - **Signature resolution is 65.46%** over the pinned corpus (817/1248; MediatR 57.08%, Serilog
-  92.04%, FluentValidation 64.25% — `bench/phase0-agent-native/metadata-binding-corpus-ledger.json`).
-  The S5 bar was never recorded in the ledger and the CI pin that re-executes the measurement
-  against the PR-body number does not exist. A third of BCL call sites therefore reach effect
-  rows as `UnresolvedBoundType`.
+  92.04%, FluentValidation 64.25% — the ledger above). A third of BCL call sites therefore reach
+  effect rows as `UnresolvedBoundType`.
 - **The index holds no effect facts.** `ProjectIndexBuilder` never mentions effects;
   `EffectSummary` persists in the incremental build cache (`Incremental/BuildStateCache.cs:52`),
-  keyed by name strings (`Effects/EffectSummaryBuilder.cs:71`). `impact` is transitive callers
+  keyed by name strings (`Effects/EffectSummaryBuilder.cs:68,75`). `impact` is transitive callers
   only (`ProjectIndex.cs:372-408`); the index records *declared* contracts, never an outcome
   (`:56-63`). `review-packet` computes impact from an in-memory call graph
   (`Reporting/ReviewPacket.cs:3-12`), not the index. MCP `calor_navigate`
   (`Mcp/Tools/NavigateTool.cs`) neither reads the index nor exposes callers/impact.
-- **0.14 gates not adjudicated** (details and dispositions in §4.5): 3.5.1 null-state slice and
-  adversarial null corpus (absent); 3.5.4 TIER1A (`docs/experiments/registry.json` empty; the
+- **0.14 gates not adjudicated** (dispositions in §4.5): 3.5.1 null-state slice and adversarial
+  null corpus (absent); 3.5.4 TIER1A (`docs/experiments/registry.json` is `{"entries": []}`; the
   reconstructed checker lives only on `origin/experiment/tier1a-rebuild-for-section-6`, not an
   ancestor of `main`); 3.5.5 self-migration (no `.calr` migrator; `SemanticsVersion.Major = 2`
   but `CheckCompatibility` still accepts 1.x, `SemanticsVersion.cs:38-46`, and has no caller in
-  `src/`; no golden regeneration; the 1.32× headline is byte-identical across 0.14.0–0.14.3 with
-  no discontinuity note); 3.5.6 elision (the differential suite reports 0 mismatches and
-  elision coverage 40/65 — the re-enable condition is met — yet `--elide-proven-guards` remains
-  opt-in).
+  `src/`; **no committed `.calr` declares `§SEMVER` at all — 0 of 886** — so the corpus has
+  compiled under 2.0.0 semantics since v0.14.0 and the "migrated corpus" of §3.3 was never a
+  distinct artifact; no golden regeneration; the 1.32× headline is byte-identical across
+  0.14.0–0.14.3 with no discontinuity note); 3.5.6 elision (the differential suite reports 0
+  mismatches and elision coverage 40/65 — the re-enable condition is met — yet
+  `--elide-proven-guards` remains opt-in, `Program.cs:94-97`).
+- **Null classes 0.14 did ship**, cited so §7 has a source: `str` scalars, arrays of `str`,
+  whitelisted generic instantiations over `str`, and user reference types from Annotated sources
+  only (CHANGELOG 0.14.0–0.14.3; S8-Oblivious widening held in draft PR #1078; epic #1082).
 - **Measurement prerequisites unstarted.** No real Calor arm
   (`tools/Calor.RoundTrip.Harness/TaskGen/TaskGenReportWriter.cs:76-86`: "the runner never
-  invokes the Calor compiler"); #881 has no code or doc work (`run-bundle.sh` / `run-pair.sh`
-  read `output_tokens` uncorrected); PR #944 — the §3.1 spike's pre-registration — is still open
-  after S1–S5 shipped, which is the register-then-merge discipline breached once already.
+  invokes the Calor compiler"); #881 has no code or doc work (`run-bundle.sh:490` /
+  `run-pair.sh:920` read `.usage.output_tokens` uncorrected); PR #944 — the §3.1 spike's
+  pre-registration — is still open after S1–S5 shipped, which is the register-then-merge
+  discipline breached once already. The only append-only tamper guard in the repo
+  (`experiment-registry-tamper-check.yml`) covers `docs/experiments/registry.json`, **not** the
+  A-annex where PPs are actually registered.
 
 ### 4.1 Entry gate — the design doc, on the direction doc's own terms
 
 `calor-direction.md` mandates `docs/design/effect-rows-in-the-type-system.md` before TIER2D-class
 implementation starts. Its 2026-04-22 postscript (`calor-direction.md:117-118`) tightened the
 terms after TIER1A failed on a designer-judgment gate, and Draft v3 cited only the weaker
-original. 0.15 adopts the postscript's three conditions verbatim:
+original. 0.15 adopts the postscript's three conditions, tightening the first:
 
-1. **An emitter spike producing actual compiler output**, not prose examples — on two named
-   modules: the dogfood utility (`tools/calor-allowlist-audit/allowlist-audit.calr`) and one
-   module from a pinned conversion subject, chosen and frozen in the design doc before the spike
-   runs. Before/after output is committed alongside the doc.
-2. **An external critique cycle** — at minimum two independent adversarial lenses on the doc
-   (evidence and internal consistency) plus the test-lens ("which test observes each normative
-   claim?"), with a review record in the doc.
+1. **An emitter spike producing actual compiler output**, not prose examples. The postscript says
+   "1–2 non-trivial modules"; this plan fixes **two**, named and frozen in the design doc before
+   the spike runs: the dogfood utility (`tools/calor-allowlist-audit/allowlist-audit.calr`) and
+   one module from a pinned conversion subject. Before/after output is committed alongside the
+   doc. The spike runs on a throwaway rows branch; it does not gate E1 (below).
+2. **An external critique cycle** with a pass bar, because every review record in this document
+   (§8–§10) returned NEEDS-FIXES-then-applied and "two lenses ran" is satisfied by construction:
+   at minimum evidence, internal-consistency, and test lenses on the doc; **exit criterion: both
+   the evidence and consistency lenses return APPROVE on a revision, or every declined finding is
+   recorded with its rationale** in the doc's review record.
 3. **Priced blast radius in the doc itself**: the `IAstVisitor` surface (~236 methods × N
-   implementers), `EffectSummary` cache migration, golden files under `tests/TestData`, LSP
-   hover and `IdScanner` keyed on `BoundType.DisplayString` (the F-3B byte-identity discipline),
-   conversion snapshots, and the round-trip harness.
+   implementers), `EffectSummary` cache migration, golden files under `tests/TestData`, the
+   `BoundType.DisplayString` byte-identity discipline (consumers:
+   `src/Calor.LanguageServer/State/WorkspaceState.cs`, `Utilities/SymbolFinder.cs` — the F-3B
+   rule), conversion snapshots, and the round-trip harness.
 
-**Demand denominator, registered before the doc is written.** The postscript reframed TIER2D as
-"architectural refactor, not new capability." That is no longer accurate: Calor0418 *rejects*
-higher-order code today. The instrument for "first-order ceiling" is therefore a count, frozen at
-a named commit: Calor0418 firings plus function-typed-value Calor0419 assumptions over the pinned
-corpus (in-repo committed `.calr` plus the three A-1.5.3 conversion subjects). Gate 2 reads from
-this denominator; the design doc opens with it.
+**Demand denominator, registered before the doc is written — with its own tautology guard.** The
+postscript reframed TIER2D as "architectural refactor, not new capability." Calor0418 *rejects*
+higher-order code today, so the claim is testable rather than settled — but a corpus written in a
+language that rejects the idiom will under-count it, which is the circularity the postscript's
+§2(b) says killed TIER1A. So: **two denominators**, both frozen in
+`bench/phase0-agent-native/higher-order-demand-ledger.json` (the `binder-incomplete-baseline.json`
+pattern, re-executed by a sibling of `BinderIncompleteRatchetTests` on the `compiler` shard),
+with the measured commit SHA recorded inside the ledger:
+
+- **D-A (Calor-native):** Calor0418 firings plus function-typed Calor0419 assumptions over the
+  committed `.calr` corpus.
+- **D-B (C#-shaped backstop):** delegate/lambda/`Func`/`Action` parameter and invocation sites in
+  the three A-1.5.3 conversion subjects (a Roslyn count, independent of Calor's rejection).
+
+**Pre-registered floor:** if D-A + D-B is below 25 sites, gate 2 adjudicates **not-adjudicated**,
+never HIT. Freeze event: the ledger's registration PR merges before the design doc opens; the
+design doc opens with the two numbers.
+
+**E1 is permitted to start before the design doc merges.** E1 (§4.2) deletes a string path and
+changes keying; it introduces no row syntax and pre-empts no design decision. The doc records
+E1's keying as executed. Without this, the doc needs E1 (for the emitter spike) and E1 needs the
+doc — a circle the first revision of Draft v4 contained.
 
 **Decisions the design doc must settle, each named so its absence is visible:**
 
 - Row syntax on function types (the direction doc's `Int !{db:w, throw}` sketch is a placeholder,
   not a decision) and how it composes with `§E{}` on declarations.
-- `Unknown` and `Assumed` as states of the row lattice (today: sentinel + side table), including
-  what an `UnresolvedBoundType` receiver contributes to a row.
+- `Unknown` and `Assumed` as states of the row lattice (today: sentinel + side table).
 - The fate of `§LAM`'s dormant `§E` annotation — it becomes the lambda's declared row, or it is
   removed; it does not stay parsed-and-ignored.
-- `FunctionBoundType` gains the effect slot; `BoundLambdaExpression.Type` becomes a
-  `FunctionBoundType`.
-- Keying: `EffectResolver`, manifests, and IL summaries key on bound symbol identity
-  (`SymbolId` / metadata symbol), with the string path deleted rather than bypassed.
 - Whether Calor0420/0421 fold into the general row-subtyping rule or remain separate codes.
+  **Both outcomes retain the four existing adversarial pins; only the emitted code differs.**
+- Whether `EffectSummary` is derived from the index or migrated into it (E5).
+- Diagnostic allocation for E4, F-4 style: **Calor0424 `EffectRowMismatch`** and **Calor0425
+  `EffectRowUnknown`** are reserved here (verified free at v0.14.3; 0400–0499 is the effects
+  band) and frozen at design-doc merge.
 - Rank-1 polymorphism: validated on the named combinator set (`Map`, `Match`, middleware,
   callbacks) by the emitter spike, or deferred via the exit ramp.
 - Async/`Task`-shaped effects: deferred past 0.15 unless the spike finds it cheap (§5.1
   unchanged). `BoundLambdaExpression.IsAsync` today affects only a display string.
 
-**Exit ramp (unchanged, pre-registered):** if rank-1 polymorphism fails to validate on the named
-combinator set, 0.15 ships monomorphic rows with explicit Unknown/Assumed propagation and defers
-polymorphism — still a shippable release that removes the first-order ceiling for the common
-case.
+(`UnresolvedBoundType` → `Unknown` row, `FunctionBoundType`'s effect slot, and symbol-identity
+keying are E1 decisions, made in §4.2, not design-doc decisions.)
 
-### 4.2 Ship — tiered, with the cut line stated
+**Exit ramp (pre-registered), and what it changes downstream:** if rank-1 polymorphism fails to
+validate on the named combinator set, 0.15 ships monomorphic rows with explicit Unknown/Assumed
+propagation and defers polymorphism. When the ramp fires, **E3's rank-1 leg and gate 1's fifth
+class are removed with it** — gate 1's denominator becomes four classes and the release notes say
+so. Still a shippable release that removes the first-order ceiling for the common case.
+
+### 4.2 Ship — tiered, with the cut lines stated
 
 MUST items gate the release; SHOULD items ship if they fit and defer to 0.15.x without
 renegotiation; DEFERRED items are named so their absence is a decision.
@@ -464,25 +513,39 @@ renegotiation; DEFERRED items are named so their absence is a decision.
 
 - **E1 — Foundation (the never-merged metadata S6, plus the lambda type).**
   `ExternalCallCollector` and the enforcement pass resolve receivers and callees from
-  `BoundExpression.Type` / bound symbols; `_variableTypeMap` is deleted (grep-pinned, per the
-  original S6 discriminating pin); `EffectResolver`, manifests, and IL summaries key on symbol
-  identity so external effects attach to typed external signatures; `BoundLambdaExpression`
-  binds to a `FunctionBoundType`; an unresolved receiver contributes an `Unknown` row through
-  `UnresolvedBoundType`, never a guessed one. E1 is the item everything else stands on, and it is
-  exactly the work Draft v3 assumed 0.14 had done.
+  `BoundExpression.Type` / bound symbols; `_variableTypeMap` is deleted; `EffectResolver`,
+  manifests, and IL summaries key on symbol identity so external effects attach to typed external
+  signatures; `BoundLambdaExpression` binds to a `FunctionBoundType`; an unresolved receiver
+  contributes an `Unknown` row through `UnresolvedBoundType`, never a guessed one. E1 is the item
+  everything else stands on, and it is exactly the work Draft v3 assumed 0.14 had done.
+  **Exit pins, to be added in the E1 PR (none exist today):** (a) a grep pin — a `[Fact]` in
+  `Calor.Enforcement.Tests` asserting no `_variableTypeMap` identifier under
+  `src/Calor.Compiler/Effects/`; (b) the original S6 behavioural criterion — a receiver whose
+  type is available **only** through metadata (no AST type string anywhere in the module)
+  resolves its effects; (c) a structural pin that the string path is deleted, not bypassed — no
+  `EffectResolver.Resolve(string, string, …)` overload remains.
 - **E2 — Effect rows** on function, delegate, and lambda types (monomorphic MUST; rank-1
   polymorphism behind the §4.1 ramp).
-- **E3 — Effect-compatibility checking** at assignment, argument, return, override,
-  interface-implementation, and rank-1 generic-instantiation sites, as one row-subtyping rule.
-  Calor0420/0421 either fold into it or are re-pinned against it (design-doc decision).
-- **E4 — Calor0418 replaced.** Accepted when the function value's row fits; a precise mismatch
-  diagnostic when it doesn't (a new code from the free 0404–0409 / 0424+ range, not a re-purposed
-  0418); explicit Unknown/Assumed propagation when metadata is incomplete. The
-  `DelegateInvocation_*` pins are rewritten from "is an error" to "fits / does not fit".
+- **E3 — Effect-compatibility checking** at assignment, argument, return, override, and
+  interface-implementation sites, as one row-subtyping rule — plus rank-1 generic-instantiation
+  sites **unless the §4.1 ramp fires**. Calor0420/0421 either fold into it or are re-pinned
+  against it (design-doc decision; pins retained either way).
+- **E4 — Calor0418 replaced.** Accepted when the function value's row fits; Calor0424 on
+  mismatch; Calor0425 when the row is Unknown/Assumed because metadata is incomplete. The
+  `DelegateInvocation_*` pins (`StrictnessBatchTests.cs:29,47,64,749`;
+  `EffectEnforcementTests.cs:354,378`) are rewritten from "is an error" to "fits / does not
+  fit"; the `--permissive-effects` waiver survives as the waiver for Calor0425 only (a row that
+  *does not fit* is never waived — §4.5 row).
 - **E5 — Effects facet in the index.** Effect rows per declaration recorded in `ProjectIndex`;
   `calor query effects`; effect-change blast radius via the existing `impact` closure.
-  `EffectSummary` is derived from the index or migrated into it — not maintained as a second,
-  name-keyed store.
+  `EffectSummary` is derived from the index or migrated into it (design-doc decision) — and
+  **a structural pin that no name-keyed second store remains** (`EffectSummaryBuilder`'s
+  `function.Name` / `"Class.Method"` keys at `:68,75` gone) ships with E5, since gate 7 observes
+  the facet's correctness but not the old store's deletion.
+- **M1 — Measurement prerequisites that block E2's merge** (moved here from §4.3 so the chain is
+  visible): PR #944 dispositioned; #881 corrected or the cost leg re-registered; the 0.15 PP
+  registered in the A-annex (A-1.10). **No effect-row implementation (E2) merges before M1 is
+  done** — §4.3 (i).
 
 **SHOULD** (0.13 §2.2 leftovers this bullet used to hide inside "the agent workflow completes")
 
@@ -490,89 +553,144 @@ renegotiation; DEFERRED items are named so their absence is a decision.
 - **E7** MCP query surface reading the index: callers / callees / impact / effects.
 - **E8** Contract outcomes recorded in the index and an invalidated-proofs facet.
 - **E9** Affected-tests mapping (a new facet; no design exists today).
+- **M2** The real Calor arm (§4.3) — a product commitment with no gate; SHOULD so its deferral is
+  a recorded decision rather than a silence.
 
-**DEFERRED** (named): async rows (§5.1); `PreconditionSuggester` on the typed CFG (#786
-residual); reflection / `DynamicInvoke` / `dynamic`-receiver dispatch (gate 1 residual list).
+**DEFERRED** (named, and frozen as gate 1's residual list at design-doc merge): async rows
+(§5.1); `PreconditionSuggester` on the typed CFG (#786 residual); reflection / `DynamicInvoke` /
+`dynamic`-receiver dispatch; **event-handler subscription** (`+=` of a function value to a .NET
+event); **BCL-returned delegates** (a `Func` obtained from a metadata call, whose row is
+Unknown by construction until IL analysis produces rows).
 
-**Cut line.** If E1 overruns, E5–E9 defer to 0.15.x; E1–E4 do not defer, because a release
-titled "Composable Effects" without rows is not that release.
+**Cut lines.** (1) If E1 overruns, E5–E9 and M2 defer to 0.15.x; E1–E4 and M1 do not defer,
+because a release titled "Composable Effects" without rows is not that release. (2) **Schedule
+abort:** if E1 has not merged by the 0.15 branch cut, 0.15.0 ships as E1-only under a renamed
+theme ("Symbol-Resolved Effects") and E2–E5 move to 0.16 — the postmortem's V3/V4 lesson is that
+this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
 
 ### 4.3 Honest measurement
 
-- **A real Calor arm, as product** (unchanged from Draft v3): Option 1 from Call S — Calor0410
-  enforcement genuinely in the agent loop — gets built regardless of any epoch. Today's harness
-  ships round-tripped C# in both arms and never invokes the compiler (§4.0).
-- **#881 is a scheduled slice, not a footnote.** The probe's cost leg reads `output_tokens` from
-  `agent.json`, which under-counts 55× on subagent/compaction runs. Either the counter is
+- **A real Calor arm, as product** (M2): Option 1 from Call S — Calor0410 enforcement genuinely
+  in the agent loop — gets built regardless of any epoch. Today's harness ships round-tripped C#
+  in both arms and never invokes the compiler (§4.0).
+- **#881 is a scheduled slice (M1), not a footnote.** The probe's cost leg reads `output_tokens`
+  from `agent.json`, which under-counts 55× on subagent/compaction runs. Either the counter is
   corrected in `run-bundle.sh` / `run-pair.sh` with a pinned reproduction, or the cost leg is
-  re-registered on a metric that does not depend on it. This lands before the PP registers.
+  re-registered on a metric that does not depend on it. Lands before the PP registers.
 - **The pre-registered fixture-scale probe**, under a NEW PP id, with the full discipline:
   **(i)** freeze event named — the PP registers in the A-annex (`docs/plans/agent-native-gates.md`,
-  currently A-1.9; the A-1.10 bump *is* the freeze event) before any effect-row implementation
+  currently A-1.9; **the A-1.10 bump is the freeze event**) before any effect-row implementation
   merges; the empty `docs/experiments/registry.json` is the TIER1A-hypothesis registry and is not
-  where this goes; **(ii)** fixture and defect classes frozen in the same annex entry, with
-  honest-timing disclosure if authoring is concurrent (A-1.2 pattern); **(iii)** the four-valued
-  outcome (hit / miss / underpowered / not-adjudicated) with a pre-registered decidability
-  fallback; **(iv)** the "no large loop tax" margin stated numerically via the PP-W5 derivation
-  (existing-epoch variance → null-simulation p95 → bootstrap-bound conjunction).
-- **Register-then-merge has a precedent to repair first:** PR #944 (the §3.1 pre-registration)
-  is still open while its spike shipped. It is merged as the historical record or closed with the
-  discrepancy noted before the 0.15 PP registers — otherwise the discipline is aspirational.
+  where this goes. **The annex has no mechanical tamper guard today** — the append-only check
+  (`experiment-registry-tamper-check.yml`) covers only `registry.json`. The A-1.10 PR extends that
+  workflow's `paths` to the annex with an append-only check on its revision log, so the freeze
+  is enforced by the same instrument that guards the other registry rather than by discipline
+  alone. **(ii)** fixture and defect classes frozen in the same annex entry, with honest-timing
+  disclosure if authoring is concurrent (A-1.2 pattern); **(iii)** the four-valued outcome (hit /
+  miss / underpowered / not-adjudicated) with a pre-registered decidability fallback; **(iv)** the
+  "no large loop tax" margin stated numerically via the PP-W5 derivation (existing-epoch
+  variance → null-simulation p95 → bootstrap-bound conjunction).
+- **Register-then-merge has a precedent to repair first (M1):** PR #944 (the §3.1
+  pre-registration) is still open while its spike shipped. It is merged as the historical record
+  or closed with the discrepancy noted before the 0.15 PP registers — otherwise the discipline is
+  aspirational.
 - **No real-scale epoch** unless both registered re-entry conditions hold (≥70 evaluable tasks;
   a real Calor arm). Unchanged.
 
-### 4.4 Release gates — instrument, denominator, freeze point
+### 4.4 Release gates — instrument, denominator, freeze point, discriminating pin
 
-Conditional (move with their SHOULD-tier deliverable): gate 3's MCP leg, and gate 7. Unconditional:
-gates 1, 2, 3 (CLI/SDK/build legs), 4, 5, 6.
+Conditional (they move with their SHOULD-tier deliverable): gate 3's MCP leg (E7), gate 7's E6/E7
+legs. Conditional on the §4.1 ramp *not* firing: gate 1's fifth class. Unconditional: everything
+else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
 
-1. **Effect laundering, closed classes.** Instrument: one adversarial pin per class, the
-   `DelegateInvocation_*` pattern. Denominator: five classes — virtual override and interface
-   implementation (already closed by Calor0420/0421; **re-pinned under rows**, since folding them
-   into E3 could silently reopen them), delegate/function-value *assignment*, *argument*,
-   *return* (closed by E3's typing rule, not by E4's rejection), and rank-1 generic
-   instantiation. Freeze point: the class list is this gate; additions go in the release notes'
-   **named residual list** (reflection, `DynamicInvoke`, `dynamic` receivers, BCL-returned
-   delegates, event handlers — whichever are not closed). "These classes closed", never "no
-   callback can".
-2. **Higher-order expressiveness.** Instrument: the §4.1 demand denominator re-counted at the
-   release commit. Denominator: the registered combinator set plus the frozen Calor0418/0419
-   count. Bar: Calor0418 firings on the registered classes go to zero without `--permissive-effects`
-   or interop wrapping; the residual count and its classes are published.
-3. **Surface agreement.** Instrument: `EditScriptIdentityTests`. Denominator: the registered
-   edit-script corpus, extended with at least one effect-row edit script (ES-08) registered
-   **before E2 merges**, and the freeze record corrected from 6 to the 7 members already in tree.
-   CLI, SDK, MCP, clean, and incremental builds agree byte-for-byte on every effect result. PR
-   #968's "equalized defaults" claim becomes a pinned property rather than a PR-body sentence.
-4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome. Unchanged.
+1. **Effect laundering, closed classes.** *Instrument:* one adversarial pin per class, the
+   `DelegateInvocation_*` pattern, positive and negative (`_IsError` / `_Compiles` pairs as
+   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* five classes —
+   virtual override and interface implementation (already closed by Calor0420/0421; **re-pinned
+   under rows**, since folding them into E3 could silently reopen them), delegate/function-value
+   *assignment*, *argument*, and *return* (closed by E3's typing rule, not by E4's rejection), and
+   rank-1 generic instantiation (four classes if the ramp fires). *Freeze point:* the class list
+   and the residual list freeze at **design-doc merge**; the residual (reflection,
+   `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates) is
+   named in the release notes as "not closed", never "no callback can". *Discriminating pin:*
+   delete E3's rule for any one class and its `_IsError` pin fails.
+2. **Higher-order expressiveness.** *Instrument:* the §4.1 demand ledger re-executed at the
+   release commit. *Denominator:* D-A + D-B as frozen, plus the registered combinator set. *Bar:*
+   Calor0418 firings on the registered classes go to zero without `--permissive-effects` or
+   interop wrapping; the residual count and its classes are published; below the 25-site floor
+   the gate reads **not-adjudicated**. *Freeze point:* the ledger's registration PR (before the
+   design doc). *Discriminating pin:* re-introduce the 0418 rejection for one class and the
+   ledger test fails.
+3. **Surface agreement.** *Instrument, as it exists:* `EditScriptIdentityTests` compares **clean
+   vs incremental only, in one in-process path** (`CompilationDriver.CompileAll`), on canonical
+   diagnostics text and serialized index bytes. *Instruments to build, each registered before E2
+   merges:* a CLI-process leg and a `Calor.Sdk` leg over the same scripts; the MCP leg is
+   conditional on E7. Effects are observed as diagnostics and index bytes — the gate claims no
+   more. *Denominator:* the edit-script corpus, **after F-3 is superseded-with-disclosure**: the
+   freeze record (`v0.13-freeze-registrations.md` F-3) registers ES-01…ES-06 with a
+   `steps.jsonl`/`expect.md` schema and ES-04 as the #883 reproduction; the tree holds
+   ES-01…ES-07 with a `script.json` schema and different semantics (the #883 shape lives in
+   ES-05/ES-07). Under F-3's own "immutable once landed; supersede-with-disclosure only" rule,
+   the supersession PR (schema + seven members re-registered, #883 leg re-identified) lands
+   **before ES-08** — the effect-row script — registers, which itself lands before E2 merges
+   (`RegisteredScriptIdsAreStable`, `EditScriptIdentityTests.cs:217-231`, forces the
+   registration mechanically). PR #968's "defaults equivalent" sentence becomes a test that
+   enumerates the four entry points' default `UnknownCallPolicy`. *Discriminating pin:* flip one
+   surface's default and the equivalence test fails; drop ES-08 from the id list and
+   `RegisteredScriptIdsAreStable` fails.
+4. **The probe adjudicates** at its frozen thresholds under its four-valued outcome.
+   *Instrument/denominator/freeze:* the A-1.10 annex entry (PP id, fixture, defect classes,
+   margin). *Discriminating pin:* the annex append-only check rejects an edit to the frozen row.
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
-   migrated `.calr` corpus" — does not exist because §3.3's self-migration did not execute
-   (§4.0). Denominator: the committed `.calr` corpus **as it is** (unmigrated; mixed `§SEMVER`
-   declarations) at a commit frozen at the 0.15 branch cut. Instrument: builds and tests green
-   under the 0.15 compiler. First-order `§E` compatibility is claimed over that corpus, not
-   universally. The self-migration debt is dispositioned in §4.5, not assumed away.
-6. **Resolution floor (new).** Instrument: the metadata-binding corpus ledger, re-executed in CI
-   (closing the S5 pin that was scoped and never built). Denominator: the pinned conversion-subject
-   commits. Freeze point: **65.46% at v0.14.3 is the floor** — E1's re-keying may not lower it,
-   and any raise is reported, not required. This is the guard against "symbol-resolved" being
-   achieved by resolving fewer symbols.
-7. **Index/query correctness, effects leg** (conditional on E5–E7 shipping in 0.15.0). The golden
-   query corpus gains effects-facet ground truth authored from the fixture, not recorded from the
-   implementation (the `QueryGoldenTests` discipline).
+   migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
+   version (§4.0). *Denominator:* the committed `.calr` corpus at the 0.15 branch-cut commit, in
+   two legs — (a) **what CI compiles today**: `tests/TestData/Benchmarks` (226 files, ≥200
+   asserted by `BulkBenchmarkCompilationTests`) plus `samples/` (`verify_phase1.py`) plus every
+   `.calr` a test project compiles; (b) **the remainder of the 886** — no job compiles them today,
+   so a `compile-all-committed-calr` job is registered **before E2 merges** and its count
+   published; until it exists the claim is leg (a) only, and says so. *Instrument:* builds and
+   tests green under the 0.15 compiler, **with E1-attributable changes separated**: E1 will
+   resolve callees that string-guessing missed and fire new, *correct* Calor0410/0419 on this
+   corpus; those are fixed in-corpus and their count published; only regressions *not*
+   attributable to a newly-resolved callee fail the gate. First-order `§E` compatibility is
+   claimed over that corpus, not universally. *Discriminating pin:* revert one in-corpus fix and
+   leg (a) goes red.
+6. **Resolution floor — keep the existing pin green.** *Instrument:*
+   `MetadataBinderCorpusMeasurementTests` (§4.0), an exact-equality pin — aggregate **and
+   per-subject** — against the committed ledger, on the `compiler` shard. *Denominator:* the
+   pinned conversion-subject commits on the pinned SDK. *Freeze point:* the v0.14.3 values
+   (817/1248; 129/226 MediatR, 104/113 Serilog, 584/909 FluentValidation) are the floor **for the
+   0.15.0 release commit, whatever moved it** — E1's re-keying and #1082's `MetadataBinder`
+   return-annotation change alike. Because the pin is two-sided, a *raise* also fails it until
+   the ledger is regenerated (`CALOR_REGENERATE_S5_LEDGER=1`) in the same PR with the delta
+   disclosed; a reference-manifest regeneration for SDK drift re-baselines the floor in its own
+   PR, never bundled. This is the guard against "symbol-resolved" being achieved by resolving
+   fewer symbols — and it is also what makes a mis-sequenced #1082 landing visible.
+   *Discriminating pin:* the test as it stands.
+7. **Index/query correctness, effects leg.** *Instrument:* `QueryGoldenTests` — ground truth
+   authored from the fixture, not recorded (`EveryGoldenStatesWhyItExists`,
+   `QueryGoldenTests.cs:152-172`); an unknown facet **throws** (`:134`), so the E5 PR must add
+   the `effects` arm or the golden cannot land. *Denominator:* `tests/TestData/QueryCorpus/`,
+   extended with effects ground truth. *Freeze point:* the E5 PR. E5 leg unconditional; E6/E7
+   legs conditional. *Discriminating pin:* alter one expected effects answer and the golden
+   fails.
 
-### 4.5 Carried 0.14 debt — dispositioned, not inherited silently
+### 4.5 Carried 0.14 debt — dispositioned with a trigger and a venue
 
 | Item | State at v0.14.3 | 0.15 disposition |
 |---|---|---|
-| 3.5.6 elision re-enable | Condition met: 0 mismatches over the pinned modeled-forms denominator, coverage 40/65 published; still opt-in | **Flip default-on in 0.15.0** as its own PR, with the coverage fraction in the release notes; if it is *not* flipped, the release notes say why |
-| 3.5.5 self-migration (2.0.0) | `Major = 2`; 1.x accepted silently; no migrator; no golden regen; no re-baseline | **Split.** (a) Wire `SemanticsVersion.CheckCompatibility` so a declared 1.x file gets a *diagnostic* (Warning; Error deferred until a migrator exists) — one PR, 0.15. (b) Migrator, golden regeneration, benchmark re-baseline: **deferred by decision** to the first release with a second real user of 2.0.0 semantics; tracked as an issue; gate 5 restated accordingly |
-| 3.5.4 TIER1A adjudication | Registry empty; checker on a non-ancestor branch | **Not a 0.15 gate.** Published in 0.15.0 release notes as "not run" (an honest negative row), or run in 0.15.x under its own §6.3 matrix if a window opens. §7's "on the record either way" is satisfied by the published not-run, not by silence |
-| 3.5.1 null-state slice + adversarial null corpus | Absent | 0.15.x candidate, after E1; not a prerequisite for rows (unchanged reasoning) |
-| #1082 (nullability follow-ons: BCL user-ref return flow, F-3C, member-access flow, Calor0208-vs-0274) | Epic open; PR #1078 draft | **Sequenced after E1.** Item 1 changes what `MetadataBinder` emits for every reference-type return — the same surface E1 re-keys on. Landing it first means re-doing E1's pins; landing it after means one migration |
-| #845 (unsigned obligation modeling) | Open | 0.15.x, unchanged priority |
-| #875 (non-null `str` root cause) | Open; the `str` scope shipped in 0.14.0–0.14.3, epic tracks the remainder | Closes when #1082 items 1–3 land; no 0.15 gate |
-| PR #944 (§3.1 pre-registration) | Open after the spike shipped | Resolved before the 0.15 PP registers (§4.3) |
-| PR #982 (gate 7 CLI leg), #981, #976 | Open docs/CI PRs | Merge or close in the 0.15 kickoff sweep; none gates 0.15 |
+| 3.5.6 elision re-enable | Condition met: 0 mismatches over the pinned modeled-forms denominator (`test.yml:196-200`), coverage 40/65 published; still opt-in | **Flip default-on in 0.15.0** as its own PR. The single blocking pin is `tests/Calor.Verification.Tests/MethodElisionCursorTests.cs:196-197` (`ProvenPostcondition_WithoutOptIn_KeepsGuard`); `DifferentialGate.cs:42` sets the flag explicitly and survives. If it is *not* flipped, the 0.15.0 release notes say why — and §7 reads accordingly |
+| 3.5.5 self-migration (2.0.0) — **supersedes §3.3 decisions 1–4 as written** | `Major = 2`; 1.x accepted silently; no migrator; no golden regen; no re-baseline; **0 of 886 committed `.calr` declare a version** | Tracked as **#1084**. (1) **Execute §3.3 decision 1 as written, in 0.15.0**: wire `CheckCompatibility` so a declared `§SEMVER{1.x}` file is *refused* with a migration pointer (Error, fail-closed — not the Warning the first revision of this draft proposed; nothing in-repo declares 1.x, so the cost is `VersioningTests.cs:70-74` and 14 doc blocks). (2) Decision 4's re-baseline becomes a CHANGELOG **disclosure**: the corpus declared nothing and has been measured under 2.0.0 semantics since v0.14.0. (3) Decisions 2–3 (migrator, golden regen) are **demand-driven** — a user-reported 1.x file re-opens them immediately; otherwise re-adjudicated at the 0.16 branch cut. Gate 5 restated accordingly |
+| 3.5.4 TIER1A adjudication | Registry empty; checker on a non-ancestor branch | **Not a 0.15 gate.** The 0.15.0 release notes carry an explicit "TIER1A: not run" row (an honest negative, a release-notes commitment with no instrument); running it under its §6.3 matrix is re-adjudicated at the 0.15.0 retro |
+| 3.5.1 null-state slice + adversarial null corpus | Absent | Not a prerequisite for rows (unchanged reasoning). Trigger: the 0.15.0 retro decides whether it is 0.15.x or 0.16; venue: the retro's disposition table |
+| #1082 (nullability follow-ons) | Epic open; PR #1078 draft | **Sequenced after E1 merges.** Item 1 changes what `MetadataBinder` emits for every reference-type return — the same surface E1 re-keys on; gate 6's ledger is what makes a mis-sequenced landing visible |
+| #845 (unsigned obligation modeling) | Open | 0.15.x; re-adjudicated at the 0.15.0 retro |
+| #875 (non-null `str` root cause) | Open; the `str` scope shipped across 0.14.0–0.14.3 | This plan's judgment (not the issue's own text): closes when #1082 items 1–3 land; no 0.15 gate |
+| #859, #884 (Z3 CI flake) | **Still open** after 0.13 and 0.14 shipped (§5.2 previously dispositioned them to 0.13) | 0.15.x instrument debt; re-adjudicated at the 0.15.0 retro with the flake rate over the 0.15 cycle attached |
+| #970 residual (verified / heuristic / incomplete tri-state) | Shipped as the analyzers' published residual | Unchanged in 0.15; the tri-state counts are published per release |
+| `--permissive-effects` waiver under rows | Waives Calor0410/0411/0418 today | Survives as the waiver for Calor0425 (Unknown/Assumed rows) only; a row that does not fit (Calor0424) is never waived. Pinned in E4 |
+| PR #944 (§3.1 pre-registration) | Open after the spike shipped | M1 — resolved before the 0.15 PP registers (§4.3) |
+| PR #982 (§2.5 gate 7 CLI leg), #981, #976 | Open docs/CI PRs | Merged or closed in the 0.15 kickoff sweep; none gates 0.15 |
 
 ## 5. Explicitly not in these three releases — and the backlog dispositioned
 
@@ -600,39 +718,41 @@ gates 1, 2, 3 (CLI/SDK/build legs), 4, 5, 6.
 ### 5.2 Open-backlog disposition table (#760–#793 and successors — every open P0/P1 gets a line)
 
 Refreshed in Draft v4 against GitHub state on 2026-08-24. Closed issues keep their row so the
-plan's history is legible; their disposition is the closing PR.
+plan's history is legible; where the closing PR is known it is named, otherwise the close date.
 
 | Issue | Disposition |
 |---|---|
-| #760, #769, #770, #771, #772, #775, #776, #777 (conversion P0s), #766, #768, #847 (P1s) | **Demoted** to demand-driven per §3.4; a named failing fixture re-opens any of them. (#766, #768 were nonetheless closed on main post-0.13.2 — see PR #981's inventory.) |
-| #761 (compilation ⇒ Roslyn-valid C#) | **Closed.** Enabled by metadata binding; the §3.5.2 ledger is the residual instrument (gate 6 in §4.4 carries it) |
+| #760, #769, #770, #771, #772, #775, #776, #777 (conversion P0s), #766, #768 (P1s) | Demoted to demand-driven by Draft v1 (§3.4) — and then **closed anyway**: #760 (PR #918, 08-11), #770/#771/#776 (08-12), #766 (PR #977) and #768 (PR #975) (08-14), #769/#772/#775/#777 (08-18). PR #981's inventory records the post-0.13.2 batch |
+| #847 (P1) | **Open** — the one conversion item still demoted; a named failing fixture re-opens it |
+| #761 (compilation ⇒ Roslyn-valid C#) | **Closed.** Enabled by metadata binding; the §3.5.2 ledger is the residual instrument (§4.4 gate 6 carries it) |
 | #762 | **Closed** (0.13 MUST, PR #900 completion) |
-| #763 (structural control-flow codegen) | **Closed** 2026-08-14 (with the #786 re-platform) |
+| #763 (structural control-flow codegen) | **Closed** (PR #972, 2026-08-14) |
 | #764 | **Closed** (0.13 MUST) |
 | #765, #767 (LSP) | **Closed** (PRs #921, #926, #980) — LSP consumes `SymbolId`s; the MCP *query* surface did not ride with it and is §4.2 E7 |
-| #773 (FeatureSupport executable contract) | Partially discharged by the PP-S4 registry (§2.5 gate 6); remainder demand-driven |
+| #773 (FeatureSupport executable contract) | **Closed** (PR #991, 2026-08-18) |
 | #778 | **Closed** (0.13 MUST) |
 | #779 | **Closed** 2026-08-11 — the differential program exists and is green (0 mismatches, coverage 40/65); the **re-enable itself is the open half**, dispositioned in §4.5 |
 | #780 | **Closed** |
 | #781 (contract inheritance/modules) | **Closed** 2026-08-13 — removed from the §4.1 design-doc scope list |
 | #782 (obligation guards on program state) | **Closed** 2026-08-13 |
 | #783 | **Closed** (PR #960) |
-| #784, #786 | **Closed** (PRs #969, #970) — no longer 0.15 work; residuals in §4.0 |
+| #784, #786 | **Closed** (PRs #969, #970) — no longer 0.15 work; residuals in §4.0/§4.5 |
 | #785 | **Closed** (PR #968) — fail-closed shipped; the type-system unification is §4.2 E1–E4 |
 | #787 (functional Sdk) | Closed by v0.12.1's first publish plus the shipped dogfood utility (`tools/calor-allowlist-audit`, CI-built via `Calor.Sdk`) |
-| #788 (MSBuild determinism) | **Closed** 2026-08-10 — §2.5 gate 2 holds on the registered edit-script corpus |
+| #788 (MSBuild determinism) | **Closed** 2026-08-10, before F-3's registered corpus was replaced in tree (§4.4 gate 3). §2.5 gate 2 holds on the ES-01…ES-07 corpus as it exists; the F-3 supersession is what makes that claim clean on paper |
 | #789 (hermetic natives) | **Closed** 2026-08-12 |
-| #790 (truthful release gates) | Closed when 0.13 shipped with the triple-form gates; §4.4 continues the form |
-| #791 (generated exhaustive infra) | **Closed** (PR #1023, "Generate exhaustive AST infrastructure") |
+| #790 (truthful release gates) | Closed when 0.13 shipped with the triple-form gates; §4.4 continues the form and adds a discriminating pin per gate |
+| #791 (generated exhaustive infra) | **Closed** (PR #1023) |
 | #792 (telemetry opt-in) | Closed |
-| #793 (audit epic) | Tracking issue; this table is its disposition |
+| #793 (audit epic) | **Closed** 2026-08-19; this table remains its disposition record |
 | #845 (unsigned-obligation modeling) | **Open** — 0.15.x (§4.5) |
 | #851 (task-gen filter precision) | Retired with the venue; re-opens only under §4.3's re-entry conditions |
-| #859, #884 (Z3 CI flake) | 0.13 (§2.2) |
+| #859, #884 (Z3 CI flake) | **Open** — Draft v3 dispositioned them to 0.13; both survived 0.13 and 0.14. 0.15.x instrument debt (§4.5) |
 | #874, #879, #883 | Closed (0.13 MUST) |
 | #875 (non-null `str`) | **Open** — `str` scope shipped across 0.14.0–0.14.3; remainder tracked by #1082 (§4.5) |
-| #881 (agent token metrics 55× under-count) | **Open, no work yet** — a scheduled 0.15 slice before the probe registers (§4.3) |
+| #881 (agent token metrics 55× under-count) | **Open, no work yet** — §4.2 M1, blocking E2's merge (§4.3) |
 | #1082 (v0.14 nullability follow-ons epic) | **Open** — sequenced after §4.2 E1 (§4.5) |
+| #1084 (§3.3 self-migration residue) | **Open** — filed by this draft; §4.5 row 2 |
 | #1011 (test-suite audit epic) | Open; continuous, not release-gated |
 | #673 (MCP scaffold spine) | Open; adoption work, not release-gated (§5.1) |
 
@@ -658,13 +778,14 @@ what §4.0 shows is closed or §4.2 commits to close. C# still wins on ecosystem
 density. Calor wins where **agent-authored correctness and explainable change impact are the
 product**: a queryable semantic project model (`calor query` anchored by the §2.5 golden query
 corpus, with the MCP query surface conditional on §4.2 E7), null safety enforced for the closed
-classes 0.14 actually shipped (`str`, arrays, whitelisted generics, Annotated user references — the
-null-state differential oracle of §3.5.1 is 0.15.x work, and TIER1A's outcome is on the record as a
-published not-run unless §4.5 changes that), honest contracts with a published falsification record
-and a visible elision-coverage fraction (40/65 at v0.14.3, default-on per §4.5), and compositional
-effect safety for the registered combinator set — with the claim instrumented at fixture scale
-under a pre-registered four-valued PP, and a standing, quantitative path back to real-scale
-measurement.
+classes 0.14 actually shipped (the §4.0 inventory: `str`, arrays of `str`, whitelisted generics
+over `str`, Annotated user references — the null-state differential oracle of §3.5.1 is 0.15.x
+work, and TIER1A's outcome is on the record as a published not-run unless §4.5 changes that),
+honest contracts with a published falsification record and a visible elision-coverage fraction
+(40/65 at v0.14.3; default-on per §4.5, or the release notes state why not), and compositional
+effect safety for the registered combinator set — monomorphically, if the §4.1 ramp fires — with
+the claim instrumented at fixture scale under a pre-registered four-valued PP, and a standing,
+quantitative path back to real-scale measurement.
 
 ## 8. Review record — round 1 (2026-08-10)
 
@@ -725,44 +846,90 @@ Declined findings: none.
 
 ## 10. Review record — round 3 (2026-08-24, Draft v3 vs. the source at v0.14.3)
 
-One source-state lens, run before 0.15 work starts: every §4 claim checked against the code, CI,
-GitHub issue state, and the v0.14 scoping docs. Result: NEEDS-FIXES; all findings applied in
-Draft v4. §2 and §3 are left as written (historical record); §0's #785 clause corrected.
+**Pass 1 — source-state audit of Draft v3** (three read-only audits: effect system, project
+model/analysis, 0.14 closeout), run before 0.15 work starts. Result: NEEDS-FIXES; applied as the
+first revision of Draft v4:
 
-- **Stale scope (CRITICAL)** — §4.2 listed #784/#786 ("analysis re-platform lands here") and #785
-  fail-closed as 0.15 deliverables; all three closed COMPLETED 2026-08-13 (PRs #969, #970, #968),
-  #783 via #960. Gate 1's "four dispatch classes" counted override and interface implementation
-  as future work; Calor0420/0421 already close them. → §4.0 inventory; §4.2 rebuilt; gate 1
-  restated as five classes with two re-pinned.
-- **Foundation assumed from 0.14 that did not land (CRITICAL)** — the effect resolver is still
-  string-keyed (`EffectResolver.cs:48`; `_variableTypeMap` live in `ExternalCallCollector.cs`);
-  metadata-binding S6 never merged (the nullability workstream reused the label); lambdas bind to
-  a stringly nominal type; `MetadataBinder` is unreferenced under `Effects/`. Draft v3's one-line
-  "effects resolve with type binding, not beside it" was the largest item in the release and
-  was priced as a bullet. → §4.2 E1 is the named foundation; gate 6 (resolution floor) guards
-  it.
-- **Gate 5 had no denominator (CRITICAL)** — "the repo's migrated `.calr` corpus" presupposed
-  §3.3's self-migration, which did not execute (no migrator; 1.x silently accepted;
-  `CheckCompatibility` unwired). → Gate 5 restated over the corpus as it is; self-migration
-  split and dispositioned in §4.5.
-- **Undelivered deliverables hidden in one bullet (Major)** — "the agent workflow completes"
-  required review-packet→index, contract outcomes in the index, an MCP query surface, and a
-  tests mapping, none of which exist. → Tiered as E6–E9 SHOULD with a stated cut line.
-- **Entry gate cited the weaker terms (Major)** — `calor-direction.md`'s postscript requires an
-  emitter spike with real output, an external critique cycle, and priced blast radius; Draft v3
-  cited only "design doc + bounded spike". → §4.1 adopts all three, adds the Calor0418/0419
-  demand denominator, and enumerates the decisions the doc must make.
-- **Measurement prerequisites unstarted (Major)** — #881 has zero work; two registries exist and
-  the plan named neither; PR #944 breached register-then-merge without a disposition. → §4.3.
-- **Carried debt without rows (Major)** — 0.14 gates 3.5.1/3.5.4/3.5.5/3.5.6 unadjudicated;
-  epic #1082 absent from §5.2; twelve §5.2 rows referenced closed issues as future work. →
-  §4.5 table; §5.2 refreshed.
-- **Minors** — freeze record says 6 edit scripts, tree has 7 (gate 3); scoping doc's
-  `contract-outcomes` facet shipped as `contracts` and records declarations only (§7 wording);
-  #781 removed from the design-doc scope list (closed).
+- **Stale scope (CRITICAL)** — §4.2 listed #784/#786 and #785 fail-closed as 0.15 deliverables;
+  all closed COMPLETED 2026-08-13 (PRs #969, #970, #968), #783 via #960. Gate 1 counted override
+  and interface implementation as future work; Calor0420/0421 already close them. → §4.0
+  inventory; §4.2 rebuilt; gate 1 restated.
+- **Foundation assumed from 0.14 that did not land (CRITICAL)** — effect resolver string-keyed,
+  `_variableTypeMap` live, metadata S6 never merged, lambdas stringly typed, `MetadataBinder`
+  unreferenced under `Effects/`. → §4.2 E1; gate 6.
+- **Gate 5 had no denominator (CRITICAL)** — presupposed a self-migration that did not execute.
+  → restated; §4.5.
+- **Undelivered deliverables in one bullet (Major)** → E6–E9. **Entry gate cited the weaker
+  terms (Major)** → §4.1. **Measurement prerequisites unstarted (Major)** → §4.3. **Carried debt
+  without rows (Major)** → §4.5; §5.2.
 
-Declined findings: none.
+**Pass 2 — three adversarial lenses on that revision** (PR #1083): evidence (92%,
+NEEDS-FIXES, 2 CRITICAL / 5 Major / 9 Minor), internal consistency + strategy (74%, NEEDS-FIXES,
+7 CRITICAL / 15 Major / 6 Minor), test-lens (~65% observable, NEEDS-FIXES, 5 load-bearing
+UNVERIFIED). All applied in the second revision:
 
-Verified clean at count precision: 18 Calor04xx codes defined with 0404–0409 and 0424+ free;
-7 edit scripts; 6 query facets; ledger 817/1248 = 65.46%; differential suite 0 mismatches,
-40/65 eliding; `SemanticsVersion.Major = 2`; `FunctionBoundType` has no effect field.
+- **The S5 pin exists (evidence CRITICAL; test-lens factual error).** The first revision said the
+  ledger's CI pin "does not exist"; `MetadataBinderCorpusMeasurementTests` is an exact-equality,
+  per-subject pin on the `compiler` shard. → §4.0 corrected; gate 6 rewritten from "build" to
+  "keep green", two-sided, bound to the release commit, per-subject.
+- **Ten of eleven "demoted" issues are closed (evidence CRITICAL)**; #773/#793 closed; #859/#884
+  open. → §5.2 rows corrected; the preamble no longer promises a closer per row.
+- **Circular entry gate (consistency CRITICAL)** — the doc needed E1 and E1 needed the doc. → E1
+  may start pre-doc; three E1 decisions removed from the design-doc list.
+- **Unconditional gates on ramp-deferrable scope (consistency CRITICAL)** — E3's rank-1 leg and
+  gate 1's fifth class. → conditional on the ramp, denominator becomes four.
+- **A MUST shipped ungated (consistency CRITICAL)** — gate 7 was conditional though E5 is MUST.
+  → E5 leg unconditional.
+- **Gate 5 penalised E1's own improvement (consistency CRITICAL)** → E1-attributable new
+  Calor0410/0419 separated and published.
+- **F-3 was replaced, not extended (consistency + evidence)** — the freeze record registers a
+  different six-script corpus under a different schema; the first revision called it "6 vs 7".
+  → gate 3 requires supersede-with-disclosure before ES-08; #788's row says so.
+- **§3.3 decision 1 had been silently rescinded (consistency CRITICAL)** — the first revision
+  proposed a Warning and an open-ended deferral. Measured: 0 of 886 committed `.calr` declare a
+  version, so fail-closed costs one test and 14 doc blocks. → executed as written in 0.15.0;
+  #1084 filed; supersession named.
+- **§4.3 untiered while gate 4 was unconditional (consistency CRITICAL)** → M1 (blocks E2) and
+  M2 (SHOULD) in §4.2.
+- **Demand denominator circular (consistency Major; test-lens load-bearing)** → two denominators
+  (D-A Calor-native, D-B Roslyn-counted backstop), a 25-site not-adjudicated floor, a named
+  ledger file and test.
+- **Gate 3 overstated its instrument by three surfaces (test-lens load-bearing)** →
+  clean-vs-incremental only as it exists; CLI/SDK legs to build; MCP conditional.
+- **Gate 5 named no job (test-lens load-bearing)** → two legs; the 886-vs-covered gap disclosed.
+- **A-annex has no tamper guard (test-lens load-bearing)** → stated; A-1.10 PR extends the
+  existing workflow to the annex.
+- **E1 "grep-pinned" cited a pin that does not exist (test-lens load-bearing)** → three named
+  pins to be added in the E1 PR; E5 gains a second-store deletion pin.
+- **§6 discipline (consistency Major)** — no gate named a discriminating pin; freeze events
+  vague. → one pin per gate; freeze events named (design-doc merge, ledger PR, ES-08 PR, A-1.10,
+  E5 PR).
+- **Schedule abort missing (consistency Major)** → cut line 2: E1-only release under a renamed
+  theme if E1 misses the branch cut.
+- **§1 and §7 unquarantined (consistency Major)** → §1 note and sequencing amendment; §7 hedged
+  on the ramp, the elision flip, and cites §4.0's null-class inventory.
+- **Residual list implementation-defined (consistency Major)** → event handlers and
+  BCL-returned delegates named in DEFERRED; residual frozen at design-doc merge.
+- **Evidence Majors/Minors applied:** Calor0418 unknown-callee cite `:1432-1434` (was
+  `:1671-1673`, an event helper); `PreconditionSuggester` is a bound-tree walker, not AST;
+  `DisplayString` consumers are `WorkspaceState.cs`/`SymbolFinder.cs`, not `IdScanner`/hover;
+  `BoundNodes.cs:2178`; `EffectSummaryBuilder.cs:68,75`; "defaults equivalent" quoted correctly;
+  "1–2 modules" is tightened to two, not adopted verbatim; the metadata flag was never
+  implemented; `:64` is the waiver pin; #875 closure is this plan's judgment; E4 codes
+  reserved (Calor0424/0425); 0420/0421 pins retained either way; `EffectSummary` decision venued;
+  "§2.5 gate 7" qualified; #970 tri-state and the permissive waiver get §4.5 rows.
+- **§10 under-recorded the first revision (consistency Major):** the §7 rewrite, the §4.4
+  conditional preamble, and gate 7 were unlisted, and "twelve" §5.2 rows was an undercount —
+  **nineteen** rows moved from a future disposition to Closed. Corrected here.
+
+**Declined findings:** none. One reviewer suggestion was narrowed rather than adopted: the
+consistency lens proposed a *dated* re-decision point for the migrator; §4.5 adopts that (0.16
+branch cut) but also keeps an immediate demand trigger, since a single 1.x user report is a
+better instrument than a date.
+
+Verified clean at count precision (both passes): 18 Calor04xx codes with 0404–0409 and 0424+
+free; 7 edit scripts in tree vs 6 registered; 6 query facets; ledger 817/1248 = 65.46% with
+129/226, 104/113, 584/909 per subject; differential 0 mismatches, 40/65 eliding;
+`SemanticsVersion.Major = 2` with `CheckCompatibility` uncalled; 0 of 886 committed `.calr`
+declare `§SEMVER`; `FunctionBoundType` has no effect field; `registry.json` is empty; the TIER1A
+branch is not an ancestor of `main`.
