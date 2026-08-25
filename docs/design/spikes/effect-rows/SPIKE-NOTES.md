@@ -40,18 +40,33 @@ Branch: `spike/effect-rows-emitter`, cut from the design-doc branch
   `git rebase --onto origin/main 5d99f900`, so only the three spike commits replay and
   main's copies of the doc and harness are the ones in the tree.
 
-### Finding F1 — three committed transcripts diverge, none regenerated
+### Finding F1 — SEVEN committed transcripts diverge, none regenerated
 
 `EffectRowExperimentHarnessTests.ExperimentTranscripts_MatchARerun` (**P29**) goes **red**
 with the prototype in the build. Per the spike's own discipline the transcripts are
 **not** regenerated — a divergence is a finding, and the frozen evidence base belongs to
-E2, not to a throwaway prototype. The three, with their verdicts:
+E2, not to a throwaway prototype.
 
-| Script / case | Committed | With the prototype | Verdict |
-|---|---|---|---|
-| `run.py` **X6a** (`§F{…}<T, U, eff e>`) | `Calor0100: Expected Greater but found Identifier` | parses; the case's own `§E{}` then under-declares `alloc` → `Calor0410` | **Intended.** X6a exists to show `eff e` is new syntax today; the spike is what makes it parse. E2 must re-author X6a, not regenerate it |
-| `run3.py` **Z1** (`§FLD{i32:x:pri}` ⏎ `§E{cw}`) | four `Calor0100` cascade lines | one `Calor0405: A §E{…} effect row must be on the same line as the type it annotates…` | **Intended** — this is §3.1's row-aware recovery, and the 4→1 collapse is exactly the claim P2(b) makes |
-| `facts.py` line 6 | `Ast/FunctionNode.cs:252` | `Ast/FunctionNode.cs:283` | **Unavoidable noise.** `facts.py` pins `file:line` structural facts; adding `ParameterNode.Row` moved the line. Any E2 implementation moves it too |
+> **Corrected in review round 1: this said THREE.** The three had been read off P29's
+> failure message, which prints the **first** difference per script and hides the rest —
+> so three drifting *scripts* looked like three *cases*. Re-diffing all six scripts in
+> full gives **seven**, and two of them are in `facts.py`, where the first-difference
+> report could never have shown the second. Recorded rather than quietly fixed: it is
+> the same failure mode the harness exists to prevent — a number taken from a summary
+> instead of from the measurement.
+
+Counted by diffing every script against its committed transcript: `run.py` **3**,
+`run3.py` **2**, `facts.py` **2**; `run2.py`, `facts2.py` and `compile53.py` **clean**.
+
+| # | Script / case | Committed | With the prototype | Verdict |
+|---|---|---|---|---|
+| 1 | `run.py` **X6a** | exit 1; **14-line** `Calor0100`/`Calor0114` cascade | parses; the case's own `§E{}` then under-declares → one `Calor0410 … 'alloc'` | **Intended.** X6a exists to show `eff e` is new syntax today. E2 must **re-author** it, not regenerate it |
+| 2 | `run.py` **X9b** (`§FLD … §E{cw}`) | exit 1; **4×** `Calor0100` | **exit 0**, compiles | **Intended** — position 8. X9b is the case §14.1 cites to disprove Draft v1's claim that `§FLD` already parsed a row |
+| 3 | `run.py` **X9c** (inline param row) | exit 1; **12×** `Calor0100` | **exit 0**, compiles | **Intended** — position 5 |
+| 4 | `run3.py` **Z1** (`§FLD` ⏎ `§E`) | **4×** `Calor0100` | one `Calor0405` | **Intended** — §3.1's recovery; the 4→1 collapse is P2(b)'s claim |
+| 5 | `run3.py` **Z3** (wrapped signature) | **8×** `Calor0100` | one `Calor0405` | **Intended**, and the strongest: §3.1 calls Z3 *not hypothetical* because Z5 shows wrapped lists are really written |
+| 6 | `facts.py` line 6 | `FunctionNode.cs:252` | `FunctionNode.cs:283` | **Unavoidable noise.** `facts.py` pins `file:line`; `ParameterNode.Row` moved it. Any E2 implementation moves it too |
+| 7 | `facts.py` `IsSubsetOf` sweep | `EEP:533` and `:571` listed | both vanish; five `EffectSet.cs` lines appear | **Intended — and it is R2's own evidence moving a pinned fact.** §6.3 says those two calls become calls to the shared `EffectRow.Fits`; this sweep is the instrument that observes it |
 
 One divergence was **not** legitimate and was fixed rather than recorded: an early draft
 trimmed the unknown-effect-code string, which changed **X5a**'s message from `' ^ e'` to
@@ -66,7 +81,7 @@ purpose:
 
 | Branch | Carries | Why |
 |---|---|---|
-| `spike/effect-rows-emitter` (pushed, **not** for merge) | the prototype: 6 files under `src/`, 0 new files | It is a spike, not E2 — its parser-level effect-variable scope alone is a shortcut E2 must replace. And with it in the build **P29 is red by design** on three cases (F1 above), so a branch carrying it cannot be the PR that "must merge before E2" |
+| `spike/effect-rows-emitter` (pushed, **not** for merge) | the prototype: 6 files under `src/`, 0 new files | It is a spike, not E2 — its parser-level effect-variable scope alone is a shortcut E2 must replace. And with it in the build **P29 is red by design** on seven cases (F1 above), so a branch carrying it cannot be the PR that "must merge before E2" |
 | `spike/effect-rows-artifacts` (**the PR**) | `docs/design/spikes/effect-rows/**`, `SpikeVerdictTests.cs`, three corpus path-exclusions, the manifest delta, the design-doc update | No `src/` change, so **P29 is green** and the frozen evidence base is untouched |
 
 `spike-verdict.json` records the prototype's branch and commit so the code that produced
@@ -113,3 +128,32 @@ as §13.5(b) so the next spike inherits it.
   `§ARR{T}` emits `new int[]` for a type-parameter element type, and the `?T`/`is_some`/
   `unwrap` Option surface does not compile. Each deviation is listed in
   `spike-verdict.json` under `artifacts.A3.deviations`, with the reason and what was kept.
+
+## Review round 1 — adversarial review of PR #1096
+
+**NEEDS-FIXES (80%)**, with the verdict itself **EARNED**: the reviewer recomputed all 29
+artifacts byte-exact from the prototype commit, and G-CODEGEN (modulo `#line`), R1, R2, R3
+and R3's counter-example all reproduced, with the caveats above holding. Twelve findings,
+**12 applied, 0 declined** — all corrections of the *record*, none re-opening the verdict.
+Full disposition table in the design doc's §15 round 4. The three that changed what the
+spike claims rather than how it says it:
+
+1. **Seven divergences, not three** (F1, corrected above). The miscount came from reading
+   P29's failure message, which prints the first difference per script.
+2. **`gCodegen.A2.diffBytes: 0` was a length delta, not a byte count.** A2 really has **7**
+   differing bytes, all digits inside `#line` directives. The field is now split into
+   `strictDiffBytes` and `nonLineDirectiveDiffBytes`, and **P27 asserts both for every
+   artifact** — the old single field was read by no test at all, so a wrong number sat in
+   the record looking like a measurement.
+3. **`spike_artifacts.py` still wrote `.g.cs`** after the evidence files were renamed to
+   `.g.cs.txt` for the Calor-first guard. It therefore emitted untracked files beside the
+   real evidence and never refreshed it — while P31's failure message told the reader to
+   run it. Fixed, and re-running it against the prototype now regenerates **all 29
+   committed files byte-identically** with nothing left untracked.
+
+Two prototype defects were found that are not record-keeping and are recorded as **E2
+obligations** (§12.4 caveats 5 and 6): Calor0404 is reached at only two of §7.3's seven
+rejection sites (the rest surface as `Calor0403: Unknown effect code 'e'` — forbidden, but
+with a taxonomy message for a scope error), and Calor0421 renders a polymorphic interface
+row as `[pure]` because its message is built from `EffectSet.ToDisplayString()`, which
+knows only the concrete part. Both have right verdicts and wrong text.
