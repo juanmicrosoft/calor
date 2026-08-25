@@ -1190,3 +1190,125 @@ before E2 rather than after.
 | `§FLD{…} §E{…}` already parses (Draft v1 §14 Q4) | Draft v1's own reasoning from `ParseClassField:8709-8719` | **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects`. It does not parse; position 7 is new syntax |
 | `§E{!e, alloc}` fails at `Expect(CloseBrace)` | consistency lens C2 | **X3b**: it reaches `Calor0403: Unknown effect code '! e'`. The lens's conclusion (reject `!`) is right; the mechanism differs |
 | MediatR `RequestPreProcessorBehavior.cs` is 29 lines | Draft v1 §12.2 | **28** at the pinned SHA |
+
+---
+
+## 15. Review record
+
+**Round 1 (2026-08-25) on Draft v1 (PR #1093).** Three lenses, all NEEDS-FIXES: evidence 92%,
+internal-consistency 88%, test-lens 88%. Exit criterion (roadmap §4.1 term 2): evidence **and**
+consistency return APPROVE on a revision, or every declined finding is recorded here with its
+rationale. Below: every finding, its disposition, and where it landed. **62 applied, 4 declined.**
+
+### Evidence lens (23 findings)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Calor0410 message quoted four times does not exist | **applied** — real text executed as **X12b**; §2.1, §3.6, §10; §14.1 |
+| 2 | `EffectResolutionStatus` is `:596-612`, not `:596-608` | **applied** — §2 table, §14.1 |
+| 3 | Calor0410 path is `:377`/`:427`/`:433`/`:441`, not `:410-443` | **applied** — §2 table, §14.1 |
+| 4, 22 | "~24 `MapShortTypeNameToFullName` sites" is the *pair* count | **applied** — §2 table splits 11 + 13 |
+| 5 | §6.4's site-5 sample is re-worded, not merely re-coded | **applied** — §6.4 says so explicitly |
+| 6 | `BindingNode` does not exist | **applied** — `BindStatementNode` (`Ast/ControlFlowNodes.cs:161`); §3.3, §9, §14.1 |
+| 7 | 9 `§I` arms + 7 `§O` arms, not 5 | **applied** — §3.3 moves the check **inside** `ParseParameter`/`ParseOutput`, so **six** insertion points cover all 16 arms |
+| 8, m1 | "six positions" vs seven rows vs "position 7" | **applied** — seven throughout (§3.3) |
+| 9 | `tests/TestData` golden bucket is 0, not ≤8 | **applied** — §9 (`0 of 359`, measured) |
+| 10 | Conversion tests never run the effect pass; four more snapshots gain diagnostics | **applied** — §9: **0 texts, 0 assertions**, `TestHelpers.cs:40-70` cited; the 7 function-typed snapshots enumerated |
+| 11 | MediatR module exercises **one** §6 site, not four | **applied** — §12.1; artifact **A3** added to carry R1/R3 |
+| 12 | The `fs:w ⊂ fs` quotation is unsourced | **applied** — attribution withdrawn, substance kept; §14.1 |
+| 13 | The `:101,:200` citation pair being corrected does not exist | **applied** — §14.1 |
+| 14 | Generics deferral is `calor-direction.md:33`, not `:57-60` | **applied** — §4.6, §12.1, §14.1 |
+| 15 | "architectural elegance" is `:112`, not `:114` | **applied** — §1, §14.1 |
+| 16 | "four pins", three lines, `:218` off by one | **applied** — §6.3 names four assertion lines `:152`, `:172`, `:219`, `:582` |
+| 17 | Pin anchors mix method, `[Fact]` and blank lines | **applied** — assertion lines throughout, stated in §6.3 |
+| 18 | Both interfaces live in one file, so "7 files" is wrong | **applied** — §9: **6 files** counterfactual |
+| 19 | "Effects subsystem 6" names 7 via a glob | **applied** — measured **10** existing + 1 new |
+| 20 | The 4-occurrence grep undercounts what `IsFunctionTypeName` accepts | **applied** — §1: **5 shapes in 5 files**, all conversion snapshots, plus 9 `§LAM` / 3 `§DEL` counted separately |
+| 21 | §5.4's `§LAM` site arithmetic | **applied** — §5: 9 occurrences in 7 files, enumerated |
+| 23 | `§MT` has its own `§E` arm at `:8836-8840` | **applied** — §3.3 position 1 |
+
+### Internal-consistency lens (3 critical, 13 major, 7 minor)
+
+| # | Finding | Disposition |
+|---|---|---|
+| C1 | `§O`/`§E` token-stream collision, 53 canonical sites | **applied** — §3: **line-adjacency rule**, with the collision executed (Y1a/Y1b/Y1c, X1b/X2b, Y5a) and the corpus measured (54/23 two-line, 2948/471 arrow, **0** same-line of any form). 22 of the 23 files are already compile-red for unrelated reasons; 1 is green |
+| C2 | `!e` collides with the `T!E` fallible suffix | **applied** — §7.1/§7.2: **`eff` modifier + bare identifier**, chosen on executed evidence (X3, X3b, X5b, X6a, X6b, Y2a, Y2b). The lens's *mechanism* (`Expect(CloseBrace)`) is corrected in §14.1: it actually reaches Calor0403 |
+| C3 | Ramp criterion 1 not adjudicable from the two modules | **applied** — §12: three artifacts, a per-criterion/per-artifact table, criterion 2 promoted to **G-CODEGEN**, verdict as `spike-verdict.json` + P27 |
+| M1 | Derive-from-index is self-refuting; `calor build` gains an index dependency | **applied** — §8.5: an **in-process projection**, index-independent, one producer and two consumers; P25 pins a fresh-clone `calor build` |
+| M2 | Waiver policy drifts across sites | **applied** — §4.5 unifies: `DoesNotFit` never waived anywhere, so **0420/0421 lose their `--permissive-effects` demotion** (`EEP:517-519`), executed as Y8a/Y8b; P11 |
+| M3 | 0424 defeatable by deleting the source `§E` | **applied** — §4.5 closes it via the 0410 ∧ 0424 composition; P12 |
+| M4 | 2 of 9 `fits` cells undefined | **applied** — §4.3's nine-cell table; P8 |
+| M5 | `Assumed` does not survive the destination (two-hop laundering) | **applied** — §4.4's destination rule, per site; P10 |
+| M6 | `⊔` not commutative; message text nondeterministic | **applied** — §4.2 makes `R` a **canonically ordered set**; P9 |
+| M7 | Omitted binding row = Unknown contradicts §5 | **applied** — §3.5: a binding **with an initializer** infers from it |
+| M8 | Gate-1 class arithmetic inconsistent | **applied** — **six, dropping to five**, in §6, §7.5, §12, §13.3, and the roadmap's own six-enumerated/five-named error recorded in §14.1 |
+| M9 | Cross-module pass missing from sites and blast radius | **applied** — §6.2 (`CrossModuleEffectEnforcementPass.cs:162`, kept as the Calor0410 leg, re-implemented on `fits`), §9, P16 |
+| M10 | 0424 misused for a rank-1 scoping violation | **applied** — **Calor0404 `EffectVariableScope`** allocated (§6.1, §7.3) |
+| M11 | Async punted to the spike | **applied** — §11 decides deferral to 0.16; (a)/(b)/(c) become the **0.16 re-entry test**, not spike criteria |
+| M12 | Entry-gate term 1 unmet at merge | **applied** — §0 states it plainly; the spike PR **must merge before E2**, and this doc's merge still freezes gate 1/2 as roadmap §4.4 specifies |
+| M13 | Ramp criteria 2 and 4 are not combinator questions | **applied for 2** (→ G-CODEGEN). **Declined for 4**: decidability by the one-line solve *is* a property of the combinator set — it is exactly what distinguishes rank-1 from rank-2 — so it stays as **R3** |
+| m2 | §14.1 omitted two corrections it had evidence for | **applied** — §14.1 now carries 14 rows |
+| m3 | `self-check docs` does not cover §4.1's `Subtypes` change | **applied** — §9's docs row states the gap; §14 Q3 asks for the decision in the E2 PR |
+| m4 | `RowDisplayString` unlocated; LSP only SHOULD | **applied** — §8.3 locates it on `EffectRow`/`BoundType`; §9 keeps the hover a SHOULD, since `DisplayString` is untouched so nothing breaks without it |
+| m5 | Argument-position rows undefined | **applied** — §4.4 states the destination row at all six sites |
+| m6 | `§E` swallowed as a type name when written *before* its type (`Token.cs:384` `IsKeyword` includes `Effects`; `ReadInlineTypeToken` accepts `IsKeyword`) | **declined, with rationale** — a `§E` written where a type is expected is malformed source that already produces a type diagnostic, the shape has **0 corpus occurrences**, and a special case costs a branch in the shared type reader for no observed benefit. The *correct* orders are pinned positively by P3 and P5 |
+| m7 | ~600–750 duplicated lines | **applied** — v2 is **≈1300 lines**: §9 collapsed to one table, §2 to a cited table, one `Map` example kept, `Match`/callbacks reduced to a sentence each |
+
+### Test lens (8 hard defects, 3 cross-cutting, ~25 claim-table gaps)
+
+| # | Finding | Disposition |
+|---|---|---|
+| F-1 | `BindingNode` — a pin cannot be written against it | **applied** (see evidence #6) |
+| F-2 | The four 0420/0421 pins mis-cited; `:582` omitted | **applied** — §6.3, §13.1 |
+| F-3 | Five orphaned 0418/0419 pins undispositioned (`:472`, `:728`, `:245`, `:587`, `:640`) | **applied** — all five in §13.1, each marked *orphaned in Draft v1* |
+| F-4 | Gate-1 denominator self-contradictory | **applied** (M8) |
+| F-5 | `fits` specified for 6 of 9 cells | **applied** (M4) |
+| F-6 | `ProjectIndex` format version not bumped for E5 | **applied** — §8.5 `"3.0"`→`"4.0"`; P24 |
+| F-7 | `eng/ast-schema.json` / `ArchitectureTests.cs:158` omitted from §9 | **applied** — §9 counts it, and cites it as the **existing** "zero visitor churn" pin; §13.1 |
+| F-8 | Gate 2's ledger cannot be "extended, not rewritten" | **applied** — §13.3 gate 2 quotes the test's own failure message (`HigherOrderDemandLedgerTests.cs:192-199`), which already instructs regeneration with the cause named |
+| X-1 | No freeze point for any pin | **applied** — §13.2's **Freeze** column, every row |
+| X-2 | No home file for any pin | **applied** — §13.2's **Home** column, every row |
+| X-3 | Message text never pinned | **applied** — **P22** pins the four new clauses in full |
+| 3.3 | No test parses `§LAM … §E` or `§DEL … §E` (0 hits in `tests/`) | **applied** — **P3** covers all seven positions, including the three that already parse |
+| 3.13 | No pin on "no lexer change" | **applied** — §9 states 0 lexer files; P5 and P18 observe the token surface |
+| 4.4 | "widening, never narrowing" is prose | **applied** — §13.3 gate 5 counts the disappearing Calor0410s |
+| 4.5 | No structural pin that `EffectResolutionStatus` gains no member | **declined, with rationale** — the enum is explicitly **not** changing (§4.2); a pin asserting the absence of a change nobody is making is maintenance with no discriminating revert. P21 pins the *mapping* from its three members to rows, which is the behaviour that matters |
+| 4.6, Q-C | No lattice property test | **applied** — **P9** |
+| 4.9 | Assumed-source cases absent from the 9-cell pin | **applied** — P8 is table-driven over all nine, incl. both Assumed axes |
+| 4.11 | "permissive is less powerful; release notes must carry it" has no instrument | **declined, with rationale** — the repo has no CHANGELOG-checking instrument, and inventing one for a single sentence is out of proportion. It stays a **release-notes commitment**, the same class as roadmap §4.5's "TIER1A: not run" row, which is also an honest negative with no instrument. The *behaviour* is pinned by P11 |
+| 4.13 | `CannotTell` propagation / `DoesNotFit` dominance unobserved | **applied** — folded into P8's table |
+| 5.1 | Lambda `CannotTell` arm and "type carries ρ_decl" unpinned | **applied** — P14's four cases |
+| 6.3 | No `CannotTell` arm per site | **applied** — P15 adds a `_CannotTell` arm to each of the six pairs |
+| 6.4 | Sites 4/5 retire Calor0419 — three pins go red | **applied** (F-3) |
+| 6.7 | `CheckEffectVariance` structural claim unpinned | **applied** — P16 |
+| 7.1–7.8 | Rank-1 parse/scope/mixed-row/Unknown-contributor arms unpinned; only 1 of 5 rejection sites covered | **applied** — **P18** covers all of them, and is deleted wholesale if the ramp fires |
+| 7.9, 12.4 | Verdict lives in a prose README | **applied** — `spike-verdict.json` + **P27**, following the two existing ledgers |
+| 8.1 | "never pure" default unpinned | **applied** — P19's `RowsDefaultToUnknownNotPure` |
+| 8.2, 8.3 | `BoundTypeTests` cited wrongly; existing exact-equality pins already enforce §8.3 | **applied** — §8.3 cites `:139`/`:150` (the *assertions*; the lens's `:134`/`:143` are the `[Fact]`/method lines) and concedes Draft v1's claim was wrong; P19, P20 |
+| 8.4 | `EffectRow.ToDisplayString` unpinned | **applied** — P20's scope |
+| 8.5 | Manifest → row mapping unpinned | **applied** — P21 |
+| 8.6 | BCL-returned delegates not explicitly in the frozen residual | **applied** — §8.4 names it as a frozen gate-1 residual |
+| **8.7, Q-E** | **"No silent Unknown" — the pin the design rests on — absent** | **applied** — **P17**, frozen **before E2** |
+| 8.8 | The 65.46% interaction has no instrument | **applied** — **§13.4** registers `calor0425-corpus-ledger.json`, per subject, split by cause, exact-equality, **before E2**. It was Draft v1's "open question 1"; it is now a decision |
+| 8.9 | The grep pin observes key deletion, not derivation | **superseded** — §8.5 no longer derives from the index; P25 pins index-independence directly, which is the stronger property |
+| 8.10 | The three `BuildStateCache` constants unpinned | **applied** — P23 |
+| 8.11 | `ProjectIndex` facet version | **applied** (F-6) |
+| 8.12 | The effects golden and gate 7's revert unnamed | **applied** — §13.3 gate 7, citing `EveryGoldenStatesWhyItExists` (`:152-172`) |
+| 10.1–10.3 | Binder shape and new message sentences unpinned | **applied** — P22, and §10 marks each new clause as new |
+| 12.1 | A1's byte-identity unpinned | **applied** — **G-CODEGEN** (§12.2), blocking |
+| 12.2 | 28 lines, not 29 | **applied** — §12.1, §14.1 |
+| 12.3 | No presence/schema test for the spike directory | **declined, with rationale** — P27's exact-equality on `spike-verdict.json` fails if the file is missing or malformed, which subsumes a separate presence test. A second test on the same artifact would have no independent discriminating revert |
+| Q-D | No parse → emit → parse round-trip per position | **applied** — **P4**, seven cases |
+| G-3 | CLI leg, SDK leg, default-`UnknownCallPolicy` equivalence, F-3 supersession | **applied** — §13.3 gate 3; the supersession **already merged** as `b5d61e18` (PR #1085) |
+| G-5 | No gate-5 row at all | **applied** — §13.3 gate 5, with legs (a)/(b), the E1-attributable separation, and three 0.15-specific additions |
+
+### Round 2
+
+Pending. Bar: APPROVE from the evidence and consistency lenses.
+
+| Round | Date | Lens | Verdict |
+|---|---|---|---|
+| 1 | 2026-08-25 | evidence / consistency / test | NEEDS-FIXES (92% / 88% / 88%) — all dispositioned above |
+| 2 | — | evidence | pending |
+| 2 | — | internal consistency | pending |
+| 2 | — | test | pending |
