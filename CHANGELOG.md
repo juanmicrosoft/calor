@@ -14,7 +14,9 @@ All notable changes to this project will be documented in this file.
   answers — pass, fail, too-noisy-to-tell, and cannot-be-judged — and the rules
   for each are set in advance. The entry also says plainly that the files it uses
   were written by the same people, a few days earlier, in an earlier experiment.
-  No product code changes; this is a record, not a feature.
+  No product code changes; this is a record, not a feature. One test comes with
+  it: a check that the five files it names are still byte-for-byte the files it
+  froze, so they cannot drift out from under the record.
 - **CI now refuses any pull request that edits or deletes an already-frozen
   line in the project's proof-point registry; only additions are allowed.**
   The registry is the A-annex of `docs/plans/agent-native-gates.md`. The

@@ -653,6 +653,63 @@ public sealed class SpikeVerdictTests
             + "Run: dotnet build src/Calor.Compiler");
     }
 
+    /// <summary>
+    /// The five fixtures annex entry A-1.11 froze as PP-E1's denominator, with
+    /// the git blob SHA-1 each is pinned to in the §A.2 row. The row is
+    /// byte-frozen by <c>scripts/check-annex-freeze.py</c> and can never be
+    /// edited, so a fixture edit would otherwise leave the row pointing at
+    /// content that no longer exists, silently. This is that pin.
+    /// </summary>
+    private static readonly (string Fixture, string BlobSha)[] PpE1FrozenFixtures =
+    [
+        ("A2", "93ecdf1605c4e220313c1dd76b3291d3a79bb705"),
+        ("A3-map", "0885b3dd40fcff28c51de72860d47a32db60bf8c"),
+        ("A3-match", "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"),
+        ("A3-middleware", "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"),
+        ("A3-callback", "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4"),
+        // The L5-A2 mutant is itself a committed artifact (A-1.11, honest timing).
+        ("A2-broadening", "f975f2824464af2531d53e889ef79e1fe5a363e4"),
+    ];
+
+    /// <summary>
+    /// PP-E1 (annex A-1.11) freezes its fixture set by blob SHA. Recompute the
+    /// git object id of each frozen fixture and compare: an edit to any of them
+    /// turns this red, which is the only mechanical link between the frozen
+    /// annex row and the bytes it names.
+    /// </summary>
+    [Fact]
+    public void PpE1FixtureBlobShasMatchTheFrozenAnnexRow()
+    {
+        foreach (var (fixture, expected) in PpE1FrozenFixtures)
+        {
+            var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+            Assert.True(File.Exists(path), $"PP-E1 fixture missing: {path}");
+
+            var actual = GitBlobSha1(path);
+            Assert.True(
+                string.Equals(actual, expected, StringComparison.Ordinal),
+                $"PP-E1 fixture '{fixture}' has blob SHA {actual}, but annex A-1.11's frozen "
+                + $"§A.2 row names {expected}. The row is append-only and cannot be corrected: "
+                + "either restore the fixture, or register the new content in a NEW annex entry "
+                + "that supersedes the cell (docs/plans/agent-native-gates.md §A.3).");
+        }
+    }
+
+    /// <summary>Git's object id for a file: SHA-1 over "blob {length}\0{bytes}".</summary>
+    private static string GitBlobSha1(string path)
+    {
+        var content = File.ReadAllBytes(path);
+        var header = System.Text.Encoding.ASCII.GetBytes(
+            $"blob {content.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}\0");
+        var payload = new byte[header.Length + content.Length];
+        header.CopyTo(payload, 0);
+        content.CopyTo(payload, header.Length);
+#pragma warning disable CA5350 // git object ids are SHA-1 by definition; not a security use
+        var digest = System.Security.Cryptography.SHA1.HashData(payload);
+#pragma warning restore CA5350
+        return Convert.ToHexStringLower(digest);
+    }
+
     private static string SpikeDirectory()
         => Path.Combine(RepositoryRoot(), "docs", "design", "spikes", "effect-rows");
 
