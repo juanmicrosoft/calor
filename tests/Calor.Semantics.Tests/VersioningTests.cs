@@ -163,19 +163,26 @@ public class VersioningTests
     }
 
     /// <summary>
-    /// Only exact MAJOR.MINOR.PATCH is accepted; caret/range forms and bare majors are
-    /// Calor0702 errors rather than silently accepted.
+    /// Only exact MAJOR.MINOR.PATCH is accepted; caret/range forms, bare majors, a
+    /// leading sign, and whitespace anywhere (Version.TryParse would tolerate the
+    /// last two — review round 1 finding 1) are Calor0702 errors rather than
+    /// silently accepted. Surrounding whitespace is deliberately NOT trimmed.
     /// </summary>
     [Fact]
     public void Compile_MalformedSemver_IsError_Calor0702()
     {
-        foreach (var malformed in new[] { "^1.0.0", ">=2.0.0 <3.0.0", "2", "2.0", "" })
+        foreach (var malformed in new[]
+                 {
+                     "^1.0.0", ">=2.0.0 <3.0.0", "2", "2.0", "", "+2.0.0", "2 . 0 . 0",
+                     " 1.0.0 ", " 1 . 0 . 0 ", "2.0.0 ", "2.0.0.0", "2.0.0-rc1", "v2.0.0",
+                 })
         {
             var result = CompileModule($"  §SEMVER{{{malformed}}}");
 
             var diagnostic = Assert.Single(result.Diagnostics.Errors);
             Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
             Assert.Contains("MAJOR.MINOR.PATCH", diagnostic.Message);
+            Assert.Null(result.Ast?.DeclaredSemanticsVersion);
         }
     }
 
@@ -188,6 +195,65 @@ public class VersioningTests
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
         Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
         Assert.Contains("only once", diagnostic.Message);
+    }
+
+    /// <summary>
+    /// Review round 1 finding 3: duplicate detection keys on "a §SEMVER was seen", not on
+    /// the stored value, so a malformed first directive followed by a valid one reports
+    /// both the malformed text and the duplicate — the second one is not quietly adopted.
+    /// </summary>
+    [Fact]
+    public void Compile_MalformedThenValidSemver_ReportsBoth_AdoptsNeither()
+    {
+        var result = CompileModule("  §SEMVER{2}\n  §SEMVER{2.0.0}");
+
+        Assert.Equal(2, result.Diagnostics.Errors.Count);
+        Assert.All(result.Diagnostics.Errors,
+            d => Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, d.Code));
+        Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("MAJOR.MINOR.PATCH"));
+        Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("only once"));
+        Assert.Null(result.Ast?.DeclaredSemanticsVersion);
+    }
+
+    /// <summary>
+    /// Review round 1 finding 4: the legacy bracket form the hook used to recommend is
+    /// exactly one clear Calor0702 pointing at braces — not an empty-string 0702 plus a
+    /// cascade of parser errors.
+    /// </summary>
+    [Fact]
+    public void Compile_BracketSemver_IsSingleError_Calor0702_UseBraces()
+    {
+        var result = CompileModule("  §SEMVER[1.0.0]");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
+        Assert.Contains("use braces: §SEMVER{MAJOR.MINOR.PATCH}", diagnostic.Message);
+    }
+
+    /// <summary>
+    /// Review round 1 finding 9: an unterminated §SEMVER{ stops at the end of its line and
+    /// reports one Calor0702 instead of swallowing the statements that follow it.
+    /// </summary>
+    [Fact]
+    public void Compile_UnterminatedSemver_IsSingleError_Calor0702()
+    {
+        var result = CompileModule("  §SEMVER{2.0.0");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
+        Assert.Contains("Unterminated §SEMVER", diagnostic.Message);
+        Assert.Equal(2, diagnostic.Span.Line);
+    }
+
+    /// <summary>Bare §SEMVER with no brace group at all is a single Calor0702.</summary>
+    [Fact]
+    public void Compile_BareSemver_IsSingleError_Calor0702()
+    {
+        var result = CompileModule("  §SEMVER");
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
+        Assert.Contains("expected §SEMVER{MAJOR.MINOR.PATCH}", diagnostic.Message);
     }
 
     /// <summary>

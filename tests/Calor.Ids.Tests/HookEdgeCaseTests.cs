@@ -93,7 +93,7 @@ public class HookEdgeCaseTests
     public void ValidateIds_LargeCalrFile_DoesNotTimeout()
     {
         // Generate content with many functions
-        var content = "module LargeModule §SEMVER[1.0.0] {\n" +
+        var content = "module LargeModule §SEMVER{1.0.0} {\n" +
             string.Join("\n", Enumerable.Range(1, 100).Select(i =>
                 $"fn Func{i} f_{GenerateTestUlid(i)}() -> int {{ return {i}; }}")) +
             "\n}";
@@ -113,7 +113,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void WindowsLineEndings_AreHandled()
     {
-        var content = "module Test §SEMVER[1.0.0] {\r\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\r\n        return 1;\r\n    }\r\n}";
+        var content = "module Test §SEMVER{1.0.0} {\r\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\r\n        return 1;\r\n    }\r\n}";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -124,7 +124,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void UnixLineEndings_AreHandled()
     {
-        var content = "module Test §SEMVER[1.0.0] {\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\n        return 1;\n    }\n}";
+        var content = "module Test §SEMVER{1.0.0} {\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\n        return 1;\n    }\n}";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -135,7 +135,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void MixedLineEndings_AreHandled()
     {
-        var content = "module Test §SEMVER[1.0.0] {\r\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\n        return 1;\r    }\n}";
+        var content = "module Test §SEMVER{1.0.0} {\r\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\n        return 1;\r    }\n}";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         // Should handle without crashing
@@ -149,7 +149,7 @@ public class HookEdgeCaseTests
     public void OldMacLineEndings_AreHandled()
     {
         // Old Mac used \r only
-        var content = "module Test §SEMVER[1.0.0] {\r    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\r        return 1;\r    }\r}";
+        var content = "module Test §SEMVER{1.0.0} {\r    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int {\r        return 1;\r    }\r}";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -165,7 +165,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void TrailingWhitespace_IsHandled()
     {
-        var content = "module Test §SEMVER[1.0.0] { }   \n   \t   ";
+        var content = "module Test §SEMVER{1.0.0} { }   \n   \t   ";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -176,7 +176,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void LeadingWhitespace_IsHandled()
     {
-        var content = "   \n\t   module Test §SEMVER[1.0.0] { }";
+        var content = "   \n\t   module Test §SEMVER{1.0.0} { }";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -187,7 +187,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void TabsInContent_AreHandled()
     {
-        var content = "module\tTest\t§SEMVER[1.0.0]\t{\t}";
+        var content = "module\tTest\t§SEMVER{1.0.0}\t{\t}";
         var json = $"{{\"file_path\": \"test.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -274,7 +274,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void ContentWithUnicode_IsHandled()
     {
-        var content = "module Test §SEMVER[1.0.0] { // 日本語コメント\n    fn 関数 f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; }\n}";
+        var content = "module Test §SEMVER{1.0.0} { // 日本語コメント\n    fn 関数 f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; }\n}";
         var json = $"{{\"file_path\": \"unicode.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -286,7 +286,7 @@ public class HookEdgeCaseTests
     [Fact]
     public void ContentWithEmoji_IsHandled()
     {
-        var content = "module Test §SEMVER[1.0.0] { // 🔥 Fire!\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; }\n}";
+        var content = "module Test §SEMVER{1.0.0} { // 🔥 Fire!\n    fn Add f_01J5X7K9M2NPQRSTABWXYZ1234() -> int { return 1; }\n}";
         var json = $"{{\"file_path\": \"emoji.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);
@@ -298,7 +298,7 @@ public class HookEdgeCaseTests
     public void ContentWithSectionSymbol_IsHandled()
     {
         // § is used in §SEMVER
-        var content = "module Test §SEMVER[1.0.0] { }";
+        var content = "module Test §SEMVER{1.0.0} { }";
         var json = $"{{\"file_path\": \"section.calr\", \"content\": {JsonEscape(content)}}}";
 
         var (exitCode, _) = HookCommand.ValidateIds(json);

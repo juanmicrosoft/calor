@@ -4,14 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **`§SEMVER{MAJOR.MINOR.PATCH}` is a new module-level directive.** It did not
+  lex before this release: any `§SEMVER` line failed with `Calor0006`
+  (unknown section marker), even though the docs described it. Write it as the
+  first line of the module body, e.g. `§SEMVER{2.0.0}`. Only that exact
+  spelling is accepted — the caret and range forms the versioning page used
+  to show (`^1.0.0`, `>=1.0.0 <2.0.0`) are no longer documented and are
+  rejected with `Calor0702`, as are the bracket form `§SEMVER[…]`, a leading
+  sign, and any whitespace inside the braces.
+
 ### Changed
 - **Files that declare `§SEMVER{1.x}` (or `0.x`) are now refused with an error
   pointing at #1084.** The compiler implements semantics version 2.0.0. Before
   this change a module that said `§SEMVER{1.0.0}` was not checked at all — the
   `§SEMVER` line did not even lex, and the compatibility check in
   `SemanticsVersion.CheckCompatibility` had no caller — so nothing stopped a
-  1.x file from being quietly read under 2.0.0 rules. Now `§SEMVER{MAJOR.MINOR.PATCH}`
-  is a real module-level directive, and the check runs on every parse:
+  1.x file from being quietly read under 2.0.0 rules. Now that the directive
+  exists, the check runs on every parse (build, language server, `format`,
+  `self-check`, MCP tools):
   - An older major (`§SEMVER{1.0.0}`) stops the build with `Calor0701`. The
     message tells you what to do: migrate the module and declare
     `§SEMVER{2.0.0}` after reviewing the nullability rules

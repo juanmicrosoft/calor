@@ -67,16 +67,21 @@ A module declares the semantics version it was written for with a
 
 ### 3.2 Syntax
 
-Exactly one form is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` with three
-numeric components.
+Exactly one spelling is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` — three runs
+of ASCII digits separated by dots, closed on the same line, nothing else
+between the braces.
 
 ```
 §SEMVER{2.0.0}
 ```
 
-Caret (`^2.0.0`), range (`>=2.0.0 <3.0.0`), and shortened (`2`, `2.0`)
-forms are **not** supported and are rejected with `Calor0702`. A module may
-contain at most one `§SEMVER`; a second one is also `Calor0702`.
+Everything else is rejected with `Calor0702`: caret (`^2.0.0`), range
+(`>=2.0.0 <3.0.0`), and shortened (`2`, `2.0`) forms; a leading sign or
+any whitespace (`+2.0.0`, `2 . 0 . 0`, `{ 2.0.0 }` — the text is not
+trimmed); pre-release suffixes (`2.0.0-rc1`); the legacy bracket form
+`§SEMVER[2.0.0]`; a bare `§SEMVER`; and a `{` not closed on its line. A
+module may contain at most one `§SEMVER`; a second one is also `Calor0702`,
+even when the first was malformed.
 
 ### 3.3 Modules That Declare Nothing
 
@@ -186,7 +191,8 @@ Precursor bump for the v0.14 nullability enforcement workstream (task #14).
 Unblocked the S5 severity flip (`Calor0272/0273/0274` Info → Error), gated
 on `SemanticsVersion.Major >= 2`.
 
-Since v0.15.0 the `§SEMVER` directive is parsed and checked: files declaring
+Unreleased (next release): the `§SEMVER` directive is now lexed, parsed and
+checked — it did not exist in the lexer before PR #1087 — and files declaring
 `1.x` (or `0.x`) are refused with `Calor0701` and a migration pointer
 (#1084 item 1); no committed `.calr` in this repository declared a version,
 so the change broke nothing in-tree. Automated 1.x → 2.0.0 migration is
@@ -318,7 +324,7 @@ public enum VersionCompatibility
 In `src/Calor.Compiler/Diagnostics/Diagnostic.cs`:
 
 ```csharp
-// Semantics version (Calor0700-0709; contract-verification results live in 0710-0729)
+// Semantics version (Calor0700-0709; contract-verification results live in 0710-0719)
 public const string SemanticsVersionMismatch = "Calor0700";           // Warning
 public const string SemanticsVersionIncompatible = "Calor0701";       // Error
 public const string SemanticsVersionInvalidDeclaration = "Calor0702"; // Error

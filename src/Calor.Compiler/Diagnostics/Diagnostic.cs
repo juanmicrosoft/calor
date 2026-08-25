@@ -465,8 +465,12 @@ public static class DiagnosticCode
     public const string SemanticsVersionIncompatible = "Calor0701";
 
     /// <summary>
-    /// Error: The <c>§SEMVER</c> directive is malformed (not <c>MAJOR.MINOR.PATCH</c>)
-    /// or declared more than once in a module.
+    /// Error: The <c>§SEMVER</c> directive is malformed (not exactly
+    /// <c>MAJOR.MINOR.PATCH</c>, bracket form, missing or unterminated braces)
+    /// or declared more than once in a module. Not to be confused with the
+    /// pre-#702 meaning of "Calor0702" (postcondition may be violated), which
+    /// was renumbered to <see cref="PostconditionMayBeViolated"/> (Calor0712);
+    /// this code was free from #702 until it was allocated here (#1087).
     /// </summary>
     public const string SemanticsVersionInvalidDeclaration = "Calor0702";
 

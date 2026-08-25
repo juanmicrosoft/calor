@@ -426,8 +426,10 @@ public static class HookCommand
                 return (0, null);
             }
 
-            // Look for §SEMVER[x.y.z] or §SEMVER{x.y.z}
-            if (!content.Contains("§SEMVER[") && !content.Contains("§SEMVER{"))
+            // Look for §SEMVER{x.y.z}. The legacy bracket form §SEMVER[x.y.z] is not
+            // a declaration — the lexer rejects it with Calor0702 — so it does not
+            // satisfy the presence check either.
+            if (!content.Contains("§SEMVER{"))
             {
                 return (0, $"REMINDER: Add §SEMVER{{{SemanticsVersion.VersionString}}} to your module for semantic versioning");
             }

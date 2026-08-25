@@ -66,10 +66,12 @@ directive, usually the first line of the module body:
 
 ### Syntax
 
-Exactly one form is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` with three numeric
-parts, for example `§SEMVER{2.0.0}`. Caret (`^2.0.0`), range
-(`>=2.0.0 <3.0.0`), and shortened (`2`, `2.0`) forms are rejected with
-`Calor0702`, and so is a second `§SEMVER` in the same module.
+Exactly one spelling is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` with three
+numeric parts and nothing else between the braces, for example
+`§SEMVER{2.0.0}`. Caret (`^2.0.0`), range (`>=2.0.0 <3.0.0`), and shortened
+(`2`, `2.0`) forms are rejected with `Calor0702`; so are a leading sign or any
+whitespace (`+2.0.0`, `{ 2.0.0 }`), the bracket form `§SEMVER[2.0.0]`, a `{`
+not closed on its line, and a second `§SEMVER` in the same module.
 
 ### Modules That Declare Nothing
 
@@ -148,9 +150,9 @@ and declare `§SEMVER{2.0.0}` after reviewing nullability semantics
 ### Version 2.0.0 (Current)
 
 Precursor bump for the v0.14 nullability enforcement work: `string` is
-non-nullable and `Calor0272/0273/0274` are errors. Since v0.15.0 the
-`§SEMVER` directive is parsed and checked, and files declaring 1.x are refused
-with `Calor0701`.
+non-nullable and `Calor0272/0273/0274` are errors. Unreleased (next release):
+the `§SEMVER` directive is now lexed, parsed and checked (it did not exist in
+the lexer before), and files declaring 1.x are refused with `Calor0701`.
 
 ### Version 1.0.0
 

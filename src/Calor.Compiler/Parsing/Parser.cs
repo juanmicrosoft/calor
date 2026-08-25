@@ -701,6 +701,7 @@ public sealed class Parser
         var moduleItems = new List<AstNode>();
         var namespaceScopes = new List<NamespaceScopeInfo>();
         string? declaredSemanticsVersion = null;
+        var sawSemVer = false;
 
         while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndModule, startToken))
         {
@@ -716,16 +717,24 @@ public sealed class Parser
                 // (compile, LSP, self-check, MCP) refuses a retired-major file
                 // (roadmap §3.3 decision 1, #1084 item 1).
                 var semverToken = Advance();
-                var versionText = semverToken.Value as string;
-                if (declaredSemanticsVersion != null)
+                if (sawSemVer)
                 {
+                    // Keyed on "seen", not on the stored value, so a malformed
+                    // first directive followed by a valid one is still a duplicate.
                     _diagnostics.ReportError(semverToken.Span,
                         DiagnosticCode.SemanticsVersionInvalidDeclaration,
                         "§SEMVER may be declared only once per module.");
                 }
-                else if (SemanticsVersion.ReportDeclaredVersion(_diagnostics, semverToken.Span, versionText))
+                else
                 {
-                    declaredSemanticsVersion = versionText!.Trim();
+                    sawSemVer = true;
+                    // A null Value means the lexer already reported the malformed
+                    // shape (bracket form, missing or unterminated braces).
+                    if (semverToken.Value is string versionText
+                        && SemanticsVersion.ReportDeclaredVersion(_diagnostics, semverToken.Span, versionText))
+                    {
+                        declaredSemanticsVersion = versionText;
+                    }
                 }
             }
             else if (Check(TokenKind.Using))

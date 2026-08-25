@@ -76,18 +76,22 @@ public static class SemanticsVersion
     /// </summary>
     /// <param name="diagnostics">The bag to report into.</param>
     /// <param name="span">The directive's span.</param>
-    /// <param name="versionText">The raw text inside the braces, or <c>null</c> when
-    /// the directive had no brace group.</param>
+    /// <param name="versionText">The raw text inside the braces. It must be exactly
+    /// <c>MAJOR.MINOR.PATCH</c> — three runs of ASCII digits separated by dots, with
+    /// no sign, whitespace, or extra components; the text is deliberately not trimmed
+    /// (<c>§SEMVER{ 2.0.0 }</c> is malformed) so the accepted form has one spelling.</param>
     /// <returns><c>true</c> when the text parsed as a version (even if it was then
     /// refused), <c>false</c> when it was malformed.</returns>
     public static bool ReportDeclaredVersion(DiagnosticBag diagnostics, Parsing.TextSpan span, string? versionText)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        var trimmed = versionText?.Trim();
-        if (string.IsNullOrEmpty(trimmed)
-            || trimmed.Split('.').Length != 3
-            || !Version.TryParse(trimmed, out var declared))
+        // Gate on the exact shape BEFORE Version.TryParse: TryParse tolerates a
+        // leading sign and surrounding whitespace per component ("+2.0.0",
+        // "2 . 0 . 0"), which must not be accepted as a declaration.
+        if (versionText == null
+            || !IsExactMajorMinorPatch(versionText)
+            || !Version.TryParse(versionText, out var declared))
         {
             diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionInvalidDeclaration,
                 $"Invalid §SEMVER declaration '{versionText ?? ""}': expected §SEMVER{{MAJOR.MINOR.PATCH}}, "
@@ -99,23 +103,35 @@ public static class SemanticsVersion
         {
             case VersionCompatibility.Incompatible when declared.Major < Major:
                 diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionIncompatible,
-                    $"Module declares semantics version {trimmed}, but this compiler implements "
+                    $"Module declares semantics version {versionText}, but this compiler implements "
                     + $"{VersionString} and refuses files written for an older major. "
                     + LegacyMajorMigrationHint);
                 break;
             case VersionCompatibility.Incompatible:
                 diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionIncompatible,
-                    $"Module requires semantics version {trimmed}, but this compiler only supports "
+                    $"Module requires semantics version {versionText}, but this compiler only supports "
                     + $"{VersionString}. Upgrade the compiler or lower the declared version.");
                 break;
             case VersionCompatibility.PossiblyIncompatible:
                 diagnostics.ReportWarning(span, DiagnosticCode.SemanticsVersionMismatch,
-                    $"Module targets semantics version {trimmed}, but this compiler supports "
+                    $"Module targets semantics version {versionText}, but this compiler supports "
                     + $"{VersionString}; the module may rely on semantics this compiler does not implement.");
                 break;
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> is exactly <c>digits.digits.digits</c>
+    /// (ASCII digits only; no sign, whitespace, or extra components).
+    /// </summary>
+    public static bool IsExactMajorMinorPatch(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var parts = text.Split('.');
+        return parts.Length == 3
+            && parts.All(part => part.Length > 0 && part.All(char.IsAsciiDigit));
     }
 
     /// <summary>

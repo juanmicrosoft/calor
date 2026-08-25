@@ -27,6 +27,9 @@ This audit compares implemented Calor language features (from `Lexer.cs` and `Pa
 ### Critical Issues Fixed
 
 1. **Removed `§SEMVER`** - Was documented but doesn't exist in lexer
+   *(Superseded: PR #1087 — roadmap §3.3 decision 1 / #1084 item 1 — adds
+   `§SEMVER{MAJOR.MINOR.PATCH}` to the lexer and parser as a module-level
+   directive; see `docs/semantics/versioning.md`.)*
 2. **Fixed `§CLASS` → `§CL`** - Incorrect alias documented
 3. **Fixed `§METHOD` → `§MT`** - Incorrect alias documented
 4. **Fixed lexer bug for `§??` and `§?.`** - Added special case handling in `ScanSectionMarker()`
