@@ -1007,7 +1007,7 @@ receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed*
 receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
 **executed** (#1095 — E1 slice 2a); the enforcement pass's string resolvers reading receivers
 from the bound tree, `BoundLambdaExpression`'s `FunctionBoundType`, and the
-`Binder` → `Effects` layering hole all **executed** (PR #1098 — E1 slice 2b, below);
+`Binder` → `Effects` layering hole all **executed** (PR #1099 — E1 slice 2b, below);
 symbol-identity keying in `EffectResolver`/manifests/IL summaries **pending** (slice 2c —
 `EffectResolver.cs:48` intact, so roadmap §4.2's E1 exit pin (c) is still unmet). E2 consumes
 all six; roadmap §4.2's cut line already prices the risk.
