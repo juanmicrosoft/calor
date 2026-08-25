@@ -9,42 +9,57 @@ name: Experiment Registry Tamper Check
 #
 #   - docs/plans/agent-native-gates.md, the A-annex where proof points are
 #     registered (docs/plans/roadmap-v0.13-v0.15.md §4.3 (i); annex entry
-#     A-1.10): every §A.2 proof-point row and every §A.3 revision-log entry
-#     must be byte-identical to the base branch, rows/entries may only be
-#     added, every annex change must be logged as a new A-1.N entry, and the
+#     A-1.10): every §A.2 proof-point row, table header and §A.3 revision-log
+#     entry must be byte-identical to the base branch, rows/entries may only
+#     be added, every annex change must be logged as a new A-1.N entry, and the
 #     annex version pointer must match the newest entry. The exact invariant,
 #     and what it does NOT guard, is documented in
-#     scripts/check-annex-freeze.py; its --self-test runs first on every
-#     invocation so the guard is demonstrably discriminating.
+#     scripts/check-annex-freeze.py.
+#
+# No `paths:` filter, deliberately: both jobs run on EVERY PR to main (the
+# test.yml `detect-changes` precedent — always run, filter inside) so that
+# `annex-freeze` can be a required status check; it costs ~0.1 s and passes
+# trivially when the annex is unchanged. The registry job skips its dotnet
+# build internally when registry.json is unchanged. Direct pushes to main are
+# also checked (HEAD^ vs HEAD) so an unreviewed push leaves a red record.
+#
+# The annex guard executed is the BASE-branch copy of the script, not the PR's
+# — otherwise a PR could neuter check() and its self-test together. A PR that
+# changes the annex together with the guard script or this workflow is refused
+# outright; land the guard change first, then the annex change.
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
-    paths:
-      - 'docs/experiments/registry.json'
-      - 'docs/plans/agent-native-gates.md'
-      - 'scripts/check-annex-freeze.py'
-      - '.github/workflows/experiment-registry-tamper-check.yml'
 
 jobs:
   tamper-check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR (with full history)
+      - name: Checkout (with full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # The workflow's paths filter is a union over both registries; skip the
-      # dotnet build when this PR leaves registry.json untouched (the validator
-      # would only compare the base file with itself).
+      - name: Resolve base ref (PR base branch, or HEAD^ on a push to main)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "BASE=origin/${{ github.base_ref }}" >> "$GITHUB_ENV"
+          else
+            echo "BASE=HEAD^" >> "$GITHUB_ENV"
+          fi
+
+      # Skip the dotnet build when this event leaves registry.json untouched
+      # (the validator would only compare the base file with itself).
       - name: Detect registry.json change vs base
         id: registry
         run: |
-          if git diff --quiet origin/${{ github.base_ref }} -- docs/experiments/registry.json; then
+          if git diff --quiet "$BASE" HEAD -- docs/experiments/registry.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "docs/experiments/registry.json is unchanged vs origin/${{ github.base_ref }}; registry validation skipped"
+            echo "docs/experiments/registry.json is unchanged vs $BASE; registry validation skipped"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
@@ -62,7 +77,7 @@ jobs:
       - name: Extract base-branch version of registry.json
         if: steps.registry.outputs.changed == 'true'
         run: |
-          git show origin/${{ github.base_ref }}:docs/experiments/registry.json > /tmp/registry-base.json 2>/dev/null \
+          git show "$BASE":docs/experiments/registry.json > /tmp/registry-base.json 2>/dev/null \
             || echo '{"entries":[]}' > /tmp/registry-base.json
           echo "Base registry:"
           cat /tmp/registry-base.json
@@ -84,22 +99,64 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR (with full history)
+      - name: Checkout (with full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Self-test the annex guard (discriminating pins run first, every time)
-        run: python3 scripts/check-annex-freeze.py --self-test
+      - name: Resolve base ref (PR base branch, or HEAD^ on a push to main)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "BASE=origin/${{ github.base_ref }}" >> "$GITHUB_ENV"
+          else
+            echo "BASE=HEAD^" >> "$GITHUB_ENV"
+          fi
+
+      # The guard that judges the annex is the one already on the base branch.
+      # Bootstrap case (the PR that introduces the guard; base has no copy):
+      # fall back to the head copy and say so loudly. After that PR merges the
+      # base path is always taken.
+      - name: Select the BASE-branch copy of the guard
+        run: |
+          if git show "$BASE":scripts/check-annex-freeze.py > /tmp/guard.py 2>/dev/null; then
+            echo "GUARD_BOOTSTRAP=false" >> "$GITHUB_ENV"
+            echo "Using the base-branch guard ($BASE:scripts/check-annex-freeze.py)"
+          else
+            rm -f /tmp/guard.py
+            cp scripts/check-annex-freeze.py /tmp/guard.py
+            echo "GUARD_BOOTSTRAP=true" >> "$GITHUB_ENV"
+            echo "::warning::BOOTSTRAP: base guard absent on $BASE — running the head copy of scripts/check-annex-freeze.py this once"
+            echo "BOOTSTRAP: base guard absent on $BASE — running the head copy of scripts/check-annex-freeze.py this once"
+          fi
+
+      # A guard change and an annex change never ride together: the annex
+      # would be judged by a guard nobody has reviewed against it yet.
+      - name: Refuse a PR that changes the annex together with the guard or this workflow
+        run: |
+          changed="$(git diff --name-only "$BASE" HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -qx 'docs/plans/agent-native-gates.md' \
+             && echo "$changed" | grep -qxE 'scripts/check-annex-freeze\.py|\.github/workflows/experiment-registry-tamper-check\.yml'; then
+            if [ "$GUARD_BOOTSTRAP" = "true" ]; then
+              echo "BOOTSTRAP: annex + guard co-change tolerated only for the PR that introduces the guard"
+            else
+              echo "::error::docs/plans/agent-native-gates.md must not change in the same PR as scripts/check-annex-freeze.py or this workflow. Land the guard change first."
+              exit 1
+            fi
+          fi
+
+      - name: Self-test the base guard (discriminating pins run first, every time)
+        run: python3 /tmp/guard.py --self-test --head-file docs/plans/agent-native-gates.md
 
       # No empty-file fallback: the annex has existed since 2026-07-24, so a
       # failed `git show` is a misconfiguration and must fail the job rather
-      # than pass the check against an empty base.
+      # than pass the check against an empty base (the guard rejects an empty
+      # base as well).
       - name: Extract base-branch version of the annex
-        run: git show origin/${{ github.base_ref }}:docs/plans/agent-native-gates.md > /tmp/annex-base.md
+        run: git show "$BASE":docs/plans/agent-native-gates.md > /tmp/annex-base.md
 
-      - name: Validate annex freeze (frozen rows and entries are append-only)
+      - name: Validate annex freeze (frozen rows, headers and entries are append-only)
         run: |
-          python3 scripts/check-annex-freeze.py \
+          python3 /tmp/guard.py \
             --base-file /tmp/annex-base.md \
             --head-file docs/plans/agent-native-gates.md
