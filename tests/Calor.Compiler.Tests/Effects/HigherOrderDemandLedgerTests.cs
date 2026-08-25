@@ -92,8 +92,9 @@ public class HigherOrderDemandLedgerTests
     private const string NotReachingEffectPassNote =
         "Known state at registration, not a filter: bench/mcp/tasks/*/expected.calr and "
         + "input.calr are MCP benchmark fixtures that are deliberately broken or written against "
-        + "older syntax (most die on Calor0251/Calor0830), benchmarks/* entries are the #901 "
-        + "stale subjects, and tests/TestData/LintScenarios/10_error_cases/* are error fixtures.";
+        + "older syntax (30 of 33 die on Calor0830 legacy closing tags, two on Calor0006, one on "
+        + "Calor0403), benchmarks/* entries are the #901 stale subjects, and "
+        + "tests/TestData/LintScenarios/10_error_cases/* are error fixtures.";
 
     /// <summary>
     /// The D-B classification, pinned as data: identifiers a declared type syntax
