@@ -117,29 +117,11 @@ async Task<int> RunCommand(string[] runArgs)
             continue;
         }
 
-        // Set bisect on the config (EnableBisect has init accessor from Get())
-        // Create a new config manually
-        config = new RoundTripConfig
-        {
-            ProjectName = config.ProjectName,
-            OriginalProjectPath = config.OriginalProjectPath,
-            LibrarySourceRelativePath = config.LibrarySourceRelativePath,
-            SolutionOrProjectFile = config.SolutionOrProjectFile,
-            ParseContextProjectFile = config.ParseContextProjectFile,
-            DotnetPath = config.DotnetPath,
-            TargetFramework = config.TargetFramework,
-            Configuration = config.Configuration,
-            ExtraBuildProperties = config.ExtraBuildProperties,
-            LooseDirectoryMode = config.LooseDirectoryMode,
-            EnableBisect = enableBisect,
-            ExcludePatterns = config.ExcludePatterns,
-            TestTimeout = config.TestTimeout,
-            BuildTimeout = buildTimeout ?? config.BuildTimeout,
-            ConversionTimeout = config.ConversionTimeout,
-            TestFilter = config.TestFilter,
-            MinimumCoverageFraction = minimumCoverage ?? config.MinimumCoverageFraction,
-            MinimumNativeFraction = minimumNative ?? config.MinimumNativeFraction,
-        };
+        // Apply the CLI overrides by deriving from the canonical project config.
+        // Never hand-copy fields here: a field this derivation drops (the
+        // upstream-flake allowlist, once — see RunConfigOverrideTests) silently
+        // changes what the gate enforces.
+        config = config.WithRunOverrides(enableBisect, buildTimeout, minimumCoverage, minimumNative);
 
         Console.WriteLine();
         Console.WriteLine(new string('=', 60));
@@ -183,11 +165,16 @@ async Task<int> RunCommand(string[] runArgs)
         Console.WriteLine($"\n{verdictEmoji} {config.ProjectName}: {report.Comparison?.Status}");
         Console.WriteLine($"   Baseline: {report.Baseline?.Passed}/{report.Baseline?.TotalTests} passing");
         Console.WriteLine($"   Round-trip: {report.RoundTripTests?.Passed ?? 0}/{report.RoundTripTests?.TotalTests ?? 0} passing");
-        Console.WriteLine($"   Regressions: {report.Comparison?.Regressions.Count ?? -1}");
+        Console.WriteLine($"   Regressions: {report.Comparison?.FormatRegressionCount() ?? "-1"}");
         if ((report.Comparison?.IgnoredFlakyRegressions.Count ?? 0) > 0)
         {
             Console.WriteLine(
                 $"   Upstream flake regressions (not blocking): {report.Comparison!.IgnoredFlakyRegressions.Count}");
+        }
+        if ((report.Comparison?.IgnoredFlakyBaselineFailures.Count ?? 0) > 0)
+        {
+            Console.WriteLine(
+                $"   Upstream flake baseline failures (not blocking): {report.Comparison!.IgnoredFlakyBaselineFailures.Count}");
         }
         var sourceCandidateCount = report.Fidelity?.Coverage.TotalConvertibleFiles
             ?? report.FileResults.Count + report.ExcludedFileCount;

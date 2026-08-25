@@ -61,7 +61,15 @@ public static class ReportGenerator
             sb.AppendLine($"| Round-trip tests | {report.RoundTripTests.Passed} passed, {report.RoundTripTests.Failed} failed, {report.RoundTripTests.Skipped} skipped |");
 
         if (report.Comparison != null)
-            sb.AppendLine($"| Regressions | **{report.Comparison.Regressions.Count}** |");
+        {
+            var ignored = report.Comparison.IgnoredFlakyRegressions.Count;
+            var ignoredNote = ignored == 0
+                ? ""
+                : $" ({ignored} ignored upstream flake{(ignored == 1 ? "" : "s")})";
+            sb.AppendLine($"| Regressions | **{report.Comparison.Regressions.Count}**{ignoredNote} |");
+            if (report.Comparison.IgnoredFlakyBaselineFailures.Count > 0)
+                sb.AppendLine($"| Baseline failures ignored as upstream flakes | {report.Comparison.IgnoredFlakyBaselineFailures.Count} |");
+        }
 
         sb.AppendLine();
 
@@ -124,7 +132,10 @@ public static class ReportGenerator
             sb.AppendLine($"- Baseline: {tests.BaselinePassed}/{tests.BaselineTotal} passed ({tests.BaselineTrxFiles} TRX file(s){(tests.BaselineUsedConsoleFallback ? ", console fallback" : "")})");
             sb.AppendLine($"- Round-trip: {tests.RoundTripPassed}/{tests.RoundTripTotal} passed ({tests.RoundTripTrxFiles} TRX file(s){(tests.RoundTripUsedConsoleFallback ? ", console fallback" : "")})");
             sb.AppendLine($"- Test inventory delta: {tests.InventoryDelta:+0;-0;0}");
-            sb.AppendLine($"- Regressions: {tests.Regressions}; new passes: {tests.NewPasses}; status: {tests.ComparisonStatus}");
+            var regressionCount = report.Comparison?.FormatRegressionCount() ?? tests.Regressions.ToString();
+            sb.AppendLine($"- Regressions: {regressionCount}; new passes: {tests.NewPasses}; status: {tests.ComparisonStatus}");
+            if (tests.IgnoredFlakyBaselineFailures > 0)
+                sb.AppendLine($"- Baseline failures ignored as upstream flakes: {tests.IgnoredFlakyBaselineFailures}");
             sb.AppendLine();
         }
 
@@ -195,6 +206,26 @@ public static class ReportGenerator
                 sb.AppendLine($"- **{reg.FullyQualifiedName}**");
                 if (reg.ErrorMessage != null)
                     sb.AppendLine($"  > {reg.ErrorMessage.Truncate(200)}");
+            }
+        }
+
+        // Known-flake failures in the BASELINE leg. These explain a non-zero
+        // baseline exit code without blocking, and are listed so nobody mistakes
+        // a tolerated baseline for a clean one.
+        if (report.Comparison is { IgnoredFlakyBaselineFailures.Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Upstream Flake Baseline Failures (Not Blocking)");
+            sb.AppendLine();
+            sb.AppendLine(
+                $"{report.Comparison.IgnoredFlakyBaselineFailures.Count} test(s) failed in the baseline run but are in the project's known-flake list; " +
+                "the baseline exit code is tolerated and the comparison still ran. See `RoundTripConfig.ExpectedFlakyTestFullyQualifiedNames` for provenance.");
+            sb.AppendLine();
+            foreach (var failure in report.Comparison.IgnoredFlakyBaselineFailures.Take(50))
+            {
+                sb.AppendLine($"- **{failure.FullyQualifiedName}**");
+                if (failure.ErrorMessage != null)
+                    sb.AppendLine($"  > {failure.ErrorMessage.Truncate(200)}");
             }
         }
 
@@ -270,6 +301,15 @@ public static class ReportGenerator
                 skipped = report.RoundTripTests.Skipped,
             } : null,
             regressions = report.Comparison?.Regressions.Count ?? -1,
+            // Upstream flakes excluded from the verdict, listed by name so the
+            // JSON stays as honest as the markdown about what was ignored.
+            ignored_upstream_flakes = new
+            {
+                regressions = report.Comparison?.IgnoredFlakyRegressions
+                    .Select(t => t.FullyQualifiedName).ToList() ?? [],
+                baseline_failures = report.Comparison?.IgnoredFlakyBaselineFailures
+                    .Select(t => t.FullyQualifiedName).ToList() ?? [],
+            },
             files = new
             {
                 total = report.Fidelity?.Coverage.TotalConvertibleFiles
@@ -332,6 +372,9 @@ public static class ReportGenerator
                     inventory_delta = report.Fidelity.Tests.InventoryDelta,
                     regressions = report.Fidelity.Tests.Regressions,
                     new_passes = report.Fidelity.Tests.NewPasses,
+                    ignored_flaky_regressions = report.Fidelity.Tests.IgnoredFlakyRegressions,
+                    ignored_flaky_baseline_failures = report.Fidelity.Tests.IgnoredFlakyBaselineFailures,
+                    ignored_flaky_round_trip_failures = report.Fidelity.Tests.IgnoredFlakyRoundTripFailures,
                     comparison_status = report.Fidelity.Tests.ComparisonStatus.ToString(),
                 },
             },

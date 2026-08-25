@@ -1712,16 +1712,34 @@ public sealed class RoundTripPipeline
         if (baseline == null || roundTrip == null)
             return new TestComparison { Status = ComparisonStatus.Incomplete };
 
+        var allowlist = config.ExpectedFlakyTestFullyQualifiedNames;
         var comparison = new TestComparison
         {
             BaselineTotal = baseline.TotalTests,
             BaselinePassed = baseline.Passed,
             RoundTripTotal = roundTrip.TotalTests,
             RoundTripPassed = roundTrip.Passed,
+            // Recorded before any early return so an Incomplete/blocked report
+            // still shows which failures were known upstream flakes.
+            IgnoredFlakyBaselineFailures = baseline.Results
+                .Where(t => t.Outcome == "Failed" && allowlist.Contains(t.FullyQualifiedName))
+                .ToList(),
+            IgnoredFlakyRoundTripFailures = roundTrip.Results
+                .Where(t => t.Outcome == "Failed" && allowlist.Contains(t.FullyQualifiedName))
+                .ToList(),
         };
 
+        // A baseline that exited non-zero is normally unusable as a reference.
+        // The one exception: `dotnet test` exited 1 and every failure it reports
+        // is an allowlisted upstream flake — then the baseline is still a valid
+        // reference and the comparison proceeds (the flakes stay visible on
+        // IgnoredFlakyBaselineFailures).
+        var baselineExitUsable = baseline.ExitCode == 0
+            || RoundTripExitPolicy.IsTestExitExplainedByKnownFlakes(
+                baseline, comparison.IgnoredFlakyBaselineFailures);
+
         if (baseline.TotalTests == 0 || roundTrip.TotalTests == 0 ||
-            baseline.ExitCode != 0 ||
+            !baselineExitUsable ||
             baseline.ParseErrors.Count > 0 ||
             roundTrip.ParseErrors.Count > 0)
         {
@@ -1787,10 +1805,10 @@ public sealed class RoundTripPipeline
             // report still surfaces them so drift stays visible. See
             // RoundTripConfig.ExpectedFlakyTestFullyQualifiedNames for
             // provenance requirements.
-            if (config.ExpectedFlakyTestFullyQualifiedNames.Count > 0)
+            if (allowlist.Count > 0)
             {
                 var flaky = regressions
-                    .Where(t => config.ExpectedFlakyTestFullyQualifiedNames.Contains(t.FullyQualifiedName))
+                    .Where(t => allowlist.Contains(t.FullyQualifiedName))
                     .ToList();
                 if (flaky.Count > 0)
                 {
@@ -1853,24 +1871,7 @@ public sealed class RoundTripPipeline
 
             // Re-run just the failing tests
             TrxParser.CleanTrxFiles(workDir);
-            var bisectConfig = new RoundTripConfig
-            {
-                ProjectName = config.ProjectName,
-                OriginalProjectPath = config.OriginalProjectPath,
-                LibrarySourceRelativePath = config.LibrarySourceRelativePath,
-                SolutionOrProjectFile = config.SolutionOrProjectFile,
-                ParseContextProjectFile = config.ParseContextProjectFile,
-                DotnetPath = config.DotnetPath,
-                TargetFramework = config.TargetFramework,
-                Configuration = config.Configuration,
-                ExtraBuildProperties = config.ExtraBuildProperties,
-                LooseDirectoryMode = config.LooseDirectoryMode,
-                TestFilter = null,
-                TestTimeout = config.TestTimeout,
-                ConversionTimeout = config.ConversionTimeout,
-                MinimumCoverageFraction = config.MinimumCoverageFraction,
-                MinimumNativeFraction = config.MinimumNativeFraction,
-            };
+            var bisectConfig = config with { TestFilter = null, EnableBisect = false };
             var result = await RunTestsAsync(
                 workDir, bisectConfig, cancellationToken: cancellationToken);
 

@@ -387,6 +387,97 @@ public class ComparisonTests
         Assert.Empty(result.IgnoredFlakyRegressions);
     }
 
+    [Fact]
+    public void BaselineFailureOnExpectedFlakyTest_DoesNotMakeComparisonIncomplete()
+    {
+        // CI job 97670944824 shape: the flake hit the BASELINE leg, `dotnet test`
+        // exited 1, and the pipeline went Incomplete ("BLOCKED: baseline tests
+        // exited with 1") before comparing anything. A baseline whose only
+        // failures are allowlisted flakes is still a valid reference.
+        const string flakyFqn = "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
+        var baseline = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Failed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var roundTrip = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var config = StubConfig("MediatR", flakyFqn);
+        Assert.Equal(1, baseline.ExitCode);
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true }, config);
+
+        Assert.Equal(ComparisonStatus.Pass, result.Status);
+        Assert.Empty(result.Regressions);
+        var ignored = Assert.Single(result.IgnoredFlakyBaselineFailures);
+        Assert.Equal(flakyFqn, ignored.FullyQualifiedName);
+        Assert.Empty(result.IgnoredFlakyRoundTripFailures);
+        Assert.Equal(1, result.PreExistingFailures);
+    }
+
+    [Fact]
+    public void BaselineFailureOnUnlistedTest_StillIncomplete()
+    {
+        // The tolerance is only for allowlisted names: an unlisted baseline
+        // failure keeps the run Incomplete exactly as before.
+        const string flakyFqn = "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
+        var baseline = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Failed"));
+        var roundTrip = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var config = StubConfig("MediatR", flakyFqn);
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true }, config);
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+        Assert.Empty(result.IgnoredFlakyBaselineFailures);
+    }
+
+    [Fact]
+    public void BaselineWithFlakyAndUnlistedFailures_StillIncomplete_ButRecordsTheFlake()
+    {
+        // Mixed baseline failures: the allowlist explains one, not the other, so
+        // the exit code is NOT explained — Incomplete, but the flake is recorded.
+        const string flakyFqn = "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
+        var baseline = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Failed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Failed"),
+            ("MediatR.Tests.Other.Third", "Third", "Passed"));
+        var roundTrip = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Passed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"),
+            ("MediatR.Tests.Other.Third", "Third", "Passed"));
+        var config = StubConfig("MediatR", flakyFqn);
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true }, config);
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+        var ignored = Assert.Single(result.IgnoredFlakyBaselineFailures);
+        Assert.Equal(flakyFqn, ignored.FullyQualifiedName);
+    }
+
+    [Fact]
+    public void ExpectedFlakyFailingInBothLegs_RecordedOnBothLegs_NotARegression()
+    {
+        const string flakyFqn = "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
+        var baseline = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Failed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var roundTrip = MakeRunWithFqn(
+            (flakyFqn, "ShouldThrowExceptionWhenTimeoutOccurs", "Failed"),
+            ("MediatR.Tests.Other.SomethingElse", "SomethingElse", "Passed"));
+        var config = StubConfig("MediatR", flakyFqn);
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true }, config);
+
+        Assert.Equal(ComparisonStatus.Pass, result.Status);
+        Assert.Empty(result.Regressions);
+        Assert.Empty(result.IgnoredFlakyRegressions);
+        Assert.Single(result.IgnoredFlakyBaselineFailures);
+        Assert.Single(result.IgnoredFlakyRoundTripFailures);
+    }
+
     private static TestRunResult MakeRunWithFqn(
         params (string FullyQualifiedName, string TestName, string Outcome)[] entries)
     {

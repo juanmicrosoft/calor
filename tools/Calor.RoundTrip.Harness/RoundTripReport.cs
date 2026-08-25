@@ -294,6 +294,34 @@ public sealed class TestComparison
     /// when the gate treats it as expected.
     /// </summary>
     public List<TestResult> IgnoredFlakyRegressions { get; set; } = [];
+
+    /// <summary>
+    /// Baseline-run failures that landed on allowlisted flaky tests. When these
+    /// are the ONLY baseline failures, the baseline's non-zero <c>dotnet test</c>
+    /// exit code is explained and the comparison proceeds instead of going
+    /// <see cref="ComparisonStatus.Incomplete"/>.
+    /// </summary>
+    public List<TestResult> IgnoredFlakyBaselineFailures { get; set; } = [];
+
+    /// <summary>
+    /// Round-trip-run failures that landed on allowlisted flaky tests, whether or
+    /// not they also failed in baseline (so a superset of
+    /// <see cref="IgnoredFlakyRegressions"/>). Used to explain the round-trip
+    /// leg's non-zero exit code in <see cref="RoundTripExitPolicy"/>.
+    /// </summary>
+    public List<TestResult> IgnoredFlakyRoundTripFailures { get; set; } = [];
+
+    /// <summary>
+    /// "0 (1 ignored upstream flake)"-style count for the summary lines, so an
+    /// ignored flake is never printed as a plain "Regressions: 1".
+    /// </summary>
+    public string FormatRegressionCount()
+    {
+        var ignored = IgnoredFlakyRegressions.Count;
+        return ignored == 0
+            ? Regressions.Count.ToString()
+            : $"{Regressions.Count} ({ignored} ignored upstream flake{(ignored == 1 ? "" : "s")})";
+    }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -455,6 +483,15 @@ public sealed class TestOutcomeSummary
     public int Regressions { get; init; }
     public int NewPasses { get; init; }
 
+    /// <summary>Regressions excluded from the verdict because the test is on the upstream-flake allowlist.</summary>
+    public int IgnoredFlakyRegressions { get; init; }
+
+    /// <summary>Baseline failures excluded from the baseline exit-code gate because the test is on the upstream-flake allowlist.</summary>
+    public int IgnoredFlakyBaselineFailures { get; init; }
+
+    /// <summary>Round-trip failures on allowlisted tests (regressed or pre-existing).</summary>
+    public int IgnoredFlakyRoundTripFailures { get; init; }
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ComparisonStatus ComparisonStatus { get; init; }
 
@@ -476,6 +513,9 @@ public sealed class TestOutcomeSummary
             InventoryDelta = (roundTrip?.TotalTests ?? 0) - (baseline?.TotalTests ?? 0),
             Regressions = comparison?.Regressions.Count ?? 0,
             NewPasses = comparison?.NewPasses.Count ?? 0,
+            IgnoredFlakyRegressions = comparison?.IgnoredFlakyRegressions.Count ?? 0,
+            IgnoredFlakyBaselineFailures = comparison?.IgnoredFlakyBaselineFailures.Count ?? 0,
+            IgnoredFlakyRoundTripFailures = comparison?.IgnoredFlakyRoundTripFailures.Count ?? 0,
             ComparisonStatus = comparison?.Status ?? ComparisonStatus.Incomplete,
         };
     }

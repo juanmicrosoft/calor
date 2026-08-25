@@ -84,6 +84,13 @@ All notable changes to this project will be documented in this file.
   `System.Text` type with a `StringBuilder` method). The old source-text
   scanning shortcut is gone and a test blocks it from coming back.
 
+### Fixed
+- The round-trip check no longer fails a pull request because of a test that
+  MediatR's own test suite is known to flake on. The known-flake list was being
+  dropped on the way into the check, and a flaky failure could still trip the
+  "tests exited with 1" gate on either the baseline or the round-trip run. Ignored
+  flakes are still listed by name in the report.
+
 ## [0.14.3] - 2026-08-24
 
 ### Benchmark Results (Statistical: 30 runs)
