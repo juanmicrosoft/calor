@@ -56,6 +56,28 @@ public sealed class SpikeVerdictTests
     /// </summary>
     private static readonly string[] BlockingArtifacts = ["A1", "A2"];
 
+    /// <summary>
+    /// After-only fixtures: the R2 and alpha-equivalence evidence. They have no
+    /// <c>before/</c> counterpart (their BEFORE is the row-less middleware and
+    /// A2 respectively), so they sit outside <see cref="PairedArtifacts"/> — but
+    /// they are cited by name in <c>spike-verdict.json</c>'s R2 evidence, so P31
+    /// must cover them or they could be deleted with every test green.
+    /// </summary>
+    private static readonly string[] AfterOnlyArtifacts =
+    [
+        "A2-broadening", "A3-middleware-alpha", "A3-middleware-broadening",
+    ];
+
+    /// <summary>
+    /// The after-only fixtures that EMIT. <c>A3-middleware-broadening</c> is
+    /// rejected with Calor0421 — being rejected is its whole point — so it has
+    /// no <c>.g.cs.txt</c> and its diagnostic list is the evidence.
+    /// </summary>
+    private static readonly string[] AfterOnlyArtifactsThatEmit =
+    [
+        "A2-broadening", "A3-middleware-alpha",
+    ];
+
     /// <summary>The four A3 combinator fixtures R1 is adjudicated over (§7.5).</summary>
     private static readonly string[] R1Fixtures =
     [
@@ -94,14 +116,26 @@ public sealed class SpikeVerdictTests
         var gCodegen = root.GetProperty("gCodegen");
         foreach (var artifact in PairedArtifacts)
         {
-            var (strictEqual, nonLineDifferences) = CompareCommittedEmittedCSharp(artifact);
+            var measured = CompareCommittedEmittedCSharp(artifact);
             var recorded = gCodegen.GetProperty(artifact);
 
-            Assert.Equal(strictEqual, recorded.GetProperty("strictBytesEqual").GetBoolean());
+            Assert.Equal(measured.StrictEqual, recorded.GetProperty("strictBytesEqual").GetBoolean());
             Assert.Equal(
-                strictEqual ? "PASS" : "PASS-MODULO-LINE-DIRECTIVES",
+                measured.StrictEqual ? "PASS" : "PASS-MODULO-LINE-DIRECTIVES",
                 recorded.GetProperty("verdict").GetString());
-            Assert.Equal(0, nonLineDifferences);
+
+            // Both byte counts are recomputed and compared to the record. The
+            // single field these replaced was a length delta that read 0 for A2
+            // while 7 bytes differed, and nothing asserted it.
+            Assert.Equal(
+                measured.StrictDiffBytes,
+                recorded.GetProperty("strictDiffBytes").GetInt32());
+            Assert.Equal(
+                measured.NonLineDirectiveDiffBytes,
+                recorded.GetProperty("nonLineDirectiveDiffBytes").GetInt32());
+
+            Assert.Equal(0, measured.NonLineDirectiveDiffBytes);
+            Assert.Equal(0, measured.NonLineDifferences);
         }
 
         Assert.Equal("PASS", gCodegen.GetProperty("overall").GetString());
@@ -113,9 +147,23 @@ public sealed class SpikeVerdictTests
         var ramp = root.GetProperty("ramp");
         var r1 = ramp.GetProperty("R1");
         Assert.True(r1.GetProperty("recordedNotRecomputed").GetBoolean());
-        Assert.Contains("E2", r1.GetProperty("recomputedBy").GetString() ?? "",
-            StringComparison.Ordinal);
+
+        // The EXACT string, not a substring. `Contains("E2")` was satisfied by
+        // anything mentioning E2 at all, so it did not actually pin the
+        // deferral — once E2 lands, this assertion is what forces the field (and
+        // this test's R1 leg) to be rewritten rather than quietly left alone.
+        Assert.Equal(
+            "P27 once E2 lands; recorded until then",
+            r1.GetProperty("recomputedBy").GetString());
         Assert.False(string.IsNullOrWhiteSpace(r1.GetProperty("recomputeDeferralReason").GetString()));
+
+        // §7.5's precondition is part of R1's claim and was dropped from the
+        // record until review round 1. Without it R1 reads as a claim about the
+        // resolution ceiling rather than about the four combinators.
+        Assert.Contains(
+            "when every participating row is concrete and every callee resolves",
+            r1.GetProperty("claim").GetString() ?? "",
+            StringComparison.Ordinal);
 
         // …but the RECORDED evidence is still read and checked against the claim.
         foreach (var fixture in R1Fixtures)
@@ -172,10 +220,35 @@ public sealed class SpikeVerdictTests
 
         // The three transcript divergences the prototype causes are recorded
         // with the exact E2 obligation, so E2 cannot regenerate more than these.
+        // SEVEN, not three. The first record listed three because it was
+        // assembled from P29's failure message, which reports the FIRST
+        // difference per script and hides the rest; review round 1 caught it by
+        // diffing every script in full. The count and the case list must agree,
+        // and the obligation must name the number, so a future edit cannot drop
+        // one silently.
         var divergences = root.GetProperty("transcriptDivergences");
-        Assert.Contains("X6a", divergences.GetProperty("e2Obligation").GetString() ?? "",
+        var cases = divergences.GetProperty("cases").EnumerateArray().ToArray();
+        Assert.Equal(7, divergences.GetProperty("count").GetInt32());
+        Assert.Equal(7, cases.Length);
+        Assert.Contains("SEVEN", divergences.GetProperty("e2Obligation").GetString() ?? "",
             StringComparison.Ordinal);
-        Assert.Equal(3, divergences.GetProperty("cases").EnumerateArray().Count());
+
+        foreach (var divergence in cases)
+        {
+            foreach (var field in new[] { "script", "case", "committed", "withPrototype", "verdict" })
+            {
+                Assert.False(string.IsNullOrWhiteSpace(divergence.GetProperty(field).GetString()),
+                    $"A transcript divergence has an empty '{field}'. Each one is an E2 "
+                    + "obligation; an unlabelled row is not one.");
+            }
+        }
+
+        // Every divergence must name a script the harness actually runs.
+        var scripts = new[] { "run.py", "run2.py", "run3.py", "facts.py", "facts2.py", "compile53.py" };
+        foreach (var divergence in cases)
+        {
+            Assert.Contains(divergence.GetProperty("script").GetString(), scripts);
+        }
     }
 
     /// <summary>
@@ -232,16 +305,19 @@ public sealed class SpikeVerdictTests
         // Leg 2 — compare the committed before/after pairs.
         foreach (var artifact in PairedArtifacts)
         {
-            var (strictEqual, nonLineDifferences) = CompareCommittedEmittedCSharp(artifact);
-            if (nonLineDifferences != 0)
+            var measured = CompareCommittedEmittedCSharp(artifact);
+            if (measured.NonLineDifferences != 0 || measured.NonLineDirectiveDiffBytes != 0)
             {
                 failures.Add(
-                    $"{artifact}: {nonLineDifferences} emitted C# line(s) differ outside #line "
+                    $"{artifact}: {measured.NonLineDifferences} emitted C# line(s) and "
+                    + $"{measured.NonLineDirectiveDiffBytes} byte(s) differ outside #line "
                     + "directives — a row changed codegen.");
             }
-            else if (!strictEqual)
+            else if (!measured.StrictEqual)
             {
                 // Allowed, and named: the only moving bytes are source positions.
+                // A2 is the one artifact whose rows sit on their own added lines;
+                // its 7 differing bytes are all digits inside #line directives.
                 Assert.Equal("A2", artifact);
             }
         }
@@ -307,6 +383,34 @@ public sealed class SpikeVerdictTests
                 }
             }
         }
+
+        // The after-only fixtures carry R2 and the alpha-equivalence proof. They
+        // were outside this loop, so `after/A3-middleware-alpha.g.cs.txt` and
+        // `after/A2-broadening.g.cs.txt` could be deleted with every test green
+        // — which is exactly the hole P31 exists to close.
+        foreach (var artifact in AfterOnlyArtifacts)
+        {
+            foreach (var extension in new[] { ".calr", ".diagnostics.txt" })
+            {
+                var path = Path.Combine(spike, "after", artifact + extension);
+                if (!File.Exists(path)) missing.Add($"after/{artifact}{extension}: missing");
+                else if (new FileInfo(path).Length == 0) missing.Add($"after/{artifact}{extension}: empty");
+            }
+        }
+
+        foreach (var artifact in AfterOnlyArtifactsThatEmit)
+        {
+            var path = Path.Combine(spike, "after", artifact + ".g.cs.txt");
+            if (!File.Exists(path)) missing.Add($"after/{artifact}.g.cs.txt: missing");
+            else if (new FileInfo(path).Length == 0) missing.Add($"after/{artifact}.g.cs.txt: empty");
+        }
+
+        // A3-middleware-broadening must NOT emit: being rejected with Calor0421
+        // is the evidence. If it starts emitting, R2's rejection half has gone.
+        Assert.False(
+            File.Exists(Path.Combine(spike, "after", "A3-middleware-broadening.g.cs.txt")),
+            "after/A3-middleware-broadening.g.cs.txt exists, but that fixture is R2's REJECTION "
+            + "case — it is supposed to fail with Calor0421 and emit nothing.");
 
         Assert.True(missing.Count == 0,
             "The spike's frozen artifacts are incomplete. Regenerate the BEFORE side with "
@@ -396,21 +500,34 @@ public sealed class SpikeVerdictTests
     }
 
     /// <summary>
-    /// Compares an artifact's committed before/after emitted C#. Returns whether
-    /// the two are byte-identical, and how many lines differ once the line
-    /// NUMBER inside a <c>#line</c> directive is normalised away.
+    /// Compares an artifact's committed before/after emitted C#.
+    ///
+    /// <para>Returns THREE numbers, because one is not enough to be honest about
+    /// A2. <c>StrictDiffBytes</c> counts differing bytes with no normalisation
+    /// whatever; <c>NonLineDirectiveDiffBytes</c> counts them again after the
+    /// line NUMBER inside a <c>#line</c> directive is normalised away; and
+    /// <c>NonLineDifferences</c> is the same thing counted in lines.</para>
+    ///
+    /// <para>An earlier version of the verdict recorded a single
+    /// <c>diffBytes</c> that was really a LENGTH delta. For A2 it read 0 while 7
+    /// bytes differed, and no test read the field — so a wrong number sat in the
+    /// record looking like a measurement. Both counts are now asserted for every
+    /// artifact.</para>
     /// </summary>
-    private static (bool StrictEqual, int NonLineDifferences) CompareCommittedEmittedCSharp(
-        string artifact)
+    private static (bool StrictEqual, int StrictDiffBytes, int NonLineDirectiveDiffBytes,
+        int NonLineDifferences) CompareCommittedEmittedCSharp(string artifact)
     {
         var spike = SpikeDirectory();
         var before = Path.Combine(spike, "before", artifact + ".g.cs.txt");
         var after = Path.Combine(spike, "after", artifact + ".g.cs.txt");
 
-        Assert.True(File.Exists(before), $"Missing before/{artifact}.g.cs");
-        Assert.True(File.Exists(after), $"Missing after/{artifact}.g.cs");
+        Assert.True(File.Exists(before), $"Missing before/{artifact}.g.cs.txt");
+        Assert.True(File.Exists(after), $"Missing after/{artifact}.g.cs.txt");
 
-        var strictEqual = File.ReadAllBytes(before).SequenceEqual(File.ReadAllBytes(after));
+        var beforeBytes = File.ReadAllBytes(before);
+        var afterBytes = File.ReadAllBytes(after);
+        var strictEqual = beforeBytes.SequenceEqual(afterBytes);
+        var strictDiffBytes = CountDifferingBytes(beforeBytes, afterBytes);
 
         var beforeLines = NormalizeLineDirectives(File.ReadAllLines(before));
         var afterLines = NormalizeLineDirectives(File.ReadAllLines(after));
@@ -418,8 +535,20 @@ public sealed class SpikeVerdictTests
             + beforeLines.Zip(afterLines).Count(pair => !string.Equals(
                 pair.First, pair.Second, StringComparison.Ordinal));
 
-        return (strictEqual, differences);
+        var nonLineDirectiveDiffBytes = CountDifferingBytes(
+            System.Text.Encoding.UTF8.GetBytes(string.Join("\n", beforeLines)),
+            System.Text.Encoding.UTF8.GetBytes(string.Join("\n", afterLines)));
+
+        return (strictEqual, strictDiffBytes, nonLineDirectiveDiffBytes, differences);
     }
+
+    /// <summary>
+    /// Counts positions at which two byte sequences differ, plus the length
+    /// delta — the <c>cmp -l | wc -l</c> reading, NOT a length comparison.
+    /// </summary>
+    private static int CountDifferingBytes(byte[] left, byte[] right)
+        => left.Zip(right).Count(pair => pair.First != pair.Second)
+           + Math.Abs(left.Length - right.Length);
 
     private static string[] NormalizeLineDirectives(string[] lines)
         => lines
