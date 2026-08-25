@@ -991,3 +991,202 @@ row fits a sync destination exactly when their effect sets do, with asynchrony c
 `Task<T>` return type the binder already has; **(c)** the change is additive, so a 0.15 program
 compiles unchanged under 0.16. Until then, `RequestPreProcessorBehavior`'s `async Task<TResponse>`
 is spiked as a **sync-shaped row over a `Task`-returning function**, which is what §12 assumes.
+
+---
+
+## 12. The emitter spike
+
+Roadmap §4.1 term 1. Draft v1 froze two modules and claimed the MediatR one exercised "four of
+the six §6 sites". It exercises **one** — interface implementation. A delegate-typed *parameter*,
+an *invocation* and a `foreach` are not §6 sites. So criterion R1 was not readable from either
+module. Corrected by splitting the artifacts by what each can adjudicate.
+
+### 12.1 The frozen artifacts
+
+| Artifact | What it is | Adjudicates | Verified |
+|---|---|---|---|
+| **A1** `tools/calor-allowlist-audit/allowlist-audit.calr` | the dogfood utility: 127 lines, 7 `§E{`, sibling `CalorAllowlistAudit.csproj`, built in CI (`.github/workflows/test.yml:181`), **no higher-order code** | **G-CODEGEN** only — the regression module | exists at `82338e37` |
+| **A2** `bench/corpus/MediatR/src/MediatR/Pipeline/RequestPreProcessorBehavior.cs` | 28 lines at the pinned MediatR SHA `fb309026775ef953a64fb5339d074426c1ad2c37`: interface implementation (`:12`), delegate-typed parameter `RequestHandlerDelegate<TResponse> next` (`:20`), invocation `await next()` (`:27`). Delegate declared at `IPipelineBehavior.cs:12`, contract at `:29` | **R2**, and G-CODEGEN | submodule initialized and read; **28** lines, not 29 (Draft v1) |
+| **A3** `docs/design/spikes/effect-rows/combinators/{map,match,middleware,callback}.calr` | the four §7.4 AFTER forms, as compiled fixtures | **R1** and **R3** | to be authored by the spike PR |
+
+A2 is chosen over `Wrappers/RequestHandlerWrapper.cs` (72 lines, method-group→delegate cast
+`:43`, `Aggregate` fold whose lambda closes over `next` and is immediately invoked `:44`) because
+that file drags in `async` (§11, deferred), generic *type* variance
+(`calor-direction.md:33`, deferred) and a fold whose accumulator is itself a function — rank-2,
+not rank-1. It is named as a **non-gating stretch subject**: re-attempted after A2 passes, with
+its outcome published either way.
+
+### 12.2 G-CODEGEN — a feature-wide blocking gate
+
+> Rows are a *checking* feature. For **A1 and A2**, the emitted C# must be byte-identical between
+> BEFORE and AFTER, modulo whitespace. If it is not, **E2 does not merge** — monomorphic or not.
+
+Promoted out of the ramp (Draft v1's criterion 2) because a codegen diff is not a rank-1
+question. This is also what makes §9's "0 `.cs` goldens" and "`CurrentCompilerSemanticsVersion`
+unchanged" claims blocking rather than assumed.
+
+### 12.3 What is committed
+
+Under `docs/design/spikes/effect-rows/`:
+
+1. `before/` and `after/` — the `.calr` source and the emitted `.g.cs` for A1, A2 and each A3
+   fixture, plus the compiler's full diagnostic list per file.
+2. `experiments/` — `run.py`, `run2.py`, `facts.py`, `facts2.py`, `compile53.py` and
+   `o53/baseline.json`: the executed cases this document quotes, so a reviewer re-runs rather
+   than re-reasons.
+3. **`spike-verdict.json`** — the machine-readable verdict, replacing Draft v1's prose `README`.
+   Schema: `{schemaVersion, measuredCommit, artifacts:{A1,A2,A3…}, gCodegen:{artifact→PASS|FAIL,
+   diffBytes}, ramp:{R1,R2,R3→PASS|FAIL, evidence}}`, with `ramp.verdict` = `VALIDATED` iff R1 ∧
+   R2 ∧ R3. It follows the pattern of the two existing ledgers
+   (`higher-order-demand-ledger.json`, `metadata-binding-corpus-ledger.json`) — JSON, a recorded
+   commit SHA, and an **exact-equality test** (§13.2 `SpikeVerdictMatchesRecomputation`).
+
+### 12.4 Pass/fail, per criterion per artifact
+
+| | A1 | A2 | A3 |
+|---|---|---|---|
+| **G-CODEGEN** (blocking, feature-wide) | required | required | n/a |
+| **R1** four combinators clean | n/a | n/a | required |
+| **R2** interface/impl, no carve-out | n/a | required | n/a |
+| **R3** one-line instantiation solve | n/a | n/a | required |
+
+The verdict is **read off `spike-verdict.json`**, not argued from prose. The spike PR must merge
+before E2; if it does not, E2 does not merge (§0 term 1).
+
+---
+
+## 13. Test plan (E2–E4)
+
+Every pin below states its **home file** and its **freeze point** — Draft v1 gave neither, which
+was the test lens's cross-cutting defect. "Design-doc merge" means this document merging;
+"before E2" means the pin lands in a PR that merges before the first effect-row implementation PR.
+
+### 13.1 Existing pins: what changes
+
+| Pin (assertion line) | Today | Disposition |
+|---|---|---|
+| `StrictnessBatchTests.cs:43` (`:29` `DelegateInvocation_FunctionTypedParameter_IsError`) | Calor0418 | **rewrite** → `..._WithoutRow_IsUnknown`: Calor0425 at the parameter + Calor0410 at `§E{}` |
+| `:60` (`:47` `_LambdaBoundLocal_IsError`) | Calor0418 | **rewrite** → `_ChargesInferredRow`: compiles; Calor0410 when `§E` is narrowed. Baseline **Y9a** |
+| `:77-80` (`:64` `_UnderPermissiveEffects_IsWaivedToWarning`) | 0418 demoted | **rewrite** → Calor0425 suppressed under the flag **+ a new sibling** asserting Calor0424 is not |
+| `:745` (`:728` `M1_ExpressionCallSpelling_DelegateValue_IsError`) | Calor0418 | **rewrite** → row of the invoked value is charged; 0425 when Unknown. *Orphaned in Draft v1* |
+| `:767` (`:749` `M1_ReturnedDelegateInvocation_IsError`) | Calor0418 | **rewrite** → returned value's row charged; 0425 when the `§O` carries no row |
+| `:502` (`:472` `C2_DecoyNamedDelegateParameter_ShadowsFunction_IsError`) | Calor0418 | **rewrite** → the decoy parameter's row governs, not the shadowed function's. *Orphaned in Draft v1* |
+| `:260` (`:245` `OverrideOfExternalBase_RoutesToAssumedChannel`) | Calor0419 | **rewrite** → Calor0425 (§6.2 retires the 0419). *Orphaned in Draft v1* |
+| `:607` (`:587` `C3_ExternalInheritedImplementation_RoutesToAssumed`) | Calor0419 | **rewrite** → Calor0425. *Orphaned in Draft v1* |
+| `:656` (`:640` `C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption`) | Calor0419 warning | **rewrite** → Calor0424/0425 at the argument per §10.2. *Orphaned in Draft v1* |
+| `:152`, `:172`, `:219`, `:582` (0420/0421 `_IsError`) | as today | **unchanged** (§6.3) |
+| `:177`, `:223` (0420/0421 `_Compiles`) | as today | **unchanged** |
+| `:612` `C4_MethodGroupArgument_ChargesCalleeDeclaredEffects` | charges callee | **unchanged** (§3.4) |
+| `:106` `FreeBareName_FailsClosed_NotSilentlyPure` | Calor0411 | **unchanged** — free-name path (`EEP:1483-1500`) untouched |
+| `EffectEnforcementTests.cs:374` (`:354`), `:398` (`:378`) | **Calor0411**, despite `DelegateInvocation_` names | **unchanged** — rewriting them would silently loosen the free-name rule |
+| `EffectsSuggestTests.cs:148-157` (`_variableTypeMap` grep) | E1 slice-1 pin | **unchanged** |
+| `MetadataBinderCorpusMeasurementTests.cs:37-118` (65.46% floor) | exact-equality, two-sided | **unchanged**; a move needs regeneration in the same PR (gate 6) |
+| `BoundTypeTests.cs:139`, `:150` (`DisplayString` exact-equality) | `"() -> VOID"`, `"(INT, STRING) -> BOOL"` | **unchanged** — and they are the pre-existing enforcement of §8.3 |
+| `ArchitectureTests.cs:158` (`eng/ast-schema.json`) | child-property sets | **edited** — four classes gain a `Row` child (§9) |
+| `BulkBenchmarkCompilationTests.cs:171` (`>= 200`) | as today | **unchanged** |
+| `EditScriptIdentityTests.cs:217-231` (`RegisteredScriptIdsAreStable`) | 7 ids, ES-01…07 | **+ ES-08**, the effect-row script. The F-3 supersession that had to precede it **already merged** — `b5d61e18` (PR #1085) |
+| `QueryGoldenTests.cs:134` (unknown facet throws) + `:152-172` (`EveryGoldenStatesWhyItExists`) | as today | **unchanged**; E5 adds the `effects` arm and its golden |
+
+### 13.2 New pins — home and freeze
+
+| # | Pin | Home | Freeze | Discriminating revert |
+|---|---|---|---|---|
+| P1 | `RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow` — case **Y1b**: compiles today, must be Calor0410 after | `Calor.Enforcement.Tests/EffectRowSyntaxTests.cs` | with E2 | drop the `Span.Line` comparison → Y1b compiles again |
+| P2 | `RowSuffix_NextLine_IsDeclarationRow` — X1b/Y6a/Y5a unchanged; the 2948/471 arrow corpus safe | same | with E2 | invert the line test → the whole corpus moves |
+| P3 | `RowParses_AtEverySevenPositions` — one case per §3.3 row, incl. the three that already parse (X7, X8, Y6a), which **no test covers today** (`grep '§LAM.*§E' tests/` → 0) | same | with E2 | remove any insertion point → that row fails |
+| P4 | `RowRoundTrips_ParseEmitParse` — parse → `CalorEmitter` → parse, byte-identical, **one case per position** | `Calor.Compiler.Tests/NewFeatureRoundTripTests.cs` | with E2 | drop the `CalorEmitter` row emission → 7 cases fail |
+| P5 | `EffectsTokenIsNotAnExpressionStart` — `TokenKind.Effects ∉ Parser.RegisteredExpressionStartTokens` (`Parser.cs:67-68`) | `Calor.Compiler.Tests/ExpressionRegistrationTests.cs` | **before E2** | add `Effects` to `ExpressionParsers` → initializers swallow rows |
+| P6 | `OmittedRow_PerSite` — declaration=pure, lambda=inferred, **binding-with-initializer=inferred**, bare binding/param/return/field=Unknown (four omitted sites, not one) | `Calor.Enforcement.Tests/EffectRowLatticeTests.cs` | with E2 | make the parameter default `Concrete(∅)` → E-3's laundering re-opens |
+| P7 | `FamilyCodeEncompassesNarrowCode` — `§E{db}` admits `db:r`; `fs:rw ⊇ fs:w` regression | `Calor.Compiler.Tests/Effects/EffectSubtypingTests.cs` (exists; `:20,:29,:38` are the `fs` cases) | with E2 | remove the `database` entry → first half fails |
+| P8 | `FitsIsTotalOverNineCells` — table-driven over §4.3, **including the three `Assumed`-destination cells** | `EffectRowLatticeTests.cs` | **design-doc merge** (the table is normative) | re-introduce `EffectSet.cs:100`'s `if (other.IsUnknown) return true` → `fits(Concrete, Unknown)` returns `Fits` |
+| P9 | `EffectRowJoin_IsASemilattice` — associative, commutative, idempotent, identity `Concrete(∅)`, top `Unknown`, **reason sets canonically ordered** | `EffectRowLatticeTests.cs` | with E2 | make `R` a concatenated list → commutativity fails |
+| P10 | `AssumedSurvivesTheDestination` — a two-hop fixture: `Assumed` source → `Fits` → destination row is `Assumed`, 0425 once per hop | `EffectRowLatticeTests.cs` | with E2 | make the destination `Concrete` → hop 2 goes silent |
+| P11 | `NeverWaived_DoesNotFit_AtAllSixSites` + `PermissiveWaivesUnknown` — incl. **Y8a's flip**: 0420/0421 stop demoting | `Calor.Enforcement.Tests/StrictnessBatchTests.cs` | with E3 | route 0424 through the policy check, or restore `EEP:517-519` |
+| P12 | `Calor0424_NotDefeatableByDeletingSourceE` — deleting the source `§E` yields Calor0410 on the source (§4.5) | `EffectRowLatticeTests.cs` | with E3 | skip the body check on rowed sources → one diagnostic disappears |
+| P13 | `ParameterRowsAreContravariant` **and** `FunctionTypesAreInvariantInTypes` | `EffectRowLatticeTests.cs` | with E3 | flip the argument order in the parameter conjunct |
+| P14 | `LambdaDeclaredRow_NarrowerThanBody_IsError`; `_CannotTell_IsCalor0425`; `_OmittedRow_IsInferred`; `_TypeCarriesDeclaredNotInferred` | `Calor.Enforcement.Tests/EffectRowLambdaTests.cs` | with E2 | restore `InferFromLambda` to ignore `lambda.Effects` |
+| P15 | Six `_IsError`/`_Compiles` pairs **plus a `_CannotTell` arm each**: `RowMismatch_At{Assignment,Argument,Return,Override,InterfaceImpl,GenericInstantiation}` | `StrictnessBatchTests.cs` | **design-doc merge** — this is gate 1's frozen denominator | delete E3's rule for one site → that `_IsError` fails |
+| P16 | `AllMismatchCodesShareOneRelation` — Calor0424, 0420, 0421 **and** `CrossModuleEffectEnforcementPass.cs:162` move together | `Calor.Enforcement.Tests/CrossModuleEffectTests.cs` | with E3 | give `CheckEffectVariance` its own subset test back |
+| P17 | **`UnresolvedReceiver_YieldsCalor0425_NeverConcrete`** — an `UnresolvedBoundType`/unresolved receiver must produce `EffectRow.Unknown`, never a `Concrete` row. **The pin the whole design rests on**; absent from Draft v1 | `Calor.Enforcement.Tests/EffectRowLatticeTests.cs` | **before E2** | make the unresolved branch return `Concrete(∅)` → the fixture goes silent |
+| P18 | `EffectVariable_*`: `Declares_EffModifier` (X6a's shape now parses); `TypeParamNamedEff_StillWorks` (the lookahead guard); `InScope_DoesNotRaise0403`; `OutOfScope_Raises0404`; `Rejected_In{Return,GenericArg,Binding,Field,Data}` (**five** rejection sites, not one); `MixedRow_IsJoin`; `InstantiatesFromArgumentRow`; `UnknownContributor_YieldsUnknown` | `Calor.Enforcement.Tests/EffectVariableTests.cs` | with E2 | **all of P18 is deleted if the ramp fires**, together with P15's site-6 pair |
+| P19 | `FunctionTypesDifferingOnlyInRow_AreNotEqual` + the `GetHashCode` half + `RowsDefaultToUnknownNotPure` | `Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs` | with E2 | drop `Row` from `Equals` |
+| P20 | `DisplayStringIsRowFree` — belt to `:139`/`:150`'s braces | same | with E2 | append the row → three tests fail |
+| P21 | `ManifestResolutionMapsToRow` — `Resolved`/`PureExplicit`/`Unknown` → `Concrete(S)`/`Concrete(∅)`/`Unknown` | `Calor.Enforcement.Tests/EffectResolverTests.cs` | with E2 | map `Unknown` to `Concrete(∅)` → P17's sibling fails |
+| P22 | `MessageTexts` — the four new strings: §10.1's `Effect row: charged by invoking …`, §10.3's two, §6.4's 0424 text. Existing pins assert `Message.Contains`; these assert the **full** new clause | `StrictnessBatchTests.cs` | with E3 | reword any clause |
+| P23 | `BuildStateCacheConstants` — `"4.0"`, `CurrentCompilerSemanticsVersion` **unchanged**, `CurrentOptionsSerializerVersion` unchanged (`BuildStateCache.cs:121-123`) | `Calor.Compiler.Tests/Incremental/` | with E5 | bump the semantics stamp → fails, and G-CODEGEN is contradicted |
+| P24 | `ProjectIndexFormatBumped` — `"4.0"` (`ProjectIndex.cs:145`) when the effects facet lands | same | with E5 | add the facet without the bump → gate 3's index bytes move silently |
+| P25 | `EffectSummaryIsIndexIndependent` — a **fresh-clone `calor build`** with no `obj/calor` present produces a complete summary; plus a structural pin that no `Effects/` or `Incremental/` file references `ProjectIndex` | `Calor.Compiler.Tests/Incremental/` | **before E5** | derive the summary from the index → the fresh-clone build fails |
+| P26 | `NoNameKeyedEffectStoreRemains` — grep pin, `EffectSummaryBuilder.cs:68,:75` keys gone | same | with E5 | re-introduce one name key |
+| P27 | `SpikeVerdictMatchesRecomputation` — exact-equality against `spike-verdict.json`, the two-ledger pattern | `Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs` | **spike PR** | edit a verdict field |
+
+### 13.3 Gate rows
+
+| Gate | Instrument | Freeze | Discriminating pin |
+|---|---|---|---|
+| **1** laundering, closed classes | P15's **six** `_IsError`/`_Compiles` pairs (five if the ramp fires) — the denominator is exactly those pairs | **design-doc merge** | delete E3's rule for one class |
+| **2** higher-order expressiveness | `HigherOrderDemandLedgerTests.cs` re-executed at the release commit. It asserts **exact equality** on `Calor0418`, `Calor0419FunctionTyped`, `Total`, `PerFile` and `NotReachingEffectPass` (`:192-199`), so driving 0418 to zero turns it **red** — it is *not* "extended, not rewritten" as Draft v1 said. **The ledger is regenerated in the E4 PR with the delta and its cause disclosed**, which is what the test's own failure message already instructs: *"The ledger is the frozen denominator — regenerate in this PR and name the cause (§4.4 gate 2 discriminating pin)."* | ledger registration PR (#1086) | re-introduce the 0418 rejection for one class |
+| **3** surface agreement | `EditScriptIdentityTests` + **ES-08**; plus three legs Draft v1 omitted: a **CLI-process** leg and a **`Calor.Sdk`** leg over the same scripts, and a test enumerating the **four entry points' default `UnknownCallPolicy`**. The F-3 supersession that had to precede ES-08 **already merged** (`b5d61e18`, PR #1085) | each leg registered **before E2** | drop ES-08 → `RegisteredScriptIdsAreStable` fails; flip one surface's default → the equivalence test fails |
+| **5** compatibility over the corpus | leg (a) what CI compiles today — `tests/TestData/Benchmarks` (226, pinned `>= 200`), `samples/` (11), every `.calr` a test project compiles; leg (b) the remainder of the 886 via a **`compile-all-committed-calr` job registered before E2**. **E1-attributable firings separated**: E1 resolves callees string-guessing missed and fires new, correct Calor0410/0419, which are fixed in-corpus and counted. **0.15-specific additions**: the Calor0410s that *disappear* from §4.1's `Subtypes` widening are listed by name; the §3.2 line-adjacency baseline (`o53/baseline.json`, 23 files, 1 green today) is re-run; §4.5's 0420/0421 de-demotion is confirmed to break no committed file | branch cut | revert one in-corpus fix → leg (a) red |
+| **6** resolution floor | `MetadataBinderCorpusMeasurementTests.cs:37-118`, two-sided exact equality | v0.14.3 values | the test as it stands |
+| **7** index/query effects leg | `QueryGoldenTests` + the `effects` golden authored (not recorded) per `EveryGoldenStatesWhyItExists` (`:152-172`) | E5 PR | alter one expected effects answer |
+
+### 13.4 The Calor0425 corpus ledger — a decision, not an open question
+
+> **Decision.** `bench/phase0-agent-native/calor0425-corpus-ledger.json` is registered **before E2
+> merges**, in the shape of the two existing ledgers: per subject (MediatR, Serilog,
+> FluentValidation), split **by cause** — unresolved receiver / row-less function-typed
+> declaration / BCL-returned delegate — with `measuredCommit`, and re-executed by an
+> exact-equality test on the `compiler` shard.
+
+Draft v1 left this as "open question 1" with the instrument being a promise that the E2 PR would
+publish a count. That is the failure mode §13.3 gate 2 exists to prevent. The number matters
+because 431 of 1248 BCL call sites do not resolve (§2.2): if the 0425 count per subject is in the
+hundreds, rows are ergonomically *worse* than Calor0418 for converted code and
+`--permissive-effects` becomes mandatory rather than exceptional — which would make §4.5's
+"strictly less powerful waiver" decision land badly. Registering the ledger makes that visible
+before E2 rather than after.
+
+---
+
+## 14. Open questions
+
+1. **Does §7.5's R2 have a usable spelling for a foreign interface?** MediatR's
+   `IPipelineBehavior` is someone else's; a Calor implementation cannot widen it. If the only
+   type-checking spelling requires editing the interface, rank-1 rows do not compose with external
+   interfaces. *Evidence needed:* A2's spike output. **Most likely ramp trigger.**
+2. **Is `eff` safe against a type parameter literally named `eff`?** §7.2's one-token lookahead
+   should make `<eff>` still work, but that is reasoning, not execution — the branch does not
+   exist yet, so it cannot be run. *Evidence needed:* P18's `TypeParamNamedEff_StillWorks` case,
+   which must be written before the branch is considered done.
+3. **How does §4.1's `Subtypes` widening get a doc-drift guard?** `calor self-check docs` checks
+   the effect-code *registry* against `effects.md`'s table (`EffectTypes.cs:134-135`,
+   `Calor1323`/`Calor1324`) but has **no check for the subtyping relation**, so a `Subtypes` entry
+   can drift from its documentation silently. *Evidence needed:* a decision on whether to extend
+   the drift checker with a `Calor13xx` code for the relation, taken in the E2 PR.
+4. **Where should Calor0425 be reported for a row-less parameter that is never invoked?** §6.2
+   puts it at the parameter span, so a converted file with FluentValidation's 236 delegate-typed
+   declarations would emit 236 warnings even where none is invoked. Reporting at the *invocation*
+   is quieter but loses the declare-your-intent pressure. *Evidence needed:* §13.4's ledger, split
+   by "declared but never invoked" vs "invoked". This draft chooses the parameter span; the
+   measurement may move it before E2.
+
+### 14.1 Corrections to governing inputs
+
+| Claim | Where | Source says |
+|---|---|---|
+| "`IAstVisitor` … ~236 methods each" | `CLAUDE.md:160`, roadmap §4.1 term 3 | **184** each (`Ast/AstNode.cs:59`, `:247`) |
+| Family codes encompass their narrow siblings (`db ⊃ db:r`), and a bare `fs` code exists | working assumption in the roadmap's shorthand — **not a quotation**: `grep -rn "fs:w\|colon-hierarchy" docs/plans/roadmap-v0.13-v0.15.md docs/design/calor-direction.md` → **0 hits**. Draft v1 attributed a phrase no governing input contains; the attribution is withdrawn, the substance stands | `EffectSubtyping.cs:14-43` has only four `*_readwrite` entries; `EffectTypes.cs:71-73` has `fs:w`/`fs:r`/`fs:rw` and no bare `fs`. §4.1 closes the gap deliberately |
+| "the 217-program benchmark corpus" | roadmap `:276`, `:848` | **226** `.calr` under `tests/TestData/Benchmarks`; the pin asserts `>= 200` (`BulkBenchmarkCompilationTests.cs:171`) |
+| Gate 1's denominator is "five classes … four classes if the ramp fires" | roadmap §4.4 gate 1 | The same sentence **enumerates six**: virtual override, interface implementation, assignment, argument, return, rank-1 generic instantiation. This document freezes the denominator at **six, dropping to five** (§6, P15) |
+| Gate-1 pin citations `StrictnessBatchTests.cs:132/176` and `:198/221` | roadmap §4.4 gate 1 | `:132`, `:198` are `[Fact]` lines and `:221` is blank. Assertion lines are `:152`, `:172`, `:219`, `:582`; `_Compiles` methods are `:177`, `:223`. This doc cites assertion lines |
+| "`EffectSet.Unknown` sentinel `:101,:200`" | attributed to roadmap §4.0 in Draft v1 | The roadmap (`:353`) cites only `EffectSet.cs:101`. Draft v1 corrected a citation pair that does not exist; withdrawn |
+| Generics deferral at `calor-direction.md:57-60` | Draft v1 §4.6, §12.2 | It is at **`:33`**; `:57` is the TIER2D-design-doc bullet |
+| "architectural elegance …" at `calor-direction.md:114` | Draft v1 §1 | **`:112`** |
+| `ParseLambdaExpression` at `Parser.cs:11299` | working note | **`:11330`**; `:11299` is inside `ParseYieldReturnStatement`'s doc comment |
+| `EffectResolutionStatus` at `EffectResolver.cs:596-608` | Draft v1 §2.2, §4.2, §8.4 | **`:596-612`**; the `Unknown` member is at `:611` |
+| Calor0410 path at `EEP:410-443` | Draft v1 | the subset test is `:377`, demotion `:381-383`, message `:427`, reports `:433`/`:441` |
+| `BindingNode` | Draft v1 §3.2, §9 | no such class (`grep -rn "\bBindingNode\b" src/` → 0). It is **`BindStatementNode`** (`Ast/ControlFlowNodes.cs:161`) |
+| The Calor0410 message shape quoted four times | Draft v1 §3.5, §5.3, §10.1, §10.3 | Fabricated. Real text: `Function '{name}' uses effect '{code}' but does not declare it`, once per effect (`EEP:427`, loop `:421`) — executed as **X12b** |
+| `§FLD{…} §E{…}` already parses (Draft v1 §14 Q4) | Draft v1's own reasoning from `ParseClassField:8709-8719` | **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects`. It does not parse; position 7 is new syntax |
+| `§E{!e, alloc}` fails at `Expect(CloseBrace)` | consistency lens C2 | **X3b**: it reaches `Calor0403: Unknown effect code '! e'`. The lens's conclusion (reject `!`) is right; the mechanism differs |
+| MediatR `RequestPreProcessorBehavior.cs` is 29 lines | Draft v1 §12.2 | **28** at the pinned SHA |
