@@ -40,6 +40,7 @@ internal static class ExecutionWorkspace
         bool Verbose,
         bool EnforceEffects,
         bool Verify,
+        bool KeepProvenGuards,
         string ContractMode,
         int TimeoutSeconds)
     {
@@ -74,6 +75,12 @@ internal static class ExecutionWorkspace
             aliases: ["--verify"],
             description: "Enable static contract verification with Z3 SMT solver");
 
+        // Same aliases as `calor compile`: run/test execute the generated code, so
+        // the v0.15 default-on elision needs its opt-out here too (PR #1088 review).
+        var keepProvenGuardsOption = new Option<bool>(
+            aliases: ["--keep-proven-guards", "--no-elide-proven-guards"],
+            description: "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; only matters with --verify)");
+
         var contractModeOption = new Option<string>(
             aliases: ["--contract-mode"],
             description: "Contract enforcement mode: off, debug, or release (default: debug)",
@@ -96,6 +103,7 @@ internal static class ExecutionWorkspace
         command.AddOption(verboseOption);
         command.AddOption(enforceEffectsOption);
         command.AddOption(verifyOption);
+        command.AddOption(keepProvenGuardsOption);
         command.AddOption(contractModeOption);
         command.AddOption(timeoutOption);
 
@@ -105,6 +113,7 @@ internal static class ExecutionWorkspace
             Verbose: ctx.ParseResult.GetValueForOption(verboseOption),
             EnforceEffects: ctx.ParseResult.GetValueForOption(enforceEffectsOption),
             Verify: ctx.ParseResult.GetValueForOption(verifyOption),
+            KeepProvenGuards: ctx.ParseResult.GetValueForOption(keepProvenGuardsOption),
             ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
             TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption));
     }
@@ -237,6 +246,7 @@ internal static class ExecutionWorkspace
                 EnforceEffects = settings.EnforceEffects,
                 UnknownCallPolicy = policy,
                 VerifyContracts = settings.Verify,
+                ElideProvenGuards = !settings.KeepProvenGuards,
                 ContractMode = CompilationDriver.ParseContractMode(settings.ContractMode),
                 ProjectDirectory = Path.GetDirectoryName(file.FullName)
             },

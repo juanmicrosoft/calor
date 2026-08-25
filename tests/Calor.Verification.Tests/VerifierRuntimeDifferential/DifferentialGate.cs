@@ -15,8 +15,11 @@ namespace Calor.Verification.Tests.VerifierRuntimeDifferential;
 
 internal static class DifferentialGate
 {
+    // Re-pinned 2026-08-24 (additive amendment in docs/plans/v0.13-freeze-registrations.md):
+    // the whitelist's prose now states the v0.15 default-on elision; the modeled-form
+    // inventory (the denominator) is unchanged.
     public const string PinnedWhitelistSha256 =
-        "3d9273a67100da8f90118491b33c56329dc9f02f0f001c9796e6e8c307440512";
+        "c296720f268c497cf93e3d27943f3a0a750ed09abce3badcb5822c4e0bd5e932";
     internal const string ProbeFieldType = "u8";
     internal const byte ProbeFieldWitness = byte.MaxValue;
     internal const string RuntimeCultureName = "en-US";
@@ -39,6 +42,8 @@ internal static class DifferentialGate
                 new VerificationOptions
                 {
                     Verbose = false,
+                    // Explicit on purpose: the differential must keep testing both
+                    // emission modes regardless of the compiler's default (v0.15: on).
                     ElideProvenGuards = false,
                     TimeoutMs = VerificationOptions.DefaultTimeoutMs,
                     CacheOptions = new VerificationCacheOptions { Enabled = false }
@@ -286,8 +291,8 @@ internal static class DifferentialGate
         {
             detail.Add(
                 elisionEligible
-                    ? "eligible Proven/Discharged guard was not elided on the opt-in path"
-                    : "fail-safe or precondition guard was elided on the opt-in path");
+                    ? "eligible Proven/Discharged guard was not elided on the elision-enabled path"
+                    : "fail-safe or precondition guard was elided on the elision-enabled path");
         }
         if (outcome.IsVacuous)
             detail.Add("generated case produced a vacuous proof");

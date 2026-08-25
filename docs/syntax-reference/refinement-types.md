@@ -154,7 +154,7 @@ Z3 proves this: given `balance >= amount` and `amount > 0`, then `balance - amou
 
 | Status | Meaning | C# Output |
 |:-------|:--------|:----------|
-| Discharged | Z3 proved the condition | Runtime guard kept (default); `// PROVEN: proof obligation [p1]` with `--elide-proven-guards` (elision is opt-in as of v0.13) |
+| Discharged | Z3 proved the condition | `// PROVEN: proof obligation [p1]` (default since v0.15); runtime guard kept with `--keep-proven-guards` |
 | Failed | Z3 found a counterexample | Runtime guard (throws on violation) |
 | Timeout | Z3 couldn't decide in time | Runtime guard (configurable by policy) |
 | Boundary | Public API — can't verify callers | Runtime guard (always emitted) |
@@ -225,7 +225,7 @@ Refinement types are a **compile-time construct**. In the emitted C#, they are e
 | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` | *(nothing — erased)* |
 | `§I{NatInt:count}` | `int count` |
 | `§I{i32:x} \| (>= # INT:0)` | `int x` |
-| `§PROOF{p1:check} (cond)` (Discharged) | Runtime guard (default); `// PROVEN: proof obligation [p1: check]` with `--elide-proven-guards` |
+| `§PROOF{p1:check} (cond)` (Discharged) | `// PROVEN: proof obligation [p1: check]` (default since v0.15); runtime guard with `--keep-proven-guards` |
 | `§PROOF{p1:check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
 
 The refinement constrains what values are valid. The obligation engine verifies those constraints and emits runtime guards only where verification fails.
@@ -268,7 +268,7 @@ The obligation policy controls what happens for each obligation status. Three bu
 
 | Status | Action |
 |:-------|:-------|
-| Discharged | Ignore in diagnostics; the runtime guard stays unless `--elide-proven-guards` is set |
+| Discharged | Ignore in diagnostics; the runtime guard is dropped by default (v0.15) and kept with `--keep-proven-guards` |
 | Failed | Error (compilation fails) |
 | Timeout | WarnAndGuard |
 | Boundary | AlwaysGuard |
@@ -310,8 +310,8 @@ The obligation engine:
 1. Creates `Boundary` obligations for `balance` and `amount` (public function)
 2. Creates a `ProofObligation` for `p1`
 3. Z3 proves `p1`: given `balance >= 0`, `amount > 0`, and `balance >= amount`, then `balance - amount >= 0`
-4. Emitted C#: runtime guards for the public boundary parameters and for `p1` (the proven
-   comment replaces `p1`'s guard only with `--elide-proven-guards` — elision is opt-in)
+4. Emitted C#: runtime guards for the public boundary parameters; `p1`'s guard is replaced by the
+   proven comment (the default since v0.15 — `--keep-proven-guards` keeps `p1`'s guard too)
 
 ---
 

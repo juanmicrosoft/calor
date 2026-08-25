@@ -17,10 +17,11 @@ calor --input <file.calr> --output <file.cs>
 
 The default `calor` command (when no subcommand is specified) compiles Calor source files to C#. This is the core functionality of the Calor compiler.
 
-> **Guard behavior in 0.13.2:** verification is diagnostic by default —
-> runtime guards remain even for `proven` verdicts. Pass
-> `--elide-proven-guards` to drop the guard when the verdict is a clean,
-> non-vacuous, assumption-free `proven`.
+> **Guard behavior since 0.15:** with `--verify`, a clean, non-vacuous,
+> assumption-free `proven` verdict drops its runtime guard by default. Pass
+> `--keep-proven-guards` to keep every guard and treat verdicts as
+> diagnostic only (the 0.13/0.14 behavior). `--elide-proven-guards` is still
+> accepted and now simply restates the default.
 
 ---
 
@@ -47,7 +48,8 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--output` | `-o` | No | Output path for a single input; otherwise each `.g.cs` is written beside its input |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable Z3 static contract verification |
-| `--elide-proven-guards` | | No | Opt in to removing runtime guards on clean, assumption-free `proven` verdicts. Without this switch, 0.13.2 keeps every guard even after verification succeeds. |
+| `--keep-proven-guards` | | No | Keep every runtime guard even after Z3 proves a contract (opts out of the 0.15 default; verification stays diagnostic). Also spelled `--no-elide-proven-guards`. |
+| `--elide-proven-guards` | | No | Drop runtime guards on clean, assumption-free `proven` verdicts. This is the default since 0.15; the switch is kept so 0.13/0.14 command lines still work. |
 | `--analyze` | | No | Enable [static analysis](/docs/cli/static-analysis/) (dataflow, bug patterns, taint tracking) |
 | `--all-findings` | | No | Report all analysis findings including inconclusive results (requires `--analyze`) |
 | `--no-enforce-effects` | | No | Opt out of default-on effect enforcement |
@@ -122,10 +124,11 @@ Use `--verify` to enable Z3 static contract verification:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
-In 0.13.2, the compiler uses Z3 to attempt proving contracts at compile time
-and reports one of seven verdicts. Runtime guards are retained regardless of
-verdict unless `--elide-proven-guards` is also set — verification is
-diagnostic by default.
+The compiler uses Z3 to attempt proving contracts at compile time and reports
+one of seven verdicts. Since 0.15, a clean `proven` postcondition drops its
+runtime guard by default; every other verdict keeps its guard. Pass
+`--keep-proven-guards` to keep all guards and use verification as a
+diagnostic only.
 
 Example output:
 
@@ -138,8 +141,8 @@ Generated MyModule.g.cs
 
 The seven statuses are `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
 `unsupported`, and `unavailable`. Only a clean, non-vacuous, assumption-free
-`proven` postcondition is eligible to lose its runtime guard — and only if
-`--elide-proven-guards` is set. See
+`proven` postcondition is eligible to lose its runtime guard — and
+`--keep-proven-guards` keeps even that one. See
 [Verification Guarantees](/docs/guides/verification-guarantees/).
 
 ---

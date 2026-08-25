@@ -8,11 +8,11 @@ order: 5
 Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
 
 Contract verification has seven explicit outcomes: `proven`, `refuted`,
-`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`. In 0.13.2,
-verification is diagnostic by default — runtime guards remain regardless of
-verdict. Passing `--elide-proven-guards` removes the guard only for a clean,
+`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`. Since
+0.15, `--verify` removes the runtime guard by default — but only for a clean,
 non-vacuous, assumption-free `proven` postcondition. `assumed` and every
-inconclusive status always keep the guard.
+inconclusive status always keep the guard. Pass `--keep-proven-guards` to
+keep every guard and use verification as a diagnostic only.
 
 ---
 

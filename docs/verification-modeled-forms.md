@@ -94,9 +94,10 @@ A postcondition proof **carried by the solver's string theory** is reported as *
 > nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on
 > the value being non-null and ASCII
 
-`Assumed` **never elides** the runtime check (only `Proven && !IsVacuous` does — and as of
-v0.13 only under the `--elide-proven-guards` opt-in; elision is off by default), so a false string
-proof can no longer delete a check that would have failed. This is the D8 precedent — name the
+`Assumed` **never elides** the runtime check (only `Proven && !IsVacuous` does — opt-in during
+v0.13/v0.14, and **on by default since v0.15** once the differential gate below reached 0 mismatches;
+`--keep-proven-guards` opts out), so a false string proof can no longer delete a check that would
+have failed. This is the D8 precedent — name the
 assumption rather than silently strengthen the claim.
 
 **Both elision channels are covered.** Postconditions elide on `Proven`; *refinement obligations*

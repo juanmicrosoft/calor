@@ -1,3 +1,4 @@
+using Calor.Compiler.Verification.Z3;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -106,6 +107,82 @@ public class RunTestCommandTests : IDisposable
         var workspace = line.Split("Workspace kept at:")[1].Trim();
         Assert.True(Directory.Exists(workspace), $"kept workspace should exist: {workspace}");
         try { Directory.Delete(workspace, recursive: true); } catch { }
+    }
+
+    // ------------------------------------------------------------------
+    // proof-based guard elision on calor run (v0.15 default-on, PR #1088)
+    // ------------------------------------------------------------------
+
+    private string WriteProvenSquareProgram()
+    {
+        // A genuine ∀-proof (x in [0, 46340] ⇒ x*x >= 0) on a function that Main calls.
+        var file = Path.Combine(_tempDir, "square.calr");
+        File.WriteAllText(file, """
+            §M{m001:SquareApp}
+              §F{f002:Square:pub}
+                §I{i32:x}
+                §O{i32}
+                §Q (>= x 0)
+                §Q (<= x 46340)
+                §S (>= result 0)
+                §R (* x x)
+              §F{f001:Main:pub} () -> void
+                §E{cw}
+                §P §C{Square} §A INT:7 §/C
+            """);
+        return file;
+    }
+
+    private (int ExitCode, string StdOut, string StdErr, string Generated) RunVerifiedKeepTemp(params string[] extraArgs)
+    {
+        var file = WriteProvenSquareProgram();
+        var args = new List<string> { "run", file, "--verify", "--keep-temp" };
+        args.AddRange(extraArgs);
+        var (exitCode, stdOut, stdErr) = RunCli(args.ToArray());
+
+        var generated = string.Empty;
+        var line = stdOut.Split('\n').FirstOrDefault(l => l.Contains("Workspace kept at:"));
+        if (line != null)
+        {
+            var workspace = line.Split("Workspace kept at:")[1].Trim();
+            var generatedFile = Directory.Exists(workspace)
+                ? Directory.GetFiles(workspace, "square.g.cs", SearchOption.AllDirectories).FirstOrDefault()
+                : null;
+            if (generatedFile != null) generated = File.ReadAllText(generatedFile);
+            try { Directory.Delete(workspace, recursive: true); } catch { }
+        }
+
+        return (exitCode, stdOut, stdErr, generated);
+    }
+
+    [SkippableFact]
+    public void Run_Verify_Default_ElidesProvenPostcondition()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var (exitCode, stdOut, stdErr, generated) = RunVerifiedKeepTemp();
+
+        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.Contains("49", stdOut);
+        Assert.NotEmpty(generated);
+        Assert.Contains("// PROVEN: Postcondition", generated);
+        Assert.DoesNotContain("ContractKind.Ensures", generated);
+        // Preconditions never elide.
+        Assert.Contains("ContractKind.Requires", generated);
+    }
+
+    [SkippableFact]
+    public void Run_Verify_KeepProvenGuards_KeepsGuard()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var (exitCode, stdOut, stdErr, generated) = RunVerifiedKeepTemp("--keep-proven-guards");
+
+        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.Contains("49", stdOut);
+        Assert.NotEmpty(generated);
+        Assert.DoesNotContain("// PROVEN: Postcondition", generated);
+        Assert.Contains("ContractKind.Ensures", generated);
     }
 
     // ------------------------------------------------------------------

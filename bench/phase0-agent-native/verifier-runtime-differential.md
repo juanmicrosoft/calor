@@ -1,7 +1,7 @@
 # Verifier ↔ Generated Runtime Differential (F-4)
 
 - **Result:** PASS
-- **Whitelist hash:** `3d9273a67100da8f90118491b33c56329dc9f02f0f001c9796e6e8c307440512`
+- **Whitelist hash:** `c296720f268c497cf93e3d27943f3a0a750ed09abce3badcb5822c4e0bd5e932`
 - **Mismatches:** 0
 - **Forms solver-handled:** 65/65 (100.00%)
 - **Forms eliding:** 40/65 (61.54%)
@@ -158,5 +158,5 @@
 
 ## Oracle
 
-Every case is emitted twice. The runtime assembly is compiled from the guard-forced emission (`ElideProvenGuards = false`); the opt-in emission is inspected separately to measure actual postcondition/obligation elision. `proven`/`discharged` must execute without a guard failure, `refuted`/`failed` must fire the generated guard, and every non-decisive status must retain the guard. The generator also requires the declared target form to occur in every base expression and rejects vacuous proofs.
+Every case is emitted twice. The runtime assembly is compiled from the guard-forced emission (`ElideProvenGuards = false`); the elision-enabled emission (`ElideProvenGuards = true`, the v0.15 default) is inspected separately to measure actual postcondition/obligation elision. `proven`/`discharged` must execute without a guard failure, `refuted`/`failed` must fire the generated guard, and every non-decisive status must retain the guard. The generator also requires the declared target form to occur in every base expression and rejects vacuous proofs.
 
