@@ -1,0 +1,94 @@
+### BoundTypeTests DisplayString exact-equality pins
+9:/// Covers constructor invariants, equality, and DisplayString formatting.
+16:    public void PrimitiveBoundType_Bare_ProducesSimpleDisplayString()
+19:        Assert.Equal("INT", t.DisplayString);
+26:        Assert.Equal("INT[bits=16]", t.DisplayString);
+33:        Assert.Equal("INT[bits=16][signed=true]", t.DisplayString);
+56:    public void NominalBoundType_DisplayString_MatchesQualifiedName()
+59:        Assert.Equal("System.Console", t.DisplayString);
+66:        // S2 discipline: DisplayString stays byte-identical to the existing
+72:        Assert.Equal("System.String", annotated.DisplayString);
+73:        Assert.Equal("System.String", notAnnotated.DisplayString);
+92:        Assert.Equal("System.Collections.Generic.List<INT>", listOfInt.DisplayString);
+105:        Assert.Equal("Dictionary<STRING, List<INT>>", dictType.DisplayString);
+114:        Assert.Equal("INT[]", t.DisplayString);
+121:        Assert.Equal("INT[,,]", t.DisplayString);
+139:        Assert.Equal("() -> VOID", t.DisplayString);
+150:        Assert.Equal("(INT, STRING) -> BOOL", t.DisplayString);
+156:    public void UnresolvedBoundType_Reason_AppearsInDisplayString()
+159:        Assert.Equal("<unresolved: no method group>", t.DisplayString);
+--- FunctionBoundType Equals tests?
+131:    // --- FunctionBoundType ---
+134:    public void FunctionBoundType_Nullary_FormatsCorrectly()
+136:        var t = new FunctionBoundType(
+143:    public void FunctionBoundType_MultiArg_FormatsCorrectly()
+145:        var t = new FunctionBoundType(
+
+### calor-direction.md
+:23: 3. **Effects as type-level row attributes (TIER2D in v2, but as a design commitment, not an evidence-gated hypothesis).** The centerpiece: unify the effect pass with the type checker so that function 
+:33: 2. **Generics with constraints, variance, higher-rank.** Moving generic type reasoning into the Calor binder rather than passing through to C#. Deferred because the type-system work for effect rows (T
+:57: - **A TIER2D design doc** — `docs/design/effect-rows-in-the-type-system.md` — is written next. Before/after binder symbols, worked examples (intra-module, cross-module, generic effect polymorphism), E
+:112: 4. **Calor is already materially different from C# without TIER2D**: explicit `§E` effects, cross-module enforcement, refinement types with Z3, contract enforcement, obligation tracking. TIER2D's cont
+:114: **Updated near-term ordering** (supersedes the Timeline section above):
+
+### roadmap gate 1 text
+1. **Effect laundering, closed classes.** *Instrument:* one adversarial pin per class, the
+   `DelegateInvocation_*` pattern, positive and negative (`_IsError` / `_Compiles` pairs as
+   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* five classes —
+   virtual override and interface implementation (already closed by Calor0420/0421; **re-pinned
+   under rows**, since folding them into E3 could silently reopen them), delegate/function-value
+   *assignment*, *argument*, and *return* (closed by E3's typing rule, not by E4's rejection), and
+   rank-1 generic instantiation (four classes if the ramp fires). *Freeze point:* the class list
+   and the residual list freeze at **design-doc merge**; the residual (reflection,
+   `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates) is
+   named in the release notes as "not closed", never "no callback can". *Discriminating pin:*
+   delete E3's rule for any one class and its `_IsError` pin fails.
+2. **Higher-order expressiveness.** *Instrument:* the §4.1 demand ledger re-executed at the
+
+### files with two-line §O then §E (23 files)
+    6  benchmarks/security/command-injection.calr
+    6  benchmarks/security/path-traversal.calr
+    6  benchmarks/security/sql-injection.calr
+    4  bench/mcp/tasks/13-greenfield-crud-module/expected.calr
+    3  bench/mcp/tasks/15-nontarget-read-module/input.calr
+    3  bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr
+    3  bench/mcp/tasks/16-nontarget-refactor-rename/input.calr
+    2  bench/mcp/tasks/06-add-effect-to-function/expected.calr
+    2  bench/mcp/tasks/06-add-effect-to-function/input.calr
+    2  bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr
+    2  bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr
+    2  bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr
+    2  bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr
+    2  bench/mcp/tasks/14-fix-test-ids-in-production/input.calr
+    1  bench/mcp/tasks/02-fix-missing-effect/expected.calr
+    1  bench/mcp/tasks/05-fix-multiple-errors/expected.calr
+    1  bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr
+    1  bench/mcp/tasks/18-fix-wrong-effect-code/input.calr
+    1  bench/mcp/tasks/19-greenfield-async-function/expected.calr
+    1  bench/mcp/tasks/20-fix-unclosed-call/expected.calr
+    1  bench/mcp/tasks/20-fix-unclosed-call/input.calr
+    1  tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr
+    1  tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr
+total files: 23  total occurrences: 54
+
+### conversion snapshots with function-typed shapes, per file
+  05-02.approved.calr          shapes=0 §LAM=1 §DEL=0  []
+  05-03.approved.calr          shapes=0 §LAM=3 §DEL=0  []
+  07-01.approved.calr          shapes=1 §LAM=0 §DEL=1  ['Predicate<T>']
+  07-02.approved.calr          shapes=1 §LAM=1 §DEL=0  ['Func<i32, i32>']
+  07-03.approved.calr          shapes=1 §LAM=1 §DEL=0  ['Func<i32, i32>']
+  07-04.approved.calr          shapes=1 §LAM=1 §DEL=0  ['Func<i32>']
+  13-03.approved.calr          shapes=1 §LAM=1 §DEL=0  ['Func<?any, ?any, bool>']
+
+### §LAM / §DEL across the committed corpus, per file
+  bench/phase0-agent-native/fixtures/d-s1.5/conditional-declaration/expected.calr  §LAM=1 §DEL=2
+  tests/Calor.Conversion.Tests/Snapshots/05-02.approved.calr  §LAM=1 §DEL=0
+  tests/Calor.Conversion.Tests/Snapshots/05-03.approved.calr  §LAM=3 §DEL=0
+  tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr  §LAM=0 §DEL=1
+  tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr  §LAM=1 §DEL=0
+  tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr  §LAM=1 §DEL=0
+  tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr  §LAM=1 §DEL=0
+  tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr  §LAM=1 §DEL=0
+
+### PR #1085 / F-3 supersession
+b5d61e18 = PR #1085 (F-3 supersession); cited by SHA -- reachability not recorded (varies with clone depth)

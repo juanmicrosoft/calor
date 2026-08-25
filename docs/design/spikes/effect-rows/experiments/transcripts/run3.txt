@@ -1,0 +1,239 @@
+==============================================================================
+CASE Z1-FLD-nextline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z1}
+  §CL{c001:C:pub}
+    §FLD{i32:x:pri}
+    §E{cw}
+    §MT{mt001:M:pub} () -> void
+      §E{}
+------------------------------------------------------------------------------
+Z1-FLD-nextline-E.calr(4,5): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Effects
+Z1-FLD-nextline-E.calr(4,7): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace
+Z1-FLD-nextline-E.calr(4,8): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier
+Z1-FLD-nextline-E.calr(4,10): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace
+
+==============================================================================
+CASE Z2-B-nextline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z2}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{y:i32} INT:1
+    §E{cw}
+------------------------------------------------------------------------------
+Z2-B-nextline-E.calr(5,5): error Calor0100: Expected statement but found Effects
+Z2-B-nextline-E.calr(5,7): error Calor0100: Expected statement but found OpenBrace
+Z2-B-nextline-E.calr(5,8): error Calor0100: Expected statement but found Identifier
+Z2-B-nextline-E.calr(5,10): error Calor0100: Expected statement but found CloseBrace
+
+==============================================================================
+CASE Z3-wrapped-inline-sig-E-inside-parens  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z3}
+  §F{f001:Apply:pub} (
+      Func<i32,i32>:transform
+      §E{cw}
+    ) -> i32
+    §E{cw}
+    §R INT:0
+------------------------------------------------------------------------------
+Z3-wrapped-inline-sig-E-inside-parens.calr(4,7): error Calor0100: Expected CloseParen but found Effects
+Z3-wrapped-inline-sig-E-inside-parens.calr(5,5): error Calor0100: Expected statement but found CloseParen
+Z3-wrapped-inline-sig-E-inside-parens.calr(5,7): error Calor0100: Expected statement but found Arrow
+Z3-wrapped-inline-sig-E-inside-parens.calr(5,10): error Calor0100: Expected statement but found Identifier
+Z3-wrapped-inline-sig-E-inside-parens.calr(6,5): error Calor0100: Expected statement but found Effects
+Z3-wrapped-inline-sig-E-inside-parens.calr(6,7): error Calor0100: Expected statement but found OpenBrace
+Z3-wrapped-inline-sig-E-inside-parens.calr(6,8): error Calor0100: Expected statement but found Identifier
+Z3-wrapped-inline-sig-E-inside-parens.calr(6,10): error Calor0100: Expected statement but found CloseBrace
+
+==============================================================================
+CASE Z4-typeparam-named-eff  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z4}
+  §F{f001:M:pub}<eff> (eff:x) -> void
+    §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z4-typeparam-named-eff.g.cs
+
+==============================================================================
+CASE Z6-typeparam-named-cw  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z6}
+  §F{f001:M:pub}<T, cw> (T:a, cw:b) -> void
+    §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z6-typeparam-named-cw.g.cs
+
+==============================================================================
+CASE Z6b-typeparam-named-fs  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z6}
+  §F{f001:M:pub}<T, fs> (T:a, fs:b) -> void
+    §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z6b-typeparam-named-fs.g.cs
+
+==============================================================================
+CASE Z5-wrapped-inline-parameter-list  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z5}
+  §F{f001:Apply:pub} (
+      i32:a,
+      i32:b
+    ) -> i32
+    §E{}
+    §R (+ a b)
+------------------------------------------------------------------------------
+Compilation successful: Z5-wrapped-inline-parameter-list.g.cs
+
+==============================================================================
+CASE Z7-class-typeparam-reaches-member  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z7}
+  §CL{c001:Box:pub}<T>
+    §FLD{T:value:pri}
+    §MT{mt001:Get:pub} () -> T
+      §E{}
+      §R value
+------------------------------------------------------------------------------
+Compilation successful: Z7-class-typeparam-reaches-member.g.cs
+
+==============================================================================
+CASE Z8-DEL-typeparam-list  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z8}
+  §DEL{d001:Handler}<T>
+    §I{T:x}
+    §O{void}
+    §E{}
+  §F{f001:Main:pub} () -> void
+    §E{}
+------------------------------------------------------------------------------
+Z8-DEL-typeparam-list.calr(2,21): error Calor0100: Expected I, O, E, or END_DEL but found Less
+Z8-DEL-typeparam-list.calr(2,22): error Calor0100: Expected I, O, E, or END_DEL but found Identifier
+Z8-DEL-typeparam-list.calr(2,23): error Calor0100: Expected I, O, E, or END_DEL but found Greater
+
+==============================================================================
+CASE Z8b-LAM-typeparam-list  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z8}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{f} §LAM{lam1}<T> §R INT:1 §/LAM{lam1}
+------------------------------------------------------------------------------
+Z8b-LAM-typeparam-list.calr(4,21): error Calor0100: Expected statement but found Less
+Z8b-LAM-typeparam-list.calr(4,22): error Calor0100: Expected statement but found Identifier
+Z8b-LAM-typeparam-list.calr(4,23): error Calor0100: Expected statement but found Greater
+
+==============================================================================
+CASE Z7b-IFACE-typeparam-reaches-member  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z7}
+  §IFACE{i001:IBox}<T>
+    §MT{mt001:Get} () -> T
+      §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z7b-IFACE-typeparam-reaches-member.g.cs
+
+==============================================================================
+CASE Z9-arrow-void-sameline-E  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z9}
+  §F{f001:Log:pub} (i32:x) -> void §E{cw}
+    §P x
+------------------------------------------------------------------------------
+Compilation successful: Z9-arrow-void-sameline-E.g.cs
+
+==============================================================================
+CASE Z9b-I-i32-sameline-E  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z9}
+  §F{f001:Log:pub}
+    §I{i32:x} §E{cw}
+    §O{void}
+    §P x
+------------------------------------------------------------------------------
+Compilation successful: Z9b-I-i32-sameline-E.g.cs
+
+==============================================================================
+CASE Z9c-O-i32-sameline-E  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Z9}
+  §F{f001:Get:pub}
+    §O{i32} §E{cw}
+    §R INT:1
+------------------------------------------------------------------------------
+Compilation successful: Z9c-O-i32-sameline-E.g.cs
+
+==============================================================================
+CASE Z10-E-inside-call-arguments  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z10}
+  §F{f001:Helper:pub} (i32:x) -> i32
+    §E{}
+    §R x
+  §F{f002:Main:pub} () -> i32
+    §E{}
+    §R §C{Helper} §A INT:1 §E{cw} §/C
+------------------------------------------------------------------------------
+Z10-E-inside-call-arguments.calr(7,28): error Calor0100: Expected EndCall but found Effects
+Z10-E-inside-call-arguments.calr(7,28): error Calor0100: Expected statement but found Effects
+Z10-E-inside-call-arguments.calr(7,30): error Calor0100: Expected statement but found OpenBrace
+Z10-E-inside-call-arguments.calr(7,31): error Calor0100: Expected statement but found Identifier
+Z10-E-inside-call-arguments.calr(7,33): error Calor0100: Expected statement but found CloseBrace
+Z10-E-inside-call-arguments.calr(7,35): error Calor0100: Expected statement but found EndCall
+
+==============================================================================
+CASE W1a-IFACE-member-typeparams  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:W1}
+  §IFACE{i001:IP}
+    §MT{mt001:Handle}<T> (T:r) -> T
+      §E{}
+------------------------------------------------------------------------------
+Compilation successful: W1a-IFACE-member-typeparams.g.cs
+
+==============================================================================
+CASE W1b-IFACE-and-impl-member-typeparams  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:W1}
+  §IFACE{i001:IP}
+    §MT{mt001:Handle}<T> (T:r) -> T
+      §E{}
+  §CL{c001:Logging:pub}
+    §IMPL{IP}
+    §MT{mt001:Handle:pub}<T> (T:r) -> T
+      §E{}
+      §R r
+------------------------------------------------------------------------------
+Compilation successful: W1b-IFACE-and-impl-member-typeparams.g.cs
+
+==============================================================================
+CASE W1c-IFACE-impl-member-typeparams-renamed  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:W1}
+  §IFACE{i001:IP}
+    §MT{mt001:Handle}<T> (T:r) -> T
+      §E{}
+  §CL{c001:Logging:pub}
+    §IMPL{IP}
+    §MT{mt001:Handle:pub}<U> (U:r) -> U
+      §E{cw}
+      §P r
+      §R r
+------------------------------------------------------------------------------
+W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementation 'Logging.Handle' of interface method 'IP.Handle' on class 'Logging' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+
+==============================================================================
+CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Z11}
+  §F{f001:Parse:pub}
+    §I{str:s}
+    §O{str!str}
+    §E{}
+    §R §OK s
+------------------------------------------------------------------------------
+Z11-fallible-brace-form-full-output.calr(6,20): error Calor1002: Generated C# failed compilation (CS0029): Cannot implicitly convert type 'Calor.Runtime.Result<object, string>' to 'Calor.Runtime.Result<string, string>'
+
