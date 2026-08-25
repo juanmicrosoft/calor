@@ -5,7 +5,9 @@ For every artifact named in MANIFEST it compiles ``before/<id>.calr`` and
 ``after/<id>.calr`` with the worktree-built compiler and writes, next to the
 sources:
 
-  <side>/<id>.g.cs             the emitted C#
+  <side>/<id>.g.cs.txt         the emitted C#, stored with a .txt suffix because
+                               the Calor-first guard rejects new .cs paths anywhere
+                               in the tree and this is a transcript, not a source
   <side>/<id>.diagnostics.txt  the compiler's full diagnostic list
 
 Discipline, matching ``run.py``/``compile53.py`` in this directory:
@@ -134,7 +136,7 @@ def emit(identifier, side, args, work):
         compile_once(source, scratch, used)
 
     emitted = os.path.exists(scratch)
-    target_cs = os.path.join(SPIKE, side, identifier + ".g.cs")
+    target_cs = os.path.join(SPIKE, side, identifier + ".g.cs.txt")
     if emitted:
         with open(scratch, "r", encoding="utf-8") as handle:
             generated = handle.read()

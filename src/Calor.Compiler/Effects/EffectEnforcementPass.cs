@@ -487,6 +487,11 @@ public sealed class EffectEnforcementPass
         var effects = new List<(EffectKind Kind, string Value)>();
         foreach (var kv in effectsNode.Effects)
         {
+            // EMITTER SPIKE: the reserved rank-1 effect-variable key is not an
+            // EffectKind category. It is carried by the ROW, not by the concrete
+            // effect set, and is resolved at the instantiation site (§7.4).
+            if (kv.Key == EffectsNode.EffectVariableCategory) continue;
+
             var kind = ParseEffectCategory(kv.Key);
             var values = kv.Value.Split(',');
             foreach (var value in values)
@@ -500,6 +505,29 @@ public sealed class EffectEnforcementPass
         }
         return EffectSet.FromInternal(effects);
     }
+
+    /// <summary>
+    /// EMITTER SPIKE (effect-rows design doc §3.5, §8.2). The row a DECLARATION
+    /// carries: its concrete effect set plus the binder indices of any rank-1
+    /// effect variables it mentions. An omitted <c>§E</c> on a declaration is
+    /// PURE, unchanged from today — the asymmetry with an omitted row at a
+    /// parameter or field (which is Unknown) is deliberate: a declaration makes
+    /// a promise, an omitted annotation states nothing.
+    /// </summary>
+    internal static EffectRow GetDeclaredRow(EffectsNode? effectsNode)
+        => effectsNode == null
+            ? EffectRow.Pure
+            : EffectRow.Concrete(GetDeclaredEffects(effectsNode), effectsNode.EffectVariableIndices);
+
+    /// <summary>
+    /// EMITTER SPIKE. The row an ANNOTATION carries at a parameter or field
+    /// (positions 4/5/8). Returns null when the source omits the row, which the
+    /// caller reads as Unknown (§3.5) — never as pure.
+    /// </summary>
+    internal static EffectRow? GetAnnotationRow(EffectsNode? row)
+        => row == null
+            ? null
+            : EffectRow.Concrete(GetDeclaredEffects(row), row.EffectVariableIndices);
 
     /// <summary>
     /// D-W2.2 — declaration-local effect-variance checks (behavioral subtyping):
@@ -530,7 +558,13 @@ public sealed class EffectEnforcementPass
                 {
                     var overrideDeclared = GetDeclaredEffects(method.Effects);
                     var baseDeclared = GetDeclaredEffects(baseMethod.Effects);
-                    if (!overrideDeclared.IsSubsetOf(baseDeclared))
+                    // EMITTER SPIKE (§6.3): the subset test becomes a call to the
+                    // SHARED EffectRow.Fits relation. No rank-1-specific branch
+                    // lives here — alpha-equivalence of effect variables is a
+                    // property of Fits, because a row carries binder INDICES.
+                    if (EffectRow.Fits(
+                            GetDeclaredRow(method.Effects),
+                            GetDeclaredRow(baseMethod.Effects)) == RowFit.DoesNotFit)
                     {
                         var extra = overrideDeclared.Except(baseDeclared)
                             .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
@@ -568,7 +602,11 @@ public sealed class EffectEnforcementPass
                     {
                         var implDeclared = GetDeclaredEffects(impl.Effects);
                         var ifaceDeclared = GetDeclaredEffects(sig.Effects);
-                        if (!implDeclared.IsSubsetOf(ifaceDeclared))
+                        // EMITTER SPIKE (§6.3, R2): same shared relation as the
+                        // override site, so a change to Fits moves both together.
+                        if (EffectRow.Fits(
+                                GetDeclaredRow(impl.Effects),
+                                GetDeclaredRow(sig.Effects)) == RowFit.DoesNotFit)
                         {
                             var extra = implDeclared.Except(ifaceDeclared)
                                 .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
@@ -1259,7 +1297,14 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromCallArguments(string callTarget, IEnumerable<ExpressionNode> arguments)
         {
             var effects = EffectSet.Empty;
-            foreach (var arg in arguments)
+
+            // EMITTER SPIKE — §6.2 site 2 (argument) and site 6 (rank-1 generic
+            // instantiation). Both engage only when the CALLEE declares a row on
+            // the parameter in question, so a row-less call is untouched.
+            var argumentList = arguments as IReadOnlyList<ExpressionNode> ?? arguments.ToList();
+            effects = effects.Union(CheckRowedArguments(callTarget, argumentList));
+
+            foreach (var arg in argumentList)
             {
                 effects = effects.Union(InferFromExpression(arg));
 
@@ -1451,6 +1496,18 @@ public sealed class EffectEnforcementPass
         /// </summary>
         private EffectSet InferFromBareNameTarget(string target, TextSpan span)
         {
+            // EMITTER SPIKE (§3.6 E-1, §7.4). A function-typed value that CARRIES
+            // A ROW can be charged, so Calor0418 — "carries no effect contract" —
+            // is simply not true of it any more. This branch is strictly
+            // ADDITIVE: it engages only when a row is present, so every row-less
+            // program (and therefore every committed test, transcript and ledger)
+            // keeps today's behaviour exactly.
+            var declaredRow = ResolveLocalValueRow(target);
+            if (declaredRow != null)
+            {
+                return ChargeInvokedRow(target, declaredRow, span);
+            }
+
             var valueType = ResolveLocalValueType(target);
             if (valueType != null)
             {
@@ -1743,6 +1800,93 @@ public sealed class EffectEnforcementPass
             return null;
         }
 
+        /// <summary>
+        /// EMITTER SPIKE (§3.3 positions 4/5/8). The row annotating the bare name
+        /// <paramref name="name"/>: a parameter of the current function, or a
+        /// field of the enclosing class. Returns null when the name has no row —
+        /// which keeps every row-less program on today's code path.
+        /// </summary>
+        private EffectRow? ResolveLocalValueRow(string name)
+        {
+            if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
+                return null;
+
+            foreach (var parameter in function.Parameters)
+            {
+                if (parameter.Name.Equals(name, StringComparison.Ordinal))
+                    return GetAnnotationRow(parameter.Row);
+            }
+
+            var field = _context.OwnerClass?.Fields.FirstOrDefault(
+                f => f.Name.Equals(name, StringComparison.Ordinal));
+            return field == null ? null : GetAnnotationRow(field.Row);
+        }
+
+        /// <summary>
+        /// EMITTER SPIKE. Charges the row of an invoked function-typed value.
+        /// The CONCRETE part flows into the ordinary effect set, where Calor0410
+        /// checks it against the enclosing declaration exactly as for any other
+        /// charge. A rank-1 VARIABLE has no concrete content, so it is checked
+        /// structurally instead: invoking a value whose row mentions variable #k
+        /// requires the enclosing declaration's own row to mention #k too —
+        /// otherwise the declaration would be hiding a caller-supplied effect,
+        /// which is the same defect Calor0410 reports for a concrete code.
+        /// </summary>
+        private EffectSet ChargeInvokedRow(string target, EffectRow row, TextSpan span)
+        {
+            if (row.Kind == EffectRow.RowKind.Unknown)
+            {
+                ReportRowUnknown(
+                    span,
+                    $"The effect row of '{target}' is Unknown, so invoking it charges Unknown effects.");
+                return EffectSet.Unknown;
+            }
+
+            var enclosing = CurrentDeclaredRow();
+            foreach (var variable in row.Variables)
+            {
+                if (enclosing.Variables.Contains(variable)) continue;
+
+                _context.Diagnostics.Report(
+                    span,
+                    DiagnosticCode.ForbiddenEffect,
+                    $"Function '{CurrentDeclarationName()}' invokes '{target}', whose effect row mentions "
+                    + "an effect variable this declaration does not declare. Add the variable to the "
+                    + "declaration's own §E{…} row.",
+                    DiagnosticSeverity.Error);
+            }
+
+            return row.Effects;
+        }
+
+        /// <summary>
+        /// EMITTER SPIKE. Calor0425 — a "cannot tell" verdict. Warning by
+        /// default, error under --strict-effects, waived by
+        /// --permissive-effects (§4.5: the waiver keeps exactly one job).
+        /// </summary>
+        private void ReportRowUnknown(TextSpan span, string message)
+        {
+            if (_context.Policy == UnknownCallPolicy.Permissive) return;
+
+            _context.Diagnostics.Report(
+                span,
+                DiagnosticCode.EffectRowUnknown,
+                message,
+                _context.StrictEffects ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning);
+        }
+
+        /// <summary>EMITTER SPIKE. The row declared by the function being walked.</summary>
+        private EffectRow CurrentDeclaredRow()
+            => _context.Functions.TryGetValue(_context.CurrentFunctionId, out var function)
+                ? GetDeclaredRow(function.Effects)
+                : EffectRow.Pure;
+
+        /// <summary>EMITTER SPIKE. The name of the function being walked, for diagnostics.</summary>
+        private string CurrentDeclarationName()
+            => _context.Functions.TryGetValue(_context.CurrentFunctionId, out var function)
+                ? function.Name
+                : _context.CurrentFunctionId;
+
         private string? FindForeachVariableType(
             string name,
             IReadOnlyList<StatementNode> rootStatements)
@@ -1997,6 +2141,126 @@ public sealed class EffectEnforcementPass
             }
 
             return (typePart, methodName);
+        }
+
+        /// <summary>
+        /// EMITTER SPIKE — §6.2 site 2 (argument) and site 6 (rank-1 generic
+        /// instantiation), implemented together because they read the same two
+        /// facts: the parameter's declared row and the argument's row.
+        ///
+        /// For each parameter the callee annotates with a row:
+        ///   • if the parameter's row is MONOMORPHIC, the argument's row must fit
+        ///     it — <c>DoesNotFit</c> is Calor0424 (never waived, §4.5),
+        ///     <c>CannotTell</c> is Calor0425;
+        ///   • if the parameter's row mentions effect variables, the argument
+        ///     contributes to their solution by §7.4's one-line rule
+        ///     <c>e := ⊔ { ρ(argⱼ) ⊖ ρ_declⱼ }</c>. One variable, one solution,
+        ///     computed in a single pass over the argument list — no constraint
+        ///     set, no fixpoint. That is the whole of R3.
+        ///
+        /// The solved effects are returned so the caller is charged them, and any
+        /// CALLER-side variable that flows into the solution is checked against
+        /// the enclosing declaration's own row.
+        /// </summary>
+        private EffectSet CheckRowedArguments(
+            string callTarget,
+            IReadOnlyList<ExpressionNode> arguments)
+        {
+            var callee = FindInternalFunctionByName(callTarget);
+            if (callee == null) return EffectSet.Empty;
+
+            var parameters = callee.Parameters;
+            if (parameters.Count == 0 || parameters.All(p => p.Row == null))
+                return EffectSet.Empty;
+
+            var solvedEffects = EffectSet.Empty;
+            var solvedVariables = new List<int>();
+
+            for (var index = 0; index < arguments.Count && index < parameters.Count; index++)
+            {
+                var parameterRow = GetAnnotationRow(parameters[index].Row);
+                if (parameterRow == null) continue;
+
+                var argument = arguments[index];
+                var argumentRow = ResolveArgumentRow(argument);
+                var argumentLabel = argument is ReferenceNode reference ? reference.Name : "argument";
+
+                if (argumentRow == null || argumentRow.Kind == EffectRow.RowKind.Unknown)
+                {
+                    ReportRowUnknown(
+                        argument.Span,
+                        $"Argument '{argumentLabel}' of '{callTarget}' has no determinable effect row, so "
+                        + $"parameter '{parameters[index].Name}' is instantiated to Unknown here.");
+                    if (parameterRow.IsPolymorphic) return EffectSet.Unknown;
+                    continue;
+                }
+
+                if (!parameterRow.IsPolymorphic)
+                {
+                    // Site 2 — a monomorphic destination.
+                    if (EffectRow.Fits(argumentRow, parameterRow) == RowFit.DoesNotFit)
+                    {
+                        _context.Diagnostics.Report(
+                            argument.Span,
+                            DiagnosticCode.EffectRowMismatch,
+                            $"Argument '{argumentLabel}' has effect row {argumentRow.ToDisplayString()}, which "
+                            + $"does not fit parameter '{parameters[index].Name}' of '{callTarget}' "
+                            + $"(declared row: {parameterRow.ToDisplayString()}). "
+                            + $"Extra effect(s): {EffectRow.ExtraEffects(argumentRow, parameterRow)}. "
+                            + $"Widen '{parameters[index].Name}', or pass a function whose row fits. "
+                            + "An effect row that does not fit is never waived.",
+                            DiagnosticSeverity.Error);
+                    }
+                    continue;
+                }
+
+                // Site 6 — the one-line solve. `⊖` is difference over the
+                // concrete part: whatever the argument brings beyond what the
+                // parameter's own row already promises.
+                foreach (var effect in argumentRow.Effects.Except(parameterRow.Effects))
+                {
+                    solvedEffects = solvedEffects.Union(
+                        EffectSet.FromInternal(new[] { effect }));
+                }
+
+                solvedVariables.AddRange(argumentRow.Variables);
+            }
+
+            // A caller-side variable that reaches the solution must be declared by
+            // the enclosing declaration's own row, exactly as for a direct
+            // invocation (see ChargeInvokedRow).
+            var enclosing = CurrentDeclaredRow();
+            foreach (var variable in solvedVariables.Distinct().OrderBy(v => v))
+            {
+                if (enclosing.Variables.Contains(variable)) continue;
+
+                _context.Diagnostics.Report(
+                    arguments.Count > 0 ? arguments[0].Span : TextSpan.Empty,
+                    DiagnosticCode.ForbiddenEffect,
+                    $"Function '{CurrentDeclarationName()}' instantiates an effect variable of "
+                    + $"'{callTarget}' from an argument whose row mentions an effect variable this "
+                    + "declaration does not declare.",
+                    DiagnosticSeverity.Error);
+            }
+
+            return solvedEffects;
+        }
+
+        /// <summary>
+        /// EMITTER SPIKE. The row of an argument expression: a rowed local value
+        /// (parameter or field), or a method group, whose row is its declared
+        /// effect set. Returns null when the spike cannot determine one.
+        /// </summary>
+        private EffectRow? ResolveArgumentRow(ExpressionNode argument)
+        {
+            if (argument is not ReferenceNode reference || reference.Name.Contains('.'))
+                return null;
+
+            var localRow = ResolveLocalValueRow(reference.Name);
+            if (localRow != null) return localRow;
+
+            var internalFunction = FindInternalFunctionByName(reference.Name);
+            return internalFunction == null ? null : GetDeclaredRow(internalFunction.Effects);
         }
 
         private FunctionNode? FindInternalFunctionByName(string name)
