@@ -1,187 +1,196 @@
-[
-  {
-    "file": "bench/mcp/tasks/02-fix-missing-effect/expected.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/05-fix-multiple-errors/expected.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/06-add-effect-to-function/expected.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/06-add-effect-to-function/input.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/13-greenfield-crud-module/expected.calr",
-    "twoLineOE": 4,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/14-fix-test-ids-in-production/input.calr",
-    "twoLineOE": 2,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/15-nontarget-read-module/input.calr",
-    "twoLineOE": 3,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr",
-    "twoLineOE": 3,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/16-nontarget-refactor-rename/input.calr",
-    "twoLineOE": 3,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/18-fix-wrong-effect-code/input.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0403",
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "bench/mcp/tasks/20-fix-unclosed-call/input.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0830"
-    ]
-  },
-  {
-    "file": "benchmarks/security/command-injection.calr",
-    "twoLineOE": 6,
-    "exit": 1,
-    "codes": [
-      "Calor0006"
-    ]
-  },
-  {
-    "file": "benchmarks/security/path-traversal.calr",
-    "twoLineOE": 6,
-    "exit": 1,
-    "codes": [
-      "Calor0100",
-      "Calor0102"
-    ]
-  },
-  {
-    "file": "benchmarks/security/sql-injection.calr",
-    "twoLineOE": 6,
-    "exit": 1,
-    "codes": [
-      "Calor0100",
-      "Calor0102"
-    ]
-  },
-  {
-    "file": "tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr",
-    "twoLineOE": 1,
-    "exit": 0,
-    "codes": []
-  },
-  {
-    "file": "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr",
-    "twoLineOE": 1,
-    "exit": 1,
-    "codes": [
-      "Calor0002"
-    ]
-  }
-]
+{
+  "schemaVersion": 1,
+  "measuredCommit": "fb3460473854d75f2b815c242392f4f559b2a80a",
+  "scope": "Every committed .calr containing a line matching \u00a7O{...} at end-of-line immediately followed by a line matching \u00a7E{, compiled one file at a time via the CLI default (EnforceEffects on, UnknownCallPolicy.Strict, no --permissive-effects). twoLineOE is the occurrence count in that file; exit and codes are the compiler's verdict at measuredCommit. Design-doc Decision 1 must not disturb any of these.",
+  "fileCount": 23,
+  "occurrenceCount": 54,
+  "compileGreen": 1,
+  "compileRed": 22,
+  "files": [
+    {
+      "file": "bench/mcp/tasks/02-fix-missing-effect/expected.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/05-fix-multiple-errors/expected.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/06-add-effect-to-function/expected.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/06-add-effect-to-function/input.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/13-greenfield-crud-module/expected.calr",
+      "twoLineOE": 4,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/14-fix-test-ids-in-production/input.calr",
+      "twoLineOE": 2,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/15-nontarget-read-module/input.calr",
+      "twoLineOE": 3,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr",
+      "twoLineOE": 3,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/16-nontarget-refactor-rename/input.calr",
+      "twoLineOE": 3,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/18-fix-wrong-effect-code/input.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0403",
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "bench/mcp/tasks/20-fix-unclosed-call/input.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0830"
+      ]
+    },
+    {
+      "file": "benchmarks/security/command-injection.calr",
+      "twoLineOE": 6,
+      "exit": 1,
+      "codes": [
+        "Calor0006"
+      ]
+    },
+    {
+      "file": "benchmarks/security/path-traversal.calr",
+      "twoLineOE": 6,
+      "exit": 1,
+      "codes": [
+        "Calor0100",
+        "Calor0102"
+      ]
+    },
+    {
+      "file": "benchmarks/security/sql-injection.calr",
+      "twoLineOE": 6,
+      "exit": 1,
+      "codes": [
+        "Calor0100",
+        "Calor0102"
+      ]
+    },
+    {
+      "file": "tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr",
+      "twoLineOE": 1,
+      "exit": 0,
+      "codes": []
+    },
+    {
+      "file": "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr",
+      "twoLineOE": 1,
+      "exit": 1,
+      "codes": [
+        "Calor0002"
+      ]
+    }
+  ]
+}

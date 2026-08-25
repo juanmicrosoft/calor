@@ -1,0 +1,190 @@
+==============================================================================
+CASE Y1a-I-sameline-cw-then-decl-pure  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y1}
+  §F{f001:Log:pub}
+    §I{str:m} §E{cw}
+    §O{void}
+    §E{}
+    §P m
+------------------------------------------------------------------------------
+Y1a-I-sameline-cw-then-decl-pure.calr(5,5): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+
+==============================================================================
+CASE Y1b-I-sameline-cw-only  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y1}
+  §F{f001:Log:pub}
+    §I{str:m} §E{cw}
+    §O{void}
+    §P m
+------------------------------------------------------------------------------
+Compilation successful: Y1b-I-sameline-cw-only.g.cs
+
+==============================================================================
+CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y1}
+  §F{f001:Log:pub}
+    §I{str:m} §E{}
+    §O{void}
+    §E{cw}
+    §P m
+------------------------------------------------------------------------------
+Compilation successful: Y1c-I-sameline-pure-then-decl-cw.g.cs
+
+==============================================================================
+CASE Y2a-fallible-brace-form  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y2}
+  §F{f001:Parse:pub}
+    §I{str:s}
+    §O{str!str}
+    §E{}
+    §R §OK s
+------------------------------------------------------------------------------
+Y2a-fallible-brace-form.calr(6,20): error Calor1002: Generated C# failed compilation (CS0029): Cannot implicitly convert type 'Calor.Runtime.Result<object, string>' to 'Calor.Runtime.Result<string, string>'
+
+==============================================================================
+CASE Y2b-fallible-in-B  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y2}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{r:i32!str} §OK INT:1
+------------------------------------------------------------------------------
+Compilation successful: Y2b-fallible-in-B.g.cs
+Y2b-fallible-in-B.calr(4,5): warning Calor0200: Type 'i32!str' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.
+
+==============================================================================
+CASE Y3a-B-with-sameline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y3}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+------------------------------------------------------------------------------
+Y3a-B-with-sameline-E.calr(4,25): error Calor0100: Expected statement but found Effects
+Y3a-B-with-sameline-E.calr(4,27): error Calor0100: Expected statement but found OpenBrace
+Y3a-B-with-sameline-E.calr(4,28): error Calor0100: Expected statement but found Identifier
+Y3a-B-with-sameline-E.calr(4,30): error Calor0100: Expected statement but found CloseBrace
+Y3a-B-with-sameline-E.calr(4,32): error Calor0100: Expected statement but found Lambda
+Y3a-B-with-sameline-E.calr(4,36): error Calor0100: Expected statement but found OpenBrace
+Y3a-B-with-sameline-E.calr(4,37): error Calor0100: Expected statement but found Identifier
+Y3a-B-with-sameline-E.calr(4,41): error Calor0100: Expected statement but found Colon
+Y3a-B-with-sameline-E.calr(4,42): error Calor0100: Expected statement but found Identifier
+Y3a-B-with-sameline-E.calr(4,43): error Calor0100: Expected statement but found Colon
+Y3a-B-with-sameline-E.calr(4,44): error Calor0100: Expected statement but found Identifier
+Y3a-B-with-sameline-E.calr(4,47): error Calor0100: Expected statement but found CloseBrace
+Y3a-B-with-sameline-E.calr(4,57): error Calor0100: Expected statement but found EndLambda
+Y3a-B-with-sameline-E.calr(4,62): error Calor0100: Expected statement but found OpenBrace
+Y3a-B-with-sameline-E.calr(4,63): error Calor0100: Expected statement but found Identifier
+Y3a-B-with-sameline-E.calr(4,67): error Calor0100: Expected statement but found CloseBrace
+
+==============================================================================
+CASE Y3b-B-plain  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y3}
+  §F{f001:Main:pub} () -> void
+    §E{}
+    §B{f:Func<i32,i32>} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+------------------------------------------------------------------------------
+Compilation successful: Y3b-B-plain.g.cs
+
+==============================================================================
+CASE Y4a-O-sameline-E-decl-later  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y4}
+  §F{f001:Make:pub}
+    §O{Func<i32>} §E{cw}
+    §E{}
+    §R §LAM{lam1} §R INT:1 §/LAM{lam1}
+------------------------------------------------------------------------------
+Compilation successful: Y4a-O-sameline-E-decl-later.g.cs
+
+==============================================================================
+CASE Y5a-arrow-sameline-E  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y5}
+  §F{f001:Log:pub} (str:m) -> void §E{cw}
+    §P m
+------------------------------------------------------------------------------
+Compilation successful: Y5a-arrow-sameline-E.g.cs
+
+==============================================================================
+CASE Y6a-MT-twoline  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y6}
+  §CL{c001:C:pub}
+    §MT{mt001:Log:pub}
+      §I{str:m}
+      §O{void}
+      §E{}
+      §P m
+------------------------------------------------------------------------------
+Y6a-MT-twoline.calr(6,7): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+
+==============================================================================
+CASE Y7a-IFACE-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y7}
+  §IFACE{i001:IRenderer}
+    §MT{m001:Render}
+      §O{void}
+      §E{}
+  §CL{c001:ConsoleRenderer:pub}
+    §IMPL{IRenderer}
+    §MT{mt001:Render:pub}
+      §O{void}
+      §E{cw}
+      §P "rendering"
+------------------------------------------------------------------------------
+Y7a-IFACE-E.calr(10,7): error Calor0421: Implementation 'ConsoleRenderer.Render' of interface method 'IRenderer.Render' on class 'ConsoleRenderer' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+
+==============================================================================
+CASE Y8a-override-broader-permissive  args: --permissive-effects  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y8}
+  §CL{c001:Base:pub}
+    §MT{mt001:Render:pub:virt}
+      §O{void}
+      §E{}
+  §CL{c002:Derived:pub}
+    §EXT{Base}
+    §MT{mt002:Render:pub:over}
+      §O{void}
+      §E{cw}
+      §P "laundered"
+------------------------------------------------------------------------------
+Compilation successful: Y8a-override-broader-permissive.g.cs
+Y8a-override-broader-permissive.calr(10,7): warning Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
+
+==============================================================================
+CASE Y8b-override-broader-strict  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{m001:Y8}
+  §CL{c001:Base:pub}
+    §MT{mt001:Render:pub:virt}
+      §O{void}
+      §E{}
+  §CL{c002:Derived:pub}
+    §EXT{Base}
+    §MT{mt002:Render:pub:over}
+      §O{void}
+      §E{cw}
+      §P "laundered"
+------------------------------------------------------------------------------
+Y8b-override-broader-strict.calr(10,7): error Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
+
+==============================================================================
+CASE Y9a-B-untyped-lambda-then-invoke-permissive  args: --permissive-effects  exit: 0
+------------------------------------------------------------------------------
+§M{m001:Y9}
+  §F{f001:UseLambda:pub} () -> i32
+    §E{}
+    §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+    §R §C{f} §A INT:1 §/C
+------------------------------------------------------------------------------
+Compilation successful: Y9a-B-untyped-lambda-then-invoke-permissive.g.cs
+Y9a-B-untyped-lambda-then-invoke-permissive.calr(5,8): warning Calor0418: Invocation of function-typed value 'f' (type 'Func<>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+

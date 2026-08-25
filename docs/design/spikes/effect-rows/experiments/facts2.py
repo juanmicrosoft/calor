@@ -42,5 +42,4 @@ for f in files:
         print(f"  {f}  §LAM={t.count('§LAM')} §DEL={t.count('§DEL')}")
 
 print("\n### PR #1085 / F-3 supersession")
-print(sh("git log --oneline -40 | grep -i 'edit.script\\|ES-0\\|F-3\\|1085' || echo '(none in last 40)'"))
-print(sh("git log --oneline --all --grep='1085' -3"))
+print(sh("git log -1 --format=%s b5d61e18"))

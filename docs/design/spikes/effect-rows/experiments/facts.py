@@ -14,7 +14,7 @@ print(sh("grep -rn 'class BindStatementNode' src/"))
 print(sh("grep -rn 'class ParameterNode\\|class OutputNode\\|class ClassFieldNode' src/"))
 
 print("\n### ast-schema / ArchitectureTests")
-print(sh("ls -la eng/ast-schema.json 2>&1 | head -1"))
+print("eng/ast-schema.json exists:", os.path.exists(os.path.join(ROOT, "eng/ast-schema.json")))
 print(sh("grep -n 'AstSchema_CoversEveryNodeDispatchAndChildRelation' tests/Calor.Compiler.Tests/ArchitectureTests.cs"))
 print(sh("grep -c 'BindStatementNode' eng/ast-schema.json"))
 
@@ -22,7 +22,7 @@ print("\n### cross-module IsSubsetOf site")
 print(sh("grep -n 'IsSubsetOf' src/Calor.Compiler/Effects/*.cs"))
 
 print("\n### ProjectIndex references outside Commands/")
-print(sh("grep -rln 'ProjectIndex' src/ | sort"))
+print(sh("grep -rln 'ProjectIndex' src/ --include='*.cs' | sort"))
 
 print("\n### Effects/*.cs file count")
 print(sh("ls src/Calor.Compiler/Effects/*.cs | wc -l"))

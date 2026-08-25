@@ -1,0 +1,49 @@
+1  n= 1  bench/mcp/tasks/02-fix-missing-effect/expected.calr                    Calor0830
+1  n= 1  bench/mcp/tasks/05-fix-multiple-errors/expected.calr                   Calor0830
+1  n= 2  bench/mcp/tasks/06-add-effect-to-function/expected.calr                Calor0830
+1  n= 2  bench/mcp/tasks/06-add-effect-to-function/input.calr                   Calor0830
+1  n= 2  bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr           Calor0830
+1  n= 2  bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr           Calor0830
+1  n= 2  bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr              Calor0830
+1  n= 4  bench/mcp/tasks/13-greenfield-crud-module/expected.calr                Calor0830
+1  n= 2  bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr            Calor0830
+1  n= 2  bench/mcp/tasks/14-fix-test-ids-in-production/input.calr               Calor0830
+1  n= 3  bench/mcp/tasks/15-nontarget-read-module/input.calr                    Calor0830
+1  n= 3  bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr             Calor0830
+1  n= 3  bench/mcp/tasks/16-nontarget-refactor-rename/input.calr                Calor0830
+1  n= 1  bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr                 Calor0830
+1  n= 1  bench/mcp/tasks/18-fix-wrong-effect-code/input.calr                    Calor0403,Calor0830
+1  n= 1  bench/mcp/tasks/19-greenfield-async-function/expected.calr             Calor0830
+1  n= 1  bench/mcp/tasks/20-fix-unclosed-call/expected.calr                     Calor0830
+1  n= 1  bench/mcp/tasks/20-fix-unclosed-call/input.calr                        Calor0830
+1  n= 6  benchmarks/security/command-injection.calr                             Calor0006
+1  n= 6  benchmarks/security/path-traversal.calr                                Calor0100,Calor0102
+1  n= 6  benchmarks/security/sql-injection.calr                                 Calor0100,Calor0102
+0  n= 1  tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr    OK
+1  n= 1  tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr   Calor0002
+
+files: 23   occurrences: 54
+compile-green today: 1   compile-red today: 22
+red files and their first code:
+    bench/mcp/tasks/02-fix-missing-effect/expected.calr ['Calor0830']
+    bench/mcp/tasks/05-fix-multiple-errors/expected.calr ['Calor0830']
+    bench/mcp/tasks/06-add-effect-to-function/expected.calr ['Calor0830']
+    bench/mcp/tasks/06-add-effect-to-function/input.calr ['Calor0830']
+    bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr ['Calor0830']
+    bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr ['Calor0830']
+    bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr ['Calor0830']
+    bench/mcp/tasks/13-greenfield-crud-module/expected.calr ['Calor0830']
+    bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr ['Calor0830']
+    bench/mcp/tasks/14-fix-test-ids-in-production/input.calr ['Calor0830']
+    bench/mcp/tasks/15-nontarget-read-module/input.calr ['Calor0830']
+    bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr ['Calor0830']
+    bench/mcp/tasks/16-nontarget-refactor-rename/input.calr ['Calor0830']
+    bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr ['Calor0830']
+    bench/mcp/tasks/18-fix-wrong-effect-code/input.calr ['Calor0403']
+    bench/mcp/tasks/19-greenfield-async-function/expected.calr ['Calor0830']
+    bench/mcp/tasks/20-fix-unclosed-call/expected.calr ['Calor0830']
+    bench/mcp/tasks/20-fix-unclosed-call/input.calr ['Calor0830']
+    benchmarks/security/command-injection.calr ['Calor0006']
+    benchmarks/security/path-traversal.calr ['Calor0100']
+    benchmarks/security/sql-injection.calr ['Calor0100']
+    tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr ['Calor0002']

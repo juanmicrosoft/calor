@@ -4,7 +4,20 @@ the fallible-type brace form, and the §B suffix position."""
 import os, subprocess, sys, textwrap
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
-DLL = os.path.join(ROOT, "src/Calor.Compiler/bin/Debug/net10.0/calor.dll")
+def _find_dll():
+    override = os.environ.get("CALOR_DLL")
+    if override:
+        return override
+    for cfg in ("Debug", "Release"):
+        p = os.path.join(ROOT, "src/Calor.Compiler/bin", cfg, "net10.0/calor.dll")
+        if os.path.exists(p):
+            return p
+    raise SystemExit(
+        "calor.dll not found under src/Calor.Compiler/bin/{Debug,Release}/net10.0/. "
+        "Run: dotnet build src/Calor.Compiler")
+
+
+DLL = _find_dll()
 EXP = os.path.dirname(os.path.abspath(__file__))
 
 CASES = {}

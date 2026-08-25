@@ -1,0 +1,158 @@
+### BindStatementNode / BindingNode
+BindingNode hits: 0
+src/Calor.Compiler/Ast/ControlFlowNodes.cs:161:public sealed class BindStatementNode : StatementNode
+src/Calor.Compiler/Ast/ClassNodes.cs:554:public sealed class ClassFieldNode : AstNode
+src/Calor.Compiler/Ast/FunctionNode.cs:21:public sealed class OutputNode : AstNode
+src/Calor.Compiler/Ast/FunctionNode.cs:252:public sealed class ParameterNode : AstNode
+
+### ast-schema / ArchitectureTests
+eng/ast-schema.json exists: True
+158:    public void AstSchema_CoversEveryNodeDispatchAndChildRelation()
+1
+
+### cross-module IsSubsetOf site
+src/Calor.Compiler/Effects/CrossModuleEffectEnforcementPass.cs:162:        if (resolution.DeclaredEffects.IsSubsetOf(declaredEffects))
+src/Calor.Compiler/Effects/EffectEnforcementPass.cs:377:        if (!computedEffects.IsSubsetOf(declaredEffects))
+src/Calor.Compiler/Effects/EffectEnforcementPass.cs:533:                    if (!overrideDeclared.IsSubsetOf(baseDeclared))
+src/Calor.Compiler/Effects/EffectEnforcementPass.cs:571:                        if (!implDeclared.IsSubsetOf(ifaceDeclared))
+src/Calor.Compiler/Effects/EffectSet.cs:97:    public bool IsSubsetOf(EffectSet other)
+
+### ProjectIndex references outside Commands/
+src/Calor.Compiler/Commands/IndexCommand.cs
+src/Calor.Compiler/Commands/QueryCommand.cs
+src/Calor.Compiler/Indexing/ProjectIndex.cs
+src/Calor.Compiler/Indexing/ProjectIndexBuilder.cs
+
+### Effects/*.cs file count
+10
+src/Calor.Compiler/Effects/CrossModuleEffectEnforcementPass.cs
+src/Calor.Compiler/Effects/CrossModuleEffectRegistry.cs
+src/Calor.Compiler/Effects/EffectEnforcementPass.cs
+src/Calor.Compiler/Effects/EffectResolver.cs
+src/Calor.Compiler/Effects/EffectSet.cs
+src/Calor.Compiler/Effects/EffectSubtyping.cs
+src/Calor.Compiler/Effects/EffectSummary.cs
+src/Calor.Compiler/Effects/EffectSummaryBuilder.cs
+src/Calor.Compiler/Effects/EffectTypes.cs
+src/Calor.Compiler/Effects/ExternalCallCollector.cs
+
+### tests/TestData function-typed .calr
+count: 0
+
+### whole-corpus function-typed positions (IsFunctionTypeName shapes)
+5
+tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr
+tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr
+tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr
+tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr
+tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr
+
+### Conversion tests: effect pass?
+=> CompileCalorToCSharpWithDiagnostics(calorSource).GeneratedCode;
+
+    public static CalorCompilationAttempt CompileCalorToCSharpWithDiagnostics(
+        string calorSource)
+    {
+        try
+        {
+            var diagnostics = new DiagnosticBag();
+            diagnostics.SetFilePath("test.calr");
+
+            var lexer = new Lexer(calorSource, diagnostics);
+            var tokens = lexer.TokenizeAllForParser();
+            if (diagnostics.HasErrors)
+                return new CalorCompilationAttempt(null, FormatDiagnostics(diagnostics));
+
+            var parser = new Parser(tokens, diagnostics);
+            var module = parser.Parse();
+            if (diagnostics.HasErrors)
+                return new CalorCompilationAttempt(null, FormatDiagnostics(diagnostics));
+
+            var emitter = new CSharpEmitter();
+            return new CalorCompilationAttempt(
+                emitter.Emit(module),
+                FormatDiagnostics(diagnostics));
+        }
+        catch (Exception ex)
+        {
+            return new CalorCompilationAttempt(
+                null,
+                [$"Compiler exception: {ex.GetType().Name}: {ex.Message}"]);
+        }
+
+        static IReadOnlyList<string> FormatDiagnostics(DiagnosticBag diagnostics)
+            => diagnostics.Select(diagnostic => diagnostic.ToString()).ToList();
+    }
+
+### orphaned / mis-cited pins
+StrictnessBatchTests.cs:152: d => d.Code == DiagnosticCode.OverrideEffectVariance && d.Message.Contains("Render"));
+StrictnessBatchTests.cs:172: diagnostic.Code == DiagnosticCode.OverrideEffectVariance
+StrictnessBatchTests.cs:219: d => d.Code == DiagnosticCode.InterfaceEffectVariance && d.Message.Contains("Render"));
+StrictnessBatchTests.cs:245: public void OverrideOfExternalBase_RoutesToAssumedChannel()
+StrictnessBatchTests.cs:260: d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("external base"));
+StrictnessBatchTests.cs:472: public void C2_DecoyNamedDelegateParameter_ShadowsFunction_IsError()
+StrictnessBatchTests.cs:502: d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'Helper'"));
+StrictnessBatchTests.cs:555: public void C3_InheritedImplementation_BroaderEffects_IsError()
+StrictnessBatchTests.cs:582: d => d.Code == DiagnosticCode.InterfaceEffectVariance
+StrictnessBatchTests.cs:587: public void C3_ExternalInheritedImplementation_RoutesToAssumed()
+StrictnessBatchTests.cs:607: d => d.Code == DiagnosticCode.AssumedEffects
+StrictnessBatchTests.cs:640: public void C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption()
+StrictnessBatchTests.cs:656: Assert.Contains(result.Diagnostics.Warnings,
+StrictnessBatchTests.cs:728: public void M1_ExpressionCallSpelling_DelegateValue_IsError()
+StrictnessBatchTests.cs:745: d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'f'"));
+StrictnessBatchTests.cs:612: public void C4_MethodGroupArgument_ChargesCalleeDeclaredEffects()
+StrictnessBatchTests.cs:106: public void FreeBareName_FailsClosed_NotSilentlyPure()
+StrictnessBatchTests.cs:133: public void OverrideWithBroaderEffects_IsError()
+
+### demand ledger test exact-equality
+string.Join(", ", measuredFailing.Except(recordedFailing)) +
+            "\n  newly reaching: " + string.Join(", ", recordedFailing.Except(measuredFailing)));
+        Assert.Equal(recorded.NotReachingEffectPass, measured.NotReachingEffectPass);
+        Assert.Equal(recorded.FilesNotReachingEffectPass, measured.FilesNotReachingEffectPass);
+        Assert.Equal(recorded.CompileExceptions, measured.CompileExceptions);
+        Assert.Equal(recorded.PerFile, measured.PerFile);
+        Assert.True(recorded.Calor0418 == measured.Calor0418
+                && recorded.Calor0419FunctionTyped == measured.Calor0419FunctionTyped
+                && recorded.Total == measured.Total,
+            $"D-A totals moved: 0418 {measured.Calor0418} / 0419(function-typed) " +
+            $"{measured.Calor0419FunctionTyped} vs ledger {recorded.Calor0418} / " +
+            $"{recorded.Calor0419FunctionTyped}. The ledger is the frozen denominator — " +
+            "regenerate in this PR and name the cause (§4.4 gate 2 discriminating pin).");
+    }
+
+### BoundTypeTests DisplayString pins
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:9:/// Covers constructor invariants, equality, and DisplayString formatting.
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:16:    public void PrimitiveBoundType_Bare_ProducesSimpleDisplayString()
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:19:        Assert.Equal("INT", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:26:        Assert.Equal("INT[bits=16]", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:33:        Assert.Equal("INT[bits=16][signed=true]", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:56:    public void NominalBoundType_DisplayString_MatchesQualifiedName()
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:59:        Assert.Equal("System.Console", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:66:        // S2 discipline: DisplayString stays byte-identical to the existing
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:72:        Assert.Equal("System.String", annotated.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:73:        Assert.Equal("System.String", notAnnotated.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:92:        Assert.Equal("System.Collections.Generic.List<INT>", listOfInt.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:105:        Assert.Equal("Dictionary<STRING, List<INT>>", dictType.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:114:        Assert.Equal("INT[]", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:121:        Assert.Equal("INT[,,]", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:139:        Assert.Equal("() -> VOID", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:150:        Assert.Equal("(INT, STRING) -> BOOL", t.DisplayString);
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:156:    public void UnresolvedBoundType_Reason_AppearsInDisplayString()
+tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:159:        Assert.Equal("<unresolved: no method group>", t.DisplayString);
+
+### calor-direction.md lines 33, 57, 112
+:33: 2. **Generics with constraints, variance, higher-rank.** Moving generic type reasoning into the Calor binder rather than passing through to C#. Deferr
+:57: - **A TIER2D design doc** — `docs/design/effect-rows-in-the-type-system.md` — is written next. Before/after binder symbols, worked examples (intra-mod
+:112: 4. **Calor is already materially different from C# without TIER2D**: explicit `§E` effects, cross-module enforcement, refinement types with Z3, contra
+
+### roadmap gate-1 class enumeration
+1. **Effect laundering, closed classes.** *Instrument:* one adversarial pin per class, the
+   `DelegateInvocation_*` pattern, positive and negative (`_IsError` / `_Compiles` pairs as
+   `StrictnessBatchTests.cs:132/176` and `:198/221` already do). *Denominator:* five classes —
+   virtual override and interface implementation (already closed by Calor0420/0421; **re-pinned
+   under rows**, since folding them into E3 could silently reopen them), delegate/function-value
+   *assignment*, *argument*, and *return* (closed by E3's typing rule, not by E4's rejection), and
+   rank-1 generic instantiation (four classes if the ramp fires). *Freeze point:* the class list
+   and the residual list freeze at **design-doc merge**; the residual (reflection,
+   `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates) is
+   named in the release notes as "not closed", never "no callback can". *Discriminating pin:*
