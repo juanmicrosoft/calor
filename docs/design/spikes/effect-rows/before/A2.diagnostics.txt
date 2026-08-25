@@ -1,0 +1,11 @@
+# docs/design/spikes/effect-rows/before/A2.calr
+# exit: 1
+# emitted: yes
+# emit args: --permissive-effects
+# diagnostics: 5
+
+docs/design/spikes/effect-rows/before/A2.calr(21,7): error Calor0410: Function 'Handle' uses effect 'unknown' but does not declare it
+docs/design/spikes/effect-rows/before/A2.calr(23,32): warning Calor0411: Unknown external call to 'processor.Process'. Add effect declaration in a .calor-effects.json manifest.
+docs/design/spikes/effect-rows/before/A2.calr(24,24): warning Calor0411: Unknown external call to '_chainProcess010.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest.
+docs/design/spikes/effect-rows/before/A2.calr(25,27): error Calor0418: Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+docs/design/spikes/effect-rows/before/A2.calr(26,19): warning Calor0411: Unknown external call to '_chainNext011.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest.

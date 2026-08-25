@@ -1,0 +1,7 @@
+# docs/design/spikes/effect-rows/after/A1.calr
+# exit: 0
+# emitted: yes
+# emit args: (none)
+# diagnostics: 0
+
+Compilation successful
