@@ -59,6 +59,17 @@ public sealed record RawCall(string CallerName, string Target, bool IsConstructo
 /// reads a symbol's type string; the binder decided, and this file reports what
 /// it decided.
 ///
+/// <para><b>What that did and did not change.</b> Slice 1's comment here said
+/// step 1 "provably reduces to <c>ReceiverSymbol.TypeName</c>". That is
+/// narrowed, not falsified: the reduction still describes what the bound-variable
+/// shape yields today, but it is no longer a property of THIS file — the binder
+/// owns the decision, and this collector can no longer reconstruct a different
+/// answer than the binder's. Slice 2a resolved no receiver that did not resolve
+/// before: <c>calor effects suggest --json</c> over every receiver shape below is
+/// byte-identical to the pre-slice output. What changed is that "unresolved" is
+/// now a type (<see cref="UnresolvedBoundType"/>) rather than an <c>OBJECT</c>
+/// string this file had to second-guess.</para>
+///
 /// <para>What the four receiver shapes give, and what this collector does with
 /// each:</para>
 ///
