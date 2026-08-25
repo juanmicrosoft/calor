@@ -188,6 +188,17 @@ public sealed class BoundVariableExpression : BoundExpression
         Variable = variable;
         ResolvedSymbols = resolvedSymbols
             ?? [variable];
+        if (typeOverride != null)
+        {
+            // The caller has already decided this reference's type and the
+            // symbol's type string is irrelevant — do not canonicalize it.
+            // TypeIdentity.Canonicalize throws on an empty/whitespace type
+            // string, and a symbol with no recorded type is precisely a case a
+            // caller passes an UnresolvedBoundType for.
+            Type = typeOverride;
+            return;
+        }
+
         var resolvedTypes = ResolvedSymbols
             .Select(symbol => TypeIdentity.Canonicalize(symbol.TypeName))
             .Distinct(StringComparer.Ordinal)
@@ -204,10 +215,9 @@ public sealed class BoundVariableExpression : BoundExpression
         // (resolvedTypes.Length > 1, falling through to "OBJECT"), also
         // stay Oblivious since the declared annotation no longer maps to
         // a single ground type.
-        Type = typeOverride
-            ?? (resolvedTypes.Length == 1
-                ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
-                : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious));
+        Type = resolvedTypes.Length == 1
+            ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
+            : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
     }
 
     // S3 scope (§D6): flow the STRING annotation only. Handles both the

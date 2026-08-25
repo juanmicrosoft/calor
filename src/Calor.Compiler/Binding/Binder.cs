@@ -3253,24 +3253,56 @@ public sealed class Binder
 
         if (receiverSymbol != null)
         {
-            var head = new BoundVariableExpression(receiverSpan, receiverSymbol);
+            // Constructing the reference node canonicalizes the symbol's type
+            // string, and canonicalization throws on a string it cannot parse —
+            // an empty one, or a bare "?" — which converted C# does produce. A
+            // receiver whose type string the binder cannot even canonicalize is
+            // precisely an unresolved receiver, so it is caught and reported as
+            // one here rather than escaping as an internal-error diagnostic that
+            // would abandon the rest of the member. Constructions below that pass
+            // typeOverride do not canonicalize and cannot throw.
+            BoundVariableExpression? typedHead;
+            try
+            {
+                typedHead = new BoundVariableExpression(receiverSpan, receiverSymbol);
+            }
+            catch (ArgumentException)
+            {
+                typedHead = null;
+            }
+
             var firstDot = receiverPath.IndexOf('.');
             if (firstDot > 0)
             {
                 // a.b.M — the binder resolves `a` only. `a.b` has no bound type,
-                // so the chain is built over the typed head and reported
-                // unresolved rather than attributed to `a`'s type.
+                // so the chain is built over the head and reported unresolved
+                // rather than attributed to `a`'s type. One Calor0270 for the
+                // whole chain, and the head shares its reason when it is itself
+                // untyped.
                 var unresolved = ReportUnresolvedReceiver(
                     receiverSpan,
                     receiverPath,
                     $"'{receiverPath}' is a member chain the binder does not type");
-                BoundExpression chain = head;
+                BoundExpression chain = typedHead
+                    ?? new BoundVariableExpression(
+                        receiverSpan, receiverSymbol, typeOverride: unresolved);
                 foreach (var segment in receiverPath[(firstDot + 1)..].Split('.'))
                 {
                     chain = new BoundFieldAccessExpression(
                         receiverSpan, chain, segment, typeName: null, resolvedType: unresolved);
                 }
                 return chain;
+            }
+
+            if (typedHead is null)
+            {
+                return new BoundVariableExpression(
+                    receiverSpan,
+                    receiverSymbol,
+                    typeOverride: ReportUnresolvedReceiver(
+                        receiverSpan,
+                        receiverPath,
+                        $"'{receiverPath}' carries a type string the binder cannot resolve to a type"));
             }
 
             // The binder's OBJECT fallback on an inferred local it could not type
@@ -3280,7 +3312,7 @@ public sealed class Binder
             // declared `§B{o:OBJECT}` (uppercase; the surface `object` keyword
             // stays lowercase and is unaffected) is conflated with the fallback —
             // documented, not distinguished, exactly as slice 1 had it.
-            if (head.Type is BoundTypes.NominalBoundType { QualifiedName: "OBJECT" }
+            if (typedHead.Type is BoundTypes.NominalBoundType { QualifiedName: "OBJECT" }
                 && !(receiverSymbol.IsParameter || receiverSymbol.IsField || receiverSymbol.IsProperty))
             {
                 return new BoundVariableExpression(
@@ -3292,7 +3324,7 @@ public sealed class Binder
                         $"'{receiverPath}' is an inferred local whose type the binder could not determine"));
             }
 
-            return head;
+            return typedHead;
         }
 
         if (receiverTypeSymbol != null)
