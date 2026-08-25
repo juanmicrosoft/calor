@@ -1,0 +1,65 @@
+PP-E1 margin derivation — 300 null simulations x 400-resample two-level cluster bootstrap, seed 4537
+
+=== m5-compare-001 — PP-W5's derivation population (method reproduction) ===
+  N1-001   A          n=5 mean_corrected=    7995 cv_corrected=0.1592 mean_naive=    7995 cv_naive=0.1592
+  N1-001   B          n=5 mean_corrected=    6014 cv_corrected=0.4296 mean_naive=    6014 cv_naive=0.4296
+  N1-002   A          n=5 mean_corrected=    5054 cv_corrected=0.2471 mean_naive=    5054 cv_naive=0.2471
+  N1-002   B          n=5 mean_corrected=    4345 cv_corrected=0.0962 mean_naive=    4345 cv_naive=0.0962
+  N1-003   A          n=5 mean_corrected=    9974 cv_corrected=0.6052 mean_naive=    9974 cv_naive=0.6052
+  N1-003   B          n=5 mean_corrected=    8942 cv_corrected=0.0657 mean_naive=    8942 cv_naive=0.0657
+  N1-005   A          n=3 mean_corrected=    9289 cv_corrected=0.3202 mean_naive=    4935 cv_naive=0.7284
+  N1-005   B          n=3 mean_corrected=    6687 cv_corrected=0.1009 mean_naive=    6687 cv_naive=0.1009
+  within-cell CV (naive): median 0.2032  max 0.7284  cells 8
+  [naive] null point: median 0.9983  p95 1.2566  -> margin on the 0.05 grid: 1.30
+      margin 1.25: null false-fail — point-only 0.053, conjunction 0.013
+      margin 1.30: null false-fail — point-only 0.020, conjunction 0.013
+      margin 1.35: null false-fail — point-only 0.013, conjunction 0.010
+      margin 1.40: null false-fail — point-only 0.010, conjunction 0.010
+      margin 1.45: null false-fail — point-only 0.007, conjunction 0.007
+      margin 1.50: null false-fail — point-only 0.000, conjunction 0.000
+      power @ 1.25x (conjunction): m=1.25 0.353  m=1.30 0.290  m=1.35 0.193  m=1.40 0.143  m=1.45 0.090  m=1.50 0.053
+      power @ 1.4x (conjunction): m=1.25 0.663  m=1.30 0.600  m=1.35 0.533  m=1.40 0.443  m=1.45 0.343  m=1.50 0.240
+      power @ 1.6x (conjunction): m=1.25 0.883  m=1.30 0.883  m=1.35 0.867  m=1.40 0.807  m=1.45 0.757  m=1.50 0.660
+  within-cell CV (corrected): median 0.2032  max 0.6052  cells 8
+  [corrected] null point: median 1.0041  p95 1.1920  -> margin on the 0.05 grid: 1.20
+      margin 1.25: null false-fail — point-only 0.027, conjunction 0.017
+      margin 1.30: null false-fail — point-only 0.017, conjunction 0.013
+      margin 1.35: null false-fail — point-only 0.010, conjunction 0.007
+      margin 1.40: null false-fail — point-only 0.010, conjunction 0.007
+      margin 1.45: null false-fail — point-only 0.003, conjunction 0.000
+      margin 1.50: null false-fail — point-only 0.000, conjunction 0.000
+      power @ 1.25x (conjunction): m=1.25 0.377  m=1.30 0.300  m=1.35 0.197  m=1.40 0.163  m=1.45 0.120  m=1.50 0.050
+      power @ 1.4x (conjunction): m=1.25 0.783  m=1.30 0.693  m=1.35 0.593  m=1.40 0.477  m=1.45 0.370  m=1.50 0.257
+      power @ 1.6x (conjunction): m=1.25 0.960  m=1.30 0.947  m=1.35 0.920  m=1.40 0.880  m=1.45 0.833  m=1.50 0.750
+
+=== w5-parity-002 — PP-E1's derivation population (realized parity epoch) ===
+  N1-001   control    n=5 mean_corrected=   12238 cv_corrected=0.7236 mean_naive=   12238 cv_naive=0.7236
+  N1-001   treatment  n=5 mean_corrected=   11660 cv_corrected=0.8038 mean_naive=    5752 cv_naive=0.5430
+  N1-002   control    n=5 mean_corrected=   10270 cv_corrected=0.6538 mean_naive=    8403 cv_naive=0.4170
+  N1-002   treatment  n=5 mean_corrected=    9633 cv_corrected=0.4599 mean_naive=    9633 cv_naive=0.4599
+  N1-003   control    n=5 mean_corrected=   14466 cv_corrected=0.4186 mean_naive=   14466 cv_naive=0.4186
+  N1-003   treatment  n=5 mean_corrected=   23468 cv_corrected=0.3120 mean_naive=   23468 cv_naive=0.3120
+  N1-005   control    n=5 mean_corrected=    7213 cv_corrected=0.1071 mean_naive=    7213 cv_naive=0.1071
+  N1-005   treatment  n=5 mean_corrected=    7577 cv_corrected=0.1962 mean_naive=    7577 cv_naive=0.1962
+  within-cell CV (naive): median 0.4178  max 0.7236  cells 8
+  [naive] null point: median 1.0029  p95 1.2880  -> margin on the 0.05 grid: 1.30
+      margin 1.25: null false-fail — point-only 0.067, conjunction 0.013
+      margin 1.30: null false-fail — point-only 0.043, conjunction 0.013
+      margin 1.35: null false-fail — point-only 0.033, conjunction 0.013
+      margin 1.40: null false-fail — point-only 0.020, conjunction 0.003
+      margin 1.45: null false-fail — point-only 0.013, conjunction 0.003
+      margin 1.50: null false-fail — point-only 0.010, conjunction 0.000
+      power @ 1.25x (conjunction): m=1.25 0.313  m=1.30 0.257  m=1.35 0.207  m=1.40 0.140  m=1.45 0.107  m=1.50 0.063
+      power @ 1.4x (conjunction): m=1.25 0.553  m=1.30 0.523  m=1.35 0.473  m=1.40 0.393  m=1.45 0.337  m=1.50 0.283
+      power @ 1.6x (conjunction): m=1.25 0.810  m=1.30 0.807  m=1.35 0.797  m=1.40 0.757  m=1.45 0.693  m=1.50 0.620
+  within-cell CV (corrected): median 0.4392  max 0.8038  cells 8
+  [corrected] null point: median 0.9925  p95 1.3302  -> margin on the 0.05 grid: 1.35
+      margin 1.25: null false-fail — point-only 0.073, conjunction 0.023
+      margin 1.30: null false-fail — point-only 0.057, conjunction 0.023
+      margin 1.35: null false-fail — point-only 0.037, conjunction 0.017
+      margin 1.40: null false-fail — point-only 0.023, conjunction 0.010
+      margin 1.45: null false-fail — point-only 0.010, conjunction 0.010
+      margin 1.50: null false-fail — point-only 0.010, conjunction 0.010
+      power @ 1.25x (conjunction): m=1.25 0.317  m=1.30 0.283  m=1.35 0.220  m=1.40 0.170  m=1.45 0.123  m=1.50 0.087
+      power @ 1.4x (conjunction): m=1.25 0.547  m=1.30 0.527  m=1.35 0.483  m=1.40 0.407  m=1.45 0.347  m=1.50 0.280
+      power @ 1.6x (conjunction): m=1.25 0.787  m=1.30 0.783  m=1.35 0.767  m=1.40 0.750  m=1.45 0.710  m=1.50 0.637
