@@ -377,20 +377,6 @@ public static class DiagnosticCode
     public const string EffectMismatch = "Calor0402";
     public const string UnknownEffectCode = "Calor0403";
 
-    /// <summary>
-    /// Error: an effect variable declared or used where the rank-1 scope rules
-    /// forbid it, out of scope, or named after a live effect code.
-    /// Effect-rows design doc §6.1 / §7.3. EMITTER SPIKE (roadmap §4.1 term 1).
-    /// </summary>
-    public const string EffectVariableScope = "Calor0404";
-
-    /// <summary>
-    /// Error: a §E{…} row written where no row can attach — not on the same line
-    /// as the type it annotates, or on a position whose type is not function-typed.
-    /// Effect-rows design doc §3.1 / §3.5 / §6.1. EMITTER SPIKE.
-    /// </summary>
-    public const string EffectRowMisplaced = "Calor0405";
-
     // Effect enforcement (Calor0410-0429)
     public const string ForbiddenEffect = "Calor0410";
     public const string UnknownExternalCall = "Calor0411";
@@ -449,20 +435,6 @@ public static class DiagnosticCode
     /// intrinsic accessor mutation, but the accessor has no §E surface.
     /// </summary>
     public const string AccessorEffectContractUnavailable = "Calor0423";
-
-    /// <summary>
-    /// Error: fits(source row, destination row) = DoesNotFit at one of the six
-    /// compatibility sites. Never waived, by any flag, at any site.
-    /// Effect-rows design doc §6.1 / §6.2. EMITTER SPIKE.
-    /// </summary>
-    public const string EffectRowMismatch = "Calor0424";
-
-    /// <summary>
-    /// Warning (error under --strict-effects): fits(...) = CannotTell — a row is
-    /// Unknown on one side, so the site cannot be adjudicated. Waived by
-    /// --permissive-effects. Effect-rows design doc §6.1. EMITTER SPIKE.
-    /// </summary>
-    public const string EffectRowUnknown = "Calor0425";
 
     // Pattern matching errors (Calor0500-0599)
     public const string NonExhaustiveMatch = "Calor0500";

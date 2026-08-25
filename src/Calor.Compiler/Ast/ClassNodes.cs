@@ -570,13 +570,6 @@ public sealed class ClassFieldNode : AstNode
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
-    /// <summary>
-    /// EMITTER SPIKE (effect-rows design doc §3.3, position 8). The effect row
-    /// annotating this field's type, written as a §E{…} on the SAME SOURCE LINE
-    /// as the field tag. Null when omitted, which per §3.5 means Unknown.
-    /// </summary>
-    public EffectsNode? Row { get; set; }
-
     public ClassFieldNode(
         TextSpan span,
         string name,

@@ -74,16 +74,6 @@ public sealed class Parser
     private bool _insideRefinementPredicate;
 
     /// <summary>
-    /// EMITTER SPIKE (effect-rows design doc §7.2/§7.3). The rank-1 effect
-    /// variables bound by the declaration currently being parsed, in binder
-    /// order — the index of a name here IS its identity for the
-    /// alpha-equivalent interface/implementation comparison (§7.3, W1c).
-    /// Cleared by every declaration that can bind one, so a variable never
-    /// leaks across declarations.
-    /// </summary>
-    private readonly List<string> _effectVariableScope = new();
-
-    /// <summary>
     /// Phase 1 of v0.6 call-closer-elision RFC: tracks the number of
     /// pending outer-call <c>§A</c> argument contexts that the inner
     /// expression is being parsed inside. Used by
@@ -1338,7 +1328,7 @@ public sealed class Parser
         var visibility = ParseVisibility(visibilityStr);
 
         // NEW: Parse optional type parameters §F{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span, allowEffectVariables: true);
+        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -1535,7 +1525,7 @@ public sealed class Parser
         var visibility = ParseVisibility(visibilityStr);
 
         // Parse optional type parameters §AF{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span, allowEffectVariables: true);
+        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -1777,106 +1767,20 @@ public sealed class Parser
         return new OutputNode(startToken.Span, typeName, attrs.GetSpan("_pos0"));
     }
 
-    private EffectsNode ParseEffects(bool allowEffectVariables = true)
+    private EffectsNode ParseEffects()
     {
         var startToken = Expect(TokenKind.Effects);
         var attrs = ParseAttributes();
 
-        // EMITTER SPIKE (§7.2b): resolve each code against the enclosing
-        // declaration's in-scope effect-variable set BEFORE the taxonomy lookup,
-        // so §E{e} binds instead of reaching Calor0403. Variables are recorded
-        // under the reserved EffectVariableCategory key as BINDER INDICES.
-        var variableIndices = new List<int>();
-
         // Interpret positional attributes
         var effects = AttributeHelper.InterpretEffectsAttributes(
             attrs,
-            code =>
-            {
-                var trimmed = code.Trim();
-                var index = _effectVariableScope.IndexOf(trimmed);
-                if (index >= 0 && allowEffectVariables)
-                {
-                    variableIndices.Add(index);
-                    return;
-                }
-
-                if (index >= 0)
-                {
-                    _diagnostics.ReportError(
-                        startToken.Span,
-                        DiagnosticCode.EffectVariableScope,
-                        $"Effect variable '{trimmed}' may not be used at this position. "
-                        + "Rank-1 effect variables may appear only in a declaration's own row and "
-                        + "in its parameters' rows.");
-                    return;
-                }
-
-                // NOTE: the UNTRIMMED code is reported, byte-for-byte as today.
-                // The harness pins this message (case X5a quotes `' ^ e'`, with
-                // the leading space the attribute round-trip inserts), so
-                // trimming it here would be a gratuitous message change.
-                _diagnostics.Report(
-                    startToken.Span,
-                    DiagnosticCode.UnknownEffectCode,
-                    $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy.");
-            });
-
-        if (variableIndices.Count > 0)
-        {
-            var mutable = new Dictionary<string, string>(effects);
-            mutable[EffectsNode.EffectVariableCategory] = string.Join(
-                ",",
-                variableIndices.Distinct().OrderBy(i => i));
-            return new EffectsNode(startToken.Span, mutable);
-        }
+            code => _diagnostics.Report(
+                startToken.Span,
+                DiagnosticCode.UnknownEffectCode,
+                $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."));
 
         return new EffectsNode(startToken.Span, effects);
-    }
-
-    /// <summary>
-    /// EMITTER SPIKE (§7.2c). True when <paramref name="name"/> collides with the
-    /// authoritative effect taxonomy — either a compact code or a colon prefix.
-    /// Ordinary TYPE parameters named after a code keep working; only <c>eff</c>
-    /// names are banned.
-    /// </summary>
-    private static bool IsLiveEffectCodeName(string name)
-        => Effects.EffectCodes.IsKnownCompactCode(name)
-           || Effects.EffectCodes.ColonPrefixes.Contains(name, StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// EMITTER SPIKE — the line-adjacency rule (§3.2), evaluated immediately
-    /// after a type is consumed. A <c>§E{…}</c> whose first token sits on the
-    /// SAME source line as the type's last token is that type's row; otherwise
-    /// the token is not consumed here and the enclosing production resumes
-    /// exactly as it does today.
-    /// </summary>
-    private EffectsNode? TryParseAdjacentRow()
-    {
-        if (!Check(TokenKind.Effects)) return null;
-        if (_position == 0) return null;
-        if (Current.Span.Line != _tokens[_position - 1].Span.Line) return null;
-        return ParseEffects(allowEffectVariables: true);
-    }
-
-    /// <summary>
-    /// EMITTER SPIKE — the parser stage of Calor0405 (§3.1/§6.1). Called at a
-    /// position that accepts a row but has no <c>§E</c> arm to fall through to.
-    /// Consumes the misplaced group so the rest of the declaration still parses,
-    /// turning a 4–11 diagnostic Calor0100 cascade into one actionable message.
-    /// </summary>
-    private void ReportAndRecoverMisplacedRow(string subject)
-    {
-        if (!Check(TokenKind.Effects)) return;
-
-        var span = Current.Span;
-        ParseEffects(allowEffectVariables: true); // recovery: consume the group
-        _diagnostics.ReportError(
-            span,
-            DiagnosticCode.EffectRowMisplaced,
-            "A §E{…} effect row must be on the same line as the type it annotates. "
-            + $"Move it onto the end of the {subject} line, or — if this is meant to be the "
-            + "declaration's own effect declaration — onto its own line in the declaration body.");
     }
 
     private RequiresNode ParseRequires()
@@ -7692,15 +7596,9 @@ public sealed class Parser
     private List<TypeParameterNode> ParseOptionalTypeParameterList(
         TextSpan defaultSpan,
         bool allowVariance = false,
-        string owner = "this declaration",
-        bool allowEffectVariables = false)
+        string owner = "this declaration")
     {
         var typeParams = new List<TypeParameterNode>();
-
-        // EMITTER SPIKE (§7.3): every declaration that can bind rank-1 effect
-        // variables resets the scope here, so a variable never leaks from one
-        // declaration into the next.
-        _effectVariableScope.Clear();
 
         if (!Check(TokenKind.Less))
         {
@@ -7711,47 +7609,6 @@ public sealed class Parser
 
         do
         {
-            // EMITTER SPIKE (§7.2a): the `eff` modifier, matched with ONE token of
-            // lookahead so a type parameter literally named `eff` (case Z4:
-            // §F{f001:M:pub}<eff> compiles today) keeps working — `eff` alone is
-            // followed by `>` or `,`, not by another identifier.
-            if (Check(TokenKind.Identifier)
-                && Current.Text == "eff"
-                && Peek(1).Kind == TokenKind.Identifier)
-            {
-                var effToken = Advance(); // consume `eff`
-                var variableToken = Advance(); // consume the variable name
-                if (!allowEffectVariables)
-                {
-                    _diagnostics.ReportError(
-                        effToken.Span,
-                        DiagnosticCode.EffectVariableScope,
-                        $"An effect variable may only be bound by a function or method declaration's own "
-                        + $"type-parameter list, not by {owner}. Move 'eff {variableToken.Text}' onto the "
-                        + "member that uses it.");
-                }
-                else if (IsLiveEffectCodeName(variableToken.Text))
-                {
-                    // §7.2(c): resolving variables before codes means a variable
-                    // named after a live code makes that code unwritable here.
-                    _diagnostics.ReportError(
-                        variableToken.Span,
-                        DiagnosticCode.EffectVariableScope,
-                        $"Effect variable '{variableToken.Text}' is named after an effect code in the "
-                        + "authoritative taxonomy, which would make that code unwritable inside this "
-                        + "declaration. Rename the effect variable.");
-                }
-                else
-                {
-                    _effectVariableScope.Add(variableToken.Text);
-                }
-
-                // Deliberately NOT added to typeParams: an effect variable is not a
-                // TYPE parameter. Keeping it out of the list is what makes rows
-                // erasable at codegen — the gate G-CODEGEN (§12.2) rests on it.
-                continue;
-            }
-
             // Check for variance modifiers: in/out before the type parameter name
             var variance = Ast.VarianceKind.None;
             if (Check(TokenKind.Identifier) && Current.Text is "in" or "out")
@@ -8387,7 +8244,7 @@ public sealed class Parser
         }
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span, allowEffectVariables: true);
+        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -8849,17 +8706,6 @@ public sealed class Parser
         var visibility = ParseVisibility(visStr);
         var fieldModifiers = ParseMethodModifiers(modStr);
 
-        // EMITTER SPIKE — position 8, the field row (§3.3), inserted BEFORE the
-        // default-value branch. A field is not a declaration that binds effect
-        // variables (§7.3 forbids position 8), so the scope is cleared first and
-        // a bare identifier in the row falls through to Calor0403 as it does today.
-        _effectVariableScope.Clear();
-        var fieldRow = TryParseAdjacentRow();
-        if (fieldRow == null && Check(TokenKind.Effects))
-        {
-            ReportAndRecoverMisplacedRow($"'{name}' field");
-        }
-
         // Check for optional default value (can be prefixed with = or just a direct expression)
         ExpressionNode? defaultValue = null;
         if (Check(TokenKind.Equals))
@@ -8883,10 +8729,7 @@ public sealed class Parser
             attrs,
             csharpAttrs,
             GetIdentifierSpan(attrs, "_pos1", name),
-            attrs.GetSpan("_pos0"))
-        {
-            Row = fieldRow, // EMITTER SPIKE — position 8
-        };
+            attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -8931,7 +8774,7 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span, allowEffectVariables: true);
+        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
 
         // Also support legacy: Extract type parameters from method name if present (e.g., Create<T>)
         if (typeParameters.Count == 0)
@@ -9076,7 +8919,7 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         // Parse optional type parameters §AMT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span, allowEffectVariables: true);
+        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
 
         // Support legacy: Extract type parameters from method name if present
         if (typeParameters.Count == 0)
@@ -13730,17 +13573,6 @@ public sealed class Parser
                     parameterIdentifierSpan = nameToken.Span;
                 }
 
-                // EMITTER SPIKE — position 5, the inline parameter row (§3.3).
-                // Insertion point: after the modifier slot, before the default
-                // value. TokenKind.Effects is not an expression start
-                // (Parser.cs's ExpressionParsers table has no entry for it), so
-                // no initializer can swallow a row here.
-                var parameterRow = TryParseAdjacentRow();
-                if (parameterRow == null && Check(TokenKind.Effects))
-                {
-                    ReportAndRecoverMisplacedRow($"'{paramName}' parameter");
-                }
-
                 // Parse optional default value: = expression
                 ExpressionNode? defaultValue = null;
                 if (Match(TokenKind.Equals))
@@ -13760,10 +13592,7 @@ public sealed class Parser
                     Array.Empty<CalorAttributeNode>(),
                     defaultValue,
                     identifierSpan: parameterIdentifierSpan,
-                    typeNameSpan: parameterTypeSpan)
-                {
-                    Row = parameterRow, // EMITTER SPIKE — position 5
-                });
+                    typeNameSpan: parameterTypeSpan));
             }
             while (Match(TokenKind.Comma));
         }
