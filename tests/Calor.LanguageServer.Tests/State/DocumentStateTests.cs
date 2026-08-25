@@ -740,6 +740,60 @@ public class DocumentStateTests
         }
     }
 
+    // ========================================================================
+    // v0.15 E1 slice 2a, review round 1 finding 2 — Calor0270 in the editor.
+    //
+    // The binder marks EVERY receiver it cannot type UnresolvedBoundType, but
+    // only reports the shapes an author can act on. These two pins observe that
+    // split where the author actually sees it: the LSP diagnostic stream
+    // (DocumentState.Reanalyze -> DiagnosticConverter), not just the bag.
+    // ========================================================================
+
+    [Fact]
+    public void Calor0270_InferredLocalReceiver_IsOneInformationDiagnostic()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:DoWork:pub} () -> void
+                §B{x} §C{Unknown.Make} §/C
+                §C{x.Run} §/C
+            """;
+
+        var state = LspTestHarness.CreateDocument(source);
+
+        var diagnostic = Assert.Single(state.Diagnostics.Where(
+            d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.SignatureUnresolved));
+        Assert.Contains("'x'", diagnostic.Message, StringComparison.Ordinal);
+
+        // What the editor is actually handed: an Information squiggle, never a
+        // warning or an error — the type is unknown, the code is not wrong.
+        var lsp = Calor.LanguageServer.Utilities.DiagnosticConverter
+            .ToLspDiagnostic(diagnostic, source);
+        Assert.Equal(
+            OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
+            lsp.Severity);
+    }
+
+    [Fact]
+    public void Calor0270_MemberChainReceiver_IsSilentInTheEditor()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:DoWork:pub} () -> void
+                §B{a} §NEW{Random} §/NEW
+                §C{a.b.Chain} §/C
+            """;
+
+        var state = LspTestHarness.CreateDocument(source);
+
+        // The receiver is still unresolved to every analysis — it just does not
+        // put an unactionable squiggle in the author's editor. Ungated, this
+        // shape produced the bulk of 875 diagnostics over the converted corpus
+        // (bench/phase0-agent-native/calor0270-corpus-ledger.json).
+        Assert.Empty(state.Diagnostics.Where(
+            d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.SignatureUnresolved));
+    }
+
     private sealed record LogEntry(
         LogLevel Level,
         Exception? Exception,

@@ -1004,10 +1004,36 @@ the interface, rank-1 rows do not compose with external interfaces. §14 Q1.
 Roadmap §4.1: *"`UnresolvedBoundType` → `Unknown` row, `FunctionBoundType`'s effect slot, and
 symbol-identity keying are E1 decisions, made in §4.2, not design-doc decisions."* Status:
 receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed** (#1089);
-receiver `BoundExpression` on the call nodes, binder-emitted `UnresolvedBoundType`, the
-`Unknown`-row contribution, symbol-identity keying in `EffectResolver`/manifests/IL summaries, and
-`BoundLambdaExpression`'s `FunctionBoundType` all **pending** (evidence in §2.2). E2 consumes all
-six; roadmap §4.2's cut line already prices the risk.
+receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
+**executed** (#1095 — E1 slice 2a); the `Unknown`-row contribution, symbol-identity keying in
+`EffectResolver`/manifests/IL summaries, and `BoundLambdaExpression`'s `FunctionBoundType` all
+**pending** (evidence in §2.2). E2 consumes all six; roadmap §4.2's cut line already prices the
+risk.
+
+**What slice 2a did and did not do — stated so E2 does not over-read it.** The slice moved a
+decision and added structure. It resolved **no** receiver that did not resolve before.
+
+- `BoundCallStatement.Receiver` / `BoundCallExpression.Receiver` carry the receiver as a real
+  `BoundExpression` in four shapes (bound variable, member-access chain, `BoundTypeReferenceExpression`,
+  or null), and `ExternalCallCollector` reads `Receiver.Type` instead of reconstructing one.
+- The binder emits `UnresolvedBoundType(reason)` — the first production emission of that type —
+  where it previously handed back `NominalBoundType("OBJECT")`, so "unresolved" and "genuinely
+  `object`" stop being the same value.
+- `BuildCallReceiver` consumes **exactly the three inputs slice 1 consumed** (`ReceiverSymbol`,
+  `ReceiverTypeSymbol`, `ResolvedTypeName`). It consults no `MetadataBinder`, opens no new
+  resolution path, and reaches no type source slice 1 could not reach.
+- Evidence: `calor effects suggest --json` over a fixture exercising all seven receiver shapes is
+  **byte-identical to `main`** apart from the `generatedAt` timestamp, stderr included; gate 6's
+  ledger (817/1248) is unmoved; `EffectsSuggestTests.cs`'s metadata-only pin
+  (`g.ToString → System.Guid`) passed on `main` before this slice and still passes.
+
+So slice 1's "step 1 provably reduces to `ReceiverSymbol.TypeName`" is **narrowed, not falsified**:
+the reduction still holds for the bound-variable shape today, but it is no longer a property of the
+*collector* — the binder owns the decision, and the collector can no longer reconstruct a different
+answer. That is what E2 gets to build on: a receiver whose unresolvedness is a typed fact
+(`UnresolvedBoundType`) rather than a string sentinel the consumer had to re-derive, which is what
+**P17** (§13) needs in order to be writable at all. What E2 does **not** get is any additional
+resolved receiver — the resolution ceiling in §2.2 (431 unresolved BCL call sites) is untouched.
 
 **The spike did not discharge any of the six, and says so.** Its prototype reads rows off the
 **AST**, because the effect pass is an AST walk (§2) and the bound tree is not on that path. So
