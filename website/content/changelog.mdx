@@ -10,6 +10,10 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+### Changed
+
+- **Proof-based guard elision is now on by default.** Compile with `--verify` and, when Z3 proves a postcondition or `§PROOF` obligation, the generated C# no longer carries that runtime check — no `--elide-proven-guards` needed (the flag still works and simply restates the default). Only a clean, non-vacuous, assumption-free `Proven` verdict qualifies; preconditions and every other verdict keep their guards, and nothing changes without `--verify`. To opt out and keep every guard (the 0.13/0.14 behavior), pass `--keep-proven-guards`, set `ElideProvenGuards = false` on `CompilationOptions`, or set `<CalorElideProvenGuards>false</CalorElideProvenGuards>` in MSBuild. The flip is backed by the solver-vs-runtime differential suite: 0 mismatches, elision coverage 40/65.
+
 ## [0.14.3] - 2026-08-24
 
 Small fix — `§NEW{Type}` constructor expressions now correctly reflect that `new Foo()` is non-null. Improves downstream nullability checks without changing any observable behavior on well-annotated code.

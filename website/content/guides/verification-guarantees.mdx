@@ -24,11 +24,13 @@ number of soundness gaps that have not yet been found is not knowable.
 Preconditions are never elided from satisfiability results. A vacuous proof is
 reported with a flag and also keeps its runtime check.
 
-In 0.13.2, verification is diagnostic by default: compiling with `--verify`
-reports verdicts but keeps every runtime guard. Passing
-`--verify --elide-proven-guards` together removes the guard only after a
-clean, non-vacuous, assumption-free proof. `assumed` and all inconclusive
-outcomes always keep their guards.
+Since 0.15, compiling with `--verify` removes a runtime guard by default —
+but only after a clean, non-vacuous, assumption-free proof. `assumed` and all
+inconclusive outcomes always keep their guards. Pass
+`--verify --keep-proven-guards` to keep every guard and use the verdicts as
+diagnostics only (the 0.13/0.14 behavior). The flip is backed by the
+solver-vs-runtime differential suite: 0 mismatches over the pinned
+modeled-forms denominator, with elision coverage published at 40/65.
 
 ## What Changed in v0.12
 
@@ -90,7 +92,7 @@ calls are pure and therefore voids the guarantee.
 
 ## Review Checklist
 
-1. In 0.13.2, `--verify` alone is diagnostic; `--elide-proven-guards` is required to drop eligible guards.
+1. Since 0.15, `--verify` drops eligible guards by default; add `--keep-proven-guards` when you want verdicts reported but every guard kept.
 2. Treat only a non-vacuous, assumption-free `proven` as eligible for elision.
 3. Read every named assumption on `assumed` results.
 4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their

@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Proof-based guard elision is now on by default.** When you compile with
+  `--verify` and Z3 proves a postcondition or a `§PROOF` obligation, the
+  compiler now leaves that runtime check out of the generated C# — you no
+  longer need to pass `--elide-proven-guards` (the flag still works; it just
+  restates the default). Only a clean, non-vacuous, assumption-free `Proven`
+  verdict qualifies. Preconditions, `Assumed`, `Timeout`, `Refuted` and every
+  other verdict keep their guards exactly as before, and nothing changes when
+  you compile without `--verify`.
+  - **To opt out** (keep every guard and use verification as a diagnostic
+    only — the 0.13/0.14 behavior): pass `--keep-proven-guards` (or
+    `--no-elide-proven-guards`) on the CLI, set `ElideProvenGuards = false` on
+    `CompilationOptions`, or set `<CalorElideProvenGuards>false</CalorElideProvenGuards>`
+    in an MSBuild project.
+  - **Why now:** this was the re-enable condition registered in 0.13 (roadmap
+    §2.1) and carried into 0.15 (roadmap §4.5). The solver-vs-runtime
+    differential suite (`bench/phase0-agent-native/verifier-runtime-differential.json`,
+    CI-blocking) reports 0 mismatches over the pinned modeled-forms
+    denominator, with elision coverage published at 40/65 forms.
+  - The default is the same on every surface — CLI, `CompilationOptions`
+    (used by the SDK, MCP tools, `review-packet` and `watch`), the MSBuild
+    task and `Sdk.targets` — and a test pins that they agree.
+
 ## [0.14.3] - 2026-08-24
 
 ### Benchmark Results (Statistical: 30 runs)

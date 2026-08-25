@@ -126,7 +126,8 @@ internal static class ReportWriter
         builder.AppendLine();
         builder.AppendLine(
             "Every case is emitted twice. The runtime assembly is compiled from the guard-forced " +
-            "emission (`ElideProvenGuards = false`); the opt-in emission is inspected separately " +
+            "emission (`ElideProvenGuards = false`); the elision-enabled emission " +
+            "(`ElideProvenGuards = true`, the v0.15 default) is inspected separately " +
             "to measure actual postcondition/obligation elision. `proven`/`discharged` must execute " +
             "without a guard failure, `refuted`/`failed` must fire the generated guard, and every " +
             "non-decisive status must retain the guard. The generator also requires the declared " +

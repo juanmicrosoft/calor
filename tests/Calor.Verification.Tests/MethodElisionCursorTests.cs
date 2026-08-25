@@ -193,15 +193,9 @@ public class MethodElisionCursorTests
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
-    [SkippableFact]
-    public void ProvenPostcondition_WithoutOptIn_KeepsGuard()
-    {
-        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-
-        // The v0.13 default (roadmap §2.1): a Proven verdict is diagnostic; the guard
-        // stays unless ElideProvenGuards is set. Same source as the elide test above,
-        // compiled WITHOUT the opt-in.
-        const string source = @"
+    // Same Proven source for both default/opt-out pins below: a genuine ∀-proof
+    // (x in [0, 46340] ⇒ x*x >= 0), not vacuous.
+    private const string ProvenSquareSource = @"
 §M{m001:Test}
   §CL{c001:Calc:pub}
     §MT{mt001:Square:pub}
@@ -212,7 +206,15 @@ public class MethodElisionCursorTests
       §S (>= result 0)
       §R (* x x)";
 
-        var result = Program.Compile(source, "test.calr", new CompilationOptions
+    [SkippableFact]
+    public void ProvenPostcondition_Default_ElidesGuard()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The v0.15 default (roadmap §4.5, re-enable condition met: differential at
+        // 0 mismatches, coverage 40/65): a clean Proven verdict drops its guard
+        // WITHOUT any opt-in. ElideProvenGuards is deliberately not set here.
+        var result = Program.Compile(ProvenSquareSource, "test.calr", new CompilationOptions
         {
             VerifyContracts = true,
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -222,12 +224,39 @@ public class MethodElisionCursorTests
         });
 
         Assert.False(result.HasErrors);
-        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
-        Assert.Contains("ContractViolationException", result.GeneratedCode);
+        Assert.Contains("// PROVEN: Postcondition", result.GeneratedCode);
+        // Only the postcondition guard (ContractKind.Ensures) goes; the two §Q
+        // precondition guards stay by design, so the exception type is still present.
+        Assert.DoesNotContain("ContractKind.Ensures", result.GeneratedCode);
+        Assert.Contains("ContractKind.Requires", result.GeneratedCode);
         // The verdict must actually be Proven — otherwise this test passes vacuously
         // for a source whose verification degraded to Assumed/Timeout. The message must
-        // also say the check was KEPT: the verbose diagnostic used to claim "elided"
-        // unconditionally, which is false without the opt-in.
+        // also say the check was ELIDED, matching the emitted code.
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.PostconditionProven && d.Message.Contains("elided"));
+    }
+
+    [SkippableFact]
+    public void ProvenPostcondition_WithOptOut_KeepsGuard()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The opt-out (CLI --keep-proven-guards / ElideProvenGuards = false): the
+        // verdict is diagnostic and the guard stays.
+        var result = Program.Compile(ProvenSquareSource, "test.calr", new CompilationOptions
+        {
+            VerifyContracts = true,
+            ElideProvenGuards = false,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+            Verbose = true,
+            StatusWriter = TextWriter.Null
+        });
+
+        Assert.False(result.HasErrors);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
+        // The message must say the check was KEPT: claiming "elided" when the guard
+        // stays would misreport the emitted code.
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.PostconditionProven && d.Message.Contains("kept"));
     }
