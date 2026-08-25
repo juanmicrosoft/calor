@@ -445,9 +445,10 @@ All grammar below is stated against the existing production it extends.
 | 4 | Parameter, tag form | `§I{Func<i32,i32>:f} §E{…}` | one `if (Check(TokenKind.Effects))` after `ParseParameter()` returns, at each `§I` dispatch arm (`Parser.cs:1369-1372` and its four siblings) |
 | 5 | Parameter, inline form | `(Func<i32,i32>:f §E{…}, i32:v) -> i32` | one `if (Check(TokenKind.Effects))` in `TryParseInlineSignature`, after the modifier slot (`Parser.cs:13567`) and before the `= default` check (`:13576`) |
 | 6 | Return / binding | `§O{Func<i32>} §E{…}` · `-> Func<i32> §E{…}` · `§B{f:Func<i32,i32>} §E{…} <init>` | one check after `ParseOutput()` (`Parser.cs:1373-1376`), one after the arrow's `ReadInlineTypeToken` (`:13620`), one after the binding's attribute group |
+| 7 | Field | `§FLD{Action<i32>:onChange:pri} §E{…}` | one check in `ParseClassField` at `Parser.cs:8709`, **before** the optional-default-value branch (`:8709-8719`), which is guarded by `Check(TokenKind.Equals) \|\| IsExpressionStart()` and therefore cannot swallow a `§E` |
 
-**Row storage.** `EffectsNode? Row` becomes a field on `ParameterNode`, `OutputNode`, and
-`BindingNode` — three existing classes. `LambdaExpressionNode.Effects`
+**Row storage.** `EffectsNode? Row` becomes a field on `ParameterNode`, `OutputNode`,
+`BindingNode`, and `ClassFieldNode` — four existing classes. `LambdaExpressionNode.Effects`
 (`Ast/LambdaNodes.cs:41`) and `DelegateDefinitionNode`'s effects field already exist. **Zero
 new AST node types, therefore zero of the 184 `IAstVisitor` methods and zero of the five
 implementers change** (§9).
@@ -486,7 +487,7 @@ reason.
 |---|---|---|
 | Function / method / delegate **declaration** | **Pure** (`EffectSet.Empty`) | Unchanged from today (`EffectEnforcementPass.cs:473-478`). 496 of the 886 committed `.calr` files contain a `§E{`; the other 390 rely on this default. Changing it breaks the corpus and gate 5. |
 | **Lambda literal** | **Inferred from the body** | The body is present and already walked (`InferFromLambda`, `:2942-2954`). Inference is sound and needs no annotation. Defaulting to pure would be *unsound* (today's `InferFromLambda` charges the body precisely because it must); defaulting to Unknown would be gratuitously lossy. |
-| Function-typed **parameter, binding, or return** | **Unknown** | There is no body to infer from and no declaration to trust. Defaulting to pure would silently re-open the laundering hole PR #968 closed. This is a *new* syntactic position, so nothing in the corpus regresses: the 886-file corpus contains 4 occurrences of `Func<`/`Action<` in `.calr` in total. |
+| Function-typed **parameter, binding, return, or field** | **Unknown** | There is no body to infer from and no declaration to trust. Defaulting to pure would silently re-open the laundering hole PR #968 closed. This is a *new* syntactic position, so nothing in the corpus regresses: the 886-file corpus contains 4 occurrences of `Func<`/`Action<` in `.calr` in total. |
 
 The asymmetry is defensible precisely because the three rows are three different epistemic
 situations: *a promise the author made*, *a fact the compiler can compute*, and *a fact nobody
@@ -1354,3 +1355,633 @@ inferred row, the verdict between them, and the assumption reasons if the row is
 must add the arm or the golden cannot land — the roadmap's own forcing function (§4.4 gate 7).
 Effect-change blast radius reuses `impact`'s transitive-caller closure
 (`ProjectIndex.cs:372-408`) unchanged.
+
+---
+
+## 9. Priced blast radius
+
+Roadmap §4.1 term 3. Every number is measured at `82338e37` with the command that produced it
+named, so a reviewer can re-run it.
+
+### 9.1 The `IAstVisitor` surface — **0 files, by construction**
+
+```
+grep -c "^    void Visit" src/Calor.Compiler/Ast/AstNode.cs   → 184
+grep -c "^    T Visit"    src/Calor.Compiler/Ast/AstNode.cs   → 184
+```
+
+Two interfaces — `IAstVisitor` (`Ast/AstNode.cs:59`) and `IAstVisitor<T>` (`:247`) — of **184
+methods each, 368 total**. (CLAUDE.md's "~236 methods each" is stale; §14 records it.)
+
+Implementers, from `grep -rn "IAstVisitor" src/ --include="*.cs"`, five outside the interface
+file itself:
+
+| File | Interface |
+|---|---|
+| `src/Calor.Compiler/Ids/IdScanner.cs:9` | `IAstVisitor` |
+| `src/Calor.Compiler/CodeGen/CSharpEmitter.cs:88` | `IAstVisitor<string>` |
+| `src/Calor.Compiler/Migration/CalorEmitter.cs:12` | `IAstVisitor<string>` |
+| `src/Calor.Compiler/Verification/ExpressionSimplifier.cs:13` | `IAstVisitor<ExpressionNode>` |
+| `src/Calor.LanguageServer/Utilities/AstPositionVisitor.cs:10` | `IAstVisitor<T>` (abstract base) |
+
+**Rows introduce no AST node type**, so no `Visit` method is added and none of the five
+implementers is *forced* to change. This is the reason §3 chose `§E{…}`-as-suffix over a new
+`!{…}` node: the counterfactual price of a new node kind is **2 interface files + 5
+implementers = 7 files minimum, ×2 methods each**, plus the CLAUDE.md seven-step checklist
+(lexer token kind, `IsKeyword` range, keyword dictionary, `ParsePrimaryExpression`,
+`IsExpressionStart`, `RoslynSyntaxVisitor`, `FeatureSupport`).
+
+What *does* change: `EffectsNode? Row` is added to four existing classes — `ParameterNode`,
+`OutputNode`, `BindingNode`, `ClassFieldNode` — and **one implementer must be updated for
+round-trip fidelity**:
+`Migration/CalorEmitter.cs` must emit the row after the type it annotates, or `calor fmt` and
+the round-trip harness lose it. `CSharpEmitter` needs no change (rows are erased at codegen —
+§7.4 criterion 2). `IdScanner` needs none (rows carry no id). `ExpressionSimplifier` needs none
+(rows are not expressions). `AstPositionVisitor` needs none unless hover is wired (SHOULD).
+
+**Bucket total: 5 source files** (4 AST node classes + `CalorEmitter.cs`), plus the parser
+(`Parsing/Parser.cs`) and the effect pass (`Effects/*.cs`), which are the feature itself rather
+than blast radius.
+
+### 9.2 `EffectSummary` cache format bump — **1 file + its tests**
+
+`BuildStateCache.CurrentFormatVersion` moves `"3.0"` → `"4.0"`
+(`src/Calor.Compiler/Incremental/BuildStateCache.cs:121`) because
+`BuildFileEntry.EffectSummary`'s shape changes (§8.5). Global invalidation on mismatch already
+exists (`:676-678`) and is the intended mechanism; the user-visible effect is one cold rebuild
+on first 0.15 build. `CurrentCompilerSemanticsVersion` (`:122`) and
+`CurrentOptionsSerializerVersion` (`:123`) do **not** change.
+
+`EffectSummaryBuilder.cs`'s name keys (`:68`, `:75`) are deleted, which is E5's structural pin
+(roadmap §4.2).
+
+### 9.3 Golden files under `tests/TestData` — **~4 `.calr`, 0 `.cs`**
+
+```
+find tests/TestData -name "*.calr" | wc -l                       → 359
+grep -rl "§E{" tests/TestData --include="*.calr" | wc -l          → 106
+find tests/TestData -name "*.cs" | wc -l                          → 391
+git ls-files "*.calr" | xargs grep -ho "Func<\|Action<\|Action}" | wc -l   → 4
+```
+
+Of 359 `.calr` goldens, 106 contain a `§E{`. **But a golden only changes if it contains a
+function-typed position**, and the entire 886-file committed corpus contains **4** occurrences
+of `Func<` / `Action<` / bare `Action`. The realistic churn is those 4 sites plus the 3 D-A
+sites from §1 (which overlap). Call it **≤ 8 `.calr` goldens**, and every one of them changes
+because a diagnostic moves (0418→nothing, or 0419→0425), not because the source text needs
+editing.
+
+The 391 `.cs` goldens change **zero times**, because rows are erased at codegen — and that is
+not an assumption, it is §7.4's spike criterion 2, which fails the ramp if it is false.
+
+Sub-buckets inside `tests/TestData`: `EditScripts/` (8 entries — ES-08, the effect-row script,
+is *added* before E2 merges per gate 3), `QueryCorpus/` (2 entries — extended with effects
+ground truth for gate 7), `Benchmarks/` (226 `.calr`, 17 with `§E{`; the compilation pin is
+`BulkBenchmarkCompilationTests.cs:171`, `entries.Count >= 200`).
+
+### 9.4 Conversion snapshots — **0 snapshot texts, 2 diagnostic expectations**
+
+```
+ls tests/Calor.Conversion.Tests/Snapshots/*.calr | wc -l   → 57
+grep -rl "§E{" tests/Calor.Conversion.Tests/Snapshots | wc -l → 7
+```
+
+> **Sub-decision: the C#→Calor converter emits no rows in 0.15.** A delegate-typed C# parameter
+> converts to a Calor parameter with **no** `§E`, i.e. an Unknown row. Rationale: emitting rows
+> would require Roslyn-side effect inference over the whole 3121-site D-B surface — a
+> campaign roadmap §3.4 explicitly declines ("no broad campaign"). Consequence: **all 57
+> snapshot texts are byte-stable.**
+
+Two snapshots change their *diagnostics*: `Snapshots/05-02.approved.calr` and
+`Snapshots/05-03.approved.calr` (the two D-A `calor0419FunctionTyped` sites) move from
+Calor0419 to Calor0425. Those are assertions in the test project, not snapshot bytes.
+
+### 9.5 `DisplayString` consumers — **0 files**
+
+By decision §8.3. The consumers that would otherwise be in scope, counted by
+`grep -rn "DisplayString" src/ --include="*.cs" | cut -d: -f1 | sort | uniq -c`:
+
+| File | Sites |
+|---|---|
+| `Analysis/BugPatterns/TypedBugPatternAnalysis.cs` | 34 |
+| `Binding/Binder.cs` | 27 |
+| `Binding/BoundTypes/BoundType.cs` | 19 |
+| `Binding/BoundNodes.cs` | 19 |
+| `Binding/Metadata/MetadataBinder.cs` | 9 |
+| `Migration/RoslynSyntaxVisitor.cs` | 6 |
+| `Analysis/Security/TaintAnalysis.cs` | 4 |
+| `LanguageServer/State/WorkspaceState.cs` | 3 (`:1137`, `:1377`, `:2542`) |
+| `Effects/EffectEnforcementPass.cs` | 3 |
+| `LanguageServer/Utilities/SymbolFinder.cs` | 2 (`:173`, `:246`) |
+| `Binding/Metadata/MetadataContext.cs`, `Effects/EffectSet.cs`, `Analysis/CallGraphAnalysis.cs` | 2 each |
+| `Commands/EffectsCommand.cs` | 1 |
+
+plus **24 test files** (`grep -rn "DisplayString" tests/ --include="*.cs" -l | wc -l`). All
+untouched. Adding `RowDisplayString` is additive.
+
+### 9.6 Round-trip harness — **0 expectation changes, 1 risk**
+
+`ProjectConfigs.KnownProjects` is five subjects — `Synthetic`, `Synthetic2`, `MediatR`,
+`Serilog`, `FluentValidation` (`tools/Calor.RoundTrip.Harness/ProjectConfigs.cs:37`). Because
+the converter emits no rows (§9.4), the harness's converted Calor is byte-stable and its
+emitted C# is unchanged.
+
+**The risk**: converted Calor now carries Unknown rows on 3121 D-B-shaped positions, so
+Calor0425 fires on a large fraction of them. Whether that reaches the harness depends on
+severity: Calor0425 is a Warning by default and the three OSS configs already build with
+`-p:TreatWarningsAsErrors=false` (`ProjectConfigs.cs:114`, `:144`, `:170`) — but that property
+governs the *Roslyn* build of the emitted C#, not Calor's own diagnostics. **The E2 PR must
+measure the Calor0425 count per subject and state whether the harness gate needs a
+tolerance.** That measurement is not available at draft time and is listed in §14.
+
+### 9.7 LSP — **1 file, SHOULD**
+
+`src/Calor.LanguageServer/Handlers/HoverHandler.cs` showing `RowDisplayString` on a
+function-typed symbol. Not a MUST; `DisplayString` is untouched (§8.3) so nothing breaks
+without it.
+
+### 9.8 Docs and website
+
+```
+grep -rl "§E{" docs/ | grep -v "^docs/plans/" | wc -l   → 31
+grep -rl "§E" website/src website/content | wc -l        → 41
+grep -rl "§E" editors/ | wc -l                           → 0
+```
+
+- **MUST:** `docs/syntax-reference/effects.md` (333 lines; the `§E` syntax section at `:36-51`
+  and the effect-code table need the row positions and the family/narrow closure of §4.1),
+  `docs/syntax-reference/structure-tags.md` (999 lines; the `§F` grammar at `:170-173`, the
+  `§LAM` and `§DEL` entries).
+- **SHOULD:** `docs/effects-and-contracts-enforcement.md`,
+  `docs/philosophy/effects-contracts-enforcement.md`, and the release notes.
+- **Website:** 41 files mention `§E`; realistically the effects page and the landing-page
+  example. The 0.15 website pass is its own PR and is not priced here beyond the count.
+- **Editors:** zero — the VSCode grammar does not reference `§E` textually.
+- **`calor self-check docs`** is the mechanical guard: `EffectCodes.DocumentedCompactCodes`
+  (`EffectTypes.cs:134-135`) is checked against `effects.md`, so any registry change made by
+  §4.1 must land with its doc row in the same PR.
+
+### 9.9 The benchmark corpus
+
+`tests/TestData/Benchmarks` holds **226** `.calr` files (not 217 — §14), pinned at
+`BulkBenchmarkCompilationTests.cs:171` (`entries.Count >= 200`). 17 contain a `§E{`. Gate 5's
+leg (a) denominator is those 226 plus `samples/` (11 `.calr`) plus every `.calr` a test project
+compiles; leg (b) is the remainder of the 886, gated on a `compile-all-committed-calr` job
+registered before E2 merges.
+
+### 9.10 Summary table
+
+| Bucket | Files changed | Note |
+|---|---|---|
+| `IAstVisitor` interfaces + implementers | **0** forced; **1** (`CalorEmitter.cs`) for round-trip | 368 methods across 2 interfaces, 5 implementers — untouched |
+| AST node classes | **4** (`ParameterNode`, `OutputNode`, `BindingNode`, `ClassFieldNode`) | one `EffectsNode? Row` field each |
+| Parser | **1** (`Parsing/Parser.cs`) | 4 new `if (Check(TokenKind.Effects))` + 1 `!` branch in the type-param list |
+| Lexer / `Token.cs` | **0** | no new token kind |
+| Effects subsystem | **6** (`EffectEnforcementPass`, `EffectSet`, `EffectSubtyping`, `EffectResolver`, `EffectSummary*`, + new `EffectRow.cs`) | the feature itself |
+| Binder | **2** (`BoundTypes/BoundType.cs`, `BoundNodes.cs`) | `FunctionBoundType` rows, lambda type |
+| Build cache | **1** (`Incremental/BuildStateCache.cs`) | format `3.0` → `4.0` |
+| Index / query | **2** (`Indexing/ProjectIndex.cs`, `Commands/QueryCommand.cs`) | E5 facet |
+| Diagnostics | **1** (`Diagnostics/Diagnostic.cs`) | Calor0424, Calor0425 |
+| `.calr` goldens | **≤ 8** | diagnostic moves, not text edits |
+| `.cs` goldens | **0** | rows erased at codegen (spike criterion 2) |
+| Conversion snapshots | **0** texts, **2** diagnostic expectations | converter emits no rows |
+| `DisplayString` consumers | **0** | decision §8.3 |
+| Round-trip harness | **0** expectations | Calor0425 volume unmeasured — §14 |
+| LSP | **1** (SHOULD) | `HoverHandler.cs` |
+| Docs | **2** MUST, ~4 SHOULD, of 31 candidates | `self-check docs` enforces the registry leg |
+| Website | ~2 of 41 candidates | separate PR |
+| Tests | **3** files reference `DelegateInvocation` (`StrictnessBatchTests.cs`, `EffectEnforcementTests.cs`, `HigherOrderDemandLedgerTests.cs`) | §13 |
+
+---
+
+## 10. Worked examples
+
+`calor-direction.md:57` asks for three: intra-module, cross-module, generic effect
+polymorphism. Each shows the binder symbols and diagnostics BEFORE and AFTER, with the
+error-message text at the binding site.
+
+### 10.1 Intra-module — a callback field
+
+```text
+§M{m001:Intra}
+  §CL{c001:Counter:pub}
+    §FLD{Action<i32>:onChange:pri}
+    §MT{mt001:Bump:pub} (i32:n) -> void
+      §E{}
+      §C{onChange} §A n §/C
+```
+
+**BEFORE — binder symbols at `82338e37`.** `onChange` is a `VariableSymbol` whose `TypeName`
+is the string `"Action<i32>"`; its `BoundType` is `NominalBoundType("Action<i32>")` — there is
+no `FunctionBoundType` for it, because nothing constructs one for a field. The effect pass
+never sees a bound symbol at all: `InferFromBareNameTarget` (`EffectEnforcementPass.cs:1452`)
+calls `ResolveLocalValueType("onChange")`, which finds the field by *name* on the owner class
+(`:1738-1741`) and returns the *string* `"Action<i32>"`. `IsFunctionTypeName` (`:1946`) matches
+`Action<`.
+
+**BEFORE — diagnostic:**
+
+```
+Calor0418: Invocation of function-typed value 'onChange' (type 'Action<i32>') is an
+error under effect enforcement: function-typed values carry no effect contract, so
+the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an
+assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+```
+
+**AFTER — source:**
+
+```text
+§M{m001:Intra}
+  §CL{c001:Counter:pub}
+    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §MT{mt001:Bump:pub} (i32:n) -> void
+      §E{cw}
+      §C{onChange} §A n §/C
+```
+
+**AFTER — binder symbols.** `onChange`'s `BoundType` is
+`FunctionBoundType(ParameterTypes: [i32], ParameterRows: [Unknown], ReturnType: void,
+Row: Concrete({cw}))`. `DisplayString` is `"(i32) -> void"` — unchanged shape, per §8.3.
+`RowDisplayString` is `"cw"`.
+
+**AFTER — diagnostics:** none. `Bump` is charged `{cw}` and declares `{cw}`.
+
+**AFTER, with `§E{}` on `Bump`** — the error the author actually wants:
+
+```
+Calor0410: Method 'Counter.Bump' performs effect(s) [cw] not declared in its
+effect set (declared: [pure]). The effect is charged by invoking 'onChange',
+whose effect row is [cw].
+```
+
+The second sentence is new and is the reason rows are worth building: today the compiler can
+say *"you invoked something"*, and after rows it can say *"you invoked something that prints."*
+
+### 10.2 Cross-module — a handler registered in one module, invoked in another
+
+```text
+§M{m001:Registry}
+  §F{f001:Register:pub} (str:name, Func<str,bool>:handler §E{fs:r}) -> void
+    §E{mut}
+    §C{Handlers.Add} §A name §A handler §/C
+```
+
+```text
+§M{m002:Client}
+  §F{f001:ReadsAndLogs:pub} (str:path) -> bool
+    §E{fs:r, cw}
+    §P path
+    §R §C{File.Exists} §A path §/C
+
+  §F{f002:Setup:pub} () -> void
+    §E{mut}
+    §C{Register} §A "reader" §A ReadsAndLogs §/C
+```
+
+**BEFORE.** `Register`'s `handler` parameter is a string type `"Func<str,bool>"`. At the
+`§C{Handlers.Add}` site, `InferFromCallArguments` (`:1259-1288`) sees the bare identifier
+`handler`, `ResolveLocalValueType` returns `"Func<str,bool>"`, `IsFunctionTypeName` accepts it,
+the target `Handlers.Add` is dotted, so it records an assumption (`:1282-1284`):
+
+```
+Calor0419: Effects of 'Register' are ASSUMED, not verified: passes function-typed
+value 'handler' to 'Handlers.Add', which may invoke it with unverifiable effects.
+The declared effect set is accepted as an assumption, not a proof; narrow the
+interop surface or add manifest coverage to restore verification.
+```
+
+At the `§C{Register}` site in `m002`, `ReadsAndLogs` is a *method group*: the
+`FindInternalFunctionByName` branch (`:1272-1278`) charges its declared `{fs:r, cw}` to
+`Setup`, which declares only `{mut}` → **Calor0410 on `Setup`**. The author's recourse today is
+to widen `Setup` to `{mut, fs:r, cw}`, which is honest but attributes the callee's effects to
+the registration, not to the invocation.
+
+Crucially, **nothing checks `ReadsAndLogs` against `handler`'s intent.** `Register` says
+"I take a filesystem reader"; `ReadsAndLogs` also prints; the compiler is silent about the
+mismatch and only notices the total.
+
+**AFTER — binder symbols.** `Register`'s `FunctionSymbol` has type
+`FunctionBoundType([STRING, FunctionBoundType([STRING], BOOL, Row: Concrete({fs:r}))], VOID,
+Row: Concrete({mut}))`. `ReadsAndLogs`'s `FunctionSymbol` has
+`Row: Concrete({fs:r, cw})`. The cross-module registry
+(`Effects/CrossModuleEffectRegistry.cs`) carries the row alongside the declared set.
+
+**AFTER — diagnostic at the binding site (`§6` site 2):**
+
+```
+Calor0424: Argument 'ReadsAndLogs' has effect row [cw, fs:r], which does not fit
+parameter 'handler' of 'Register' (declared row: [fs:r]). Extra effect(s): cw.
+Widen 'handler''s row to §E{cw,fs:r}, or pass a function whose row fits. An effect
+row that does not fit is never waived by --permissive-effects.
+```
+
+And the `§C{Handlers.Add}` site in `m001` moves from Calor0419 to nothing at all, *provided*
+`Handlers.Add` resolves — because `handler`'s row is now concrete and the assumption it
+justified no longer exists. If `Handlers` is unresolved, it is Calor0425 instead, which is the
+same information with an honest cause attached.
+
+### 10.3 Generic effect polymorphism — `Map` over a resolved and an unresolved callee
+
+```text
+§M{m001:Poly}
+  §F{f001:Map:pub}<T, U, !e> ([T]:xs, Func<T,U>:f §E{!e}) -> [U]
+    §E{!e, alloc}
+    §B{~out:[U]} §ARR{U} (len xs)
+    §L{l1:i:0:(len xs):1}
+      §IX{out i} = §C{f} §A §IX{xs i} §/C
+    §R out
+
+  §F{f002:Double:pub} (i32:x) -> i32
+    §E{}
+    §R (* x 2)
+
+  §F{f003:Announce:pub} (i32:x) -> i32
+    §E{cw}
+    §P x
+    §R x
+
+  §F{f004:UsePure:pub} ([i32]:xs) -> [i32]
+    §E{alloc}
+    §R §C{Map} §A xs §A Double §/C
+
+  §F{f005:UseImpure:pub} ([i32]:xs) -> [i32]
+    §E{alloc}
+    §R §C{Map} §A xs §A Announce §/C
+```
+
+**BEFORE.** `Map` does not compile at all: `Calor0418` at `§C{f}`
+(`EffectEnforcementPass.cs:1465`). There is no BEFORE for `f004`/`f005` because the module
+never gets past `f001`.
+
+**AFTER — instantiation, per §7.2.**
+
+- `f004`: `Double`'s row is `Concrete(∅)`; `f`'s declared row is `{!e}`; residue is `∅`, so
+  `e := Concrete(∅)`. `Map`'s instantiated own row is `{alloc}`. `UsePure` declares `{alloc}`.
+  **No diagnostic.**
+- `f005`: `Announce`'s row is `Concrete({cw})`; residue is `{cw}`, so `e := Concrete({cw})`.
+  `Map`'s instantiated row is `{cw, alloc}`. `UseImpure` declares `{alloc}`. **Calor0410:**
+
+```
+Calor0410: Function 'UseImpure' performs effect(s) [cw] not declared in its effect
+set (declared: [alloc]). The effect is charged by instantiating 'Map''s effect
+variable '!e' to [cw] at this call site, from argument 'Announce' (row: [cw]).
+```
+
+That sentence — *"the effect is charged by instantiating `!e` to `[cw]` … from argument
+`Announce`"* — is the payload of Decision 5. It is also the sentence the emitter spike has to
+produce for real before the ramp is not fired.
+
+**AFTER with an unresolved callee.** If `Announce` were replaced by a BCL-returned delegate —
+one of the 34.54% of call sites the resolution ledger says do not resolve — the argument's row
+is `Unknown`, so `e := Unknown`, and the call site reports:
+
+```
+Calor0425: Effect variable '!e' of 'Map' instantiates to Unknown at this call site:
+argument row for 'handler' could not be determined (receiver
+'System.Collections.Generic.IList<T>' has no member named 'Select'). 'UseImpure' is
+charged Unknown effects. Add a .calor-effects.json manifest entry, or compile with
+--permissive-effects to waive this.
+```
+
+The parenthetical reuses the resolution ledger's own unresolved-class strings
+(`metadata-binding-corpus-ledger.json`, `unresolvedByClass`) so the diagnostic and the ledger
+name the same failure the same way.
+
+---
+
+## 11. Async
+
+> **Decision.** Async / `Task`-shaped effects are **deferred past 0.15**, unchanged from
+> roadmap §5.1 — unless the emitter spike finds them cheap, under the definition below.
+
+**Why deferral is coherent today.** `await` is transparent to the effect pass:
+
+```
+EffectEnforcementPass.cs:2538
+  AwaitExpressionNode await_ => InferFromExpression(await_.Awaited),
+```
+
+Awaiting contributes exactly the awaited expression's effects and nothing else. And there is
+**no async effect kind**: `EffectKind` is `Unknown | IO | Mutation | Memory | Exception |
+Nondeterminism` (`Effects/EffectTypes.cs:6-14`), and `EffectCodes.Registry` (`:65-109`) has no
+`async`, `task`, or `await` entry. `BoundLambdaExpression.IsAsync` affects only the display
+string (`Binding/BoundNodes.cs:2178`, the `"ASYNC_"` prefix). So async is not *modelled*
+today, and rows can be added without modelling it: an `async` function's row is the row of its
+body, exactly as its effect set is today.
+
+**What "cheap" would mean, concretely.** The spike may promote async into 0.15 only if all
+three hold: (a) no new `EffectKind` member and no new `EffectCodes.Registry` entry are required
+— i.e. asynchrony is expressible as a *row property* (a flag on `EffectRow`) rather than as an
+effect code, so `EffectSet`'s serialization (`EffectSummary.cs:107-111`,
+`EffectEntry{Kind,Value}`) is untouched; (b) `fits` needs no async-specific case — an async
+function's row fits a sync destination's row exactly when their effect sets do, with the
+asynchrony carried by the `Task<T>` return type the binder already has; and (c) the two spike
+modules' AFTER output is unchanged whether or not the async flag is present, so shipping it is
+additive and not shipping it costs nothing. If any of the three fails, async stays deferred and
+`RequestPreProcessorBehavior`'s `async Task<TResponse>` is spiked as a *sync-shaped* row over a
+`Task`-returning function, which is what §12 assumes.
+
+---
+
+## 12. What the emitter spike must show
+
+Roadmap §4.1 term 1: two modules, named and **frozen here, before the spike runs**. Before/after
+output is committed alongside this doc. The spike runs on a throwaway rows branch and does not
+gate E1.
+
+### 12.1 Module 1 — the dogfood utility
+
+**`tools/calor-allowlist-audit/allowlist-audit.calr`** — verified to exist at `82338e37`:
+127 lines, 7 `§E{` declarations, and a sibling `CalorAllowlistAudit.csproj` so the emitted C#
+actually builds. It is real Calor written for a real job (auditing
+`.calor-csharp-allowlist` against its own prose rules), not a fixture.
+
+It contains **no higher-order code today**, which is the point: it is the *regression* module.
+Its BEFORE and AFTER emitted C# must be byte-identical, proving rows are additive on code that
+does not use them.
+
+### 12.2 Module 2 — the MediatR pipeline behaviour
+
+**`bench/corpus/MediatR/src/MediatR/Pipeline/RequestPreProcessorBehavior.cs`** — verified to
+exist at the pinned MediatR SHA `fb309026775ef953a64fb5339d074426c1ad2c37` (submodule
+initialized to check; 29 lines).
+
+Justification for this file over the alternatives, stated as a choice:
+
+- It is the **minimal complete middleware `next` site**. It contains, in 29 lines, exactly
+  four of the six §6 sites: an interface implementation (`: IPipelineBehavior<TRequest,
+  TResponse>`, `:12`), a delegate-typed *parameter* (`RequestHandlerDelegate<TResponse> next`,
+  `:20`), an *invocation* of that parameter (`await next()`, `:27`), and a `foreach` over an
+  injected collection whose element method is called (`:22-25`). The delegate itself is
+  declared at `bench/corpus/MediatR/src/MediatR/IPipelineBehavior.cs:12`
+  (`public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();`) and the interface
+  contract at `:29`.
+- It is **rank-1-polymorphic by construction**: a pipeline behaviour must be usable over any
+  handler's effects, which is precisely §7.3(c). It is the one place where the exit ramp's
+  criterion 3 (interface vs implementation row) can be observed on real code.
+- It is **29 lines**, so a complete BEFORE/AFTER emitter output is committable and readable by
+  a reviewer who is not holding the whole corpus in their head.
+
+**Not chosen, and why.** `Wrappers/RequestHandlerWrapper.cs` (72 lines) was the roadmap's other
+suggestion. It is richer — a method-group→delegate cast (`:43`), an `Aggregate` fold whose
+lambda closes over `next` (`:44`), and an immediate invocation of the fold's result (`:44`,
+the trailing `()`). But it drags in three things 0.15 defers or excludes: `async` (§11),
+generic *type* variance (`calor-direction.md:57-60`), and a fold whose accumulator is itself a
+function — which is rank-2, not rank-1. Spiking it would test the ramp against features the
+ramp is not about. It is named here as the **stretch subject**: if the spike passes on
+`RequestPreProcessorBehavior`, `RequestHandlerWrapper` is re-attempted and its outcome
+*published* but not gating.
+
+### 12.3 What is committed
+
+Under `docs/design/spikes/effect-rows/`, one directory per module:
+
+1. `before/<name>.calr` — the module as Calor at `82338e37` (for module 2, the converter's
+   output at the pinned SHA).
+2. `before/<name>.g.cs` — the emitted C#, and the compiler's full diagnostic list.
+3. `after/<name>.calr` — the same module with rows.
+4. `after/<name>.g.cs` — the emitted C#, and the full diagnostic list.
+5. `README.md` — the four ramp criteria of §7.4 with a PASS/FAIL verdict per criterion per
+   module, and the diff command a reviewer runs to check criterion 2.
+
+### 12.4 Pass/fail criterion for the ramp
+
+Restated so it is in one place. **Rank-1 polymorphism is validated iff all four of §7.4's
+conditions hold on module 2** (module 1 tests only criterion 2, the regression). Any failure
+fires the ramp: 0.15 ships monomorphic rows, E3 loses site 6, gate 1's denominator drops to
+four classes, effect-variable syntax does not ship, and the release notes say so.
+
+The verdict is read off the committed `README.md`, not argued from it.
+
+---
+
+## 13. Test plan skeleton (E2–E4)
+
+### 13.1 Existing pins that change
+
+| Pin | Today | After | Why |
+|---|---|---|---|
+| `StrictnessBatchTests.cs:29` `DelegateInvocation_FunctionTypedParameter_IsError` | asserts Calor0418 Error | **rewritten** to `..._WithoutRow_IsUnknown`: asserts Calor0425 on the row-less parameter and Calor0410 on `§E{}` | E4 replaces 0418 |
+| `StrictnessBatchTests.cs:47` `DelegateInvocation_LambdaBoundLocal_IsError` | asserts Calor0418 Error | **rewritten** to `..._LambdaBoundLocal_ChargesInferredRow`: asserts no error, and Calor0410 when the enclosing `§E` is narrowed | §5's inferred-row rule |
+| `StrictnessBatchTests.cs:64` `DelegateInvocation_UnderPermissiveEffects_IsWaivedToWarning` | asserts 0418 demoted to Warning | **rewritten** to assert Calor0425 suppressed under `--permissive-effects` **and** a new sibling asserting Calor0424 is *not* suppressed | §4.5's waiver split |
+| `StrictnessBatchTests.cs:749` `M1_ReturnedDelegateInvocation_IsError` | asserts Calor0418 on `GetF()()` | **rewritten** to assert the returned value's row is charged; Calor0425 when the `§O` carries no row | E4 |
+| `EffectEnforcementTests.cs:354` `DelegateInvocation_SingleWordTarget_FailsClosed` | asserts **Calor0411** | **unchanged** — this is the unknown-call chain, not 0418 | the free-name path (`:1483-1500`) is untouched by rows |
+| `EffectEnforcementTests.cs:378` `DelegateInvocation_InStrictMode_IsError` | asserts **Calor0411** under `--strict-effects` | **unchanged** | same |
+| `StrictnessBatchTests.cs:132`/`:176` (Calor0420 error/compiles) | as today | **unchanged** | §6.3 keeps the code |
+| `StrictnessBatchTests.cs:199`/`:221` (Calor0421 error/compiles) | as today | **unchanged** | §6.3 keeps the code |
+| `StrictnessBatchTests.cs:155` (alpha-equivalent generic override) | as today | **unchanged** | variance matching is unaffected |
+| `HigherOrderDemandLedgerTests.cs` | re-executes the D-A/D-B ledger | **extended**, not rewritten: gate 2's release-commit re-execution asserts D-A's 0418 count is 0 on the registered classes | roadmap §4.4 gate 2 |
+| `EffectsSuggestTests.cs:148-157` (`_variableTypeMap` grep) | E1 slice 1 pin | **unchanged** | |
+| `MetadataBinderCorpusMeasurementTests.cs:37-118` (65.46% floor) | exact-equality, two-sided | **unchanged**; a move requires regeneration in the same PR | gate 6 |
+| `BulkBenchmarkCompilationTests.cs:171` (`>= 200`) | as today | **unchanged** | |
+| `EditScriptIdentityTests.cs:217-231` (`RegisteredScriptIdsAreStable`) | 7 ids | **+ ES-08**, the effect-row script, before E2 merges | gate 3 |
+| `QueryGoldenTests.cs:134` (unknown facet throws) | as today | **unchanged**; E5 adds the `effects` arm or the golden cannot land | gate 7 |
+
+Note the two `EffectEnforcementTests` pins are listed **because they look like 0418 pins and
+are not**. Their method names say `DelegateInvocation_` but their assertions are on
+`DiagnosticCode.UnknownExternalCall` (`:374`, `:398`). Rewriting them would be a silent
+loosening of the free-name fail-closed rule.
+
+### 13.2 New pins, per decision
+
+| Decision | New pin | Discriminating revert — what to undo to watch it fail |
+|---|---|---|
+| **D1 (§3) row syntax** | `RowOnParameter_TagAndInlineForms_ParseIdentically` — the `§I{…} §E{…}` and `(T:x §E{…})` spellings produce the same `ParameterNode.Row` | delete the `if (Check(TokenKind.Effects))` in `TryParseInlineSignature` → the inline half parses no row |
+| **D1 (§3.2)** | `EffectsTokenIsNotAnExpressionStart` — asserts `TokenKind.Effects ∉ Parser.RegisteredExpressionStartTokens` (`Parser.cs:67-68` exposes the collection) | add `TokenKind.Effects` to `ExpressionParsers` → a `§B{f:Func<…>} §E{cw} <init>` swallows its row into the initializer |
+| **D1 (§3.4)** | `OmittedRow_OnDeclaration_IsPure_OnParameter_IsUnknown` — one module, both defaults observed | make the parameter default `Concrete(∅)` → the Calor0425 half fails and E-4's laundering re-opens |
+| **D2 (§4.1)** | `FamilyCodeEncompassesNarrowCode` — `§E{db}` admits a `db:r` effect; `§E{fs:rw}` admits `fs:w` (regression) | remove the `database` entry from `EffectSubtyping.Subtypes` → the first half fails |
+| **D2 (§4.4)** | `UnknownRow_FitsNothing_AndIsFittedByNothing` — a table-driven pin over all 9 `fits` cells | re-introduce `EffectSet.IsSubsetOf`'s `if (other.IsUnknown) return true` into `fits` → `fits(Concrete, Unknown)` returns `Fits` and the cell fails |
+| **D2 (§4.5)** | `PermissiveWaivesUnknownNotMismatch` — Calor0425 suppressed, Calor0424 not, in one compilation | route Calor0424 through the policy check → the second assertion fails |
+| **D2 (§4.6)** | `ParameterRowsAreContravariant` — the `RunTwice` example of §4.6, both directions | flip the argument order in the parameter-row conjunct → the fitting case starts failing and the non-fitting one passes |
+| **D3 (§5)** | `LambdaDeclaredRow_NarrowerThanBody_IsError` (E-5) and `LambdaOmittedRow_IsInferred_NoDiagnostic` | restore `InferFromLambda` to ignore `lambda.Effects` → the first fails |
+| **D4 (§6)** | One `_IsError`/`_Compiles` pair per site, the `DelegateInvocation_*` pattern: `RowMismatch_AtAssignment`, `_AtArgument`, `_AtReturn`, `_AtOverride` (0420), `_AtInterfaceImpl` (0421), `_AtGenericInstantiation` (0424; **removed if the ramp fires**) | delete E3's rule for any one site → that site's `_IsError` fails. This *is* gate 1's discriminating pin |
+| **D4 (§6.3)** | `AllThreeMismatchCodesShareOneRelation` — a change to `EffectRow.Fits` must move Calor0424, Calor0420 and Calor0421 together (asserted by driving all three through one fixture family) | give `CheckEffectVariance` its own subset test again → the pin fails when the shared relation changes |
+| **D5 (§7)** | `EffectVariable_InstantiatesFromArgumentRow` (§10.3's `f004`/`f005` pair) and `EffectVariable_InReturnPosition_IsRejected` (rank-1 restriction) | remove the return-position check → the second passes when it should fail. **All D5 pins are deleted if the ramp fires**, together with site 6's pair |
+| **D6 (§8.2)** | `FunctionTypesDifferingOnlyInRow_AreNotEqual` | drop `Row` from `FunctionBoundType.Equals` → fails |
+| **D6 (§8.3)** | `DisplayStringIsRowFree` — `FunctionBoundType.DisplayString` matches `^\(.*\) -> .*$` with no effect code in it | append the row to `DisplayString` → fails, and so do several of the 24 test files in §9.5 |
+| **D6 (§8.5)** | `NoNameKeyedEffectStoreRemains` — a grep pin, the `_variableTypeMap` pattern: no `function.Name` / `"{cls.Name}.{method.Name}"` key construction under `Effects/EffectSummaryBuilder.cs` | re-introduce one name key → fails. This is E5's structural pin from roadmap §4.2 |
+
+### 13.3 The one pin that is not a unit test
+
+Gate 2's instrument is the demand ledger re-executed at the release commit
+(`tests/Calor.Compiler.Tests/Effects/HigherOrderDemandLedgerTests.cs`, on the `compiler`
+shard). Its discriminating pin, per roadmap §4.4: *"re-introduce the 0418 rejection for one
+class and the ledger test fails."* That pin is the only one that observes the *whole corpus*
+rather than a fixture, and it is the one that would catch a rows implementation that removes
+Calor0418 by making everything Unknown instead of by making rows work.
+
+---
+
+## 14. Open questions
+
+Stated as questions, each with the evidence that would settle it. None blocks this draft
+reaching review; each blocks a specific downstream commitment.
+
+1. **How much Calor0425 does 65.46% resolution actually produce?**
+   `metadata-binding-corpus-ledger.json` says 431 of 1248 BCL call sites do not resolve. Every
+   unresolved *function-typed* position becomes an Unknown row and a Calor0425. If that number
+   is in the hundreds per subject, rows are ergonomically worse than Calor0418 for converted
+   code, and `--permissive-effects` becomes mandatory rather than exceptional — which would
+   make §4.5's "less powerful waiver" decision land badly.
+   *Evidence needed:* the E2 PR compiles the three conversion subjects and publishes the
+   Calor0425 count per subject, split by cause (unresolved receiver / row-less parameter /
+   BCL-returned delegate). §9.6 flags the same number as the round-trip harness risk.
+
+2. **Does the interface/implementation row interaction of §7.3(c) have a usable spelling?**
+   The `IPipelineBehavior` example shows an implementation that legitimately does more than
+   its interface (`{!e, cw}` vs `{!e}`) and is correctly rejected by Calor0421. The author's
+   fix is to widen the interface — but the interface is *someone else's* (MediatR's), and a
+   Calor program implementing a foreign interface cannot widen it.
+   *Evidence needed:* the spike's module-2 output. If the only spelling requires editing the
+   interface, then rank-1 rows do not compose with external interfaces and criterion 3 of
+   §7.4 fails, firing the ramp. This is the single most likely ramp trigger.
+
+3. **Is `§E{!e}` distinguishable from a future user-defined effect code beginning with `!`?**
+   `EffectCodes.Registry` has no `!`-prefixed code today and `ParseValue` does not consume `!`
+   (`Parser.cs:5737-...` handles `~`, `#`, `?`, `[`), so the sigil is free. But if user-defined
+   effect codes ever ship, `!` is claimed.
+   *Evidence needed:* a decision on user-defined effect codes, which is not in scope for 0.15.
+   Recorded so the sigil choice is not silently load-bearing.
+
+4. *(Closed during drafting, kept for the record.)* **Does the `§FLD` tag accept a trailing
+   `§E`?** §10.1 writes `§FLD{Action<i32>:onChange:pri} §E{cw}`. Verified: `ParseClassField`
+   (`Parser.cs:8689-8733`) parses attributes, then C# attributes, then an *optional default
+   value* guarded by `Check(TokenKind.Equals)` or `IsExpressionStart()` (`:8709-8719`). Since
+   `TokenKind.Effects` is not an expression start (§3.2), a trailing `§E{…}` is not swallowed
+   by the default-value branch, and a row check inserted at `:8709` — before that branch — is
+   unambiguous. `§FLD` is position 7 in §3.2's table. **Not an open question.**
+
+5. **What is the Calor0425 severity default for a row-less parameter in a file that never
+   invokes it?** §3.4 makes an omitted row Unknown, and §6 reports Calor0425 at the parameter
+   span (E-4). A converted file with 236 delegate-typed declarations (FluentValidation's count)
+   would emit 236 warnings even if none is invoked. Reporting at the *invocation* instead
+   would be quieter but would lose the "declare your intent" pressure.
+   *Evidence needed:* the same E2 measurement as question 1, split by "declared but never
+   invoked" vs "invoked". This draft chooses the parameter span; the measurement may move it.
+
+### 14.1 Corrections to governing inputs
+
+Recorded because §0's discipline says the source wins.
+
+| Claim | Where | Source says |
+|---|---|---|
+| "`IAstVisitor` … ~236 methods each" | `CLAUDE.md`, and roadmap §4.1 term 3 | **184** each (`Ast/AstNode.cs:59`, `:247`) |
+| "the existing colon-hierarchy (`fs:w ⊂ fs`)" | roadmap §4 shorthand | There is **no `fs` code** (`EffectTypes.cs:71-73`), and family codes do **not** encompass narrow ones (`EffectSubtyping.cs:14-43`). §4.1 closes the second half deliberately; the first half is simply not a thing |
+| "the 217-program benchmark corpus" | working shorthand | **226** `.calr` under `tests/TestData/Benchmarks`; the pin asserts `>= 200` (`BulkBenchmarkCompilationTests.cs:171`) |
+| "`EffectSet.Unknown` sentinel `:101,:200`" | roadmap §4.0 | `:20` declares it, `:200-203` constructs it, `:101` is the *not-a-subset* rule. All three are real; the pair cited is incomplete |
+| "`ParseLambdaExpression :11299`" | working note | `:11330`; `:11299` is inside `ParseYieldReturnStatement`'s doc comment |
+
+---
+
+## 15. Review record
+
+Empty at Draft v1. Per roadmap §4.1 term 2, this document exits the critique cycle when the
+**evidence** and **internal-consistency** lenses both return APPROVE on a revision, or when
+every declined finding is recorded here with its rationale. The **test lens** ("does a test
+observe every claim?") runs alongside; §13 is written to be its target.
+
+| Round | Date | Lens | Verdict | Findings applied / declined |
+|---|---|---|---|---|
+| — | — | evidence | pending | — |
+| — | — | internal consistency | pending | — |
+| — | — | test | pending | — |
