@@ -33,17 +33,105 @@ public static class SemanticsVersion
     /// <summary>
     /// Checks if a declared semantics version is compatible with this compiler.
     /// </summary>
+    /// <remarks>
+    /// Major must match exactly. A declared major <em>newer</em> than
+    /// <see cref="Major"/> means this compiler is too old for the file; a declared
+    /// major <em>older</em> than <see cref="Major"/> (e.g. <c>§SEMVER{1.0.0}</c> on
+    /// the 2.x compiler) means the file was written against retired semantics and
+    /// must be migrated — it is refused rather than silently reinterpreted
+    /// (roadmap §3.3 decision 1, fail-closed; tracked in #1084 item 1). Same major
+    /// with a higher declared minor is <see cref="VersionCompatibility.PossiblyIncompatible"/>.
+    /// </remarks>
     /// <param name="declared">The version declared by a module.</param>
     /// <returns>The compatibility status.</returns>
     public static VersionCompatibility CheckCompatibility(Version declared)
     {
-        if (declared.Major > Major)
+        if (declared.Major != Major)
             return VersionCompatibility.Incompatible;
 
-        if (declared.Major == Major && declared.Minor > Minor)
+        if (declared.Minor > Minor)
             return VersionCompatibility.PossiblyIncompatible;
 
         return VersionCompatibility.Compatible;
+    }
+
+    /// <summary>
+    /// Migration pointer appended to the Calor0701 message when a module declares a
+    /// major older than <see cref="Major"/>. Kept as a constant so tests and docs can
+    /// pin the exact wording.
+    /// </summary>
+    public const string LegacyMajorMigrationHint =
+        "Files written for an older major (1.x, 0.x) are not silently reinterpreted; migrate the module and "
+        + "declare §SEMVER{2.0.0} after reviewing nullability semantics (Calor0272/0273/0274). "
+        + "See https://github.com/juanmicrosoft/calor/issues/1084.";
+
+    /// <summary>
+    /// Validates a module's <c>§SEMVER{...}</c> directive against this compiler and
+    /// reports the outcome: Calor0702 (Error) when the text is not a
+    /// <c>MAJOR.MINOR.PATCH</c> version, Calor0701 (Error) when the major does not
+    /// match <see cref="Major"/> — with <see cref="LegacyMajorMigrationHint"/> when the
+    /// declared major is older — and Calor0700 (Warning) when the declared minor is
+    /// ahead of <see cref="Minor"/>. Called by the parser so every consumer of the
+    /// parse (compile, LSP, self-check, MCP) sees the same verdict.
+    /// </summary>
+    /// <param name="diagnostics">The bag to report into.</param>
+    /// <param name="span">The directive's span.</param>
+    /// <param name="versionText">The raw text inside the braces. It must be exactly
+    /// <c>MAJOR.MINOR.PATCH</c> — three runs of ASCII digits separated by dots, with
+    /// no sign, whitespace, or extra components; the text is deliberately not trimmed
+    /// (<c>§SEMVER{ 2.0.0 }</c> is malformed) so the accepted form has one spelling.</param>
+    /// <returns><c>true</c> when the text parsed as a version (even if it was then
+    /// refused), <c>false</c> when it was malformed.</returns>
+    public static bool ReportDeclaredVersion(DiagnosticBag diagnostics, Parsing.TextSpan span, string? versionText)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        // Gate on the exact shape BEFORE Version.TryParse: TryParse tolerates a
+        // leading sign and surrounding whitespace per component ("+2.0.0",
+        // "2 . 0 . 0"), which must not be accepted as a declaration.
+        if (versionText == null
+            || !IsExactMajorMinorPatch(versionText)
+            || !Version.TryParse(versionText, out var declared))
+        {
+            diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionInvalidDeclaration,
+                $"Invalid §SEMVER declaration '{versionText ?? ""}': expected §SEMVER{{MAJOR.MINOR.PATCH}}, "
+                + $"e.g. §SEMVER{{{VersionString}}}.");
+            return false;
+        }
+
+        switch (CheckCompatibility(declared))
+        {
+            case VersionCompatibility.Incompatible when declared.Major < Major:
+                diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionIncompatible,
+                    $"Module declares semantics version {versionText}, but this compiler implements "
+                    + $"{VersionString} and refuses files written for an older major. "
+                    + LegacyMajorMigrationHint);
+                break;
+            case VersionCompatibility.Incompatible:
+                diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionIncompatible,
+                    $"Module requires semantics version {versionText}, but this compiler only supports "
+                    + $"{VersionString}. Upgrade the compiler or lower the declared version.");
+                break;
+            case VersionCompatibility.PossiblyIncompatible:
+                diagnostics.ReportWarning(span, DiagnosticCode.SemanticsVersionMismatch,
+                    $"Module targets semantics version {versionText}, but this compiler supports "
+                    + $"{VersionString}; the module may rely on semantics this compiler does not implement.");
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> is exactly <c>digits.digits.digits</c>
+    /// (ASCII digits only; no sign, whitespace, or extra components).
+    /// </summary>
+    public static bool IsExactMajorMinorPatch(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var parts = text.Split('.');
+        return parts.Length == 3
+            && parts.All(part => part.Length > 0 && part.All(char.IsAsciiDigit));
     }
 
     /// <summary>
@@ -116,7 +204,8 @@ public enum VersionCompatibility
     PossiblyIncompatible,
 
     /// <summary>
-    /// The declared version is incompatible with this compiler.
+    /// The declared version is incompatible with this compiler: its major differs
+    /// from <see cref="SemanticsVersion.Major"/> in either direction.
     /// Emits diagnostic Calor0701 (Error).
     /// </summary>
     Incompatible

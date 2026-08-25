@@ -592,7 +592,11 @@ public class HookCommandTests : IDisposable
 
         Assert.NotNull(blockReason);
         Assert.Contains("overflow", blockReason, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("§SEMVER", blockReason);
+        // Brace form at the current major — the bracket form §SEMVER[1.0.0] the hook
+        // used to recommend is refused by the lexer (Calor0702) since #1087.
+        Assert.Contains($"§SEMVER{{{SemanticsVersion.VersionString}}}", blockReason);
+        Assert.Contains("§SEMVER{2.0.0}", blockReason);
+        Assert.DoesNotContain("§SEMVER[", blockReason);
     }
 
     [Fact]

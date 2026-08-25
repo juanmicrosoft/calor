@@ -459,10 +459,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Opt-in to deleting runtime guards on Proven/Discharged verdicts (roadmap v0.13
-    /// §2.1). Default false: verification verdicts are diagnostic; every guard stays.
+    /// Delete runtime guards on clean Proven/Discharged verdicts. Default true since
+    /// v0.15 (roadmap §4.5; the differential gate is at 0 mismatches). Set false to
+    /// keep every guard and treat verdicts as diagnostic only.
     /// </summary>
-    public bool ElideProvenGuards { get; set; }
+    public bool ElideProvenGuards { get; set; } = true;
 
     private bool ShouldEmitObligationGuard(
         Verification.Obligations.ObligationKind kind,
@@ -4537,9 +4538,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var verificationResult = GetPostconditionVerificationResult();
         _currentPostconditionIndex++;
 
-        // Proven postconditions elide the runtime check ONLY when the caller opted in
-        // (roadmap v0.13 §2.1: elision is opt-in; verification is diagnostic by
-        // default). A Proven verdict is a genuine ∀-proof (UNSAT on negation); a
+        // Proven postconditions elide the runtime check unless the caller opted out
+        // (ElideProvenGuards = false; default on since v0.15, roadmap §4.5).
+        // A Proven verdict is a genuine ∀-proof (UNSAT on negation); a
         // VACUOUS proof never qualifies (guarantees plan D-G1.3): it holds only
         // because the precondition set is unsatisfiable, so the check is kept.
         if (ElideProvenGuards
@@ -9152,9 +9153,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 var requiresGuard = Verification.Obligations.ObligationPolicy.RequiresGuard(action);
                 switch (matching.Status)
                 {
-                    // Elision is opt-in (roadmap v0.13 §2.1): a Discharged obligation
-                    // drops its guard only when the caller asked for it; otherwise the
-                    // verdict is diagnostic and the check stays.
+                    // Elision is the default (v0.15, roadmap §4.5): a Discharged
+                    // obligation drops its guard unless the caller opted out, in which
+                    // case the verdict is diagnostic and the check stays.
                     case Verification.Obligations.ObligationStatus.Discharged
                         when ElideProvenGuards && !requiresGuard:
                         AppendLine($"// PROVEN: proof obligation [{node.Id}{desc}]");

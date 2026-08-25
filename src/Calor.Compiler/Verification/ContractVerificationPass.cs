@@ -217,12 +217,12 @@ public sealed class ContractVerificationPass
                 }
                 else if (!isPrecondition && _options.Verbose)
                 {
-                    // v0.13: elision is opt-in, so the message must state what actually
-                    // happens to the check — claiming "elided" when the guard stays
+                    // The message must state what actually happens to the check —
+                    // claiming "elided" when the guard stays (--keep-proven-guards)
                     // would misreport the emitted code.
                     var checkDisposition = _options.ElideProvenGuards
                         ? "Runtime check elided."
-                        : "Runtime check kept (elision opt-in not set).";
+                        : "Runtime check kept (--keep-proven-guards).";
                     _diagnostics.ReportVerification(
                         span,
                         DiagnosticCode.PostconditionProven,

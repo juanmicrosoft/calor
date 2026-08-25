@@ -228,4 +228,49 @@ public class ParserTests
         Assert.NotNull(arg);
         Assert.Equal("Hello from Calor!", arg.Value);
     }
+
+    /// <summary>
+    /// §SEMVER{MAJOR.MINOR.PATCH} is a module-level directive: the lexer captures the
+    /// version text verbatim and the parser stores it on the module (#1084 item 1).
+    /// </summary>
+    [Fact]
+    public void Parse_SemverDirective_PopulatesDeclaredSemanticsVersion()
+    {
+        var source = $$"""
+            §M{m001:Test}
+              §SEMVER{{{SemanticsVersion.VersionString}}}
+              §F{f001:Main:pub} () -> void
+                §E{}
+                §R
+            """;
+
+        var module = Parse(source, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors.Select(e => e.Message)));
+        Assert.Equal(SemanticsVersion.VersionString, module.DeclaredSemanticsVersion);
+        Assert.Single(module.Functions);
+    }
+
+    /// <summary>Calor→Calor emission preserves the directive, so formatting/round-trip does not drop it.</summary>
+    [Fact]
+    public void CalorEmitter_RoundTrips_SemverDirective()
+    {
+        var source = $$"""
+            §M{m001:Test}
+              §SEMVER{{{SemanticsVersion.VersionString}}}
+              §F{f001:Main:pub} () -> void
+                §E{}
+                §R
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var emitted = new Migration.CalorEmitter().Emit(module);
+        Assert.Contains($"§SEMVER{{{SemanticsVersion.VersionString}}}", emitted);
+
+        var reparsed = Parse(emitted, out var reparseDiagnostics);
+        Assert.False(reparseDiagnostics.HasErrors, string.Join("; ", reparseDiagnostics.Errors.Select(e => e.Message)));
+        Assert.Equal(SemanticsVersion.VersionString, reparsed.DeclaredSemanticsVersion);
+    }
 }

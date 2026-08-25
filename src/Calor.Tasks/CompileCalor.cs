@@ -33,6 +33,7 @@ internal sealed record CompileCalorCacheInputs(
     string Nullable,
     bool TreatWarningsAsErrors,
     bool VerifyContracts,
+    bool ElideProvenGuards,
     bool EnableILAnalysis,
     string ExperimentalFlags,
     string ProjectDirectory,
@@ -60,6 +61,7 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "nullable", Nullable);
         Append(builder, "treatWarningsAsErrors", TreatWarningsAsErrors ? "true" : "false");
         Append(builder, "verifyContracts", VerifyContracts ? "true" : "false");
+        Append(builder, "elideProvenGuards", ElideProvenGuards ? "true" : "false");
         Append(builder, "enableILAnalysis", EnableILAnalysis ? "true" : "false");
         Append(builder, "experimentalFlags", ExperimentalFlags);
         Append(builder, "projectDirectory", ProjectDirectory);
@@ -206,10 +208,13 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool Verify { get; set; }
 
     /// <summary>
-    /// Opt in to deleting runtime contract guards on Proven verdicts (MSBuild property
-    /// <c>CalorElideProvenGuards</c>). v0.13 default: off — verification is diagnostic.
+    /// Delete runtime contract guards on clean Proven verdicts (MSBuild property
+    /// <c>CalorElideProvenGuards</c>). Default true since v0.15, matching
+    /// <c>CompilationOptions.ElideProvenGuards</c>; set
+    /// <c>&lt;CalorElideProvenGuards&gt;false&lt;/CalorElideProvenGuards&gt;</c> to keep
+    /// every guard (verification stays diagnostic). Only matters with <c>CalorVerify</c>.
     /// </summary>
-    public bool ElideProvenGuards { get; set; }
+    public bool ElideProvenGuards { get; set; } = true;
 
     /// <summary>
     /// Semicolon- or comma-separated list of experimental feature flag names to enable.
@@ -256,6 +261,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             Nullable,
             TreatWarningsAsErrors,
             Verify,
+            ElideProvenGuards,
             EnableILAnalysis,
             canonicalExperimentalFlags,
             DescribePath(ProjectDirectory, includeContent: false),

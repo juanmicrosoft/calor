@@ -619,32 +619,56 @@ public sealed class ObligationTests
         Assert.NotEqual(ObligationStatus.Discharged, subtype.Status);
     }
 
-    [Fact]
-    public void CSharpEmit_DischargedObligation_DefaultKeepsGuard()
+    private const string DischargedObligationSource = """
+        §M{m001:Test}
+          §F{f001:Main:pub}
+              §I{i32:x}
+              §O{void}
+              §PROOF{p1:check} (>= x INT:0)
+        """;
+
+    private static ObligationTracker DischargedTracker(ModuleNode module)
     {
-        // v0.13 default: verification is diagnostic. Without the opt-in, a Discharged
-        // obligation keeps its runtime check.
-        var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
         var tracker = new ObligationTracker();
-        var genr = new ObligationGenerator(tracker);
-        genr.Generate(module);
+        new ObligationGenerator(tracker).Generate(module);
         foreach (var obl in tracker.Obligations)
         {
             if (obl.Kind == ObligationKind.ProofObligation)
                 obl.Status = ObligationStatus.Discharged;
         }
 
+        return tracker;
+    }
+
+    [Fact]
+    public void CSharpEmit_DischargedObligation_DefaultElidesGuard()
+    {
+        // v0.15 default (roadmap §4.5): a Discharged obligation drops its runtime
+        // check without any opt-in — the emitter's ElideProvenGuards defaults to true.
+        var module = Parse(DischargedObligationSource, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = DischargedTracker(module);
+
         var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker);
+        var csharp = emitter.Emit(module);
+
+        Assert.DoesNotContain("throw new InvalidOperationException", csharp);
+        Assert.Contains("// PROVEN: proof obligation [p1: check]", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_DischargedObligation_OptOutKeepsGuard()
+    {
+        // Opt-out (--keep-proven-guards / ElideProvenGuards = false): the verdict is
+        // diagnostic and the Discharged obligation keeps its runtime check.
+        var module = Parse(DischargedObligationSource, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+        var tracker = DischargedTracker(module);
+
+        var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker)
+        {
+            ElideProvenGuards = false
+        };
         var csharp = emitter.Emit(module);
 
         Assert.Contains("throw new InvalidOperationException", csharp);

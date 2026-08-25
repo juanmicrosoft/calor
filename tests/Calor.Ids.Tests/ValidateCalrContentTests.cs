@@ -17,7 +17,7 @@ public class ValidateCalrContentTests
         var json = """
             {
                 "file_path": "test.calr",
-                "content": "module Test §SEMVER[1.0.0] { }"
+                "content": "module Test §SEMVER{1.0.0} { }"
             }
             """;
 
@@ -49,7 +49,7 @@ public class ValidateCalrContentTests
         var json = """
             {
                 "file_path": "test.calr",
-                "content": "module Test { } // §SEMVER[1.0.0]"
+                "content": "module Test { } // §SEMVER{1.0.0}"
             }
             """;
 
@@ -66,7 +66,7 @@ public class ValidateCalrContentTests
         var json = """
             {
                 "file_path": "test.calr",
-                "content": "module Test §SEMVER[2.1.3] { }"
+                "content": "module Test §SEMVER{2.1.3} { }"
             }
             """;
 
@@ -94,7 +94,33 @@ public class ValidateCalrContentTests
 
         Assert.Equal(0, exitCode); // Warning, not blocking
         Assert.NotNull(warning);
-        Assert.Contains("§SEMVER", warning);
+        // The reminder must recommend the brace form at the current major, which is
+        // what the lexer accepts (#1087) — not the retired §SEMVER[1.0.0].
+        Assert.Contains($"§SEMVER{{{Calor.Compiler.SemanticsVersion.VersionString}}}", warning);
+        Assert.Contains("§SEMVER{2.0.0}", warning);
+        Assert.DoesNotContain("§SEMVER[", warning);
+    }
+
+    /// <summary>
+    /// The legacy bracket form is no longer a declaration (the lexer rejects it with
+    /// Calor0702), so it does not satisfy the presence check either — the hook keeps
+    /// nudging until the file carries §SEMVER{...}.
+    /// </summary>
+    [Fact]
+    public void CalrFile_WithBracketSemver_StillWarns()
+    {
+        var json = """
+            {
+                "file_path": "test.calr",
+                "content": "module Test §SEMVER[1.0.0] { }"
+            }
+            """;
+
+        var (exitCode, warning) = HookCommand.ValidateCalrContent(json);
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(warning);
+        Assert.Contains("§SEMVER{", warning);
     }
 
     [Fact]
