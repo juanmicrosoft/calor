@@ -277,6 +277,100 @@ public class BoundTypeArchitectureTests
             + "naming what moved:\n  " + string.Join("\n  ", drifted.Take(25)));
     }
 
+    /// <summary>
+    /// v0.15 E1 slice 2b — a lambda's bound type is a
+    /// <see cref="FunctionBoundType"/> (kind 5), not a
+    /// <see cref="NominalBoundType"/> whose name happens to spell a signature,
+    /// AND its <c>DisplayString</c> is byte-identical to the pre-slice
+    /// <c>LAMBDA(...)-&gt;...</c> string.
+    ///
+    /// <para>Both halves matter. The kind is what lets the effect pass and
+    /// <c>ExternalCallCollector</c> answer "is this a function type?"
+    /// structurally. The string has to stay because <c>Binder.cs:1320</c>
+    /// infers an untyped <c>§B</c>'s <c>TypeName</c> from the initializer's
+    /// <c>DisplayString</c>, so a change here would move OTHER expressions'
+    /// display strings — the thing the corpus golden above pins.</para>
+    ///
+    /// <para>Discriminates: drop <c>displayOverride</c> and the string becomes
+    /// <c>(i32) -&gt; INT</c>; revert to <c>NominalBoundType</c> and the kind
+    /// assertion fails.</para>
+    /// </summary>
+    [Theory]
+    [InlineData(
+        "§B{f} §LAM{l1:x:i32} (+ x INT:1)",
+        "LAMBDA(i32)->INT")]
+    [InlineData(
+        "§B{g} §LAM{l2}",
+        "LAMBDA()->VOID")]
+    public void LambdaExpression_BindsToFunctionBoundType_WithUnchangedDisplayString(
+        string bindingLine,
+        string expectedDisplay)
+    {
+        var source = string.Join("\n", [
+            "§M{m1:LambdaTypeProbe}",
+            "  §F{f1:Main:pub} () -> void",
+            "    §E{}",
+            $"    {bindingLine}",
+            "",
+        ]);
+
+        var lambdas = BindAndCollect<BoundLambdaExpression>(source);
+        var lambda = Assert.Single(lambdas);
+
+        var functionType = Assert.IsType<FunctionBoundType>(lambda.Type);
+        Assert.Equal(expectedDisplay, functionType.DisplayString);
+    }
+
+    /// <summary>
+    /// The structural half of the item above, stated as the property the
+    /// consumers depend on: the parameter and return slots carry real
+    /// <see cref="BoundType"/>s, so a consumer never has to parse the display
+    /// string back into a type (the registered anti-pattern on
+    /// <see cref="BoundType"/>).
+    /// </summary>
+    [Fact]
+    public void LambdaFunctionBoundType_CarriesParameterAndReturnTypes()
+    {
+        var source = string.Join("\n", [
+            "§M{m1:LambdaShapeProbe}",
+            "  §F{f1:Main:pub} () -> void",
+            "    §E{}",
+            "    §B{f} §LAM{l1:x:i32:y:str} (+ x INT:1)",
+            "",
+        ]);
+
+        var lambda = Assert.Single(BindAndCollect<BoundLambdaExpression>(source));
+        var functionType = Assert.IsType<FunctionBoundType>(lambda.Type);
+
+        Assert.Equal(
+            "i32, str",
+            string.Join(", ", functionType.ParameterTypes.Select(t => t.DisplayString)));
+        // The expression body's OWN bound type, handed over by the binder — not
+        // a string re-parsed into a type.
+        Assert.Equal("INT", functionType.ReturnType.DisplayString);
+    }
+
+    private static IReadOnlyList<T> BindAndCollect<T>(string source)
+        where T : BoundNode
+    {
+        var lexDiagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, lexDiagnostics).TokenizeAllForParser();
+        var parseDiagnostics = new DiagnosticBag();
+        var module = new Parser(tokens, parseDiagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(module);
+        return Descendants(bound).OfType<T>().ToArray();
+    }
+
+    private static IEnumerable<BoundNode> Descendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+        }
+    }
+
     private static IEnumerable<BoundExpression> EnumerateBoundExpressions(BoundNode node)
     {
         if (node is BoundExpression expr)

@@ -2254,7 +2254,8 @@ public sealed class BoundLambdaExpression : BoundExpression
         bool isStatic,
         BoundExpression? expressionBody,
         IReadOnlyList<BoundStatement>? statementBody,
-        string returnTypeName)
+        string returnTypeName,
+        BoundType? returnType = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -2267,8 +2268,28 @@ public sealed class BoundLambdaExpression : BoundExpression
         ExpressionBody = expressionBody;
         StatementBody = statementBody;
         ReturnTypeName = returnTypeName ?? throw new ArgumentNullException(nameof(returnTypeName));
+        // v0.15 E1 slice 2b — a lambda's type is a FUNCTION type, not a nominal
+        // one whose name happens to spell a signature. Kind 5 is what the
+        // effect pass and ExternalCallCollector test structurally, instead of
+        // sniffing a "LAMBDA(" prefix off a string.
+        //
+        // The DisplayString is deliberately UNCHANGED (see the FunctionBoundType
+        // ctor's displayOverride doc): Binder.cs:1320 infers an untyped §B's
+        // TypeName from the initializer's DisplayString, so this string escapes
+        // into other expressions' types, the verifier cache and the LSP
+        // call-graph key. Rows (E2) decide whether to unify the spelling.
         var signature = string.Join(",", parameters.Select(parameter => parameter.TypeName));
-        Type = new NominalBoundType($"{(isAsync ? "ASYNC_" : "")}LAMBDA({signature})->{returnTypeName}");
+        Type = new FunctionBoundType(
+            System.Collections.Immutable.ImmutableArray.CreateRange(
+                parameters.Select(
+                    parameter => (BoundType)new NominalBoundType(parameter.TypeName))),
+            // The body's own bound type when the binder has one (an expression
+            // lambda); otherwise the string it computed for a statement body or
+            // VOID, wrapped nominally. No parsing of DisplayString back into a
+            // BoundType — the caller hands over the real type or nothing.
+            returnType ?? new NominalBoundType(returnTypeName),
+            displayOverride:
+                $"{(isAsync ? "ASYNC_" : "")}LAMBDA({signature})->{returnTypeName}");
         Children = expressionBody != null ? [expressionBody] : Array.Empty<BoundExpression>();
     }
 }

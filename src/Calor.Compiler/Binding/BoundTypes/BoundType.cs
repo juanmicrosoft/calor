@@ -215,14 +215,31 @@ public sealed class FunctionBoundType : BoundType
     public BoundType ReturnType { get; }
     public override string DisplayString { get; }
 
-    public FunctionBoundType(ImmutableArray<BoundType> parameterTypes, BoundType returnType)
+    /// <param name="displayOverride">v0.15 E1 slice 2b. Lambdas bind to this kind
+    /// now, and their historical <c>LAMBDA(str)-&gt;i32</c> spelling is
+    /// load-bearing: <c>Binder.BindStatement</c> infers an untyped <c>§B</c>'s
+    /// <c>TypeName</c> from the initializer's <see cref="DisplayString"/>
+    /// (<c>Binder.cs:1320</c>), so the lambda's string becomes a
+    /// <see cref="BoundVariableExpression"/>'s type string, the verifier cache
+    /// key, and the LSP call-graph key. Changing it would break
+    /// <c>DisplayString</c> byte-identity for expressions that are not lambdas,
+    /// which is exactly what the corpus golden pins. So the KIND changes and the
+    /// STRING does not; §8.3's canonical <c>(p1, p2) -&gt; ret</c> stays the
+    /// default for every other construction. Note <see cref="Equals"/> compares
+    /// shape only — two function types with the same parameters and return type
+    /// are equal whatever they display as. E2 decides whether to unify the
+    /// spelling when rows land.</param>
+    public FunctionBoundType(
+        ImmutableArray<BoundType> parameterTypes,
+        BoundType returnType,
+        string? displayOverride = null)
     {
         if (returnType is null) throw new ArgumentNullException(nameof(returnType));
         if (parameterTypes.IsDefault) parameterTypes = ImmutableArray<BoundType>.Empty;
         ParameterTypes = parameterTypes;
         ReturnType = returnType;
         var parms = string.Join(", ", parameterTypes.Select(p => p.DisplayString));
-        DisplayString = $"({parms}) -> {returnType.DisplayString}";
+        DisplayString = displayOverride ?? $"({parms}) -> {returnType.DisplayString}";
     }
 
     public override bool Equals(BoundType? other) =>

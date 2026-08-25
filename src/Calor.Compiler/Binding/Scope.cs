@@ -966,17 +966,31 @@ public sealed class TypeSymbol : Symbol
     public string QualifiedName { get; }
     public Visibility Visibility { get; }
 
+    /// <summary>
+    /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is
+    /// how a <see cref="BoundTypes.NominalBoundType"/> gets marked as
+    /// delegate-typed, so consumers can answer "is this a function type?"
+    /// structurally instead of prefix-matching <c>"Func&lt;"</c> on a type name
+    /// (see <c>EffectEnforcementPass.IsFunctionBoundType</c>). Only reachable
+    /// when the nominal type carries its <c>Declaration</c>; a receiver whose
+    /// BoundType was built from a bare type string still falls back to the
+    /// string test.
+    /// </summary>
+    public bool IsDelegate { get; }
+
     public TypeSymbol(
         SymbolId id,
         string name,
         string qualifiedName,
         Visibility visibility,
         TextSpan declarationSpan,
-        TextSpan? definitionSpan = null)
+        TextSpan? definitionSpan = null,
+        bool isDelegate = false)
         : base(id, name, declarationSpan, definitionSpan)
     {
         QualifiedName = qualifiedName ?? throw new ArgumentNullException(nameof(qualifiedName));
         Visibility = visibility;
+        IsDelegate = isDelegate;
     }
 }
 

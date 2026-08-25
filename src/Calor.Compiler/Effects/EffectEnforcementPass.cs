@@ -833,6 +833,35 @@ public sealed class EffectEnforcementPass
     internal static string MapShortTypeNameToFullName(string shortName) =>
         TypeIdentity.MapShortTypeNameToFullName(shortName);
 
+    /// <summary>
+    /// v0.15 E1 slice 2b — "is this a function type?" answered from the BOUND
+    /// TYPE instead of a prefix test on a type name.
+    ///
+    /// <para>Two structural answers, both produced by the binder:
+    /// <see cref="FunctionBoundType"/> (what a <c>§LAM</c> binds to since this
+    /// slice) and a <see cref="NominalBoundType"/> whose
+    /// <see cref="NominalBoundType.Declaration"/> is a <c>§DEL</c> type
+    /// (<c>TypeSymbol.IsDelegate</c>). Neither can be spelled around: an alias,
+    /// a metadata return, or a type parameter that resolves to a function type
+    /// answers true here and answers false to every string test.</para>
+    ///
+    /// <para>It is deliberately NOT a superset of the string tests. Where the
+    /// binder hands over only a type string — a declared <c>Func&lt;i32&gt;</c>
+    /// parameter, whose BoundType is a bare <c>NominalBoundType("Func&lt;i32&gt;")</c>
+    /// with no <c>Declaration</c> — this returns false and the caller's string
+    /// test still decides. That keeps Calor0418's behaviour byte-stable
+    /// (<c>StrictnessBatchTests.cs:29,47,64,749</c>;
+    /// <c>EffectEnforcementTests.cs:354,378</c>) while making the structural
+    /// answer the one that is asked first.</para>
+    /// </summary>
+    // Fully qualified rather than a file-level `using`: adding one shifts every
+    // line in this file, and the effect-rows spike transcripts pin
+    // EffectEnforcementPass.cs:377/:533/:571 by line number (facts.py).
+    internal static bool IsFunctionBoundType(Binding.BoundTypes.BoundType? type) =>
+        type is Binding.BoundTypes.FunctionBoundType
+        || (type is Binding.BoundTypes.NominalBoundType nominal
+            && nominal.Declaration is { IsDelegate: true });
+
     private List<string> FindCallChain(string startFunctionId, EffectKind targetKind, string targetValue)
     {
         // BFS to find shortest path to the effect

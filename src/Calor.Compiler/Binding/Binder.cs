@@ -479,7 +479,10 @@ public sealed class Binder
             qualifiedName,
             visibility,
             declarationSpan,
-            definitionSpan));
+            definitionSpan,
+            // E1 slice 2b: §DEL declarations are function types. Marking the
+            // symbol is what lets a consumer ask the type instead of the string.
+            isDelegate: kind == "delegate"));
     }
 
     private void RegisterClassTree(
@@ -2560,7 +2563,11 @@ public sealed class Binder
             lambda.IsStatic,
             expressionBody,
             statementBody,
-            returnType);
+            returnType,
+            // E1 slice 2b: hand the expression body's real BoundType to the
+            // lambda's FunctionBoundType. A statement body has no single bound
+            // expression, so the node falls back to the string it just computed.
+            expressionBody?.Type);
     }
 
     private BoundExpression BindMatchExpression(MatchExpressionNode match)
