@@ -21,11 +21,12 @@ public enum CallKind
 /// A collected external call with its resolved type, method, and kind.
 ///
 /// <para><see cref="ReceiverResolved"/> is false when the binder could not
-/// vouch for the receiver's type: an <see cref="UnresolvedBoundType"/>, the
-/// binder's <c>OBJECT</c> fallback on an inferred local, a function-typed
-/// value, a member chain (<c>a.b.M</c>, <c>this.f.M</c>) the bound tree does
-/// not type, a receiver that is neither a bound variable nor written as a
-/// type reference (<c>foo.Bar</c>), or a module whose binding threw. In that
+/// vouch for the receiver's type: an <see cref="UnresolvedBoundType"/> (which
+/// since slice 2a is how the binder reports both its inference fallback on an
+/// inferred local and a member chain such as <c>a.b.M</c>), a function-typed
+/// value, a receiver that is neither a bound variable nor written as a
+/// type reference (<c>foo.Bar</c>, <c>this.f.M</c>), or a module whose binding
+/// threw. In that
 /// case <see cref="TypeName"/> is the receiver exactly as written in source —
 /// never a guessed type — and consumers must report the call as unresolved
 /// rather than key a manifest entry on it. v0.15 E1 (roadmap §4.2),
@@ -50,33 +51,43 @@ public sealed record RawCall(string CallerName, string Target, bool IsConstructo
 /// Walks the Calor AST to collect external method invocations.
 /// Covers top-level functions, class methods, and constructors.
 ///
-/// Receiver types come from the bound tree (v0.15 E1 slice 1, metadata-binding
-/// S6). What that means today, stated plainly:
+/// Receiver types come from the bound tree (v0.15 E1, metadata-binding S6).
+/// Since slice 2a there is exactly one step: read
+/// <see cref="BoundCallExpression.Receiver"/> /
+/// <see cref="BoundCallStatement.Receiver"/> and classify its
+/// <see cref="BoundType"/>. Nothing here reconstructs a receiver expression or
+/// reads a symbol's type string; the binder decided, and this file reports what
+/// it decided.
 ///
-///   1. A receiver that is a bound variable resolves from the binder's symbol
-///      type — the <see cref="BoundType"/> a <see cref="BoundVariableExpression"/>
-///      for that variable carries, which in this slice is always a
-///      <see cref="NominalBoundType"/> wrapping <see cref="VariableSymbol.TypeName"/>.
-///      That string is where a type known only through binding or metadata (an
-///      inferred <c>§B</c>, a BCL return type resolved by <c>MetadataBinder</c>)
-///      reaches the effect system. On top of it this slice adds three honesty
-///      guards: the binder's <c>OBJECT</c> fallback on an inferred local, a
-///      member chain through the variable (<c>a.b.M</c>), and a function-typed
-///      value (<c>LAMBDA(...)</c>, <c>Func&lt;…&gt;</c>) are all reported
-///      unresolved instead of being attributed a type. A receiver
-///      <c>BoundExpression</c> on the call nodes, and <c>UnresolvedBoundType</c>
-///      emitted by the binder (scoping §D6), are slice 2.
-///   2. A receiver that is a Calor-declared type used statically resolves to
-///      <see cref="TypeSymbol.QualifiedName"/>.
-///   3. A receiver that is neither, but is written as a type reference (every
-///      dot-separated segment a capitalized identifier: <c>Console</c>,
-///      <c>System.IO.File</c>, <c>OrderRepo</c>) takes the identity the binder
-///      assigned it (<see cref="BoundCallExpression.ResolvedTypeName"/>: the
-///      source text with short BCL names expanded). This keeps
-///      <c>calor effects suggest</c> able to propose manifest entries for
-///      external types metadata does not know. Anything else (<c>foo.Bar</c>,
-///      <c>this.sb.Append</c>, <c>_items.Add</c> with no bound symbol) is
-///      reported unresolved — the source text is never echoed as a type.
+/// <para>What the four receiver shapes give, and what this collector does with
+/// each:</para>
+///
+///   1. A bound local/parameter/field receiver arrives as a
+///      <see cref="BoundVariableExpression"/>. Its <see cref="BoundType"/> is
+///      where a type known only through binding or metadata (an inferred
+///      <c>§B</c>, a BCL return type resolved by <c>MetadataBinder</c>) reaches
+///      the effect system. The binder has already replaced its <c>OBJECT</c>
+///      inference fallback with <see cref="UnresolvedBoundType"/>, so the only
+///      guard left here is the function-typed one (<c>LAMBDA(...)</c>,
+///      <c>Func&lt;…&gt;</c>): invoking a function value is not a nominal
+///      receiver, and its row is E2/E4's business.
+///   2. A member chain (<c>a.b.M</c>) arrives as a
+///      <see cref="BoundFieldAccessExpression"/> typed
+///      <see cref="UnresolvedBoundType"/> — reported unresolved, never
+///      attributed to the head's type.
+///   3. A static type receiver — a Calor-declared type, or one written as a type
+///      reference (every dot-separated segment capitalized: <c>Console</c>,
+///      <c>System.IO.File</c>, <c>OrderRepo</c>) — arrives as a
+///      <see cref="BoundTypeReferenceExpression"/> and takes the binder's name
+///      verbatim. This keeps <c>calor effects suggest</c> able to propose
+///      manifest entries for external types metadata does not know.
+///   4. Anything else (<c>foo.Bar</c>, <c>this.sb.Append</c>, <c>_items.Add</c>
+///      with no bound symbol) arrives as a null <c>Receiver</c> and is reported
+///      unresolved — the source text is never echoed as a type.
+///
+/// An unresolved receiver keeps its source text in <see cref="CollectedCall.TypeName"/>
+/// for the report and sets <see cref="CollectedCall.ReceiverResolved"/> false; it
+/// is never given a guessed type.
 ///
 /// If binding the module throws, every dotted receiver is reported unresolved.
 /// There is no AST-side variable-type map.
@@ -296,22 +307,12 @@ public sealed class ExternalCallCollector
                     case BoundCallStatement statement when HasReceiver(statement.Target):
                         _boundReceiverTypes[
                             (statement.Span.Start, statement.Span.End, statement.Target)] =
-                            ResolveBoundReceiver(
-                                statement.Span,
-                                statement.Target,
-                                statement.ReceiverSymbol,
-                                statement.ReceiverTypeSymbol,
-                                statement.ResolvedTypeName);
+                            ResolveBoundReceiver(statement.Receiver);
                         break;
                     case BoundCallExpression expression when HasReceiver(expression.Target):
                         _boundReceiverTypes[
                             (expression.Span.Start, expression.Span.End, expression.Target)] =
-                            ResolveBoundReceiver(
-                                expression.Span,
-                                expression.Target,
-                                expression.ReceiverSymbol,
-                                expression.ReceiverTypeSymbol,
-                                expression.ResolvedTypeName);
+                            ResolveBoundReceiver(expression.Receiver);
                         break;
                 }
             }
@@ -341,47 +342,32 @@ public sealed class ExternalCallCollector
     }
 
     /// <summary>
-    /// Resolution order (v0.15 E1 slice 1): the receiver variable's symbol type
-    /// (with the OBJECT / chain / function-type guards), then a Calor-declared
-    /// receiver type, then the binder's identity for a receiver written as a
-    /// type reference. Everything else is unresolved.
+    /// v0.15 E1 slice 2a — the receiver's identity is read off the receiver
+    /// <see cref="BoundExpression"/> the binder attached to the call node. There
+    /// is no reconstruction here and no symbol-string path: a null
+    /// <c>Receiver</c> is the binder saying it has nothing to vouch for, and an
+    /// <see cref="UnresolvedBoundType"/> is the binder saying it looked and
+    /// could not name the type (it reported Calor0270 at that site).
+    ///
+    /// <para>A <see cref="BoundTypeReferenceExpression"/> receiver takes the
+    /// binder's name verbatim — that name is already the resolution decision
+    /// (a Calor <c>TypeSymbol.QualifiedName</c>, or the source text with short
+    /// BCL names expanded), so re-normalizing it here would second-guess the
+    /// binder.</para>
     /// </summary>
-    private static BoundReceiver ResolveBoundReceiver(
-        TextSpan span,
-        string target,
-        VariableSymbol? receiverSymbol,
-        TypeSymbol? receiverTypeSymbol,
-        string? resolvedTypeName)
+    private static BoundReceiver ResolveBoundReceiver(BoundExpression? receiver)
     {
-        var receiverPath = target[..target.LastIndexOf('.')];
+        if (receiver is null)
+            return BoundReceiver.Unresolved;
 
-        if (receiverSymbol != null)
+        if (receiver is BoundTypeReferenceExpression)
         {
-            // The binder resolves the FIRST segment of the target as a variable.
-            // For a member chain (a.b.Method) the bound tree types `a` only;
-            // `a.b` has no bound type, so the receiver is unresolved rather than
-            // attributed to `a`'s type.
-            if (receiverPath.Contains('.'))
-                return BoundReceiver.Unresolved;
-
-            // The BoundType a read of this variable carries. In this slice that
-            // is NominalBoundType(receiverSymbol.TypeName) — the binder's symbol
-            // type string — because call nodes have no receiver BoundExpression
-            // yet; see FromBoundType for what is live and what is forward-looking.
-            return FromBoundType(new BoundVariableExpression(span, receiverSymbol).Type, receiverSymbol);
+            return receiver.Type is UnresolvedBoundType
+                ? BoundReceiver.Unresolved
+                : new BoundReceiver(receiver.Type.FullyQualifiedName);
         }
 
-        if (receiverTypeSymbol != null)
-            return new BoundReceiver(receiverTypeSymbol.QualifiedName);
-
-        // Not a bound variable and not a Calor type. The binder's
-        // ResolvedTypeName for this shape is the source text (short BCL names
-        // expanded), so it only counts when the receiver is WRITTEN as a type
-        // reference — Console, System.IO.File, OrderRepo. A lowercase head
-        // (foo.Bar, this.sb.Append, _items.Add) is not vouched for.
-        return IsTypeQualifiedReference(receiverPath) && resolvedTypeName is { } sourceQualifiedType
-            ? new BoundReceiver(sourceQualifiedType)
-            : BoundReceiver.Unresolved;
+        return FromBoundType(receiver.Type);
     }
 
     /// <summary>
@@ -408,41 +394,31 @@ public sealed class ExternalCallCollector
     }
 
     /// <summary>
-    /// Classifies a receiver's <see cref="BoundType"/>. In slice 1 the only
-    /// shape that reaches here is <see cref="NominalBoundType"/> (a
-    /// <see cref="BoundVariableExpression"/> wraps the symbol's TypeName), so
-    /// the nominal arms are the live path. The other arms are kept
-    /// deliberately, as forward-compatible classification for slice 2, when
-    /// call nodes carry a receiver <c>BoundExpression</c> and the binder emits
-    /// <see cref="UnresolvedBoundType"/> / <see cref="FunctionBoundType"/>;
-    /// no test exercises them today.
+    /// Classifies a receiver's <see cref="BoundType"/>.
+    ///
+    /// <para>The <c>OBJECT</c> sentinel arm slice 1 carried here is gone: the
+    /// binder now stamps <see cref="UnresolvedBoundType"/> on the receiver
+    /// itself for an inferred local it could not type, so this method no longer
+    /// needs the receiver's <see cref="VariableSymbol"/> to tell a genuine
+    /// <c>object</c> declaration from the inference fallback. A receiver typed
+    /// <c>OBJECT</c> that reaches this method is therefore a real <c>object</c>
+    /// and resolves to <c>System.Object</c>.</para>
+    ///
+    /// <para>The function-type guard stays: invoking a function-typed value is
+    /// not a nominal receiver, and effect rows on function types are E2/E4.
+    /// <see cref="FunctionBoundType"/> is still unreachable — lambdas remain
+    /// <c>NominalBoundType("LAMBDA(...)")</c> until the E1 lambda-type item
+    /// lands — so the string guard below is what actually fires today.</para>
     /// </summary>
-    private static BoundReceiver FromBoundType(BoundType type, VariableSymbol receiverSymbol)
+    private static BoundReceiver FromBoundType(BoundType type)
     {
         switch (type)
         {
             case UnresolvedBoundType:
-                // Slice 2: the binder does not emit this yet.
                 return BoundReceiver.Unresolved;
             case FunctionBoundType:
-                // Slice 2: lambdas are still NominalBoundType("LAMBDA(...)");
-                // see the nominal arm's function-type guard.
                 return BoundReceiver.Unresolved;
             case NominalBoundType nominal when IsFunctionTypeName(nominal.QualifiedName):
-                // Invoking a function-typed value: the callee is not a nominal
-                // receiver; effect rows on function types are E2/E4.
-                return BoundReceiver.Unresolved;
-            case NominalBoundType { QualifiedName: "OBJECT" }
-                when !(receiverSymbol.IsParameter || receiverSymbol.IsField || receiverSymbol.IsProperty):
-                // The binder's fallback for an inferred local it could not type
-                // (unknown callee return, disagreeing conditional resolutions).
-                // Until the binder emits UnresolvedBoundType (scoping §D6) this
-                // sentinel is its unresolved marker; do not read it as
-                // System.Object. Parameters, fields and properties always carry
-                // a declared type, so their OBJECT is honoured below. A local
-                // explicitly declared `§B{o:OBJECT}` (uppercase; the surface
-                // `object` keyword stays lowercase and is unaffected) is
-                // conflated with the sentinel — documented, not distinguished.
                 return BoundReceiver.Unresolved;
             case NominalBoundType nominal:
                 return FromTypeName(nominal.FullyQualifiedName);
