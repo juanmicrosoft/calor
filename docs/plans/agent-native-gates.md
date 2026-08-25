@@ -324,6 +324,27 @@ disclosures in the A-1.5 entry below.
 
 ### A.3 Annex revision log
 
+**A-1.9.1 — #881 correction landed (2026-08-25).** Additive amendment under the §7 supersession
+rule to the A-1.9 metric erratum; no threshold changes, no frozen row touched. Both runners now
+take the cost-leg token figure from the shared `bench/phase0-agent-native/token-usage.py`, which
+sums `modelUsage[*].outputTokens` over the whole run (main conversation, subagent turns,
+compaction segments) instead of reading the envelope's final-turn `usage.output_tokens`. The
+side-model topic-detector call is excluded only when it is small (key matches `haiku` AND
+`outputTokens` < 100); a large `haiku` entry is a subagent and counts. `costUSD` is untouched
+and still includes the excluded call. `result.json` `tokens.output` is the corrected figure; a
+`tokenUsage` block records `output_tokens_naive` (the old `usage.output_tokens`),
+`output_tokens_corrected`, `models_counted`, `models_excluded`, cache-token counts,
+`origin_kind`, `undercount_ratio` and `undercount_flagged`, and the runner prints a
+collection-time warning whenever naive and corrected disagree by more than 5 % — the guard that
+would have caught all four A-1.9 cases. If the helper fails, the runner falls back to the naive
+figure and marks `tokenUsage.source` `fallback-naive` — never a silent zero. The archived
+`w5-parity-001`/`-002` `result.json` files are NOT rewritten: they carry the naive figure the
+frozen row named, and A-1.9's corrected ratios were recomputed from the archived `agent.json`
+envelopes. Any row registered after this date that names a per-run output-token metric means
+`tokens.output` as derived by `token-usage.py`. Pinned reproduction:
+`bench/phase0-agent-native/tests/test_token_usage.py` (synthetic fixtures shaped like the 55×
+run plus the archived run itself).
+
 **A-1.9 — PP-W5 adjudicated. PASS on `w5-parity-002` (2026-08-06); the first attempt is
 recorded VOID.** Additive; registers the outcome against the row frozen at A-1.4 tranche 1,
 with the A-1.5.6 additive note applied.
@@ -348,21 +369,6 @@ the worst by **55×** (543 recorded vs 30,084 actual, `num_turns` 1). Corrected,
 ratios are 0.953 / 0.938 / 1.622 / 1.051 and the point estimate is **1.0016** — the verdict is
 PASS on either basis, and robust across 200 bootstrap seeds. Future epochs should pin
 `modelUsage[*].outputTokens` or disallow subagent spawning.
-
-**Correction landed (#881, roadmap §4.2 M1).** Both runners now take the cost-leg figure from
-the shared `bench/phase0-agent-native/token-usage.py`, which sums `modelUsage[*].outputTokens`
-over every model except the side-model topic detector (default exclusion `haiku`, ~15 tokens,
-never applied when it would exclude every model). `result.json` `tokens.output` is that
-corrected figure; a `tokenUsage` block records `output_tokens_naive` (the old
-`usage.output_tokens`), `output_tokens_corrected`, `models_counted`, `models_excluded`,
-`origin_kind`, `undercount_ratio` and `undercount_flagged`, and the runner prints a
-collection-time warning whenever the two disagree by more than 5 % — the guard that would have
-caught all four cases above. The archived `w5-parity-001`/`-002` `result.json` files are NOT
-rewritten: they carry the naive figure the frozen row named, and the corrected ratios quoted
-above were recomputed from the archived `agent.json` envelopes. Any row registered after this
-date that names a per-run output-token metric means `tokens.output` as derived by
-`token-usage.py`. Pinned reproduction: `bench/phase0-agent-native/tests/test_token_usage.py`
-(synthetic fixtures shaped like the 55× run plus the archived run itself).
 
 **Two claims from an earlier revision of this entry are WITHDRAWN**, both artifacts of that
 defect. (a) *"One task cost the treatment half the tokens"* — the 0.470 does not exist; that run
