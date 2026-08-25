@@ -58,3 +58,58 @@ trimmed the unknown-effect-code string, which changed **X5a**'s message from `' 
 `'^ e'`. That is a gratuitous message change on a path the spike does not own; the
 untrimmed code is reported again and X5a matches its transcript.
 
+
+## Final structure — two branches
+
+The spike produced a throwaway prototype and a set of artifacts. They ship apart, on
+purpose:
+
+| Branch | Carries | Why |
+|---|---|---|
+| `spike/effect-rows-emitter` (pushed, **not** for merge) | the prototype: 6 files under `src/`, 0 new files | It is a spike, not E2 — its parser-level effect-variable scope alone is a shortcut E2 must replace. And with it in the build **P29 is red by design** on three cases (F1 above), so a branch carrying it cannot be the PR that "must merge before E2" |
+| `spike/effect-rows-artifacts` (**the PR**) | `docs/design/spikes/effect-rows/**`, `SpikeVerdictTests.cs`, three corpus path-exclusions, the manifest delta, the design-doc update | No `src/` change, so **P29 is green** and the frozen evidence base is untouched |
+
+`spike-verdict.json` records the prototype's branch and commit so the code that produced
+the AFTER artifacts stays fetchable and reviewable.
+
+## Finding F2 — spike artifacts collide with three corpus instruments
+
+Committing `.calr` fixtures under `docs/` turned **three** frozen instruments red, each
+of which enumerates `.calr` repo-wide and had no reason to expect artifacts there:
+
+| Instrument | How it enumerates | Symptom |
+|---|---|---|
+| `HigherOrderDemandLedgerTests.DA_CalorNative_MatchesLedgerExactly` | filesystem walk | `D-A corpus size moved: 901 vs 886` |
+| `LosslessFormattingTests.CheckedInCalorCorpus_…` | `git ls-files '*.calr'` | `trackedFileCount` 886 vs 901 |
+| `experiments/facts.py` (pinned by P29) | `git ls-files '*.calr'` | the "5 function-typed shapes in 5 files" count §1 quotes moved |
+
+All three now exclude `docs/design/spikes/` by path. **No count changed** — those files
+were never part of the 886 — so no ledger, baseline or transcript was regenerated. Round 3
+had solved the same problem for *scratch* files by writing them outside the repository;
+committed artifacts cannot move, so they are excluded instead. Recorded in the design doc
+as §13.5(b) so the next spike inherits it.
+
+## What the spike could not make honest
+
+- **R1 is weaker than its wording.** Its bar is the *absence* of Calor0404/0424/0425, and
+  the prototype is additive — every new path is gated on a row being present — so §3.5's
+  Calor0425-on-omitted-row is unimplemented and a row-less function-typed position still
+  reaches Calor0418. The four fixtures do type-check cleanly; not every 0425 route was
+  exercised.
+- **R1 is recorded, not recomputed, on the PR branch.** §12.3 has P27 recompute it by
+  compiling each A3 fixture, which needs a compiler that parses a row. `spike-verdict.json`
+  says so in `ramp.R1.recomputedBy`, and P27 asserts that deferral string so it cannot be
+  left recorded once E2 lands.
+- **§8.2 is untouched.** The prototype reads rows off the AST, because the effect pass is an
+  AST walk. `FunctionBoundType.Row` / `ParameterRows` is still owed by E2.
+- **R2's residual stands.** Member-level `eff` works when **both** sides are Calor. A
+  C#-declared `IPipelineBehavior` has no row for the implementation to be checked against,
+  so §14 Q1 is narrowed, not closed.
+- **A2 is not the corpus file verbatim.** `calor convert` fails on it alone with four CS0246
+  errors, so its three MediatR dependencies were inlined before conversion. The class body is
+  the corpus file's, unmodified, and the pinned 29-line subject is still pinned by its own
+  test leg.
+- **Three A3 fixtures deviate from §7.4's literal spelling** — `§IX` is not a live marker,
+  `§ARR{T}` emits `new int[]` for a type-parameter element type, and the `?T`/`is_some`/
+  `unwrap` Option surface does not compile. Each deviation is listed in
+  `spike-verdict.json` under `artifacts.A3.deviations`, with the reason and what was kept.
