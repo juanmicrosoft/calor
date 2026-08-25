@@ -3254,12 +3254,22 @@ public sealed class Binder
         if (receiverSymbol != null)
         {
             // Constructing the reference node canonicalizes the symbol's type
-            // string, and canonicalization throws on a string it cannot parse —
-            // an empty one, or a bare "?" — which converted C# does produce. A
-            // receiver whose type string the binder cannot even canonicalize is
-            // precisely an unresolved receiver, so it is caught and reported as
-            // one here rather than escaping as an internal-error diagnostic that
-            // would abandon the rest of the member. Constructions below that pass
+            // string, and TypeIdentity.Canonicalize (Binding/Scope.cs:316) throws
+            // on a string it cannot parse — an empty one, or a bare "?".
+            //
+            // A bare "?" is not hypothetical: the C# → Calor converter emits it
+            // for a lambda parameter whose type it could not infer.
+            // TryInferLambdaParameterType (Migration/RoslynSyntaxVisitor.cs:11774-11794,
+            // called at :11877 and :11885) hands back Roslyn's display spelling of
+            // the parameter's type, and for an error type that spelling is "?" —
+            // which the emitter then writes as `§LAM{l1:ctx:?}`. That is a
+            // converter defect, tracked separately; the binder's job here is not
+            // to amplify it.
+            //
+            // A receiver whose type string the binder cannot even canonicalize is
+            // precisely an unresolved receiver, so it is caught and marked as one
+            // here rather than escaping as an internal-error diagnostic that would
+            // abandon the rest of the member. Constructions below that pass
             // typeOverride do not canonicalize and cannot throw.
             BoundVariableExpression? typedHead;
             try
@@ -3279,10 +3289,11 @@ public sealed class Binder
                 // rather than attributed to `a`'s type. One Calor0270 for the
                 // whole chain, and the head shares its reason when it is itself
                 // untyped.
-                var unresolved = ReportUnresolvedReceiver(
+                var unresolved = UnresolvedReceiver(
                     receiverSpan,
                     receiverPath,
-                    $"'{receiverPath}' is a member chain the binder does not type");
+                    "is a member chain the binder does not type",
+                    report: ShouldReportUnresolvedReceiver(receiverPath));
                 BoundExpression chain = typedHead
                     ?? new BoundVariableExpression(
                         receiverSpan, receiverSymbol, typeOverride: unresolved);
@@ -3299,10 +3310,11 @@ public sealed class Binder
                 return new BoundVariableExpression(
                     receiverSpan,
                     receiverSymbol,
-                    typeOverride: ReportUnresolvedReceiver(
+                    typeOverride: UnresolvedReceiver(
                         receiverSpan,
                         receiverPath,
-                        $"'{receiverPath}' carries a type string the binder cannot resolve to a type"));
+                        "carries a type string the binder cannot resolve to a type",
+                        report: ShouldReportUnresolvedReceiver(receiverPath)));
             }
 
             // The binder's OBJECT fallback on an inferred local it could not type
@@ -3318,10 +3330,11 @@ public sealed class Binder
                 return new BoundVariableExpression(
                     receiverSpan,
                     receiverSymbol,
-                    typeOverride: ReportUnresolvedReceiver(
+                    typeOverride: UnresolvedReceiver(
                         receiverSpan,
                         receiverPath,
-                        $"'{receiverPath}' is an inferred local whose type the binder could not determine"));
+                        "is an inferred local whose type the binder could not determine",
+                        report: ShouldReportUnresolvedReceiver(receiverPath)));
             }
 
             return typedHead;
@@ -3349,20 +3362,81 @@ public sealed class Binder
     }
 
     /// <summary>
-    /// One Calor0270 per unresolved receiver, at the receiver span, and the
-    /// <see cref="BoundTypes.UnresolvedBoundType"/> that carries the same reason downstream.
+    /// The <see cref="BoundTypes.UnresolvedBoundType"/> for a receiver the binder
+    /// cannot type, and — only when <paramref name="report"/> — one Calor0270 at
+    /// the receiver span.
+    ///
+    /// <para><b>Marking and reporting are separate decisions.</b> Every receiver
+    /// the binder cannot type is marked, always, because downstream analyses must
+    /// never read an unresolved receiver as resolved. Only the shapes an author
+    /// can actually act on are reported, because a diagnostic nobody can act on
+    /// is noise in the editor. <see cref="ShouldReportUnresolvedReceiver"/> owns
+    /// that split and states the evidence behind it.</para>
     /// </summary>
-    private BoundTypes.UnresolvedBoundType ReportUnresolvedReceiver(
+    private BoundTypes.UnresolvedBoundType UnresolvedReceiver(
         Parsing.TextSpan span,
         string receiverPath,
-        string reason)
+        string reason,
+        bool report)
     {
-        _diagnostics.ReportInfo(
-            span,
-            DiagnosticCode.SignatureUnresolved,
-            $"Receiver '{receiverPath}' has no type the binder can vouch for: {reason}. " +
-            "Analyses that need its type will report the call as unresolved rather than guess one.");
-        return new BoundTypes.UnresolvedBoundType(reason);
+        if (report)
+        {
+            _diagnostics.ReportInfo(
+                span,
+                DiagnosticCode.SignatureUnresolved,
+                $"Receiver '{receiverPath}' {reason}, so the call's receiver type is unresolved. " +
+                "Analyses that need the type report the call as unresolved rather than guess one; " +
+                "give the binding an explicit type, or call through the declaring type.");
+        }
+
+        return new BoundTypes.UnresolvedBoundType($"receiver '{receiverPath}' {reason}");
+    }
+
+    /// <summary>
+    /// Whether an unresolved receiver is worth telling the author about.
+    ///
+    /// <para>Measured on the converted corpus (see the ledger registered at
+    /// <c>bench/phase0-agent-native/calor0270-corpus-ledger.json</c>): reporting
+    /// every unresolved receiver produced 875 Info diagnostics across 76 of 305
+    /// modules, overwhelmingly of two shapes an author cannot act on —</para>
+    /// <list type="number">
+    /// <item><b>member chains</b> (<c>result.IsValid.ToString</c>): the binder
+    /// does not type members of a receiver yet. That is a binder limitation, not
+    /// anything wrong with the code, and "give the binding an explicit type" is
+    /// not advice the author can follow.</item>
+    /// <item><b>converter-synthesized temporaries</b> (<c>_chainIsValid042</c>):
+    /// the author never wrote the binding, so they cannot annotate it.</item>
+    /// </list>
+    /// <para>Both are still <i>marked</i> <see cref="BoundTypes.UnresolvedBoundType"/> —
+    /// silence here is about the editor, never about what the type system claims.
+    /// The two shapes that remain reportable are the ones an explicit type
+    /// annotation fixes: an inferred local the binder could not type, and a
+    /// declared type string it cannot resolve to a type.</para>
+    /// </summary>
+    private static bool ShouldReportUnresolvedReceiver(string receiverPath) =>
+        !receiverPath.Contains('.', StringComparison.Ordinal)
+        && !IsConverterSynthesizedName(receiverPath);
+
+    /// <summary>
+    /// A binding the C# → Calor converter generated rather than the author.
+    /// <c>ConversionContext.GenerateId</c> (<c>Migration/ConversionContext.cs:424-429</c>)
+    /// spells them <c>_{prefix}{Hint}{NNN}</c> — a leading underscore and a
+    /// three-digit counter — across ~23 prefixes (<c>_chain</c>, <c>_cast</c>,
+    /// <c>_tern</c>, …). Matching the shape rather than enumerating the prefixes
+    /// keeps this from silently going stale when a prefix is added; the cost is
+    /// that a hand-written <c>_foo001</c> is also treated as synthesized, which
+    /// only ever means one fewer Info diagnostic.
+    /// </summary>
+    private static bool IsConverterSynthesizedName(string name)
+    {
+        if (name.Length < 5 || name[0] != '_')
+            return false;
+        for (var i = name.Length - 3; i < name.Length; i++)
+        {
+            if (!char.IsAsciiDigit(name[i]))
+                return false;
+        }
+        return char.IsAsciiLetter(name[name.Length - 4]);
     }
 
     private (string? TypeName, string? MethodName) GetResolvedCallIdentity(
