@@ -5,25 +5,40 @@
   "artifacts": {
     "A1": {
       "what": "tools/calor-allowlist-audit/allowlist-audit.calr, the dogfood utility built in CI at .github/workflows/test.yml:174. 127 lines, no higher-order code.",
-      "adjudicates": ["G-CODEGEN"],
+      "adjudicates": [
+        "G-CODEGEN"
+      ],
       "before": "before/A1.calr",
       "after": "after/A1.calr",
       "note": "before and after are byte-identical sources: A1 has no function-typed position, so there is no row to add. It is the regression module."
     },
     "A2": {
       "what": "bench/corpus/MediatR/src/MediatR/Pipeline/RequestPreProcessorBehavior.cs at the pinned SHA fb309026775ef953a64fb5339d074426c1ad2c37 (29 lines by `grep -c ''`), converted to Calor by `calor convert`.",
-      "adjudicates": ["R2", "G-CODEGEN"],
+      "adjudicates": [
+        "R2",
+        "G-CODEGEN"
+      ],
       "before": "before/A2.calr",
       "after": "after/A2.calr",
       "deviations": [
         "The file's three MediatR dependencies (RequestHandlerDelegate, IPipelineBehavior, IRequestPreProcessor) are inlined into before/A2.source.cs.txt before conversion, because `calor convert` validates the round-tripped C# and fails with four CS0246 errors on the file alone. The class body is the corpus file's, verbatim.",
-        "async is modelled as a sync-shaped row over a Task-returning function, exactly as design-doc S11 says the spike should."
+        "async is modelled as a sync-shaped row over a Task-returning function, exactly as design-doc S11 says the spike should.",
+        "The class declaration drops `where TRequest : notnull`. `calor convert` does not carry the constraint across, and the spike did not add it back by hand: a type constraint is orthogonal to effect rows, and editing it in would make the artifact LESS faithful to what the converter actually produces, not more.",
+        "The three XML doc-comment blocks of the corpus file (on the class and on its two type parameters) are absent from the converted Calor. Same reason — this artifact is the converter's output, recorded as-is."
       ]
     },
     "A3": {
       "what": "The four combinator fixtures of S7.4, in their AFTER forms.",
-      "adjudicates": ["R1", "R3"],
-      "fixtures": ["A3-map", "A3-match", "A3-middleware", "A3-callback"],
+      "adjudicates": [
+        "R1",
+        "R3"
+      ],
+      "fixtures": [
+        "A3-map",
+        "A3-match",
+        "A3-middleware",
+        "A3-callback"
+      ],
       "deviations": [
         "A3-map: the type parameters <T, U> of S7.4's form are dropped and the fixture is monomorphic in TYPES ([i32] / Func<i32,i32>), keeping only `eff e`. Reason: `SARR{T} n` emits `new int[n]` for a type-parameter element type and the generated C# fails with CS0029 — a pre-existing codegen gap unrelated to rows, and generic TYPE parameters are deferred by calor-direction.md:33 anyway. The effect-polymorphic content of the fixture is unchanged.",
         "A3-map: S7.4's body uses `SIX{out i} = ...`, which is not a live section marker (`Calor0006: Unknown section marker`). Transcribed to `SSETIDX{out} i ...`, the real spelling.",
@@ -50,19 +65,44 @@
     "openResidual": "The MediatR interface is someone else's (S14 Q1). Member-level `eff` means a Calor implementation can be effect-polymorphic without editing the interface ONLY IF the interface is also written in Calor with the `eff` binder. For a truly external C#-declared IPipelineBehavior there is no Calor row on the interface at all, so the implementation's row has nothing to be checked against and the site routes to the assumed/unknown channel. The spike does not close that; it shows the spelling works when both sides are Calor."
   },
   "gCodegen": {
-    "definition": "Design-doc S12.2. For each artifact the before/ and after/ .calr are emitted by the SAME compiler and the .g.cs compared. `strict` is byte-for-byte; `moduloLineDirectives` additionally normalises the line NUMBER inside `#line N \"<source>.calr\"`, which tracks the source and necessarily moves when the author adds annotation lines.",
-    "A1": {"verdict": "PASS", "strictBytesEqual": true, "diffBytes": 0},
+    "definition": "Design-doc S12.2. For each artifact the before/ and after/ .calr are emitted by the SAME compiler and the .g.cs compared. `strict` is byte-for-byte; `moduloLineDirectives` additionally normalises the line NUMBER inside `#line N \"<source>.calr\"`, which tracks the source and necessarily moves when the author adds annotation lines. Two counts are recorded per artifact and BOTH are asserted by P27: `strictDiffBytes` is the number of differing bytes with no normalisation at all, and `nonLineDirectiveDiffBytes` is the same count after the `#line` numbers are normalised. The earlier single `diffBytes` field was a LENGTH delta, which read 0 for A2 even though 7 bytes differ — a field no test read, and one that flattered the result. Replaced in review round 1.",
+    "A1": {
+      "verdict": "PASS",
+      "strictBytesEqual": true,
+      "strictDiffBytes": 0,
+      "nonLineDirectiveDiffBytes": 0
+    },
     "A2": {
       "verdict": "PASS-MODULO-LINE-DIRECTIVES",
       "strictBytesEqual": false,
-      "diffBytes": 0,
-      "differingNonLineDirectiveLines": 0,
-      "explanation": "Every differing byte is inside a `#line` directive, and the two files are the same length. after/A2.calr has two more source lines than before/A2.calr (the SE{e} row on the interface member and on the implementation), so the directives that point INTO the source move by two. No emitted C# construct differs. The `eff` binder is fully erased: the emitted `Handle` signature is `Task<TResponse> Handle(TRequest, RequestHandlerDelegate<TResponse>, CancellationToken)` on both sides, with no `<e>`."
+      "explanation": "7 bytes differ (`cmp -l`), every one of them a digit inside a `#line` directive; the two files are the same LENGTH, which is why the old `diffBytes` field read 0 and why it was replaced. after/A2.calr has two more source lines than before/A2.calr (the SE{e} row on the interface member and on the implementation), so the directives pointing into the source move by two. No emitted C# construct differs. The `eff` binder is fully erased: the emitted `Handle` signature is `Task<TResponse> Handle(TRequest, RequestHandlerDelegate<TResponse>, CancellationToken)` on both sides, with no `<e>`.",
+      "strictDiffBytes": 7,
+      "nonLineDirectiveDiffBytes": 0
     },
-    "A3-map": {"verdict": "PASS", "strictBytesEqual": true, "diffBytes": 0},
-    "A3-match": {"verdict": "PASS", "strictBytesEqual": true, "diffBytes": 0},
-    "A3-middleware": {"verdict": "PASS", "strictBytesEqual": true, "diffBytes": 0},
-    "A3-callback": {"verdict": "PASS", "strictBytesEqual": true, "diffBytes": 0},
+    "A3-map": {
+      "verdict": "PASS",
+      "strictBytesEqual": true,
+      "strictDiffBytes": 0,
+      "nonLineDirectiveDiffBytes": 0
+    },
+    "A3-match": {
+      "verdict": "PASS",
+      "strictBytesEqual": true,
+      "strictDiffBytes": 0,
+      "nonLineDirectiveDiffBytes": 0
+    },
+    "A3-middleware": {
+      "verdict": "PASS",
+      "strictBytesEqual": true,
+      "strictDiffBytes": 0,
+      "nonLineDirectiveDiffBytes": 0
+    },
+    "A3-callback": {
+      "verdict": "PASS",
+      "strictBytesEqual": true,
+      "strictDiffBytes": 0,
+      "nonLineDirectiveDiffBytes": 0
+    },
     "overall": "PASS",
     "honestReading": "Five of six artifacts are byte-identical under the STRICT reading, including all four A3 fixtures — because an inline row is written on the SAME line as the type it annotates, so adding one shifts nothing. A2 is the one artifact whose rows sit on their own added lines, and it is byte-identical everywhere except the source-position directives. The design's claim — rows are erased at codegen — holds. The feature-wide gate does NOT block."
   },
@@ -72,10 +112,11 @@
       "recomputedBy": "P27 once E2 lands; recorded until then",
       "recordedNotRecomputed": true,
       "recomputeDeferralReason": "Design-doc S12.3 says P27 recomputes R1 by compiling each A3 fixture and asserting zero Calor0404/0424/0425. That recomputation needs a compiler that PARSES a row, and this PR carries no src/ change — the prototype lives on branch spike/effect-rows-emitter and is not merged. Until E2 lands, R1 is RECORDED from the diagnostic lists the prototype produced, exactly as R2 and R3 are. P27 asserts those lists exist, are non-empty of header, and contain none of the three codes; it does NOT re-derive them, and it does not skip.",
-      "claim": "Each of Map, Match, middleware/next and callbacks, in its AFTER form, compiles with zero Calor0424, zero Calor0425 and zero Calor0404, without --permissive-effects and without any SCSHARP block.",
+      "claim": "Each of Map, Match, middleware/next and callbacks, in its AFTER form, compiles with zero Calor0424, zero Calor0425 and zero Calor0404, without --permissive-effects and without any SCSHARP block, when every participating row is concrete and every callee resolves.",
       "evidence": "after/A3-map.diagnostics.txt, after/A3-match.diagnostics.txt, after/A3-middleware.diagnostics.txt, after/A3-callback.diagnostics.txt — all four report `exit: 0` and `diagnostics: 0` on a PLAIN compile.",
       "beforeContrast": "Each before/ counterpart is rejected today with Calor0418 at the invocation (2 occurrences for A3-middleware, 1 each for the others).",
-      "caveat": "R1's bar is the ABSENCE of three codes. The prototype is deliberately additive — every new code path is gated on a row being PRESENT — so the Calor0425-on-omitted-row path of S3.5 is NOT implemented, and a row-less function-typed position still reaches today's Calor0418 rather than 0425. R1 is therefore weaker evidence than its wording suggests: it says the four combinators type-check cleanly, not that every 0425 route was exercised. Stated here rather than left for a reader to discover."
+      "caveat": "R1's bar is the ABSENCE of three codes. The prototype is deliberately additive — every new code path is gated on a row being PRESENT — so the Calor0425-on-omitted-row path of S3.5 is NOT implemented, and a row-less function-typed position still reaches today's Calor0418 rather than 0425. R1 is therefore weaker evidence than its wording suggests: it says the four combinators type-check cleanly, not that every 0425 route was exercised. Stated here rather than left for a reader to discover.",
+      "preconditionNote": "The trailing clause is S7.5's own and was dropped from this record until review round 1. It matters: it is what makes R1 a claim about the four COMBINATORS rather than about the resolution ceiling. Every A3 fixture satisfies it by construction — each row is either concrete or a bound effect variable, and every callee is in-module, so no unresolved receiver can contribute."
     },
     "R2": {
       "verdict": "PASS",
@@ -141,17 +182,79 @@
   "transcriptDivergences": {
     "policy": "Recorded, NOT regenerated. The committed transcripts are E2's frozen evidence base; a throwaway prototype does not get to rewrite them.",
     "P29Status": "GREEN on this PR (no src/ change). RED on branch spike/effect-rows-emitter, by design, on the three cases below.",
-    "e2Obligation": "When E2 merges, regenerate EXACTLY these three and no others: run.py case X6a, run3.py case Z1, and facts.py line 6. A regeneration that moves any other line means E2 changed behaviour the spike did not, and that change needs its own justification in the E2 PR body.",
+    "e2Obligation": "When E2 merges, regenerate EXACTLY these SEVEN and no others. A regeneration that moves any other line means E2 changed behaviour the spike did not, and that change needs its own justification in the E2 PR body.",
     "cases": [
-      {"script": "run.py", "case": "X6a", "committed": "Calor0100: Expected Greater but found Identifier", "withPrototype": "parses; the case's own SE{} then under-declares alloc, so Calor0410", "verdict": "INTENDED — X6a exists to show `eff e` is new syntax today"},
-      {"script": "run3.py", "case": "Z1", "committed": "four Calor0100 cascade lines", "withPrototype": "one Calor0405", "verdict": "INTENDED — S3.1's row-aware recovery, and the 4-to-1 collapse is P2(b)'s own claim"},
-      {"script": "facts.py", "case": "line 6", "committed": "Ast/FunctionNode.cs:252", "withPrototype": "Ast/FunctionNode.cs:283", "verdict": "UNAVOIDABLE — facts.py pins file:line structural facts and ParameterNode.Row moved the line"}
+      {
+        "script": "run.py",
+        "case": "X6a-eff-modifier-in-typaram-list",
+        "committed": "exit 1; a 14-line Calor0100/Calor0114 cascade starting `Expected Greater but found Identifier`",
+        "withPrototype": "the type-parameter list parses; the case's own SE{} then under-declares its body, so one `Calor0410: Function 'Map' uses effect 'alloc' but does not declare it`",
+        "verdict": "INTENDED. X6a exists precisely to show that `eff e` is NEW SYNTAX today (S7.2). E2 must RE-AUTHOR it as a positive case, not merely regenerate it."
+      },
+      {
+        "script": "run.py",
+        "case": "X9b-FLD-with-sameline-E",
+        "committed": "exit 1; 4x Calor0100 `Expected TP, WHERE, EXT, IMPL, FLD, ... but found Effects`",
+        "withPrototype": "exit 0, `Compilation successful`",
+        "verdict": "INTENDED. This is POSITION 8 (the field row) doing exactly what S3.3 promises. X9b is the case S14.1 cites to disprove Draft v1's claim that SFLD already parsed a row; once position 8 lands it must compile, and E2 re-authors it as the positive case."
+      },
+      {
+        "script": "run.py",
+        "case": "X9c-inline-param-with-E",
+        "committed": "exit 1; 12x Calor0100 starting `Expected CloseParen but found Effects`",
+        "withPrototype": "exit 0, `Compilation successful`",
+        "verdict": "INTENDED. POSITION 5 (the inline parameter row), S3.3. Same disposition as X9b: E2 re-authors it as a positive case."
+      },
+      {
+        "script": "run3.py",
+        "case": "Z1-FLD-nextline-E",
+        "committed": "4x Calor0100 cascade",
+        "withPrototype": "1x Calor0405 naming the 'x' field line",
+        "verdict": "INTENDED. S3.1's row-aware recovery at a position with no SE arm to fall through to. The 4-to-1 collapse is exactly the claim P2(b) makes."
+      },
+      {
+        "script": "run3.py",
+        "case": "Z3-wrapped-inline-sig-E-inside-parens",
+        "committed": "8x Calor0100 cascade through the rest of the signature and body",
+        "withPrototype": "1x Calor0405 naming the 'transform' parameter line",
+        "verdict": "INTENDED, and the strongest of the three Calor0405 cases: S3.1 calls Z3 'not hypothetical' because Z5 shows wrapped parameter lists really are written. 8-to-1."
+      },
+      {
+        "script": "facts.py",
+        "case": "line 6 - the ParameterNode probe",
+        "committed": "src/Calor.Compiler/Ast/FunctionNode.cs:252",
+        "withPrototype": "src/Calor.Compiler/Ast/FunctionNode.cs:283",
+        "verdict": "UNAVOIDABLE. facts.py pins file:line structural facts and adding `ParameterNode.Row` moved the line. Any E2 implementation moves it too."
+      },
+      {
+        "script": "facts.py",
+        "case": "the IsSubsetOf compatibility-site sweep",
+        "committed": "EffectEnforcementPass.cs:533 and :571 (the two CheckEffectVariance subset tests) are listed",
+        "withPrototype": "both vanish; five EffectSet.cs lines appear instead (the EffectRow.Fits docs and its subset helper)",
+        "verdict": "INTENDED, and it is R2's OWN EVIDENCE moving a pinned fact. S6.3 says the two IsSubsetOf calls 'become calls to the shared EffectRow.Fits'; this sweep is the instrument that observes it, so when the claim comes true the transcript must change. Review round 1 caught that the first record omitted this — the spike's headline result moved a fact the harness pins, and that has to be stated, not discovered by E2."
+      }
     ],
-    "notADivergence": "An early draft trimmed the unknown-effect-code string and changed X5a's message from ' ^ e' to '^ e'. That was a gratuitous change on a path the spike does not own; it was FIXED, not recorded."
+    "notADivergence": "An early draft trimmed the unknown-effect-code string and changed X5a's message from ' ^ e' to '^ e'. That was a gratuitous change on a path the spike does not own; it was FIXED, not recorded.",
+    "count": 7,
+    "howCounted": "All SIX harness scripts were re-run against the prototype and diffed against their committed transcripts: run.py 3, run3.py 2, facts.py 2, and run2.py / facts2.py / compile53.py CLEAN. Review round 1 found the first record listed only three — it had been assembled from the test's FIRST-difference-per-script message, which reports one line per script and hides the rest. Counting now comes from a full diff of every script, which is the only way the number can be trusted."
   },
   "regressionEvidence": {
     "tests/Calor.Enforcement.Tests": "344 passed, 0 failed",
     "HigherOrderDemandLedgerTests": "green (D-A exact equality unchanged; D-B skipped, its submodules are not initialised)",
     "reason": "Every new code path is gated on a row being present, so a row-less program takes today's path."
-  }
+  },
+  "e2MessageObligations": [
+    {
+      "finding": "Calor0404 is allocated but never REACHED for two of S7.3's rejection sites.",
+      "observed": "The prototype routes `SCL{c001:C:pub}<eff e>` and an out-of-scope `SE{e}` to `Calor0403: Unknown effect code 'e'`, not to Calor0404.",
+      "why": "Both are forbidden, so the prototype is not UNSOUND — it forbids them incidentally, by never binding the name, and the author then sees a message about the effect TAXONOMY for what is really a scope error.",
+      "obligation": "E2 must make S7.3's seven rejection sites report Calor0404 with the scope message, which is what P18's `Rejected_*` cases assert. The spike's Calor0404 fires only on the two sites it wired explicitly (a class/interface-level `eff` binder, and an `eff` name colliding with the taxonomy)."
+    },
+    {
+      "finding": "Calor0421's message renders a polymorphic interface row as `[pure]`.",
+      "observed": "On after/A3-middleware-broadening.calr the interface declares `SE{e}` and the diagnostic reads `(interface declares: [pure])`.",
+      "why": "The message is built from `EffectSet.ToDisplayString()`, which knows only the CONCRETE part; the effect variable lives on the row. The VERDICT is right — the implementation's extra `[cw]` is correctly rejected — but the text tells the author the interface promised purity when it promised 'whatever the caller's function does'.",
+      "obligation": "E2 must render the row, not the set, at both variance sites — S8.3 already reserves `EffectRow.ToDisplayString()` for exactly this, and P22 is where the text is pinned."
+    }
+  ]
 }
