@@ -1585,11 +1585,19 @@ public sealed class EffectEnforcementPass
         /// in which case every resolver below behaves exactly as it did before
         /// this slice.
         ///
-        /// <para>Receivers only. A name in a non-receiver position — a method
-        /// group passed as an argument, a bare call target — is absent here and
-        /// resolves through the AST as before; the string this pass gets back is
-        /// quoted verbatim in Calor0418's message, so the source spelling has to
-        /// survive.</para>
+        /// <para>Receivers only, in the sense of what is COLLECTED: a name that
+        /// is never a receiver anywhere in this function is absent here and
+        /// resolves through the AST as before — the string this pass gets back
+        /// is quoted verbatim in Calor0418's message, so the source spelling has
+        /// to survive.</para>
+        ///
+        /// <para><b>But the map is keyed by name, not by position</b> (review
+        /// round 1, finding 6): a name used as a receiver ONCE answers from here
+        /// at EVERY occurrence in the function, receiver or not. The ambiguity
+        /// rule in <see cref="CallGraphAnalysis.BoundValueTypes"/> is what makes
+        /// that safe — a name the binder types two ways is dropped — and that
+        /// doc states the residual exposure. Keying by position would need a
+        /// position argument threaded through eleven call sites; deferred.</para>
         /// </summary>
         private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>? _boundValueTypes;
 
@@ -1645,6 +1653,35 @@ public sealed class EffectEnforcementPass
             // suppressing the AST fallback for those deletes resolution the
             // fallback still performs. Measured: 05-02/05-03.approved.calr go
             // from clean to Calor0411 + Calor0410 on '_chainWhere005.ToList'.
+            //
+            // STRUCTURAL, CURRENTLY UNREACHABLE (review round 1, finding 1).
+            // The Unresolved branch is not observable today: no reachable shape
+            // reaches it while the AST fallback would answer with a concrete
+            // type, so deleting the branch changes no diagnostic anywhere. It is
+            // kept because it states which of the two paths is authoritative,
+            // and E2 makes it live the moment the binder types more receivers.
+            // Do not read it as an observed fail-closed guarantee — fail-closed
+            // is delivered by the pass's existing end-of-chain ReportUnknownCall
+            // (PR #968), which both branches reach.
+            //
+            // Measured three ways:
+            //   1. Over all 301 committed .calr files (tests/TestData/Benchmarks,
+            //      samples, benchmarks, Conversion snapshots), every unresolved
+            //      receiver arriving here is Reported=false — 32 sites, all
+            //      _chainNNN or member chains. Zero Reported=true.
+            //   2. Hand-built fixtures DO reach Reported=true (a §EACH variable
+            //      shadowing a field), but the AST fallback returns null there
+            //      too, so the answer is the same either way.
+            //   3. Why, structurally: the binder reports unresolved only for §B
+            //      locals and loop variables, never for parameters/fields/
+            //      properties — and those are the only AST sources carrying a
+            //      concrete declared type. For a §B the AST search returns its
+            //      own non-answer "?" (see FindLocalDeclarationType, "known
+            //      value, unknown type") rather than falling through to a field,
+            //      and Calor0255 forbids a loop variable from shadowing an
+            //      enclosing local or parameter outright.
+            // Reproduce: trace (name, Reported, ResolveLocalValueTypeFromAst)
+            // here and compile the corpus.
             if (type is Binding.BoundTypes.UnresolvedBoundType unresolved)
             {
                 return unresolved.Reported
@@ -1714,6 +1751,16 @@ public sealed class EffectEnforcementPass
                     return boundTypeName;
             }
 
+            return ResolveLocalValueTypeFromAst(name);
+        }
+
+        /// <summary>
+        /// The pre-slice-2b AST search, extracted so the resolver order above
+        /// reads as "bound first, then this" and so the fallback can be probed
+        /// on its own.
+        /// </summary>
+        private string? ResolveLocalValueTypeFromAst(string name)
+        {
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
                 return null;
 
@@ -2075,8 +2122,21 @@ public sealed class EffectEnforcementPass
             if (parts.Length < 2)
                 return (null, EffectSet.Empty);
 
+            // FIXME(E2): this branch returns EffectSet.Empty, discarding the
+            // property-getter effects the member walk below charges as it steps
+            // through `a.b.c`. Knowing the END type is not the same as knowing
+            // that reaching it ran a getter with effects. Dead today — slice 2a
+            // types every member chain UnresolvedBoundType, so AskBoundTree
+            // never answers Typed for a dotted path — but it goes live the
+            // moment E2 types chains, and would then silently under-charge.
+            //
+            // Guarded rather than left as a comment: the shortcut is taken only
+            // when the walk could not have charged anything anyway, i.e. when no
+            // segment after the head resolves to a property getter with effects.
+            // Otherwise fall through and let the walk charge them.
             if (AskBoundTree(receiverPath, out var boundPathType) == BoundValueAnswerKind.Typed
-                && boundPathType != "Func<>")
+                && boundPathType != "Func<>"
+                && !ChainWalkCouldChargeEffects(parts))
             {
                 return (MapShortTypeNameToFullName(boundPathType), EffectSet.Empty);
             }
@@ -2101,6 +2161,37 @@ public sealed class EffectEnforcementPass
             }
 
             return (currentType, effects);
+        }
+
+        /// <summary>
+        /// Whether stepping through <paramref name="parts"/> the way
+        /// <see cref="ResolveReceiverChain"/>'s member walk does could charge
+        /// any effect. Used to decide whether the bound-type shortcut above is
+        /// safe: if no getter on the way contributes effects, skipping the walk
+        /// loses nothing. FIXME(E2) — remove once chain types carry rows and the
+        /// walk's effects can be read off the type instead of re-derived.
+        /// </summary>
+        private bool ChainWalkCouldChargeEffects(string[] parts)
+        {
+            var currentType = ResolveVariableType(parts[0]);
+            if (currentType == null)
+                return false;
+
+            for (var i = 1; i < parts.Length; i++)
+            {
+                var getter = _context.Resolver.ResolveGetter(currentType, parts[i]);
+                if (getter.Status == EffectResolutionStatus.Unknown)
+                    return false;
+                if (!getter.Effects.IsEmpty)
+                    return true;
+
+                var nextType = ResolveKnownMemberType(currentType, parts[i]);
+                if (nextType == null)
+                    return false;
+                currentType = nextType;
+            }
+
+            return false;
         }
 
         private string? ResolveKnownMemberType(string receiverType, string memberName)

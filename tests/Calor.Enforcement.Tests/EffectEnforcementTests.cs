@@ -955,10 +955,10 @@ public class EffectEnforcementTests
         var source = @"
 §M{m001:BoundReceiverProbe}
   §F{f001:Go:pub}
-      §O{str}
-      §E{rand}
-      §B{g} §C{System.Guid.NewGuid} §/C
-      §R §C{g.ToString} §/C
+    §O{str}
+    §E{rand}
+    §B{g} §C{System.Guid.NewGuid} §/C
+    §R §C{g.ToString} §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -992,10 +992,10 @@ public class EffectEnforcementTests
   §CL{c001:Box:pub}
     §FLD{x:Random:priv}
     §MT{mt01:Go:pub}
-        §O{str}
-        §E{rand}
-        §B{x} §C{System.Guid.NewGuid} §/C
-        §R §C{x.ToString} §/C
+      §O{str}
+      §E{rand}
+      §B{x} §C{System.Guid.NewGuid} §/C
+      §R §C{x.ToString} §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -1015,15 +1015,22 @@ public class EffectEnforcementTests
     ///
     /// <para>MEASURED: passes on a clean <c>main</c> worktree as well — the AST
     /// search finds nothing for that receiver either, so both routes fail
-    /// closed. Equivalence pin: what the slice changes is WHY — a typed
-    /// decision instead of an absent string.</para>
+    /// closed. Equivalence pin.</para>
+    ///
+    /// <para><b>This test does NOT observe the Reported veto</b> (review round
+    /// 1, finding 1). It passes with the veto, without it, and on <c>main</c>.
+    /// The veto branch in <c>AskBoundTree</c> is structural and currently
+    /// unreachable — its own comment carries the three-way measurement. What
+    /// this pin does observe is the pass's end-of-chain fail-closed behaviour
+    /// (PR #968), which both routes reach.</para>
     ///
     /// <para>The veto is scoped to REPORTED unresolvedness
     /// (<c>UnresolvedBoundType.Reported</c>). Applying it to every unresolved
     /// receiver was tried and measurably deleted resolution: the
     /// converter-synthesized <c>_chainNNN</c> temporaries in
     /// <c>05-02</c>/<c>05-03.approved.calr</c> went from clean to Calor0411 +
-    /// Calor0410, failing <c>LosslessFormattingTests</c>.</para>
+    /// Calor0410, failing <c>LosslessFormattingTests</c>. That scoping IS
+    /// observed, by that test.</para>
     /// </summary>
     [Fact]
     public void E1Slice2b_UnresolvedBoundReceiver_FailsClosed()
@@ -1031,10 +1038,10 @@ public class EffectEnforcementTests
         var source = @"
 §M{m001:UnresolvedProbe}
   §F{f001:Go:pub}
-      §I{Mystery:m}
-      §O{void}
-      §E{}
-      §C{m.DoWork} §/C
+    §I{Mystery:m}
+    §O{void}
+    §E{}
+    §C{m.DoWork} §/C
 ";
         var result = TestHarness.CompileWithEffects(source);
 
@@ -1063,10 +1070,10 @@ public class EffectEnforcementTests
         var source = @"
 §M{m001:BareTargetProbe}
   §F{f001:Go:pub}
-      §I{Func<i32>:make}
-      §O{i32}
-      §E{}
-      §R §C{make} §/C
+    §I{Func<i32>:make}
+    §O{i32}
+    §E{}
+    §R §C{make} §/C
 ";
         var result = TestHarness.Compile(source);
 

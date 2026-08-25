@@ -559,17 +559,16 @@ public static class TypeIdentity
     }
 
     /// <summary>
+    /// Maps common short type names to fully-qualified names for manifest resolution.
+    /// Used by both ParseCallTarget (in EffectInferrer) and ParseCallTargetForChain.
+    /// </summary>
+    /// <remarks>
     /// v0.15 E1 slice 2b — moved here from <c>Effects/EffectEnforcementPass.cs</c>.
     /// The binder needs this expansion (a short BCL receiver spelling such as
     /// <c>Random</c> must reach <c>System.Random</c>) and <c>Binding/</c> is not
     /// allowed to reference <c>Effects/</c>; the pass keeps an internal forwarder
     /// so its own call sites are unchanged. Pure string function, no state.
-    /// </summary>
-
-    /// <summary>
-    /// Maps common short type names to fully-qualified names for manifest resolution.
-    /// Used by both ParseCallTarget (in EffectInferrer) and ParseCallTargetForChain.
-    /// </summary>
+    /// </remarks>
     public static string MapShortTypeNameToFullName(string shortName)
     {
         // Calor surface syntax for the runtime's Option/Result types:

@@ -196,6 +196,26 @@ public sealed class CallGraphAnalysis
     /// bound answers disagree between two call sites in one function is dropped
     /// rather than guessed; the AST path then decides as it did before.</para>
     ///
+    /// <para><b>The real invariant, stated exactly</b> (review round 1, finding
+    /// 6). The map is keyed by NAME, not by position: if a name is used as a
+    /// receiver ANYWHERE in the function, this answers for that name EVERYWHERE
+    /// in the function, including at occurrences that are not receivers. The
+    /// consumer (<c>ResolveLocalValueType</c>) is itself name-keyed and has no
+    /// position to pass, so keying by (name, position) would need a second
+    /// parameter threaded through eleven call sites; that is deferred.</para>
+    ///
+    /// <para>What makes it safe today rather than merely convenient: the
+    /// ambiguity rule above. Two occurrences of one name that the binder types
+    /// differently — the case where "answers everywhere" would be wrong — are
+    /// dropped, so the AST decides exactly as before. What survives is a name
+    /// the binder gives ONE answer for throughout the function, and a name with
+    /// one type does not change type by appearing in a different position. The
+    /// residual exposure is a name the binder types identically at two
+    /// occurrences that the AST search would have answered differently, which
+    /// requires the AST search to disagree with itself on one name in one
+    /// function; no such shape is reachable from the resolvers' inputs
+    /// today.</para>
+    ///
     /// <para>Deliberately RECEIVERS ONLY, not every bound name. A name in a
     /// non-receiver position — a method group passed as an argument, a bare
     /// call target — must keep resolving through the AST, because the string

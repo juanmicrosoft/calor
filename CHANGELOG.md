@@ -49,12 +49,17 @@ All notable changes to this project will be documented in this file.
   checker already produced, and only falls back to the text search for shapes
   the type checker does not cover. If the type checker looked and could not
   name the type, the effect checker no longer substitutes a guess — the call is
-  treated as unknown, which is the safe answer. Nothing you compile changes as
-  a result: the same code produces the same messages, because the two routes
-  agree today. What changes is that the type checker's answer is now the one
-  that counts. Lambdas also get a proper function type internally, so
-  "is this a function value?" is answered by the type rather than by matching
-  text like `Func<`.
+  treated as unknown, which is the safe answer.
+  - **What you will see:** two kinds of code that used to be reported as
+    "unknown call" now compile cleanly, because the type checker knew the
+    answer all along. One is a binding with no written type whose value comes
+    from a .NET call — `§B{g} §C{System.Guid.NewGuid}`, then `g.ToString`. The
+    other is a local that shares its name with a field of a different type: the
+    old text search found the field and answered with the wrong one. Code that
+    already resolved is unaffected, and no existing message changes its wording.
+  - Lambdas also get a proper function type internally, so "is this a function
+    value?" is answered by the type rather than by matching text like `Func<`.
+    The type's printed name is unchanged.
 - **When the compiler cannot work out the type of the thing you are calling a
   method on, it now records that as a fact instead of leaving a placeholder.**
   Take `x.Run`, where `x` came from a call the compiler could not identify.
