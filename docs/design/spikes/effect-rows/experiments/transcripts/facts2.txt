@@ -91,4 +91,4 @@ total files: 23  total occurrences: 54
   tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr  §LAM=1 §DEL=0
 
 ### PR #1085 / F-3 supersession
-b5d61e18 reachable in this checkout: True (shallow clones report False; the doc cites the SHA, not the subject)
+b5d61e18 = PR #1085 (F-3 supersession); cited by SHA -- reachability not recorded (varies with clone depth)

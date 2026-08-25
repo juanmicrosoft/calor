@@ -49,13 +49,8 @@ for f in files:
         print(f"  {f}  §LAM={t.count('§LAM')} §DEL={t.count('§DEL')}")
 
 print("\n### PR #1085 / F-3 supersession")
-# Deliberately NOT `git log`: CI checks out shallow, so history-derived facts
-# are absent there and present locally -- exactly the drift that broke the
-# first version of this transcript. Instead probe the pinned object and print
-# a fixed marker either way; both branches are deterministic, and the doc
-# cites the SHA rather than the subject line.
-_present = subprocess.run(
-    ["git", "cat-file", "-e", "b5d61e18^{commit}"],
-    capture_output=True, text=True, env=_ENV).returncode == 0
-print("b5d61e18 reachable in this checkout:", _present,
-      "(shallow clones report False; the doc cites the SHA, not the subject)")
+# Deliberately NOT `git log` and NOT a reachability probe: CI checks out
+# shallow, so any history-derived fact -- including "is this SHA present" --
+# differs between a full local clone and CI. The doc cites the SHA and the PR
+# number, both of which are constants; that is all this transcript records.
+print("b5d61e18 = PR #1085 (F-3 supersession); cited by SHA -- reachability not recorded (varies with clone depth)")
