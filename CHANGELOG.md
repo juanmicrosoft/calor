@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- The round-trip check no longer fails a pull request because of a test that
+  MediatR's own test suite is known to flake on. The known-flake list was being
+  dropped on the way into the check, and a flaky failure could still trip the
+  "tests exited with 1" gate on either the baseline or the round-trip run. Ignored
+  flakes are still listed by name in the report.
+
 ### Changed
 - **Proof-based guard elision is now on by default.** When Z3 proves a
   contract — with `--verify` (postconditions) or refinement verification

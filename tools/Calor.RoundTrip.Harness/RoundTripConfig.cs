@@ -2,8 +2,10 @@ namespace Calor.RoundTrip.Harness;
 
 /// <summary>
 /// Configuration for a round-trip verification run against a target project.
+/// A record so derived configs (CLI overrides, bisect re-runs) are built with
+/// <c>with</c> and carry every field; see <see cref="WithRunOverrides"/>.
 /// </summary>
-public sealed class RoundTripConfig
+public sealed record RoundTripConfig
 {
     /// <summary>Display name for reports.</summary>
     public required string ProjectName { get; init; }
@@ -114,6 +116,27 @@ public sealed class RoundTripConfig
     public HashSet<string> ExpectedFlakyTestFullyQualifiedNames { get; init; } = [];
 
     internal Action<string>? FileConversionStarted { get; init; }
+
+    /// <summary>
+    /// Apply the <c>run</c> command's CLI overrides to a project config. Built on
+    /// a record <c>with</c> expression on purpose: a hand-written field copy here
+    /// once dropped <see cref="ExpectedFlakyTestFullyQualifiedNames"/>, so the CI
+    /// gate never saw the MediatR flake allowlist and kept blocking on it.
+    /// </summary>
+    public RoundTripConfig WithRunOverrides(
+        bool enableBisect,
+        TimeSpan? buildTimeout,
+        double? minimumCoverage,
+        double? minimumNative)
+    {
+        return this with
+        {
+            EnableBisect = enableBisect,
+            BuildTimeout = buildTimeout ?? BuildTimeout,
+            MinimumCoverageFraction = minimumCoverage ?? MinimumCoverageFraction,
+            MinimumNativeFraction = minimumNative ?? MinimumNativeFraction,
+        };
+    }
 
     public static List<string> DefaultExcludePatterns() =>
     [
