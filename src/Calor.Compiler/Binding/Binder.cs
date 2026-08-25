@@ -3263,7 +3263,8 @@ public sealed class Binder
             // called at :11877 and :11885) hands back Roslyn's display spelling of
             // the parameter's type, and for an error type that spelling is "?" —
             // which the emitter then writes as `§LAM{l1:ctx:?}`. That is a
-            // converter defect, tracked separately; the binder's job here is not
+            // converter defect (root cause: issue #1097, 72 pre-existing ICEs over the
+            // converted corpus, unchanged by this slice); the binder's job here is not
             // to amplify it.
             //
             // A receiver whose type string the binder cannot even canonicalize is
