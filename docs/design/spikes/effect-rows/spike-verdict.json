@@ -75,7 +75,7 @@
     "A2": {
       "verdict": "PASS-MODULO-LINE-DIRECTIVES",
       "strictBytesEqual": false,
-      "explanation": "7 bytes differ (`cmp -l`), every one of them a digit inside a `#line` directive; the two files are the same LENGTH, which is why the old `diffBytes` field read 0 and why it was replaced. after/A2.calr has two more source lines than before/A2.calr (the SE{e} row on the interface member and on the implementation), so the directives pointing into the source move by two. No emitted C# construct differs. The `eff` binder is fully erased: the emitted `Handle` signature is `Task<TResponse> Handle(TRequest, RequestHandlerDelegate<TResponse>, CancellationToken)` on both sides, with no `<e>`.",
+      "explanation": "7 bytes differ (`cmp -l`), every one of them a digit inside a `#line` directive; the two files are the same LENGTH, which is why the old `diffBytes` field read 0 and why it was replaced. after/A2.calr has two more source lines than before/A2.calr (the SE{e} row on the interface member and on the implementation), so the directives pointing into the source move by one (the first, 19→20) or two (the other five). No emitted C# construct differs. The `eff` binder is fully erased: the emitted `Handle` signature is `Task<TResponse> Handle(TRequest, RequestHandlerDelegate<TResponse>, CancellationToken)` on both sides, with no `<e>`.",
       "strictDiffBytes": 7,
       "nonLineDirectiveDiffBytes": 0
     },

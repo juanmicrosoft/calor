@@ -946,7 +946,7 @@ Calor0421 still fires when those parameters are renamed, so the interface↔impl
 already alpha-equivalent. Only if member-level provably cannot express R2 does the class-level
 binder ship, and only then does **§9's seventh insertion point become unconditional**.
 
-Either way R2 remains this document's most-likely ramp trigger (§14 Q1): the implementation
+Either way R2 was, when this section was written, this document's most-likely ramp trigger (§14 Q1 — the spike has since answered it: the ramp did not fire): the implementation
 declares `{e, cw}` against an interface row of `{e}`, which the ordinary `fits` relation must
 reject as Calor0421, and the *corrected* program requires widening `IPipelineBehavior` — an
 interface Calor does not own.
