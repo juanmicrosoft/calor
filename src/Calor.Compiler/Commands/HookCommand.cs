@@ -224,9 +224,9 @@ public static class HookCommand
         else
         {
             var systemMessage = $"This is a Calor-first project. Create an .calr file instead: {suggestedPath}\n\n" +
-                                "Calor has formal semantics v1.0.0. Key rules:\n" +
+                                $"Calor has formal semantics v{SemanticsVersion.VersionString}. Key rules:\n" +
                                 "- Overflow traps, evaluation is left-to-right\n" +
-                                "- Always add §SEMVER[1.0.0] to modules\n\n" +
+                                $"- Always add §SEMVER{{{SemanticsVersion.VersionString}}} to modules\n\n" +
                                 "Use @calor for syntax, @calor-semantics for behavior rules.";
             response = new GeminiDenyResponse
             {
@@ -305,7 +305,7 @@ public static class HookCommand
                                   "IMPORTANT: Calor has formal semantics that differ from C#:\n" +
                                   "  - Integer overflow TRAPS (throws OverflowException)\n" +
                                   "  - Evaluation is strictly left-to-right\n" +
-                                  "  - Always include §SEMVER[1.0.0] in modules\n\n" +
+                                  $"  - Always include §SEMVER{{{SemanticsVersion.VersionString}}} in modules\n\n" +
                                   "Use /calor skill for syntax, /calor-semantics for behavior rules.";
 
                 return (1, blockReason, suggestedPath);
@@ -426,10 +426,12 @@ public static class HookCommand
                 return (0, null);
             }
 
-            // Look for §SEMVER[x.y.z] or §SEMVER{x.y.z}
-            if (!content.Contains("§SEMVER[") && !content.Contains("§SEMVER{"))
+            // Look for §SEMVER{x.y.z}. The legacy bracket form §SEMVER[x.y.z] is not
+            // a declaration — the lexer rejects it with Calor0702 — so it does not
+            // satisfy the presence check either.
+            if (!content.Contains("§SEMVER{"))
             {
-                return (0, "REMINDER: Add §SEMVER[1.0.0] to your module for semantic versioning");
+                return (0, $"REMINDER: Add §SEMVER{{{SemanticsVersion.VersionString}}} to your module for semantic versioning");
             }
 
             return (0, null);

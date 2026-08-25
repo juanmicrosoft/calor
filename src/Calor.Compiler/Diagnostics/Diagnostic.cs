@@ -456,9 +456,23 @@ public static class DiagnosticCode
 
     /// <summary>
     /// Error: Module declares an incompatible semantics version (major version mismatch).
-    /// The code cannot be compiled with this compiler version.
+    /// The code cannot be compiled with this compiler version. Fires in both directions:
+    /// a declared major newer than <see cref="SemanticsVersion.Major"/> (the compiler is
+    /// too old) and a declared major older than it (the file was written for retired
+    /// semantics and must be migrated — roadmap §3.3 decision 1 / #1084: fail-closed,
+    /// never silently reinterpreted).
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
+
+    /// <summary>
+    /// Error: The <c>§SEMVER</c> directive is malformed (not exactly
+    /// <c>MAJOR.MINOR.PATCH</c>, bracket form, missing or unterminated braces)
+    /// or declared more than once in a module. Not to be confused with the
+    /// pre-#702 meaning of "Calor0702" (postcondition may be violated), which
+    /// was renumbered to <see cref="PostconditionMayBeViolated"/> (Calor0712);
+    /// this code was free from #702 until it was allocated here (#1087).
+    /// </summary>
+    public const string SemanticsVersionInvalidDeclaration = "Calor0702";
 
     // Contract verification results (Calor0710-0719 reserved; 0710-0719 assigned)
     // — emitted by Verification/ContractVerificationPass. This sub-band is disjoint

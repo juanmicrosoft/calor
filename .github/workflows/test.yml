@@ -152,15 +152,15 @@ jobs:
           --filter "FullyQualifiedName~EditScriptIdentityTests"
           --verbosity normal
 
-      - name: Run corpus binder ratchet
+      - name: Run corpus binder ratchet and higher-order demand ledger (D-B leg)
         run: |
           set -euo pipefail
           dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
             -c Release --no-build \
-            --filter "FullyQualifiedName~BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline" \
+            --filter "FullyQualifiedName~BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline|FullyQualifiedName~HigherOrderDemandLedgerTests.DB_CSharpBackstop_MatchesLedgerExactly" \
             --verbosity normal 2>&1 | tee /tmp/binder-ratchet.log
           if grep -q "corpus submodules not initialized" /tmp/binder-ratchet.log; then
-            echo "::error::Corpus binder ratchet skipped despite recursive checkout."
+            echo "::error::Corpus-gated ratchet (binder ratchet or demand ledger D-B) skipped despite recursive checkout."
             exit 1
           fi
 

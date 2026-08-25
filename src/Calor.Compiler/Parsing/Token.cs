@@ -84,6 +84,7 @@ public enum TokenKind
     Continue,
     Goto,
     Label,
+    SemVer,             // §SEMVER{MAJOR.MINOR.PATCH} - module semantics-version declaration
     Bind,
 
     // Phase 3: Type System

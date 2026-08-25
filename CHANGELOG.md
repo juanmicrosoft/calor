@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **`§SEMVER{MAJOR.MINOR.PATCH}` is a new module-level directive.** It did not
+  lex before this release: any `§SEMVER` line failed with `Calor0006`
+  (unknown section marker), even though the docs described it. Write it as the
+  first line of the module body, e.g. `§SEMVER{2.0.0}`. Only that exact
+  spelling is accepted — the caret and range forms the versioning page used
+  to show (`^1.0.0`, `>=1.0.0 <2.0.0`) are no longer documented and are
+  rejected with `Calor0702`, as are the bracket form `§SEMVER[…]`, a leading
+  sign, and any whitespace inside the braces.
+
+### Changed
+- **Files that declare `§SEMVER{1.x}` (or `0.x`) are now refused with an error
+  pointing at #1084.** The compiler implements semantics version 2.0.0. Before
+  this change a module that said `§SEMVER{1.0.0}` was not checked at all — the
+  `§SEMVER` line did not even lex, and the compatibility check in
+  `SemanticsVersion.CheckCompatibility` had no caller — so nothing stopped a
+  1.x file from being quietly read under 2.0.0 rules. Now that the directive
+  exists, the check runs on every parse (build, language server, `format`,
+  `self-check`, MCP tools):
+  - An older major (`§SEMVER{1.0.0}`) stops the build with `Calor0701`. The
+    message tells you what to do: migrate the module and declare
+    `§SEMVER{2.0.0}` after reviewing the nullability rules
+    (`Calor0272`/`0273`/`0274`). It links to
+    [#1084](https://github.com/juanmicrosoft/calor/issues/1084).
+  - A newer major (`§SEMVER{3.0.0}`) still stops the build with `Calor0701`
+    ("upgrade the compiler").
+  - A higher minor (`§SEMVER{2.1.0}`) compiles with a `Calor0700` warning.
+  - A version that is not exactly `MAJOR.MINOR.PATCH` (for example `^1.0.0` or
+    `2.0`), or a second `§SEMVER` in the same module, is a new `Calor0702` error.
+  - Files that declare nothing are unchanged: they take the compiler's version
+    and get no new diagnostic.
+  No committed `.calr` file declared a version, so nothing in the repo breaks.
+  This is roadmap §3.3 decision 1 (fail-closed) and item 1 of #1084. The
+  write-hook reminder now suggests `§SEMVER{2.0.0}` instead of `§SEMVER[1.0.0]`.
+- **Proof-based guard elision is now on by default.** When Z3 proves a
+  contract — with `--verify` (postconditions) or refinement verification
+  (`§PROOF` obligations, refinement-type entry/return checks, index-bounds and
+  subtype obligations, reached today through the MCP `calor_refine` tool) —
+  the compiler now leaves that runtime check out of the generated C#. You no
+  longer need to pass `--elide-proven-guards` (the flag still works; it just
+  restates the default). Only a clean `Proven` verdict with no assumptions
+  attached qualifies. Preconditions, `Assumed`, `Timeout`, `Refuted` and every
+  other verdict keep their guards exactly as before, and a compile that runs
+  no verification at all is unchanged.
+  - **To opt out** (keep every guard and use verification as a diagnostic
+    only — the 0.13/0.14 behavior): pass `--keep-proven-guards` (or
+    `--no-elide-proven-guards`) on `calor compile`, `calor run` and
+    `calor test`; set `ElideProvenGuards = false` on `CompilationOptions`; pass
+    `"keepProvenGuards": true` in the MCP `calor_compile` options; or set
+    `<CalorElideProvenGuards>false</CalorElideProvenGuards>` in an MSBuild
+    project (the MSBuild cache knows about this setting, so changing it
+    recompiles).
+  - **Why now:** in 0.13 we said we would only turn this on once a test suite
+    showed that "Z3 says proven" and "the check never fails at runtime" always
+    agree. That suite now exists, runs on every CI build, and reports zero
+    disagreements across the 65 contract shapes it covers (40 of which can
+    actually be elided). One honest caveat: the test suite runs the guarded
+    version of the code and checks the shape of the elided version — it does
+    not run the elided version.
+  - The default is the same on every surface — CLI, `CompilationOptions`
+    (used by the SDK, MCP tools, `review-packet`, `run`/`test`), the MSBuild
+    task and `Sdk.targets` — and a test pins that they agree. (`calor watch`
+    never runs verification, so it is unaffected.)
+
 ### v0.15 foundation
 - **`calor effects suggest` now learns what type a variable is from the
   compiler's own type information instead of guessing from the source text.**

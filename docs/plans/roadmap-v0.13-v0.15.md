@@ -93,7 +93,8 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
   from the original 0.14 slot because the full-vs-incremental identity gate (§2.5) and
   review-packet's "invalidated proofs" facet are unsound without trustworthy cache keys.
 - **Guard-elision policy: resolved now, by decision rather than by gate.** Proof-based guard elision
-  becomes **explicitly opt-in** in 0.13; verification remains diagnostic by default. The
+  becomes **explicitly opt-in** in 0.13; verification remains diagnostic by default. *(Default-on
+  since PR #1088, 0.15.0 — the condition below was met.)* The
   solver-vs-runtime differential suite (#779) is then built as a *program* rather than a release
   blocker: its denominator is the **`verification-modeled-forms.md` whitelist pinned by content
   hash** (not "whatever currently elides" — the shipped closure mechanism is demotion to `Assumed`,
@@ -193,7 +194,7 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    corpus including shadowing cases. Instrument: a harness command applying SymbolId-addressed
    renames, shipping with the spine — the deferred LSP (§2.3) later consumes the same identities;
    this gate does not wait for it.
-5. **Differential program (elision opt-in)**: the #779 suite exists, runs in CI against the pinned
+5. **Differential program (elision opt-in; default-on since PR #1088)**: the #779 suite exists, runs in CI against the pinned
    `verification-modeled-forms.md` denominator, and the elision-coverage fraction is published.
    Zero-mismatch is the 0.14 re-enable bar, not a 0.13 blocker (§2.1).
 6. **PP-S4 registry**: exists at its A-1.5.7-registered location, schema, and CI entry point, and
@@ -324,7 +325,7 @@ completion of the 0.13 program).
    executed; the benchmark re-baseline and its discontinuity are in the CHANGELOG.
 6. **Elision re-enable** (carried from 0.13): differential suite zero-mismatch over the pinned
    modeled-forms denominator with published coverage fraction; otherwise elision stays opt-in and
-   the release says so.
+   the release says so. *(Met at v0.14.3; flipped default-on by PR #1088 for 0.15.0.)*
 
 ## 4. v0.15 — Composable Effects
 
@@ -418,7 +419,8 @@ higher-order code instead of rejecting it.
   distinct artifact; no golden regeneration; the 1.32× headline is byte-identical across
   0.14.0–0.14.3 with no discontinuity note); 3.5.6 elision (the differential suite reports 0
   mismatches and elision coverage 40/65 — the re-enable condition is met — yet
-  `--elide-proven-guards` remains opt-in, `Program.cs:94-97`).
+  `--elide-proven-guards` remained opt-in at v0.14.3, `Program.cs:94-97` — **flipped default-on by
+  PR #1088** for 0.15.0; `--keep-proven-guards` is the opt-out).
 - **Null classes 0.14 did ship**, cited so §7 has a source: `str` scalars, arrays of `str`,
   whitelisted generic instantiations over `str`, and user reference types from Annotated sources
   only (CHANGELOG 0.14.0–0.14.3; S8-Oblivious widening held in draft PR #1078; epic #1082).
@@ -679,8 +681,8 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
 
 | Item | State at v0.14.3 | 0.15 disposition |
 |---|---|---|
-| 3.5.6 elision re-enable | Condition met: 0 mismatches over the pinned modeled-forms denominator (`test.yml:196-200`), coverage 40/65 published; still opt-in | **Flip default-on in 0.15.0** as its own PR. The single blocking pin is `tests/Calor.Verification.Tests/MethodElisionCursorTests.cs:196-197` (`ProvenPostcondition_WithoutOptIn_KeepsGuard`); `DifferentialGate.cs:42` sets the flag explicitly and survives. If it is *not* flipped, the 0.15.0 release notes say why — and §7 reads accordingly |
-| 3.5.5 self-migration (2.0.0) — **supersedes §3.3 decisions 1–4 as written** | `Major = 2`; 1.x accepted silently; no migrator; no golden regen; no re-baseline; **0 of 886 committed `.calr` declare a version** | Tracked as **#1084**. (1) **Execute §3.3 decision 1 as written, in 0.15.0**: wire `CheckCompatibility` so a declared `§SEMVER{1.x}` file is *refused* with a migration pointer (Error, fail-closed — not the Warning the first revision of this draft proposed; nothing in-repo declares 1.x, so the cost is `VersioningTests.cs:70-74` and 14 doc blocks). (2) Decision 4's re-baseline becomes a CHANGELOG **disclosure**: the corpus declared nothing and has been measured under 2.0.0 semantics since v0.14.0. (3) Decisions 2–3 (migrator, golden regen) are **demand-driven** — a user-reported 1.x file re-opens them immediately; otherwise re-adjudicated at the 0.16 branch cut. Gate 5 restated accordingly |
+| 3.5.6 elision re-enable | Condition met: 0 mismatches over the pinned modeled-forms denominator (`test.yml:196-200`), coverage 40/65 published; still opt-in at v0.14.3 | **Done — PR #1088** flips default-on for 0.15.0 on every surface (CLI compile/run/test, `CompilationOptions`, MSBuild task + `Sdk.targets`, MCP `calor_compile`), with `--keep-proven-guards` as the opt-out. The blocking pin `ProvenPostcondition_WithoutOptIn_KeepsGuard` became `ProvenPostcondition_Default_ElidesGuard` + `_WithOptOut_KeepsGuard`; `DifferentialGate.cs:42` still sets the flag explicitly (both legs). Caveat carried into the changelog: the differential executes the guard-forced emission and inspects the elided emission structurally |
+| 3.5.5 self-migration (2.0.0) — **supersedes §3.3 decisions 1–4 as written** | `Major = 2`; 1.x accepted silently; no migrator; no golden regen; no re-baseline; **0 of 886 committed `.calr` declare a version** | Tracked as **#1084**. (1) **Execute §3.3 decision 1 as written, in 0.15.0**: wire `CheckCompatibility` so a declared `§SEMVER{1.x}` file is *refused* with a migration pointer (Error, fail-closed — not the Warning the first revision of this draft proposed; nothing in-repo declares 1.x, so the cost is `VersioningTests.cs:70-74` and 14 doc blocks). (2) Decision 4's re-baseline becomes a CHANGELOG **disclosure**: the corpus declared nothing and has been measured under 2.0.0 semantics since v0.14.0. (3) Decisions 2–3 (migrator, golden regen) are **demand-driven** — a user-reported 1.x file re-opens them immediately; otherwise re-adjudicated at the 0.16 branch cut. Gate 5 restated accordingly. (Executing this revealed the directive had never been lexed; PR #1087 adds it.) |
 | 3.5.4 TIER1A adjudication | Registry empty; checker on a non-ancestor branch | **Not a 0.15 gate.** The 0.15.0 release notes carry an explicit "TIER1A: not run" row (an honest negative, a release-notes commitment with no instrument); running it under its §6.3 matrix is re-adjudicated at the 0.15.0 retro |
 | 3.5.1 null-state slice + adversarial null corpus | Absent | Not a prerequisite for rows (unchanged reasoning). Trigger: the 0.15.0 retro decides whether it is 0.15.x or 0.16; venue: the retro's disposition table |
 | #1082 (nullability follow-ons) | Epic open; PR #1078 draft | **Sequenced after E1 merges.** Item 1 changes what `MetadataBinder` emits for every reference-type return — the same surface E1 re-keys on; gate 6's ledger is what makes a mis-sequenced landing visible |

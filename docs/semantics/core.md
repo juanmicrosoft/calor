@@ -481,14 +481,18 @@ Mutable bindings require explicit declaration:
 
 See `docs/semantics/versioning.md` for details on semantics versioning.
 
-**Current Version:** 1.0.0
+**Current Version:** 2.0.0
 
 Modules can declare required semantics version:
 
 ```calor
 §M{m001:MyModule}
-  §SEMVER{1.0.0}
+  §SEMVER{2.0.0}
 ```
+
+A module that declares an older major (`§SEMVER{1.0.0}`) is refused with
+`Calor0701` — see `docs/semantics/versioning.md` §5 for the rule and the
+migration pointer.
 
 ---
 

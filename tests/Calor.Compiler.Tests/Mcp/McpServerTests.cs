@@ -190,6 +190,41 @@ public class McpServerTests
         Assert.Contains("diagnostics", json);
     }
 
+    /// <summary>
+    /// The MCP compile tool goes through Program.Compile, so an agent handing it a
+    /// §SEMVER{1.0.0} module gets the fail-closed Calor0701 refusal with the migration
+    /// pointer (#1084 item 1 / #1087) rather than silently reinterpreted 2.0.0 output.
+    /// </summary>
+    [Fact]
+    public async Task McpMessageHandler_HandleToolsCall_CompileTool_LegacySemver_ReportsCalor0701()
+    {
+        var handler = new McpMessageHandler();
+        var request = new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("41").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse("""
+                {
+                    "name": "calor_compile",
+                    "arguments": {
+                        "source": "§M{m001:Legacy}\n  §SEMVER{1.0.0}\n  §F{f001:Answer:pub} () -> i32\n    §E{}\n    §R INT:42\n"
+                    }
+                }
+                """).RootElement
+        };
+
+        var response = await handler.HandleRequestAsync(request);
+
+        Assert.NotNull(response);
+        Assert.Null(response.Error);
+        Assert.NotNull(response.Result);
+
+        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
+        Assert.Contains("Calor0701", json);
+        Assert.Contains("issues/1084", json);
+        Assert.DoesNotContain("\"success\":true", json.Replace(" ", ""));
+    }
+
     [Fact]
     public async Task McpMessageHandler_HandleToolsCall_ConvertTool_Success()
     {

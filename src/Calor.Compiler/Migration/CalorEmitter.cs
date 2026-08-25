@@ -161,6 +161,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine($"§M{{{node.Id}:{moduleName}}}");
         Indent();
 
+        if (node.DeclaredSemanticsVersion != null)
+        {
+            AppendLine($"§SEMVER{{{node.DeclaredSemanticsVersion}}}");
+        }
+
         if (HasExplicitNamespaceTopology(node))
         {
             EmitScopedModuleBody(node);
