@@ -291,8 +291,8 @@ internal static class DifferentialGate
         {
             detail.Add(
                 elisionEligible
-                    ? "eligible Proven/Discharged guard was not elided on the opt-in path"
-                    : "fail-safe or precondition guard was elided on the opt-in path");
+                    ? "eligible Proven/Discharged guard was not elided on the elision-enabled path"
+                    : "fail-safe or precondition guard was elided on the elision-enabled path");
         }
         if (outcome.IsVacuous)
             detail.Add("generated case produced a vacuous proof");

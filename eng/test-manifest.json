@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7653,
+      "expectedTotal": 7660,
       "expectedSkipped": 3
     },
     {
@@ -82,7 +82,7 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 96,
+      "expectedTotal": 98,
       "expectedSkipped": 0
     },
     {
@@ -128,7 +128,7 @@
     },
     {
       "reason": "Z3 not available",
-      "count": 393
+      "count": 397
     },
     {
       "reason": "corpus submodules not initialized",

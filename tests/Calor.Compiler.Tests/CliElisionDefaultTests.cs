@@ -109,6 +109,35 @@ public class CliElisionDefaultTests : IDisposable
     }
 
     [Fact]
+    public void NoVerify_KeepsPostconditionGuard()
+    {
+        // Without --verify there is no verdict to act on: the default-on elision must
+        // leave the postcondition guard exactly where 0.14 left it.
+        var input = WriteProvenSource();
+        var output = Path.Combine(_tempDir, "square.cs");
+
+        var (exit, _, _) = CliTestHarness.RunCli(_tempDir, "--input", input, "--output", output);
+
+        Assert.Equal(0, exit);
+        var generated = File.ReadAllText(output);
+        Assert.DoesNotContain("// PROVEN: Postcondition", generated);
+        Assert.Contains("ContractKind.Ensures", generated);
+    }
+
+    [Fact]
+    public void ElideProvenGuards_WithoutVerify_WarnsButCompiles()
+    {
+        var input = WriteProvenSource();
+        var output = Path.Combine(_tempDir, "square.cs");
+
+        var (exit, _, stdErr) = CliTestHarness.RunCli(
+            _tempDir, "--input", input, "--output", output, "--elide-proven-guards");
+
+        Assert.Equal(0, exit);
+        Assert.Contains("--elide-proven-guards has no effect without --verify", stdErr);
+    }
+
+    [Fact]
     public void NoFlag_WithoutVerify_DoesNotWarn()
     {
         var input = WriteProvenSource();

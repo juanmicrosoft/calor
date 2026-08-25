@@ -5,27 +5,35 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
-- **Proof-based guard elision is now on by default.** When you compile with
-  `--verify` and Z3 proves a postcondition or a `§PROOF` obligation, the
-  compiler now leaves that runtime check out of the generated C# — you no
+- **Proof-based guard elision is now on by default.** When Z3 proves a
+  contract — with `--verify` (postconditions) or refinement verification
+  (`§PROOF` obligations, refinement-type entry/return checks, index-bounds and
+  subtype obligations, reached today through the MCP `calor_refine` tool) —
+  the compiler now leaves that runtime check out of the generated C#. You no
   longer need to pass `--elide-proven-guards` (the flag still works; it just
-  restates the default). Only a clean, non-vacuous, assumption-free `Proven`
-  verdict qualifies. Preconditions, `Assumed`, `Timeout`, `Refuted` and every
-  other verdict keep their guards exactly as before, and nothing changes when
-  you compile without `--verify`.
+  restates the default). Only a clean `Proven` verdict with no assumptions
+  attached qualifies. Preconditions, `Assumed`, `Timeout`, `Refuted` and every
+  other verdict keep their guards exactly as before, and a compile that runs
+  no verification at all is unchanged.
   - **To opt out** (keep every guard and use verification as a diagnostic
     only — the 0.13/0.14 behavior): pass `--keep-proven-guards` (or
-    `--no-elide-proven-guards`) on the CLI, set `ElideProvenGuards = false` on
-    `CompilationOptions`, or set `<CalorElideProvenGuards>false</CalorElideProvenGuards>`
-    in an MSBuild project.
-  - **Why now:** this was the re-enable condition registered in 0.13 (roadmap
-    §2.1) and carried into 0.15 (roadmap §4.5). The solver-vs-runtime
-    differential suite (`bench/phase0-agent-native/verifier-runtime-differential.json`,
-    CI-blocking) reports 0 mismatches over the pinned modeled-forms
-    denominator, with elision coverage published at 40/65 forms.
+    `--no-elide-proven-guards`) on `calor compile`, `calor run` and
+    `calor test`; set `ElideProvenGuards = false` on `CompilationOptions`; pass
+    `"keepProvenGuards": true` in the MCP `calor_compile` options; or set
+    `<CalorElideProvenGuards>false</CalorElideProvenGuards>` in an MSBuild
+    project (the MSBuild cache knows about this setting, so changing it
+    recompiles).
+  - **Why now:** in 0.13 we said we would only turn this on once a test suite
+    showed that "Z3 says proven" and "the check never fails at runtime" always
+    agree. That suite now exists, runs on every CI build, and reports zero
+    disagreements across the 65 contract shapes it covers (40 of which can
+    actually be elided). One honest caveat: the test suite runs the guarded
+    version of the code and checks the shape of the elided version — it does
+    not run the elided version.
   - The default is the same on every surface — CLI, `CompilationOptions`
-    (used by the SDK, MCP tools, `review-packet` and `watch`), the MSBuild
-    task and `Sdk.targets` — and a test pins that they agree.
+    (used by the SDK, MCP tools, `review-packet`, `run`/`test`), the MSBuild
+    task and `Sdk.targets` — and a test pins that they agree. (`calor watch`
+    never runs verification, so it is unaffected.)
 
 ## [0.14.3] - 2026-08-24
 

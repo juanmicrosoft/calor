@@ -33,6 +33,7 @@ internal sealed record CompileCalorCacheInputs(
     string Nullable,
     bool TreatWarningsAsErrors,
     bool VerifyContracts,
+    bool ElideProvenGuards,
     bool EnableILAnalysis,
     string ExperimentalFlags,
     string ProjectDirectory,
@@ -60,6 +61,7 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "nullable", Nullable);
         Append(builder, "treatWarningsAsErrors", TreatWarningsAsErrors ? "true" : "false");
         Append(builder, "verifyContracts", VerifyContracts ? "true" : "false");
+        Append(builder, "elideProvenGuards", ElideProvenGuards ? "true" : "false");
         Append(builder, "enableILAnalysis", EnableILAnalysis ? "true" : "false");
         Append(builder, "experimentalFlags", ExperimentalFlags);
         Append(builder, "projectDirectory", ProjectDirectory);
@@ -259,6 +261,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             Nullable,
             TreatWarningsAsErrors,
             Verify,
+            ElideProvenGuards,
             EnableILAnalysis,
             canonicalExperimentalFlags,
             DescribePath(ProjectDirectory, includeContent: false),

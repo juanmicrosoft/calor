@@ -845,6 +845,7 @@ public class CompileCalorIntegrationTests : IDisposable
     [InlineData("enforceEffects")]
     [InlineData("typeCheck")]
     [InlineData("verify")]
+    [InlineData("elideProvenGuards")]
     [InlineData("ilAnalysis")]
     [InlineData("experimental")]
     public void OptionsHash_FlippingAnyDiagnosticsAffectingOption_InvalidatesWarmCache(string option)
@@ -872,6 +873,7 @@ public class CompileCalorIntegrationTests : IDisposable
             case "enforceEffects": flipped.EnforceEffects = false; break;
             case "typeCheck": flipped.TypeCheck = false; break;
             case "verify": flipped.Verify = true; break;
+            case "elideProvenGuards": flipped.ElideProvenGuards = false; break;
             case "ilAnalysis": flipped.EnableILAnalysis = true; break;
             case "experimental": flipped.ExperimentalFlags = "pilot-hello-world"; break;
         }
@@ -883,6 +885,50 @@ public class CompileCalorIntegrationTests : IDisposable
             Assert.Contains("Compiling", msgs);
         var cache = BuildStateCache.Load(_outputDir);
         Assert.NotNull(cache);
+    }
+
+    // PR #1088 review: CalorElideProvenGuards is a codegen-affecting option (v0.15
+    // default-on elision). Opting out after a default build must recompile and
+    // the recompiled output must keep the postcondition guard — a stale cache hit
+    // would silently ship the elided .g.cs under a project that asked for guards.
+    [Fact]
+    public void ElideProvenGuards_OptOutAfterDefaultBuild_RecompilesAndKeepsGuard()
+    {
+        var src = CreateSourceFile("ElideOptOut.calr", """
+            §M{m001:ElideOptOut}
+              §CL{c001:Calc:pub}
+                §MT{mt001:Square:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §Q (>= x 0)
+                  §Q (<= x 46340)
+                  §S (>= result 0)
+                  §R (* x x)
+            """);
+        var output = Path.Combine(_outputDir, "ElideOptOut.g.cs");
+
+        var cold = CreateTask(src);
+        cold.Verify = true;
+        Assert.True(cold.Execute());
+        Assert.True(cold.ElideProvenGuards, "task default must be elide-on (v0.15)");
+        var elided = File.ReadAllText(output);
+        if (Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable)
+        {
+            Assert.Contains("// PROVEN: Postcondition", elided);
+            Assert.DoesNotContain("ContractKind.Ensures", elided);
+        }
+
+        var optOut = CreateTask(src);
+        optOut.Verify = true;
+        optOut.ElideProvenGuards = false;
+        Assert.True(optOut.Execute());
+        var messages = string.Join("\n", ((TestBuildEngine)optOut.BuildEngine).Messages);
+        Assert.Contains("[options-or-inputs-changed]", messages);
+        Assert.DoesNotContain("skipping", messages);
+
+        var kept = File.ReadAllText(output);
+        Assert.DoesNotContain("// PROVEN: Postcondition", kept);
+        Assert.Contains("ContractKind.Ensures", kept);
     }
 
     [Fact]
