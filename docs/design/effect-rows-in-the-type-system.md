@@ -1,7 +1,7 @@
 # Effect Rows in the Type System (TIER2D)
 
-**Status:** Draft v2
-**Date:** 2026-08-25 (v1 2026-08-25; review round 1 applied — §15)
+**Status:** Draft v3
+**Date:** 2026-08-25 (v1 and v2 same day; review rounds 1 and 2 applied — §15)
 **Measured against:** `main` @ `82338e37` (v0.14.3 + PR #1089 E1 slice 1 + PR #1090)
 **Governing inputs:** `docs/design/calor-direction.md` (`:23` TIER2D, `:33` generics deferral,
 `:57` the three worked examples, `:90-120` the postscript); `docs/plans/roadmap-v0.13-v0.15.md`
@@ -10,13 +10,23 @@
 `bench/phase0-agent-native/higher-order-demand-ledger.json`;
 `bench/phase0-agent-native/metadata-binding-corpus-ledger.json`.
 
-**Evidence discipline (new in v2).** Every claim about how the compiler behaves today is backed
-by an **executed** experiment against a compiler built from this worktree
-(`dotnet build src/Calor.Compiler` → `src/Calor.Compiler/bin/Debug/net10.0/calor.dll`), not by
-reading source. Cases are labelled `X*`/`Y*` and their **verbatim** output is quoted. Reproduce
-with `docs/design/spikes/effect-rows/experiments/run.py`. Structural claims (line numbers, file
-counts) carry `file:line` and the command that produced them. Where a governing input disagrees
-with the source, the source wins and the disagreement is recorded in §14.1.
+**Evidence discipline (v2), pinned (v3).** Every claim about how the compiler behaves today is
+backed by an **executed** experiment against a compiler built from this tree, not by reading
+source. Cases are labelled `X*` / `Y*` / `Z*` and their **verbatim** output is quoted;
+`docs/design/spikes/effect-rows/experiments/` holds the scripts, their canonical transcripts, and
+`regenerate-transcripts.py`.
+
+v2 left those outputs *reproducible but unobserved*, which is the failure mode this document
+criticises Draft v1 for. v3 closes it:
+`tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs` re-runs all six scripts
+and diffs against the committed transcripts (**P29**), and shape-checks the corpus baseline
+(**P30**). It never skips — a missing compiler build is a hard failure, because a skipped
+evidence pin is how Draft v1's fabricated quotations survived. If the compiler changes, the test
+goes red naming the script, and the doc and the transcripts are updated in the same PR.
+
+Structural claims (line numbers, file counts) carry `file:line` and the command that produced
+them. Where a governing input disagrees with the source, the source wins and the disagreement is
+recorded in §14.1.
 
 ---
 
@@ -167,11 +177,19 @@ three source files — `Commands/IndexCommand.cs`, `Commands/QueryCommand.cs`,
 
 ## 3. Decision 1 — Row syntax
 
-> **Decision.** A row is written with the **existing `§E{…}` tag**. Which thing it annotates is
-> decided by **line adjacency**: a `§E{…}` whose first token sits on the **same source line** as
-> the last token of the type immediately preceding it is **that type's row**; a `§E{…}` on any
-> **later line** is the **enclosing declaration's own row**, exactly as today. Seven positions.
-> No new token, no new AST node type, no new `IAstVisitor` method.
+> **Decision.** A row is written with the **existing `§E{…}` tag**, and **line adjacency** decides
+> what it annotates:
+>
+> - a `§E{…}` whose first token sits on the **same source line** as the last token of the type
+>   immediately preceding it is **that type's row**;
+> - **otherwise the `§E` is not consumed at that position** and the enclosing production resumes
+>   as it does today. In `§F` / `§MT` / `§DEL` section loops that means the token reaches their
+>   existing `§E` arm and is the **declaration's own row**, unchanged. At the four positions with
+>   no such arm — inline parameter, binding, field, and a wrapped inline signature — it is a parse
+>   error today, so E2 replaces the cascade with a row-aware recovery diagnostic,
+>   **Calor0405 `EffectRowMisplaced`**.
+>
+> **Eight positions** (§3.3). No new token, no new AST node type, no new `IAstVisitor` method.
 
 ### 3.1 The collision, executed
 
@@ -203,6 +221,40 @@ So the ambiguity is real at three positions, not one, and the docs make the two-
 canonical (`docs/syntax-reference/effects.md:44-51` — *"Place the effect declaration after the
 output type"*; repeated `structure-tags.md:170-176`).
 
+**And the "later line ⇒ declaration row" reading only holds where a `§E` arm exists.** Draft v2
+stated it unconditionally; executed, it is false at four positions. `§FLD` sits in the
+class-member loop, `§B` in the statement loop, and a wrapped inline signature inside `( )` — and
+none of the three has a `§E` arm, so today a non-adjacent `§E` there is a four-diagnostic cascade
+that never mentions effects:
+
+```
+CASE Z1  §CL{…} / §FLD{i32:x:pri} ⏎ §E{cw}
+  (4,5)  Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD,
+                    AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Effects
+  (4,7)  … but found OpenBrace      (4,8) … but found Identifier      (4,10) … but found CloseBrace
+
+CASE Z2  §B{y:i32} INT:1 ⏎ §E{cw}
+  (5,5)  Calor0100: Expected statement but found Effects
+  (5,7)  … OpenBrace      (5,8) … Identifier      (5,10) … CloseBrace
+
+CASE Z3  §F{…} ( ⏎ Func<i32,i32>:transform ⏎ §E{cw} ⏎ ) -> i32
+  (4,7)  Calor0100: Expected CloseParen but found Effects
+  … then 7 more cascade lines through the rest of the signature and the body
+```
+
+Z3 is not hypothetical: **Z5** confirms inline parameter lists really do wrap across lines and
+compile, so an author writing a wrapped signature is one newline away from the cascade. E2 must
+therefore emit a **row-aware recovery** at these four positions rather than a token cascade:
+
+```
+Calor0405: A §E{…} effect row must be on the same line as the type it annotates.
+Move it onto the end of the 'transform' parameter line, or — if this is meant to be
+the function's own effect declaration — onto its own line in the §F body.
+```
+
+Recovery consumes the `§E{…}` group so the rest of the declaration still parses, turning four (or
+eleven) diagnostics into one. §13.2 P2 pins all four positions against their Z-case baselines.
+
 ### 3.2 Why line adjacency, and what it costs
 
 `TextSpan` exposes `Line` (`Parsing/TextSpan.cs:12`), so the rule is one comparison —
@@ -225,17 +277,21 @@ claim, executed rather than asserted. It is still a **breaking change to a form 
 today** (Y1b, X2b, Y5a all compile now and would mean something else), and the release notes must
 say so; it is not a change to any form anybody has written.
 
-The 23 files were each compiled at `82338e37` as the baseline the E2 PR re-runs
-(`experiments/compile53.py`, results in `o53/baseline.json`). Today **22 of the 23 are already
-compile-red for reasons unrelated to effects** — 15 `bench/mcp/tasks/*` on Calor0830 legacy
-closers, 3 `benchmarks/security/*` on Calor0006/0100/0102 (the #901 stale subjects), 1 lint error
-fixture on Calor0002 — which is the same set the demand ledger lists in
-`notReachingEffectPass`. **Exactly one is green**:
+The 23 files were each compiled as the baseline the E2 PR re-runs (`experiments/compile53.py`,
+results in `o53/baseline.json`, shape-pinned by **P30**). Today **22 of the 23 are already
+compile-red for reasons unrelated to effects** — **18** `bench/mcp/tasks/*` on Calor0830 legacy
+closers, **3** `benchmarks/security/*` on Calor0006/0100/0102 (the #901 stale subjects), **1**
+lint error fixture on Calor0002 — which is the same set the demand ledger lists in
+`notReachingEffectPass`. (v2 wrote "15 + 3 + 1 = 22"; the ledger says 18. P30 asserts the
+breakdown so the arithmetic cannot drift again.) **Exactly one is green**:
 `tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr`. So the live risk surface
 for the two-line `§O`/`§E` form is one file and one occurrence, and the dominant real corpus is
 the 2948/471 arrow form, which the rule provably cannot reach.
 
-### 3.3 The seven positions and the six insertion points
+### 3.3 The eight positions and the six insertion points
+
+v2 said "seven positions" over a table with eight labelled rows (…6, 6b, 7). There are **eight**;
+position 6 simply has two spellings. Renumbered here and used consistently throughout.
 
 | # | Position | Spelling | Parses today? |
 |---|---|---|---|
@@ -244,13 +300,13 @@ the 2948/471 arrow form, which the rule provably cannot reach.
 | 3 | Delegate declaration | `§DEL{id:Name}` … `§E{…}` | **yes** — `:11574-11577`; **X8** compiles today |
 | 4 | Parameter, tag form | `§I{Func<i32,i32>:f} §E{…}` | parses, **wrong meaning** — Y1a/Y1b |
 | 5 | Parameter, inline form | `(Func<i32,i32>:f §E{…}, i32:v)` | **no** — **X9c**: `Calor0100: Expected CloseParen but found Effects` |
-| 6 | Return | `§O{Func<i32>} §E{…}` / `-> Func<i32> §E{…}` | parses, **wrong meaning** — X2b, Y5a |
-| 6b | Binding | `§B{f:Func<i32,i32>} §E{…} <init>` | **no** — **Y3a**: `Calor0100: Expected statement but found Effects` |
-| 7 | Field | `§FLD{Action<i32>:onChange:pri} §E{…}` | **no** — **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects` |
+| 6 | Return (two spellings) | `§O{Func<i32>} §E{…}` and `-> Func<i32> §E{…}` | parses, **wrong meaning** — X2b, Y5a |
+| 7 | Binding | `§B{f:Func<i32,i32>} §E{…} <init>` | **no** — **Y3a**: `Calor0100: Expected statement but found Effects` |
+| 8 | Field | `§FLD{Action<i32>:onChange:pri} §E{…}` | **no** — **X9b**: `Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, … but found Effects` |
 
-(Draft v1's §14 Q4 closed position 7 by *reading* `ParseClassField`'s default-value guard and
+(Draft v1's §14 Q4 closed position 8 by *reading* `ParseClassField`'s default-value guard and
 concluded it already parsed. **X9b disproves that**: the class-member loop rejects `Effects`
-before the guard is relevant. Corrected here; the correction is why v2 executes everything.)
+before the guard is relevant. Corrected here; the correction is why v2 and v3 execute everything.)
 
 **Insertion points: six, not twenty.** The evidence lens counted 9 `§I`→`ParseParameter` dispatch
 arms (`Parser.cs:1369, :1565, :8271, :8826, :8971, :10137, :10300, :10390, :11566`) and 7
@@ -258,19 +314,28 @@ arms (`Parser.cs:1369, :1565, :8271, :8826, :8971, :10137, :10300, :10390, :1156
 fatal to Draft v1's "one check per arm". **The check moves inside the shared productions
 instead**, so each is written once:
 
-| Insertion point | Covers |
+| Insertion point | Covers position(s) |
 |---|---|
-| end of `ParseParameter()` (`Parser.cs:1740-1752`) | all **9** `§I` arms |
-| end of `ParseOutput()` (`:1754-1768`) | all **7** `§O` arms |
-| `TryParseInlineSignature`, after the modifier slot (`:13567`) | inline parameters |
-| `TryParseInlineSignature`, after the arrow's return type (`:13620`) | `-> T §E{…}` |
-| `ParseClassField()`, before the default-value branch (`:8709`) | `§FLD` |
-| the `§B` production, after its attribute group | `§B` |
+| end of `ParseParameter()` (`Parser.cs:1740-1752`) | **4** — all **9** `§I` arms |
+| end of `ParseOutput()` (`:1754-1768`) | **6** (`§O` spelling) — all **7** `§O` arms |
+| `TryParseInlineSignature`, after the modifier slot (`:13567`) | **5** |
+| `TryParseInlineSignature`, after the arrow's return type (`:13620`) | **6** (`->` spelling) |
+| `ParseClassField()`, before the default-value branch (`:8709`) | **8** |
+| the `§B` production, after its attribute group | **7** |
 
 Positions 1–3 need **no** parser change at all. `TokenKind.Effects` is absent from
 `ExpressionParsers` (`Parser.cs:15-65`, exactly 47 entries), so `IsExpressionStart()`
 (`:2466-2469`) is false for it and no initializer or default-value parse can swallow a row —
-which is why insertion points 5 and 6 are safe. That property is pinned (§13.2).
+which is why insertion points at positions 5, 7 and 8 are safe. That property is pinned (P5).
+
+Each of the six also carries the **Calor0405 recovery** of §3.1 on its non-adjacent branch, at
+the four positions (5, 6-wrapped, 7, 8) that have no `§E` arm to fall through to.
+
+For completeness, one more place a `§E` can be written and is rejected today, so that E2 does not
+accidentally start accepting it: inside a call's argument list. **Z10** —
+`§R §C{Helper} §A INT:1 §E{cw} §/C` — gives `Calor0100: Expected EndCall but found Effects` at
+(7,28) plus five cascade lines. Arguments are values, not declarations; they have no row, and
+Calor0405 is *not* extended there. P3 pins the rejection.
 
 **Row storage.** `EffectsNode? Row` on four **existing** classes:
 `ParameterNode` (`Ast/FunctionNode.cs:252`), `OutputNode` (`Ast/FunctionNode.cs:21`),
@@ -310,6 +375,32 @@ effects this callable may perform*. Consequences:
 The asymmetry is three different epistemic situations — *a promise*, *a computable fact*, *no
 information*. Collapsing them would have to pick pure (unsound) or Unknown (breaks 390 files and
 every `§B{f} §LAM`).
+
+**And a row on a position that is not function-typed is Calor0405.** v2 defined what an *omitted*
+row means but never what a *present* row means on an `i32`. Executed, all four such forms compile
+today with the `§E` read as the declaration's row:
+
+```
+CASE Z9   §F{f001:Log:pub} (i32:x) -> void §E{cw}      → Compilation successful
+CASE Z9b  §I{i32:x} §E{cw}                             → Compilation successful
+CASE Z9c  §O{i32} §E{cw}                               → Compilation successful
+          (§FLD{i32:x} §E{cw} does not parse at all — X9b)
+```
+
+Under the line rule each becomes a suffix row on `void` / `i32`, which has no meaning: a
+non-function type performs no effects. **Decision: E2 reports Calor0405 `EffectRowMisplaced`**,
+the same code as §3.1's recovery, with a second message:
+
+```
+Calor0405: 'x' has type 'i32', which is not a function type, so it cannot carry an
+effect row. Remove the §E{cw}, or — if this is the function's own effect declaration
+— move it onto its own line.
+```
+
+One code, two situations, both "a row where a row cannot go". Note this makes **Z9 a second
+breaking change on a form that compiles today**, alongside §3.2's three — and like those, its
+corpus count is **0**: the same-line sweep that found 0 function-typed same-line rows found 0
+same-line rows of any kind. P6 pins one case per position.
 
 ### 3.6 Six worked examples with executed BEFORE diagnostics
 
@@ -528,6 +619,17 @@ shape; `CannotTell` → **Calor0425**. The lambda's *type* then carries `ρ_decl
 is the contract, as for a function. If `§E` is absent the type carries `ρ_body` and nothing is
 reported.
 
+**The declaration boundary converts `Assumed` to `Concrete`, deliberately.** If `ρ_body` is
+`Assumed(S, R)` and the author writes `§E{…}`, the type that leaves the declaration is
+`Concrete(declared)` — the reasons do not ride onward, unlike at the six binding sites of §4.4.
+That is not the two-hop laundering M5 closes: a declaration is exactly where Calor0419 already
+reports the assumption today (`EEP:448-463`, per function, with its reason list), so the
+provenance is surfaced at the boundary rather than carried past it. The alternative — an
+`Assumed` row escaping every annotated function — would make Calor0425 fire at every downstream
+call site of anything that touches interop, which is the noise §13.4's ledger exists to avoid.
+The boundary is a **seventh** place a row changes form and is deliberately **not** a §6 site;
+P10 covers it as a third case so the conversion is observed rather than assumed.
+
 **Interaction with §3.5.** A `§B{f} §LAM …` with no binding row takes the *initializer's* row,
 which is the lambda's — so the common shape stays silent. Executed baseline **Y9a**: today that
 shape yields `Calor0418` at the invocation (demoted to a warning under `--permissive-effects`);
@@ -548,11 +650,16 @@ after E4 it compiles, with `{}` charged. That is §13.1's rewrite of
 Calor0424  EffectRowMismatch    Error.   fits(...) = DoesNotFit. Never waived, any flag, any site.
 Calor0425  EffectRowUnknown     Warning; Error under --strict-effects.
                                 fits(...) = CannotTell. Waived by --permissive-effects.
-Calor0404  EffectVariableScope  Error.   An effect variable used where §7.1 forbids it, or not in
-                                scope. A declaration-shape violation, never a binding-site verdict.
+Calor0404  EffectVariableScope  Error.   An effect variable declared or used where §7.3 forbids
+                                it, out of scope, or named after a live effect code (§7.2).
+                                A declaration-shape violation, never a binding-site verdict.
+Calor0405  EffectRowMisplaced   Error.   A §E{…} row written where no row can attach: not on the
+                                same line as its type (§3.1 recovery), or on a position whose
+                                type is not a function type (§3.5). Replaces a 4–11 diagnostic
+                                Calor0100 cascade with one actionable message.
 ```
 
-All three free: `grep -rn "Calor042[4-9]\|Calor040[4-9]" src/ tests/` → no hits;
+All four free: `grep -rn "Calor042[4-9]\|Calor040[4-9]" src/ tests/` → no hits;
 `Diagnostic.cs:378` `Calor0403`, `:381` `Calor0410`, `:437` `Calor0423`, `:440` `Calor0500`.
 Draft v1 used Calor0424 for rank-1 scope violations, conflating a *declaration* defect with a
 *binding-site verdict*; Calor0404 separates them.
@@ -663,26 +770,57 @@ CASE X6b  §F{…}<T, out U> (…)          → Calor0119: Type parameter varian
 
 X5b: a bare identifier survives `ParsePositionalAttributes` → `ParseValue` → 
 `InterpretEffectsAttributes` **byte-exact**, and lands on the one code (`Calor0403`) whose lookup
-E2 extends. X6a: `eff e` is new syntax today. X6b: an identifier-shaped modifier before a type
-parameter name **is an existing pattern** (`in`/`out`, `Parser.cs:7612-7621`, gated by
-`Calor0119`), so `eff` is the same shape, not a new one.
+E2 extends. X6a: `eff e` is new syntax today.
+
+X6b establishes a **weaker** precedent than v2 claimed, and the claim is softened accordingly:
+`in`/`out` show that an identifier-shaped modifier can precede a type-parameter name in this
+production (`Parser.cs:7612-7621`), but they are matched with **no lookahead** and, on a `§F`,
+they are **rejected** (`Calor0119`, because `allowVariance: false`). So `eff` reuses the *shape*,
+not a working code path: it needs its own branch, its own lookahead, and its own enablement
+per declaration form. That is a real cost and §9 carries it.
 
 **Exact changes.** (a) `ParseOptionalTypeParameterList` (`Parser.cs:7596-7639`) gains a branch
 beside the variance branch: `Check(TokenKind.Identifier) && Current.Text == "eff" &&
 Peek(1).Kind == TokenKind.Identifier` marks the next identifier an effect variable. The one-token
-lookahead is what keeps a type parameter literally named `eff` (`<eff>`) working. (b)
+lookahead keeps a type parameter literally named `eff` working — **Z4** confirms `<eff>` compiles
+today (`§F{f001:M:pub}<eff> (eff:x) -> void` → `Compilation successful`), so that is a real
+compatibility obligation, not a hypothetical. (b)
 `AttributeHelper.InterpretEffectsAttributes` (`:329`) resolves each code against the enclosing
 declaration's in-scope effect-variable set **before** `EffectCodes.TryParseCompact`, so `§E{e}`
 binds and an out-of-scope `§E{e}` raises **Calor0404**, not Calor0403. No lexer change, no new
 token kind, no `IsKeyword` change.
 
-### 7.3 Scope (Calor0404)
+**(c) An `eff` name may not collide with the effect taxonomy.** Resolving variables before codes
+(step b) means a variable named after a live code would make that code unwritable inside the
+declaration. Executed, the collision is reachable today:
 
-Permitted: the declaration's own row; a parameter's row. Forbidden, each its own Calor0404
-message: a **return** row (a returned function mentioning the caller's variable is rank-2); inside
-a **generic argument** (`List<Func<i32,i32> §E{e}>` — types are strings in the parser, §3);
-on a **`§B`**, a **field**, or a data declaration (nothing binds the variable there). A row may
-mix: `§E{cw, e}` denotes `Concrete({cw}) ⊔ e`.
+```
+CASE Z6   §F{f001:M:pub}<T, cw> (T:a, cw:b) -> void   → Compilation successful
+CASE Z6b  §F{f001:M:pub}<T, fs> (T:a, fs:b) -> void   → Compilation successful
+```
+
+`<T, cw>` compiles as an ordinary type parameter today, so `<T, eff cw>` would silently shadow
+console-write. **Decision: an `eff` name that appears in `EffectCodes.Registry` (any of the 31
+entries, legacy included) or in `EffectCodes.ColonPrefixes` (`EffectTypes.cs:142-148`) is
+**Calor0404** at the declaration.** Ordinary *type* parameters named `cw` keep working — the ban
+is on `eff` names only, so Z6/Z6b stay green. P18 pins both polarities.
+
+### 7.3 Scope (Calor0404) — a partition of the eight positions
+
+v2's permitted/forbidden lists left positions 2 and 3 unmentioned. The complete partition:
+
+| Position | Effect variable? | Why |
+|---|---|---|
+| 1 declaration's own row (`§F`/`§MT`) | **permitted** | this is where it is bound |
+| 4 parameter, tag form · 5 parameter, inline form | **permitted** | the binding site the solve reads |
+| 6 return row | **forbidden** | a returned function mentioning the caller's variable is rank-2 |
+| 7 binding · 8 field | **forbidden** | nothing binds a variable there |
+| — inside a generic argument (`List<Func<i32,i32> §E{e}>`) | **forbidden** | types are strings in the parser (§3.1) |
+| **2 lambda literal** (`§LAM`) | **forbidden** | a lambda has no type-parameter list to bind one — **Z8b**: `§LAM{lam1}<T>` → `Calor0100: Expected statement but found Less`. Its row is inferred or concrete |
+| **3 delegate declaration** (`§DEL`) | **forbidden** | `§DEL` has no type-parameter list at all — **Z8**: `§DEL{d001:Handler}<T>` → `Calor0100: Expected I, O, E, or END_DEL but found Less`. Giving delegates one is a generics change, deferred (`calor-direction.md:33`) |
+
+Six rejection sites, each its own Calor0404 message; P18 covers all six. A row may mix a variable
+and concrete codes: `§E{cw, e}` denotes `Concrete({cw}) ⊔ e`.
 
 ### 7.4 Instantiation, and the combinator set
 
@@ -709,11 +847,60 @@ Called with a pure `Double`, `e := Concrete(∅)` and `Map`'s row is `{alloc}`. 
 only `§E{alloc}` gets `Calor0410: Function 'UseImpure' uses effect 'cw' but does not declare it`
 plus the new provenance clause (§10.3).
 
-**`Match`** binds one variable across both arms, so `e` is their join — a pure `onNone` and a
-printing `onSome` give `{cw}`. **Middleware/`next`** is §7.5's decisive case, below.
-**Callbacks** need **no** effect variable: a `§FLD{Action<i32>:onChange} §E{cw}` carries a
-concrete row, so three of the four combinators need rank-1 and the fourth does not — if the ramp
-fires, callbacks still work.
+**`Match`** — one variable across both arms, so `e` is their join: a pure `onNone` and a printing
+`onSome` give `{cw}`.
+
+```text
+§M{m001:After}
+  §F{f001:MatchOption:pub}<T, U, eff e> (?T:opt, Func<T,U>:onSome §E{e}, Func<U>:onNone §E{e}) -> U
+    §E{e}
+    §IF{if1} (is_some opt)
+      §R §C{onSome} §A (unwrap opt) §/C
+    §R §C{onNone} §/C
+```
+
+**Middleware / `next`** — R2's decisive case, restored here because v2's compression deleted it
+and left §12's A3 pointing at a spelling the document no longer contained:
+
+```text
+§M{m001:After}
+  §IFACE{i001:IPipelineBehavior}<TReq, TRes, eff e>
+    §MT{mt001:Handle} (TReq:request, Func<TRes>:next §E{e}) -> TRes
+      §E{e}
+
+  §CL{c001:LoggingBehavior:IPipelineBehavior:pub}<TReq, TRes, eff e>
+    §MT{mt001:Handle:pub} (TReq:request, Func<TRes>:next §E{e}) -> TRes
+      §E{e, cw}
+      §P "before"
+      §R §C{next} §/C
+```
+
+**This spelling requires an `eff` variable declared on a class or interface and read by a member's
+row — a scope rule §7.3's table does not grant.** Its shape is at least plausible: **Z7** shows a
+class type parameter reaches a member (`§CL{c001:Box:pub}<T>` with `§MT … -> T` compiles), and
+**Z7b** shows the same for an interface. So the parser work is real but bounded: add the `eff`
+branch to the `§CL`/`§IFACE` type-parameter lists (which already exist and already flow to
+members) and thread the enclosing declaration's effect-variable set into member row resolution.
+**§9 prices it as a seventh parser insertion point.** It is scheduled *only* if R2 needs it —
+which is precisely what the spike adjudicates, and precisely why R2 is this document's own
+most-likely ramp trigger (§14 Q1): the implementation shown above declares `{e, cw}` against an
+interface row of `{e}`, which the ordinary `fits` relation must reject as Calor0421, and the
+*corrected* program requires widening `IPipelineBehavior` — an interface Calor does not own.
+
+**Callbacks** need **no** effect variable at all: a `§FLD{Action<i32>:onChange} §E{cw}` (position
+8) carries a concrete row.
+
+```text
+§M{m001:After}
+  §CL{c001:Counter:pub}
+    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §MT{mt001:Bump:pub} (i32:n) -> void
+      §E{cw}
+      §C{onChange} §A n §/C
+```
+
+So three of the four combinators need rank-1 and the fourth does not — if the ramp fires,
+callbacks still work.
 
 ### 7.5 The exit ramp
 
