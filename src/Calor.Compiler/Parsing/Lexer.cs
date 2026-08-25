@@ -66,6 +66,7 @@ public sealed class Lexer
         ["CN"] = TokenKind.Continue,        // §CN = Continue
         ["GOTO"] = TokenKind.Goto,          // §GOTO{label} = Goto
         ["LABEL"] = TokenKind.Label,        // §LABEL{label} = Label
+        ["SEMVER"] = TokenKind.SemVer,      // §SEMVER{MAJOR.MINOR.PATCH} = semantics-version declaration (lexed by ScanSemVerDirective; listed here for the keyword registry / doc-drift check)
         ["BODY"] = TokenKind.Body,          // §BODY - explicit body start (optional)
         ["END_BODY"] = TokenKind.EndBody,   // §END_BODY - explicit body end (optional)
 
@@ -1005,6 +1006,14 @@ public sealed class Lexer
         if (fullKeyword.Equals("LABEL", StringComparison.Ordinal) && Current == '{')
         {
             return ScanBraceContent(TokenKind.Label);
+        }
+
+        // Special handling for §SEMVER{MAJOR.MINOR.PATCH}: capture the version text
+        // verbatim (a dotted triple would otherwise lex as float/int fragments) and
+        // reject the bracket / brace-less / unterminated shapes right here.
+        if (fullKeyword.Equals("SEMVER", StringComparison.Ordinal))
+        {
+            return ScanSemVerDirective();
         }
 
         // Special handling for §PP{CONDITION}: preprocessor conditional start
@@ -2051,6 +2060,61 @@ public sealed class Lexer
         var content = _source[contentStart.._position];
         Advance(); // consume closing '}'
         return MakeToken(kind, content);
+    }
+
+    /// <summary>
+    /// Scans the argument of <c>§SEMVER</c>. Only <c>§SEMVER{...}</c> closed on the
+    /// same line is a well-formed directive: the token's Value is then the raw brace
+    /// content and the parser validates it (Calor0700/0701/0702). Every other shape —
+    /// the legacy bracket form <c>§SEMVER[...]</c>, a missing brace group, or a brace
+    /// group not closed on its line — is reported here as Calor0702 and yields a
+    /// <see cref="TokenKind.SemVer"/> token with a null Value so the parser does not
+    /// report it a second time. Unlike <see cref="ScanBraceContent"/> this never scans
+    /// past the end of the line, so an unterminated directive cannot swallow the
+    /// statements that follow it.
+    /// </summary>
+    private Token ScanSemVerDirective()
+    {
+        if (Current == '{')
+        {
+            Advance(); // consume '{'
+            var contentStart = _position;
+            while (!IsAtEnd && Current != '}' && Current != '\n' && Current != '\r')
+            {
+                Advance();
+            }
+
+            if (!IsAtEnd && Current == '}')
+            {
+                var content = _source[contentStart.._position];
+                Advance(); // consume '}'
+                return MakeToken(TokenKind.SemVer, content);
+            }
+
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.SemanticsVersionInvalidDeclaration,
+                "Unterminated §SEMVER directive: expected '}' on the same line, as in §SEMVER{MAJOR.MINOR.PATCH}.");
+            return MakeToken(TokenKind.SemVer);
+        }
+
+        if (Current == '[')
+        {
+            while (!IsAtEnd && Current != ']' && Current != '\n' && Current != '\r')
+            {
+                Advance();
+            }
+            if (!IsAtEnd && Current == ']')
+            {
+                Advance(); // consume ']'
+            }
+
+            _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.SemanticsVersionInvalidDeclaration,
+                "Invalid §SEMVER declaration: the bracket form §SEMVER[...] is not accepted; use braces: §SEMVER{MAJOR.MINOR.PATCH}.");
+            return MakeToken(TokenKind.SemVer);
+        }
+
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.SemanticsVersionInvalidDeclaration,
+            "Invalid §SEMVER declaration: expected §SEMVER{MAJOR.MINOR.PATCH}.");
+        return MakeToken(TokenKind.SemVer);
     }
 
     /// <summary>
