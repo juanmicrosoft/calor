@@ -350,6 +350,62 @@ public class BoundTypeArchitectureTests
         Assert.Equal("INT", functionType.ReturnType.DisplayString);
     }
 
+    /// <summary>
+    /// v0.15 E1 slice 2b — the side channel the effect pass reads receivers
+    /// through. <c>CallGraphAnalysis.BoundValueTypes(callerId)</c> hands over
+    /// the bound <see cref="BoundType"/> of each call site's receiver, keyed by
+    /// the receiver path as the target spells it.
+    ///
+    /// <para>This is the structural pin for the slice: the API does not exist
+    /// on <c>main</c>, and the effect pass's resolvers now consult it before any
+    /// AST type string. Delete the <c>RecordReceiver</c> call in
+    /// <c>ResolveBoundCallSites</c> and the assertions below go empty.</para>
+    ///
+    /// <para>Also pins the two invariants the resolvers depend on: a receiver
+    /// the binder typed arrives NOMINAL (so it can be keyed as a manifest
+    /// type), and a receiver it could not type arrives
+    /// <see cref="UnresolvedBoundType"/> (so the resolver can fail closed
+    /// instead of guessing).</para>
+    /// </summary>
+    [Fact]
+    public void CallGraphSideChannel_CarriesBoundReceiverTypesPerCallSite()
+    {
+        var source = string.Join("\n", [
+            "§M{m001:ReceiverChannelProbe}",
+            "  §F{f001:Go:pub}",
+            "      §I{i32:n}",
+            "      §O{void}",
+            "      §E{}",
+            "      §B{sb} §NEW{StringBuilder}",
+            "      §C{sb.AppendLine} §A STR:\"x\" §/C",
+            "      §B{u} §C{Whatever.Make} §/C",
+            "      §C{u.Run} §/C",
+            "",
+        ]);
+
+        var lexDiagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, lexDiagnostics).TokenizeAllForParser();
+        var module = new Parser(tokens, new DiagnosticBag()).Parse();
+        var analysis = Calor.Compiler.Analysis.CallGraphAnalysis.Build(module);
+
+        Assert.True(analysis.IsBoundResolutionComplete);
+        var receivers = analysis.BoundValueTypes("f001");
+
+        // Anti-vacuity: the probe has two dotted call sites.
+        Assert.True(
+            receivers.Count >= 2,
+            $"side channel carried {receivers.Count} receivers; the probe has two");
+
+        // A receiver the binder typed: nominal, keyable as a manifest type.
+        var stringBuilder = Assert.IsType<NominalBoundType>(receivers["sb"]);
+        Assert.Equal("StringBuilder", stringBuilder.QualifiedName);
+
+        // A receiver the binder could not type — an inferred §B whose
+        // initializer it cannot resolve. This is the §D6 exit ramp, and it is
+        // why ResolveLocalValueType returns null here instead of guessing.
+        Assert.IsType<UnresolvedBoundType>(receivers["u"]);
+    }
+
     private static IReadOnlyList<T> BindAndCollect<T>(string source)
         where T : BoundNode
     {

@@ -925,4 +925,143 @@ public class EffectEnforcementTests
         Assert.False(result.HasErrors);
     }
 
+    // ---------------------------------------------------------------
+    // v0.15 E1 slice 2b — the enforcement pass reads receivers from the
+    // bound tree. Each test below names the resolver path it exercises.
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// EQUIVALENCE pin, not a discriminating one — stated plainly because the
+    /// scope asked for a discriminating one and it could not be built. An
+    /// inferred <c>§B</c> whose
+    /// initializer is a BCL call has NO type string anywhere in the AST: the
+    /// binding declares none and <c>FindLocalDeclarationType</c> only
+    /// understands an explicit type or a <c>§NEW</c> initializer. The bound
+    /// tree does know — <c>MetadataBinder</c> types the initializer, so
+    /// <c>Receiver.Type</c> on the following call is
+    /// <c>NominalBoundType("System.Guid")</c>.
+    ///
+    /// <para>MEASURED: this passes on <c>main</c> too. The AST path reaches the
+    /// same answer for this shape by a different route, so the bound path
+    /// resolves nothing new here — the same honest headline slice 2a carried.
+    /// The pin's job is to hold the answer STILL while the resolver order
+    /// changes underneath it.</para>
+    /// </summary>
+    [Fact]
+    public void E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee()
+    {
+        var source = @"
+§M{m001:BoundReceiverProbe}
+  §F{f001:Go:pub}
+      §O{str}
+      §E{rand}
+      §B{g} §C{System.Guid.NewGuid} §/C
+      §R §C{g.ToString} §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.DoesNotContain(
+            result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.DoesNotContain(
+            result.Diagnostics.ToList(),
+            d => d.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    /// <summary>
+    /// The bound path is preferred when BOTH paths have an answer AND they
+    /// disagree. A class field <c>x:Random</c> is shadowed by a local
+    /// <c>§B{x}</c> whose initializer is a BCL call: the AST search finds no
+    /// local type and falls through to the FIELD, so the string path answers
+    /// <c>Random</c> — the wrong scope. The binder types the local from its
+    /// initializer, so the bound receiver is <c>System.Guid</c>.
+    ///
+    /// <para>MEASURED: also passes on <c>main</c> — the string path's wrong
+    /// answer does not change the outcome for this pair of types. Equivalence
+    /// pin, not a discriminating one.</para>
+    /// </summary>
+    [Fact]
+    public void E1Slice2b_LocalShadowsFieldAndTheStringPathIsWrong_TheBoundTypeWins()
+    {
+        var source = @"
+§M{m001:ShadowProbe}
+  §CL{c001:Box:pub}
+    §FLD{x:Random:priv}
+    §MT{mt01:Go:pub}
+        §O{str}
+        §E{rand}
+        §B{x} §C{System.Guid.NewGuid} §/C
+        §R §C{x.ToString} §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.DoesNotContain(
+            result.Diagnostics.ToList(),
+            d => d.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(
+            result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    /// <summary>
+    /// Fail-closed (design doc §8.1, P17's precondition). A receiver the binder
+    /// LOOKED at and could not name arrives as <c>UnresolvedBoundType</c>, and
+    /// the AST string search does not get to supply a guess in its place: the
+    /// call reaches <c>ReportUnknownCall</c> / <c>EffectSet.Unknown</c>.
+    ///
+    /// <para>MEASURED: passes on <c>main</c> as well — on this compiler the AST
+    /// search finds nothing for that receiver either, so both routes fail
+    /// closed. What the slice changes is WHY: a typed decision instead of an
+    /// absent string.</para>
+    /// </summary>
+    [Fact]
+    public void E1Slice2b_UnresolvedBoundReceiver_FailsClosed()
+    {
+        var source = @"
+§M{m001:UnresolvedProbe}
+  §F{f001:Go:pub}
+      §I{Mystery:m}
+      §O{void}
+      §E{}
+      §C{m.DoWork} §/C
+";
+        var result = TestHarness.CompileWithEffects(source);
+
+        Assert.Contains(
+            result.Diagnostics.ToList(),
+            d => d.Code == DiagnosticCode.UnknownExternalCall
+                 || d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    /// <summary>
+    /// SURVIVING FALLBACK — <c>function.Parameters[].TypeName</c>. A parameter
+    /// used as a BARE call target is not a receiver, so the receiver side
+    /// channel carries no entry for it and the AST parameter-type string is
+    /// what fills Calor0418's message.
+    ///
+    /// <para>This is the shape that decided the slice's scope. An earlier
+    /// revision recorded every bound name, not just receivers; that made the
+    /// side channel answer here and in the method-group-argument arm, and
+    /// <c>StrictnessBatchTests.C2</c>/<c>C4</c> went red because the
+    /// method-group charging arm stopped firing. Names outside receiver
+    /// positions keep resolving through the AST.</para>
+    /// </summary>
+    [Fact]
+    public void E1Slice2b_FunctionTypedParameterAsBareTarget_UsesTheAstParameterType()
+    {
+        var source = @"
+§M{m001:BareTargetProbe}
+  §F{f001:Go:pub}
+      §I{Func<i32>:make}
+      §O{i32}
+      §E{}
+      §R §C{make} §/C
+";
+        var result = TestHarness.Compile(source);
+
+        var delegateInvocation = Assert.Single(
+            result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.DelegateInvocation));
+        Assert.Contains("function-typed value 'make'", delegateInvocation.Message);
+        Assert.Contains("Func<", delegateInvocation.Message);
+    }
 }

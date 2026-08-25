@@ -1578,11 +1578,18 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
-        /// v0.15 E1 slice 2b — the binder's answers for the current function,
-        /// fetched once from the side channel
-        /// (<see cref="CallGraphAnalysis.BoundValueTypes"/>). Empty when binding
-        /// threw, in which case every resolver below behaves exactly as it did
-        /// before this slice.
+        /// v0.15 E1 slice 2b — the binder's RECEIVER types for the current
+        /// function, fetched once from the side channel
+        /// (<see cref="CallGraphAnalysis.BoundValueTypes"/>), keyed by the
+        /// receiver path as the call target spells it. Empty when binding threw,
+        /// in which case every resolver below behaves exactly as it did before
+        /// this slice.
+        ///
+        /// <para>Receivers only. A name in a non-receiver position — a method
+        /// group passed as an argument, a bare call target — is absent here and
+        /// resolves through the AST as before; the string this pass gets back is
+        /// quoted verbatim in Calor0418's message, so the source spelling has to
+        /// survive.</para>
         /// </summary>
         private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>? _boundValueTypes;
 
@@ -1621,11 +1628,10 @@ public sealed class EffectEnforcementPass
         /// string, i.e. the same text the AST search would have found.</para>
         ///
         /// <para><c>OBJECT</c> and <c>?</c> are treated as NO answer rather than
-        /// as a type: they are the binder's non-answers for a value it could not
-        /// type outside a receiver position (a receiver gets
-        /// <c>UnresolvedBoundType</c> instead since slice 2a). Returning them as
-        /// types would make <see cref="InferFromBareNameTarget"/> report
-        /// Calor0418 on shapes that never reported it.</para>
+        /// as a type: they are the binder's non-answers, and returning them as
+        /// types would let a placeholder be keyed as a manifest type. A receiver
+        /// the binder actually looked at and could not name arrives as
+        /// <c>UnresolvedBoundType</c> instead, since slice 2a.</para>
         /// </summary>
         private BoundValueAnswerKind AskBoundTree(string name, out string typeName)
         {
@@ -1668,19 +1674,22 @@ public sealed class EffectEnforcementPass
         /// the AST strings do not get to guess one in its place (fail-closed,
         /// design doc §8.1 / P17).</para>
         ///
-        /// <para>The AST search below is the FALLBACK, and only for shapes the
-        /// bound tree does not represent for this name:</para>
+        /// <para>The AST search below is the FALLBACK, for every shape the
+        /// receiver side channel does not carry:</para>
         /// <list type="bullet">
-        ///   <item><description><c>function.Parameters[].TypeName</c> — a
-        ///   parameter never referenced in the body, so no
-        ///   <c>BoundVariableExpression</c> exists to read a type off.</description></item>
+        ///   <item><description><c>function.Parameters[].TypeName</c> — the name
+        ///   is not used as a call receiver anywhere in this function (it is a
+        ///   bare call target, a method-group argument, or simply read), so no
+        ///   bound receiver exists to read a type off.</description></item>
         ///   <item><description><c>FindLocalDeclarationType</c> /
         ///   <c>FindForeachVariableType</c> — a <c>§B</c> or <c>§FE</c> variable
         ///   in a statement shape the binder does not bind (interop content,
-        ///   unsupported constructs), and the same for a name whose bound answers
-        ///   disagreed across scopes and were dropped as ambiguous.</description></item>
+        ///   unsupported constructs), a module whose binding threw, and a
+        ///   receiver path whose bound answers disagreed between two call sites
+        ///   and were dropped as ambiguous.</description></item>
         ///   <item><description><c>OwnerClass.Fields[].TypeName</c> — a field of
-        ///   the enclosing class never read in this function's body.</description></item>
+        ///   the enclosing class used somewhere other than a receiver
+        ///   position.</description></item>
         /// </list>
         /// <para>A lambda-initialized binding without an explicit type reports the
         /// marker type "Func&lt;&gt;" on both paths.</para>
@@ -1931,6 +1940,11 @@ public sealed class EffectEnforcementPass
         /// module-level <c>§DEL</c> name reached through
         /// <c>_context.DelegateTypeNames</c>.</para>
         /// </summary>
+        /// <para>The structural half answers for a receiver the side channel
+        /// carries (<c>f.Invoke</c> where <c>f</c> is a lambda or a <c>§DEL</c>
+        /// value); a bare call target is not a receiver, so that site reduces to
+        /// the string test today — which is what keeps Calor0418 byte-stable.
+        /// </para>
         private bool IsFunctionValued(string name, string typeName) =>
             IsFunctionBoundType(BoundValueTypes.GetValueOrDefault(name))
             || IsFunctionTypeName(typeName);
