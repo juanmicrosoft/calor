@@ -1000,7 +1000,7 @@ Roadmap §4.1: *"`UnresolvedBoundType` → `Unknown` row, `FunctionBoundType`'s 
 symbol-identity keying are E1 decisions, made in §4.2, not design-doc decisions."* Status:
 receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed** (#1089);
 receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
-**executed** (#1094 — E1 slice 2a: `BoundCallStatement.Receiver` / `BoundCallExpression.Receiver`
+**executed** (#1095 — E1 slice 2a: `BoundCallStatement.Receiver` / `BoundCallExpression.Receiver`
 with four shapes, `UnresolvedBoundType(reason)` + `Calor0270` at receivers the binder cannot type,
 and `ExternalCallCollector` reading `Receiver.Type` as step 1); the `Unknown`-row contribution,
 symbol-identity keying in `EffectResolver`/manifests/IL summaries, and
