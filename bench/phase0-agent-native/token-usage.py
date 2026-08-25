@@ -28,8 +28,14 @@ must never lose a run over accounting). Fields:
     input_tokens_naive        usage.input_tokens as recorded
     input_tokens_corrected    sum of modelUsage[*].inputTokens over counted models
     output_tokens_all_models  unfiltered sum over every modelUsage entry
+    cache_read_input_tokens_naive / cache_creation_input_tokens_naive
+                              the envelope's top-level cache counters (final turn)
+    cache_read_input_tokens_corrected / cache_creation_input_tokens_corrected
+                              sums of modelUsage[*].cacheReadInputTokens /
+                              .cacheCreationInputTokens over counted models
+                              (audit only; tokens.input keeps its meaning)
     models_counted            sorted model keys that contribute to *_corrected
-    models_excluded           {model key: outputTokens} dropped by --exclude-model
+    models_excluded           {model key: outputTokens} dropped as side calls
     source                    "modelUsage" | "usage" (no modelUsage: naive is
                               the best available) | "missing"
     origin_kind               envelope origin.kind (e.g. "task-notification"
@@ -40,10 +46,15 @@ must never lose a run over accounting). Fields:
                               --flag-ratio (default 1.05) — the collection-time
                               guard the issue asked for
 
---exclude-model (default "haiku") drops the ~15-token topic-detector call
-that Claude Code makes on a side model. An entry is dropped only when at
-least one NON-matching model exists, so an epoch pinned to a matching
-model still counts its own output.
+--exclude-model (default "haiku") names the side model Claude Code uses for
+its ~15-token topic-detector call. An entry is dropped only when BOTH hold:
+its key matches the pattern AND its outputTokens is below --side-call-max
+(default 100). A large matching entry is a haiku SUBAGENT (4 archived
+envelopes carry 4,850-10,142 haiku output tokens) and counts. The size gate
+is used rather than `canonicalModel` because older envelopes lack that
+field. If every entry would be excluded, everything is counted (an epoch
+pinned to the side model still counts its own output). `total_cost_usd` /
+`costUSD` are not touched by this exclusion and still include the side call.
 
 Python 3.9 compatible; standard library only.
 """
@@ -55,6 +66,7 @@ import sys
 
 DEFAULT_EXCLUDE = "haiku"
 DEFAULT_FLAG_RATIO = 1.05
+DEFAULT_SIDE_CALL_MAX = 100
 
 
 def _int(value):
@@ -71,6 +83,10 @@ def _empty(source):
         "input_tokens_naive": 0,
         "input_tokens_corrected": 0,
         "output_tokens_all_models": 0,
+        "cache_read_input_tokens_naive": 0,
+        "cache_read_input_tokens_corrected": 0,
+        "cache_creation_input_tokens_naive": 0,
+        "cache_creation_input_tokens_corrected": 0,
         "models_counted": [],
         "models_excluded": {},
         "source": source,
@@ -113,7 +129,8 @@ def load_envelope(path):
     return chosen
 
 
-def compute(envelope, exclude_pattern=DEFAULT_EXCLUDE, flag_ratio=DEFAULT_FLAG_RATIO):
+def compute(envelope, exclude_pattern=DEFAULT_EXCLUDE, flag_ratio=DEFAULT_FLAG_RATIO,
+            side_call_max=DEFAULT_SIDE_CALL_MAX):
     """Pure computation over a parsed envelope (None = missing file)."""
     if not isinstance(envelope, dict):
         return _empty("missing")
@@ -123,6 +140,8 @@ def compute(envelope, exclude_pattern=DEFAULT_EXCLUDE, flag_ratio=DEFAULT_FLAG_R
         usage = {}
     naive_out = _int(usage.get("output_tokens"))
     naive_in = _int(usage.get("input_tokens"))
+    naive_cr = _int(usage.get("cache_read_input_tokens"))
+    naive_cc = _int(usage.get("cache_creation_input_tokens"))
 
     origin = envelope.get("origin")
     origin_kind = origin.get("kind") if isinstance(origin, dict) else None
@@ -134,22 +153,31 @@ def compute(envelope, exclude_pattern=DEFAULT_EXCLUDE, flag_ratio=DEFAULT_FLAG_R
     if isinstance(model_usage, dict):
         for key, val in model_usage.items():
             if isinstance(val, dict):
-                entries.append((str(key), _int(val.get("outputTokens")), _int(val.get("inputTokens"))))
+                entries.append((str(key), _int(val.get("outputTokens")), _int(val.get("inputTokens")),
+                                _int(val.get("cacheReadInputTokens")), _int(val.get("cacheCreationInputTokens"))))
 
     result = _empty("modelUsage" if entries else "usage")
     result["output_tokens_naive"] = naive_out
     result["input_tokens_naive"] = naive_in
     result["origin_kind"] = origin_kind
     result["num_turns"] = num_turns
+    result["cache_read_input_tokens_naive"] = naive_cr
+    result["cache_creation_input_tokens_naive"] = naive_cc
 
     if not entries:
         result["output_tokens_corrected"] = naive_out
         result["input_tokens_corrected"] = naive_in
         result["output_tokens_all_models"] = naive_out
+        result["cache_read_input_tokens_corrected"] = naive_cr
+        result["cache_creation_input_tokens_corrected"] = naive_cc
         return result
 
     pattern = re.compile(exclude_pattern) if exclude_pattern else None
-    kept = [e for e in entries if not (pattern and pattern.search(e[0]))]
+
+    def is_side_call(entry):
+        return bool(pattern) and bool(pattern.search(entry[0])) and entry[1] < side_call_max
+
+    kept = [e for e in entries if not is_side_call(e)]
     if not kept:
         kept = entries  # every model matched: count everything rather than nothing
     kept_keys = {e[0] for e in kept}
@@ -157,6 +185,8 @@ def compute(envelope, exclude_pattern=DEFAULT_EXCLUDE, flag_ratio=DEFAULT_FLAG_R
     result["output_tokens_corrected"] = sum(e[1] for e in kept)
     result["input_tokens_corrected"] = sum(e[2] for e in kept)
     result["output_tokens_all_models"] = sum(e[1] for e in entries)
+    result["cache_read_input_tokens_corrected"] = sum(e[3] for e in kept)
+    result["cache_creation_input_tokens_corrected"] = sum(e[4] for e in kept)
     result["models_counted"] = sorted(kept_keys)
     result["models_excluded"] = {e[0]: e[1] for e in sorted(entries) if e[0] not in kept_keys}
 
@@ -179,8 +209,12 @@ def main(argv=None):
     parser.add_argument("--flag-ratio", type=float, default=DEFAULT_FLAG_RATIO,
                         help="set undercount_flagged when corrected/naive exceeds "
                              "this (default: %(default)s)")
+    parser.add_argument("--side-call-max", type=int, default=DEFAULT_SIDE_CALL_MAX,
+                        help="a matching model is excluded only when its outputTokens "
+                             "is below this (default: %(default)s)")
     args = parser.parse_args(argv)
-    result = compute(load_envelope(args.agent_json), args.exclude_model, args.flag_ratio)
+    result = compute(load_envelope(args.agent_json), args.exclude_model, args.flag_ratio,
+                     args.side_call_max)
     json.dump(result, sys.stdout, sort_keys=True)
     sys.stdout.write("\n")
     return 0

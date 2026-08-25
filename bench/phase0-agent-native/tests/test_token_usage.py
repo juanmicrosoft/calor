@@ -109,6 +109,36 @@ class EdgeShapes(unittest.TestCase):
         self.assertEqual(r["models_counted"], ["claude-haiku-4-5-20251001"])
         self.assertEqual(r["models_excluded"], {})
 
+    def test_large_haiku_entry_is_a_subagent_and_counts(self):
+        # feasibility-dry-001/N1-001 run-3 shape: haiku 10,142 vs main 3,893.
+        r = run_cli(fixture("haiku-subagent-run.agent.json"))
+        self.assertEqual(r["output_tokens_naive"], 3893)
+        self.assertEqual(r["output_tokens_corrected"], 3893 + 10142)
+        self.assertEqual(r["models_counted"], ["claude-fable-5", "claude-haiku-4-5-20251001"])
+        self.assertEqual(r["models_excluded"], {})
+        self.assertTrue(r["undercount_flagged"])
+
+    def test_side_call_size_gate_is_configurable(self):
+        r = run_cli(fixture("haiku-subagent-run.agent.json"), "--side-call-max", "20000")
+        self.assertEqual(r["output_tokens_corrected"], 3893)
+        self.assertEqual(r["models_excluded"], {"claude-haiku-4-5-20251001": 10142})
+
+    def test_cache_counters_are_reported_for_audit_only(self):
+        r = run_cli(fixture("haiku-subagent-run.agent.json"))
+        self.assertEqual(r["cache_read_input_tokens_naive"], 50000)
+        self.assertEqual(r["cache_read_input_tokens_corrected"], 170000)
+        self.assertEqual(r["cache_creation_input_tokens_naive"], 3000)
+        self.assertEqual(r["cache_creation_input_tokens_corrected"], 12000)
+        self.assertEqual(r["input_tokens_corrected"], 2030)  # tokens.input semantics unchanged
+
+    def test_truncated_envelope_is_missing_not_a_crash(self):
+        # Non-empty but cut off mid-object: the helper must still exit 0 and
+        # report source "missing"; the runner's fallback path handles it.
+        r = run_cli(fixture("truncated-run.agent.json"))
+        self.assertEqual(r["source"], "missing")
+        self.assertEqual(r["output_tokens_naive"], 0)
+        self.assertEqual(r["output_tokens_corrected"], 0)
+
     def test_envelope_without_modelusage_falls_back_to_naive_and_says_so(self):
         r = run_cli(fixture("no-modelusage-run.agent.json"))
         self.assertEqual(r["source"], "usage")
