@@ -5,18 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **The proof-point registry in `docs/plans/agent-native-gates.md` (the
-  A-annex) is now tamper-guarded in CI.** The append-only check that already
-  protected `docs/experiments/registry.json`
+- **CI now refuses any pull request that edits or deletes an already-frozen
+  line in the project's proof-point registry; only additions are allowed.**
+  The registry is the A-annex of `docs/plans/agent-native-gates.md`. The
+  append-only check that already protected `docs/experiments/registry.json`
   (`experiment-registry-tamper-check.yml`) now also runs
-  `scripts/check-annex-freeze.py` on every PR that touches the annex. A frozen
-  proof-point row or revision-log entry that differs from `main`, an annex
+  `scripts/check-annex-freeze.py` on every pull request and every push to
+  `main` — using the copy of the script already on `main`, so a pull request
+  cannot weaken the guard and use it in the same change. A frozen proof-point
+  row, table header or revision-log entry that differs from `main`, an annex
   change with no new `A-1.N` log entry, or a version pointer that disagrees
-  with the log all fail the PR; adding rows and entries is still allowed. The
-  script's `--self-test` (17 pins) runs first so the guard is shown to catch
-  a mutated row before it judges the real file. Roadmap v0.13-v0.15 §4.3 (i),
-  annex entry A-1.10 — the guard half; the 0.15 proof point itself registers
-  later, with the effect-rows design doc.
+  with the log all fail. The script's `--self-test` (28 pins) runs first so
+  the guard is shown to catch a mutated row before it judges the real file.
+  Roadmap v0.13-v0.15 §4.3 (i), annex entry A-1.10 — the guard half; the 0.15
+  proof point itself registers later, with the effect-rows design doc.
 - **`§SEMVER{MAJOR.MINOR.PATCH}` is a new module-level directive.** It did not
   lex before this release: any `§SEMVER` line failed with `Calor0006`
   (unknown section marker), even though the docs described it. Write it as the
