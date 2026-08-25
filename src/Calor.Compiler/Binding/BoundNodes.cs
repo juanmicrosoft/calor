@@ -1719,7 +1719,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         TextSpan span,
         BoundExpression target,
         string fieldName,
-        string typeName,
+        string? typeName,
         VariableSymbol? resolvedField = null,
         TextSpan? fieldNameSpan = null,
         IReadOnlyList<VariableSymbol>? resolvedFields = null,

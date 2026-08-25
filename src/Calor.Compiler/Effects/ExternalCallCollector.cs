@@ -390,7 +390,7 @@ public sealed class ExternalCallCollector
     /// in source. Variables, fields, <c>this</c>, and member chains through them
     /// fail this test.
     /// </summary>
-    private static bool IsTypeQualifiedReference(string receiver)
+    internal static bool IsTypeQualifiedReference(string receiver)
     {
         if (string.IsNullOrEmpty(receiver))
             return false;
