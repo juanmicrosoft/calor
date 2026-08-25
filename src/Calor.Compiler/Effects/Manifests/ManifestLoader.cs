@@ -21,6 +21,18 @@ public sealed class ManifestLoader
 
     private readonly List<string> _loadErrors = new();
     private readonly List<(EffectManifest Manifest, ManifestSource Source)> _loadedManifests = new();
+    private readonly bool _loadUserLevelManifests;
+
+    /// <summary>
+    /// Creates a loader. <paramref name="loadUserLevelManifests"/> controls whether
+    /// <c>~/.calor/manifests/</c> is consulted by <see cref="LoadAll"/>; pass
+    /// <c>false</c> for hermetic measurements that must not depend on the machine
+    /// they run on (built-in manifests are always loaded).
+    /// </summary>
+    public ManifestLoader(bool loadUserLevelManifests = true)
+    {
+        _loadUserLevelManifests = loadUserLevelManifests;
+    }
 
     /// <summary>
     /// Errors encountered during loading.
@@ -42,8 +54,12 @@ public sealed class ManifestLoader
         // 1. Load built-in embedded manifests (lowest priority)
         LoadBuiltInManifests();
 
-        // 2. Load user-level manifests from ~/.calor/manifests/
-        LoadUserLevelManifests();
+        // 2. Load user-level manifests from ~/.calor/manifests/ (unless the loader
+        //    was constructed hermetic)
+        if (_loadUserLevelManifests)
+        {
+            LoadUserLevelManifests();
+        }
 
         // 3. Load solution-level manifests if provided
         if (!string.IsNullOrEmpty(solutionDirectory))

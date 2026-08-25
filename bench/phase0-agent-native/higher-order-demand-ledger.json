@@ -1,69 +1,206 @@
 {
   "schemaVersion": 1,
   "registeredAt": "2026-08-24",
-  "measuredCommit": "03270bc27d45ab99a2fa3971354653ec10cb6906",
+  "measuredCommit": "4acc7f43ee6a747aeb5aaf24ca1f455d3b92b730",
   "floor": 25,
   "floorRule": "Pre-registered (roadmap §4.1): if dA.total + dB.aggregate.total is below 25 sites, §4.4 gate 2 adjudicates NOT-ADJUDICATED, never HIT. The floor is frozen with the ledger's registration PR and is not re-tuned after the design doc opens.",
-  "scope": "D-A: every .calr under the repository root (bin/, obj/, .git/, node_modules/ and bench/corpus/ submodules excluded; nothing else filtered), compiled one file at a time via Program.Compile with default CompilationOptions (EnforceEffects=true, UnknownCallPolicy.Strict, StrictEffects=false, no manifests, UnsafeTranspileOnly to skip Roslyn validation of the emitted C#). Files that fail before the effect pass (lexer/parser/type-check/binder errors; witnessed by the absence of the verbose 'Effect enforcement completed' status line) are counted in filesNotReachingEffectPass, never dropped. Calor0419 is counted per DIAGNOSTIC (one per function, first three reasons shown), so a function with more than three assumptions whose function-typed reason is truncated out of the message is under-counted — a known floor, not a ceiling. D-B: Roslyn syntax-only (CSharpSyntaxTree.ParseText, LanguageVersion.Preview, no preprocessor symbols defined, so inactive #if branches are not scanned) over bench/corpus/{MediatR,serilog,FluentValidation}/src/**/*.cs (bin/, obj/ excluded).",
+  "scope": "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/ and bench/corpus/ submodules excluded; nothing else filtered), compiled one file at a time via Program.Compile with EnforceEffects=true, UnknownCallPolicy.Strict, StrictEffects=false, EnableTypeChecking=true (the CLI default), UnsafeTranspileOnly=false, DeferGeneratedOutputValidation=true (per-file Roslyn validation of the emitted C# is skipped; it runs after the effect pass and cannot affect the counts), ProjectDirectory=null (the CLI sets it to the file's directory; here no project-local manifest is consulted), and a shared hermetic EffectResolver loading built-in manifests only; no project/solution/user-level manifests. Files that fail before the effect pass (lexer/parser/type-check/binder errors; witnessed by the absence of Program.Compile's verbose 'Effect enforcement completed' status line) are listed by name with their first error code in notReachingEffectPass, never dropped. Calor0419 is counted per DIAGNOSTIC (one per function, first three reasons shown), so a function with more than three assumptions whose function-typed reason is truncated out of the message is under-counted — a known floor, not a ceiling. D-B: Roslyn syntax-only (CSharpSyntaxTree.ParseText, LanguageVersion.Preview, no preprocessor symbols defined, so inactive #if branches are not scanned) over bench/corpus/{MediatR,serilog,FluentValidation}/src/**/*.cs (bin/, obj/ excluded). delegate declarations are collected per SUBJECT (all files) before classifying, so a delegate declared in one file counts where it is used in another.",
   "classes": {
     "dA.calor0418": "Calor0418 DelegateInvocation diagnostics (any severity) — invocation of a parameter/§B/field value or of a returned delegate value under enforcement.",
     "dA.calor0419FunctionTyped": "Calor0419 AssumedEffects diagnostics whose message contains 'function-typed value' — a function-typed local/parameter passed as an argument to a dotted (external) call target (EffectEnforcementPass.InferFromCallArguments).",
     "dB.lambdas": "SimpleLambdaExpressionSyntax + ParenthesizedLambdaExpressionSyntax.",
     "dB.anonymousMethods": "AnonymousMethodExpressionSyntax (delegate (...) { ... }).",
     "dB.delegateDeclarations": "DelegateDeclarationSyntax (delegate R Name(...);).",
-    "dB.delegateTypedDeclarations": "Parameters, fields, properties and locals whose declared type syntax (after unwrapping '?' and a namespace qualifier) is Func<…>, Action, Action<…>, Predicate<…>, Comparison<…>, Converter<…>, EventHandler, EventHandler<…>, or the name of a delegate declared in the same file. 'var' locals never count.",
+    "dB.delegateTypedDeclarations": "Parameters, fields, event fields, properties and locals whose declared type syntax (after unwrapping '?' and a namespace qualifier) is Func<…>, Action, Action<…>, Predicate<…>, Comparison<…>, Converter<…>, EventHandler, EventHandler<…>, or the name of a delegate declared anywhere in the same subject. 'var' locals never count.",
     "dB.delegateInvocations": "InvocationExpressionSyntax whose target is a bare identifier, or identifier.Invoke / identifier?.Invoke, where the identifier is one of the delegate-typed declaration names collected in the same file."
   },
-  "demandTotal": 3112,
+  "demandTotal": 3124,
   "dA": {
+    "measuredCommit": "4acc7f43ee6a747aeb5aaf24ca1f455d3b92b730",
     "fileCount": 886,
     "filesNotReachingEffectPass": 45,
+    "notReachingEffectPassNote": "Known state at registration, not a filter: bench/mcp/tasks/*/expected.calr and input.calr are MCP benchmark fixtures that are deliberately broken or written against older syntax (most die on Calor0251/Calor0830), benchmarks/* entries are the #901 stale subjects, and tests/TestData/LintScenarios/10_error_cases/* are error fixtures.",
     "notReachingEffectPass": [
-      "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
-      "bench/mcp/tasks/01-fix-closing-tag/input.calr",
-      "bench/mcp/tasks/02-fix-missing-effect/expected.calr",
-      "bench/mcp/tasks/02-fix-missing-effect/input.calr",
-      "bench/mcp/tasks/03-fix-wrong-id-prefix/expected.calr",
-      "bench/mcp/tasks/03-fix-wrong-id-prefix/input.calr",
-      "bench/mcp/tasks/04-fix-duplicate-id/expected.calr",
-      "bench/mcp/tasks/04-fix-duplicate-id/input.calr",
-      "bench/mcp/tasks/05-fix-multiple-errors/expected.calr",
-      "bench/mcp/tasks/05-fix-multiple-errors/input.calr",
-      "bench/mcp/tasks/06-add-effect-to-function/expected.calr",
-      "bench/mcp/tasks/06-add-effect-to-function/input.calr",
-      "bench/mcp/tasks/07-greenfield-simple-function/expected.calr",
-      "bench/mcp/tasks/08-greenfield-module-with-class/expected.calr",
-      "bench/mcp/tasks/09-convert-csharp-simple/expected.calr",
-      "bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr",
-      "bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr",
-      "bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr",
-      "bench/mcp/tasks/12-fix-mismatched-closing-tag/expected.calr",
-      "bench/mcp/tasks/12-fix-mismatched-closing-tag/input.calr",
-      "bench/mcp/tasks/13-greenfield-crud-module/expected.calr",
-      "bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr",
-      "bench/mcp/tasks/14-fix-test-ids-in-production/input.calr",
-      "bench/mcp/tasks/15-nontarget-read-module/input.calr",
-      "bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr",
-      "bench/mcp/tasks/16-nontarget-refactor-rename/input.calr",
-      "bench/mcp/tasks/17-fix-missing-return/expected.calr",
-      "bench/mcp/tasks/17-fix-missing-return/input.calr",
-      "bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr",
-      "bench/mcp/tasks/18-fix-wrong-effect-code/input.calr",
-      "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
-      "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
-      "bench/mcp/tasks/20-fix-unclosed-call/input.calr",
-      "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr",
-      "benchmarks/arithmetic/div-by-zero.calr",
-      "benchmarks/arithmetic/overflow.calr",
-      "benchmarks/loops/bounds-violation.calr",
-      "benchmarks/null-safety/null-deref.calr",
-      "benchmarks/security/command-injection.calr",
-      "benchmarks/security/path-traversal.calr",
-      "benchmarks/security/sql-injection.calr",
-      "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
-      "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
-      "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
-      "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
+      {
+        "file": "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/01-fix-closing-tag/input.calr",
+        "firstError": "Calor0006"
+      },
+      {
+        "file": "bench/mcp/tasks/02-fix-missing-effect/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/02-fix-missing-effect/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/03-fix-wrong-id-prefix/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/03-fix-wrong-id-prefix/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/04-fix-duplicate-id/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/04-fix-duplicate-id/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/05-fix-multiple-errors/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/05-fix-multiple-errors/input.calr",
+        "firstError": "Calor0006"
+      },
+      {
+        "file": "bench/mcp/tasks/06-add-effect-to-function/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/06-add-effect-to-function/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/07-greenfield-simple-function/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/08-greenfield-module-with-class/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/09-convert-csharp-simple/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/12-fix-mismatched-closing-tag/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/12-fix-mismatched-closing-tag/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/13-greenfield-crud-module/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/14-fix-test-ids-in-production/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/15-nontarget-read-module/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/16-nontarget-refactor-rename/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/17-fix-missing-return/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/17-fix-missing-return/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/18-fix-wrong-effect-code/input.calr",
+        "firstError": "Calor0403"
+      },
+      {
+        "file": "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/mcp/tasks/20-fix-unclosed-call/input.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr",
+        "firstError": "Calor0208"
+      },
+      {
+        "file": "benchmarks/arithmetic/div-by-zero.calr",
+        "firstError": "Calor0102"
+      },
+      {
+        "file": "benchmarks/arithmetic/overflow.calr",
+        "firstError": "Calor0255"
+      },
+      {
+        "file": "benchmarks/loops/bounds-violation.calr",
+        "firstError": "Calor0102"
+      },
+      {
+        "file": "benchmarks/null-safety/null-deref.calr",
+        "firstError": "Calor0102"
+      },
+      {
+        "file": "benchmarks/security/command-injection.calr",
+        "firstError": "Calor0006"
+      },
+      {
+        "file": "benchmarks/security/path-traversal.calr",
+        "firstError": "Calor0102"
+      },
+      {
+        "file": "benchmarks/security/sql-injection.calr",
+        "firstError": "Calor0102"
+      },
+      {
+        "file": "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
+        "firstError": "Calor0208"
+      },
+      {
+        "file": "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
+        "firstError": "Calor0830"
+      },
+      {
+        "file": "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
+        "firstError": "Calor0006"
+      },
+      {
+        "file": "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr",
+        "firstError": "Calor0002"
+      }
     ],
     "compileExceptions": [],
     "calor0418": 1,
@@ -88,6 +225,7 @@
     ]
   },
   "dB": {
+    "measuredCommit": "4acc7f43ee6a747aeb5aaf24ca1f455d3b92b730",
     "perSubject": [
       {
         "subject": "MediatR",
@@ -96,9 +234,9 @@
         "lambdas": 73,
         "anonymousMethods": 0,
         "delegateDeclarations": 2,
-        "delegateTypedDeclarations": 7,
-        "delegateInvocations": 2,
-        "total": 84
+        "delegateTypedDeclarations": 11,
+        "delegateInvocations": 6,
+        "total": 92
       },
       {
         "subject": "Serilog",
@@ -107,9 +245,9 @@
         "lambdas": 79,
         "anonymousMethods": 0,
         "delegateDeclarations": 0,
-        "delegateTypedDeclarations": 63,
-        "delegateInvocations": 27,
-        "total": 169
+        "delegateTypedDeclarations": 64,
+        "delegateInvocations": 28,
+        "total": 171
       },
       {
         "subject": "FluentValidation",
@@ -118,9 +256,9 @@
         "lambdas": 2524,
         "anonymousMethods": 0,
         "delegateDeclarations": 0,
-        "delegateTypedDeclarations": 235,
-        "delegateInvocations": 97,
-        "total": 2856
+        "delegateTypedDeclarations": 236,
+        "delegateInvocations": 98,
+        "total": 2858
       }
     ],
     "aggregate": {
@@ -128,9 +266,9 @@
       "lambdas": 2676,
       "anonymousMethods": 0,
       "delegateDeclarations": 2,
-      "delegateTypedDeclarations": 305,
-      "delegateInvocations": 126,
-      "total": 3109
+      "delegateTypedDeclarations": 311,
+      "delegateInvocations": 132,
+      "total": 3121
     }
   }
 }
