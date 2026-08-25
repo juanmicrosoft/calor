@@ -531,8 +531,14 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   veto was implemented, measured to delete resolution (`05-02`/`05-03.approved.calr` went from
   clean to Calor0411 + Calor0410, failing `LosslessFormattingTests`), and deferred to **E2**,
   which is also when `EffectRow` exists for the row half of this sentence to be literal. The
-  scoped branch is structural and currently unreachable — design doc §8.1 carries the
-  three-way measurement. E1 is the item
+  scoped branch is **corpus-unreachable but observable**: no committed `.calr` file reaches it
+  (32-site sweep, all unreported), yet it is pinned by
+  `EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel`, which fails
+  when the branch is deleted. It is reachable through the name-keyed side channel — a name used
+  both as a receiver and as a bare call target — where without the veto the AST's `"?"` sentinel
+  is mistaken for a type and Calor0418 launders the call. Design doc §8.1 carries the
+  measurement. (Round 1 of review called this branch unreachable; that was wrong and is
+  corrected.) E1 is the item
   everything else stands on, and it is exactly the work Draft v3 assumed 0.14 had done.
   **Exit pins, to be added in the E1 PR (none exist today):** (a) a grep pin — a `[Fact]` in
   `Calor.Enforcement.Tests` asserting no `_variableTypeMap` identifier under

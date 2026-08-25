@@ -1207,9 +1207,10 @@ public sealed class EffectEnforcementPass
             // shadowed pure function's effects).
             if (!target.Contains('.'))
             {
-                if (ResolveLocalValueType(target) != null)
-                    return InferFromBareNameTarget(target, span);
-
+                // InferFromBareNameTarget re-runs the value lookup itself and
+                // branches on it there; both arms of the old `if` called it
+                // unconditionally, so the test was dead. Collapsed in E1 slice 2b
+                // (review round 2, nit 5) — behaviour unchanged.
                 return InferFromBareNameTarget(target, span);
             }
 
@@ -1595,9 +1596,13 @@ public sealed class EffectEnforcementPass
         /// round 1, finding 6): a name used as a receiver ONCE answers from here
         /// at EVERY occurrence in the function, receiver or not. The ambiguity
         /// rule in <see cref="CallGraphAnalysis.BoundValueTypes"/> is what makes
-        /// that safe — a name the binder types two ways is dropped — and that
-        /// doc states the residual exposure. Keying by position would need a
-        /// position argument threaded through eleven call sites; deferred.</para>
+        /// that sound — a name the binder types two ways is dropped. The spread
+        /// is also load-bearing rather than merely tolerated: it is how the
+        /// Unresolved branch below is reachable at a BARE call target, which is
+        /// what <c>E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel</c>
+        /// pins. Keying by position would need a position argument threaded
+        /// through eleven call sites AND that veto re-established at the
+        /// bare-target position; deferred.</para>
         /// </summary>
         private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>? _boundValueTypes;
 
@@ -1654,34 +1659,49 @@ public sealed class EffectEnforcementPass
             // fallback still performs. Measured: 05-02/05-03.approved.calr go
             // from clean to Calor0411 + Calor0410 on '_chainWhere005.ToList'.
             //
-            // STRUCTURAL, CURRENTLY UNREACHABLE (review round 1, finding 1).
-            // The Unresolved branch is not observable today: no reachable shape
-            // reaches it while the AST fallback would answer with a concrete
-            // type, so deleting the branch changes no diagnostic anywhere. It is
-            // kept because it states which of the two paths is authoritative,
-            // and E2 makes it live the moment the binder types more receivers.
-            // Do not read it as an observed fail-closed guarantee — fail-closed
-            // is delivered by the pass's existing end-of-chain ReportUnknownCall
-            // (PR #968), which both branches reach.
+            // CORPUS-UNREACHABLE BUT OBSERVABLE (review round 2, correcting
+            // round 1, which wrongly called this branch unreachable and said
+            // deleting it changed nothing).
             //
-            // Measured three ways:
-            //   1. Over all 301 committed .calr files (tests/TestData/Benchmarks,
-            //      samples, benchmarks, Conversion snapshots), every unresolved
-            //      receiver arriving here is Reported=false — 32 sites, all
-            //      _chainNNN or member chains. Zero Reported=true.
-            //   2. Hand-built fixtures DO reach Reported=true (a §EACH variable
-            //      shadowing a field), but the AST fallback returns null there
-            //      too, so the answer is the same either way.
-            //   3. Why, structurally: the binder reports unresolved only for §B
-            //      locals and loop variables, never for parameters/fields/
-            //      properties — and those are the only AST sources carrying a
-            //      concrete declared type. For a §B the AST search returns its
-            //      own non-answer "?" (see FindLocalDeclarationType, "known
-            //      value, unknown type") rather than falling through to a field,
-            //      and Calor0255 forbids a loop variable from shadowing an
-            //      enclosing local or parameter outright.
-            // Reproduce: trace (name, Reported, ResolveLocalValueTypeFromAst)
-            // here and compile the corpus.
+            // Pinned by
+            // EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel,
+            // which FAILS if this branch is deleted, with its control
+            // _SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel.
+            //
+            // The reachability path is the NAME-KEYED side channel (see
+            // CallGraphAnalysis.BoundValueTypes). A name used as a receiver
+            // ANYWHERE in the function answers from here at EVERY occurrence,
+            // including positions the channel never collects. So:
+            //
+            //     §B{u} §C{Mystery.Make} §/C
+            //     §C{u.Run} §/C     <- receiver use: puts u's Reported
+            //                          UnresolvedBoundType into the channel
+            //     §C{u} §/C         <- bare target: reads it back
+            //
+            // Without this branch the bare target falls through to the AST
+            // search, which hands back the SENTINEL "?" for a §B it cannot type
+            // (FindLocalDeclarationType, "known value, unknown type").
+            // InferFromBareNameTarget tests `!= null`, not the sentinel, so "?"
+            // is treated as a type and the call takes the delegate-invocation
+            // arm: Calor0418 "declared type '?'", charging EffectSet.Empty.
+            // Measured: 0411,0411,0418,0410 without the branch vs
+            // 0411,0411,0411,0410 with it. Guessing here would launder effects,
+            // so the veto is load-bearing, not decorative.
+            //
+            // ResolveVariableType guards `declared == "?"`; the other
+            // ResolveLocalValueType call sites do not. Adding that guard here
+            // keeps every suite green but SUBSUMES this branch — the pin above
+            // then passes with the branch deleted, because both answer the same
+            // question at different layers. Unifying them is slice-2c work, not
+            // a drive-by. Recorded as debt in design doc §8.1.
+            //
+            // CORPUS claim, and only that: over all 301 committed .calr files
+            // every unresolved receiver arriving here is Reported=false — 32
+            // sites, all _chainNNN or member chains, zero Reported=true. So the
+            // branch changes nothing on the committed corpus, which is why the
+            // ledgers and transcripts are unmoved; it is NOT evidence that the
+            // branch is unobservable. Reproduce the sweep by tracing
+            // (name, Reported, ResolveLocalValueTypeFromAst(name)) here.
             if (type is Binding.BoundTypes.UnresolvedBoundType unresolved)
             {
                 return unresolved.Reported

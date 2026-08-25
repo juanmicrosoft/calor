@@ -19,7 +19,7 @@
       "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 356,
+      "expectedTotal": 358,
       "expectedSkipped": 0
     },
     {

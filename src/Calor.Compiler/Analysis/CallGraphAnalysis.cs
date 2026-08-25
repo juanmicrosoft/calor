@@ -204,17 +204,25 @@ public sealed class CallGraphAnalysis
     /// position to pass, so keying by (name, position) would need a second
     /// parameter threaded through eleven call sites; that is deferred.</para>
     ///
-    /// <para>What makes it safe today rather than merely convenient: the
-    /// ambiguity rule above. Two occurrences of one name that the binder types
-    /// differently — the case where "answers everywhere" would be wrong — are
-    /// dropped, so the AST decides exactly as before. What survives is a name
-    /// the binder gives ONE answer for throughout the function, and a name with
-    /// one type does not change type by appearing in a different position. The
-    /// residual exposure is a name the binder types identically at two
-    /// occurrences that the AST search would have answered differently, which
-    /// requires the AST search to disagree with itself on one name in one
-    /// function; no such shape is reachable from the resolvers' inputs
-    /// today.</para>
+    /// <para>The ambiguity rule above is what keeps it sound: two occurrences of
+    /// one name that the binder types differently — the case where "answers
+    /// everywhere" would be wrong — are dropped, so the AST decides exactly as
+    /// before. What survives is a name the binder gives ONE answer for
+    /// throughout the function, and a name with one type does not change type by
+    /// appearing in a different position.</para>
+    ///
+    /// <para><b>This spread is not merely benign — it is load-bearing</b>
+    /// (review round 2). It is the path by which
+    /// <c>EffectEnforcementPass.AskBoundTree</c>'s fail-closed veto is reachable
+    /// at all: a name used as a receiver ONCE and as a bare call target
+    /// elsewhere carries its <c>Reported</c> <c>UnresolvedBoundType</c> into
+    /// <c>InferFromBareNameTarget</c>, where it stops the AST's <c>"?"</c>
+    /// sentinel from being mistaken for a type and laundered into a Calor0418
+    /// that charges nothing. Pinned by
+    /// <c>EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel</c>.
+    /// So keying by position later is not a free tidy-up: it would need that
+    /// veto re-established at the bare-target position, or the <c>"?"</c>
+    /// sentinel guarded there, or the pin would go silent.</para>
     ///
     /// <para>Deliberately RECEIVERS ONLY, not every bound name. A name in a
     /// non-receiver position — a method group passed as an argument, a bare

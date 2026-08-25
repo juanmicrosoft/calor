@@ -1059,18 +1059,41 @@ resolved receivers are Calor-side, not new `MetadataBinder` resolutions.
   `_chainWhere005.ToList`, failing `LosslessFormattingTests` (which passes on `main`). The
   `Reported` bit is the discriminator #1095 already computes, so no new judgement was invented.
 
-  **The veto branch itself is STRUCTURAL AND CURRENTLY UNREACHABLE** — same status as the two
-  residues below, and stated here rather than left implied (review round 1, finding 1). Deleting
-  it changes no diagnostic: over all 301 committed `.calr` files every unresolved receiver
-  arriving at the resolver is `Reported=false` (32 sites, all `_chainNNN` or member chains; zero
-  `Reported=true`); hand-built fixtures reach `Reported=true` but the AST fallback declines there
-  too. Structurally, the binder reports unresolved only for `§B` locals and loop variables —
-  never parameters/fields/properties, the only AST sources carrying a concrete declared type —
-  and for a `§B` the AST search returns its own non-answer `"?"` rather than falling through to a
-  field, while Calor0255 forbids a loop variable from shadowing an enclosing local or parameter.
-  **So fail-closed is not claimed as an observed property of this branch**; it is delivered by
-  the pass's existing end-of-chain `ReportUnknownCall` (PR #968), which both routes reach. The
-  branch is kept because it records which path is authoritative, and E2 makes it live.
+  **The veto branch is CORPUS-UNREACHABLE BUT OBSERVABLE** — correcting round 1, which called it
+  unreachable and claimed deleting it changed no diagnostic. That was false. It is pinned by
+  `EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel`, which fails
+  when the branch is deleted, with an explicit control
+  (`_SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel`).
+
+  The reachability path is the **name-keyed side channel** (§8.1 below, and
+  `CallGraphAnalysis.BoundValueTypes`): a name used as a receiver anywhere in a function answers
+  from the channel at *every* occurrence, including positions the channel never collects. A name
+  that is both a receiver and a bare call target therefore carries its `Reported`
+  `UnresolvedBoundType` into `InferFromBareNameTarget`:
+
+  ```
+  §B{u} §C{Mystery.Make} §/C
+  §C{u.Run} §/C     ← receiver use: records u's Reported UnresolvedBoundType
+  §C{u} §/C         ← bare target: reads it back
+  ```
+
+  Without the veto the bare target falls through to the AST search, which returns the **sentinel**
+  `"?"` for a `§B` it cannot type. `InferFromBareNameTarget` tests `!= null`, not the sentinel, so
+  `"?"` is treated as a type and the call takes the delegate-invocation arm — `Calor0418
+  "declared type '?'"`, charging `EffectSet.Empty`. Measured: `0411, 0411, 0418, 0410` without the
+  branch versus `0411, 0411, 0411, 0410` with it. Guessing there launders effects, so the veto is
+  load-bearing.
+
+  **Corpus claim, and only that:** over all 301 committed `.calr` files every unresolved receiver
+  arriving at the resolver is `Reported=false` — 32 sites, all `_chainNNN` or member chains, zero
+  `Reported=true`. That is why the ledgers and transcripts are unmoved. It is **not** evidence
+  that the branch is unobservable, which is the inference round 1 got wrong.
+
+  **Slice-2c debt.** `ResolveVariableType` guards `declared == "?"`; the other
+  `ResolveLocalValueType` call sites do not. Adding that guard keeps every suite green (measured)
+  but **subsumes** the veto — the pin above then passes with the branch deleted, because the guard
+  and the veto answer the same question at two layers. Unifying them is a deliberate slice-2c
+  change, not a drive-by that silently un-pins the test.
 - **Receivers only.** An earlier revision recorded every bound name; that made the side channel
   answer in non-receiver positions and regressed the method-group-argument charging arm
   (`StrictnessBatchTests` C2/C4). Names outside receiver positions keep resolving through the

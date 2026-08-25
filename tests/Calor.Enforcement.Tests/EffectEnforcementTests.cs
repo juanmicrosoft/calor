@@ -1052,6 +1052,91 @@ public class EffectEnforcementTests
     }
 
     /// <summary>
+    /// v0.15 E1 slice 2b, review round 2 — the pin that OBSERVES the
+    /// <c>Reported</c> veto in <c>AskBoundTree</c>. Round 1 claimed the veto was
+    /// unreachable; that was wrong, and this is the shape that reaches it.
+    ///
+    /// <para>The name <c>u</c> is used two ways in one function: as a call
+    /// RECEIVER (<c>u.Run</c>), which is what puts its <c>Reported</c>
+    /// <c>UnresolvedBoundType</c> into the side channel, and as a BARE call
+    /// target (<c>§C{u}</c>), a position the side channel does not collect.
+    /// Because the channel is keyed by NAME rather than by position, the
+    /// receiver's answer reaches the bare target too — the name-keyed leak
+    /// documented on <c>CallGraphAnalysis.BoundValueTypes</c> is exactly the
+    /// veto's reachability path.</para>
+    ///
+    /// <para>Without the veto, <c>ResolveLocalValueType</c> falls through to the
+    /// AST search, which returns the SENTINEL <c>"?"</c> for a binding it cannot
+    /// type. <c>InferFromBareNameTarget</c> branches on <c>!= null</c>, so the
+    /// sentinel is treated as a type and the bare call takes the
+    /// delegate-invocation arm — <c>Calor0418: Invocation of value 'u' (declared
+    /// type '?')</c>, returning <c>EffectSet.Empty</c>. That is a guess, and a
+    /// laundering one: it charges nothing. With the veto the call stays
+    /// <c>Calor0411</c> and fails closed.</para>
+    ///
+    /// <para>MEASURED — delete the veto and re-run: <c>0411, 0411, 0418,
+    /// 0410</c> instead of <c>0411, 0411, 0411, 0410</c>.</para>
+    /// </summary>
+    [Fact]
+    public void E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel()
+    {
+        var source = @"
+§M{m001:VetoReach}
+  §F{f001:Go:pub}
+    §E{}
+    §B{u} §C{Mystery.Make} §/C
+    §C{u.Run} §/C
+    §C{u} §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.DoesNotContain(
+            result.Diagnostics.ToList(),
+            d => d.Code == DiagnosticCode.DelegateInvocation);
+        Assert.Contains(
+            result.Diagnostics.ToList(),
+            d => d.Code == DiagnosticCode.UnknownExternalCall
+                 && d.Message.Contains("'u'"));
+    }
+
+    /// <summary>
+    /// The control for
+    /// <see cref="E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel"/>,
+    /// making the discriminator explicit: the SAME binding and the SAME bare
+    /// call, with the receiver use removed. Nothing then puts <c>u</c> into the
+    /// side channel, the veto cannot fire, and the AST sentinel reaches
+    /// <c>InferFromBareNameTarget</c> — Calor0418, on this branch and on
+    /// <c>main</c> alike. One receiver use is the only difference between the
+    /// two fixtures, and it is the difference between failing closed and
+    /// guessing.
+    ///
+    /// <para>This also records why the <c>"?"</c> sentinel is NOT guarded at
+    /// this call site the way <c>ResolveVariableType</c> guards it (round 2,
+    /// item 4). Adding <c>valueType != "?"</c> keeps every suite green —
+    /// measured — but it turns this control into Calor0411 as well, and with it
+    /// the veto's only observable path disappears: the pin above then passes
+    /// with the veto deleted. The sentinel guard and the veto answer the same
+    /// question at two layers. Unifying them is a deliberate slice-2c change,
+    /// not a drive-by that silently un-pins the test above.</para>
+    /// </summary>
+    [Fact]
+    public void E1Slice2b_SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel()
+    {
+        var source = @"
+§M{m001:VetoControl}
+  §F{f001:Go:pub}
+    §E{}
+    §B{u} §C{Mystery.Make} §/C
+    §C{u} §/C
+";
+        var result = TestHarness.Compile(source);
+
+        var delegateInvocation = Assert.Single(
+            result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.DelegateInvocation));
+        Assert.Contains("declared type '?'", delegateInvocation.Message);
+    }
+
+    /// <summary>
     /// SURVIVING FALLBACK — <c>function.Parameters[].TypeName</c>. A parameter
     /// used as a BARE call target is not a receiver, so the receiver side
     /// channel carries no entry for it and the AST parameter-type string is
