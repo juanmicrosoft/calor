@@ -231,11 +231,13 @@ public class EffectsSuggestTests
     }
 
     /// <summary>
-    /// A receiver the binder cannot type is reported as unresolved and never
-    /// given a guessed type: <c>x</c> is bound from an unknown callee (the
-    /// binder's OBJECT fallback) and <c>a.b</c> is a member chain the bound
-    /// tree does not type. Neither may surface as <c>OBJECT</c>,
-    /// <c>System.Object</c>, or the type of <c>a</c>.
+    /// A receiver the binder cannot vouch for is reported as unresolved and
+    /// never given a guessed type: <c>x</c> is bound from an unknown callee
+    /// (the binder's OBJECT fallback); <c>a.b</c> is a member chain the bound
+    /// tree does not type; <c>foo</c> is not a bound variable and not written
+    /// as a type; <c>this.sb</c> is a chain through <c>this</c>. None may
+    /// surface as <c>OBJECT</c>, <c>System.Object</c>, the type of <c>a</c>,
+    /// or as the echoed source text with <c>ReceiverResolved == true</c>.
     /// </summary>
     [Fact]
     public void Collector_UnresolvedReceiver_IsReportedWithoutGuessedType()
@@ -248,6 +250,11 @@ public class EffectsSuggestTests
       §C{x.Run} §/C
       §B{a} §NEW{Random} §/NEW
       §C{a.b.Chain} §/C
+      §C{foo.Bar} §/C
+  §CL{c001:Holder:pub}
+      §MT{mt001:Write:pub}
+          §O{void}
+          §C{this.sb.Append} §A STR:""x"" §/C
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -260,6 +267,20 @@ public class EffectsSuggestTests
         Assert.False(chain.ReceiverResolved);
         Assert.Equal("a.b", chain.TypeName);
 
+        var bar = Assert.Single(calls, c => c.MethodName == "Bar");
+        Assert.False(bar.ReceiverResolved);
+        Assert.Equal("foo", bar.TypeName);
+
+        var append = Assert.Single(calls, c => c.MethodName == "Append");
+        Assert.False(append.ReceiverResolved);
+        Assert.Equal("this.sb", append.TypeName);
+
+        // The type-qualified callee that produced x is still a resolved receiver
+        // (written as a type reference), so suggest can still propose it.
+        var make = Assert.Single(calls, c => c.MethodName == "Make");
+        Assert.True(make.ReceiverResolved);
+        Assert.Equal("Unknown", make.TypeName);
+
         Assert.DoesNotContain(calls, c => c.TypeName is "OBJECT" or "System.Object");
         Assert.DoesNotContain(calls, c => c.TypeName == "System.Random" && c.MethodName == "Chain");
 
@@ -267,6 +288,86 @@ public class EffectsSuggestTests
         var resolver = new EffectResolver();
         resolver.Initialize();
         Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(run.TypeName, run.MethodName).Status);
+    }
+
+    /// <summary>
+    /// A lambda-bound variable is a function value, not a nominal receiver:
+    /// invoking it must not be attributed to the binder's
+    /// <c>LAMBDA(...)</c> type string.
+    /// </summary>
+    [Fact]
+    public void Collector_FunctionTypedReceiver_IsUnresolved()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
+      §C{f.Invoke} §A INT:1 §/C
+";
+        var module = Parse(source);
+        var calls = ExternalCallCollector.Collect(module);
+
+        var invoke = Assert.Single(calls, c => c.MethodName == "Invoke");
+        Assert.False(invoke.ReceiverResolved);
+        Assert.Equal("f", invoke.TypeName);
+        Assert.DoesNotContain(calls, c => c.TypeName.StartsWith("LAMBDA", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// An array-typed receiver resolves to <c>System.Array</c>, not to the
+    /// element type.
+    /// </summary>
+    [Fact]
+    public void Collector_ArrayReceiver_ResolvesToSystemArray()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §I{i32[]:arr}
+      §O{void}
+      §C{arr.Clone} §/C
+";
+        var module = Parse(source);
+        var calls = ExternalCallCollector.Collect(module);
+
+        var clone = Assert.Single(calls, c => c.MethodName == "Clone");
+        Assert.True(clone.ReceiverResolved);
+        Assert.Equal("System.Array", clone.TypeName);
+        Assert.DoesNotContain(calls, c => c.TypeName == "System.Int32");
+    }
+
+    /// <summary>
+    /// Resolution step 2: a Calor-declared class used as a static receiver
+    /// resolves through its <c>TypeSymbol</c>. And the deliberate slice-1
+    /// residual, pinned so it cannot drift silently: a receiver written as a
+    /// type reference that is neither a Calor type nor known to metadata
+    /// (<c>OrderRepo</c>) stays a resolved receiver, so
+    /// <c>calor effects suggest</c> can still propose a manifest entry for it.
+    /// </summary>
+    [Fact]
+    public void Collector_CalorClassStaticReceiver_ResolvesThroughTypeSymbol()
+    {
+        var source = @"
+§M{m001:Test}
+  §CL{c001:Helper:pub}
+      §MT{mt001:Run:pub}
+          §O{void}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{Helper.Run} §/C
+      §C{OrderRepo.Save} §/C
+";
+        var module = Parse(source);
+        var calls = ExternalCallCollector.Collect(module);
+
+        var run = Assert.Single(calls, c => c.MethodName == "Run");
+        Assert.True(run.ReceiverResolved);
+        Assert.EndsWith("Helper", run.TypeName, StringComparison.Ordinal);
+
+        var save = Assert.Single(calls, c => c.MethodName == "Save");
+        Assert.True(save.ReceiverResolved);
+        Assert.Equal("OrderRepo", save.TypeName);
     }
 
     private static string RepoRoot() =>

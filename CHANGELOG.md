@@ -67,17 +67,22 @@ All notable changes to this project will be documented in this file.
     (used by the SDK, MCP tools, `review-packet`, `run`/`test`), the MSBuild
     task and `Sdk.targets` — and a test pins that they agree. (`calor watch`
     never runs verification, so it is unaffected.)
-
-### v0.15 foundation
-- **`calor effects suggest` now learns what type a variable is from the
-  compiler's own type information instead of guessing from the source text.**
-  A variable whose type is only known through .NET metadata (for example
-  `§B{g} §C{System.Guid.NewGuid} §/C` followed by `§C{g.ToString} §/C`)
-  now resolves to the right type. When the compiler cannot work out a
-  receiver's type, the call is reported as unresolved with a warning instead of
-  being written into the manifest under a made-up name. The old text-scanning
-  shortcut (`_variableTypeMap`) is gone and a test now blocks it from coming
-  back.
+- **`calor effects suggest` takes a variable's type from the compiler's own
+  type information, not from the source text** (v0.15 foundation, first
+  slice). A variable whose type is only known through .NET metadata (for
+  example `§B{g} §C{System.Guid.NewGuid} §/C` followed by
+  `§C{g.ToString} §/C`) resolves to the right type. A call whose receiver the
+  compiler cannot vouch for — an inferred variable it could not type, a chain
+  like `a.b.Method`, a lambda or function value, or a lowercase name that is
+  not a known variable (`foo.Bar`, `this.sb.Append`) — is now reported with a
+  new `Calor1360` warning and left out of the suggested manifest instead of
+  becoming a manifest entry named after the variable. In `--json` mode the
+  warning is in `diagnostics` and `data.untypedReceivers` gives the count.
+  Calls written through a type name (`Console.WriteLine`, `OrderRepo.Save`)
+  still get manifest entries as before. A dotted `§NEW{System.Text.StringBuilder}`
+  is now collected as one constructor of that type (it used to be split into a
+  `System.Text` type with a `StringBuilder` method). The old source-text
+  scanning shortcut is gone and a test blocks it from coming back.
 
 ## [0.14.3] - 2026-08-24
 

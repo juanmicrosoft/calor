@@ -145,7 +145,7 @@ Classes:
 | `convert` | E | **Yes** (`--format json`) | conversion issues as `Calor1343` envelope diagnostics; direction/features/benchmark under `data` |
 | `format` | E | **Yes** (`--format json`) | real parser diagnostics + `Calor1340`-band; per-file statuses under `data` |
 | `ids` | E | **Yes** (`check --format json`) | `Calor0800`-band findings as envelope diagnostics with `declarationId`; `index` artifact (`calor.ids.json`) unchanged |
-| `effects` | D | **Yes** (`--json`) | resolve/list/suggest stdout wrapped under `data`; manifest file stays raw |
+| `effects` | D | **Yes** (`--json`) | resolve/list/suggest stdout wrapped under `data`; manifest file stays raw. `suggest` adds `data.untypedReceivers` (count of calls whose receiver has no resolved type) on both its paths and reports each such call as a `Calor1360` warning in `diagnostics` |
 | `benchmark` | D | **Yes** (`--format json`) | quick/project/full payloads under `data`; string-interpolated JSON replaced with real serialization |
 | `coverage` | D | **Yes** | `CoverageResult` under `data` |
 | `feature-check` | D | **Yes** | payloads under `data` |

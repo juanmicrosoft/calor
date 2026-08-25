@@ -20,14 +20,16 @@ public enum CallKind
 /// <summary>
 /// A collected external call with its resolved type, method, and kind.
 ///
-/// <para><see cref="ReceiverResolved"/> is false when the bound tree could not
-/// type the receiver (an <see cref="UnresolvedBoundType"/>, the binder's
-/// <c>OBJECT</c> fallback for an expression it could not type, a member chain
-/// the bound tree does not type, or a function-typed value). In that case
-/// <see cref="TypeName"/> is the receiver exactly as written in source — never
-/// a guessed type — and consumers must report the call as unresolved rather
-/// than key a manifest entry on it. v0.15 E1 (roadmap §4.2), metadata-binding
-/// scoping §3 S6 / D5.</para>
+/// <para><see cref="ReceiverResolved"/> is false when the binder could not
+/// vouch for the receiver's type: an <see cref="UnresolvedBoundType"/>, the
+/// binder's <c>OBJECT</c> fallback on an inferred local, a function-typed
+/// value, a member chain (<c>a.b.M</c>, <c>this.f.M</c>) the bound tree does
+/// not type, a receiver that is neither a bound variable nor written as a
+/// type reference (<c>foo.Bar</c>), or a module whose binding threw. In that
+/// case <see cref="TypeName"/> is the receiver exactly as written in source —
+/// never a guessed type — and consumers must report the call as unresolved
+/// rather than key a manifest entry on it. v0.15 E1 (roadmap §4.2),
+/// metadata-binding scoping §3 S6 / D5.</para>
 /// </summary>
 public sealed record CollectedCall(
     string TypeName,
@@ -48,24 +50,36 @@ public sealed record RawCall(string CallerName, string Target, bool IsConstructo
 /// Walks the Calor AST to collect external method invocations.
 /// Covers top-level functions, class methods, and constructors.
 ///
-/// Receiver types come from the bound tree (v0.15 E1, metadata-binding S6):
+/// Receiver types come from the bound tree (v0.15 E1 slice 1, metadata-binding
+/// S6). What that means today, stated plainly:
 ///
-///   1. A receiver that is a bound variable resolves through the
-///      <see cref="BoundType"/> a read of that variable carries
-///      (<see cref="BoundVariableExpression.Type"/>) — this is where a type
-///      known only through binding or metadata (an inferred <c>§B</c>, a BCL
-///      return type resolved by <c>MetadataBinder</c>) reaches the effect system.
+///   1. A receiver that is a bound variable resolves from the binder's symbol
+///      type — the <see cref="BoundType"/> a <see cref="BoundVariableExpression"/>
+///      for that variable carries, which in this slice is always a
+///      <see cref="NominalBoundType"/> wrapping <see cref="VariableSymbol.TypeName"/>.
+///      That string is where a type known only through binding or metadata (an
+///      inferred <c>§B</c>, a BCL return type resolved by <c>MetadataBinder</c>)
+///      reaches the effect system. On top of it this slice adds three honesty
+///      guards: the binder's <c>OBJECT</c> fallback on an inferred local, a
+///      member chain through the variable (<c>a.b.M</c>), and a function-typed
+///      value (<c>LAMBDA(...)</c>, <c>Func&lt;…&gt;</c>) are all reported
+///      unresolved instead of being attributed a type. A receiver
+///      <c>BoundExpression</c> on the call nodes, and <c>UnresolvedBoundType</c>
+///      emitted by the binder (scoping §D6), are slice 2.
 ///   2. A receiver that is a Calor-declared type used statically resolves to
 ///      <see cref="TypeSymbol.QualifiedName"/>.
-///   3. A type-qualified receiver written in source (<c>System.Console</c>,
-///      <c>Console</c>) takes the identity the binder assigned it
-///      (<see cref="BoundCallExpression.ResolvedTypeName"/>).
+///   3. A receiver that is neither, but is written as a type reference (every
+///      dot-separated segment a capitalized identifier: <c>Console</c>,
+///      <c>System.IO.File</c>, <c>OrderRepo</c>) takes the identity the binder
+///      assigned it (<see cref="BoundCallExpression.ResolvedTypeName"/>: the
+///      source text with short BCL names expanded). This keeps
+///      <c>calor effects suggest</c> able to propose manifest entries for
+///      external types metadata does not know. Anything else (<c>foo.Bar</c>,
+///      <c>this.sb.Append</c>, <c>_items.Add</c> with no bound symbol) is
+///      reported unresolved — the source text is never echoed as a type.
 ///
-/// A receiver the binder could not type is reported with
-/// <see cref="CollectedCall.ReceiverResolved"/> == false and never receives a
-/// guessed type. There is no AST-side variable-type map: when binding is
-/// unavailable altogether, only the source-literal receiver text (with short
-/// BCL names expanded) is reported.
+/// If binding the module throws, every dotted receiver is reported unresolved.
+/// There is no AST-side variable-type map.
 ///
 /// Two collection modes share the traversal logic:
 ///
@@ -87,6 +101,10 @@ public sealed class ExternalCallCollector
     private readonly List<CollectedCall> _calls = new();
     private readonly List<RawCall> _rawCalls = new();
     private readonly Dictionary<(int Start, int End, string Target), BoundReceiver> _boundReceiverTypes = new();
+
+    // Set when Binder.Bind threw for the module: no receiver can then be vouched
+    // for, so every dotted call is reported unresolved rather than echoed.
+    private bool _indexingFailed;
 
     // Set by CollectPerFunctionWithBareNames before visiting each function's body,
     // so TryAddCall can tag RawCalls with the enclosing caller identity.
@@ -243,13 +261,21 @@ public sealed class ExternalCallCollector
             else
                 receiverResolved = false;
         }
-        else if (!typePart.Contains('.'))
+        else if (_indexingFailed)
         {
-            // No bound call site (binding unavailable for this module or this
-            // node shape): the bare receiver is taken as a type name written in
-            // source, with short BCL names expanded. Dotted receivers are kept
-            // verbatim.
+            // Binding threw for this module: nothing can be vouched for.
+            receiverResolved = false;
+        }
+        else if (IsTypeQualifiedReference(typePart))
+        {
+            // The binder produced no call node for this shape (e.g. a call
+            // nested in an expression it wraps as unsupported), but the
+            // receiver is written as a type reference; expand short BCL names.
             typePart = EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
+        }
+        else
+        {
+            receiverResolved = false;
         }
 
         if (!string.IsNullOrEmpty(typePart) && !string.IsNullOrEmpty(methodName))
@@ -292,9 +318,11 @@ public sealed class ExternalCallCollector
         }
         catch
         {
-            // Binding is an enrichment here: without it, TryAddCall reports the
-            // source-literal receiver text, and raw per-function mode still
-            // keeps the unresolved target explicit.
+            // Without a bound tree no receiver can be vouched for: TryAddCall
+            // reports every dotted receiver as unresolved (source text kept for
+            // the report), and raw per-function mode still keeps the target
+            // explicit.
+            _indexingFailed = true;
         }
     }
 
@@ -313,9 +341,10 @@ public sealed class ExternalCallCollector
     }
 
     /// <summary>
-    /// Resolution order (v0.15 E1): the receiver variable's bound type, then a
-    /// Calor-declared receiver type, then the binder's identity for a
-    /// type-qualified receiver written in source.
+    /// Resolution order (v0.15 E1 slice 1): the receiver variable's symbol type
+    /// (with the OBJECT / chain / function-type guards), then a Calor-declared
+    /// receiver type, then the binder's identity for a receiver written as a
+    /// type reference. Everything else is unresolved.
     /// </summary>
     private static BoundReceiver ResolveBoundReceiver(
         TextSpan span,
@@ -335,38 +364,85 @@ public sealed class ExternalCallCollector
             if (receiverPath.Contains('.'))
                 return BoundReceiver.Unresolved;
 
-            // The BoundType a read of this variable carries — the same shape a
-            // BoundVariableExpression for the receiver would expose.
-            return FromBoundType(new BoundVariableExpression(span, receiverSymbol).Type);
+            // The BoundType a read of this variable carries. In this slice that
+            // is NominalBoundType(receiverSymbol.TypeName) — the binder's symbol
+            // type string — because call nodes have no receiver BoundExpression
+            // yet; see FromBoundType for what is live and what is forward-looking.
+            return FromBoundType(new BoundVariableExpression(span, receiverSymbol).Type, receiverSymbol);
         }
 
         if (receiverTypeSymbol != null)
             return new BoundReceiver(receiverTypeSymbol.QualifiedName);
 
-        // A type-qualified receiver written in source (System.Console, Console):
-        // the binder's identity for it, which is the source text with short BCL
-        // names expanded — not a variable-type guess.
-        return resolvedTypeName is { } sourceQualifiedType
+        // Not a bound variable and not a Calor type. The binder's
+        // ResolvedTypeName for this shape is the source text (short BCL names
+        // expanded), so it only counts when the receiver is WRITTEN as a type
+        // reference — Console, System.IO.File, OrderRepo. A lowercase head
+        // (foo.Bar, this.sb.Append, _items.Add) is not vouched for.
+        return IsTypeQualifiedReference(receiverPath) && resolvedTypeName is { } sourceQualifiedType
             ? new BoundReceiver(sourceQualifiedType)
             : BoundReceiver.Unresolved;
     }
 
-    private static BoundReceiver FromBoundType(BoundType type)
+    /// <summary>
+    /// True when every dot-separated segment of <paramref name="receiver"/> is a
+    /// capitalized identifier — the shape of a namespace/type reference written
+    /// in source. Variables, fields, <c>this</c>, and member chains through them
+    /// fail this test.
+    /// </summary>
+    private static bool IsTypeQualifiedReference(string receiver)
+    {
+        if (string.IsNullOrEmpty(receiver))
+            return false;
+        foreach (var segment in receiver.Split('.'))
+        {
+            if (segment.Length == 0 || !char.IsUpper(segment[0]))
+                return false;
+            for (var i = 1; i < segment.Length; i++)
+            {
+                if (!(char.IsLetterOrDigit(segment[i]) || segment[i] == '_' || segment[i] == '`'))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Classifies a receiver's <see cref="BoundType"/>. In slice 1 the only
+    /// shape that reaches here is <see cref="NominalBoundType"/> (a
+    /// <see cref="BoundVariableExpression"/> wraps the symbol's TypeName), so
+    /// the nominal arms are the live path. The other arms are kept
+    /// deliberately, as forward-compatible classification for slice 2, when
+    /// call nodes carry a receiver <c>BoundExpression</c> and the binder emits
+    /// <see cref="UnresolvedBoundType"/> / <see cref="FunctionBoundType"/>;
+    /// no test exercises them today.
+    /// </summary>
+    private static BoundReceiver FromBoundType(BoundType type, VariableSymbol receiverSymbol)
     {
         switch (type)
         {
             case UnresolvedBoundType:
+                // Slice 2: the binder does not emit this yet.
                 return BoundReceiver.Unresolved;
             case FunctionBoundType:
+                // Slice 2: lambdas are still NominalBoundType("LAMBDA(...)");
+                // see the nominal arm's function-type guard.
+                return BoundReceiver.Unresolved;
+            case NominalBoundType nominal when IsFunctionTypeName(nominal.QualifiedName):
                 // Invoking a function-typed value: the callee is not a nominal
                 // receiver; effect rows on function types are E2/E4.
                 return BoundReceiver.Unresolved;
-            case NominalBoundType { QualifiedName: "OBJECT" }:
-                // The binder's fallback for an expression it could not type
+            case NominalBoundType { QualifiedName: "OBJECT" }
+                when !(receiverSymbol.IsParameter || receiverSymbol.IsField || receiverSymbol.IsProperty):
+                // The binder's fallback for an inferred local it could not type
                 // (unknown callee return, disagreeing conditional resolutions).
                 // Until the binder emits UnresolvedBoundType (scoping §D6) this
                 // sentinel is its unresolved marker; do not read it as
-                // System.Object.
+                // System.Object. Parameters, fields and properties always carry
+                // a declared type, so their OBJECT is honoured below. A local
+                // explicitly declared `§B{o:OBJECT}` (uppercase; the surface
+                // `object` keyword stays lowercase and is unaffected) is
+                // conflated with the sentinel — documented, not distinguished.
                 return BoundReceiver.Unresolved;
             case NominalBoundType nominal:
                 return FromTypeName(nominal.FullyQualifiedName);
@@ -381,6 +457,27 @@ public sealed class ExternalCallCollector
         }
     }
 
+    /// <summary>
+    /// Mirrors <c>EffectEnforcementPass.IsFunctionTypeName</c> (private to the
+    /// pass) plus the binder's lambda spellings.
+    /// </summary>
+    private static bool IsFunctionTypeName(string typeName)
+    {
+        var t = typeName.Trim().TrimEnd('?');
+        return t.StartsWith("LAMBDA(", StringComparison.Ordinal)
+            || t.StartsWith("ASYNC_LAMBDA(", StringComparison.Ordinal)
+            || t.Equals("Action", StringComparison.Ordinal)
+            || t.StartsWith("Action<", StringComparison.Ordinal)
+            || t.StartsWith("Func<", StringComparison.Ordinal)
+            || t.StartsWith("Predicate<", StringComparison.Ordinal)
+            || t.StartsWith("Comparison<", StringComparison.Ordinal)
+            || t.StartsWith("Converter<", StringComparison.Ordinal)
+            || t.Equals("Delegate", StringComparison.Ordinal)
+            || t.Equals("MulticastDelegate", StringComparison.Ordinal)
+            || t.Equals("EventHandler", StringComparison.Ordinal)
+            || t.StartsWith("EventHandler<", StringComparison.Ordinal);
+    }
+
     private static BoundReceiver FromTypeName(string typeName)
     {
         var trimmed = typeName.Trim().TrimStart('?').TrimEnd('?');
@@ -393,9 +490,10 @@ public sealed class ExternalCallCollector
         }
 
         var nominal = GetNominalTypeName(typeName);
-        return string.IsNullOrEmpty(nominal)
-            ? BoundReceiver.Unresolved
-            : new BoundReceiver(EffectEnforcementPass.MapShortTypeNameToFullName(nominal));
+        if (string.IsNullOrEmpty(nominal))
+            return BoundReceiver.Unresolved;
+        var mapped = EffectEnforcementPass.MapShortTypeNameToFullName(nominal);
+        return new BoundReceiver(mapped is "OBJECT" or "object" ? "System.Object" : mapped);
     }
 
     private static IEnumerable<BoundNode> Descendants(BoundNode node)

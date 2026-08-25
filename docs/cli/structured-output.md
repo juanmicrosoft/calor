@@ -189,6 +189,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1356` | Review packet: refinement-type honesty note (#782) — refinement obligations are compile-time analysis only; no runtime guard is emitted for them |
 | `Calor1357` | Review packet: produced under an explicit waiver (`--permissive-effects` or `--contract-mode off`) — disclosed on the packet's first line |
 | `Calor1358` | Review packet: a `--changed` selector matched no declaration id or name in the given files (likely a typo) — its caller impact is absent from the packet |
+| `Calor1360` | Effects suggest: a call's receiver has no resolved type (an inferred local the compiler could not type, a member chain, a function value, or a plain object) — the call is reported but not written into the suggested manifest; `data.untypedReceivers` carries the count |
 
 ## Notes on specific commands
 
