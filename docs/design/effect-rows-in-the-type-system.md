@@ -39,7 +39,7 @@ recorded in §14.1.
 | 3 | **Priced blast radius in the doc** | **§9**, one table, each row with the command that produced its number. |
 | — | **Demand denominator registered before the doc opens** | **DONE** (PR #1086). D-A **3**, D-B **3121**, total **3124**, floor **25**. §1. |
 | — | **E1 permitted to start before this doc merges** | Slice 1 executed (PR #1089); slice 2 pending. §8.1 records both. |
-| — | **Diagnostic allocation frozen at design-doc merge** | **Calor0424 `EffectRowMismatch`**, **Calor0425 `EffectRowUnknown`**, **Calor0404 `EffectVariableScope`**. All three verified free: `grep -rn "Calor042[4-9]\|Calor040[4-9]" src/ tests/` → no hits; `Diagnostic.cs:378` is `Calor0403`, `:381` `Calor0410`, `:437` `Calor0423`, `:440` `Calor0500`. |
+| — | **Diagnostic allocation frozen at design-doc merge** | **Four** codes: **Calor0404 `EffectVariableScope`**, **Calor0405 `EffectRowMisplaced`**, **Calor0424 `EffectRowMismatch`**, **Calor0425 `EffectRowUnknown`** (§6.1). All four verified free: `grep -rn "Calor042[4-9]\|Calor040[4-9]" src/ tests/` → no hits; `Diagnostic.cs:378` is `Calor0403`, `:381` `Calor0410`, `:437` `Calor0423`, `:440` `Calor0500`. |
 
 ---
 
@@ -659,6 +659,20 @@ Calor0405  EffectRowMisplaced   Error.   A §E{…} row written where no row can
                                 Calor0100 cascade with one actionable message.
 ```
 
+**Calor0405 fires at two different stages, and only one of them recovers.** Worth stating,
+because "one code, two situations" (§3.5) could otherwise read as one implementation:
+
+| Stage | Trigger | Recovery |
+|---|---|---|
+| **Parser** (§3.1) | a `§E{…}` token at a position that accepts no row and has no `§E` arm to fall through to — Z1/Z2/Z3/X9c | **yes.** The `§E{…}` group is consumed so the rest of the declaration still parses; that is the whole point, since today's alternative is a 4–11 diagnostic cascade. Parsing continues with a complete AST |
+| **Binder** (§3.5) | a syntactically well-placed, same-line row whose annotated type turns out **not to be a function type** — Z9/Z9b/Z9c | **no, and none is needed.** The row parsed cleanly and is attached to a `ParameterNode`/`OutputNode`/`BindStatementNode`/`ClassFieldNode`; the binder simply reports and drops it. There is nothing to resynchronise |
+
+The stages cannot be merged: the parser does not know whether `Func<i32,i32>` is a function type
+(types are strings until binding, §3.1), and the binder never sees a token the parser could not
+place. Same code because the author's fix is the same in both — *move or delete the row* — and
+the two messages of §3.1 and §3.5 say which. P2 pins the parser stage against its Z-baselines;
+P6 pins the binder stage against Z9/Z9b/Z9c.
+
 All four free: `grep -rn "Calor042[4-9]\|Calor040[4-9]" src/ tests/` → no hits;
 `Diagnostic.cs:378` `Calor0403`, `:381` `Calor0410`, `:437` `Calor0423`, `:440` `Calor0500`.
 Draft v1 used Calor0424 for rank-1 scope violations, conflating a *declaration* defect with a
@@ -821,15 +835,40 @@ v2's permitted/forbidden lists left positions 2 and 3 unmentioned. The complete 
 
 | Position | Effect variable? | Why |
 |---|---|---|
-| 1 declaration's own row (`§F`/`§MT`) | **permitted** | this is where it is bound |
-| 4 parameter, tag form · 5 parameter, inline form | **permitted** | the binding site the solve reads |
-| 6 return row | **forbidden** | a returned function mentioning the caller's variable is rank-2 |
-| 7 binding · 8 field | **forbidden** | nothing binds a variable there |
+| **1** declaration's own row (`§F`/`§MT`) | **permitted** | this is where it is bound |
+| **2** lambda literal (`§LAM`) | **forbidden** | a lambda has no type-parameter list to bind one — **Z8b**: `§LAM{lam1}<T>` → `Calor0100: Expected statement but found Less`. Its row is inferred or concrete |
+| **3** delegate declaration (`§DEL`) | **forbidden** | `§DEL` has no type-parameter list at all — **Z8**: `§DEL{d001:Handler}<T>` → `Calor0100: Expected I, O, E, or END_DEL but found Less`. Giving delegates one is a generics change, deferred (`calor-direction.md:33`) |
+| **4** parameter, tag form · **5** parameter, inline form | **permitted** | the binding site the solve reads |
+| **6** return row | **forbidden** | a returned function mentioning the caller's variable is rank-2 |
+| **7** binding · **8** field | **forbidden** | nothing binds a variable there |
 | — inside a generic argument (`List<Func<i32,i32> §E{e}>`) | **forbidden** | types are strings in the parser (§3.1) |
-| **2 lambda literal** (`§LAM`) | **forbidden** | a lambda has no type-parameter list to bind one — **Z8b**: `§LAM{lam1}<T>` → `Calor0100: Expected statement but found Less`. Its row is inferred or concrete |
-| **3 delegate declaration** (`§DEL`) | **forbidden** | `§DEL` has no type-parameter list at all — **Z8**: `§DEL{d001:Handler}<T>` → `Calor0100: Expected I, O, E, or END_DEL but found Less`. Giving delegates one is a generics change, deferred (`calor-direction.md:33`) |
+| — **class / interface-level** (`§CL{…}<T, eff e>`, `§IFACE{…}<T, eff e>`) | **forbidden in E2** | the cell v2 left blank while §7.4's middleware form used it — see below |
 
-Six rejection sites, each its own Calor0404 message; P18 covers all six. A row may mix a variable
+**Class/interface-level `eff` is forbidden in E2, and the spike decides whether that holds.**
+The partition above must be total, because **R1 is recomputed by P27 and requires all four A3
+fixtures to compile with zero Calor0404** — so a middleware fixture that binds `eff e` at
+`§IFACE<…, eff e>` would fail R1 *by this document's own rule*, and the ramp would fire for a
+reason that is an artefact of the doc rather than a fact about rank-1. Resolved by deciding the
+cell and sequencing the spike:
+
+1. **E2 forbids it.** A declaration-level binder is a generics change
+   (`calor-direction.md:33`), and §9's seventh parser insertion point stays **conditional**.
+2. **The spike tries the member-level spelling first** — `§MT{mt001:Handle:pub}<eff e> (…)`,
+   which is **position 1 and already permitted**. **W1a** shows a member of an interface can
+   carry its own type-parameter list today (`§MT{mt001:Handle}<T> (T:r) -> T` compiles), and
+   **W1b** shows the implementing class member can too.
+3. **Class-level becomes permitted only if the spike PR demonstrates member-level cannot express
+   R2**, and at that point §9's seventh insertion point becomes **unconditional** and this table
+   row flips — in the spike PR, with the evidence attached.
+
+What W1 does *not* settle is whether `fits` would identify the interface's `e` with the
+implementation's `e`. It is encouraging: **W1c** renames the member type parameter (`<T>` on the
+interface, `<U>` on the implementation) and Calor0421 **still fires**, which means
+`CheckEffectVariance` matched the two members alpha-equivalently — the same property
+`StrictnessBatchTests.cs:172` pins for overrides. Encouraging is not proven, and the proof is
+the spike's.
+
+Seven rejection sites, each its own Calor0404 message; P18 covers all seven. A row may mix a variable
 and concrete codes: `§E{cw, e}` denotes `Concrete({cw}) ⊔ e`.
 
 ### 7.4 Instantiation, and the combinator set
@@ -885,17 +924,27 @@ and left §12's A3 pointing at a spelling the document no longer contained:
       §R §C{next} §/C
 ```
 
-**This spelling requires an `eff` variable declared on a class or interface and read by a member's
-row — a scope rule §7.3's table does not grant.** Its shape is at least plausible: **Z7** shows a
-class type parameter reaches a member (`§CL{c001:Box:pub}<T>` with `§MT … -> T` compiles), and
-**Z7b** shows the same for an interface. So the parser work is real but bounded: add the `eff`
-branch to the `§CL`/`§IFACE` type-parameter lists (which already exist and already flow to
-members) and thread the enclosing declaration's effect-variable set into member row resolution.
-**§9 prices it as a seventh parser insertion point.** It is scheduled *only* if R2 needs it —
-which is precisely what the spike adjudicates, and precisely why R2 is this document's own
-most-likely ramp trigger (§14 Q1): the implementation shown above declares `{e, cw}` against an
-interface row of `{e}`, which the ordinary `fits` relation must reject as Calor0421, and the
-*corrected* program requires widening `IPipelineBehavior` — an interface Calor does not own.
+**The spelling above binds `eff e` at the class/interface level, which §7.3 forbids in E2** — so
+as written this fixture would fail R1 on Calor0404. That is a live open question, not an
+oversight, and §7.3 sequences it: **the spike PR must decide A3's middleware spelling before
+freezing A3**, trying the **member-level** form first —
+
+```text
+§IFACE{i001:IPipelineBehavior}<TReq, TRes>
+  §MT{mt001:Handle}<eff e> (TReq:request, Func<TRes>:next §E{e}) -> TRes
+    §E{e}
+```
+
+— which is **position 1 and already permitted**. **W1a**/**W1b** show a member of an interface
+*and* of the implementing class can carry its own type-parameter list today; **W1c** shows
+Calor0421 still fires when those parameters are renamed, so the interface↔implementation match is
+already alpha-equivalent. Only if member-level provably cannot express R2 does the class-level
+binder ship, and only then does **§9's seventh insertion point become unconditional**.
+
+Either way R2 remains this document's most-likely ramp trigger (§14 Q1): the implementation
+declares `{e, cw}` against an interface row of `{e}`, which the ordinary `fits` relation must
+reject as Calor0421, and the *corrected* program requires widening `IPipelineBehavior` — an
+interface Calor does not own.
 
 **Callbacks** need **no** effect variable at all: a `§FLD{Action<i32>:onChange} §E{cw}` (position
 8) carries a concrete row.
@@ -1043,7 +1092,7 @@ Every row measured at `82338e37`; the command is named where it is not a plain `
 | …but `CalorEmitter.cs` **does** change | **1** | round-trip fidelity: `calor fmt` and the harness must re-emit the row (§13.2 pins parse→emit→parse per position) |
 | AST node classes | **4** | `ParameterNode` (`Ast/FunctionNode.cs:252`), `OutputNode` (`Ast/FunctionNode.cs:21`), `BindStatementNode` (`Ast/ControlFlowNodes.cs:161`), `ClassFieldNode` (`Ast/ClassNodes.cs:554`) |
 | **`eng/ast-schema.json`** | **1** | forced by `tests/Calor.Compiler.Tests/ArchitectureTests.cs:158` `AstSchema_CoversEveryNodeDispatchAndChildRelation`; **this is also the existing "zero visitor churn" pin** — Draft v1 counted 0 here |
-| Parser | **1** | `Parsing/Parser.cs`: **6** row insertion points covering all eight positions (§3.3), each also carrying the Calor0405 recovery; **1** `eff` branch in `ParseOptionalTypeParameterList` (`:7596-7639`) with its own lookahead and per-declaration-form enablement (§7.2 — `in`/`out` are *not* a working precedent, only a shape one); **+1 conditional** — if R2 needs class/interface-level `eff` threaded into member rows (§7.4), a seventh insertion point in the `§CL`/`§IFACE` type-parameter lists plus scope threading into member row resolution. Scheduled only if the spike says R2 needs it |
+| Parser | **1** | `Parsing/Parser.cs`: **6** row insertion points covering all eight positions (§3.3), each also carrying the Calor0405 recovery; **1** `eff` branch in `ParseOptionalTypeParameterList` (`:7596-7639`) with its own lookahead and per-declaration-form enablement (§7.2 — `in`/`out` are *not* a working precedent, only a shape one); **+1 conditional** — a seventh insertion point in the `§CL`/`§IFACE` type-parameter lists plus scope threading into member row resolution. **Contingent on one named outcome**: it is scheduled **only if the spike PR proves the member-level `§MT{…}<eff e>` spelling cannot express R2** (§7.3, §12.1). If member-level works — which **W1a**/**W1b** make plausible, since interface and implementing-class members already carry their own type-parameter lists — this line is **zero**, because position 1 is already permitted and needs no new insertion point |
 | Lexer / `Token.cs` | **0** | no new token kind, no `IsKeyword` change (§7.2) |
 | Effects subsystem | **10 existing + 1 new** | `ls src/Calor.Compiler/Effects/*.cs` → 10, all touched (incl. both `CrossModuleEffect*.cs`, §6.2), plus new `EffectRow.cs` |
 | Binder | **2** | `Binding/BoundTypes/BoundType.cs`, `Binding/BoundNodes.cs` |
@@ -1205,7 +1254,26 @@ module. Corrected by splitting the artifacts by what each can adjudicate.
 |---|---|---|---|
 | **A1** `tools/calor-allowlist-audit/allowlist-audit.calr` | the dogfood utility: 127 lines, 7 `§E{`, sibling `CalorAllowlistAudit.csproj`, built in CI at `.github/workflows/test.yml:174` and run at `:176`, **no higher-order code** | **G-CODEGEN** only — the regression module | exists at `82338e37` |
 | **A2** `bench/corpus/MediatR/src/MediatR/Pipeline/RequestPreProcessorBehavior.cs` | **29** lines at the pinned MediatR SHA `fb309026775ef953a64fb5339d074426c1ad2c37`: interface implementation (`:12`), delegate-typed parameter `RequestHandlerDelegate<TResponse> next` (`:20`), invocation `await next()` (`:27`). Delegate declared at `IPipelineBehavior.cs:12`, contract at `:29` | **R2**, and G-CODEGEN | 29 by `awk 'END{print NR}'` / `grep -c ''`; `wc -l` reports 28 because the last line is unterminated. Draft v1 said 29 and was right; v2 "corrected" it to 28 from a lens finding **without executing**, and enshrined the error in §14.1. Restored, and the measuring command named |
-| **A3** `docs/design/spikes/effect-rows/combinators/{map,match,middleware,callback}.calr` | the four AFTER forms of §7.4, **all four of which now exist in this document** (v2's compression had deleted three, leaving A3 pointing at spellings the doc did not contain) | **R1** and **R3** | to be authored by the spike PR, transcribed from §7.4 |
+| **A3** `docs/design/spikes/effect-rows/combinators/{map,match,middleware,callback}.calr` | the four AFTER forms of §7.4, **all four of which now exist in this document** (v2's compression had deleted three, leaving A3 pointing at spellings the doc did not contain) | **R1** and **R3** | to be authored by the spike PR, transcribed from §7.4 — **except the middleware fixture, whose spelling the spike must decide first (below)** |
+
+> **Open Major, carried openly (consistency lens, round 3).** §7.4's middleware form binds
+> `eff e` at `§IFACE<…, eff e>` / `§CL<…, eff e>` — the one spelling **§7.3 forbids in E2** — so
+> R1, which **P27 recomputes** as "all four A3 fixtures compile with zero Calor0404", would fail
+> on it *by this document's own rule*. That would fire the ramp for an artefact of the doc rather
+> than a fact about rank-1, so it must not be left implicit.
+>
+> **Sequencing decision: the spike PR decides A3's middleware spelling BEFORE freezing A3.**
+> Member-level first — `§MT{mt001:Handle}<eff e> (…)`, position 1, already permitted — on the
+> strength of **W1a**/**W1b** (interface and implementing-class members each carry their own
+> type-parameter list today) and **W1c** (Calor0421 fires across *renamed* member type
+> parameters, so the interface↔implementation match is already alpha-equivalent, the property
+> `StrictnessBatchTests.cs:172` pins for overrides). Class/interface-level ships **only** if
+> member-level provably cannot express R2, and only then does §9's seventh parser insertion point
+> become unconditional and §7.3's last row flip.
+>
+> What is **not** settled: whether `fits` identifies the interface's `e` with the
+> implementation's `e`. W1c is evidence about *member matching*, not about *row unification*.
+> That is the spike's to prove, and it is why this is recorded as open rather than closed.
 
 A2 is chosen over `Wrappers/RequestHandlerWrapper.cs` (72 lines, method-group→delegate cast
 `:43`, `Aggregate` fold whose lambda closes over `next` and is immediately invoked `:44`) because
@@ -1332,7 +1400,7 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P15 | Six `_IsError`/`_Compiles` pairs **plus a `_CannotTell` arm each**: `RowMismatch_At{Assignment,Argument,Return,Override,InterfaceImpl,GenericInstantiation}` | `StrictnessBatchTests.cs` | **design-doc merge** — this is gate 1's frozen denominator | delete E3's rule for one site → that `_IsError` fails |
 | P16 | `AllMismatchCodesShareOneRelation` — Calor0424, 0420, 0421 **and** `CrossModuleEffectEnforcementPass.cs:162` move together | `Calor.Enforcement.Tests/CrossModuleEffectTests.cs` | with E3 | give `CheckEffectVariance` its own subset test back |
 | P17 | **`UnresolvedReceiver_YieldsCalor0425_NeverConcrete`** — an `UnresolvedBoundType`/unresolved receiver must produce `EffectRow.Unknown`, never a `Concrete` row. **The pin the whole design rests on**; absent from Draft v1 | `Calor.Enforcement.Tests/EffectRowLatticeTests.cs` | **before E2** | make the unresolved branch return `Concrete(∅)` → the fixture goes silent |
-| P18 | `EffectVariable_*`: `Declares_EffModifier` (X6a's shape now parses); **`TypeParamNamedEff_StillWorks`** (the lookahead guard — **Z4** compiles today and must keep compiling); **`EffectVariableNamedLikeACode_IsCalor0404`** (`<T, eff cw>` rejected, while the ordinary type parameter `<T, cw>` of **Z6**/**Z6b** stays green); `InScope_DoesNotRaise0403`; `OutOfScope_Raises0404`; `Rejected_In{Return,GenericArg,Binding,Field,Lambda,Delegate}` (**six** rejection sites — §7.3's partition, with the `§LAM`/`§DEL` halves anchored on **Z8b**/**Z8**); `MixedRow_IsJoin`; `InstantiatesFromArgumentRow`; `UnknownContributor_YieldsUnknown` | `Calor.Enforcement.Tests/EffectVariableTests.cs` | with E2 | **all of P18 is deleted if the ramp fires**, together with P15's site-6 pair |
+| P18 | `EffectVariable_*`: `Declares_EffModifier` (X6a's shape now parses); **`TypeParamNamedEff_StillWorks`** (the lookahead guard — **Z4** compiles today and must keep compiling); **`EffectVariableNamedLikeACode_IsCalor0404`** (`<T, eff cw>` rejected, while the ordinary type parameter `<T, cw>` of **Z6**/**Z6b** stays green); `InScope_DoesNotRaise0403`; `OutOfScope_Raises0404`; `Rejected_In{Return,GenericArg,Binding,Field,Lambda,Delegate,ClassOrInterfaceLevel}` (**seven** rejection sites — §7.3's total partition, with the `§LAM`/`§DEL` halves anchored on **Z8b**/**Z8** and the class/interface half flipping to `_Permitted` only if the spike PR proves member-level cannot express R2); **`MemberLevelEffOnInterfaceMember_Parses`** (position 1, anchored on **W1a**/**W1b**); `MixedRow_IsJoin`; `InstantiatesFromArgumentRow`; `UnknownContributor_YieldsUnknown` | `Calor.Enforcement.Tests/EffectVariableTests.cs` | with E2 | **all of P18 is deleted if the ramp fires**, together with P15's site-6 pair |
 | P19 | `FunctionTypesDifferingOnlyInRow_AreNotEqual` + the `GetHashCode` half + `RowsDefaultToUnknownNotPure` | `Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs` | with E2 | drop `Row` from `Equals` |
 | P20 | `DisplayStringIsRowFree` — belt to `:139`/`:150`'s braces | same | with E2 | append the row → three tests fail |
 | P21 | `ManifestResolutionMapsToRow` — `Resolved`/`PureExplicit`/`Unknown` → `Concrete(S)`/`Concrete(∅)`/`Unknown` | `Calor.Enforcement.Tests/EffectResolverTests.cs` | with E2 | map `Unknown` to `Concrete(∅)` → P17's sibling fails |
@@ -1453,11 +1521,18 @@ or every declined finding is recorded here with its rationale.
 |---|---|---|---|---|
 | 1 | Draft v1 | NEEDS-FIXES 92% | NEEDS-FIXES 88% | NEEDS-FIXES 88% |
 | 2 | Draft v2 | **APPROVE 94%** | NEEDS-FIXES 85% | NEEDS-FIXES 91% |
-| 3 | Draft v3 | pending | pending | pending |
+| 3 | Draft v3 | **APPROVE 95%** | **APPROVE 88%** (one open Major, carried — blocks the spike PR, not this merge) | NEEDS-FIXES 93% |
+| 4 | Draft v4 | pending | pending | pending |
 
-**Round 1 (on Draft v1).** **80 dispositions: 74 applied, 4 declined, 1 partly declined (M13),
-1 superseded (test-lens 8.9).** (v2's summary line said "62 applied, 4 declined", which matched
-neither the finding counts nor the rows below; recounted here from the tables themselves.)
+**Round 1 (on Draft v1). 87 disposition rows** — 22 evidence + 22 consistency + 43 test-lens —
+**= 81 applied + 4 declined + 1 partly declined (M13) + 1 superseded (test-lens 8.9)**. One of the
+four declines (test-lens 12.3) was **reversed in v3** after round 2 judged it unsound; it is
+counted here as declined because that is what round 1 decided, and the reversal is recorded in
+round 2's N6 row.
+
+(Arithmetic history, since this line has now been wrong twice: v2 said "62 applied, 4 declined";
+v3's first pass said "80 dispositions, 74 applied". Both were hand-totalled. The figures above are
+counted from the tables below — 87 rows, and 81 + 4 + 1 + 1 = 87.)
 
 ### Evidence lens, round 1 (22 findings; ids run 1–23 with 4 and 22 merged)
 
@@ -1556,12 +1631,12 @@ neither the finding counts nor the rows below; recounted here from the tables th
 | 10.1–10.3 | Binder shape and new message sentences unpinned | **applied** — P22, and §10 marks each new clause as new |
 | 12.1 | A1's byte-identity unpinned | **applied** — **G-CODEGEN** (§12.2), blocking |
 | 12.2 | 28 lines, not 29 | **applied** — §12.1, §14.1 |
-| 12.3 | No presence/schema test for the spike directory | **declined, with rationale** — P27's exact-equality on `spike-verdict.json` fails if the file is missing or malformed, which subsumes a separate presence test. A second test on the same artifact would have no independent discriminating revert |
+| 12.3 | No presence/schema test for the spike directory | **declined in v2 — REVERSED in v3.** The v2 rationale ("P27 subsumes it") was wrong: P27 reads one JSON file and would pass with every artifact missing. Round 2's N6 caught it; **P31** now asserts the manifest |
 | Q-D | No parse → emit → parse round-trip per position | **applied** — **P4**, seven cases |
 | G-3 | CLI leg, SDK leg, default-`UnknownCallPolicy` equivalence, F-3 supersession | **applied** — §13.3 gate 3; the supersession **already merged** as `b5d61e18` (PR #1085) |
 | G-5 | No gate-5 row at all | **applied** — §13.3 gate 5, with legs (a)/(b), the E1-attributable separation, and three 0.15-specific additions |
 
-## Round 2 (on Draft v2)
+### Round 2 (on Draft v2)
 
 **Evidence: APPROVE 94%** — the lens re-executed all 36 committed cases and reported *"No
 committed experiment output diverged from my re-run"*, plus independent re-measurement of the
@@ -1570,8 +1645,9 @@ applied below. **Consistency: NEEDS-FIXES 85%** — all three round-1 CRITICALs 
 Majors, all on decisions v2 introduced. **Test-lens: NEEDS-FIXES 91%** — 12 of 13 round-1
 load-bearing gaps closed; four blockers, all applied.
 
-**24 dispositions: 24 applied, 0 declined.** Every round-2 finding was a sentence-plus-pin fix;
-none re-opened a decision.
+**22 disposition rows** — 10 consistency + 5 test-lens + 7 evidence — **= 22 applied, 0
+declined.** (v3's first pass said "24 dispositions"; counted from the tables it is 22.) Every
+round-2 finding was a sentence-plus-pin fix; none re-opened a decision.
 
 ### Consistency lens, round 2 (5 majors, 4 minors)
 
@@ -1579,7 +1655,7 @@ none re-opened a decision.
 |---|---|---|
 | N1 | The line rule's second branch ("later line ⇒ declaration row") is **false at four positions** — `§FLD`, `§B`, a wrapped inline signature and the inline parameter form have no `§E` arm to fall through to, and cascade 4–11× Calor0100 with no mention of effects (**Z1**, **Z2**, **Z3**; **Z5** shows wrapped parameter lists are a real authoring shape) | **applied** — Decision 1 restated as *same line ⇒ that type's row; otherwise the token is not consumed at that position*, with **Calor0405 `EffectRowMisplaced`** as a row-aware recovery replacing the cascade (§3.1). **P2** extended to all four positions against their executed baselines |
 | N2 | An `eff` name can shadow a live effect code: `<T, cw>` compiles today (**Z6**) and §7.2 resolves variables before codes, making the real `cw` unwritable | **applied** — §7.2(c): an `eff` name in `EffectCodes.Registry` or `ColonPrefixes` is **Calor0404**. Ordinary type parameters named `cw`/`fs` keep working (Z6/Z6b stay green). **P18** gains `EffectVariableNamedLikeACode_IsCalor0404` |
-| N3 | §7.3's scope lists don't partition the positions — `§LAM` and `§DEL` are in neither, and `§DEL` has no type-parameter list at all (**Z8**) | **applied** — §7.3 is now a full partition table over all eight positions; `§LAM` and `§DEL` are **forbidden**, anchored on **Z8b** and **Z8**. Six rejection sites in **P18**, not five |
+| N3 | §7.3's scope lists don't partition the positions — `§LAM` and `§DEL` are in neither, and `§DEL` has no type-parameter list at all (**Z8**) | **applied** — §7.3 is now a full partition table over all eight positions; `§LAM` and `§DEL` are **forbidden**, anchored on **Z8b** and **Z8**. Six rejection sites in **P18**, not five (round 3's T-N3 found the partition still had a blank cell and made it **seven**) |
 | N4 | R2's middleware AFTER spelling was deleted in the v1→v2 cut, yet A3 is "the four §7.4 AFTER forms" and only `Map`'s existed | **applied** — all three restored to §7.4 (`Match`, middleware/`next`, callback field). The middleware spelling needs an `eff` variable on a **class/interface** read by a member row — a scope rule §7.3 does not grant; **Z7**/**Z7b** show class and interface type parameters do reach members, so it is bounded, and §9 prices it as a conditional seventh insertion point scheduled only if R2 needs it. Named as this document's own most-likely ramp trigger |
 | N5 | A row on a non-function-typed position has no stated meaning — `-> void §E{cw}` compiles today (**Z9**) and becomes `void`'s row under the new rule | **applied** — §3.5: **Calor0405**, the same code as N1's recovery (one code, two situations, both "a row where a row cannot go"). **P6** gains one case per position against Z9/Z9b/Z9c |
 | M5-res | The declaration boundary still converts `Assumed`→`Concrete` and is not one of the six sites; P10's fixture passes with that hop open | **applied** — §5 states the conversion is deliberate because Calor0419 already reports the assumption at that boundary, names it a seventh place a row changes form, and explains why the alternative (an `Assumed` row escaping every annotated function) is the noise §13.4 exists to avoid. **P10** gains it as case (c) |
@@ -1610,6 +1686,34 @@ none re-opened a decision.
 | N6 | §7.1 mixes verbatim output with paraphrase | **applied** — the Y2a paraphrase replaced by **Z11**'s verbatim `Calor1002 (CS0029)`, which supports the claim more strongly than the paraphrase did |
 | r1-res | "seven positions" over eight labelled rows; `:767`/`:656` point at `Assert.Contains(` rather than the predicate | **applied** — renumbered to **eight positions** throughout (6 simply has two spellings); the two citations moved to `:768`/`:657` |
 
-### Round 3
+### Round 3 (on Draft v3)
 
-Pending. Bar: APPROVE from the evidence and consistency lenses.
+**Evidence: APPROVE 95%.** **Consistency: APPROVE 88%**, with one open Major recorded rather than
+closed — it blocks the **spike PR**, not this merge, and is carried in §12.1 and §7.3 so it is
+visible. **Test-lens: NEEDS-FIXES 93%**, four mechanical items. **CI also failed** the harness
+test v3 had just introduced, which is the round's most useful result: the pin worked.
+
+**9 disposition rows: 9 applied, 0 declined.**
+
+| # | Finding | Disposition |
+|---|---|---|
+| CI | `tests (compiler)` run 32868158970 — **`ExperimentTranscripts_MatchARerun` red**. (a) `facts.py` line 4: committed `ClassNodes.cs:554` vs re-run `FunctionNode.cs:21` — recursive grep and glob results come back in **filesystem order**, which differs between APFS and ext4. (b) `facts2.py` line 94: committed F-3 subject line vs `<end of output>` — the transcript carried a **`git log`-derived** fact a shallow CI checkout does not have | **applied** — every multi-file probe now sorts by path then **numeric** line; `LC_ALL=C`/`LANG=C` pinned in both scripts; the `BoundTypeTests` probe's recursive fallback replaced by the real path; the F-3 probe reads the **pinned object's existence** (`git cat-file -e`) and prints a fixed marker in **both** branches, since the doc cites the SHA and not the subject. Full audit of all six scripts; ties in `facts2.py`'s listing made total rather than insertion-ordered. **Portability then proven three ways**: `LC_ALL=C` and `en_US.UTF-8` byte-identical; a second checkout at a different absolute path byte-identical; and no absolute path or timestamp appears in any transcript |
+| **The pin caught its own author.** | — | Worth stating plainly, because it is the whole argument for P29: the transcripts were authored on macOS and were wrong on Linux, and **nothing in v1 or v2 would have noticed**. The first thing the new test did was fail on the doc it was written to protect |
+| T-N1 | `compile53.py` rewrote `o53/baseline.json` — including a fresh `measuredCommit` — **unconditionally**, and P29 runs it every test. So every test run dirtied a committed gate-5 instrument, and **P30's "measuredCommit is 40-hex" leg was self-fulfilling**: its sibling had just written one | **applied** — the write is behind `CALOR_WRITE_O53_BASELINE=1` (set by `regenerate-transcripts.py`), the `CALOR_REGENERATE_S5_LEDGER` pattern. The default path **verifies** the recomputed counts against the committed ledger and reports a verdict. Both modes print identical lines, so the transcript is mode-independent. Confirmed: `git status` is clean after `dotnet test --filter EffectRowExperimentHarnessTests` |
+| T-N2 | `eng/test-manifest.json` not bumped; `scripts/check_trx.py:73` is **exact equality** | **applied** — `Calor.Compiler.Tests` `expectedTotal` **7670 → 7672** (main's current value + the two new `[Fact]`s), `expectedSkipped` unchanged at 3 since neither skips. `python3 scripts/check_test_quality.py` passes |
+| T-N3 / C-Major | **§7.3's partition neither permitted nor forbade class/interface-level `eff`**, yet §7.4's middleware form used it and **R1 — which P27 recomputes — requires all four A3 fixtures to compile with zero Calor0404**. So the middleware fixture would have failed R1 *by this document's own rule*, firing the ramp for an artefact of the doc rather than a fact about rank-1 | **applied** — §7.3 gains the eighth row: **forbidden in E2**, with the sequencing spelled out. **The spike PR must decide A3's middleware spelling before freezing A3**: member-level `§MT{…}<eff e>` first (position 1, already permitted), class-level only if member-level provably cannot express R2 — at which point §9's seventh insertion point becomes **unconditional** and the table row flips. §9's "+1 conditional" is now contingent on that named outcome, and **zero** if member-level works. §12.1 carries the open Major in full. **P18** gains the seventh rejection case plus `MemberLevelEffOnInterfaceMember_Parses`. New evidence added to the harness: **W1a**/**W1b** (interface *and* implementing-class members each carry their own type-parameter list today) and **W1c** (Calor0421 fires across *renamed* member type parameters, so the interface↔implementation match is already alpha-equivalent — the property `StrictnessBatchTests.cs:172` pins for overrides). What W1 does **not** settle, and the doc now says so: whether `fits` identifies the interface's `e` with the implementation's `e` |
+| E-V1 | §0's diagnostic row listed three codes; §6.1 allocates four | **applied** — §0 now says **four** and names Calor0405 |
+| E-N5 | §15's counts do not self-sum against its own tables | **applied** — recounted **from the tables**: round 1 is **87 rows = 81 applied + 4 declined + 1 partial + 1 superseded**; round 2 is **22 rows, all applied** (v3's first pass said 24). The arithmetic history is recorded in-line, since this line had by then been wrong twice |
+| — | The Calor0405 two-stage distinction was implicit | **applied** — §6.1 gains a table: the **parser** stage (§3.1) **recovers** by consuming the `§E{…}` group so the rest of the declaration still parses; the **binder** stage (§3.5) does not and needs no recovery, because the row parsed cleanly and is simply reported and dropped. Same code because the author's fix is the same — move or delete the row |
+| E-r2 | The test-lens reviewer's own correction | **recorded** — v2's "28 lines" for `RequestPreProcessorBehavior.cs` came from **the reviewer's `wc -l`**, which undercounts an unterminated final line; **v3's 29 is right**, and v1 had been right all along. §14.1 already carries this as the clearest instance of accepting an unexecuted claim — the round-3 addition is naming where it came from, so the lesson reads symmetrically: the doc's evidence discipline applies to reviewer findings too |
+
+#### Carried open into the spike PR
+
+One item is deliberately **not** closed here, and is recorded in §7.3, §9, §12.1 and this table so
+it cannot be carried silently: **A3's middleware spelling**. It blocks freezing A3, which the
+spike PR does; it does not block this document merging, because §7.3 now makes the E2 rule total
+(forbidden) and §9's conditional cost contingent on a named, testable outcome.
+
+#### Round 4
+
+Pending, if required. Bar: APPROVE from the evidence and consistency lenses.
