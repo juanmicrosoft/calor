@@ -30,14 +30,23 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **When the compiler cannot work out the type of the thing you are calling a
-  method on, it now says so instead of quietly guessing.** Writing something
-  like `x.Run` where `x` came from a call the compiler could not identify used
-  to leave it filling in a placeholder type behind the scenes. It now records
-  "I do not know this type", notes it as an informational `Calor0270` message,
-  and every tool that reads it — effect checking, `calor effects suggest` —
-  treats the call as unknown rather than pretending it resolved. Nothing that
-  already resolved changes, and a variable you genuinely declared as `object`
-  is still an `object`.
+  method on, it now records that as a fact instead of leaving a placeholder.**
+  Take `x.Run`, where `x` came from a call the compiler could not identify.
+  Before, it quietly filled in a stand-in type, and the tools downstream had to
+  guess whether that stand-in meant "this really is a plain object" or "I gave
+  up". Now the compiler marks it "type unknown" outright, so the tools no longer
+  have to guess.
+  - **What you will see:** in an editor, an informational note (`Calor0270`)
+    on the two cases you can actually fix — a variable the compiler could not
+    work out a type for, and one whose written type it could not make sense of.
+    Adding an explicit type to the binding clears it. Cases you cannot fix,
+    like `a.b.Run` (the compiler does not yet track types through `a.b`) or a
+    variable the C# converter generated for you, stay silent — they are still
+    treated as unknown internally, they just do not nag you about it.
+  - **What does not change:** nothing that already worked out a type behaves
+    differently, a variable you genuinely declared as `object` is still an
+    `object`, and command-line output — including `calor effects suggest` — is
+    byte-for-byte what it was.
 
 - **Files that declare `§SEMVER{1.x}` (or `0.x`) are now refused with an error
   pointing at #1084.** The compiler implements semantics version 2.0.0. Before

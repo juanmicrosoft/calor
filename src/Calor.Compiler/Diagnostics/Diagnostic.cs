@@ -270,11 +270,32 @@ public static class DiagnosticCode
     public const string InheritanceCycle = "Calor0262";
 
     /// <summary>
-    /// Info (S4) / Warning (S6) / Error (§3.5): the v0.14 metadata binder
-    /// could not resolve a .NET call site against real metadata. Message
-    /// includes receiver-type display, method name, and argument count.
-    /// Callers wrap the result as <c>UnresolvedBoundType</c> so downstream
-    /// analyses treat it as "do not claim".
+    /// Info (S4) / Warning (S6) / Error (§3.5): a type or signature the compiler
+    /// could not resolve, reported so the author knows a claim was declined
+    /// rather than made. In every case the result is carried as
+    /// <c>UnresolvedBoundType</c> so downstream analyses treat it as
+    /// "do not claim". Two producers today, with different message shapes:
+    ///
+    /// <list type="number">
+    /// <item><b>Signature (v0.14 §D6/F-4)</b> — the metadata binder could not
+    /// resolve a .NET call site against real metadata. Message names the
+    /// receiver-type display, method name, and argument count.</item>
+    /// <item><b>Receiver (v0.15 E1 slice 2a)</b> — the binder could not
+    /// determine the type of a call's receiver. Message names the receiver as
+    /// written and why. Reported only for the shapes an author can act on: an
+    /// inferred local the binder could not type, and a declared type string it
+    /// cannot resolve. Member chains and converter-synthesized temporaries are
+    /// still <i>marked</i> unresolved but are not reported, because the advice
+    /// would be unactionable — <c>Binder.ShouldReportUnresolvedReceiver</c>, and
+    /// the volume ledger at
+    /// <c>bench/phase0-agent-native/calor0270-corpus-ledger.json</c>.</item>
+    /// </list>
+    ///
+    /// <para>One code covers both because they are one fact to the author —
+    /// "the compiler does not know this type, so it is not claiming anything
+    /// about it" — and consumers act on them identically. If a future producer
+    /// needs different consumer handling, allocate a distinct code rather than
+    /// stretching this contract further.</para>
     /// See docs/plans/v0.14-metadata-binding-scoping.md §D6 / F-4.
     /// </summary>
     public const string SignatureUnresolved = "Calor0270";

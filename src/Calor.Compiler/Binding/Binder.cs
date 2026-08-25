@@ -3349,6 +3349,14 @@ public sealed class Binder
                 receiverTypeSymbol);
         }
 
+        // NOTE (review round 1, finding 10 — deferred to slice 2b): reaching into
+        // Effects.ExternalCallCollector from Binding/ widens an existing layering
+        // hole (GetResolvedCallIdentity already calls into
+        // Effects.EffectEnforcementPass). IsTypeQualifiedReference is a pure
+        // string predicate with no Effects dependency and belongs in Binding/,
+        // but moving it also means moving its callers' expectations, so it is
+        // slice-2b work rather than an unreviewed drive-by here.
+        //
         // Not a bound variable and not a Calor-declared type. GetResolvedCallIdentity's
         // name for this shape is the source text with short BCL names expanded, so it
         // only counts when the receiver is WRITTEN as a type reference — Console,
