@@ -1144,7 +1144,8 @@ public sealed class EffectEnforcementPass
                         effects = effects.Union(GetDeclaredEffects(internalFunc.Effects));
                     }
                 }
-                else if (IsFunctionTypeName(valueType) && callTarget.Contains('.'))
+                else if (IsFunctionValued(reference.Name, valueType)
+                         && callTarget.Contains('.'))
                 {
                     RecordAssumption(
                         $"passes function-typed value '{reference.Name}' to '{callTarget}', " +
@@ -1324,7 +1325,7 @@ public sealed class EffectEnforcementPass
                 var severity = _context.Policy == UnknownCallPolicy.Permissive
                     ? DiagnosticSeverity.Warning
                     : DiagnosticSeverity.Error;
-                var typeDescription = IsFunctionTypeName(valueType)
+                var typeDescription = IsFunctionValued(target, valueType)
                     ? $"function-typed value '{target}' (type '{valueType}')"
                     : $"value '{target}' (declared type '{valueType}')";
                 _context.Diagnostics.Report(
@@ -1577,23 +1578,134 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
-        /// Resolves a bare name to the declared type of the value it denotes:
-        /// current-function parameter, §B binding (anywhere in the body, including
-        /// nested blocks), or enclosing-class field. Returns null for free names.
-        /// A lambda-initialized binding without an explicit type reports the marker
-        /// type "Func&lt;&gt;" (function-typed by construction).
+        /// v0.15 E1 slice 2b — the binder's answers for the current function,
+        /// fetched once from the side channel
+        /// (<see cref="CallGraphAnalysis.BoundValueTypes"/>). Empty when binding
+        /// threw, in which case every resolver below behaves exactly as it did
+        /// before this slice.
+        /// </summary>
+        private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>? _boundValueTypes;
+
+        private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType> BoundValueTypes =>
+            _boundValueTypes ??= _context.CallGraph.BoundValueTypes(_context.CurrentFunctionId);
+
+        /// <summary>What the bound tree said about a name.</summary>
+        private enum BoundValueAnswerKind
+        {
+            /// <summary>The binder has nothing for this name — use the AST strings.</summary>
+            NoAnswer,
+
+            /// <summary>
+            /// <c>UnresolvedBoundType</c>: the binder LOOKED and could not name
+            /// the type. Fail closed — the AST strings must not supply a guess in
+            /// its place, because the whole point of §D6's exit ramp is that
+            /// "unresolved" stops being spelled like a type.
+            /// </summary>
+            Unresolved,
+
+            /// <summary>A type the binder can name.</summary>
+            Typed,
+        }
+
+        /// <summary>
+        /// v0.15 E1 slice 2b — asks the bound tree for a value's type before any
+        /// AST string is consulted.
+        ///
+        /// <para>The answer is normalized into the vocabulary the rest of this
+        /// pass already speaks, so that consulting the binder first cannot move
+        /// a diagnostic's TEXT: a function type answers with the pass's existing
+        /// <c>"Func&lt;&gt;"</c> marker — the same string
+        /// <see cref="FindLocalDeclarationType"/> produces for a lambda-initialized
+        /// <c>§B</c> — and every other kind answers with its
+        /// <c>DisplayString</c>, which for a bound variable IS the symbol's type
+        /// string, i.e. the same text the AST search would have found.</para>
+        ///
+        /// <para><c>OBJECT</c> and <c>?</c> are treated as NO answer rather than
+        /// as a type: they are the binder's non-answers for a value it could not
+        /// type outside a receiver position (a receiver gets
+        /// <c>UnresolvedBoundType</c> instead since slice 2a). Returning them as
+        /// types would make <see cref="InferFromBareNameTarget"/> report
+        /// Calor0418 on shapes that never reported it.</para>
+        /// </summary>
+        private BoundValueAnswerKind AskBoundTree(string name, out string typeName)
+        {
+            typeName = "";
+            if (!BoundValueTypes.TryGetValue(name, out var type))
+                return BoundValueAnswerKind.NoAnswer;
+
+            if (type is Binding.BoundTypes.UnresolvedBoundType)
+                return BoundValueAnswerKind.Unresolved;
+
+            var display = type.DisplayString;
+            if (IsFunctionBoundType(type)
+                || display.StartsWith("LAMBDA(", StringComparison.Ordinal)
+                || display.StartsWith("ASYNC_LAMBDA(", StringComparison.Ordinal))
+            {
+                // The pass's existing marker for "function-typed by construction".
+                // The LAMBDA( spellings appear on a §B whose TypeName the binder
+                // inferred from a lambda's DisplayString (Binder.cs:1320), which
+                // is a NominalBoundType carrying that text, not a function type.
+                typeName = "Func<>";
+                return BoundValueAnswerKind.Typed;
+            }
+
+            if (string.IsNullOrWhiteSpace(display)
+                || display is "?" or "OBJECT")
+            {
+                return BoundValueAnswerKind.NoAnswer;
+            }
+
+            typeName = display;
+            return BoundValueAnswerKind.Typed;
+        }
+
+        /// <summary>
+        /// Resolves a bare name to the declared type of the value it denotes.
+        ///
+        /// <para>v0.15 E1 slice 2b — the BOUND TREE answers first
+        /// (<see cref="AskBoundTree"/>). An <c>UnresolvedBoundType</c> ends the
+        /// lookup with null: the binder looked and could not name the type, and
+        /// the AST strings do not get to guess one in its place (fail-closed,
+        /// design doc §8.1 / P17).</para>
+        ///
+        /// <para>The AST search below is the FALLBACK, and only for shapes the
+        /// bound tree does not represent for this name:</para>
+        /// <list type="bullet">
+        ///   <item><description><c>function.Parameters[].TypeName</c> — a
+        ///   parameter never referenced in the body, so no
+        ///   <c>BoundVariableExpression</c> exists to read a type off.</description></item>
+        ///   <item><description><c>FindLocalDeclarationType</c> /
+        ///   <c>FindForeachVariableType</c> — a <c>§B</c> or <c>§FE</c> variable
+        ///   in a statement shape the binder does not bind (interop content,
+        ///   unsupported constructs), and the same for a name whose bound answers
+        ///   disagreed across scopes and were dropped as ambiguous.</description></item>
+        ///   <item><description><c>OwnerClass.Fields[].TypeName</c> — a field of
+        ///   the enclosing class never read in this function's body.</description></item>
+        /// </list>
+        /// <para>A lambda-initialized binding without an explicit type reports the
+        /// marker type "Func&lt;&gt;" on both paths.</para>
         /// </summary>
         private string? ResolveLocalValueType(string name)
         {
+            switch (AskBoundTree(name, out var boundTypeName))
+            {
+                case BoundValueAnswerKind.Unresolved:
+                    return null;
+                case BoundValueAnswerKind.Typed:
+                    return boundTypeName;
+            }
+
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
                 return null;
 
+            // FALLBACK: declared parameter type string.
             foreach (var parameter in function.Parameters)
             {
                 if (parameter.Name.Equals(name, StringComparison.Ordinal))
                     return parameter.TypeName;
             }
 
+            // FALLBACK: §B declaration / §FE variable type string, found lexically.
             var declaredType = FindLocalDeclarationType(name, function.Body);
             if (declaredType != null)
                 return declaredType;
@@ -1602,6 +1714,7 @@ public sealed class EffectEnforcementPass
             if (foreachType != null)
                 return foreachType;
 
+            // FALLBACK: enclosing-class field type string.
             var field = _context.OwnerClass?.Fields.FirstOrDefault(
                 f => f.Name.Equals(name, StringComparison.Ordinal));
             if (field != null)
@@ -1803,6 +1916,25 @@ public sealed class EffectEnforcementPass
             };
         }
 
+        /// <summary>
+        /// v0.15 E1 slice 2b — "is the value called <paramref name="name"/> a
+        /// function value?", asked of the BOUND TYPE first
+        /// (<see cref="EffectEnforcementPass.IsFunctionBoundType"/>: a
+        /// <c>FunctionBoundType</c>, or a nominal type whose declaration is a
+        /// <c>§DEL</c>) and only then of the type string.
+        ///
+        /// <para>SURVIVING FALLBACK — <see cref="IsFunctionTypeName"/>, for the
+        /// shapes whose function-typedness exists only as text: a declared
+        /// <c>Func&lt;…&gt;</c>/<c>Action</c>/<c>Predicate&lt;…&gt;</c>
+        /// parameter, binding or field (the binder builds a plain nominal type
+        /// from the type string, with no declaration attached), and a
+        /// module-level <c>§DEL</c> name reached through
+        /// <c>_context.DelegateTypeNames</c>.</para>
+        /// </summary>
+        private bool IsFunctionValued(string name, string typeName) =>
+            IsFunctionBoundType(BoundValueTypes.GetValueOrDefault(name))
+            || IsFunctionTypeName(typeName);
+
         private bool IsFunctionTypeName(string typeName)
         {
             var t = typeName.Trim().TrimEnd('?');
@@ -1892,11 +2024,38 @@ public sealed class EffectEnforcementPass
             return MapShortTypeNameToFullName(declared);
         }
 
+        /// <summary>
+        /// Resolves a dotted receiver path (<c>a.b</c> in <c>a.b.M</c>) to a
+        /// manifest-ready type, charging any property getters walked on the way.
+        ///
+        /// <para>v0.15 E1 slice 2b — the BOUND TREE answers first: the whole
+        /// path is a receiver the binder attached to the call node, so if it can
+        /// name that receiver's type there is nothing to walk.</para>
+        ///
+        /// <para>An <c>UnresolvedBoundType</c> here does NOT end the lookup, and
+        /// that is deliberate. Slice 2a types EVERY member chain
+        /// <c>UnresolvedBoundType</c> — PR #1095 records the shape as "binder
+        /// limitation, unactionable", which is why it is marked but never
+        /// reported as Calor0270. Treating a binder limitation as an
+        /// authoritative "not a type" would delete resolution the property walk
+        /// below still performs. The fail-closed rule applies where slice 2a's
+        /// exit ramp is an actual DECISION: a bare receiver head, handled in
+        /// <see cref="ResolveLocalValueType"/>.</para>
+        ///
+        /// <para>SURVIVING FALLBACK: the member-by-member property/field walk,
+        /// for chains the binder does not type.</para>
+        /// </summary>
         private (string? Type, EffectSet Effects) ResolveReceiverChain(string receiverPath)
         {
             var parts = receiverPath.Split('.');
             if (parts.Length < 2)
                 return (null, EffectSet.Empty);
+
+            if (AskBoundTree(receiverPath, out var boundPathType) == BoundValueAnswerKind.Typed
+                && boundPathType != "Func<>")
+            {
+                return (MapShortTypeNameToFullName(boundPathType), EffectSet.Empty);
+            }
 
             var currentType = ResolveVariableType(parts[0]);
             if (currentType == null)

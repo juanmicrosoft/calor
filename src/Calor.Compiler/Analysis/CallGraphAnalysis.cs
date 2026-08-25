@@ -44,6 +44,11 @@ public sealed class CallGraphAnalysis
 
     private readonly IReadOnlyDictionary<AstCallKey, IReadOnlyList<string>> _resolvedCallIds;
     private readonly IReadOnlySet<AstCallKey> _boundCallSites;
+    private static readonly IReadOnlyDictionary<string, Binding.BoundTypes.BoundType> NoBoundValues =
+        new Dictionary<string, Binding.BoundTypes.BoundType>(StringComparer.Ordinal);
+    private readonly IReadOnlyDictionary<
+        string,
+        IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>> _boundValueTypes;
 
     /// <summary>
     /// Builds an overload-precise graph from bound calls. External calls remain
@@ -178,6 +183,34 @@ public sealed class CallGraphAnalysis
     public bool IsBoundResolutionComplete { get; }
 
     /// <summary>
+    /// v0.15 E1 slice 2b — the binder side-channel's RECEIVER types, per caller.
+    /// For each legacy function id, the bound
+    /// <see cref="Binding.BoundTypes.BoundType"/> of the receiver of every call
+    /// site in that function, keyed by the receiver path exactly as the call
+    /// target spells it (<c>"sb"</c> for <c>sb.Append</c>, <c>"a.b"</c> for
+    /// <c>a.b.M</c>). This is the <c>Receiver</c> BoundExpression PR #1095 put
+    /// on the call nodes, handed to a consumer that walks the AST.
+    ///
+    /// <para>This is what lets <c>EffectEnforcementPass</c>'s resolvers ask the
+    /// bound tree BEFORE falling back to AST type strings. A receiver path whose
+    /// bound answers disagree between two call sites in one function is dropped
+    /// rather than guessed; the AST path then decides as it did before.</para>
+    ///
+    /// <para>Deliberately RECEIVERS ONLY, not every bound name. A name in a
+    /// non-receiver position — a method group passed as an argument, a bare
+    /// call target — must keep resolving through the AST, because the string
+    /// this pass gets back is quoted verbatim in Calor0418's message and drives
+    /// the method-group charging arm. Widening it is a later slice with its own
+    /// evidence.</para>
+    ///
+    /// <para>Empty when binding threw (<see cref="IsBoundResolutionComplete"/>
+    /// false) — the pass then behaves exactly as it did before this slice.</para>
+    /// </summary>
+    public IReadOnlyDictionary<string, Binding.BoundTypes.BoundType> BoundValueTypes(
+        string callerFunctionId) =>
+        _boundValueTypes.TryGetValue(callerFunctionId, out var map) ? map : NoBoundValues;
+
+    /// <summary>
     /// Strongly connected components in reverse topological order.
     /// </summary>
     public List<List<string>> StronglyConnectedComponents { get; }
@@ -192,6 +225,9 @@ public sealed class CallGraphAnalysis
         IReadOnlyDictionary<AstCallKey, IReadOnlyList<string>> resolvedCallIds,
         IReadOnlySet<AstCallKey> boundCallSites,
         bool isBoundResolutionComplete,
+        IReadOnlyDictionary<
+            string,
+            IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>> boundValueTypes,
         List<List<string>> sccs)
     {
         ForwardGraph = forwardGraph;
@@ -203,6 +239,7 @@ public sealed class CallGraphAnalysis
         _resolvedCallIds = resolvedCallIds;
         _boundCallSites = boundCallSites;
         IsBoundResolutionComplete = isBoundResolutionComplete;
+        _boundValueTypes = boundValueTypes;
         StronglyConnectedComponents = sccs;
     }
 
@@ -421,7 +458,7 @@ public sealed class CallGraphAnalysis
             }
         }
 
-        var (resolvedCallIds, boundCallSites, boundResolutionComplete) =
+        var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes) =
             ResolveBoundCallSites(ast, functions);
 
         // Build call edges
@@ -475,19 +512,67 @@ public sealed class CallGraphAnalysis
             resolvedCallIds,
             boundCallSites,
             boundResolutionComplete,
+            boundValueTypes,
             sccs);
     }
 
     private static (
         Dictionary<AstCallKey, IReadOnlyList<string>> Resolved,
         HashSet<AstCallKey> BoundCallSites,
-        bool Complete)
+        bool Complete,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>>
+            BoundValueTypes)
         ResolveBoundCallSites(
             ModuleNode ast,
             IReadOnlyDictionary<string, FunctionNode> functions)
     {
         var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
+        // callerId -> name -> bound type. A name whose bound answers disagree is
+        // recorded as null (ambiguous) and dropped at the end: better to fall
+        // back to the AST string than to hand a shadowed name the wrong scope's
+        // type. E1 slice 2b.
+        var valueTypes =
+            new Dictionary<string, Dictionary<string, Binding.BoundTypes.BoundType?>>(
+                StringComparer.Ordinal);
+
+        void RecordValue(string callerId, string name, Binding.BoundTypes.BoundType type)
+        {
+            if (string.IsNullOrEmpty(name))
+                return;
+            if (!valueTypes.TryGetValue(callerId, out var map))
+            {
+                map = new Dictionary<string, Binding.BoundTypes.BoundType?>(StringComparer.Ordinal);
+                valueTypes[callerId] = map;
+            }
+            if (!map.TryGetValue(name, out var existing))
+            {
+                map[name] = type;
+                return;
+            }
+            if (existing is null || existing.Equals(type))
+                return;
+            // Two different bound answers for one name in one function: the AST
+            // path decides, as it did before this slice.
+            map[name] = null;
+        }
+
+        // The receiver of a call site, keyed by the receiver path exactly as the
+        // target spells it ("sb" in "sb.Append", "a.b" in "a.b.M"). The pass
+        // looks the receiver path up directly; a bare head also lands in the
+        // same map through RecordValue above.
+        void RecordReceiver(
+            string callerId,
+            string target,
+            Binding.BoundExpression? receiverExpression)
+        {
+            if (receiverExpression is null)
+                return;
+            var lastDot = target.LastIndexOf('.');
+            if (lastDot <= 0)
+                return;
+            RecordValue(callerId, target[..lastDot], receiverExpression.Type);
+        }
 
         try
         {
@@ -525,12 +610,14 @@ public sealed class CallGraphAnalysis
                             callees = statement.ResolvedSymbols;
                             receiver = statement.ReceiverSymbol;
                             inaccessibleCall = statement.IsInaccessibleCall;
+                            RecordReceiver(callerId, statement.Target, statement.Receiver);
                             break;
                         case BoundCallExpression expression:
                             target = expression.Target;
                             callees = expression.ResolvedSymbols;
                             receiver = expression.ReceiverSymbol;
                             inaccessibleCall = expression.IsInaccessibleCall;
+                            RecordReceiver(callerId, expression.Target, expression.Receiver);
                             break;
                         case BoundNewExpression creation:
                             target = $"{creation.Type.DisplayString}..ctor";
@@ -578,11 +665,44 @@ public sealed class CallGraphAnalysis
         catch
         {
             // AST-only compatibility remains available. Calls that could not be
-            // bound fall back only to unambiguous name resolution below.
-            return (resolved, boundCallSites, false);
+            // bound fall back only to unambiguous name resolution below. No
+            // bound types either: the pass keeps its pre-slice-2b behaviour.
+            return (
+                resolved,
+                boundCallSites,
+                false,
+                new Dictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>>(
+                    StringComparer.Ordinal));
         }
 
-        return (resolved, boundCallSites, true);
+        return (resolved, boundCallSites, true, FreezeValueTypes(valueTypes));
+    }
+
+    /// <summary>
+    /// Drops the ambiguous entries (a name with two different bound answers in
+    /// one function) and hands back a read-only view. E1 slice 2b.
+    /// </summary>
+    private static IReadOnlyDictionary<
+            string,
+            IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>>
+        FreezeValueTypes(
+            Dictionary<string, Dictionary<string, Binding.BoundTypes.BoundType?>> valueTypes)
+    {
+        var frozen =
+            new Dictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>>(
+                StringComparer.Ordinal);
+        foreach (var (callerId, map) in valueTypes)
+        {
+            var unambiguous = new Dictionary<string, Binding.BoundTypes.BoundType>(
+                StringComparer.Ordinal);
+            foreach (var (name, type) in map)
+            {
+                if (type is not null)
+                    unambiguous[name] = type;
+            }
+            frozen[callerId] = unambiguous;
+        }
+        return frozen;
     }
 
     private static string? ResolveLegacyFunctionId(
