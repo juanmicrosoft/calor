@@ -1317,6 +1317,18 @@ spellings of one call — which is what lets a row be cached and compared rather
 re-derived. Second, the manifest schema is unchanged: keys are a lookup-side refactor, and no
 committed manifest was edited to land them.
 
+> **The key's parameter component is weaker than the rest of it, and E2 should not assume
+> otherwise** (review round 1, MAJOR 3). On a manifest entry the parameter list is the DECLARED
+> signature. On a **call-site** key it is the inferred types of the **arguments**
+> (`EffectEnforcementPass.InferExpressionType` — bound where the receiver side channel typed the
+> name, AST-derived otherwise), not the callee's resolved parameter types. The binder's
+> `BclCallResolution` is private to `Binder` and unreferenced under `Effects/`, and the effect
+> pass is an AST walk that never holds a `BoundCallExpression`, so the callee's real signature is
+> not on this path at all. Overload discrimination is therefore exactly as good as it was before
+> slice 2c — re-keying preserved it rather than improving it. Making the declaring type
+> symbol-derived while the parameter list stays inference-derived is a deliberate asymmetry, and
+> it is the second of E1's two named residuals (roadmap §4.2).
+
 **The key also records what the manifest cannot.** `IsStatic`, `ReceiverInterfaces` and
 `FromStringFallback` sit outside key equality on purpose — no manifest entry names them, so
 letting them split the cache would let a bound-receiver key and a string-fallback key for one

@@ -746,6 +746,20 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// <summary>
     /// Normalized parameter types, or null when no parameter list was named.
     /// See the class remarks: null and empty are different lookups.
+    ///
+    /// <para><b>What these actually are, since it is easy to over-read
+    /// (review round 1, MAJOR 3).</b> On a manifest entry they are the DECLARED
+    /// parameter types, parsed from the entry's signature. On a CALL-SITE key
+    /// they are the inferred types of the ARGUMENTS, from
+    /// <c>EffectEnforcementPass.InferExpressionType</c> — bound where the
+    /// receiver side channel typed the name, AST-derived otherwise. They are
+    /// <b>not</b> the callee's resolved parameter types: the binder's
+    /// <c>BclCallResolution</c> is private to <c>Binder</c> and is not reachable
+    /// from <c>Effects/</c>, and the effect pass is an AST walk that never holds
+    /// a <c>BoundCallExpression</c>. Overload discrimination is therefore only
+    /// as good as argument inference, exactly as it was before this slice —
+    /// re-keying did not change it. Carrying the callee's real signature is E2
+    /// work.</para>
     /// </summary>
     public IReadOnlyList<string>? ParameterTypes { get; }
 
