@@ -1065,17 +1065,25 @@ public class EffectEnforcementTests
     /// documented on <c>CallGraphAnalysis.BoundValueTypes</c> is exactly the
     /// veto's reachability path.</para>
     ///
-    /// <para>Without the veto, <c>ResolveLocalValueType</c> falls through to the
-    /// AST search, which returns the SENTINEL <c>"?"</c> for a binding it cannot
-    /// type. <c>InferFromBareNameTarget</c> branches on <c>!= null</c>, so the
-    /// sentinel is treated as a type and the bare call takes the
-    /// delegate-invocation arm — <c>Calor0418: Invocation of value 'u' (declared
-    /// type '?')</c>, returning <c>EffectSet.Empty</c>. That is a guess, and a
-    /// laundering one: it charges nothing. With the veto the call stays
-    /// <c>Calor0411</c> and fails closed.</para>
+    /// <para><b>v0.15 E1 slice 2c, review round 1 (MAJOR 2) — this test no
+    /// longer discriminates, and saying so is the point.</b> Slice 2b's version
+    /// of this comment claimed "delete the veto and re-run: <c>0411, 0411, 0418,
+    /// 0410</c> instead of <c>0411, 0411, 0411, 0410</c>". That was true then
+    /// and is false now. Slice 2c guards the AST's <c>"?"</c> sentinel at
+    /// <c>InferFromBareNameTarget</c>
+    /// (<c>EffectEnforcementPass.UnknownLocalTypeSentinel</c>), so the sentinel
+    /// is no longer mistaken for a type at the bare target and this fixture
+    /// reaches <c>Calor0411</c> whether or not the veto branch exists. Deleting
+    /// the veto leaves the Enforcement suite at 358/358.</para>
     ///
-    /// <para>MEASURED — delete the veto and re-run: <c>0411, 0411, 0418,
-    /// 0410</c> instead of <c>0411, 0411, 0411, 0410</c>.</para>
+    /// <para>The test is RETAINED as a behavioural pin — it asserts what this
+    /// fixture does, which is still worth holding — but it is <b>not</b> the
+    /// veto's discriminating pin, and nothing currently is. The veto is kept
+    /// because it states the fail-closed rule at the layer that owns it
+    /// (<c>AskBoundTree</c>); E2 owes the pin that observes it, once chain
+    /// typing makes <c>AskBoundTree</c> answer <c>Typed</c> for dotted paths.
+    /// The branch comment in <c>EffectEnforcementPass</c> carries the same
+    /// statement, and so does design doc §8.1.</para>
     /// </summary>
     [Fact]
     public void E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel()

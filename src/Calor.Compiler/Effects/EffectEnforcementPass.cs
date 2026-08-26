@@ -1699,49 +1699,66 @@ public sealed class EffectEnforcementPass
             // fallback still performs. Measured: 05-02/05-03.approved.calr go
             // from clean to Calor0411 + Calor0410 on '_chainWhere005.ToList'.
             //
-            // CORPUS-UNREACHABLE BUT OBSERVABLE (review round 2, correcting
-            // round 1, which wrongly called this branch unreachable and said
-            // deleting it changed nothing).
+            // ───────────────────────────────────────────────────────────────
+            // v0.15 E1 slice 2c, review round 1 (MAJOR 2) — READ THIS BEFORE
+            // TRUSTING ANY OLDER COMMENT HERE. Everything slice 2b wrote about
+            // this branch being pinned is now FALSE, and the previous text said
+            // otherwise. Corrected in place rather than deleted, because "this
+            // is retained without a pin" is exactly the kind of claim that has
+            // to survive in the source.
             //
-            // Pinned by
-            // EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel,
-            // which FAILS if this branch is deleted, with its control
-            // _SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel.
+            // THIS BRANCH HAS NO DISCRIMINATING PIN. Delete it and the whole
+            // Enforcement suite stays green (358/358). Slice 2b's
+            // E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel is
+            // RETAINED as a behavioural pin — it asserts the fixture's outcome
+            // — but it no longer fails when this branch goes, and its control
+            // was renamed (see
+            // E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse).
+            //
+            // Why it stopped discriminating: slice 2c guards the AST's "?"
+            // sentinel at InferFromBareNameTarget (UnknownLocalTypeSentinel), so
+            // the sentinel is no longer mistaken for a type there. Slice 2b's
+            // comment said "InferFromBareNameTarget tests != null, not the
+            // sentinel" — that is no longer true, and it was the mechanism the
+            // whole 0418-vs-0411 argument rested on. The outer guard now answers
+            // the same question this branch answers, so the fixture reaches
+            // Calor0411 either way. Round 1 probed four more shapes looking for
+            // one where the two layers disagree and found none.
+            //
+            // WHY IT IS KEPT ANYWAY. It states the fail-closed rule at the layer
+            // that OWNS it: "the binder looked, told the author it could not name
+            // the type (Calor0270), and the AST does not get to guess in its
+            // place". The outer guard is a sentinel check in one consumer; this
+            // is the rule. E2 needs the rule here the moment chains carry types,
+            // because then AskBoundTree starts answering Typed for dotted paths
+            // and every consumer — not just the bare-target one — depends on
+            // Unresolved meaning Unresolved.
+            //
+            // WHAT E2 OWES: a pin that fails when this branch is deleted, i.e. a
+            // shape where a Reported UnresolvedBoundType reaches a consumer whose
+            // AST fallback returns a REAL type rather than the sentinel. That
+            // shape does not exist today; when chain typing lands it will.
             //
             // The reachability path is the NAME-KEYED side channel (see
             // CallGraphAnalysis.BoundValueTypes). A name used as a receiver
             // ANYWHERE in the function answers from here at EVERY occurrence,
-            // including positions the channel never collects. So:
+            // including positions the channel never collects:
             //
             //     §B{u} §C{Mystery.Make} §/C
             //     §C{u.Run} §/C     <- receiver use: puts u's Reported
             //                          UnresolvedBoundType into the channel
             //     §C{u} §/C         <- bare target: reads it back
             //
-            // Without this branch the bare target falls through to the AST
-            // search, which hands back the SENTINEL "?" for a §B it cannot type
-            // (FindLocalDeclarationType, "known value, unknown type").
-            // InferFromBareNameTarget tests `!= null`, not the sentinel, so "?"
-            // is treated as a type and the call takes the delegate-invocation
-            // arm: Calor0418 "declared type '?'", charging EffectSet.Empty.
-            // Measured: 0411,0411,0418,0410 without the branch vs
-            // 0411,0411,0411,0410 with it. Guessing here would launder effects,
-            // so the veto is load-bearing, not decorative.
-            //
-            // ResolveVariableType guards `declared == "?"`; the other
-            // ResolveLocalValueType call sites do not. Adding that guard here
-            // kept every pre-existing suite green but SUBSUMES this branch — the pin above
-            // then passes with the branch deleted, because both answer the same
-            // question at different layers. Unifying them is slice-2c work, not
-            // a drive-by. Recorded as debt in design doc §8.1.
-            //
-            // CORPUS claim, and only that: over all 301 committed .calr files
+            // CORPUS claim, and only that: over all 886 committed .calr files
             // every unresolved receiver arriving here is Reported=false — 32
-            // sites, all _chainNNN or member chains, zero Reported=true. So the
+            // sites, all _chainNNN or member chains, zero Reported=true. (Slice
+            // 2b's comment said 301; that was the count of a narrower sweep and
+            // is corrected here to the demand ledger's denominator.) So the
             // branch changes nothing on the committed corpus, which is why the
-            // ledgers and transcripts are unmoved; it is NOT evidence that the
-            // branch is unobservable. Reproduce the sweep by tracing
+            // ledgers and transcripts are unmoved; it is NOT evidence about
+            // observability either way. Reproduce the sweep by tracing
             // (name, Reported, ResolveLocalValueTypeFromAst(name)) here.
+            // ───────────────────────────────────────────────────────────────
             if (type is Binding.BoundTypes.UnresolvedBoundType unresolved)
             {
                 return unresolved.Reported
