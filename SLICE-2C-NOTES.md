@@ -23,9 +23,24 @@ src file — Calor-first guard forbids new `src/*.cs`).
       `ArchitectureTests.EffectResolver_ExposesNoStringTypeNameResolveOverload`
       (appended at END of the file so `facts.py`'s `ArchitectureTests.cs:158` pin does not shift)
 - [x] all src + test + bench callers migrated; Enforcement suite 358/358 green
-- [ ] key ledger bench/phase0-agent-native/effect-resolver-key-ledger.json
-- [ ] "?" sentinel decision
-- [ ] ChainWalkCouldChargeEffects FIXME(E2)
+- [x] key ledger `bench/phase0-agent-native/effect-resolver-key-ledger.json` +
+      `tests/Calor.Compiler.Tests/Effects/EffectResolverKeyLedgerTests.cs` (compiler shard,
+      `[SkippableFact]`, exact per-subject equality). Aggregate 202 bound / 751 string over
+      844 measured .calr (42 not measured, counted not dropped).
+      Regenerate: `CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1`.
+      GOTCHA: the ledger must lex with `TokenizeAllForParser()`, not `Tokenize()` —
+      the latter drops ~600 files into filesNotMeasured.
+- [x] "?" sentinel: option (a) SCOPED. Guarded at `InferFromBareNameTarget`
+      (`UnknownLocalTypeSentinel`), veto retained. Blanket removal rejected WITH REASON:
+      `ResolveLocalValueType` returning null instead of "?" makes
+      `InferFromReference`/`InferSetterEffects` fall to `EffectSet.Empty`, turning a reported
+      unknown operation into silence (fail-OPEN). Corpus delta = 0 (D-A ledger unmoved at 3,
+      exact-equality, so the shape does not occur in the 886 committed .calr).
+      Control pin re-specified as
+      `E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse`.
+      COST: `_VetoesTheAstSentinel` is no longer discriminating (guard subsumes veto).
+- [x] ChainWalkCouldChargeEffects FIXME(E2) — states it is untested, unreachable today, and
+      what pin E2 must land before chain typing merges
 - [ ] docs (design §8.1/§8.4, roadmap §4.2, CHANGELOG)
 - [ ] suites
 

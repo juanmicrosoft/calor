@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "registeredAt": "2026-08-26",
+  "scope": "Every committed .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, bench/corpus/ submodules and docs/design/spikes/ artifacts excluded; nothing else filtered), partitioned into subjects by top-level directory. Each file is lexed and parsed, then run through EffectEnforcementPass with UnknownCallPolicy.Strict and a hermetic EffectResolver (built-in manifests only; ProjectDirectory and SolutionDirectory null). keysFromBound counts EffectResolverKey instances built by EffectResolverKey.FromBoundReceiver \u2014 the receiver\u0027s type came from the bound tree; keysFromString counts EffectResolverKey.FromStrings \u2014 the caller held only text. Both are counted per CALL SITE, before the resolver\u0027s cache, so the ledger measures how the compiler ASKS rather than how often an answer had to be computed. Files that fail to lex/parse, or whose pass throws, contribute no keys and are counted in filesNotMeasured.",
+  "aggregateKeysFromBound": 202,
+  "aggregateKeysFromString": 751,
+  "perSubject": [
+    {
+      "subject": "bench",
+      "keysFromBound": 176,
+      "keysFromString": 551,
+      "filesMeasured": 334,
+      "filesNotMeasured": 33
+    },
+    {
+      "subject": "benchmarks",
+      "keysFromBound": 0,
+      "keysFromString": 0,
+      "filesMeasured": 1,
+      "filesNotMeasured": 6
+    },
+    {
+      "subject": "samples",
+      "keysFromBound": 1,
+      "keysFromString": 36,
+      "filesMeasured": 11,
+      "filesNotMeasured": 0
+    },
+    {
+      "subject": "scripts",
+      "keysFromBound": 0,
+      "keysFromString": 0,
+      "filesMeasured": 2,
+      "filesNotMeasured": 0
+    },
+    {
+      "subject": "src",
+      "keysFromBound": 3,
+      "keysFromString": 26,
+      "filesMeasured": 10,
+      "filesNotMeasured": 0
+    },
+    {
+      "subject": "tests",
+      "keysFromBound": 22,
+      "keysFromString": 135,
+      "filesMeasured": 485,
+      "filesNotMeasured": 3
+    },
+    {
+      "subject": "tools",
+      "keysFromBound": 0,
+      "keysFromString": 3,
+      "filesMeasured": 1,
+      "filesNotMeasured": 0
+    }
+  ]
+}
