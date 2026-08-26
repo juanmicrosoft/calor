@@ -563,6 +563,15 @@ public class NewFeatureRoundTripTests
     /// "identical to the original source" was never the property, and claiming it
     /// would be claiming something the emitter does not do for any construct.
     /// </summary>
+    /// <remarks>
+    /// <b>This half is the weaker one.</b> An emitter that dropped every row would
+    /// still be a fixed point — it would emit the same row-less text twice. What
+    /// discriminates "the row survived" is the <c>Assert.Contains</c> in the caller,
+    /// which is why each case's expected string carries its POSITION (the <c>§I</c>
+    /// tag, the <c>-&gt;</c>, the <c>§FLD</c> or <c>§B</c> header, or the surrounding
+    /// newlines for a row that must stand on its own line) rather than a bare
+    /// <c>§E{cw}</c> — which any other position's row in the same output would satisfy.
+    /// </remarks>
     private static void AssertEmitterIsAFixedPoint(string source)
     {
         var first = Parse(source, out var d1);
@@ -586,7 +595,7 @@ public class NewFeatureRoundTripTests
           §F{f001:F:pub} () -> void
             §E{cw}
             §P "x"
-        """, "§E{cw}")]
+        """, "\n    §E{cw}\n")]
     // position 2 — lambda literal. The emitter did not write this tag back before
     // this slice, so the row was silently dropped on every round trip.
     [InlineData("""
@@ -605,7 +614,7 @@ public class NewFeatureRoundTripTests
             §E{cw}
           §F{f001:Main:pub} () -> void
             §E{}
-        """, "§E{cw}")]
+        """, "\n    §E{cw}\n")]
     // position 4 — parameter, tag form
     [InlineData("""
         §M{m001:R}
@@ -644,7 +653,7 @@ public class NewFeatureRoundTripTests
           §F{f001:Main:pub} () -> void
             §E{}
             §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x INT:1) §/LAM{lam1}
-        """, "§E{cw}")]
+        """, "§B{Func<i32, i32>:f} §E{cw}")]
     // position 8 — field
     [InlineData("""
         §M{m001:R}
