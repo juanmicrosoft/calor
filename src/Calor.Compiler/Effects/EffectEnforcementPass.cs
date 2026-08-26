@@ -642,18 +642,29 @@ public sealed class EffectEnforcementPass
                     else if (externalBaseName != null)
                     {
                         // The §IMPL is satisfied (if at all) by a member inherited
-                        // from an EXTERNAL base: the destination row is Unknown, so
-                        // site 5's verdict is CannotTell. v0.15 E3 slice a retires
-                        // this Calor0419 in favour of Calor0425 (§6.2), with §6.4's
-                        // third message sample — which NAMES the row rather than
-                        // merely re-coding the old text.
-                        ReportRowUnknown(
+                        // from an EXTERNAL base: variance cannot be checked, so the
+                        // interface's declared effect set is only an assumption —
+                        // surfaced like external-base overrides (Calor0419).
+                        //
+                        // §6.2 retires this Calor0419 and its override sibling in
+                        // favour of Calor0425. Slice a does NOT take it, and the
+                        // reason is that the two must move TOGETHER: the override
+                        // arm (above) is an AddAssumption, not a report, and the
+                        // assumption it registers propagates through the SCC pass
+                        // into every caller's computed effect set. Converting only
+                        // this one would make sites 4 and 5 disagree about what an
+                        // unresolvable base means, for a message improvement.
+                        // Owed by the slice that redesigns the assumption channel.
+                        var assumedSeverity = _strictEffects
+                            ? DiagnosticSeverity.Error
+                            : DiagnosticSeverity.Warning;
+                        _diagnostics.Report(
                             cls.Span,
-                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member "
-                            + "not visible in this module (inherited from external base "
-                            + $"'{externalBaseName}'), so its effect row is Unknown. The interface's "
-                            + $"declared row {GetDeclaredEffects(sig.Effects).ToRow().ToCompactDisplayString()} "
-                            + "is assumed here, not verified.");
+                            DiagnosticCode.AssumedEffects,
+                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member that is " +
+                            $"not visible in this module (inherited from external base '{externalBaseName}'). " +
+                            "The interface's declared effect set is ASSUMED for this implementation, not verified.",
+                            assumedSeverity);
                     }
                 }
             }

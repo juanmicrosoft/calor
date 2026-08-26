@@ -65,7 +65,14 @@ public class EffectRowLatticeTests
                 §R value
             """);
 
-        Assert.Null(parameter.FunctionType);
+        // v0.15 E3 slice a widened §8.2: EVERY function-typed position now gets a
+        // FunctionBoundType, rowed or not. What P6 actually asserts — the ROW is
+        // Unknown, never pure — is unchanged and is the line below. Slice b's
+        // `Assert.Null` asserted the SCOPE LIMIT §8.2 said E3 would lift, not the
+        // §3.5 rule, so it is replaced rather than deleted.
+        Assert.NotNull(parameter.FunctionType);
+        Assert.True(parameter.FunctionType!.Row.IsUnknown);
+        Assert.NotEqual(EffectRow.Pure, parameter.FunctionType.Row);
         Assert.True(RowOf(parameter).IsUnknown);
     }
 
@@ -111,10 +118,14 @@ public class EffectRowLatticeTests
     {
         // §3.5 row 4, the case the rename above uncovered: a function-typed
         // binding with NO row and NO initializer. Nothing is declared and there
-        // is nothing to infer from, so the answer is Unknown — no
-        // FunctionBoundType at all, which RowOf reads as EffectRow.Unknown.
-        // Defaulting it to pure would let a later assignment of a printing
-        // lambda pass a check that believed the binding provably pure.
+        // is nothing to infer from, so the row is Unknown. Defaulting it to pure
+        // would let a later assignment of a printing lambda pass a check that
+        // believed the binding provably pure.
+        //
+        // v0.15 E3 slice a: the binding now HAS a FunctionBoundType (§8.2 —
+        // every function-typed position does), carrying EffectRow.Unknown. Slice
+        // b read "Unknown" off the ABSENCE of a type; the row itself is the
+        // durable assertion and is what this pins now.
         var binding = BindSingleLocal("""
             §M{m001:M}
               §F{f001:Main:pub} () -> void
@@ -122,7 +133,9 @@ public class EffectRowLatticeTests
                 §B{~f:Func<i32,i32>}
             """);
 
-        Assert.Null(binding.FunctionType);
+        Assert.NotNull(binding.FunctionType);
+        Assert.True(binding.FunctionType!.Row.IsUnknown);
+        Assert.NotEqual(EffectRow.Pure, binding.FunctionType.Row);
         Assert.True(RowOf(binding).IsUnknown);
     }
 
