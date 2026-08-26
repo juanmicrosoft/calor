@@ -197,7 +197,7 @@ three source files — `Commands/IndexCommand.cs`, `Commands/QueryCommand.cs`,
 >
 > **Eight positions** (§3.3). No new token, no new AST node type, no new `IAstVisitor` method.
 
-> **STATUS — LANDED (syntax only), PR #PRNUM, v0.15 E2 slice a.** All eight positions parse,
+> **STATUS — LANDED (syntax only), PR #1101, v0.15 E2 slice a.** All eight positions parse,
 > `CalorEmitter` round-trips every one, and **Calor0405** replaces the cascade at the positions
 > with no `§E` arm. What landed is the *writing* of a row; **nothing compares two rows yet**.
 > Still pending, and owned by slice b / E3: §3.5's Calor0425-on-omitted-row and the
@@ -778,7 +778,7 @@ Draft v1 claimed otherwise. The re-wording is deliberate (it names the row) and 
 > inside `§E{…}` (`§E{e}`). Not `!e`. They may appear only in a declaration's own row and its
 > parameters' rows; anything else is **Calor0404**. Ships iff the §7.5 ramp does not fire.
 
-> **STATUS — LANDED (syntax only), PR #PRNUM, v0.15 E2 slice a.** The `eff` modifier parses in the
+> **STATUS — LANDED (syntax only), PR #1101, v0.15 E2 slice a.** The `eff` modifier parses in the
 > `§F`/`§AF`/`§MT`/`§AMT` type-parameter lists (including an interface member's, which is the
 > spelling the spike chose), the one-token lookahead keeps **Z4**'s `<eff>` compiling, §7.2(c)'s
 > name-collision ban is **Calor0404**, and `CalorEmitter` round-trips the binder. Binders are
@@ -1877,7 +1877,7 @@ the transcripts are E2's frozen evidence base and a throwaway prototype does not
 **If E2's regeneration moves any other line, that is a behaviour change the spike did not make,
 and it needs its own justification in the E2 PR body.**
 
-> **EXECUTED, E2 slice a, PR #PRNUM — the count is FIFTEEN, not seven, and every extra is
+> **EXECUTED, E2 slice a, PR #1101 — the count is FIFTEEN, not seven, and every extra is
 > accounted for.** The seven above were produced by a prototype that implemented **only**
 > positions 5 and 8 (`spike-verdict.json.prototype.notImplemented`). Slice a implements **all
 > eight**, so every case that exercises a position the prototype skipped moves too. The full
