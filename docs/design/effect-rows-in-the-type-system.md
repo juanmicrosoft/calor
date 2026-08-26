@@ -508,8 +508,16 @@ encompass their narrow siblings. The table itself moved: `EffectRow.FamilySubtyp
 `Binding/BoundTypes/`, over the internal `category:value` codes) is the single source of truth,
 and `EffectSubtyping.Subtypes` is DERIVED from it by splitting on the first colon — because
 `Binding/` may not reference `Effects/` and two hand-written tables would be two things to keep
-in step. The `:rw` rows are listed first so `GetBroadestEncompassing`'s answers are byte-identical
-to 0.14's. **Calor0410s that DISAPPEARED from the corpus: none** — the 886-file differential
+in step. The `:rw` rows are listed first so `GetBroadestEncompassing` keeps 0.14's answer for a
+NARROW code (`db:r` still resolves to `db:rw`, not to `db`). **Its answer for a `_readwrite` code
+does change and the ordering cannot prevent it:** on 0.14 nothing covered `db:rw`, so it returned
+`db:rw`; here `db` covers it and is returned. Suppressing that would mean dropping `db:rw` from
+`db`'s subtype list, which would make `§E{db}` stop admitting `db:rw` — the opposite of the
+widening. `GetBroadestEncompassing` has **no production caller**, so the change is test-visible
+only, and `EffectSubtypingTests` pins the new answer rather than leaving it to be found. An
+earlier revision of this paragraph and of `EffectRow.FamilySubtypes`'s doc comment claimed the
+method was byte-identical; that was **false for the three `_readwrite` codes** and is corrected
+here (review round 1, MAJOR 1). **Calor0410s that DISAPPEARED from the corpus: none** — the 886-file differential
 against `4766c8fc` shows zero files with a changed exit code or diagnostic-code set, which is
 gate 5's "listed by name" leg discharged with an empty list. Pin **P7**
 (`EffectSubtypingTests.cs`) covers all nine family/narrow pairs, the one-way direction, the

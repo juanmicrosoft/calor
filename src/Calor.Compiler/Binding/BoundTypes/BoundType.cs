@@ -605,9 +605,24 @@ public sealed class EffectRow : IEquatable<EffectRow>
     /// siblings. Widening only — nothing that compiled stops compiling.</para>
     ///
     /// <para>Order matters for <c>EffectSubtyping.GetBroadestEncompassing</c>,
-    /// which returns the FIRST broad code covering a narrow one: the
-    /// <c>:rw</c> rows are listed first so its answers stay byte-identical to
-    /// 0.14's.</para>
+    /// which returns the FIRST broad code covering a narrow one. The
+    /// <c>:rw</c> rows are listed first so a NARROW code keeps 0.14's answer:
+    /// <c>database_read</c> is covered by both <c>database_readwrite</c> and
+    /// <c>database</c>, and still resolves to the former.</para>
+    ///
+    /// <para><b>A <c>_readwrite</c> code's answer DOES change, and the ordering
+    /// cannot save it.</b> On 0.14 nothing covered <c>network_readwrite</c>, so
+    /// <c>GetBroadestEncompassing</c> returned it unchanged; here
+    /// <c>network</c> covers it and is returned instead. Same for
+    /// <c>database_readwrite</c> and <c>environment_readwrite</c>. That is the
+    /// correct answer under §4.1 — the bare family really is broader — and
+    /// suppressing it would mean dropping <c>db:rw</c> from <c>db</c>'s list,
+    /// which would make <c>§E{db}</c> stop admitting <c>db:rw</c> and break the
+    /// widening this table exists for. The method has <b>no production
+    /// caller</b> (<c>grep -rn GetBroadestEncompassing src/</c> → its own
+    /// definition only), so the change is observable in tests only;
+    /// <c>EffectSubtypingTests</c> pins the new answer explicitly rather than
+    /// leaving it to be discovered.</para>
     /// </summary>
     public static readonly IReadOnlyList<KeyValuePair<string, IReadOnlyList<string>>> FamilySubtypes =
     [

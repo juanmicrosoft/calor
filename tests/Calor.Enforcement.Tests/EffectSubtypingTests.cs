@@ -250,6 +250,40 @@ public class EffectSubtypingTests
         Assert.Equal((EffectKind.IO, "filesystem_readwrite"), broadest);
     }
 
+    [Theory]
+    // v0.15 §4.1, review round 1 MAJOR 1. On 0.14 nothing covered a *_readwrite
+    // code, so GetBroadestEncompassing returned it UNCHANGED. The bare family
+    // codes now cover them, so the answer moves — and that is correct: `db` really
+    // is broader than `db:rw`. Suppressing it would mean dropping db:rw from db's
+    // subtype list, which would make §E{db} stop admitting db:rw and undo the
+    // widening. The method has no production caller, so this is the only place
+    // the change is observable; it is pinned rather than left to be discovered.
+    [InlineData("database_readwrite", "database")]
+    [InlineData("network_readwrite", "network")]
+    [InlineData("environment_readwrite", "environment")]
+    public void GetBroadestEncompassing_OfAReadWriteCode_IsNowItsBareFamily(
+        string readWrite, string family)
+    {
+        Assert.Equal(
+            (EffectKind.IO, family),
+            EffectSubtyping.GetBroadestEncompassing((EffectKind.IO, readWrite)));
+    }
+
+    [Fact]
+    public void GetBroadestEncompassing_OfANarrowCode_IsUnchangedFrom014()
+    {
+        // The half the :rw-first ordering DOES protect: database_read is covered
+        // by both database_readwrite and database, and still answers with the
+        // former, exactly as on 0.14. Reorder FamilySubtypes so the bare families
+        // come first and this goes red while the theory above stays green.
+        Assert.Equal(
+            (EffectKind.IO, "database_readwrite"),
+            EffectSubtyping.GetBroadestEncompassing((EffectKind.IO, "database_read")));
+        Assert.Equal(
+            (EffectKind.IO, "filesystem_readwrite"),
+            EffectSubtyping.GetBroadestEncompassing((EffectKind.IO, "filesystem_read")));
+    }
+
     [Fact]
     public void GetBroadestEncompassing_ReturnsSelf_WhenNoParent()
     {
