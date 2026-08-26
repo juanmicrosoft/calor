@@ -1,46 +1,40 @@
+using Calor.Compiler.Binding.BoundTypes;
+
 namespace Calor.Compiler.Effects;
 
 /// <summary>
 /// Defines subtype relationships for effects.
 /// A "readwrite" effect encompasses both "read" and "write" effects.
 /// This allows declaring a broad effect that covers narrower ones.
+///
+/// <para>v0.15 E2 slice b — this table is no longer written here. It is
+/// DERIVED from <see cref="EffectRow.FamilySubtypes"/>, the compact-code
+/// family/narrow table that lives in <c>Binding/BoundTypes/</c> because
+/// <c>Binding/</c> may not reference <c>Effects/</c> (design-doc §4.1 and
+/// <c>ArchitectureTests.BindingLayer_HasNoReferenceToEffectsNamespace</c>).
+/// Two hand-written tables would be two things to keep in step; a derivation
+/// cannot drift. The 0.15 widening — a bare <c>db</c> / <c>net</c> / <c>env</c>
+/// now encompassing its narrow siblings — arrives here through that table.</para>
 /// </summary>
 public static class EffectSubtyping
 {
     /// <summary>
-    /// Maps broad effects to their constituent narrower effects.
-    /// For example, filesystem_readwrite encompasses filesystem_read and filesystem_write.
+    /// Maps broad effects to their constituent narrower effects, projected from
+    /// <see cref="EffectRow.FamilySubtypes"/> into the internal
+    /// <c>(kind, value)</c> vocabulary. Enumeration order is the source table's,
+    /// which is what keeps <see cref="GetBroadestEncompassing"/> byte-identical
+    /// to 0.14 (the <c>:rw</c> rows come first).
     /// </summary>
-    private static readonly Dictionary<(EffectKind Kind, string Value), List<(EffectKind Kind, string Value)>> Subtypes = new()
+    private static readonly Dictionary<(EffectKind Kind, string Value), List<(EffectKind Kind, string Value)>> Subtypes =
+        EffectRow.FamilySubtypes.ToDictionary(
+            entry => ToInternal(entry.Key),
+            entry => entry.Value.Select(ToInternal).ToList());
+
+    private static (EffectKind Kind, string Value) ToInternal(string compactCode)
     {
-        // Filesystem: rw encompasses r and w
-        [(EffectKind.IO, "filesystem_readwrite")] = new()
-        {
-            (EffectKind.IO, "filesystem_read"),
-            (EffectKind.IO, "filesystem_write")
-        },
-
-        // Network: rw encompasses r and w
-        [(EffectKind.IO, "network_readwrite")] = new()
-        {
-            (EffectKind.IO, "network_read"),
-            (EffectKind.IO, "network_write")
-        },
-
-        // Database: rw encompasses r and w
-        [(EffectKind.IO, "database_readwrite")] = new()
-        {
-            (EffectKind.IO, "database_read"),
-            (EffectKind.IO, "database_write")
-        },
-
-        // Environment: rw encompasses r and w
-        [(EffectKind.IO, "environment_readwrite")] = new()
-        {
-            (EffectKind.IO, "environment_read"),
-            (EffectKind.IO, "environment_write")
-        }
-    };
+        var parsed = EffectCodes.ParseCompact(compactCode);
+        return (parsed.Kind, parsed.Value);
+    }
 
     /// <summary>
     /// Returns true if the declared effect encompasses the required effect.
