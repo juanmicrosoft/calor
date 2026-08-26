@@ -5303,11 +5303,24 @@ public sealed class Binder
     {
         if (!_misplacedRowsReported.Add(row)) return;
 
+        // ONE vocabulary across all nine positions. The two return spellings do
+        // not arrive equal: ExpandType rewrites §O{void} to VOID, but the arrow
+        // form `-> void §E{cw}` reaches OutputNode.TypeName as the raw `void`,
+        // so the same mistake was reported as 'VOID' in one spelling and 'void'
+        // in the other (review round 1, MINOR 5). Canonicalize normalises HERE,
+        // in the message only — expanding the arrow form in the parser would
+        // move FunctionNode.Output.TypeName for every arrow-form function in the
+        // corpus, which is a change with a blast radius and nothing to do with
+        // rows.
+        var displayed = typeName is null
+            ? "?"
+            : TypeIdentity.Canonicalize(typeName);
+
         // A return has no name of its own to quote, so it is described by its
         // kind. Every other position is named.
         var described = subjectKind == "return"
-            ? $"The return type '{typeName ?? "?"}' is not a function type"
-            : $"'{subject}' has type '{typeName ?? "?"}', which is not a function type";
+            ? $"The return type '{displayed}' is not a function type"
+            : $"'{subject}' has type '{displayed}', which is not a function type";
 
         _diagnostics.ReportError(
             row.Span,

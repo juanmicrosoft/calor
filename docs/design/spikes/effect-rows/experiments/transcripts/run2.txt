@@ -94,7 +94,7 @@ CASE Y5a-arrow-sameline-E  args: (none)  exit: 1
   §F{f001:Log:pub} (str:m) -> void §E{cw}
     §P m
 ------------------------------------------------------------------------------
-Y5a-arrow-sameline-E.calr(2,36): error Calor0405: The return type 'void' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+Y5a-arrow-sameline-E.calr(2,36): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Y6a-MT-twoline  args: (none)  exit: 1

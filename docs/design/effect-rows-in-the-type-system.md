@@ -2066,8 +2066,8 @@ and it needs its own justification in the E2 PR body.**
 > | `run2.py` **Y1a** | `Calor0410` at (5,5) | `Calor0405` at (3,15), *"'m' has type 'STRING'…"* | §3.5 / P6 — a row on a `str` parameter. **Not in §13.2's list of six**; same shape as Y1b |
 > | `run2.py` **Y1b** | `Calor0410` at (2,3) | `Calor0405` at (3,15) | §3.5 / P6. **P1's old case** |
 > | `run2.py` **Y1c** | `exit 0` | `Calor0405` at (3,15) | same shape, pure row. **Not in §13.2's list of six** |
-> | `run2.py` **Y5a** | `Calor0410` at (2,3) | `Calor0405` at (2,36) | §3.5 / P6 — `-> void §E{cw}` |
-> | `run3.py` **Z9** | `Calor0410` at (2,3) | `Calor0405` at (2,36) | §3.5 / P6, named by P6 |
+> | `run2.py` **Y5a** | `Calor0410` at (2,3) | `Calor0405` at (2,36), *"The return type 'VOID'…"* | §3.5 / P6 — `-> void §E{cw}` |
+> | `run3.py` **Z9** | `Calor0410` at (2,3) | `Calor0405` at (2,36), *"The return type 'VOID'…"* | §3.5 / P6, named by P6 |
 > | `run3.py` **Z9b** | `Calor0410` at (2,3) | `Calor0405` at (3,15), *"'x' has type 'INT'…"* | §3.5 / P6, named by P6 |
 > | `run3.py` **Z9c** | `exit 0` | `Calor0405` at (3,13) | §3.5 / P6, **named by P6's own row** in §13.2 and absent from the "six" only because its baseline is clean, not Calor0410 |
 >
@@ -2078,9 +2078,16 @@ and it needs its own justification in the E2 PR body.**
 > ordering rather than by a suppression rule.
 >
 > **Two message details worth recording, because they are what a reader will notice first.**
-> (1) The diagnostic quotes the BINDER's type vocabulary — `'STRING'`, `'INT'` — not the surface
-> spelling `str`/`i32`, because `ParameterNode.TypeName` is already `ExpandType`'d by the parser.
-> §3.5's illustrative message writes `i32`; the implementation writes what it actually knows.
+> (1) The diagnostic quotes the BINDER's type vocabulary — `'STRING'`, `'INT'`, `'VOID'` — not the
+> surface spelling `str`/`i32`/`void`. §3.5's illustrative message writes `i32`; the implementation
+> writes what it actually knows. **The two return spellings do not arrive in that vocabulary
+> equal**: `ExpandType` rewrites `§O{void}` to `VOID`, but the arrow form `-> void §E{cw}` reaches
+> `OutputNode.TypeName` as the raw `void`, so the first revision of this slice reported the same
+> mistake as `'VOID'` in one spelling and `'void'` in the other (review round 1, MINOR 5). The
+> binder now runs `TypeIdentity.Canonicalize` **in the message only**, which gives one vocabulary
+> across all nine cases. Expanding the arrow form in the parser would move
+> `FunctionNode.Output.TypeName` for every arrow-form function in the corpus — a blast radius with
+> nothing to do with rows. Y5a and Z9 were regenerated for this and nothing else.
 > (2) It says *"Remove the `§E{…}`"* rather than quoting the author's codes. Quoting them needs
 > the compact projection, which is an `Effects` table `Binding/` may not reach (§4's deviation
 > note). Naming the row's position is enough to find it.

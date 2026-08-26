@@ -130,7 +130,7 @@ CASE Z9-arrow-void-sameline-E  args: (none)  exit: 1
   §F{f001:Log:pub} (i32:x) -> void §E{cw}
     §P x
 ------------------------------------------------------------------------------
-Z9-arrow-void-sameline-E.calr(2,36): error Calor0405: The return type 'void' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+Z9-arrow-void-sameline-E.calr(2,36): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Z9b-I-i32-sameline-E  args: (none)  exit: 1
