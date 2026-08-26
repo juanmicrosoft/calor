@@ -1329,10 +1329,39 @@ public sealed class EffectEnforcementPass
         ///     fails loud under the strict policy (Calor0411 + unknown effects)
         ///     instead of the pre-W2 behavior of silently assuming purity.
         /// </summary>
+        /// <summary>
+        /// The AST search's answer for "there is a value with this name, and I
+        /// cannot type it" (<see cref="FindLocalDeclarationType"/>, and
+        /// <c>§USING</c> without a declared type). It is a real answer on the
+        /// property-read paths — <c>InferFromReference</c> and
+        /// <c>InferSetterEffects</c> use it to report an unknown operation
+        /// rather than silently charging nothing — which is why it is named
+        /// here instead of deleted.
+        /// </summary>
+        private const string UnknownLocalTypeSentinel = "?";
+
         private EffectSet InferFromBareNameTarget(string target, TextSpan span)
         {
             var valueType = ResolveLocalValueType(target);
-            if (valueType != null)
+
+            // v0.15 E1 slice 2c — the sentinel is NOT a type, and this is the
+            // one site where treating it as one is a decision rather than a
+            // formatting detail. `§C{u}` on a `§B{u}` the pass cannot type used
+            // to take the delegate-invocation arm and report Calor0418
+            // "declared type '?'", charging EffectSet.Empty — a guess that
+            // launders the call. It now falls through to the unknown-call chain
+            // and fails closed as Calor0411, which is what the SAME fixture with
+            // a receiver use already did through AskBoundTree's veto.
+            //
+            // Slice 2b recorded this as debt and refused to do it as a
+            // drive-by, because it SUBSUMES that veto: with the guard here, the
+            // veto's fixture reaches Calor0411 by this path too, so
+            // E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel no
+            // longer fails when the veto branch is deleted. The veto is kept
+            // anyway — it is the fail-closed rule stated at the layer that owns
+            // it, and E2 needs it there when chains become typed — but design
+            // doc §8.1 now records plainly that it has no discriminating pin.
+            if (valueType != null && valueType != UnknownLocalTypeSentinel)
             {
                 var severity = _context.Policy == UnknownCallPolicy.Permissive
                     ? DiagnosticSeverity.Warning
@@ -2005,7 +2034,20 @@ public sealed class EffectEnforcementPass
                         {
                             return callResultType;
                         }
-                        return "?"; // known value, unknown type
+                        // Known value, unknown type. v0.15 E1 slice 2c: this
+                        // stays a sentinel rather than becoming null, because
+                        // null here means "no such value" and the two are
+                        // consumed differently — InferFromReference /
+                        // InferSetterEffects report an unknown operation for the
+                        // first and charge nothing for the second. Collapsing
+                        // them was implemented and rejected: it turns an
+                        // untyped receiver's property read from a reported
+                        // unknown operation into EffectSet.Empty, which is a
+                        // fail-OPEN change and the opposite of what this slice
+                        // is for. The one site where the sentinel was a guess —
+                        // a bare call target — guards it explicitly
+                        // (InferFromBareNameTarget, UnknownLocalTypeSentinel).
+                        return UnknownLocalTypeSentinel;
                     case IfStatementNode ifStmt:
                         var inIf = FindLocalDeclarationType(name, ifStmt.ThenBody)
                             ?? ifStmt.ElseIfClauses.Select(c => FindLocalDeclarationType(name, c.Body)).FirstOrDefault(t => t != null)
@@ -2282,8 +2324,25 @@ public sealed class EffectEnforcementPass
         /// <see cref="ResolveReceiverChain"/>'s member walk does could charge
         /// any effect. Used to decide whether the bound-type shortcut above is
         /// safe: if no getter on the way contributes effects, skipping the walk
-        /// loses nothing. FIXME(E2) — remove once chain types carry rows and the
-        /// walk's effects can be read off the type instead of re-derived.
+        /// loses nothing.
+        ///
+        /// <para><b>FIXME(E2) — this method is UNTESTED and needs a pin the
+        /// moment E2 types chains.</b> Nothing observes it today, and nothing
+        /// can: its only caller is the bound-type shortcut in
+        /// <see cref="ResolveReceiverChain"/>, and that shortcut is unreachable
+        /// because slice 2a types EVERY member chain
+        /// <c>UnresolvedBoundType</c>, so <see cref="AskBoundTree"/> never
+        /// answers <c>Typed</c> for a dotted path. Deleting this method's body
+        /// and returning a constant would therefore fail no test — which is
+        /// exactly the condition that makes it dangerous, because the day E2
+        /// gives chain expressions real types the shortcut goes live and a
+        /// wrong answer here silently UNDER-CHARGES: it would skip a member
+        /// walk that runs property getters with effects. E2 must land a pin
+        /// that (a) drives a chain the binder types, (b) puts an effectful
+        /// getter partway along it, and (c) asserts the effect is charged —
+        /// before, not after, chain typing merges. Remove the method entirely
+        /// once chain types carry rows and the walk's effects can be read off
+        /// the type instead of re-derived.</para>
         /// </summary>
         private bool ChainWalkCouldChargeEffects(string[] parts)
         {

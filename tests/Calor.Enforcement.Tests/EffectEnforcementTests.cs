@@ -1100,40 +1100,64 @@ public class EffectEnforcementTests
     }
 
     /// <summary>
-    /// The control for
+    /// v0.15 E1 slice 2c — RE-SPECIFIED. This was slice 2b's control for
     /// <see cref="E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel"/>,
-    /// making the discriminator explicit: the SAME binding and the SAME bare
-    /// call, with the receiver use removed. Nothing then puts <c>u</c> into the
-    /// side channel, the veto cannot fire, and the AST sentinel reaches
-    /// <c>InferFromBareNameTarget</c> — Calor0418, on this branch and on
-    /// <c>main</c> alike. One receiver use is the only difference between the
-    /// two fixtures, and it is the difference between failing closed and
-    /// guessing.
+    /// and it pinned the OLD behaviour: the same binding and the same bare call
+    /// with the receiver use removed produced <c>Calor0418 "declared type
+    /// '?'"</c>, because nothing put <c>u</c> into the side channel, the veto
+    /// could not fire, and the AST's <c>"?"</c> sentinel reached
+    /// <c>InferFromBareNameTarget</c>, which tested <c>!= null</c>.
     ///
-    /// <para>This also records why the <c>"?"</c> sentinel is NOT guarded at
-    /// this call site the way <c>ResolveVariableType</c> guards it (round 2,
-    /// item 4). Adding <c>valueType != "?"</c> kept every pre-existing suite green —
-    /// measured — but it turns this control into Calor0411 as well, and with it
-    /// the veto's only observable path disappears: the pin above then passes
-    /// with the veto deleted. The sentinel guard and the veto answer the same
-    /// question at two layers. Unifying them is a deliberate slice-2c change,
-    /// not a drive-by that silently un-pins the test above.</para>
+    /// <para>Slice 2c resolves that debt. The sentinel is now guarded at the
+    /// bare-target site
+    /// (<c>EffectEnforcementPass.UnknownLocalTypeSentinel</c>), so the answer no
+    /// longer depends on whether the name happened to be used as a receiver
+    /// somewhere else in the function: <b>a bare call on an unknown-typed
+    /// <c>§B</c> is Calor0411 either way</b>. That symmetry is what this test
+    /// now pins, and it is the point — Calor0418 charged
+    /// <c>EffectSet.Empty</c> on a value the pass could not type at all, which
+    /// is laundering; Calor0411 fails closed.</para>
+    ///
+    /// <para><b>What this costs, stated rather than hidden.</b> The guard
+    /// SUBSUMES the veto for this shape, so
+    /// <c>E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel</c> now
+    /// passes even with the veto branch deleted — it is retained as a
+    /// behavioural pin, not a discriminating one. The veto itself is kept
+    /// because it states the fail-closed rule at the layer that owns it
+    /// (<c>AskBoundTree</c>), and E2 needs it there once chains carry types.
+    /// Design doc §8.1 records the same thing.</para>
     /// </summary>
     [Fact]
-    public void E1Slice2b_SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel()
+    public void E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse()
     {
-        var source = @"
+        var withoutReceiverUse = @"
 §M{m001:VetoControl}
   §F{f001:Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u} §/C
 ";
-        var result = TestHarness.Compile(source);
+        var withReceiverUse = @"
+§M{m001:VetoReach}
+  §F{f001:Go:pub}
+    §E{}
+    §B{u} §C{Mystery.Make} §/C
+    §C{u.Run} §/C
+    §C{u} §/C
+";
 
-        var delegateInvocation = Assert.Single(
-            result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.DelegateInvocation));
-        Assert.Contains("declared type '?'", delegateInvocation.Message);
+        foreach (var source in new[] { withoutReceiverUse, withReceiverUse })
+        {
+            var result = TestHarness.Compile(source);
+
+            Assert.DoesNotContain(
+                result.Diagnostics.ToList(),
+                d => d.Code == DiagnosticCode.DelegateInvocation);
+            Assert.Contains(
+                result.Diagnostics.ToList(),
+                d => d.Code == DiagnosticCode.UnknownExternalCall
+                     && d.Message.Contains("'u'"));
+        }
     }
 
     /// <summary>
