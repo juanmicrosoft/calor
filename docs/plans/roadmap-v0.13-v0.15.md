@@ -539,6 +539,22 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   unknown-typed `§B` is now Calor0411 whether or not the name was also a receiver, with a
   measured corpus delta of **zero** — at the cost, stated in design doc §8.1, that
   `E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel` is no longer discriminating.
+
+  **"COMPLETE" means the three exit pins are met. The MUST body above has two named
+  residuals, and they are carried to E2 rather than claimed** (review round 1, MINOR 10).
+  *(i) "IL summaries key on symbol identity" is not literally true.* `ILEffectAnalyzer`
+  takes an `EffectResolverKey`, but every key on that path is built by
+  `EffectResolverKey.FromStrings` from IL metadata TEXT — a `MethodKey`'s type name, member
+  name and parameter signature. Symbol identity for IL callees needs the IL reader to hand
+  back resolved type references instead of names, which is E2 work; today the ledger counts
+  those keys honestly as string fallbacks. *(ii) The key's parameter component is inferred
+  ARGUMENT types, not the callee's signature.* The declaring type is symbol-derived; the
+  parameter list is still `InferExpressionType`'s answer, because `BclCallResolution` is
+  private to `Binder` and the effect pass never holds a `BoundCallExpression`. Overload
+  discrimination is therefore exactly as good as before the slice. Design doc §8.4 carries
+  both, and the key ledger measures declaring-type provenance only — not parameter-type
+  provenance.
+
   The remainder of this bullet is the scope as written when E1 opened.
   `ExternalCallCollector` and the enforcement pass resolve receivers and callees from
   `BoundExpression.Type` / bound symbols; `_variableTypeMap` is deleted; `EffectResolver`,

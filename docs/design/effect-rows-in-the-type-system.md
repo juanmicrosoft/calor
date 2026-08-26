@@ -1060,6 +1060,13 @@ The six-step order and `"*"` wildcard semantics are unchanged, statement for sta
   (`ExperimentTranscripts_MatchARerun`) are untouched — including `facts.py`'s
   `Effects/*.cs` file-count row, which is why `EffectResolverKey` lives inside
   `EffectResolver.cs` rather than in a file of its own.
+- **Two residuals, named rather than absorbed into "complete"** (review round 1). First,
+  `ILEffectAnalyzer.TryResolve` takes a key, but every key on the IL path is built by
+  `FromStrings` from metadata TEXT (a `MethodKey`'s type name, member name, parameter
+  signature) — so "IL summaries key on symbol identity" is not literally true, and the ledger
+  counts those keys as string fallbacks, which is the honest answer. Second, the key's
+  parameter component is inferred ARGUMENT types (§8.4), not the callee's resolved signature.
+  The declaring type is symbol-derived; the parameter list is not. Both are E2's.
 - **A new ledger, because the structural pin alone can be satisfied cosmetically.** An API can
   be keyed on symbol identity while every caller still funnels text through one factory. So
   `bench/phase0-agent-native/effect-resolver-key-ledger.json` records, per subject, how many
