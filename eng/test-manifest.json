@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7683,
+      "expectedTotal": 7686,
       "expectedSkipped": 3
     },
     {
@@ -133,6 +133,10 @@
     {
       "reason": "corpus submodules not initialized",
       "count": 4
+    },
+    {
+      "reason": "no committed .calr found under the repository root — partial checkout",
+      "count": 1
     }
   ],
   "releaseGates": [

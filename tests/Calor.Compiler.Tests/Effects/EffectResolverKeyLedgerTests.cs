@@ -145,12 +145,16 @@ public class EffectResolverKeyLedgerTests
     /// The ledger must not be able to pass by measuring nothing: a denominator
     /// of zero would make every equality above trivially true.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void Ledger_MeasuresANonEmptyCorpus_AndRecordsItsScope()
     {
         var ledgerPath = Path.Combine(
             RepoRoot, "bench", "phase0-agent-native", "effect-resolver-key-ledger.json");
-        Skip.IfNot(File.Exists(ledgerPath), "key ledger not yet generated");
+
+        // Deliberately NOT a skip: the ledger is committed, so a missing file is
+        // a deleted instrument, not an environment gap. A skip here would let
+        // the freeze disappear quietly.
+        Assert.True(File.Exists(ledgerPath), $"key ledger is missing at {ledgerPath}");
 
         using var stream = File.OpenRead(ledgerPath);
         var committed = JsonSerializer.Deserialize<JsonElement>(stream);
