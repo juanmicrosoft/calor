@@ -215,6 +215,37 @@ public sealed class FunctionBoundType : BoundType
     public BoundType ReturnType { get; }
     public override string DisplayString { get; }
 
+    /// <summary>
+    /// v0.15 E2 slice b, design-doc §8.2 — the callee's OWN effect row: the
+    /// effects a value of this function type may perform when invoked.
+    ///
+    /// <para>Defaults to <see cref="EffectRow.Unknown"/>, <b>never</b> to pure.
+    /// Defaulting to <c>Concrete(∅)</c> would re-open exactly the laundering
+    /// hole rows exist to close: a row-less function-typed parameter would claim
+    /// to be provably pure when in fact nothing is known about it.</para>
+    ///
+    /// <para>Part of <see cref="Equals"/> and <see cref="GetHashCode"/> — two
+    /// function types differing only in row are DIFFERENT types, which is the
+    /// central claim of the effect-row work. Deliberately absent from
+    /// <see cref="DisplayString"/> (§8.3): consumers compare display strings
+    /// byte-for-byte, and the verifier cache and the LSP call-graph key are
+    /// built from them.</para>
+    /// </summary>
+    public EffectRow Row { get; }
+
+    /// <summary>
+    /// v0.15 E2 slice b, design-doc §8.2/§4.6 — the row of each parameter, in
+    /// declaration order, for parameters that are themselves function-typed.
+    /// Always the same length as <see cref="ParameterTypes"/>; entries default
+    /// to <see cref="EffectRow.Unknown"/>.
+    ///
+    /// <para>Required by §4.6's CONTRAvariance rule, which E3 implements: a
+    /// destination's parameter row must fit into the source's, because a
+    /// destination that promises to supply a printing callback is not satisfied
+    /// by a source that accepts only pure ones.</para>
+    /// </summary>
+    public ImmutableArray<EffectRow> ParameterRows { get; }
+
     /// <param name="displayOverride">v0.15 E1 slice 2b. Lambdas bind to this kind
     /// now, and their historical <c>LAMBDA(str)-&gt;i32</c> spelling is
     /// load-bearing: <c>Binder.BindStatement</c> infers an untyped <c>§B</c>'s
@@ -229,23 +260,51 @@ public sealed class FunctionBoundType : BoundType
     /// shape only — two function types with the same parameters and return type
     /// are equal whatever they display as. E2 decides whether to unify the
     /// spelling when rows land.</param>
+    /// <param name="row">The function type's own effect row (§8.2). Omitted means
+    /// <see cref="EffectRow.Unknown"/> — "nothing is known" — never pure.</param>
+    /// <param name="parameterRows">Per-parameter rows (§4.6). Omitted, short or
+    /// <c>default</c> is padded with <see cref="EffectRow.Unknown"/>; a longer
+    /// list is truncated, so <see cref="ParameterRows"/> and
+    /// <see cref="ParameterTypes"/> always agree in length.</param>
     public FunctionBoundType(
         ImmutableArray<BoundType> parameterTypes,
         BoundType returnType,
-        string? displayOverride = null)
+        string? displayOverride = null,
+        EffectRow? row = null,
+        ImmutableArray<EffectRow> parameterRows = default)
     {
         if (returnType is null) throw new ArgumentNullException(nameof(returnType));
         if (parameterTypes.IsDefault) parameterTypes = ImmutableArray<BoundType>.Empty;
         ParameterTypes = parameterTypes;
         ReturnType = returnType;
+        Row = row ?? EffectRow.Unknown;
+        ParameterRows = AlignRows(parameterRows, parameterTypes.Length);
         var parms = string.Join(", ", parameterTypes.Select(p => p.DisplayString));
+        // §8.3 — the row is NOT part of the display string, by decision.
         DisplayString = displayOverride ?? $"({parms}) -> {returnType.DisplayString}";
+    }
+
+    private static ImmutableArray<EffectRow> AlignRows(ImmutableArray<EffectRow> rows, int arity)
+    {
+        if (arity == 0) return ImmutableArray<EffectRow>.Empty;
+        var builder = ImmutableArray.CreateBuilder<EffectRow>(arity);
+        for (var index = 0; index < arity; index++)
+        {
+            builder.Add(!rows.IsDefault && index < rows.Length && rows[index] is { } row
+                ? row
+                : EffectRow.Unknown);
+        }
+        return builder.MoveToImmutable();
     }
 
     public override bool Equals(BoundType? other) =>
         other is FunctionBoundType f
         && f.ParameterTypes.SequenceEqual(ParameterTypes)
-        && f.ReturnType.Equals(ReturnType);
+        && f.ReturnType.Equals(ReturnType)
+        // §8.2 — rows are part of type IDENTITY. Note this is equality, not
+        // assignability: EffectRow.Fits is the separate, three-valued relation.
+        && f.Row.Equals(Row)
+        && f.ParameterRows.SequenceEqual(ParameterRows);
 
     public override int GetHashCode()
     {
@@ -253,6 +312,11 @@ public sealed class FunctionBoundType : BoundType
         foreach (var p in ParameterTypes)
         {
             h = HashCode.Combine(h, p);
+        }
+        h = HashCode.Combine(h, Row);
+        foreach (var r in ParameterRows)
+        {
+            h = HashCode.Combine(h, r);
         }
         return h;
     }
@@ -301,4 +365,379 @@ public sealed class UnresolvedBoundType : BoundType
         other is UnresolvedBoundType u && u.Reason == Reason;
 
     public override int GetHashCode() => Reason.GetHashCode(StringComparison.Ordinal);
+}
+
+/// <summary>
+/// The three-valued verdict of <see cref="EffectRow.Fits"/> — design-doc
+/// §4.3. Deliberately NOT a bool: "we cannot tell" is a distinct answer from
+/// "no", and collapsing them is what let effects launder through function-typed
+/// values in 0.14.
+/// </summary>
+public enum EffectFit
+{
+    /// <summary>The source row is admissible at the destination.</summary>
+    Fits,
+
+    /// <summary>The source row is provably wider than the destination's. Calor0424 in E3; never waived.</summary>
+    DoesNotFit,
+
+    /// <summary>At least one side is <see cref="EffectRow.Unknown"/>. Calor0425 in E3; waived by <c>--permissive-effects</c>.</summary>
+    CannotTell,
+}
+
+/// <summary>The three shapes a row can take — design-doc §4.</summary>
+public enum EffectRowKind
+{
+    /// <summary>A known, complete effect set.</summary>
+    Concrete,
+
+    /// <summary>A known set that rests on one or more assumptions, each named by a reason.</summary>
+    Assumed,
+
+    /// <summary>No information. Top of the lattice; fits nothing and is fitted by nothing.</summary>
+    Unknown,
+}
+
+/// <summary>
+/// v0.15 E2 slice b — the effect-row lattice of design-doc §4:
+/// <c>Row ::= Concrete(S) | Assumed(S, R) | Unknown</c>.
+///
+/// <para><b>Why this type lives in <c>Binding/BoundTypes/</c> and not in
+/// <c>Effects/</c>.</b> <see cref="FunctionBoundType"/> carries a row (§8.2),
+/// and <c>ArchitectureTests.BindingLayer_HasNoReferenceToEffectsNamespace</c>
+/// forbids <c>Binding/</c> from naming the <c>Effects</c> namespace at all —
+/// the binder is upstream of effect enforcement. A row whose carrier were
+/// <c>Effects.EffectSet</c> would force exactly that reference. So the carrier
+/// is a canonically ordered set of <b>internal effect codes</b> spelled
+/// <c>"category:value"</c> (<c>"io:console_write"</c>, <c>"io:database_read"</c>)
+/// — the vocabulary <c>BoundFunction.DeclaredEffects</c> and
+/// <c>BoundLambdaExpression.DeclaredEffects</c> already use, so <c>Binding/</c>
+/// gains no new dependency at all. The compact surface spelling (<c>"cw"</c>,
+/// <c>"db:r"</c>) is a rendering, not the identity: projecting it needs
+/// <c>Effects.EffectCodes.Registry</c>, so it lives on the <c>Effects</c> side
+/// as <c>EffectRowDisplay.ToCompactDisplayString</c>. This is the one place
+/// slice b departs from §8.3's literal wording, and it departs in the direction
+/// the architecture pin requires.</para>
+///
+/// <para>The family/narrow relation (<see cref="FamilySubtypes"/>) moves here
+/// with the carrier, exactly as <c>MapShortTypeNameToFullName</c> moved to
+/// <c>Binding/TypeIdentity</c> in E1 slice 2b. <c>Effects.EffectSubtyping</c>
+/// now DERIVES its table from <see cref="FamilySubtypes"/>, so there is one
+/// source of truth rather than two that can drift.</para>
+///
+/// <para><b>Reasons are an ordered SET, not a list.</b> Draft v1 concatenated
+/// them, which made <see cref="Join"/> non-commutative and the semilattice
+/// claim false. With an ordinal-sorted set, <see cref="Join"/> is associative,
+/// commutative and idempotent, with identity <see cref="Pure"/> and top
+/// <see cref="Unknown"/> (pinned by P9).</para>
+///
+/// <para><b>Not in <c>DisplayString</c>.</b> §8.3 — rows never appear in a
+/// <see cref="BoundType.DisplayString"/>; <see cref="ToDisplayString"/> is the
+/// separate spelling diagnostics and hover use.</para>
+/// </summary>
+public sealed class EffectRow : IEquatable<EffectRow>
+{
+    private static readonly ImmutableSortedSet<string> NoStrings =
+        ImmutableSortedSet<string>.Empty.WithComparer(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Top of the lattice: no information. Absorbing under <see cref="Join"/>,
+    /// and <see cref="Fits"/> answers <see cref="EffectFit.CannotTell"/> for it
+    /// on EITHER side — <c>EffectSet.IsSubsetOf</c>'s "everything is a subset of
+    /// unknown" is deliberately NOT carried into the row relation (§4.3).
+    /// </summary>
+    public static readonly EffectRow Unknown =
+        new(EffectRowKind.Unknown, NoStrings, NoStrings);
+
+    /// <summary>Identity under <see cref="Join"/>: <c>Concrete(∅)</c>, a provably pure row.</summary>
+    public static readonly EffectRow Pure =
+        new(EffectRowKind.Concrete, NoStrings, NoStrings);
+
+    public EffectRowKind Kind { get; }
+
+    /// <summary>
+    /// The row's effect set, as INTERNAL <c>category:value</c> codes
+    /// (<c>"io:console_write"</c>), ordinal-sorted. Not the compact surface
+    /// spelling — that is a registry projection <c>Binding/</c> cannot reach,
+    /// and it lives on <c>Effects.EffectRowDisplay.ToCompactDisplayString</c>
+    /// (see this type's summary). An earlier revision of this comment said
+    /// "compact surface codes", left over from before the carrier changed
+    /// (review round 1, MINOR 7).
+    ///
+    /// <para>Empty for <see cref="Unknown"/> — read <see cref="Kind"/>, not
+    /// <c>Codes.Count</c>, to tell "pure" from "no information".</para>
+    /// </summary>
+    public ImmutableSortedSet<string> Codes { get; }
+
+    /// <summary>
+    /// Why this row is only assumed, one sentence per reason, ordinal-sorted so
+    /// <see cref="Join"/> is commutative and diagnostics are traversal-order
+    /// independent. Empty unless <see cref="Kind"/> is
+    /// <see cref="EffectRowKind.Assumed"/>.
+    /// </summary>
+    public ImmutableSortedSet<string> Reasons { get; }
+
+    private EffectRow(
+        EffectRowKind kind,
+        ImmutableSortedSet<string> codes,
+        ImmutableSortedSet<string> reasons)
+    {
+        Kind = kind;
+        Codes = codes;
+        Reasons = reasons;
+    }
+
+    public bool IsUnknown => Kind == EffectRowKind.Unknown;
+    public bool IsAssumed => Kind == EffectRowKind.Assumed;
+    public bool IsConcrete => Kind == EffectRowKind.Concrete;
+
+    /// <summary>A row that is known exactly.</summary>
+    public static EffectRow Concrete(IEnumerable<string>? codes)
+    {
+        var set = Normalize(codes);
+        return set.IsEmpty ? Pure : new EffectRow(EffectRowKind.Concrete, set, NoStrings);
+    }
+
+    /// <summary>
+    /// A row that rests on assumptions. An empty reason set is not an assumption,
+    /// so it degrades to <see cref="Concrete"/> — otherwise <see cref="Join"/>'s
+    /// identity law would have two distinct units.
+    /// </summary>
+    public static EffectRow Assumed(IEnumerable<string>? codes, IEnumerable<string>? reasons)
+    {
+        var reasonSet = Normalize(reasons);
+        if (reasonSet.IsEmpty) return Concrete(codes);
+        return new EffectRow(EffectRowKind.Assumed, Normalize(codes), reasonSet);
+    }
+
+    /// <summary>
+    /// The join <c>⊔</c> of design-doc §4.2 — the INFERENCE operator. Top is
+    /// <see cref="Unknown"/> (absorbing on either side); identity is
+    /// <see cref="Pure"/>. Associative, commutative, idempotent (P9).
+    /// </summary>
+    public static EffectRow Join(EffectRow? left, EffectRow? right)
+    {
+        if (left is null) return right ?? Unknown;
+        if (right is null) return left;
+        if (left.IsUnknown || right.IsUnknown) return Unknown;
+
+        var codes = left.Codes.Union(right.Codes);
+        var reasons = left.Reasons.Union(right.Reasons);
+        return reasons.IsEmpty
+            ? Concrete(codes)
+            : new EffectRow(EffectRowKind.Assumed, codes, reasons);
+    }
+
+    /// <summary>
+    /// The three-valued CHECKING relation of design-doc §4.3, total over all
+    /// nine source × destination cells. Deliberately a different relation from
+    /// <see cref="Equals(EffectRow)"/>: this is assignability, that is identity.
+    ///
+    /// <para>Unknown on EITHER side is <see cref="EffectFit.CannotTell"/>. In
+    /// particular <c>fits(Concrete(∅), Unknown)</c> is NOT
+    /// <see cref="EffectFit.Fits"/>: <c>EffectSet.IsSubsetOf</c>'s
+    /// <c>if (other.IsUnknown) return true</c> is sound for a computed set
+    /// against a DECLARED set (which can never be unknown, because
+    /// <c>§E{unknown}</c> is unwritable) and unsound for rows, where a
+    /// destination is Unknown by omission. P8 pins the whole table and names
+    /// re-introducing that line as its discriminating revert.</para>
+    ///
+    /// <para><see cref="EffectRowKind.Assumed"/> fits exactly like its
+    /// underlying set; the reasons it carries are what E3 reports as Calor0425,
+    /// not a change of verdict. Reading them off a <see cref="EffectFit.Fits"/>
+    /// verdict is <see cref="CarriedReasons"/>.</para>
+    /// </summary>
+    public static EffectFit Fits(EffectRow? source, EffectRow? destination)
+    {
+        var src = source ?? Unknown;
+        var dst = destination ?? Unknown;
+
+        if (src.IsUnknown || dst.IsUnknown)
+            return EffectFit.CannotTell;
+
+        return IsSubsetWithSubtyping(src.Codes, dst.Codes)
+            ? EffectFit.Fits
+            : EffectFit.DoesNotFit;
+    }
+
+    /// <summary>
+    /// The reasons a hop must carry, from whichever side the assumption came —
+    /// §4.3's "Assumed … always propagates 0425". Empty when neither side is
+    /// assumed.
+    /// </summary>
+    public static ImmutableSortedSet<string> CarriedReasons(EffectRow? source, EffectRow? destination)
+        => (source?.Reasons ?? NoStrings).Union(destination?.Reasons ?? NoStrings);
+
+    /// <summary>
+    /// Design-doc §4.4 — the row a value HAS once it has arrived at a
+    /// destination it fits. An <see cref="EffectRowKind.Assumed"/> source
+    /// produces an <see cref="EffectRowKind.Assumed"/> destination, so the
+    /// assumption cannot be laundered away by one more hop. Pinned by P10(a).
+    ///
+    /// <para><b>An Unknown destination returns Unknown and DISCARDS the source's
+    /// reasons.</b> That is sound only because such a hop is
+    /// <see cref="EffectFit.CannotTell"/>, never
+    /// <see cref="EffectFit.Fits"/>: E3 reports Calor0425 at that hop from the
+    /// verdict itself, so nothing is lost. <b>E3 must not call this on a
+    /// CannotTell hop expecting the reasons to survive</b> — read them from
+    /// <see cref="CarriedReasons"/>, which is total and keeps them.</para>
+    /// </summary>
+    public static EffectRow AtDestination(EffectRow? source, EffectRow? destination)
+    {
+        var dst = destination ?? Unknown;
+        if (dst.IsUnknown) return Unknown;
+
+        var reasons = CarriedReasons(source, destination);
+        return reasons.IsEmpty ? Concrete(dst.Codes) : Assumed(dst.Codes, reasons);
+    }
+
+    /// <summary>
+    /// Design-doc §5 — the DECLARATION boundary, which is deliberately NOT one
+    /// of §6's six binding sites. When an author writes <c>§E{…}</c> on a
+    /// function or a lambda, the type that leaves the declaration is
+    /// <c>Concrete(declared)</c> even if the body's inferred row was
+    /// <see cref="EffectRowKind.Assumed"/>: Calor0419 already surfaces the
+    /// assumption AT the declaration, so the provenance is reported there rather
+    /// than carried past it. Pinned by P10(c).
+    /// </summary>
+    public static EffectRow AtDeclarationBoundary(EffectRow? declared)
+    {
+        var row = declared ?? Unknown;
+        return row.IsUnknown ? Unknown : Concrete(row.Codes);
+    }
+
+    /// <summary>
+    /// The family/narrow table of design-doc §4.1, over internal
+    /// <c>"category:value"</c> effect codes, and the single source of truth for
+    /// effect subtyping — <c>Effects.EffectSubtyping</c> derives its
+    /// <c>(kind, value)</c> table from this one by splitting on the first colon.
+    ///
+    /// <para>0.15 WIDENS it: a bare family code (<c>db</c>, <c>net</c>,
+    /// <c>env</c>) now encompasses its narrow siblings, which 0.14 did not.
+    /// Under rows that gap would surface at every binding site instead of only
+    /// at a declaration. <c>filesystem</c> has no bare code, so <c>fs:rw</c>
+    /// stays the filesystem top; <c>proc</c> and <c>http</c> have no narrow
+    /// siblings. Widening only — nothing that compiled stops compiling.</para>
+    ///
+    /// <para>Order matters for <c>EffectSubtyping.GetBroadestEncompassing</c>,
+    /// which returns the FIRST broad code covering a narrow one. The
+    /// <c>:rw</c> rows are listed first so a NARROW code keeps 0.14's answer:
+    /// <c>database_read</c> is covered by both <c>database_readwrite</c> and
+    /// <c>database</c>, and still resolves to the former.</para>
+    ///
+    /// <para><b>A <c>_readwrite</c> code's answer DOES change, and the ordering
+    /// cannot save it.</b> On 0.14 nothing covered <c>network_readwrite</c>, so
+    /// <c>GetBroadestEncompassing</c> returned it unchanged; here
+    /// <c>network</c> covers it and is returned instead. Same for
+    /// <c>database_readwrite</c> and <c>environment_readwrite</c>. That is the
+    /// correct answer under §4.1 — the bare family really is broader — and
+    /// suppressing it would mean dropping <c>db:rw</c> from <c>db</c>'s list,
+    /// which would make <c>§E{db}</c> stop admitting <c>db:rw</c> and break the
+    /// widening this table exists for. The method has <b>no production
+    /// caller</b> (<c>grep -rn GetBroadestEncompassing src/</c> → its own
+    /// definition only), so the change is observable in tests only;
+    /// <c>EffectSubtypingTests</c> pins the new answer explicitly rather than
+    /// leaving it to be discovered.</para>
+    /// </summary>
+    public static readonly IReadOnlyList<KeyValuePair<string, IReadOnlyList<string>>> FamilySubtypes =
+    [
+        new("io:filesystem_readwrite", new[] { "io:filesystem_read", "io:filesystem_write" }),
+        new("io:network_readwrite", new[] { "io:network_read", "io:network_write" }),
+        new("io:database_readwrite", new[] { "io:database_read", "io:database_write" }),
+        new("io:environment_readwrite", new[] { "io:environment_read", "io:environment_write" }),
+        // 0.15 §4.1 — the bare family codes (db, net, env), which 0.14 did not
+        // relate to their narrow siblings at all. filesystem has no bare code.
+        new("io:network", new[] { "io:network_read", "io:network_write", "io:network_readwrite" }),
+        new("io:database", new[] { "io:database_read", "io:database_write", "io:database_readwrite" }),
+        new("io:environment", new[] { "io:environment_read", "io:environment_write", "io:environment_readwrite" }),
+    ];
+
+    private static readonly Dictionary<string, HashSet<string>> FamilyIndex =
+        FamilySubtypes.ToDictionary(
+            entry => entry.Key,
+            entry => new HashSet<string>(entry.Value, StringComparer.Ordinal),
+            StringComparer.Ordinal);
+
+    /// <summary>
+    /// True when the compact code <paramref name="broad"/> admits
+    /// <paramref name="narrow"/> — an exact match, or the family/narrow relation
+    /// of <see cref="FamilySubtypes"/>. This is <c>⊆ₑ</c> (§4.3) at the element
+    /// level.
+    /// </summary>
+    public static bool Encompasses(string broad, string narrow)
+    {
+        if (string.Equals(broad, narrow, StringComparison.Ordinal)) return true;
+        return FamilyIndex.TryGetValue(broad, out var narrower) && narrower.Contains(narrow);
+    }
+
+    private static bool IsSubsetWithSubtyping(
+        ImmutableSortedSet<string> source,
+        ImmutableSortedSet<string> destination)
+    {
+        foreach (var code in source)
+        {
+            var covered = false;
+            foreach (var declared in destination)
+            {
+                if (Encompasses(declared, code))
+                {
+                    covered = true;
+                    break;
+                }
+            }
+
+            if (!covered) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The row's shape in <c>[unknown]</c> / <c>[pure]</c> / <c>[assumed: …]</c>
+    /// form (§8.3), spelled in the INTERNAL <c>category:value</c> vocabulary this
+    /// type carries. User-facing text wants the compact surface codes, and
+    /// projecting those needs the effect-code registry, so
+    /// <c>Effects.EffectRowDisplay.ToCompactDisplayString</c> is the spelling
+    /// diagnostics use. Never appears in a
+    /// <see cref="BoundType.DisplayString"/>.
+    /// </summary>
+    public string ToDisplayString()
+    {
+        if (IsUnknown) return "[unknown]";
+        if (IsAssumed) return $"[assumed: {(Codes.IsEmpty ? "pure" : string.Join(", ", Codes))}]";
+        return Codes.IsEmpty ? "[pure]" : string.Join(", ", Codes);
+    }
+
+    private static ImmutableSortedSet<string> Normalize(IEnumerable<string>? values)
+    {
+        if (values is null) return NoStrings;
+        var builder = NoStrings.ToBuilder();
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                builder.Add(value);
+        }
+        return builder.ToImmutable();
+    }
+
+    public bool Equals(EffectRow? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Kind == other.Kind
+            && Codes.SetEquals(other.Codes)
+            && Reasons.SetEquals(other.Reasons);
+    }
+
+    public override bool Equals(object? obj) => obj is EffectRow other && Equals(other);
+
+    public override int GetHashCode()
+    {
+        var hash = (int)Kind;
+        foreach (var code in Codes) hash = HashCode.Combine(hash, code);
+        foreach (var reason in Reasons) hash = HashCode.Combine(hash, reason);
+        return hash;
+    }
+
+    public override string ToString() => ToDisplayString();
 }

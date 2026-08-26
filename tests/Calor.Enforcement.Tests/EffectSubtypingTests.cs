@@ -80,6 +80,108 @@ public class EffectSubtypingTests
         Assert.True(EffectSubtyping.Encompasses(declared, required));
     }
 
+    // -------------------------------------------------------------- P7 -----
+    // Design-doc §4.1, 0.15's WIDENING: a bare family code encompasses its
+    // narrow siblings. 0.14 did not relate them at all, which under rows would
+    // surface at every binding site instead of only at a declaration.
+    //
+    // Discriminating revert: remove the "io:database" entry from
+    // EffectRow.FamilySubtypes and FamilyCodeEncompassesNarrowCode goes red
+    // while the fs:rw regression below stays green.
+
+    [Theory]
+    // database
+    [InlineData("database", "database_read")]
+    [InlineData("database", "database_write")]
+    [InlineData("database", "database_readwrite")]
+    // network
+    [InlineData("network", "network_read")]
+    [InlineData("network", "network_write")]
+    [InlineData("network", "network_readwrite")]
+    // environment
+    [InlineData("environment", "environment_read")]
+    [InlineData("environment", "environment_write")]
+    [InlineData("environment", "environment_readwrite")]
+    public void FamilyCodeEncompassesNarrowCode(string family, string narrow)
+    {
+        Assert.True(EffectSubtyping.Encompasses(
+            (EffectKind.IO, family),
+            (EffectKind.IO, narrow)));
+    }
+
+    [Fact]
+    public void FamilyCodeWidening_IsOneWay()
+    {
+        // The narrow code does NOT encompass the family — a §E{db:r} declaration
+        // must not admit an operation that does arbitrary database work.
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "database_read"),
+            (EffectKind.IO, "database")));
+    }
+
+    [Fact]
+    public void FilesystemHasNoBareFamilyCode_SoReadWriteStaysItsTop()
+    {
+        // §4.1: `filesystem` is not in the registry, so fs:rw remains the
+        // filesystem top. This is the regression half of P7 — it must keep
+        // passing while the three families above start passing.
+        Assert.True(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "filesystem_readwrite"),
+            (EffectKind.IO, "filesystem_write")));
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "filesystem"),
+            (EffectKind.IO, "filesystem_write")));
+    }
+
+    [Fact]
+    public void LegacyInternalValues_AreOutsideTheFamilyTable_AndThatIsE3s()
+    {
+        // Review round 1, MINOR 8. The registry carries LEGACY internal values
+        // whose compact code duplicates a modern one — ("io","dbr") and
+        // ("io","dbw") both spell db:r / db:w — and EffectRow.FamilySubtypes
+        // does not list them, so the family widening does not reach them.
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "database"), (EffectKind.IO, "dbr")));
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "filesystem_readwrite"), (EffectKind.IO, "file_write")));
+
+        // It is not reachable by PARSING: EffectCodes groups by compact code and
+        // prefers the non-legacy entry, so §E{db:r} and EffectSet.From("db:r")
+        // both produce ("io","database_read"), which the table does cover.
+        Assert.True(EffectSet.From("db:r").IsSubsetOf(EffectSet.From("db")));
+        Assert.True(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "database"), (EffectKind.IO, "database_read")));
+
+        // Adding the aliases is a WIDENING beyond §4.1's nine pairs, so it is
+        // not slice b's: this PR's reviewed property is "EffectSubtyping is main
+        // plus exactly the nine §4.1 pairs", and a Calor0410 could disappear from
+        // the corpus on the back of it. This pin exists so the gap is observed
+        // rather than latent — E3 flips it deliberately, and updates this test.
+    }
+
+    [Fact]
+    public void ProcAndHttpHaveNoNarrowSiblings()
+    {
+        // §4.1 names them explicitly. Nothing to widen, and nothing that widens
+        // into them.
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "process"),
+            (EffectKind.IO, "environment_read")));
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "network"),
+            (EffectKind.IO, "http")));
+    }
+
+    [Fact]
+    public void FamilyWidening_ReachesEffectSetIsSubsetOf()
+    {
+        // The widening is not a private fact about Encompasses: it is what a
+        // §E{db} declaration ADMITS. This is the sentence §4.1 writes.
+        Assert.True(EffectSet.From("db:r").IsSubsetOf(EffectSet.From("db")));
+        Assert.True(EffectSet.From("net:w", "env:r").IsSubsetOf(EffectSet.From("net", "env")));
+        Assert.False(EffectSet.From("db").IsSubsetOf(EffectSet.From("db:r")));
+    }
+
     [Fact]
     public void ExactMatch_IsEncompassed()
     {
@@ -172,6 +274,40 @@ public class EffectSubtypingTests
         var broadest = EffectSubtyping.GetBroadestEncompassing(effect);
 
         Assert.Equal((EffectKind.IO, "filesystem_readwrite"), broadest);
+    }
+
+    [Theory]
+    // v0.15 §4.1, review round 1 MAJOR 1. On 0.14 nothing covered a *_readwrite
+    // code, so GetBroadestEncompassing returned it UNCHANGED. The bare family
+    // codes now cover them, so the answer moves — and that is correct: `db` really
+    // is broader than `db:rw`. Suppressing it would mean dropping db:rw from db's
+    // subtype list, which would make §E{db} stop admitting db:rw and undo the
+    // widening. The method has no production caller, so this is the only place
+    // the change is observable; it is pinned rather than left to be discovered.
+    [InlineData("database_readwrite", "database")]
+    [InlineData("network_readwrite", "network")]
+    [InlineData("environment_readwrite", "environment")]
+    public void GetBroadestEncompassing_OfAReadWriteCode_IsNowItsBareFamily(
+        string readWrite, string family)
+    {
+        Assert.Equal(
+            (EffectKind.IO, family),
+            EffectSubtyping.GetBroadestEncompassing((EffectKind.IO, readWrite)));
+    }
+
+    [Fact]
+    public void GetBroadestEncompassing_OfANarrowCode_IsUnchangedFrom014()
+    {
+        // The half the :rw-first ordering DOES protect: database_read is covered
+        // by both database_readwrite and database, and still answers with the
+        // former, exactly as on 0.14. Reorder FamilySubtypes so the bare families
+        // come first and this goes red while the theory above stays green.
+        Assert.Equal(
+            (EffectKind.IO, "database_readwrite"),
+            EffectSubtyping.GetBroadestEncompassing((EffectKind.IO, "database_read")));
+        Assert.Equal(
+            (EffectKind.IO, "filesystem_readwrite"),
+            EffectSubtyping.GetBroadestEncompassing((EffectKind.IO, "filesystem_read")));
     }
 
     [Fact]

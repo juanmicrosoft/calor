@@ -475,6 +475,23 @@ AFTER: identical code and message, computed by the shared `fits` relation (§6.3
 
 ## 4. Decision 2 — The row lattice
 
+> **LANDED — E2 slice b, PR #1102.** `EffectRow` implements this section in
+> `src/Calor.Compiler/Binding/BoundTypes/BoundType.cs`: `Concrete`/`Assumed`/`Unknown`, `Join`
+> (§4.2), the three-valued `Fits` (§4.3, all nine cells), `AtDestination` (§4.4),
+> `AtDeclarationBoundary` (§5) and `FamilySubtypes`/`Encompasses` (§4.1). Pins **P6–P10** are
+> green; the corpus delta over all 886 committed `.calr` is **zero files**.
+>
+> **One deviation, forced by the architecture pin.** §8.3 says the row's display string extends
+> `EffectSet.ToDisplayString()`'s compact surface codes. `EffectRow` lives in `Binding/`, which
+> `ArchitectureTests.BindingLayer_HasNoReferenceToEffectsNamespace` forbids from naming the
+> `Effects` namespace at all — and the compact spelling is a projection through
+> `EffectCodes.Registry`, which is an `Effects` table. So `S` is carried in the INTERNAL
+> `category:value` vocabulary `BoundFunction.DeclaredEffects` already uses, and the compact
+> rendering is `Effects.EffectRowDisplay.ToCompactDisplayString` — an extension method on the row,
+> living on the side of the layering that owns the registry. Same for the `EffectSet` ↔
+> `EffectRow` bridge. §8.3's user-facing spellings (`[unknown]`, `[pure]`, `cw, fs:w`,
+> `[assumed: cw]`) are unchanged and pinned.
+
 > **Decision.** `Row ::= Concrete(S) | Assumed(S, R) | Unknown`, with `S` a registry-closed effect
 > set and `R` a **canonically ordered set** of reasons. Inference uses a join `⊔` (⊤ = Unknown).
 > Checking uses a **separate three-valued relation** `fits` — `Fits | DoesNotFit | CannotTell` —
@@ -486,6 +503,26 @@ AFTER: identical code and message, computed by the shared `fits` relation (§6.3
 `S` ranges over `EffectCodes.Registry` (`EffectTypes.cs:65-109`), ordered by
 `EffectSubtyping.Encompasses` (`EffectSubtyping.cs:52-66`).
 
+**Sub-decision — EXECUTED, E2 slice b (PR #1102).** `database`, `network` and `environment` now
+encompass their narrow siblings. The table itself moved: `EffectRow.FamilySubtypes` (in
+`Binding/BoundTypes/`, over the internal `category:value` codes) is the single source of truth,
+and `EffectSubtyping.Subtypes` is DERIVED from it by splitting on the first colon — because
+`Binding/` may not reference `Effects/` and two hand-written tables would be two things to keep
+in step. The `:rw` rows are listed first so `GetBroadestEncompassing` keeps 0.14's answer for a
+NARROW code (`db:r` still resolves to `db:rw`, not to `db`). **Its answer for a `_readwrite` code
+does change and the ordering cannot prevent it:** on 0.14 nothing covered `db:rw`, so it returned
+`db:rw`; here `db` covers it and is returned. Suppressing that would mean dropping `db:rw` from
+`db`'s subtype list, which would make `§E{db}` stop admitting `db:rw` — the opposite of the
+widening. `GetBroadestEncompassing` has **no production caller**, so the change is test-visible
+only, and `EffectSubtypingTests` pins the new answer rather than leaving it to be found. An
+earlier revision of this paragraph and of `EffectRow.FamilySubtypes`'s doc comment claimed the
+method was byte-identical; that was **false for the three `_readwrite` codes** and is corrected
+here (review round 1, MAJOR 1). **Calor0410s that DISAPPEARED from the corpus: none** — the 886-file differential
+against `4766c8fc` shows zero files with a changed exit code or diagnostic-code set, which is
+gate 5's "listed by name" leg discharged with an empty list. Pin **P7**
+(`EffectSubtypingTests.cs`) covers all nine family/narrow pairs, the one-way direction, the
+`fs:rw` regression half, and the reach into `EffectSet.IsSubsetOf`. The original wording follows.
+
 **Sub-decision, executed in E2's PR:** add `database`, `network` and `environment` to
 `EffectSubtyping.Subtypes` (`:14-43`) so a bare family code encompasses its narrow siblings.
 Today it does not (§2), which under rows becomes visible at every binding site instead of only at
@@ -494,6 +531,22 @@ a declaration. `filesystem` has no bare code so `fs:rw` stays the filesystem top
 and any Calor0410 that *disappears* is listed by name in the E2 PR body and counted by gate 5.
 `Calor0401 UnusedEffectDeclaration` is declared and never reported (`Diagnostic.cs:376`), so the
 widening has no 0401 blast radius.
+
+**The widening does NOT reach the registry's LEGACY internal values, and that gap is E3's**
+(E2 slice b, review round 1 MINOR 8). `EffectCodes.Registry` carries legacy entries whose compact
+code duplicates a modern one — `("io","dbr")` and `("io","dbw")` both spell `db:r`/`db:w`, and
+`("io","file_write"/"file_read"/"file_delete")` spell `fw`/`fr`/`fd` — and
+`EffectRow.FamilySubtypes` lists none of them, so `Encompasses(("io","database"), ("io","dbr"))`
+is **False**. It is **not reachable by parsing**: `EffectCodes` groups by compact code and prefers
+the non-legacy entry, so `§E{db:r}` and `EffectSet.From("db:r")` both yield
+`("io","database_read")`, which the table does cover. It is reachable only by a caller that
+constructs the legacy internal value directly — `EffectSet.FromInternal`, or a manifest written
+against the legacy spelling — and no production caller does so today. Slice b deliberately leaves
+it: adding the aliases is a widening **beyond** this section's nine pairs, and a Calor0410 could
+disappear from the corpus on the back of it, which would break the reviewed property that
+`EffectSubtyping` is main plus exactly those nine.
+`EffectSubtypingTests.LegacyInternalValues_AreOutsideTheFamilyTable_AndThatIsE3s` pins the gap so
+it is observed rather than latent.
 
 ### 4.2 The join `⊔` (inference)
 
@@ -553,6 +606,13 @@ the two-hop laundering the design claims to close. The rule, stated once:
 Concretely, per site (§6.2's numbering): 1 the binding's row; 2 the parameter's row; 3 the
 declaration's return row; 4 the base method's row; 5 the interface member's row; 6 the
 instantiated bound. In every case an `Assumed` source produces an `Assumed` destination.
+
+**One edge, stated so E3 does not trip on it** (E2 slice b). When the DESTINATION is `Unknown`,
+`EffectRow.AtDestination` returns `Unknown` and **discards the source's reasons**. That is sound
+only because such a hop is `CannotTell`, never `Fits` — E3 reports Calor0425 there from the
+verdict itself, so no reason is lost. **E3 must not call `AtDestination` on a `CannotTell` hop
+expecting reasons to survive it**; `EffectRow.CarriedReasons` is the total function that keeps
+them, on every cell.
 
 ### 4.5 `--permissive-effects`
 
@@ -1277,6 +1337,48 @@ that rank-1 rows *type-check* and *erase at codegen*, not that the representatio
 
 ### 8.2 `FunctionBoundType`
 
+> **LANDED — E2 slice b, PR #1102.** `Row` and `ParameterRows` exist, default to
+> `EffectRow.Unknown`, are part of `Equals`/`GetHashCode`, and are absent from `DisplayString`.
+> `ParameterRows` is length-aligned to `ParameterTypes` by construction. Producers today:
+> `BoundLambdaExpression` (the `§LAM`'s declared row, §5), `VariableSymbol.FunctionType` (a rowed
+> parameter, field or `§B`, plus §3.5's inference from a function-typed initializer) and
+> `FunctionSymbol.ReturnFunctionType` (position 6). `displayOverride` is retained and extended:
+> a rowed declared position keeps **the type name the binder already holds for it** rather than
+> §8.3's canonical `(p1, p2) -> ret`, for the same byte-identity reason lambdas keep
+> `LAMBDA(i32)->INT`.
+>
+> **That name is the parser-EXPANDED spelling for the BLOCK forms and the raw source text for the INLINE forms.**
+> `ExpandType` rewrites `Func<i32,i32>` to `Func<INT, INT>` before it reaches `ParameterNode.TypeName` /
+> `OutputNode.TypeName` in the block forms (`§I{Func<i32,i32>:cb} §E{cw}`, `§O{Func<i32,i32>} §E{fs:w}`
+> both display `Func<INT, INT>`), but the inline signature `(Func<i32,i32>:g §E{cw})` and the arrow form
+> `-> Func<i32,i32> §E{fs:w}` keep the raw `Func<i32,i32>` (measured in review round 2 of PR #1102, R2-B).
+> The split is block-vs-inline, not parameter-vs-return. Two earlier revisions of this note were wrong
+> in different ways ("keeps its SURFACE spelling"; then "both positions expand"). The expanded name is the right
+> string to use: it is exactly what `VariableSymbol.TypeName` and every existing consumer of these
+> positions already carry, so nothing moves. Reaching for the raw source text would be the change
+> with a blast radius.
+>
+> **Carry-over 1 (Equals vs DisplayString) is decided: display does NOT participate in equality.**
+> `Equals` is shape + rows; `DisplayString` stays a diagnostic artifact. Two structurally
+> identical function types that print differently are still equal, and a cache keyed on
+> `DisplayString` is therefore coarser than the type, not finer — which is the safe direction.
+> Unifying the spelling would move `BoundTypeTests.cs:139`/`:150`, the corpus golden and the LSP
+> call-graph key for zero behavioural gain.
+>
+> **Carry-over 2 (raw lambda parameter spellings) is NOT taken in slice b, and the reason is
+> measured, not stylistic.** Canonicalising them changes `FunctionBoundType.Equals` for lambdas
+> without changing anything that reads the result, so it is a change with a blast radius and no
+> observer. Slice b leaves the spellings raw and hands the normalisation to E3, which is the
+> slice that first compares two function types for assignability and therefore the first slice
+> that can pin the difference.
+>
+> **What slice b deliberately does NOT do:** it does not give every function-typed position a
+> `FunctionBoundType`. Only rowed positions (and a `§B` inferring from one) get one. Doing it
+> unconditionally would make `EffectEnforcementPass.IsFunctionBoundType` answer true where it
+> answers false today, moving Calor0418's behaviour on programs that contain no rows at all —
+> the opposite of a slice whose corpus delta is zero. E3 widens it when it has a checking site
+> to serve.
+
 ```csharp
 // extends Binding/BoundTypes/BoundType.cs:212-241
 public ImmutableArray<BoundType> ParameterTypes { get; }
@@ -1803,10 +1905,26 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 > (`§I{Func<i32,i32>:f} §E{cw}` against a pure declaration) and hands the non-function-typed
 > cases to P6. A slice-b PR that merely regenerates these six transcripts without saying that has
 > silently changed what P1 asserts.
+>
+> **EXECUTED — E2 slice b, PR #1102.** P1 is re-specified exactly as above, in
+> `EffectRowSyntaxTests.RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow`, whose doc
+> comment records the collision and the move. What P1 still owns is the LINE RULE — which type
+> the row attached to — now asserted on a `Func<i32,i32>` parameter against a separate later-line
+> `§E{}`, plus a control that no Calor0405 fires on a function-typed subject, plus the bound
+> `FunctionBoundType.Row`. Its discriminating revert is unchanged in kind: drop the `Span.Line`
+> comparison and the row becomes the declaration's again.
+>
+> **The count above is SIX and the executed number is NINE.** Beyond Y1b, Y5a, X2a, X2b, Z9 and
+> Z9b, three more cases are the same shape and move for the same reason: **Y1a** and **Y1c**
+> (`§I{str:m} §E{…}` with a separate declaration-level `§E`, which this blockquote's enumeration
+> missed — they differ from Y1b only in also having a declaration row) and **Z9c**
+> (`§O{i32} §E{cw}`), which is not in this list because it compiles CLEAN today rather than
+> landing on Calor0410, but which **P6's own row names explicitly**. Measured from a full diff of
+> all six transcripts, not from a summary — the same discipline §13.5(a)'s closing note demands.
 
 | # | Pin | Home | Freeze | Discriminating revert |
 |---|---|---|---|---|
-| P1 | `RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow` — case **Y1b**: compiles today, must be Calor0410 after | `Calor.Enforcement.Tests/EffectRowSyntaxTests.cs` | with E2 | drop the `Span.Line` comparison → Y1b compiles again |
+| P1 | `RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow` — **RE-SPECIFIED by E2 slice b** (see the blockquote above). Subject is now **function-typed**: `§I{Func<i32,i32>:f} §E{cw}` against a declaration whose own later-line `§E{}` stays pure. Asserts the row attached to the PARAMETER, that no Calor0405 fires on a function-typed subject, and that the bound `FunctionBoundType.Row` is `Concrete({cw})`. Its old subject **Y1b** moved to P6, which answers Calor0405 for it. *(Slice a's wording — "case Y1b: compiles today, must be Calor0410 after" — was a state slice b had to break, and is superseded rather than deleted so the history is legible.)* | `Calor.Enforcement.Tests/EffectRowSyntaxTests.cs:51` | with E2 | drop the `Span.Line` comparison → the row becomes the declaration's again |
 | P2 | `RowSuffix_NonAdjacent_*` — **two halves.** (a) *falls through to a `§E` arm*: X1b/Y6a/Y5a unchanged, the 2948/471 arrow corpus safe. (b) *no `§E` arm to fall through to*: **Calor0405** replaces the cascade at all four positions, one case each against its executed baseline — **Z1** (`§FLD` ⏎ `§E`, 4× Calor0100 today), **Z2** (`§B` ⏎ `§E`, 4×), **Z3** (wrapped inline signature, 8×), and the inline-parameter form (**X9c**) | same | with E2 | invert the line test → the whole corpus moves; drop the recovery → the cascade counts come back |
 | P3 | `RowParses_AtEveryEightPositions` — one case per §3.3 row, incl. the three that already parse (X7, X8, Y6a), which **no test covers today** (`grep '§LAM.*§E' tests/` → 0); plus a negative: `§E` inside a `§C…§/C` argument list stays rejected (**Z10**) | same | with E2 | remove any insertion point → that row fails |
 | P4 | `RowRoundTrips_ParseEmitParse` — parse → `CalorEmitter` → parse, byte-identical, **one case per position** | `Calor.Compiler.Tests/NewFeatureRoundTripTests.cs` | with E2 | drop the `CalorEmitter` row emission → 7 cases fail |
@@ -1822,10 +1940,10 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P14 | `LambdaDeclaredRow_NarrowerThanBody_IsError`; `_CannotTell_IsCalor0425`; `_OmittedRow_IsInferred`; `_TypeCarriesDeclaredNotInferred` | `Calor.Enforcement.Tests/EffectRowLambdaTests.cs` | with E2 | restore `InferFromLambda` to ignore `lambda.Effects` |
 | P15 | Six `_IsError`/`_Compiles` pairs **plus a `_CannotTell` arm each**: `RowMismatch_At{Assignment,Argument,Return,Override,InterfaceImpl,GenericInstantiation}` | `StrictnessBatchTests.cs` | **design-doc merge** — this is gate 1's frozen denominator | delete E3's rule for one site → that `_IsError` fails |
 | P16 | `AllMismatchCodesShareOneRelation` — Calor0424, 0420, 0421 **and** `CrossModuleEffectEnforcementPass.cs:162` move together | `Calor.Enforcement.Tests/CrossModuleEffectTests.cs` | with E3 | give `CheckEffectVariance` its own subset test back |
-| P17 | **`UnresolvedReceiver_YieldsCalor0425_NeverConcrete`** — an `UnresolvedBoundType`/unresolved receiver must produce `EffectRow.Unknown`, never a `Concrete` row. **The pin the whole design rests on**; absent from Draft v1 | `Calor.Enforcement.Tests/EffectRowLatticeTests.cs` | **before E2** | make the unresolved branch return `Concrete(∅)` → the fixture goes silent |
+| P17 | **`UnresolvedReceiver_YieldsCalor0425_NeverConcrete`** — an `UnresolvedBoundType`/unresolved receiver must produce `EffectRow.Unknown`, never a `Concrete` row. **The pin the whole design rests on**; absent from Draft v1 | `Calor.Enforcement.Tests/EffectRowLatticeTests.cs` | ~~before E2~~ → **with E3** (see the note below) | make the unresolved branch return `Concrete(∅)` → the fixture goes silent |
 | P18 | `EffectVariable_*`: `Declares_EffModifier` (X6a's shape now parses); **`TypeParamNamedEff_StillWorks`** (the lookahead guard — **Z4** compiles today and must keep compiling); **`EffectVariableNamedLikeACode_IsCalor0404`** (`<T, eff cw>` rejected, while the ordinary type parameter `<T, cw>` of **Z6**/**Z6b** stays green); `InScope_DoesNotRaise0403`; `OutOfScope_Raises0404`; `Rejected_In{Return,GenericArg,Binding,Field,Lambda,Delegate,ClassOrInterfaceLevel}` (**seven** rejection sites — §7.3's total partition, with the `§LAM`/`§DEL` halves anchored on **Z8b**/**Z8** and the class/interface half flipping to `_Permitted` only if the spike PR proves member-level cannot express R2); **`MemberLevelEffOnInterfaceMember_Parses`** (position 1, anchored on **W1a**/**W1b**); `MixedRow_IsJoin`; `InstantiatesFromArgumentRow`; `UnknownContributor_YieldsUnknown` | `Calor.Enforcement.Tests/EffectVariableTests.cs` | with E2 | **all of P18 is deleted if the ramp fires**, together with P15's site-6 pair |
-| P19 | `FunctionTypesDifferingOnlyInRow_AreNotEqual` + the `GetHashCode` half + `RowsDefaultToUnknownNotPure` | `Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs` | with E2 | drop `Row` from `Equals` |
-| P20 | `DisplayStringIsRowFree` — belt to `:139`/`:150`'s braces | same | with E2 | append the row → three tests fail |
+| P19 | `FunctionTypesDifferingOnlyInRow_AreNotEqual` + the `GetHashCode` half + `RowsDefaultToUnknownNotPure` | **`Calor.Enforcement.Tests/EffectRowLatticeTests.cs:462`, `:479`** — *moved by E2 slice b from `BoundTypeTests.cs`*; see the note below the table | with E2 | drop `Row` from `Equals` |
+| P20 | `DisplayStringIsRowFree` — belt to `BoundTypeTests.cs:139`/`:150`'s braces | **`Calor.Enforcement.Tests/EffectRowLatticeTests.cs:492`** — *moved, same reason* | with E2 | append the row → three tests fail |
 | P21 | `ManifestResolutionMapsToRow` — `Resolved`/`PureExplicit`/`Unknown` → `Concrete(S)`/`Concrete(∅)`/`Unknown` | `Calor.Enforcement.Tests/EffectResolverTests.cs` | with E2 | map `Unknown` to `Concrete(∅)` → P17's sibling fails |
 | P22 | `MessageTexts` — the four new strings: §10.1's `Effect row: charged by invoking …`, §10.3's two, §6.4's 0424 text. Existing pins assert `Message.Contains`; these assert the **full** new clause | `StrictnessBatchTests.cs` | with E3 | reword any clause |
 | P23 | `BuildStateCacheConstants` — `"4.0"`, `CurrentCompilerSemanticsVersion` **unchanged**, `CurrentOptionsSerializerVersion` unchanged (`BuildStateCache.cs:121-123`) | `Calor.Compiler.Tests/Incremental/` | with E5 | bump the semantics stamp → fails, and G-CODEGEN is contradicted |
@@ -1837,7 +1955,31 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P29 | **`ExperimentTranscripts_MatchARerun`** — re-runs all six harness scripts and diffs against the committed transcripts. Closes the round-2 finding that ~40 quoted outputs were reproducible but unobserved. **Never skips**: a missing compiler build is a hard failure | `tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs` — **landed in this PR** | **before E2** (already frozen) | reword any diagnostic the doc quotes → red, naming the script and the first differing line |
 | P30 | **`O53Baseline_HasLedgerShape_AndTheCountsTheDocQuotes`** — `o53/baseline.json` gains `schemaVersion` + `measuredCommit` (40-hex, shape-checked not compared to HEAD, per `HigherOrderDemandLedgerTests.cs:480-498`) and the test asserts 23 files / 54 occurrences / 1 green / 22 red **and the 18+3+1 breakdown** §3.2 quotes | same — **landed in this PR** | **before E2** (already frozen) | change any count → red |
 | P31 | **`SpikeArtifactManifestIsComplete`** — for every artifact in `spike-verdict.json`, the `before/`/`after/` `.calr`, `.g.cs` and diagnostic list exist, are non-empty, and the diagnostic list parses. Replaces v2's unsound decline of the presence check (P27 would pass with every artifact missing) | `SpikeVerdictTests.cs` | **spike PR** | delete one `.g.cs` → red |
-| P32 | **`Calor0425CorpusLedgerMatchesRecomputation`** — §13.4's ledger, exact-equality per subject and per cause, `measuredCommit` shape-checked. The only instrument v2 left without a P-number | `tests/Calor.Compiler.Tests/Effects/Calor0425CorpusLedgerTests.cs` (`compiler` shard, `Skip.IfNot` on submodules, registered in `eng/test-manifest.json`) | **before E2** | change one per-subject count → red |
+| P32 | **`Calor0425CorpusLedgerMatchesRecomputation`** — §13.4's ledger, exact-equality per subject and per cause, `measuredCommit` shape-checked. The only instrument v2 left without a P-number | `tests/Calor.Compiler.Tests/Effects/Calor0425CorpusLedgerTests.cs` (`compiler` shard, `Skip.IfNot` on submodules, registered in `eng/test-manifest.json`) | ~~before E2~~ → **with E3** (see the note below) | change one per-subject count → red |
+
+> **P17 and P32's freeze column was impossible, and is corrected to "with E3"** (E2 slice b,
+> review round 1 MINOR 12). Both were frozen "before E2", and **neither can exist until E3**:
+> P17's name asserts *Calor0425*, and P32 is the *Calor0425* corpus ledger. Calor0425 is allocated
+> by §6.1 but **no code path emits it** — slice b builds the relation, E3 emits the diagnostic. A
+> pin cannot be frozen before the diagnostic it asserts exists, so the column said something that
+> could not be done rather than something that was skipped.
+>
+> Slice b lands the **substitutable half of P17** — the part that does not need a diagnostic:
+> `EffectRowLatticeTests.ManifestResolutionStatusMapsToRow` asserts that
+> `EffectSet.Unknown.ToRow()` is `EffectRow.Unknown` and never `Concrete(∅)`, which is the mapping
+> P17 exists to protect, and `UnknownRow_FitsNothing_AndIsFittedByNothing` (P8) asserts that such
+> a row can never yield `Fits`. What is **still owed** is P17's own sentence — that an unresolved
+> RECEIVER, reaching the effect pass, produces that row and surfaces as Calor0425 at a site — and
+> P32 entirely. Naming this rather than treating the substitutes as P17 is the point: the two
+> pins are E3's, and E3's PR body must say so.
+
+> **Why P19/P20 do not live in `BoundTypeTests.cs`** (E2 slice b). `facts.py` probes
+> `grep -n 'DisplayString' tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs` and pins
+> the result as a transcript line. A pin named `DisplayStringIsRowFree` in that file moves that
+> probe, and §13.5(a) permits exactly the transcript changes it names. The assertions are
+> unchanged — only the file differs — and `BoundTypeTests.cs:139`/`:150` remain the belt this is a
+> brace for. Re-homing is free the next time that transcript legitimately moves, and is E3's to
+> take if it moves the sweep.
 
 ### 13.3 Gate rows
 
@@ -1947,6 +2089,47 @@ and it needs its own justification in the E2 PR body.**
 > `§I{str:m} §E{cw} §E{net}` was silently reading the first as the parameter's row and the second
 > as the *declaration's*, via the `§F` loop's `§E` arm. Now one Calor0405, naming the repair
 > (`§E{cw, net}`).
+
+> **EXECUTED, E2 slice b, PR #1102 — NINE moved cases, all of them P6, and no other line in any
+> transcript moved.** Counted from a full diff of all six transcripts. `facts.py`, `facts2.py`
+> and `compile53.py` are **CLEAN** — in particular the `IsSubsetOf` compatibility-site sweep did
+> **not** move, because slice b does not touch `IsSubsetOf` (E3 owns it, obligation #7), and the
+> `Effects/*.cs` file-count row is unmoved because slice b adds **no** file under `Effects/`.
+> `o53/baseline.json`'s counts (23 files / 54 occurrences / 1 green / 22 red) are unchanged; only
+> its `measuredCommit` is re-stamped, which is gate 5's line-adjacency leg re-run.
+>
+> | Case | Committed (after slice a) | After slice b | Why |
+> |---|---|---|---|
+> | `run.py` **X2a** | `Calor0410` at (2,3) | `Calor0405` at (4,14), *"The return type 'VOID' is not a function type…"* | §3.5 / P6 — `§O{void} §E{cw}` |
+> | `run.py` **X2b** | `Calor0410` at (2,3) | `Calor0405` at (4,14) | same, `§E{}` spelling |
+> | `run2.py` **Y1a** | `Calor0410` at (5,5) | `Calor0405` at (3,15), *"'m' has type 'STRING'…"* | §3.5 / P6 — a row on a `str` parameter. **Not in §13.2's list of six**; same shape as Y1b |
+> | `run2.py` **Y1b** | `Calor0410` at (2,3) | `Calor0405` at (3,15) | §3.5 / P6. **P1's old case** |
+> | `run2.py` **Y1c** | `exit 0` | `Calor0405` at (3,15) | same shape, pure row. **Not in §13.2's list of six** |
+> | `run2.py` **Y5a** | `Calor0410` at (2,3) | `Calor0405` at (2,36), *"The return type 'VOID'…"* | §3.5 / P6 — `-> void §E{cw}` |
+> | `run3.py` **Z9** | `Calor0410` at (2,3) | `Calor0405` at (2,36), *"The return type 'VOID'…"* | §3.5 / P6, named by P6 |
+> | `run3.py` **Z9b** | `Calor0410` at (2,3) | `Calor0405` at (3,15), *"'x' has type 'INT'…"* | §3.5 / P6, named by P6 |
+> | `run3.py` **Z9c** | `exit 0` | `Calor0405` at (3,13) | §3.5 / P6, **named by P6's own row** in §13.2 and absent from the "six" only because its baseline is clean, not Calor0410 |
+>
+> **Each moved case is now ONE diagnostic, not two.** Calor0405 is reported by the binder, and
+> `Program.Compile` returns as soon as binding has errors, so the consequential Calor0410 —
+> which existed only because the row had been taken away from the declaration — does not fire.
+> That is the same 4→1 / 8→1 collapse §3.1's recovery makes, arrived at by the pipeline's own
+> ordering rather than by a suppression rule.
+>
+> **Two message details worth recording, because they are what a reader will notice first.**
+> (1) The diagnostic quotes the BINDER's type vocabulary — `'STRING'`, `'INT'`, `'VOID'` — not the
+> surface spelling `str`/`i32`/`void`. §3.5's illustrative message writes `i32`; the implementation
+> writes what it actually knows. **The two return spellings do not arrive in that vocabulary
+> equal**: `ExpandType` rewrites `§O{void}` to `VOID`, but the arrow form `-> void §E{cw}` reaches
+> `OutputNode.TypeName` as the raw `void`, so the first revision of this slice reported the same
+> mistake as `'VOID'` in one spelling and `'void'` in the other (review round 1, MINOR 5). The
+> binder now runs `TypeIdentity.Canonicalize` **in the message only**, which gives one vocabulary
+> across all nine cases. Expanding the arrow form in the parser would move
+> `FunctionNode.Output.TypeName` for every arrow-form function in the corpus — a blast radius with
+> nothing to do with rows. Y5a and Z9 were regenerated for this and nothing else.
+> (2) It says *"Remove the `§E{…}`"* rather than quoting the author's codes. Quoting them needs
+> the compact projection, which is an `Effects` table `Binding/` may not reach (§4's deviation
+> note). Naming the row's position is enough to find it.
 
 `spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
 machine-readable form, and P27 asserts that the case list holds exactly seven rows.

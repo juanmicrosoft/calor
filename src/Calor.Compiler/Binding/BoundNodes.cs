@@ -2255,7 +2255,12 @@ public sealed class BoundLambdaExpression : BoundExpression
         BoundExpression? expressionBody,
         IReadOnlyList<BoundStatement>? statementBody,
         string returnTypeName,
-        BoundType? returnType = null)
+        BoundType? returnType = null,
+        // v0.15 E2 slice b, §5 — the lambda's DECLARED row (ρ_decl), computed
+        // by the binder from `effects`. Omitted (or `null`) means Unknown, NOT
+        // pure: §3.5 infers an omitted lambda row from the body, and the body's
+        // row is E3's to compute.
+        EffectRow? declaredRow = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -2289,7 +2294,11 @@ public sealed class BoundLambdaExpression : BoundExpression
             // BoundType — the caller hands over the real type or nothing.
             returnType ?? new NominalBoundType(returnTypeName),
             displayOverride:
-                $"{(isAsync ? "ASYNC_" : "")}LAMBDA({signature})->{returnTypeName}");
+                $"{(isAsync ? "ASYNC_" : "")}LAMBDA({signature})->{returnTypeName}",
+            // v0.15 E2 slice b, §8.2 — the row rides on the TYPE, which is what
+            // makes two lambdas with the same shape and different declared
+            // effects different types.
+            row: declaredRow);
         Children = expressionBody != null ? [expressionBody] : Array.Empty<BoundExpression>();
     }
 }

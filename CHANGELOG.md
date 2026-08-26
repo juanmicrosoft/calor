@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Those callback annotations now mean something to the compiler.** Last time you
+  could write `§I{Func<i32,i32>:transform} §E{cw}` — "this callback may print" — and
+  the compiler would faithfully remember the words. Now the annotation is part of
+  the *type*. Two callbacks with the same shape but different permissions are two
+  different types, the way `i32` and `str` are two different types, and the
+  compiler can tell them apart.
+
+  Along with that comes a way to answer the only question that matters about two
+  of these annotations — *does this one fit into that one?* — with **three**
+  answers rather than two: **yes**, **no**, and **cannot tell**. The third one is
+  the important one. When a callback comes from outside Calor, or from a library
+  the compiler has no information about, the honest answer is "I don't know", and
+  saying "yes" there is how effects quietly escape. So "I don't know" is now a
+  thing the compiler can say, and it never counts as a yes.
+
+  **Mismatches are still not reported.** The compiler can now decide whether a
+  callback fits where it is being used; it does not yet complain when it does not.
+  That is the next release, and it is the last piece. All 886 Calor files in this
+  repository compile to byte-for-byte the same result as before.
+
+- **`§E{db}` now covers `§E{db:r}`, and the same for `net` and `env`.** If a
+  function declared the broad "touches the database" effect, and the code inside it
+  only *read* from the database, the compiler used to complain that the narrow
+  effect wasn't declared. It no longer does — declaring the broad effect covers the
+  narrow ones, which is what everyone already assumed it meant. This only ever
+  makes more programs compile, never fewer. (`fs:rw` already worked this way;
+  there is no bare `fs` code, so filesystem behaviour is unchanged.)
+
+- **A clearer message when an effect annotation is on something that can't have
+  one.** Writing `§E{cw}` after a plain `i32` — a number performs no effects — used
+  to be silently accepted and quietly re-read as the whole function's effect
+  declaration, which is usually not what the author meant. It is now **Calor0405**,
+  the same message you already get for an annotation on the wrong line, and it
+  tells you both ways to fix it: remove it, or move it onto its own line if it was
+  meant to be the function's own declaration.
 - **You can now write down what a callback is allowed to do.** Until now, if a
   function took another function as a parameter — a callback, a handler, a
   comparison — Calor had no way to say what that inner function was permitted to

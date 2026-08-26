@@ -231,3 +231,81 @@ public sealed class EffectSet : IEquatable<EffectSet>
 
     public static bool operator !=(EffectSet? left, EffectSet? right) => !(left == right);
 }
+
+/// <summary>
+/// v0.15 E2 slice b — the bridge between <see cref="EffectSet"/> (the effect
+/// pass's carrier) and <see cref="EffectRow"/> (the type system's).
+///
+/// <para>It lives on the <c>Effects</c> side, not on <c>EffectRow</c>, because
+/// <c>Binding/</c> may not reference <c>Effects/</c>
+/// (<c>ArchitectureTests.BindingLayer_HasNoReferenceToEffectsNamespace</c>) and
+/// because the compact surface spelling of an effect code needs
+/// <see cref="EffectCodes.Registry"/>, which is the effect layer's own table.
+/// </para>
+/// </summary>
+public static class EffectRowDisplay
+{
+    /// <summary>
+    /// The row rendered for a human, in the compact surface codes authors write:
+    /// <c>[unknown]</c>, <c>[pure]</c>, <c>"cw, fs:w"</c>, and — new in 0.15 —
+    /// <c>[assumed: cw]</c>. Design-doc §8.3.
+    /// </summary>
+    public static string ToCompactDisplayString(this Binding.BoundTypes.EffectRow? row)
+    {
+        var value = row ?? Binding.BoundTypes.EffectRow.Unknown;
+        if (value.IsUnknown) return "[unknown]";
+
+        var codes = string.Join(", ", value.Codes.Select(ToCompactCode).OrderBy(c => c, StringComparer.Ordinal));
+        if (value.IsAssumed) return $"[assumed: {(codes.Length == 0 ? "pure" : codes)}]";
+        return codes.Length == 0 ? "[pure]" : codes;
+    }
+
+    /// <summary>
+    /// The row an effect SET denotes. <see cref="EffectSet.Unknown"/> becomes
+    /// <see cref="EffectRow.Unknown"/> — never <c>Concrete(∅)</c>, which is the
+    /// mistake P17's sibling pin exists to catch.
+    /// </summary>
+    public static Binding.BoundTypes.EffectRow ToRow(this EffectSet? set)
+    {
+        if (set is null || set.IsUnknown) return Binding.BoundTypes.EffectRow.Unknown;
+        return Binding.BoundTypes.EffectRow.Concrete(set.Effects.Select(e => $"{ToCategory(e.Kind)}:{e.Value}"));
+    }
+
+    /// <summary>
+    /// The effect set underlying a row. <see cref="EffectRow.Unknown"/> becomes
+    /// <see cref="EffectSet.Unknown"/>; an <c>Assumed</c> row yields its
+    /// underlying set, because <c>fits</c> treats an assumption as its set plus
+    /// a reason to report, not as a different set (§4.3).
+    /// </summary>
+    public static EffectSet ToEffectSet(this Binding.BoundTypes.EffectRow? row)
+    {
+        var value = row ?? Binding.BoundTypes.EffectRow.Unknown;
+        if (value.IsUnknown) return EffectSet.Unknown;
+        return EffectSet.FromInternal(value.Codes.Select(SplitCode));
+    }
+
+    private static string ToCompactCode(string internalCode)
+    {
+        var separator = internalCode.IndexOf(':');
+        if (separator < 0) return internalCode;
+        return EffectCodes.ToCompact(internalCode[..separator], internalCode[(separator + 1)..]);
+    }
+
+    private static (EffectKind Kind, string Value) SplitCode(string internalCode)
+    {
+        var separator = internalCode.IndexOf(':');
+        var category = separator < 0 ? string.Empty : internalCode[..separator];
+        var value = separator < 0 ? internalCode : internalCode[(separator + 1)..];
+        return (EffectCodes.ParseKind(category), value);
+    }
+
+    private static string ToCategory(EffectKind kind) => kind switch
+    {
+        EffectKind.IO => "io",
+        EffectKind.Mutation => "mutation",
+        EffectKind.Memory => "memory",
+        EffectKind.Exception => "exception",
+        EffectKind.Nondeterminism => "nondeterminism",
+        _ => "unknown",
+    };
+}

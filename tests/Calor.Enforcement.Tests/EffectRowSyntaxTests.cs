@@ -29,36 +29,74 @@ public class EffectRowSyntaxTests
     // ---------------------------------------------------------------- P1 -----
     // The line rule attaches a same-line §E to the type it follows, not to the
     // enclosing declaration. Discriminating revert: drop the Span.Line comparison
-    // in TryParseSameLineRow and Y1b compiles again.
+    // in TryParseSameLineRow and the row becomes the declaration's again — the
+    // parameter's Row goes null and the function's Effects becomes non-null.
+    //
+    // RE-SPECIFIED BY E2 SLICE B (design-doc §13.2's blockquote, recorded in
+    // review round 1 of PR #1101). As written in slice a this pin used **Y1b** —
+    // `§I{str:m} §E{cw}` — and asserted Calor0410 end-to-end. But `str` is not a
+    // function type, so under §3.5 that row is a row on a position which cannot
+    // carry one, and pin **P6** says it must be **Calor0405**. Two pins named
+    // different answers for one source. P1 and P6 are both right about their own
+    // claim, and the collision is the seam between a slice that CONSUMES rows
+    // and a slice that checks WHAT THEY ARE ATTACHED TO.
+    //
+    // So P1 moves onto a function-typed subject — `§I{Func<i32,i32>:f} §E{cw}`
+    // against a pure declaration, which is design-doc §3.6's E-3 — and the
+    // non-function-typed cases (Y1a, Y1b, Y1c, Y5a, X2a, X2b, Z9, Z9b, Z9c) are
+    // handed to `EffectRowLatticeTests.RowOnNonFunctionTypedPosition_IsCalor0405`.
+    // What P1 still owns is the LINE RULE: which type the row attached to.
 
     [Fact]
     public void RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow()
     {
-        // Executed baseline Y1b: this source COMPILES on main, because the flat §F
-        // section loop reads every §E as the declaration's own row (§3.1).
+        // A function-typed parameter carrying a row, on a declaration that
+        // declares no effects of its own. On main the §F section loop reads the
+        // §E as the DECLARATION's row, so `Apply` would be declared `cw`.
         const string source = """
-            §M{m001:Y1}
-              §F{f001:Log:pub}
-                §I{str:m} §E{cw}
-                §O{void}
-                §P m
+            §M{m001:P1}
+              §F{f001:Apply:pub}
+                §I{Func<i32,i32>:transform} §E{cw}
+                §I{i32:value}
+                §O{i32}
+                §E{}
+                §R value
             """;
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
 
         var function = Assert.Single(module.Functions);
-        var parameter = Assert.Single(function.Parameters);
+        var transform = function.Parameters[0];
 
-        Assert.NotNull(parameter.Row);
-        Assert.Contains("io", parameter.Row!.Effects.Keys);
-        // The declaration keeps NO row of its own: the §E was the parameter's.
-        Assert.Null(function.Effects);
+        // The row is the PARAMETER's…
+        Assert.NotNull(transform.Row);
+        Assert.Contains("io", transform.Row!.Effects.Keys);
+        Assert.Null(function.Parameters[1].Row);
 
-        // …and that is observable end-to-end: 'Log' is now declared pure while its
-        // body writes to the console.
+        // …and the declaration's own row is the separate, later-line §E{}, which
+        // stays pure. Under the pre-line-rule reading these would be one row.
+        Assert.NotNull(function.Effects);
+        Assert.Empty(function.Effects!.Effects);
+
+        // End-to-end: a function-typed subject carries the row rather than being
+        // rejected, so no Calor0405 — the control that keeps this pin from being
+        // satisfied by P6's rule firing everywhere.
         var compiled = TestHarness.Compile(source);
-        Assert.Contains(compiled.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.DoesNotContain(
+            compiled.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMisplaced);
+
+        // And the row reaches the TYPE SYSTEM, which is what slice b adds: the
+        // parameter's symbol carries a FunctionBoundType whose Row is the
+        // declared one. Checking it against an argument is E3 (Calor0424/0425).
+        var bindingDiagnostics = new DiagnosticBag();
+        var bound = new Calor.Compiler.Binding.Binder(bindingDiagnostics, "test.calr").Bind(module);
+        var boundParameter = Assert.Single(bound.Functions).Symbol.Parameters[0];
+        Assert.NotNull(boundParameter.FunctionType);
+        Assert.Equal(
+            Calor.Compiler.Binding.BoundTypes.EffectRow.Concrete(["io:console_write"]),
+            boundParameter.FunctionType!.Row);
     }
 
     [Theory]

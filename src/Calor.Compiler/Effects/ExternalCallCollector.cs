@@ -444,24 +444,22 @@ public sealed class ExternalCallCollector
     }
 
     /// <summary>
-    /// Mirrors <c>EffectEnforcementPass.IsFunctionTypeName</c> (private to the
-    /// pass) plus the binder's lambda spellings.
+    /// The shared delegate-shape list (<c>Binding.TypeIdentity.IsFunctionTypeName</c>)
+    /// plus the binder's two lambda spellings, which are this caller's own and
+    /// belong to no other consumer.
+    ///
+    /// <para>v0.15 E2 slice b, review round 1 (MINOR 11): this was a THIRD
+    /// hand-maintained copy of the list, alongside the pass's and the binder's.
+    /// The list now lives in one place and all three read it. Behaviour is
+    /// unchanged statement for statement — the shared helper applies the same
+    /// <c>Trim().TrimEnd('?')</c> and tests the same ten shapes.</para>
     /// </summary>
     private static bool IsFunctionTypeName(string typeName)
     {
         var t = typeName.Trim().TrimEnd('?');
         return t.StartsWith("LAMBDA(", StringComparison.Ordinal)
             || t.StartsWith("ASYNC_LAMBDA(", StringComparison.Ordinal)
-            || t.Equals("Action", StringComparison.Ordinal)
-            || t.StartsWith("Action<", StringComparison.Ordinal)
-            || t.StartsWith("Func<", StringComparison.Ordinal)
-            || t.StartsWith("Predicate<", StringComparison.Ordinal)
-            || t.StartsWith("Comparison<", StringComparison.Ordinal)
-            || t.StartsWith("Converter<", StringComparison.Ordinal)
-            || t.Equals("Delegate", StringComparison.Ordinal)
-            || t.Equals("MulticastDelegate", StringComparison.Ordinal)
-            || t.Equals("EventHandler", StringComparison.Ordinal)
-            || t.StartsWith("EventHandler<", StringComparison.Ordinal);
+            || Binding.TypeIdentity.IsFunctionTypeName(t);
     }
 
     private static BoundReceiver FromTypeName(string typeName)

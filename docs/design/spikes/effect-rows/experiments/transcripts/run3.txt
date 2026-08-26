@@ -130,7 +130,7 @@ CASE Z9-arrow-void-sameline-E  args: (none)  exit: 1
   §F{f001:Log:pub} (i32:x) -> void §E{cw}
     §P x
 ------------------------------------------------------------------------------
-Z9-arrow-void-sameline-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+Z9-arrow-void-sameline-E.calr(2,36): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Z9b-I-i32-sameline-E  args: (none)  exit: 1
@@ -141,17 +141,17 @@ CASE Z9b-I-i32-sameline-E  args: (none)  exit: 1
     §O{void}
     §P x
 ------------------------------------------------------------------------------
-Z9b-I-i32-sameline-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+Z9b-I-i32-sameline-E.calr(3,15): error Calor0405: 'x' has type 'INT', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
-CASE Z9c-O-i32-sameline-E  args: (none)  exit: 0
+CASE Z9c-O-i32-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Z9}
   §F{f001:Get:pub}
     §O{i32} §E{cw}
     §R INT:1
 ------------------------------------------------------------------------------
-Compilation successful: Z9c-O-i32-sameline-E.g.cs
+Z9c-O-i32-sameline-E.calr(3,13): error Calor0405: The return type 'INT' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Z10-E-inside-call-arguments  args: (none)  exit: 1

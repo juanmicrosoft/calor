@@ -65,7 +65,16 @@ public static class BindingDiagnosticPolicy
             or Diagnostics.DiagnosticCode.AmbiguousOverload
             or Diagnostics.DiagnosticCode.NoMatchingOverload
             or Diagnostics.DiagnosticCode.BindRequiresTypeOrInitializer
-            or Diagnostics.DiagnosticCode.InstanceMemberInStaticContext;
+            or Diagnostics.DiagnosticCode.InstanceMemberInStaticContext
+            // v0.15 E2 slice b — the binder's half of the effect-row rules.
+            // Calor0405 (a row on a position that is not function-typed, §3.5)
+            // and Calor0404 (an effect variable no enclosing declaration binds,
+            // §7.3) are declaration-shape errors, not analysis instrumentation:
+            // the program is ill-formed, so they must reach the author the way
+            // the parser's half of Calor0405 already does. Neither can fire on a
+            // program with no rows in it, and the committed corpus has none.
+            or Diagnostics.DiagnosticCode.EffectRowMisplaced
+            or Diagnostics.DiagnosticCode.EffectVariableScope;
     }
 
     public static void PropagateCompilationErrors(
@@ -506,7 +515,13 @@ public static class TypeIdentity
         return true;
     }
 
-    private static bool TrySplitGeneric(
+    /// <summary>
+    /// Splits <c>Func&lt;i32, str&gt;</c> into <c>Func</c> and <c>[i32, str]</c>,
+    /// respecting nesting. <c>internal</c> since v0.15 E2 slice b so the binder
+    /// can read a function type's arity off its declared spelling when building
+    /// a rowed <c>FunctionBoundType</c>.
+    /// </summary>
+    internal static bool TrySplitGeneric(
         string type,
         out string genericName,
         out IReadOnlyList<string> arguments)
@@ -748,6 +763,49 @@ public static class TypeIdentity
     /// reach for it (PR #1095 review finding 10). The collector keeps an internal
     /// forwarder.</para>
     /// </summary>
+    /// <summary>
+    /// True when <paramref name="typeName"/> SPELLS a function type: one of the
+    /// BCL delegate shapes, or a name <paramref name="isDeclaredDelegate"/>
+    /// recognises as a <c>§DEL</c> declared in this compilation.
+    ///
+    /// <para>v0.15 E2 slice b — moved here from
+    /// <c>EffectEnforcementPass.IsFunctionTypeName</c>, which keeps a
+    /// forwarder. The binder needs the same predicate to answer §3.5's "can
+    /// this position carry an effect row?" (Calor0405, pin P6), and
+    /// <c>Binding/</c> may not reference <c>Effects/</c>. One list, two
+    /// callers — a second copy would drift the moment either side learned a new
+    /// shape.</para>
+    ///
+    /// <para>This is the STRING test. Structural function-typedness — a
+    /// <c>FunctionBoundType</c>, or a nominal type whose declaration is a
+    /// <c>§DEL</c> — is <c>EffectEnforcementPass.IsFunctionBoundType</c>, and
+    /// is asked first wherever a bound type is in hand.</para>
+    /// </summary>
+    public static bool IsFunctionTypeName(
+        string? typeName,
+        Func<string, bool>? isDeclaredDelegate = null)
+    {
+        if (string.IsNullOrWhiteSpace(typeName)) return false;
+        var t = typeName.Trim().TrimEnd('?');
+        if (isDeclaredDelegate != null)
+        {
+            var open = t.IndexOf('<');
+            var stripped = open > 0 ? t[..open] : t;
+            if (stripped.Length > 0 && isDeclaredDelegate(stripped))
+                return true;
+        }
+        return t.Equals("Action", StringComparison.Ordinal)
+            || t.StartsWith("Action<", StringComparison.Ordinal)
+            || t.StartsWith("Func<", StringComparison.Ordinal)
+            || t.StartsWith("Predicate<", StringComparison.Ordinal)
+            || t.StartsWith("Comparison<", StringComparison.Ordinal)
+            || t.StartsWith("Converter<", StringComparison.Ordinal)
+            || t.Equals("Delegate", StringComparison.Ordinal)
+            || t.Equals("MulticastDelegate", StringComparison.Ordinal)
+            || t.Equals("EventHandler", StringComparison.Ordinal)
+            || t.StartsWith("EventHandler<", StringComparison.Ordinal);
+    }
+
     public static bool IsTypeQualifiedReference(string receiver)
     {
         if (string.IsNullOrEmpty(receiver))
@@ -832,6 +890,27 @@ public sealed class VariableSymbol : Symbol
     /// </summary>
     public BoundTypes.NullableAnnotation NullableAnnotation { get; }
 
+    /// <summary>
+    /// v0.15 E2 slice b, design-doc §8.2 — the function type this variable
+    /// denotes, when it denotes one AND an effect row is attached to it. Set for
+    /// a rowed function-typed parameter, field or <c>§B</c>, and for a <c>§B</c>
+    /// whose row is INFERRED from a function-typed initializer (§3.5).
+    ///
+    /// <para><c>null</c> for everything else, including a row-less
+    /// <c>Func&lt;i32,i32&gt;</c> parameter — whose row is
+    /// <see cref="BoundTypes.EffectRow.Unknown"/> by §3.5, and which E3 will
+    /// widen this property to cover once it has a checking site to serve. Slice
+    /// b deliberately does not build one for every function-typed position,
+    /// because doing so would make <c>EffectEnforcementPass.IsFunctionBoundType</c>
+    /// answer true where it answers false today and move Calor0418's
+    /// behaviour on programs that have no rows at all.</para>
+    ///
+    /// <para><see cref="TypeName"/> is untouched, and the function type's
+    /// <c>DisplayString</c> is the declared spelling, so nothing that reads
+    /// either moves.</para>
+    /// </summary>
+    public BoundTypes.FunctionBoundType? FunctionType { get; }
+
     public VariableSymbol(
         SymbolId id,
         string name,
@@ -847,7 +926,8 @@ public sealed class VariableSymbol : Symbol
         bool isProperty = false,
         bool isStatic = false,
         ConditionalAlternative? conditionalAlternative = null,
-        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
+        BoundTypes.FunctionBoundType? functionType = null)
         : base(id, name, declarationSpan, conditionalAlternative: conditionalAlternative)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -861,6 +941,7 @@ public sealed class VariableSymbol : Symbol
         Visibility = visibility;
         DeclaringTypeName = declaringTypeName;
         NullableAnnotation = nullableAnnotation;
+        FunctionType = functionType;
     }
 
     public VariableSymbol(
@@ -880,6 +961,14 @@ public sealed class VariableSymbol : Symbol
 public sealed class FunctionSymbol : Symbol
 {
     public string ReturnType { get; }
+
+    /// <summary>
+    /// v0.15 E2 slice b, design-doc §8.2 — the RETURN's function type when the
+    /// declaration writes a row on it (<c>§O{Func&lt;i32&gt;} §E{cw}</c> or
+    /// <c>-&gt; Func&lt;i32&gt; §E{cw}</c>, position 6). <c>null</c> otherwise;
+    /// <see cref="ReturnType"/> is unchanged either way.
+    /// </summary>
+    public BoundTypes.FunctionBoundType? ReturnFunctionType { get; init; }
     public IReadOnlyList<VariableSymbol> Parameters { get; }
     public IReadOnlyList<string> TypeParameters { get; }
     public Visibility Visibility { get; }
