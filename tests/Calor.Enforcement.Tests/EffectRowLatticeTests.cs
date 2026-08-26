@@ -368,7 +368,7 @@ public class EffectRowLatticeTests
         Assert.Equal(EffectFit.Fits, EffectRow.Fits(source, firstDestination));
         var afterHopOne = EffectRow.AtDestination(source, firstDestination);
         Assert.Equal(EffectRowKind.Assumed, afterHopOne.Kind);
-        Assert.Contains("receiver type could not be resolved", afterHopOne.Reasons);
+        Assert.Contains("receiver type could not be resolved", afterHopOne.Reasons.ToArray());
 
         // Second hop: the reason is still there, so E3 still has something to
         // report. Under the naive rule this hop would be silent.
@@ -376,7 +376,7 @@ public class EffectRowLatticeTests
         Assert.Equal(EffectFit.Fits, EffectRow.Fits(afterHopOne, secondDestination));
         var afterHopTwo = EffectRow.AtDestination(afterHopOne, secondDestination);
         Assert.Equal(EffectRowKind.Assumed, afterHopTwo.Kind);
-        Assert.Contains("receiver type could not be resolved", afterHopTwo.Reasons);
+        Assert.Contains("receiver type could not be resolved", afterHopTwo.Reasons.ToArray());
     }
 
     [Fact]
