@@ -359,16 +359,26 @@ public sealed class Binder
         _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
         _declarationIdOccurrences.Clear();
+        _delegateTypeNames.Clear();
+        _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
         _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
         _declarationContext = _moduleSymbolId;
 
         var functions = new List<BoundFunction>();
 
+        // v0.15 E2 slice b — §DEL names first, before ANY registration: a row on
+        // a delegate-typed parameter must not be reported as misplaced merely
+        // because top-level functions register before module.Delegates do.
+        CollectDelegateTypeNames(module);
+
         RegisterTopLevelFunctions(module);
         RegisterAdditionalTypes(module);
         foreach (var cls in module.Classes)
             RegisterClassTree(cls, _moduleSymbolId, null);
+
+        // v0.15 E2 slice b, pin P6.
+        CheckEffectRowPlacement(module);
 
         foreach (var func in module.Functions)
             functions.Add(BindFunction(func));
@@ -398,7 +408,9 @@ public sealed class Binder
                 function.IdentifierSpan,
                 function.Visibility,
                 containingTypeName: null,
-                definitionSpan: function.Span);
+                definitionSpan: function.Span,
+                output: function.Output,
+                effectParameters: function.EffectParameters);
             _functionSymbols.Add(function, symbol);
 
             var simpleLookupName = GetCallableLookupName(function.Name);
@@ -483,6 +495,7 @@ public sealed class Binder
             // E1 slice 2b: §DEL declarations are function types. Marking the
             // symbol is what lets a consumer ask the type instead of the string.
             isDelegate: kind == "delegate"));
+
     }
 
     private void RegisterClassTree(
@@ -542,7 +555,11 @@ public sealed class Binder
                 // through BoundVariableExpression carry the correct
                 // annotation. Scoped to STRING per §D6; non-STRING keeps
                 // the safe Oblivious default.
-                nullableAnnotation: TryReadDeclaredStringAnnotation(field.TypeName));
+                nullableAnnotation: TryReadDeclaredStringAnnotation(field.TypeName),
+                // v0.15 E2 slice b — position 8's row (§3.3). A §FLD has no
+                // type-parameter list, so no `eff` binders are in scope.
+                functionType: TryBuildRowedFunctionType(
+                    field.TypeName, field.Row, binders: null));
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -601,7 +618,9 @@ public sealed class Binder
                 method.Visibility,
                 qualifiedClassName,
                 method.Span,
-                conditionalAlternative);
+                conditionalAlternative,
+                output: method.Output,
+                effectParameters: method.EffectParameters);
             _functionSymbols.Add(method, symbol);
 
             if (!classScope.TryDeclareOverload(lookupName, symbol, out var duplicate))
@@ -630,7 +649,11 @@ public sealed class Binder
                 constructor.Visibility,
                 qualifiedClassName,
                 constructor.Span,
-                conditionalAlternative);
+                conditionalAlternative,
+                // A §CTOR has no §O and no type-parameter list, so no return row
+                // and no `eff` binders — only its parameters can carry a row.
+                output: null,
+                effectParameters: null);
             _functionSymbols.Add(constructor, symbol);
 
             if (!classScope.TryDeclareOverload(qualifiedLookupName, symbol, out var duplicate))
@@ -800,7 +823,12 @@ public sealed class Binder
         Visibility visibility,
         string? containingTypeName,
         Parsing.TextSpan definitionSpan,
-        ConditionalAlternative? conditionalAlternative = null)
+        ConditionalAlternative? conditionalAlternative = null,
+        // v0.15 E2 slice b — the declaration's own §E-row context. `output`
+        // carries position 6's row; `effectParameters` are the `eff` binders a
+        // parameter row may mention (§7.2).
+        OutputNode? output = null,
+        IReadOnlyList<EffectParameterInfo>? effectParameters = null)
     {
         var parameterSymbols = parameters
             .Select((parameter, index) => CreateVariable(
@@ -821,7 +849,11 @@ public sealed class Binder
                 // parameter.TypeName is already ExpandType'd by the
                 // parser (?string → OPTION[inner=STRING]); the helper
                 // handles both forms. Scoped to STRING per §D6.
-                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName)))
+                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName),
+                // v0.15 E2 slice b — position 4/5's row (§3.3). Null unless the
+                // parameter both carries a §E and spells a function type.
+                functionType: TryBuildRowedFunctionType(
+                    parameter.TypeName, parameter.Row, effectParameters)))
             .ToArray();
         var symbol = new FunctionSymbol(
             id,
@@ -833,7 +865,12 @@ public sealed class Binder
             visibility,
             containingTypeName,
             definitionSpan,
-            conditionalAlternative);
+            conditionalAlternative)
+        {
+            // v0.15 E2 slice b — position 6's row (§3.3).
+            ReturnFunctionType = TryBuildRowedFunctionType(
+                output?.TypeName, output?.Row, effectParameters),
+        };
         TrackSymbol(symbol);
         return symbol;
     }
@@ -853,7 +890,8 @@ public sealed class Binder
         bool isProperty = false,
         bool isStatic = false,
         ConditionalAlternative? conditionalAlternative = null,
-        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
+        BoundTypes.FunctionBoundType? functionType = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -870,7 +908,8 @@ public sealed class Binder
             isProperty,
             isStatic,
             conditionalAlternative,
-            nullableAnnotation);
+            nullableAnnotation,
+            functionType);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -884,7 +923,8 @@ public sealed class Binder
         Parsing.TextSpan declarationSpan,
         string kind,
         ExpressionNode? defaultValue = null,
-        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
+        BoundTypes.FunctionBoundType? functionType = null)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
@@ -896,7 +936,8 @@ public sealed class Binder
             modifier,
             declarationSpan,
             defaultValue,
-            nullableAnnotation: nullableAnnotation);
+            nullableAnnotation: nullableAnnotation,
+            functionType: functionType);
     }
 
     private SymbolId CreateDeclarationId(
@@ -1084,7 +1125,13 @@ public sealed class Binder
                 // top-level function-parameter site so constructor /
                 // operator / indexer / etc. parameters also inherit
                 // their declared STRING nullability. Scoped per §D6.
-                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName));
+                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName),
+                // v0.15 E2 slice b — position 4/5's row for the callables that
+                // bind their parameters here rather than at registration
+                // (operators, indexers). No `eff` binders: neither production
+                // has a type-parameter list.
+                functionType: TryBuildRowedFunctionType(
+                    parameter.TypeName, parameter.Row, binders: null));
             if (!_scope.TryDeclare(symbol))
             {
                 var suggestedName = GenerateUniqueName(parameter.Name);
@@ -1412,6 +1459,20 @@ public sealed class Binder
                 ? explicitAnnotation
                 : InferAnnotationForStringBinding(bind.TypeName, typeName, initializer);
 
+        // v0.15 E2 slice b — position 7's row (§3.3), and §3.5's asymmetry:
+        //   * a row that is WRITTEN is the binding's row (Calor0405 when the
+        //     binding is not function-typed — this is the one row position that
+        //     CheckEffectRowPlacement cannot reach, because a §B nests
+        //     arbitrarily deep inside a body and the binder already visits every
+        //     one of them here);
+        //   * an OMITTED row on a binding WITH an initializer is INFERRED from
+        //     the initializer's row, not Unknown. That is what keeps the common
+        //     `§B{f} §LAM …` shape silent, which §5 needs;
+        //   * an omitted row with NO initializer stays Unknown (no
+        //     FunctionBoundType, nothing to infer from, and defaulting to pure
+        //     would re-open the hole PR #968 closed).
+        var bindFunctionType = BindBindingRow(bind, typeName, initializer);
+
         var variable = CreateLocalVariable(
             bind.Name,
             typeName,
@@ -1420,7 +1481,8 @@ public sealed class Binder
             ParameterModifier.None,
             bind.IdentifierSpan,
             "local",
-            nullableAnnotation: declaredAnnotation);
+            nullableAnnotation: declaredAnnotation,
+            functionType: bindFunctionType);
 
         if (!_scope.TryDeclare(variable))
         {
@@ -1455,6 +1517,45 @@ public sealed class Binder
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
+    }
+
+    /// <summary>
+    /// §3.5 — the function type a <c>§B</c> denotes, with its row. Written row
+    /// wins; otherwise the initializer's row is INHERITED when the initializer
+    /// is itself function-typed (the <c>§B{f} §LAM …</c> shape); otherwise
+    /// <c>null</c>, which is Unknown.
+    /// </summary>
+    private BoundTypes.FunctionBoundType? BindBindingRow(
+        BindStatementNode bind,
+        string typeName,
+        BoundExpression? initializer)
+    {
+        if (bind.Row != null)
+        {
+            // The declared type when there is one; otherwise the inferred type
+            // name, so `§B{f} §E{cw} §LAM …` is judged on what it actually is.
+            var subjectType = bind.TypeName ?? typeName;
+            if (!IsFunctionTypedSpelling(subjectType)
+                && initializer?.Type is not BoundTypes.FunctionBoundType)
+            {
+                ReportRowOnNonFunctionType(bind.Row, subjectType, bind.Name, "binding");
+                return null;
+            }
+
+            var declared = BindRow(bind.Row, binders: null);
+            return initializer?.Type is BoundTypes.FunctionBoundType initializerType
+                ? new BoundTypes.FunctionBoundType(
+                    initializerType.ParameterTypes,
+                    initializerType.ReturnType,
+                    displayOverride: initializerType.DisplayString,
+                    row: declared,
+                    parameterRows: initializerType.ParameterRows)
+                : BuildFunctionType(subjectType, declared);
+        }
+
+        // Omitted row, function-typed initializer: inherit the initializer's
+        // row verbatim — including its Unknown, when that is what it is.
+        return initializer?.Type as BoundTypes.FunctionBoundType;
     }
 
     private static bool TryBuildStringTarget(string bindTypeName, out BoundTypes.BoundType? target)
@@ -2552,6 +2653,23 @@ public sealed class Binder
             .ToArray()
             ?? Array.Empty<string>();
 
+        // v0.15 E2 slice b, §5 — the §LAM's §E becomes the lambda's DECLARED
+        // row (ρ_decl), which is what its type carries. Omitted leaves the type
+        // Unknown here: §3.5 says an omitted lambda row is inferred from the
+        // BODY, and the body's row (ρ_body) is computed by the effect pass, not
+        // the binder — E3 owns both the inference and the ρ_body ⊑ ρ_decl check
+        // (Calor0410). Unknown is the sound placeholder: it fits nothing and is
+        // fitted by nothing, so nothing can pass a check on the strength of a
+        // row slice b has not computed.
+        //
+        // The declaration boundary converts deliberately (§5): what leaves a
+        // lambda that declares a row is Concrete(declared), never an Assumed row
+        // carrying the body's reasons.
+        var declaredRow = lambda.Effects == null
+            ? BoundTypes.EffectRow.Unknown
+            : BoundTypes.EffectRow.AtDeclarationBoundary(
+                BindRow(lambda.Effects, binders: null));
+
         return new BoundLambdaExpression(
             lambda.Span,
             lambda.Id,
@@ -2567,7 +2685,8 @@ public sealed class Binder
             // E1 slice 2b: hand the expression body's real BoundType to the
             // lambda's FunctionBoundType. A statement body has no single bound
             // expression, so the node falls back to the string it just computed.
-            expressionBody?.Type);
+            expressionBody?.Type,
+            declaredRow);
     }
 
     private BoundExpression BindMatchExpression(MatchExpressionNode match)
@@ -4961,6 +5080,315 @@ public sealed class Binder
         var boundBody = BindStatements(body);
         return new BoundFunction(span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(), memberKind, className);
+    }
+
+    // ===== v0.15 E2 slice b — effect rows (design-doc §3.5, §4, §5, §8.2) =====
+
+    /// <summary>
+    /// Every <c>§E</c> row already reported as misplaced, by REFERENCE. One row
+    /// is reachable from more than one binder path (a parameter list is walked
+    /// at registration and again at body binding), and pin P6 says Calor0405 is
+    /// reported once per offending row, not once per visit.
+    /// </summary>
+    private readonly HashSet<EffectsNode> _misplacedRowsReported =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// Simple names declared with <c>§DEL</c> anywhere in this compilation.
+    /// Populated during type registration, which is why
+    /// <see cref="CheckEffectRowPlacement"/> runs AFTER all registration rather
+    /// than inside <c>CreateFunctionSymbol</c>: top-level functions are
+    /// registered before <c>module.Delegates</c>, so a row on a
+    /// <c>§DEL</c>-typed parameter would otherwise be reported as misplaced.
+    /// </summary>
+    private readonly HashSet<string> _delegateTypeNames = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// §3.5 / pin P6 — a <c>§E{…}</c> row on a position whose type is NOT a
+    /// function type is Calor0405 <c>EffectRowMisplaced</c>. A non-function type
+    /// performs no effects, so a row there has no meaning; before 0.15 the same
+    /// <c>§E</c> was silently read as the DECLARATION's own row, which is why
+    /// <c>Z9</c>/<c>Z9b</c>/<c>Z9c</c> compile on main.
+    ///
+    /// <para>This is the second of Calor0405's two situations. The first — a row
+    /// that is not on the same line as the type it annotates — is reported by
+    /// the parser (E2 slice a). One code, two ways of writing a row where a row
+    /// cannot go.</para>
+    ///
+    /// <para>Runs over DECLARATIONS only. Position 7 (a <c>§B</c>'s row) is
+    /// checked at <see cref="BindBindStatement"/> instead, because a binding can
+    /// be nested arbitrarily deep inside a body and the binder already visits
+    /// every one of them there.</para>
+    /// </summary>
+    private void CheckEffectRowPlacement(ModuleNode module)
+    {
+        foreach (var function in module.Functions)
+            CheckCallableRows(function.Parameters, function.Output);
+
+        foreach (var @delegate in module.Delegates)
+            CheckCallableRows(@delegate.Parameters, @delegate.Output);
+
+        foreach (var @interface in module.Interfaces)
+            CheckInterfaceRows(@interface);
+
+        foreach (var cls in module.Classes)
+            CheckClassRows(cls);
+    }
+
+    private void CollectDelegateTypeNames(ModuleNode module)
+    {
+        foreach (var @delegate in module.Delegates)
+            _delegateTypeNames.Add(@delegate.Name);
+        foreach (var cls in module.Classes)
+            CollectNestedDelegateTypeNames(cls);
+    }
+
+    private void CollectNestedDelegateTypeNames(ClassDefinitionNode cls)
+    {
+        foreach (var @delegate in cls.NestedDelegates)
+            _delegateTypeNames.Add(@delegate.Name);
+        foreach (var nested in cls.NestedClasses)
+            CollectNestedDelegateTypeNames(nested);
+    }
+
+    /// <summary>
+    /// §8.2 — the <see cref="BoundTypes.FunctionBoundType"/> a row-carrying
+    /// position denotes, or <c>null</c> when the position is not function-typed
+    /// (the Calor0405 case) or carries no row.
+    ///
+    /// <para>The DISPLAY STRING is the declared spelling, not §8.3's canonical
+    /// <c>(p1, p2) -&gt; ret</c>. Consumers compare display strings
+    /// byte-for-byte — <c>Binder.BindStatement</c> infers an untyped <c>§B</c>'s
+    /// <c>TypeName</c> from one, the verifier caches on one, the LSP builds a
+    /// call-graph key from one — so a position that used to print
+    /// <c>Func&lt;i32,i32&gt;</c> keeps printing it. The KIND becomes a function
+    /// type; the string does not move. That is the same trade E1 slice 2b made
+    /// for lambdas.</para>
+    ///
+    /// <para><see cref="BoundTypes.FunctionBoundType.ParameterRows"/> is all
+    /// <see cref="BoundTypes.EffectRow.Unknown"/> here, and that is not a
+    /// shortcut: a row on a nested generic argument
+    /// (<c>Func&lt;Func&lt;i32,i32&gt; §E{cw}, i32&gt;</c>) is unreachable in
+    /// 0.15 — inline generic arguments are read as text, never as a type with a
+    /// row (E2 slice a, deviation 4) — so there is no source that could supply
+    /// one.</para>
+    /// </summary>
+    private BoundTypes.FunctionBoundType? TryBuildRowedFunctionType(
+        string? typeName,
+        EffectsNode? row,
+        IReadOnlyList<EffectParameterInfo>? binders)
+    {
+        if (row == null || typeName == null) return null;
+        if (!IsFunctionTypedSpelling(typeName)) return null;
+        return BuildFunctionType(typeName, BindRow(row, binders));
+    }
+
+    /// <summary>
+    /// The structural shape of a declared function-type spelling.
+    /// <c>Func&lt;A,B&gt;</c> is <c>(A) -&gt; B</c>, <c>Action&lt;A&gt;</c> is
+    /// <c>(A) -&gt; VOID</c>, <c>Predicate&lt;A&gt;</c> is <c>(A) -&gt; BOOL</c>.
+    /// Anything else the string test admits — a bare <c>Delegate</c>, a
+    /// <c>§DEL</c> name whose declaration the binder does not resolve here —
+    /// gets an arity-0 shape, which is honest: the row is known, the signature
+    /// is not, and nothing in slice b reads the signature.
+    /// </summary>
+    private static BoundTypes.FunctionBoundType BuildFunctionType(
+        string typeName,
+        BoundTypes.EffectRow row)
+    {
+        var declared = typeName.Trim();
+        var parameters = System.Collections.Immutable.ImmutableArray<BoundTypes.BoundType>.Empty;
+        BoundTypes.BoundType returnType = new BoundTypes.NominalBoundType("VOID");
+
+        if (TypeIdentity.TrySplitGeneric(declared.TrimEnd('?'), out var generic, out var arguments)
+            && arguments.Count > 0)
+        {
+            switch (generic)
+            {
+                case "Func":
+                    parameters = System.Collections.Immutable.ImmutableArray.CreateRange(
+                        arguments.Take(arguments.Count - 1)
+                            .Select(argument => (BoundTypes.BoundType)new BoundTypes.NominalBoundType(argument)));
+                    returnType = new BoundTypes.NominalBoundType(arguments[^1]);
+                    break;
+                case "Predicate":
+                    parameters = System.Collections.Immutable.ImmutableArray.CreateRange(
+                        arguments.Select(argument => (BoundTypes.BoundType)new BoundTypes.NominalBoundType(argument)));
+                    returnType = new BoundTypes.NominalBoundType("BOOL");
+                    break;
+                default:
+                    parameters = System.Collections.Immutable.ImmutableArray.CreateRange(
+                        arguments.Select(argument => (BoundTypes.BoundType)new BoundTypes.NominalBoundType(argument)));
+                    break;
+            }
+        }
+
+        return new BoundTypes.FunctionBoundType(
+            parameters,
+            returnType,
+            displayOverride: declared,
+            row: row);
+    }
+
+    private void CheckInterfaceRows(InterfaceDefinitionNode @interface)
+    {
+        foreach (var method in @interface.Methods)
+            CheckCallableRows(method.Parameters, method.Output);
+        foreach (var indexer in @interface.Indexers)
+            CheckCallableRows(indexer.Parameters, output: null);
+    }
+
+    private void CheckClassRows(ClassDefinitionNode cls)
+    {
+        foreach (var field in cls.Fields)
+            CheckRowPosition(field.Row, field.TypeName, field.Name, "field");
+        foreach (var method in cls.Methods)
+            CheckCallableRows(method.Parameters, method.Output);
+        foreach (var constructor in cls.Constructors)
+            CheckCallableRows(constructor.Parameters, output: null);
+        foreach (var indexer in cls.Indexers)
+            CheckCallableRows(indexer.Parameters, output: null);
+        foreach (var op in cls.OperatorOverloads)
+            CheckCallableRows(op.Parameters, op.Output);
+        foreach (var nested in cls.NestedClasses)
+            CheckClassRows(nested);
+        foreach (var nested in cls.NestedInterfaces)
+            CheckInterfaceRows(nested);
+        foreach (var nested in cls.NestedDelegates)
+            CheckCallableRows(nested.Parameters, nested.Output);
+    }
+
+    private void CheckCallableRows(IReadOnlyList<ParameterNode> parameters, OutputNode? output)
+    {
+        foreach (var parameter in parameters)
+            CheckRowPosition(parameter.Row, parameter.TypeName, parameter.Name, "parameter");
+        if (output != null)
+            CheckRowPosition(output.Row, output.TypeName, output.TypeName, "return");
+    }
+
+    private void CheckRowPosition(EffectsNode? row, string? typeName, string subject, string subjectKind)
+    {
+        if (row == null) return;
+        if (IsFunctionTypedSpelling(typeName)) return;
+        ReportRowOnNonFunctionType(row, typeName, subject, subjectKind);
+    }
+
+    /// <summary>
+    /// "Can a value of this declared type carry an effect row?" — the STRING
+    /// half of the function-typedness question (<c>TypeIdentity</c>), plus the
+    /// <c>§DEL</c> names this compilation declares. The binder has no bound type
+    /// for a declared parameter/field/return spelling, so the string test is the
+    /// whole answer here; where a bound type IS in hand (a lambda) the type is a
+    /// <c>FunctionBoundType</c> by construction and never reaches this path.
+    /// </summary>
+    private bool IsFunctionTypedSpelling(string? typeName)
+        => TypeIdentity.IsFunctionTypeName(typeName, _delegateTypeNames.Contains);
+
+    private void ReportRowOnNonFunctionType(
+        EffectsNode row,
+        string? typeName,
+        string subject,
+        string subjectKind)
+    {
+        if (!_misplacedRowsReported.Add(row)) return;
+
+        // A return has no name of its own to quote, so it is described by its
+        // kind. Every other position is named.
+        var described = subjectKind == "return"
+            ? $"The return type '{typeName ?? "?"}' is not a function type"
+            : $"'{subject}' has type '{typeName ?? "?"}', which is not a function type";
+
+        _diagnostics.ReportError(
+            row.Span,
+            DiagnosticCode.EffectRowMisplaced,
+            $"{described}, so it cannot carry an effect row. Remove the §E{{…}}, or — if this is "
+            + "the function's own effect declaration — move it onto its own line.");
+    }
+
+    /// <summary>
+    /// The row's effect codes in the internal <c>category:value</c> spelling
+    /// <see cref="BoundTypes.EffectRow"/> carries. <c>EffectsNode.Effects</c>
+    /// maps a category to its values COMMA-JOINED (<c>§E{cw, fs:w}</c> is one
+    /// entry, <c>io -&gt; "console_write,filesystem_write"</c>), so the values
+    /// have to be split back apart.
+    /// </summary>
+    private static IEnumerable<string> EnumerateRowCodes(EffectsNode row)
+    {
+        foreach (var (category, values) in row.Effects)
+        {
+            foreach (var value in values.Split(','))
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    yield return $"{category.ToLowerInvariant()}:{value.Trim().ToLowerInvariant()}";
+            }
+        }
+    }
+
+    /// <summary>
+    /// The <see cref="BoundTypes.EffectRow"/> an <c>§E{…}</c> denotes, resolving
+    /// any effect VARIABLES it mentions against the binders of the declaration
+    /// that owns the row (§7.2, index-based per the spike's alpha-equivalence
+    /// finding).
+    ///
+    /// <para>A row that mentions a variable is <see cref="BoundTypes.EffectRow.Unknown"/>
+    /// in slice b: until §7.4's instantiation lands (E3) the variable's
+    /// contribution genuinely is not known, and Unknown is the sound answer —
+    /// it fits nothing and is fitted by nothing, so no assignment can slip
+    /// through on an uninstantiated row.</para>
+    ///
+    /// <para>A variable with no binder on the owning declaration is Calor0404.
+    /// It is <b>not reachable from source today</b>: the parser tracks the same
+    /// scope while it parses the row and leaves an unbound name as an unknown
+    /// effect CODE (Calor0403), so nothing lands in
+    /// <c>EffectsNode.EffectVariables</c> that was not bound. The check is here
+    /// because the binder is where scope is supposed to be decided, and it is
+    /// pinned as a unit test on the helper rather than as a source
+    /// transcript.</para>
+    /// </summary>
+    private BoundTypes.EffectRow BindRow(
+        EffectsNode? row,
+        IReadOnlyList<EffectParameterInfo>? binders)
+    {
+        if (row == null) return BoundTypes.EffectRow.Unknown;
+
+        var mentionsVariable = false;
+        foreach (var variable in row.EffectVariables)
+        {
+            var ordinal = ResolveEffectVariable(variable, binders);
+            if (ordinal < 0)
+            {
+                _diagnostics.ReportError(
+                    row.Span,
+                    DiagnosticCode.EffectVariableScope,
+                    $"Effect variable '{variable}' is not bound by this declaration. "
+                    + "Declare it in the type-parameter list — §F{f:Name:pub}<eff "
+                    + $"{variable}> — or use an effect code from the taxonomy.");
+            }
+            mentionsVariable = true;
+        }
+
+        return mentionsVariable
+            ? BoundTypes.EffectRow.Unknown
+            : BoundTypes.EffectRow.Concrete(EnumerateRowCodes(row));
+    }
+
+    /// <summary>
+    /// The ordinal of <paramref name="name"/> in the declaration's <c>eff</c>
+    /// binder list, or -1 when it binds nothing. Index-based, not name-based:
+    /// two declarations that spell their binders differently but use them in the
+    /// same positions denote the same polymorphic type (alpha-equivalence).
+    /// </summary>
+    private static int ResolveEffectVariable(
+        string name,
+        IReadOnlyList<EffectParameterInfo>? binders)
+    {
+        if (binders == null) return -1;
+        for (var index = 0; index < binders.Count; index++)
+        {
+            if (string.Equals(binders[index].Name, name, StringComparison.Ordinal))
+                return index;
+        }
+        return -1;
     }
 
     // ===== Effect extraction =====

@@ -8,7 +8,7 @@ CASE Y1a-I-sameline-cw-then-decl-pure  args: (none)  exit: 1
     §E{}
     §P m
 ------------------------------------------------------------------------------
-Y1a-I-sameline-cw-then-decl-pure.calr(5,5): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+Y1a-I-sameline-cw-then-decl-pure.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Y1b-I-sameline-cw-only  args: (none)  exit: 1
@@ -19,10 +19,10 @@ CASE Y1b-I-sameline-cw-only  args: (none)  exit: 1
     §O{void}
     §P m
 ------------------------------------------------------------------------------
-Y1b-I-sameline-cw-only.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+Y1b-I-sameline-cw-only.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
-CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 0
+CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Y1}
   §F{f001:Log:pub}
@@ -31,7 +31,7 @@ CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 0
     §E{cw}
     §P m
 ------------------------------------------------------------------------------
-Compilation successful: Y1c-I-sameline-pure-then-decl-cw.g.cs
+Y1c-I-sameline-pure-then-decl-cw.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Y2a-fallible-brace-form  args: (none)  exit: 1
@@ -94,7 +94,7 @@ CASE Y5a-arrow-sameline-E  args: (none)  exit: 1
   §F{f001:Log:pub} (str:m) -> void §E{cw}
     §P m
 ------------------------------------------------------------------------------
-Y5a-arrow-sameline-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+Y5a-arrow-sameline-E.calr(2,36): error Calor0405: The return type 'void' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE Y6a-MT-twoline  args: (none)  exit: 1

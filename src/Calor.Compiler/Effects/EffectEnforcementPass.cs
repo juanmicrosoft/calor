@@ -2166,23 +2166,13 @@ public sealed class EffectEnforcementPass
             IsFunctionBoundType(BoundValueTypes.GetValueOrDefault(name))
             || IsFunctionTypeName(typeName);
 
-        private bool IsFunctionTypeName(string typeName)
-        {
-            var t = typeName.Trim().TrimEnd('?');
-            var stripped = StripGenericArguments(t);
-            if (stripped != null && _context.DelegateTypeNames.Contains(stripped))
-                return true;
-            return t.Equals("Action", StringComparison.Ordinal)
-                || t.StartsWith("Action<", StringComparison.Ordinal)
-                || t.StartsWith("Func<", StringComparison.Ordinal)
-                || t.StartsWith("Predicate<", StringComparison.Ordinal)
-                || t.StartsWith("Comparison<", StringComparison.Ordinal)
-                || t.StartsWith("Converter<", StringComparison.Ordinal)
-                || t.Equals("Delegate", StringComparison.Ordinal)
-                || t.Equals("MulticastDelegate", StringComparison.Ordinal)
-                || t.Equals("EventHandler", StringComparison.Ordinal)
-                || t.StartsWith("EventHandler<", StringComparison.Ordinal);
-        }
+        // v0.15 E2 slice b — the list moved to Binding/TypeIdentity so the
+        // binder's Calor0405 check (pin P6) and this pass share ONE predicate.
+        // Forwarder kept so this pass's call sites are unchanged.
+        private bool IsFunctionTypeName(string typeName) =>
+            TypeIdentity.IsFunctionTypeName(
+                typeName,
+                name => _context.DelegateTypeNames.Contains(name));
 
         private void ReportUnknownCall(string target, TextSpan span)
         {

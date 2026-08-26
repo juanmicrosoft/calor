@@ -31,7 +31,7 @@ CASE X2a-sameline-O-and-E  args: (none)  exit: 1
     §O{void} §E{cw}
     §P m
 ------------------------------------------------------------------------------
-X2a-sameline-O-and-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+X2a-sameline-O-and-E.calr(4,14): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE X2b-sameline-O-and-E-pure  args: (none)  exit: 1
@@ -42,7 +42,7 @@ CASE X2b-sameline-O-and-E-pure  args: (none)  exit: 1
     §O{void} §E{}
     §P m
 ------------------------------------------------------------------------------
-X2b-sameline-O-and-E-pure.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+X2b-sameline-O-and-E-pure.calr(4,14): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
 CASE X3-bang-sigil-in-E  args: (none)  exit: 1
