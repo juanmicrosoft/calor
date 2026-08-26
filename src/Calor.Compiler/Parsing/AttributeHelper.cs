@@ -326,9 +326,18 @@ public static class AttributeHelper
     /// E.g., §E{fs:r} gets parsed as _pos0="fs", _pos1="r" instead of _pos0="fs:r"
     /// Also handles comma-separated effects like §E{cw,fs:w} which becomes _pos0="cw,fs", _pos1="w"
     /// </summary>
+    /// <param name="isEffectVariable">
+    /// Resolves a reconstructed code against the enclosing declaration's in-scope
+    /// <c>eff</c> binders. Consulted <b>before</b> <see cref="EffectCodes.TryParseCompact"/>,
+    /// per design-doc §7.2(b), so <c>§E{e}</c> binds the variable rather than failing
+    /// the taxonomy lookup. A name the predicate rejects keeps today's behaviour.
+    /// </param>
+    /// <param name="effectVariableSink">Receives each code the predicate accepted, in source order.</param>
     public static Dictionary<string, string> InterpretEffectsAttributes(
         AttributeCollection attrs,
-        Action<string>? reportUnknownCode = null)
+        Action<string>? reportUnknownCode = null,
+        Func<string, bool>? isEffectVariable = null,
+        ICollection<string>? effectVariableSink = null)
     {
         var effects = new Dictionary<string, string>();
 
@@ -485,6 +494,14 @@ public static class AttributeHelper
         // Now process all the reconstructed effect codes
         foreach (var code in effectCodes)
         {
+            // §7.2(b): effect variables resolve BEFORE the taxonomy, so a declaration
+            // that binds `eff e` reads §E{e} as the variable and never as a code.
+            if (isEffectVariable is not null && isEffectVariable(code))
+            {
+                effectVariableSink?.Add(code);
+                continue;
+            }
+
             if (!EffectCodes.TryParseCompact(code, out _, out var category, out var value))
             {
                 reportUnknownCode?.Invoke(code);

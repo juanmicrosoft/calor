@@ -11,7 +11,7 @@ CASE Y1a-I-sameline-cw-then-decl-pure  args: (none)  exit: 1
 Y1a-I-sameline-cw-then-decl-pure.calr(5,5): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
-CASE Y1b-I-sameline-cw-only  args: (none)  exit: 0
+CASE Y1b-I-sameline-cw-only  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Y1}
   §F{f001:Log:pub}
@@ -19,7 +19,7 @@ CASE Y1b-I-sameline-cw-only  args: (none)  exit: 0
     §O{void}
     §P m
 ------------------------------------------------------------------------------
-Compilation successful: Y1b-I-sameline-cw-only.g.cs
+Y1b-I-sameline-cw-only.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
 CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 0
@@ -57,29 +57,14 @@ Compilation successful: Y2b-fallible-in-B.g.cs
 Y2b-fallible-in-B.calr(4,5): warning Calor0200: Type 'i32!str' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.
 
 ==============================================================================
-CASE Y3a-B-with-sameline-E  args: (none)  exit: 1
+CASE Y3a-B-with-sameline-E  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:Y3}
   §F{f001:Main:pub} () -> void
     §E{}
     §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
 ------------------------------------------------------------------------------
-Y3a-B-with-sameline-E.calr(4,25): error Calor0100: Expected statement but found Effects
-Y3a-B-with-sameline-E.calr(4,27): error Calor0100: Expected statement but found OpenBrace
-Y3a-B-with-sameline-E.calr(4,28): error Calor0100: Expected statement but found Identifier
-Y3a-B-with-sameline-E.calr(4,30): error Calor0100: Expected statement but found CloseBrace
-Y3a-B-with-sameline-E.calr(4,32): error Calor0100: Expected statement but found Lambda
-Y3a-B-with-sameline-E.calr(4,36): error Calor0100: Expected statement but found OpenBrace
-Y3a-B-with-sameline-E.calr(4,37): error Calor0100: Expected statement but found Identifier
-Y3a-B-with-sameline-E.calr(4,41): error Calor0100: Expected statement but found Colon
-Y3a-B-with-sameline-E.calr(4,42): error Calor0100: Expected statement but found Identifier
-Y3a-B-with-sameline-E.calr(4,43): error Calor0100: Expected statement but found Colon
-Y3a-B-with-sameline-E.calr(4,44): error Calor0100: Expected statement but found Identifier
-Y3a-B-with-sameline-E.calr(4,47): error Calor0100: Expected statement but found CloseBrace
-Y3a-B-with-sameline-E.calr(4,57): error Calor0100: Expected statement but found EndLambda
-Y3a-B-with-sameline-E.calr(4,62): error Calor0100: Expected statement but found OpenBrace
-Y3a-B-with-sameline-E.calr(4,63): error Calor0100: Expected statement but found Identifier
-Y3a-B-with-sameline-E.calr(4,67): error Calor0100: Expected statement but found CloseBrace
+Compilation successful: Y3a-B-with-sameline-E.g.cs
 
 ==============================================================================
 CASE Y3b-B-plain  args: (none)  exit: 0
@@ -103,13 +88,13 @@ CASE Y4a-O-sameline-E-decl-later  args: (none)  exit: 0
 Compilation successful: Y4a-O-sameline-E-decl-later.g.cs
 
 ==============================================================================
-CASE Y5a-arrow-sameline-E  args: (none)  exit: 0
+CASE Y5a-arrow-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Y5}
   §F{f001:Log:pub} (str:m) -> void §E{cw}
     §P m
 ------------------------------------------------------------------------------
-Compilation successful: Y5a-arrow-sameline-E.g.cs
+Y5a-arrow-sameline-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
 CASE Y6a-MT-twoline  args: (none)  exit: 1

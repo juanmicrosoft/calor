@@ -52,6 +52,112 @@ Place the effect declaration after the output type:
   // body
 ```
 
+**The line matters.** A `§E{...}` on its **own line**, as above, is the function's own
+effect declaration. A `§E{...}` written on the **same line** as a type belongs to that
+type instead — see *Effect rows* below.
+
+---
+
+## Effect Rows
+
+*New in v0.15.*
+
+If a function takes another function as a parameter — a callback, a handler, a
+comparison — you can now say what that inner function is allowed to do. Write the same
+`§E{...}` tag on the **same line** as the type it describes:
+
+```
+§F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+```
+
+That says: *`transform` may write to the console.* Before this, there was no way to say
+it, so calling `transform` at all was an error.
+
+The rule is just the line. A `§E{...}` on the same line as a type is that type's row; a
+`§E{...}` on its own line is the function's effect declaration, exactly as it always was.
+Almost everyone already writes the second form, so almost nothing changes.
+
+### The eight places you can write one
+
+```
+§F{f001:F:pub} () -> void
+  §E{cw}                                    // 1. the function's own declaration
+
+§B{f} §LAM{lam1:x:i32} §E{cw} ... §/LAM{lam1} // 2. a lambda
+
+§DEL{d001:Handler}
+  §I{i32:x}
+  §O{void}
+  §E{cw}                                    // 3. a delegate
+
+§I{Func<i32,i32>:f} §E{cw}                  // 4. a parameter, tag form
+(Func<i32,i32>:f §E{cw}, i32:v)             // 5. a parameter, inline form
+§O{Func<i32>} §E{cw}                        // 6. a return type
+() -> Func<i32> §E{cw}                      //    …or the arrow spelling
+§B{f:Func<i32,i32>} §E{cw} <initializer>    // 7. a binding
+§FLD{Action<i32>:onChange:pri} §E{cw}       // 8. a field
+```
+
+A type carries **one** row. To allow several effects, put them in the one row —
+`§E{cw, net}` — not in two tags side by side.
+
+### Placeholder effects (`eff`)
+
+Sometimes a function should be allowed to do *whatever the caller's function does*, no
+more and no less. Write a placeholder in the type-parameter list with `eff`, then use its
+name in the rows:
+
+```
+§F{f001:Twice:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
+  §E{e}
+  §R INT:0
+```
+
+`Twice` is pure when `f` is pure, and writes to the console when `f` does. One definition
+serves both callers.
+
+A placeholder can only be declared on a function or a method — including a method inside
+an interface — and can only be used in that declaration's own row and in its parameters'
+rows. It may not be named after a real effect code such as `cw`, because then that code
+could not be written inside the declaration.
+
+### When it goes wrong
+
+**Calor0405** — the row is somewhere a row cannot go. Most often the row is on the wrong
+line:
+
+```
+§FLD{i32:x:pri}
+§E{cw}            // Calor0405: move it onto the end of the 'x' field line
+```
+
+It also fires if you write two rows on one type. The message always names both repairs.
+
+**Calor0404** — a placeholder is declared where it cannot be (on a class or an interface
+rather than on a member), used somewhere it cannot be (a return type, a binding, a
+lambda), or named after a real effect code.
+
+### What is checked today
+
+**Writing a row is not yet checked against anything.** The compiler reads it, remembers
+it, and re-prints it faithfully — `calor fmt` keeps it — but it does not yet compare the
+row on a callback against what the function you passed actually does. That comparison is
+the next release. Writing a row today is documentation the compiler has agreed to carry.
+
+**So the thing you most want to do still does not work yet.** Calling a callback is
+refused, row or no row:
+
+```
+§F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+  §E{cw}
+  §R §C{transform} §A value §/C     // Calor0418, even with the row above
+```
+
+The row is what will *make* that call legal — the compiler has to compare it against the
+function you actually pass, and that comparison is the next release. Until then a call
+through a function-typed value still needs `§CSHARP` interop or
+`--permissive-effects`, exactly as before.
+
 ---
 
 ## Effect Codes

@@ -197,6 +197,22 @@ three source files — `Commands/IndexCommand.cs`, `Commands/QueryCommand.cs`,
 >
 > **Eight positions** (§3.3). No new token, no new AST node type, no new `IAstVisitor` method.
 
+> **STATUS — LANDED (syntax only), PR #1101, v0.15 E2 slice a.** All eight positions parse,
+> `CalorEmitter` round-trips every one, and **Calor0405** replaces the cascade at the positions
+> with no `§E` arm. What landed is the *writing* of a row; **nothing compares two rows yet**.
+> Still pending, and owned by slice b / E3: §3.5's Calor0425-on-omitted-row and the
+> **function-typedness check** (a row on an `i32` — pin **P6**), §3.4's Calor0410 provenance
+> clause, and every §6 site.
+>
+> **One correction to this section, measured.** §3.3 and §9 say adding a `Row` child to the four
+> node classes forces an `eng/ast-schema.json` edit, because of
+> `ArchitectureTests.cs:158`. It does not. That test compares
+> `AstSchemaMetadata.Nodes[].ChildProperties` against `RecursiveAstWalker.GetAllChildProperties`,
+> and **both sides are computed by reflection** (`Ast/AstNode.cs:633`); the committed JSON carries
+> only `{name, source}` per node and has no `childProperties` key at all. A schema edit is forced
+> by a new node *type*, not a new child property. E2 slice a adds no node type and edited no
+> schema. (`facts.py` already recorded the JSON's shape; nothing re-read it against the claim.)
+
 ### 3.1 The collision, executed
 
 Draft v1 assumed a suffix `§E` could be told apart from a declaration `§E` positionally. It
@@ -761,6 +777,29 @@ Draft v1 claimed otherwise. The re-wording is deliberate (it names the row) and 
 > type-parameter list** (`§F{f001:Map:pub}<T, U, eff e>`) and used as a **bare identifier**
 > inside `§E{…}` (`§E{e}`). Not `!e`. They may appear only in a declaration's own row and its
 > parameters' rows; anything else is **Calor0404**. Ships iff the §7.5 ramp does not fire.
+
+> **STATUS — LANDED (syntax only), PR #1101, v0.15 E2 slice a.** The `eff` modifier parses in the
+> `§F`/`§AF`/`§MT`/`§AMT` type-parameter lists (including an interface member's, which is the
+> spelling the spike chose), the one-token lookahead keeps **Z4**'s `<eff>` compiling, §7.2(c)'s
+> name-collision ban is **Calor0404**, and `CalorEmitter` round-trips the binder. Binders are
+> stored as `EffectParameters` on the declaring node and are deliberately **not**
+> `TypeParameterNode`s, so codegen erases them by construction (G-CODEGEN, §12.2).
+>
+> **Three of §7.3's seven rejection sites are Calor0404 today** — return, binding and lambda —
+> plus the class/interface-level binder. The other three are refused, but not by that code, and
+> the honest reading is recorded rather than papered over:
+>
+> | §7.3 site | Slice a | Why |
+> |---|---|---|
+> | return · binding · lambda row | **Calor0404** | the binder is in scope and the position forbids the mention |
+> | class/interface-level `eff` | **Calor0404** | rejected at the binder, message points at the member-level spelling |
+> | field row · delegate row | Calor0403 | **unreachable with a bound variable.** A `§FLD` is not inside the member that could bind one, and a `§DEL` has no type-parameter list at all (**Z8**) and is a sibling of every declaration that has one. Refused by the taxonomy instead |
+> | inside a generic argument | no row produced | inline types are read as strings (`ReadInlineTypeToken`), so a `§E` there never reaches a row parse. Pinned as "no row", not as a Calor0404 the compiler cannot reach |
+>
+> **Out-of-scope use stays Calor0403.** §7.2(b)'s second half — routing an *unbound* `§E{e}` to
+> Calor0404 — needs the binder and is **E3's**. Pinned as a boundary
+> (`EffectVariableTests.OutOfScope_KeepsTodaysCalor0403_AndIsE3sToMove`) so it is observed rather
+> than forgotten. Instantiation (§7.4) and the join are also E3's; slice a only records.
 
 ### 7.1 Why not `!e` — executed
 
@@ -1746,6 +1785,25 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 
 ### 13.2 New pins — home and freeze
 
+> **P1 and P6 contradict each other, and slice b re-specifies P1.** Recorded in review round 1 of
+> PR #1101 rather than discovered when slice b turns a green pin red.
+>
+> P1's own case is **Y1b** — `§I{str:m} §E{cw}` over a `str` parameter — and P1 says it must be
+> **Calor0410** after E2. But `str` is not a function type, so under §3.5 that row is a row on a
+> position that cannot carry one, and **P6 says it must be Calor0405**. The two pins name
+> different answers for the same source.
+>
+> Five more cases are the same shape and the same collision: **Y5a** and **X2a**/**X2b**
+> (`-> void §E{cw}` and `§O{void} §E{cw}`) and **Z9**/**Z9b**. §13.5(a) lists all six as having
+> moved to Calor0410 in slice a; **all six move again, to Calor0405, when P6 lands in slice b.**
+>
+> This is not a defect in either pin — it is the seam between a slice that consumes rows and a
+> slice that checks what they are attached to. But it means **P1 as written is a state slice b
+> must break**, so slice b re-specifies P1 onto a function-typed subject
+> (`§I{Func<i32,i32>:f} §E{cw}` against a pure declaration) and hands the non-function-typed
+> cases to P6. A slice-b PR that merely regenerates these six transcripts without saying that has
+> silently changed what P1 asserts.
+
 | # | Pin | Home | Freeze | Discriminating revert |
 |---|---|---|---|---|
 | P1 | `RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow` — case **Y1b**: compiles today, must be Calor0410 after | `Calor.Enforcement.Tests/EffectRowSyntaxTests.cs` | with E2 | drop the `Span.Line` comparison → Y1b compiles again |
@@ -1836,9 +1894,62 @@ the transcripts are E2's frozen evidence base and a throwaway prototype does not
 | 7 | `facts.py` — the `IsSubsetOf` compatibility-site sweep | `EffectEnforcementPass.cs:533` and `:571` are listed | both **vanish**; five `EffectSet.cs` lines appear instead | **Intended, and it is R2's own evidence moving a pinned fact.** §6.3 says those two calls "become calls to the shared `EffectRow.Fits`"; this sweep is the instrument that observes it, so when the claim comes true the transcript *must* change |
 
 **If E2's regeneration moves any other line, that is a behaviour change the spike did not make,
-and it needs its own justification in the E2 PR body.** `spike-verdict.json`'s
-`transcriptDivergences.e2Obligation` carries the same sentence in machine-readable form, and
-P27 asserts that the case list holds exactly seven rows.
+and it needs its own justification in the E2 PR body.**
+
+> **EXECUTED, E2 slice a, PR #1101 — FIFTEEN moved items, not seven, and every extra is
+> accounted for.** Counted from a full diff of all six transcripts, not from this table:
+> `run.py` **5** (X2a, X2b, X6a, X9b, X9c), `run2.py` **3** (Y1b, Y3a, Y5a), `run3.py` **5**
+> (Z1, Z2, Z3, Z9, Z9b), `facts.py` **2** file:line probes — **13 named cases plus 2 probes**.
+> The `IsSubsetOf` row below is the sixteenth line of the table and did **not** move; it is
+> listed because the spike obliged E2 to say what happened to it, not because anything changed.
+> (Review round 1 caught this table being read as if every row were a divergence — the same
+> summary-instead-of-measurement error §13.5(a)'s own closing note warns about. Re-derived from
+> the diff.) The seven above were produced by a prototype that implemented **only**
+> positions 5 and 8 (`spike-verdict.json.prototype.notImplemented`). Slice a implements **all
+> eight**, so every case that exercises a position the prototype skipped moves too. The full
+> accounting, by script:
+>
+> | Case | Obligation | Result |
+> |---|---|---|
+> | `run.py` **X6a** | #1 | **as predicted** — one `Calor0410 … uses effect 'alloc'`, verbatim |
+> | `run3.py` **Z1** | #4 | **as predicted** — 4 → 1 Calor0405 naming the `x` field line |
+> | `run3.py` **Z3** | #5 | **as predicted** — 8 → 1 Calor0405 naming the `transform` parameter line |
+> | `facts.py` `ParameterNode` probe | #6 | **as predicted** — `FunctionNode.cs:252` → `:283`, the same line the prototype produced |
+> | `run.py` **X9b** | #2 | **partially** — the 4× `Calor0100` cascade is gone (position 8 lands), but the case does **not** reach `exit 0`: it reaches today's `Calor0418`, because accepting the invocation needs row **checking**. The syntax half is discharged; the acceptance half is E3's |
+> | `run.py` **X9c** | #3 | **partially** — same, for position 5: 12 → 1, `Calor0418` not `exit 0` |
+> | `facts.py` `IsSubsetOf` sweep | #7 | **not moved** — correctly. It observes `CheckEffectVariance` routing through `EffectRow.Fits`, which is E3's change |
+> | `facts.py` `ClassFieldNode` probe | — | `ClassNodes.cs:554` → `:564`. Same unavoidable mechanism as #6; the spike's table listed only the `ParameterNode` line because its prototype touched `ClassFieldNode` differently |
+> | `run2.py` **Y1b** | — | `Compilation successful` → `Calor0410`. **This is pin P1's own case**, named in §13.2. Position 4 |
+> | `run2.py` **Y5a** | — | same flip, arrow spelling. §3.2 names Y5a as one of the three forms this decision knowingly breaks |
+> | `run.py` **X2a**, **X2b** | — | same flip / same code with a moved span, `§O` spelling. §3.2 names X2b |
+> | `run3.py` **Z9**, **Z9b** | — | `Compilation successful` → `Calor0410`. These are §3.5's non-function-typed cases, whose **final** answer is Calor0405. Slice a consumes the row but does not yet check function-typedness (pin **P6**), so they land on 0410 in between. Slice b moves them to their final state |
+> | `run2.py` **Y3a** | — | 16 × `Calor0100` → compiles. **Position 7**, the `§B` row, which §3.3 lists and the prototype did not implement |
+> | `run3.py` **Z2** | — | 4 × `Calor0100` → 1 Calor0405. Position 7's recovery — listed explicitly by **P2(b)**, absent from the spike's table only because the prototype had no position 7 |
+>
+> `run2.py`'s remaining cases, `facts2.py` and **`compile53.py` are CLEAN** — so
+> `o53/baseline.json`'s 23 files / 54 occurrences / 1 green / 22 red are **unchanged**, which is
+> gate 5's line-adjacency leg discharged.
+>
+> **Two defects were found this way and fixed; both were the same mistake.** A first draft put
+> the Calor0405 recovery in the statement and class-member **loops** rather than in the
+> productions that own a row. That made it fire on any stray `§E`, and two cases proved it wrong:
+> **Z10** (`§R §C{Helper} §A INT:1 §E{cw} §/C`) gained a Calor0405 inside an argument list, which
+> §3.3 forbids outright — *"Arguments are values, not declarations; they have no row, and
+> Calor0405 is not extended there"* — and **X4** had the function's own perfectly correct `§E{}`
+> line reported as misplaced, because a broken `§O{str!str}` parse had left it in statement
+> position. A "the row must start its line" guard fixed Z10's single-line spelling and hid the
+> rest: review round 1 found the **multi-line** call (`§C{Helper}` ⏎ `§A INT:1` ⏎ `§E{cw}`) still
+> reporting Calor0405, since that `§E` does start its line. Anchoring the recovery to the `§B` /
+> `§FLD` production that owns the row closes all of it by construction, and **X4's and Z10's
+> transcripts are byte-identical to the committed ones**.
+>
+> **A third came out of the same review.** A type carries at most one row, but nothing said so:
+> `§I{str:m} §E{cw} §E{net}` was silently reading the first as the parameter's row and the second
+> as the *declaration's*, via the `§F` loop's `§E` arm. Now one Calor0405, naming the repair
+> (`§E{cw, net}`).
+
+`spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
+machine-readable form, and P27 asserts that the case list holds exactly seven rows.
 
 > **How the count was wrong the first time, and why that matters.** The spike PR first recorded
 > **three**. They had been read off P29's failure message, which prints the **first** difference

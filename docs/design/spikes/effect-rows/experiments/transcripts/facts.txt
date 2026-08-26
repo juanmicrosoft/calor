@@ -1,9 +1,9 @@
 ### BindStatementNode / BindingNode
 BindingNode hits: 0
 src/Calor.Compiler/Ast/ControlFlowNodes.cs:161:public sealed class BindStatementNode : StatementNode
-src/Calor.Compiler/Ast/ClassNodes.cs:554:public sealed class ClassFieldNode : AstNode
+src/Calor.Compiler/Ast/ClassNodes.cs:564:public sealed class ClassFieldNode : AstNode
 src/Calor.Compiler/Ast/FunctionNode.cs:21:public sealed class OutputNode : AstNode
-src/Calor.Compiler/Ast/FunctionNode.cs:252:public sealed class ParameterNode : AstNode
+src/Calor.Compiler/Ast/FunctionNode.cs:283:public sealed class ParameterNode : AstNode
 
 ### ast-schema / ArchitectureTests
 eng/ast-schema.json exists: True

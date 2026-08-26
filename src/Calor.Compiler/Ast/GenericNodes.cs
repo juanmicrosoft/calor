@@ -16,6 +16,25 @@ public enum VarianceKind
 }
 
 /// <summary>
+/// An effect variable bound by an <c>eff</c> modifier in a declaration's
+/// type-parameter list: <c>§F{f001:Map:pub}&lt;T, U, eff e&gt;</c>.
+/// </summary>
+/// <remarks>
+/// Deliberately <b>not</b> an <see cref="AstNode"/> and deliberately not a
+/// <see cref="TypeParameterNode"/> — following the <c>InlineRefinementInfo</c>
+/// precedent. Effect binders are erased at codegen (design-doc §12.2 G-CODEGEN),
+/// and keeping them out of <c>TypeParameters</c> makes that erasure the default
+/// for every consumer of that list rather than something each must remember.
+/// <para>
+/// <paramref name="Ordinal"/> is the binder's index within the original
+/// <c>&lt;…&gt;</c> list, which is what lets <c>CalorEmitter</c> reproduce
+/// <c>&lt;T, eff e&gt;</c> and <c>&lt;eff e, T&gt;</c> byte-exactly instead of
+/// assuming binders are written last.
+/// </para>
+/// </remarks>
+public sealed record EffectParameterInfo(string Name, int Ordinal, TextSpan Span);
+
+/// <summary>
 /// Represents a type parameter declaration.
 /// New syntax: §F{id:name:pub}&lt;T&gt; or §CL{id:name:pub}&lt;T, U&gt;
 /// Legacy: §TP[T] (no longer supported in new code)

@@ -590,6 +590,18 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   cannot be satisfied by deleting resolution outright).
 - **E2 — Effect rows** on function, delegate, and lambda types (monomorphic MUST; rank-1
   polymorphism behind the §4.1 ramp).
+  - **slice a (syntax) — LANDED, PR #1101.** All eight positions of design-doc §3.3 parse,
+    `CalorEmitter` round-trips every one, `eff` binders parse with the one-token lookahead that
+    keeps a type parameter named `eff` working, and **Calor0404** / **Calor0405** are allocated
+    and raised. Zero diagnostic changes across all 886 committed `.calr`. Rows can be **written**;
+    nothing compares two of them yet.
+  - **slice b — owes the checking half:** §3.5 / pin **P6** (a row on a non-function-typed
+    position is Calor0405, and the omitted-row lattice), §8.2 (`FunctionBoundType.Row` /
+    `ParameterRows` — rows live only on the AST today), §7.2(b)'s second half (an *unbound*
+    `§E{e}` routing to Calor0404 rather than today's Calor0403), and §5's Calor0410 on a lambda
+    whose body exceeds its declared row. **P6 re-specifies P1**: six cases slice a moved to
+    Calor0410 (Y1b, Y5a, X2a, X2b, Z9, Z9b) are rows on non-function types and move again to
+    Calor0405 — see the §13.2 note.
 - **E3 — Effect-compatibility checking** at assignment, argument, return, override, and
   interface-implementation sites, as one row-subtyping rule — plus rank-1 generic-instantiation
   sites **unless the §4.1 ramp fires**. Calor0420/0421 either fold into it or are re-pinned

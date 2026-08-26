@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -72,6 +73,61 @@ public sealed class Parser
     private int _position;
     private bool _insideArgContext;
     private bool _insideRefinementPredicate;
+
+    /// <summary>
+    /// Stack of <c>eff</c> binder scopes, innermost last. A scope is pushed when a
+    /// declaration form that may bind effect variables (<c>§F</c>, <c>§AF</c>,
+    /// <c>§MT</c>, <c>§AMT</c>, and an interface member's <c>§MT</c>) has parsed its
+    /// type-parameter list, and popped in a <c>finally</c> when that declaration is
+    /// done. Nesting is real — an interface member sits inside a <c>§IFACE</c> and a
+    /// <c>§LAM</c> sits inside a function body — which is why this is a stack and not
+    /// the spike prototype's single list reset by every type-parameter list.
+    /// </summary>
+    private readonly List<IReadOnlyList<EffectParameterInfo>> _effectVariableScopes = new();
+
+    /// <summary>
+    /// Calor0405 recovery for the <b>declaration that just finished parsing</b>: a
+    /// <c>§E{…}</c> now sitting at the start of the following line, at a position whose
+    /// enclosing loop has no <c>§E</c> arm to fall through to. Executed baselines
+    /// <b>Z1</b> (<c>§FLD</c> ⏎ <c>§E</c>, 4× Calor0100) and <b>Z2</b> (<c>§B</c> ⏎
+    /// <c>§E</c>, 4× Calor0100).
+    /// </summary>
+    /// <remarks>
+    /// <para>Called at the END of <c>ParseBindStatement</c> and <c>ParseClassField</c>,
+    /// which is where §3.1 puts it — "each of the six insertion points carries the
+    /// Calor0405 recovery on its non-adjacent branch". An earlier draft of this slice
+    /// hoisted it into the statement and class-member LOOPS instead, on the reasoning
+    /// that the production could not see a token it had already returned past. That
+    /// reasoning was wrong — <c>Current</c> IS the <c>§E</c> when these productions
+    /// return — and hoisting it cost three separate defects, all found in review:</para>
+    /// <list type="number">
+    /// <item>a broken multi-line call (<c>§C{Helper}</c> ⏎ <c>§A INT:1</c> ⏎
+    /// <c>§E{cw}</c>) reached the statement loop and was told its row was on the wrong
+    /// line, extending Calor0405 into an argument list — which §3.3 forbids outright;</item>
+    /// <item>a failed inline signature left the function's own perfectly correct
+    /// <c>§E{…}</c> line in statement position, where it was reported as misplaced
+    /// (executed case <b>X4</b>);</item>
+    /// <item>the "which declaration?" subject had to be remembered in a parser field,
+    /// which leaked across scopes and could name a field in a different class.</item>
+    /// </list>
+    /// <para>Anchoring the recovery to the production that owns the row removes all
+    /// three by construction: it cannot fire unless a <c>§B</c> or <c>§FLD</c> was the
+    /// thing immediately before the <c>§E</c>, and the subject is the declaration in
+    /// hand rather than a remembered one.</para>
+    /// </remarks>
+    private void TryRecoverTrailingEffectRow(string subject, string subjectKind)
+    {
+        if (!Check(TokenKind.Effects))
+            return;
+
+        // Calor0405's whole claim is that a row is on the wrong LINE. A §E still on
+        // the declaration's own line was already taken as its row by
+        // TryParseSameLineRow; anything else here belongs to the enclosing production.
+        if (_position > 0 && PreviousToken.Span.Line == Current.Span.Line)
+            return;
+
+        ReportMisplacedEffectRow(subject, subjectKind);
+    }
 
     /// <summary>
     /// Phase 1 of v0.6 call-closer-elision RFC: tracks the number of
@@ -1328,7 +1384,13 @@ public sealed class Parser
         var visibility = ParseVisibility(visibilityStr);
 
         // NEW: Parse optional type parameters §F{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -1480,7 +1542,10 @@ public sealed class Parser
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef, identifierSpan: identifierSpan);
+            properties, lockNode, author, taskRef, identifierSpan: identifierSpan)
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     /// <summary>
@@ -1525,7 +1590,13 @@ public sealed class Parser
         var visibility = ParseVisibility(visibilityStr);
 
         // Parse optional type parameters §AF{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -1672,7 +1743,10 @@ public sealed class Parser
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef, isAsync: true, identifierSpan: identifierSpan);
+            properties, lockNode, author, taskRef, isAsync: true, identifierSpan: identifierSpan)
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     private ParameterNode ParseParameter()
@@ -1711,6 +1785,12 @@ public sealed class Parser
 
         var csharpAttrs = ParseCSharpAttributes();
 
+        // Position 4 (§3.3): §I{Func<i32,i32>:f} §E{cw} — the row must sit on the same
+        // line as the tag it annotates. A §E on a later line is left for the enclosing
+        // §F/§MT/§DEL section loop's own §E arm, where it is the declaration's row.
+        // Covers all 9 §I dispatch arms, because the check lives in the shared production.
+        var row = TryParseSameLineRow(EffectRowPosition.Parameter);
+
         // Parse optional inline refinement: §I{type:name | (predicate using #)}
         InlineRefinementInfo? inlineRefinement = null;
         if (Check(TokenKind.Pipe))
@@ -1748,7 +1828,8 @@ public sealed class Parser
             defaultValue,
             inlineRefinement,
             identifierSpan,
-            attrs.GetSpan("_pos0"));
+            attrs.GetSpan("_pos0"),
+            row);
     }
 
     private OutputNode ParseOutput()
@@ -1764,13 +1845,76 @@ public sealed class Parser
             typeName = "";
         }
 
-        return new OutputNode(startToken.Span, typeName, attrs.GetSpan("_pos0"));
+        // Position 6, §O spelling (§3.3): §O{Func<i32>} §E{cw}. Same line rule; a §E on
+        // a later line is the declaration's row and is the canonical two-line corpus
+        // form (54 occurrences across 23 files), so it must NOT be consumed here.
+        // Covers all 7 §O dispatch arms.
+        var row = TryParseSameLineRow(EffectRowPosition.Return);
+
+        return new OutputNode(startToken.Span, typeName, attrs.GetSpan("_pos0"), row);
     }
 
-    private EffectsNode ParseEffects()
+    /// <summary>
+    /// Where a <c>§E{…}</c> is being read. Governs one thing only in this slice:
+    /// whether an in-scope effect variable may be <i>mentioned</i> here
+    /// (design-doc §7.3's partition of the eight positions).
+    /// </summary>
+    private enum EffectRowPosition
+    {
+        /// <summary>Position 1 — the declaration's own row. Variables permitted.</summary>
+        Declaration,
+        /// <summary>Positions 4 and 5 — a parameter's row. Variables permitted.</summary>
+        Parameter,
+        /// <summary>Position 6 — a return row. Forbidden: it would be rank-2.</summary>
+        Return,
+        /// <summary>Position 7 — a binding's row. Nothing binds a variable there.</summary>
+        Binding,
+        /// <summary>Position 8 — a field's row. Nothing binds a variable there.</summary>
+        Field,
+        /// <summary>Position 2 — a lambda literal has no type-parameter list (Z8b).</summary>
+        Lambda,
+        /// <summary>Position 3 — a delegate declaration has no type-parameter list (Z8).</summary>
+        Delegate,
+    }
+
+    private static bool PermitsEffectVariables(EffectRowPosition position)
+        => position is EffectRowPosition.Declaration or EffectRowPosition.Parameter;
+
+    private static string DescribeEffectRowPosition(EffectRowPosition position) => position switch
+    {
+        EffectRowPosition.Return => "a return row — a returned function mentioning the caller's effect variable would be rank-2 polymorphism",
+        EffectRowPosition.Binding => "a binding's row — a §B binds no effect variable",
+        EffectRowPosition.Field => "a field's row — a §FLD binds no effect variable",
+        EffectRowPosition.Lambda => "a lambda literal's row — a §LAM has no type-parameter list to bind one",
+        EffectRowPosition.Delegate => "a delegate declaration's row — a §DEL has no type-parameter list to bind one",
+        _ => "this position",
+    };
+
+    /// <summary>
+    /// True when <paramref name="name"/> is bound as an effect variable by some
+    /// enclosing declaration. Effect variables are ordinary identifiers, so the
+    /// comparison is case-sensitive — unlike the effect taxonomy's lookup.
+    /// </summary>
+    private bool IsEffectVariableInScope(string name)
+    {
+        for (var i = _effectVariableScopes.Count - 1; i >= 0; i--)
+        {
+            foreach (var binder in _effectVariableScopes[i])
+            {
+                if (string.Equals(binder.Name, name, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private EffectsNode ParseEffects(EffectRowPosition position = EffectRowPosition.Declaration)
     {
         var startToken = Expect(TokenKind.Effects);
         var attrs = ParseAttributes();
+
+        var variables = new List<string>();
 
         // Interpret positional attributes
         var effects = AttributeHelper.InterpretEffectsAttributes(
@@ -1778,9 +1922,98 @@ public sealed class Parser
             code => _diagnostics.Report(
                 startToken.Span,
                 DiagnosticCode.UnknownEffectCode,
-                $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."));
+                $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."),
+            IsEffectVariableInScope,
+            variables);
 
-        return new EffectsNode(startToken.Span, effects);
+        if (variables.Count > 0 && !PermitsEffectVariables(position))
+        {
+            // §7.3: the variable is bound, but not usable here.
+            foreach (var variable in variables)
+            {
+                _diagnostics.ReportError(
+                    startToken.Span,
+                    DiagnosticCode.EffectVariableScope,
+                    $"Effect variable '{variable}' cannot be used in {DescribeEffectRowPosition(position)}. "
+                    + "An effect variable may appear only in the row of the declaration that binds it "
+                    + "and in the rows of that declaration's parameters.");
+            }
+
+            variables.Clear();
+        }
+
+        return new EffectsNode(startToken.Span, effects, variables);
+    }
+
+    /// <summary>
+    /// The token most recently consumed, or the current token when nothing has been
+    /// consumed yet. <see cref="Peek"/> indexes without a lower bound, so this is the
+    /// safe spelling of <c>Peek(-1)</c>.
+    /// </summary>
+    private Token PreviousToken => _position > 0 ? _tokens[_position - 1] : Current;
+
+    /// <summary>
+    /// Reads a <c>§E{…}</c> as the effect row of the type just consumed, if and only
+    /// if it is <b>same-line adjacent</b> to that type — design-doc §3 Decision 1.
+    /// A <c>§E</c> on a later line is deliberately left unconsumed: at a position
+    /// whose enclosing section loop has a <c>§E</c> arm it is the declaration's own
+    /// row (the 2948/471-occurrence two-line arrow corpus depends on this), and at a
+    /// position with no such arm the enclosing loop's recovery reports Calor0405.
+    /// </summary>
+    private EffectsNode? TryParseSameLineRow(EffectRowPosition position)
+    {
+        if (!Check(TokenKind.Effects))
+            return null;
+
+        if (Current.Span.Line != PreviousToken.Span.Line)
+            return null;
+
+        var row = ParseEffects(position);
+
+        // A type carries at most ONE row. Without this, a second adjacent §E is not
+        // merely unhelpful, it is silent and wrong: in `§I{str:m} §E{cw} §E{net}` the
+        // first becomes the parameter's row and the second falls through to the §F
+        // section loop's §E arm and becomes the DECLARATION's row — two different
+        // meanings from one line, with no diagnostic. Inline, the same shape cascades.
+        // A row mixing effects is written `§E{cw, net}`, which is what the message says.
+        while (Check(TokenKind.Effects) && Current.Span.Line == PreviousToken.Span.Line)
+        {
+            _diagnostics.ReportError(
+                Current.Span,
+                DiagnosticCode.EffectRowMisplaced,
+                "A type can carry only one §E{…} effect row. Combine the codes into a single "
+                + "row — §E{cw, net} — or, if this is meant to be the function's own effect "
+                + "declaration, move it onto its own line in the §F body.");
+
+            Advance();
+            ParseAttributes();
+        }
+
+        return row;
+    }
+
+    /// <summary>
+    /// Reports Calor0405 for a <c>§E{…}</c> that is not same-line adjacent to any type
+    /// and sits at a position with no declaration-level <c>§E</c> arm to fall through
+    /// to, then <b>consumes the whole group</b> so the rest of the enclosing production
+    /// still parses. That recovery is what collapses the executed baselines from four
+    /// (Z1) and eight (Z3) diagnostics to one.
+    /// </summary>
+    private void ReportMisplacedEffectRow(string? subject, string subjectKind)
+    {
+        var target = subject is { Length: > 0 }
+            ? $"the end of the '{subject}' {subjectKind} line"
+            : "the end of the line whose type it annotates";
+
+        _diagnostics.ReportError(
+            Current.Span,
+            DiagnosticCode.EffectRowMisplaced,
+            $"A §E{{…}} effect row must be on the same line as the type it annotates. Move it onto {target}, "
+            + "or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.");
+
+        // Consume §E and its attribute group(s) so the caller resumes cleanly.
+        Advance();
+        ParseAttributes();
     }
 
     private RequiresNode ParseRequires()
@@ -2182,7 +2415,6 @@ public sealed class Parser
         {
             return ParseMisalignedElseClause();
         }
-
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
         return null;
@@ -5474,6 +5706,11 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BIND", "name");
         }
 
+        // Position 7 (§3.3): §B{f:Func<i32,i32>} §E{cw} <init>. The row sits between the
+        // header group and the initializer. TokenKind.Effects is not an expression start
+        // (pinned), so the initializer parse below can never swallow one.
+        var row = TryParseSameLineRow(EffectRowPosition.Binding);
+
         // Parse optional initializer expression.
         // Don't consume a following §IF as the initializer when it's a block IF statement
         // (no → arrow after the condition). Block IFs are separate statements.
@@ -5507,6 +5744,10 @@ public sealed class Parser
             }
         }
 
+        // §3.1 recovery for position 7. Executed baseline Z2: four Calor0100 today,
+        // none of which mentions effects.
+        TryRecoverTrailingEffectRow(name, "§B");
+
         var span = initializer != null ? startToken.Span.Union(initializer.Span) : startToken.Span;
         var rawPos0 = attrs["_pos0"] ?? "";
         var nameKey = rawPos0 == name || rawPos0 == $"~{name}" ? "_pos0" : "_pos1";
@@ -5520,7 +5761,8 @@ public sealed class Parser
             initializer,
             attrs,
             identifierSpan,
-            GetBindTypeSpan(attrs, typeName));
+            GetBindTypeSpan(attrs, typeName),
+            row);
     }
 
     /// <summary>
@@ -7596,7 +7838,9 @@ public sealed class Parser
     private List<TypeParameterNode> ParseOptionalTypeParameterList(
         TextSpan defaultSpan,
         bool allowVariance = false,
-        string owner = "this declaration")
+        string owner = "this declaration",
+        List<EffectParameterInfo>? effectParameters = null,
+        string? effectOwner = null)
     {
         var typeParams = new List<TypeParameterNode>();
 
@@ -7609,6 +7853,21 @@ public sealed class Parser
 
         do
         {
+            // §7.2(a): `eff e` binds an effect variable. Matched with a ONE-TOKEN
+            // lookahead so a type parameter literally named `eff` keeps working —
+            // Z4 (`§F{f001:M:pub}<eff> (eff:x) -> void`) compiles today and must
+            // keep compiling. `in`/`out` above are matched with no lookahead at all;
+            // this branch deliberately does not copy that.
+            if (Check(TokenKind.Identifier)
+                && Current.Text == "eff"
+                && Peek(1).Kind == TokenKind.Identifier)
+            {
+                Advance(); // consume `eff`
+                var effNameToken = Advance();
+                RecordEffectBinder(effNameToken, effectParameters, typeParams.Count, effectOwner ?? owner);
+                continue;
+            }
+
             // Check for variance modifiers: in/out before the type parameter name
             var variance = Ast.VarianceKind.None;
             if (Check(TokenKind.Identifier) && Current.Text is "in" or "out")
@@ -7638,6 +7897,72 @@ public sealed class Parser
 
         Expect(TokenKind.Greater); // >
         return typeParams;
+    }
+
+    /// <summary>
+    /// Records — or rejects — one <c>eff</c> binder from a type-parameter list.
+    /// Two rejections, both Calor0404 and both at parse time:
+    /// the declaration form may not bind effect variables at all (§7.3's
+    /// class/interface-level row), or the binder's name collides with the effect
+    /// taxonomy, which would make that code unwritable inside the declaration
+    /// (§7.2(c)). An ordinary type parameter named after a code — <b>Z6</b>'s
+    /// <c>&lt;T, cw&gt;</c> — is untouched by both: the ban is on <c>eff</c> names.
+    /// </summary>
+    private void RecordEffectBinder(
+        Token nameToken,
+        List<EffectParameterInfo>? effectParameters,
+        int typeParameterCount,
+        string owner)
+    {
+        var name = nameToken.Text;
+
+        if (effectParameters is null)
+        {
+            _diagnostics.ReportError(
+                nameToken.Span,
+                DiagnosticCode.EffectVariableScope,
+                $"An 'eff' effect variable cannot be declared on {owner}. In 0.15 an effect "
+                + "variable may only be bound by a function or method declaration — write it on "
+                + "the member's own type-parameter list, for example §MT{mt001:Handle:pub}<eff e>.");
+            return;
+        }
+
+        if (EffectCodes.KnownCompactCodes.Contains(name, StringComparer.OrdinalIgnoreCase)
+            || EffectCodes.ColonPrefixes.Contains(name, StringComparer.OrdinalIgnoreCase))
+        {
+            _diagnostics.ReportError(
+                nameToken.Span,
+                DiagnosticCode.EffectVariableScope,
+                $"Effect variable 'eff {name}' is named after the effect code '{name}'. "
+                + "Effect variables are resolved before the effect taxonomy, so this name would "
+                + "make the code unwritable inside this declaration. Rename the variable.");
+            return;
+        }
+
+        effectParameters.Add(new EffectParameterInfo(
+            name,
+            typeParameterCount + effectParameters.Count,
+            nameToken.Span));
+    }
+
+    /// <summary>
+    /// Pushes an <c>eff</c> binder scope for the declaration being parsed. Dispose
+    /// pops it, so nesting is correct even when a declaration's body throws.
+    /// </summary>
+    private EffectVariableScope PushEffectVariableScope(IReadOnlyList<EffectParameterInfo> binders)
+    {
+        _effectVariableScopes.Add(binders);
+        return new EffectVariableScope(this);
+    }
+
+    private readonly struct EffectVariableScope : IDisposable
+    {
+        private readonly Parser _parser;
+
+        internal EffectVariableScope(Parser parser) => _parser = parser;
+
+        public void Dispose() => _parser._effectVariableScopes.RemoveAt(
+            _parser._effectVariableScopes.Count - 1);
     }
 
     /// <summary>
@@ -8244,7 +8569,13 @@ public sealed class Parser
         }
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -8316,7 +8647,10 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs);
+        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs)
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     /// <summary>
@@ -8429,7 +8763,9 @@ public sealed class Parser
         var implementedInterfaceSpans = new List<TextSpan>();
 
         // NEW: Parse optional type parameters §CL{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectOwner: "a class");
 
         // Also support legacy: Extract type parameters from class name if present (e.g., Repository<T>)
         if (typeParameters.Count == 0)
@@ -8706,6 +9042,11 @@ public sealed class Parser
         var visibility = ParseVisibility(visStr);
         var fieldModifiers = ParseMethodModifiers(modStr);
 
+        // Position 8 (§3.3): §FLD{Action<i32>:onChange:pri} §E{cw}. Read BEFORE the
+        // default-value branch. X9b is the executed proof this did not already parse:
+        // the class-member loop rejected Effects four diagnostics earlier.
+        var row = TryParseSameLineRow(EffectRowPosition.Field);
+
         // Check for optional default value (can be prefixed with = or just a direct expression)
         ExpressionNode? defaultValue = null;
         if (Check(TokenKind.Equals))
@@ -8718,6 +9059,9 @@ public sealed class Parser
             defaultValue = ParseExpression();
         }
 
+        // §3.1 recovery for position 8. Executed baseline Z1: four Calor0100 today.
+        TryRecoverTrailingEffectRow(name, "field");
+
         var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
         return new ClassFieldNode(
             span,
@@ -8729,7 +9073,8 @@ public sealed class Parser
             attrs,
             csharpAttrs,
             GetIdentifierSpan(attrs, "_pos1", name),
-            attrs.GetSpan("_pos0"));
+            attrs.GetSpan("_pos0"),
+            row);
     }
 
     /// <summary>
@@ -8774,7 +9119,13 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // Also support legacy: Extract type parameters from method name if present (e.g., Create<T>)
         if (typeParameters.Count == 0)
@@ -8874,7 +9225,10 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
-            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name));
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     /// <summary>
@@ -8919,7 +9273,13 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         // Parse optional type parameters §AMT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // Support legacy: Extract type parameters from method name if present
         if (typeParameters.Count == 0)
@@ -9020,7 +9380,10 @@ public sealed class Parser
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
             isAsync: true,
-            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name));
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     private static MethodModifiers ParseMethodModifiers(string modStr)
@@ -11393,7 +11756,7 @@ public sealed class Parser
         EffectsNode? effects = null;
         if (Check(TokenKind.Effects))
         {
-            effects = ParseEffects();
+            effects = ParseEffects(EffectRowPosition.Lambda);
         }
 
         // Parse body - either expression or statements
@@ -11573,7 +11936,7 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Effects))
             {
-                effects = ParseEffects();
+                effects = ParseEffects(EffectRowPosition.Delegate);
             }
             else
             {
@@ -13573,6 +13936,16 @@ public sealed class Parser
                     parameterIdentifierSpan = nameToken.Span;
                 }
 
+                // Position 5 (§3.3): (Func<i32,i32>:f §E{cw}, i32:v). The inline
+                // parameter list is one of the four positions with no §E arm behind it,
+                // so a non-adjacent §E here is Calor0405 with recovery rather than the
+                // twelve-diagnostic cascade of the executed X9c/Z3 baselines.
+                var inlineRow = TryParseSameLineRow(EffectRowPosition.Parameter);
+                if (inlineRow == null && Check(TokenKind.Effects))
+                {
+                    ReportMisplacedEffectRow(paramName, "parameter");
+                }
+
                 // Parse optional default value: = expression
                 ExpressionNode? defaultValue = null;
                 if (Match(TokenKind.Equals))
@@ -13592,7 +13965,8 @@ public sealed class Parser
                     Array.Empty<CalorAttributeNode>(),
                     defaultValue,
                     identifierSpan: parameterIdentifierSpan,
-                    typeNameSpan: parameterTypeSpan));
+                    typeNameSpan: parameterTypeSpan,
+                    row: inlineRow));
             }
             while (Match(TokenKind.Comma));
         }
@@ -13618,7 +13992,12 @@ public sealed class Parser
             }
             var typeStartPosition = _position;
             var returnType = prefix + ReadInlineTypeToken();
-            output = new OutputNode(span, returnType, GetConsumedSpan(typeStartPosition));
+
+            // Position 6, arrow spelling (§3.3): ) -> Func<i32> §E{cw}. A §E on a later
+            // line is left alone: that is the 2948-occurrence / 471-file compact corpus
+            // form and it must keep meaning the declaration's own row.
+            var arrowRow = TryParseSameLineRow(EffectRowPosition.Return);
+            output = new OutputNode(span, returnType, GetConsumedSpan(typeStartPosition), arrowRow);
         }
     }
 
