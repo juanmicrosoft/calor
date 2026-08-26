@@ -854,7 +854,7 @@ public sealed class EffectEnforcementPass
                 destination,
                 sourceDescription: $"Initializer of binding '{bind.Name}'",
                 destinationDescription: $"binding '{bind.Name}'",
-                destinationName: bind.Name,
+                destinationName: $"'{bind.Name}'",
                 destinationIsPosition: true,
                 positionDescription: $"Binding '{bind.Name}'",
                 owner: _function.Name);
@@ -904,7 +904,7 @@ public sealed class EffectEnforcementPass
                     PositionRow(parameter.Row),
                     sourceDescription: $"Argument {source.Value.Description}",
                     destinationDescription: $"parameter '{parameter.Name}' of '{callee.Name}'",
-                    destinationName: parameter.Name,
+                    destinationName: $"'{parameter.Name}'",
                     destinationIsPosition: parameter.Row == null,
                     positionDescription: $"Parameter '{parameter.Name}' of '{callee.Name}'",
                     owner: callee.Name);
@@ -964,7 +964,7 @@ public sealed class EffectEnforcementPass
                         $"{sourceDescription} has effect row {source.ToCompactDisplayString()}, which does "
                         + $"not fit {destinationDescription} (declared row: "
                         + $"{destination.ToCompactDisplayString()}). Extra effect(s): {extra}. Widen "
-                        + $"'{destinationName}' to §E{{{extra}}}, or pass a function whose row fits. "
+                        + $"{destinationName} to §E{{{extra}}}, or pass a function whose row fits. "
                         + "An effect row that does not fit is never waived.",
                         DiagnosticSeverity.Error);
                     break;
