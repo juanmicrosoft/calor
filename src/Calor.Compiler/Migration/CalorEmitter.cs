@@ -716,7 +716,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MethodSignatureNode node)
     {
-        var typeParams = FormatTypeParameterList(node.TypeParameters, node.EffectParameters);
+        var (typeParams, typeParamsAfterGroup) =
+            SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var inlineFmt = TryFormatInlineParams(node.Parameters);
@@ -724,11 +725,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{inlineParams}{inlineReturn}");
+            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}");
+            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
             Indent();
             EmitParameterLines(node.Parameters);
             EmitOutputLine(node.Output);
@@ -1246,7 +1247,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
-        var typeParams = FormatTypeParameterList(node.TypeParameters, node.EffectParameters);
+        var (typeParams, typeParamsAfterGroup) =
+            SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
 
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -1258,11 +1260,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{inlineParams}{inlineReturn}");
+            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}");
+            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
         }
         Indent();
 
@@ -1316,7 +1318,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(FunctionNode node)
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
-        var typeParams = FormatTypeParameterList(node.TypeParameters, node.EffectParameters);
+        var (typeParams, typeParamsAfterGroup) =
+            SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var functionName = node.Name;
         var genericStart = functionName.LastIndexOf('<');
         if (node.TypeParameters.Count > 0
@@ -1335,11 +1338,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{typeParamsAfterGroup}");
         }
         Indent();
 
@@ -4166,6 +4169,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// parameters with <c>eff</c> binders at the ordinals they were written at, so
     /// <c>&lt;T, eff e&gt;</c> and <c>&lt;eff e, T&gt;</c> both round-trip.
     /// </summary>
+    /// <summary>
+    /// Splits a declaration's <c>&lt;…&gt;</c> list into the part that goes INSIDE the
+    /// header group — where <c>§F</c> and <c>§MT</c> have always written it — and the
+    /// part that goes after it.
+    /// </summary>
+    /// <remarks>
+    /// The in-group spelling is textually stable but semantically lossy: on re-parse
+    /// <c>§F{f001:Map&lt;T&gt;:pub}</c> keeps <c>&lt;T&gt;</c> as part of the NAME and
+    /// <c>TypeParameters</c> comes back empty. That is pre-existing and harmless for
+    /// plain type parameters, because the text round-trips unchanged. It is <b>not</b>
+    /// harmless for an <c>eff</c> binder: an absorbed binder is no longer bound, and
+    /// the re-parsed program fails with <c>Calor0403</c> on its own rows. So a list
+    /// carrying a binder is written after the group instead, where
+    /// <c>ParseOptionalTypeParameterList</c> — the branch that understands
+    /// <c>eff</c> — actually reads it. Lists with no binder keep the old placement
+    /// byte for byte.
+    /// </remarks>
+    private (string InGroup, string AfterGroup) SplitTypeParameterList(
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<EffectParameterInfo> effectParameters)
+    {
+        var rendered = FormatTypeParameterList(typeParameters, effectParameters);
+        return effectParameters.Count > 0 ? ("", rendered) : (rendered, "");
+    }
+
     private string FormatTypeParameterList(
         IReadOnlyList<TypeParameterNode> typeParameters,
         IReadOnlyList<EffectParameterInfo> effectParameters)

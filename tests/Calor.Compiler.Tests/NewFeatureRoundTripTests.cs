@@ -552,4 +552,139 @@ public class NewFeatureRoundTripTests
     }
 
     #endregion
+
+    #region Effect rows (v0.15 E2 slice a — design-doc pin P4)
+
+    /// <summary>
+    /// Parse → <c>CalorEmitter</c> → parse → emit, asserting the emitter is a fixed
+    /// point: <c>emit(parse(s))</c> equals <c>emit(parse(emit(parse(s))))</c>, byte
+    /// for byte. That is the achievable form of P4 — the emitter has always
+    /// normalised source (it reorders effect codes, drops optional whitespace), so
+    /// "identical to the original source" was never the property, and claiming it
+    /// would be claiming something the emitter does not do for any construct.
+    /// </summary>
+    private static void AssertEmitterIsAFixedPoint(string source)
+    {
+        var first = Parse(source, out var d1);
+        Assert.False(d1.HasErrors,
+            $"Source should parse cleanly.\n{string.Join("\n", d1.Select(d => d.Message))}");
+        var once = new CalorFormatter().Format(first);
+
+        var second = Parse(once, out var d2);
+        Assert.False(d2.HasErrors,
+            $"Emitted Calor should re-parse cleanly.\nEmitted:\n{once}\n"
+            + string.Join("\n", d2.Select(d => d.Message)));
+        var twice = new CalorFormatter().Format(second);
+
+        Assert.Equal(once, twice);
+    }
+
+    [Theory]
+    // position 1 — the declaration's own row
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:F:pub} () -> void
+            §E{cw}
+            §P "x"
+        """, "§E{cw}")]
+    // position 2 — lambda literal. The emitter did not write this tag back before
+    // this slice, so the row was silently dropped on every round trip.
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Main:pub} () -> void
+            §E{}
+            §B{f} §LAM{lam1:x:i32} §E{cw} (+ x INT:1) §/LAM{lam1}
+        """, "§LAM{lam1:x:i32} §E{cw}")]
+    // position 3 — delegate declaration. Emitted as `§E{[console, write]}` before
+    // this slice: a stringified KeyValuePair that did not re-parse.
+    [InlineData("""
+        §M{m001:R}
+          §DEL{d001:Handler}
+            §I{i32:x}
+            §O{void}
+            §E{cw}
+          §F{f001:Main:pub} () -> void
+            §E{}
+        """, "§E{cw}")]
+    // position 4 — parameter, tag form
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Apply:pub}
+            §I{Func<i32,i32>:transform} §E{cw}
+            §I{i32:value} = INT:1
+            §O{i32}
+            §E{cw}
+            §R INT:0
+        """, "§I{Func<i32, i32>:transform} §E{cw}")]
+    // position 5 — parameter, inline form
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+            §E{cw}
+            §R INT:0
+        """, "Func<i32, i32>:transform §E{cw}")]
+    // position 6 — return, §O spelling
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Make:pub}
+            §O{Func<i32>} §E{cw}
+            §E{cw}
+            §R §LAM{lam1} INT:0 §/LAM{lam1}
+        """, "-> Func<i32> §E{cw}")]
+    // position 6 — return, arrow spelling
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Make:pub} () -> Func<i32> §E{cw}
+            §E{cw}
+            §R §LAM{lam1} INT:0 §/LAM{lam1}
+        """, "-> Func<i32> §E{cw}")]
+    // position 7 — binding
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Main:pub} () -> void
+            §E{}
+            §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x INT:1) §/LAM{lam1}
+        """, "§E{cw}")]
+    // position 8 — field
+    [InlineData("""
+        §M{m001:R}
+          §CL{c001:C:pub}
+            §FLD{Action<i32>:onChange:pri} §E{cw}
+            §MT{mt001:M:pub} () -> void
+              §E{}
+        """, "§FLD{Action<i32>:onChange:priv} §E{cw}")]
+    // an empty row is not the same as no row (§3.5) and must survive
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
+            §E{}
+            §R INT:0
+        """, "Func<i32, i32>:a §E{}")]
+    // the `eff` binder, written last in the type-parameter list
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Map:pub}<T, eff e> (Func<i32,i32>:f §E{e}) -> i32
+            §E{e}
+            §R INT:0
+        """, "<T,eff e>")]
+    // …and written FIRST, which is why EffectParameterInfo carries an Ordinal
+    [InlineData("""
+        §M{m001:R}
+          §F{f001:Map:pub}<eff e, T> (Func<i32,i32>:f §E{e}) -> i32
+            §E{e}
+            §R INT:0
+        """, "<eff e,T>")]
+    public void RowRoundTrips_ParseEmitParse(string source, string expectedInEmitted)
+    {
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            string.Join("\n", diagnostics.Select(d => d.Message)));
+
+        var emitted = new CalorFormatter().Format(module);
+        Assert.Contains(expectedInEmitted, emitted);
+
+        AssertEmitterIsAFixedPoint(source);
+    }
+
+    #endregion
 }
