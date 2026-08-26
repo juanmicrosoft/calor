@@ -101,6 +101,27 @@ public class ExpressionRegistrationTests
         Assert.Single(call.Arguments);
     }
 
+    /// <summary>
+    /// Design-doc pin <b>P5</b>. <c>TokenKind.Effects</c> must never become an
+    /// expression start. Effect rows are read at six explicit parser insertion points
+    /// (design-doc §3.3); every one of them sits next to a place an initializer or a
+    /// default value may follow — <c>§B{f:Func&lt;i32,i32&gt;} §E{cw} &lt;init&gt;</c>,
+    /// <c>§FLD{…} §E{cw} = default</c>, <c>§I{…} §E{cw} = default</c>. If
+    /// <c>Effects</c> were registered, <c>IsExpressionStart()</c> would be true for it
+    /// and the initializer parse would swallow the row before the row check ever ran.
+    /// </summary>
+    [Fact]
+    public void EffectsTokenIsNotAnExpressionStart()
+    {
+        var property = typeof(Parser).GetProperty(
+            "RegisteredExpressionStartTokens",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var registered = Assert.IsAssignableFrom<IEnumerable<TokenKind>>(property?.GetValue(null)).ToHashSet();
+
+        Assert.DoesNotContain(TokenKind.Effects, registered);
+        Assert.DoesNotContain(TokenKind.Effects, Cases.Keys);
+    }
+
     [Fact]
     public void TestCasesCoverEveryRegisteredExpressionStartToken()
     {
