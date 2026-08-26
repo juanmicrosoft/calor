@@ -698,7 +698,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
             if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
             var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}";
+            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}{FormatEffectRow(p.Row)}";
         }));
     }
 
@@ -711,21 +711,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitOutputLine(OutputNode? output)
     {
         if (output != null)
-            AppendLine($"§O{{{TypeMapper.CSharpToCalor(output.TypeName)}}}");
+            AppendLine(Visit(output));
     }
 
     public string Visit(MethodSignatureNode node)
     {
-        var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
-            : "";
+        var typeParams = FormatTypeParameterList(node.TypeParameters, node.EffectParameters);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}" : "";
+            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
             AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{inlineParams}{inlineReturn}");
         }
         else
@@ -947,7 +945,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsVolatile) modifiers.Add("volatile");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
-        AppendLine($"§FLD{{{typeName}:{EscapeCalorIdentifier(node.Name)}:{visibility}{modStr}}}{attrs}{defaultVal}");
+        AppendLine($"§FLD{{{typeName}:{EscapeCalorIdentifier(node.Name)}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
 
         return "";
     }
@@ -1185,7 +1183,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (inlineFmt != null)
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}" : "";
+            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
             AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}{inlineParams}{inlineReturn}");
         }
         else
@@ -1248,9 +1246,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
 
-        var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
-            : "";
+        var typeParams = FormatTypeParameterList(node.TypeParameters, node.EffectParameters);
 
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -1261,7 +1257,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (inlineFmt != null)
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {output}" : "";
+            var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
             AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{inlineParams}{inlineReturn}");
         }
         else
@@ -1320,9 +1316,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(FunctionNode node)
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
-        var typeParams = node.TypeParameters.Count > 0
-            ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
-            : "";
+        var typeParams = FormatTypeParameterList(node.TypeParameters, node.EffectParameters);
         var functionName = node.Name;
         var genericStart = functionName.LastIndexOf('<');
         if (node.TypeParameters.Count > 0
@@ -1340,7 +1334,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (inlineFmt != null)
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {output}" : "";
+            var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
             AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
         }
         else
@@ -1391,17 +1385,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
-    public string Visit(OutputNode node) => $"§O{{{TypeMapper.CSharpToCalor(node.TypeName)}}}";
+    public string Visit(OutputNode node)
+        => $"§O{{{TypeMapper.CSharpToCalor(node.TypeName)}}}{FormatEffectRow(node.Row)}";
 
     public string Visit(EffectsNode node)
     {
-        if (node.Effects.Count == 0)
+        if (node.Effects.Count == 0 && node.EffectVariables.Count == 0)
             return "";
 
-        var effectCodes = node.Effects
-            .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
-            .Distinct();
-        return $"§E{{{string.Join(",", effectCodes)}}}";
+        return FormatEffectsTag(node);
     }
 
     public string Visit(ParameterNode node)
@@ -1415,7 +1407,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
         var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
-        var result = $"§I{{{typeName}:{EscapeCalorIdentifier(node.Name)}{modStr}}}{attrs}";
+        var result = $"§I{{{typeName}:{EscapeCalorIdentifier(node.Name)}{modStr}}}{attrs}{FormatEffectRow(node.Row)}";
         if (node.InlineRefinement != null)
         {
             var predicate = node.InlineRefinement.Predicate.Accept(this);
@@ -1569,7 +1561,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         var header = string.Join(":", headerParts);
 
-        AppendLine($"{bindHeader} §LAM{{{header}}}");
+        AppendLine($"{bindHeader} §LAM{{{header}}}{(lambda.Effects != null ? " " + FormatEffectsTag(lambda.Effects) : "")}");
         Indent();
         foreach (var stmt in lambda.StatementBody!)
         {
@@ -1786,6 +1778,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var typePrefix = mappedType != null ? $"{mappedType}:" : "";
             bindHeader = $"§B{{{typePrefix}{EscapeCalorIdentifier(node.Name)}}}";
         }
+
+        // Position 7 (§3.3): the row sits between the header group and the initializer.
+        bindHeader += FormatEffectRow(node.Row);
 
         // Match expression as initializer must use block form so case arms are emitted
         // at the correct indent. The naive `Initializer.Accept(this)` returns a
@@ -3281,6 +3276,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         var header = string.Join(":", headerParts);
 
+        // Position 2 (§3.3 / §5): §LAM{lam1:x:i32} §E{…}. The parser has always read
+        // this tag; the emitter never wrote it back, so a lambda row did not survive a
+        // round trip. An EMPTY §E{} is emitted too — §3.5 gives "declared pure" and
+        // "no row" different meanings.
+        var lambdaRow = node.Effects != null ? " " + FormatEffectsTag(node.Effects) : "";
+
         if (node.IsExpressionLambda && node.ExpressionBody != null)
         {
             // Inline-sibling context: the body is space-joined between §LAM{...}
@@ -3289,12 +3290,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // inline argument and corrupt the AST. Mirrors the v0.6.1 zero-arg
             // discipline at all other sibling-context sites.
             var body = AcceptInInlineSibling(node.ExpressionBody);
-            return $"§LAM{{{header}}} {body} §/LAM{{{node.Id}}}";
+            return $"§LAM{{{header}}}{lambdaRow} {body} §/LAM{{{node.Id}}}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
         {
             var sb = new System.Text.StringBuilder();
-            sb.Append($"§LAM{{{header}}}");
+            sb.Append($"§LAM{{{header}}}{lambdaRow}");
 
             // For short lambdas (1-2 statements), emit inline — unless any statement
             // produces multi-line output (e.g. FallbackCommentNode), which would bury
@@ -3343,7 +3344,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else
         {
             // Empty lambda
-            return $"§LAM{{{header}}} §/LAM{{{node.Id}}}";
+            return $"§LAM{{{header}}}{lambdaRow} §/LAM{{{node.Id}}}";
         }
     }
 
@@ -3780,12 +3781,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         if (node.Output != null)
         {
-            AppendLine($"§O{{{TypeMapper.CSharpToCalor(node.Output.TypeName)}}}");
+            AppendLine(Visit(node.Output));
         }
         if (node.Effects != null)
         {
-            var effects = string.Join(",", node.Effects.Effects);
-            AppendLine($"§E{{{effects}}}");
+            // Was `string.Join(",", node.Effects.Effects)`, which stringifies
+            // KeyValuePairs and emits `§E{[console, write]}` — a §DEL row did not
+            // survive a round trip at all. P4 pins position 3, so it does now.
+            AppendLine(FormatEffectsTag(node.Effects));
         }
 
         Dedent();
@@ -4129,13 +4132,64 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private void EmitEffects(EffectsNode? effects)
     {
-        if (effects == null || effects.Effects.Count == 0)
+        if (effects == null || (effects.Effects.Count == 0 && effects.EffectVariables.Count == 0))
             return;
 
+        AppendLine(FormatEffectsTag(effects));
+    }
+
+    /// <summary>
+    /// Renders a <c>§E{…}</c> tag: concrete codes first, then any effect variables.
+    /// <c>§E{cw, e}</c> round-trips to <c>§E{cw,e}</c> — the same normalisation the
+    /// emitter has always applied to code lists.
+    /// </summary>
+    private static string FormatEffectsTag(EffectsNode effects)
+    {
         var effectCodes = effects.Effects
             .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
-            .Distinct();
-        AppendLine($"§E{{{string.Join(",", effectCodes)}}}");
+            .Distinct()
+            .Concat(effects.EffectVariables);
+        return $"§E{{{string.Join(",", effectCodes)}}}";
+    }
+
+    /// <summary>
+    /// Renders an effect row as a same-line suffix. Unlike a declaration's own
+    /// <c>§E</c>, an <b>empty</b> row is still emitted: design-doc §3.5 gives
+    /// <c>§E{}</c> (pure) and an omitted row (Unknown) different meanings, so
+    /// dropping the tag would change what the source says.
+    /// </summary>
+    private static string FormatEffectRow(EffectsNode? row)
+        => row == null ? "" : " " + FormatEffectsTag(row);
+
+    /// <summary>
+    /// Renders a declaration's <c>&lt;…&gt;</c> list, interleaving ordinary type
+    /// parameters with <c>eff</c> binders at the ordinals they were written at, so
+    /// <c>&lt;T, eff e&gt;</c> and <c>&lt;eff e, T&gt;</c> both round-trip.
+    /// </summary>
+    private string FormatTypeParameterList(
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<EffectParameterInfo> effectParameters)
+    {
+        if (typeParameters.Count == 0 && effectParameters.Count == 0)
+            return "";
+
+        var slots = new string?[typeParameters.Count + effectParameters.Count];
+        foreach (var binder in effectParameters)
+        {
+            if (binder.Ordinal >= 0 && binder.Ordinal < slots.Length && slots[binder.Ordinal] is null)
+                slots[binder.Ordinal] = $"eff {binder.Name}";
+        }
+
+        var next = 0;
+        foreach (var typeParameter in typeParameters)
+        {
+            while (next < slots.Length && slots[next] is not null)
+                next++;
+            if (next < slots.Length)
+                slots[next] = Visit(typeParameter);
+        }
+
+        return $"<{string.Join(",", slots.Where(slot => slot is not null))}>";
     }
 
     private static string GetCalorOperatorSymbol(BinaryOperator op) => op switch

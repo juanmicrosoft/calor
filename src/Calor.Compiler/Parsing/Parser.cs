@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -1360,7 +1361,13 @@ public sealed class Parser
         var visibility = ParseVisibility(visibilityStr);
 
         // NEW: Parse optional type parameters §F{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -1512,7 +1519,10 @@ public sealed class Parser
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef, identifierSpan: identifierSpan);
+            properties, lockNode, author, taskRef, identifierSpan: identifierSpan)
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     /// <summary>
@@ -1557,7 +1567,13 @@ public sealed class Parser
         var visibility = ParseVisibility(visibilityStr);
 
         // Parse optional type parameters §AF{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -1704,7 +1720,10 @@ public sealed class Parser
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef, isAsync: true, identifierSpan: identifierSpan);
+            properties, lockNode, author, taskRef, isAsync: true, identifierSpan: identifierSpan)
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     private ParameterNode ParseParameter()
@@ -7782,7 +7801,9 @@ public sealed class Parser
     private List<TypeParameterNode> ParseOptionalTypeParameterList(
         TextSpan defaultSpan,
         bool allowVariance = false,
-        string owner = "this declaration")
+        string owner = "this declaration",
+        List<EffectParameterInfo>? effectParameters = null,
+        string? effectOwner = null)
     {
         var typeParams = new List<TypeParameterNode>();
 
@@ -7795,6 +7816,21 @@ public sealed class Parser
 
         do
         {
+            // §7.2(a): `eff e` binds an effect variable. Matched with a ONE-TOKEN
+            // lookahead so a type parameter literally named `eff` keeps working —
+            // Z4 (`§F{f001:M:pub}<eff> (eff:x) -> void`) compiles today and must
+            // keep compiling. `in`/`out` above are matched with no lookahead at all;
+            // this branch deliberately does not copy that.
+            if (Check(TokenKind.Identifier)
+                && Current.Text == "eff"
+                && Peek(1).Kind == TokenKind.Identifier)
+            {
+                Advance(); // consume `eff`
+                var effNameToken = Advance();
+                RecordEffectBinder(effNameToken, effectParameters, typeParams.Count, effectOwner ?? owner);
+                continue;
+            }
+
             // Check for variance modifiers: in/out before the type parameter name
             var variance = Ast.VarianceKind.None;
             if (Check(TokenKind.Identifier) && Current.Text is "in" or "out")
@@ -7824,6 +7860,72 @@ public sealed class Parser
 
         Expect(TokenKind.Greater); // >
         return typeParams;
+    }
+
+    /// <summary>
+    /// Records — or rejects — one <c>eff</c> binder from a type-parameter list.
+    /// Two rejections, both Calor0404 and both at parse time:
+    /// the declaration form may not bind effect variables at all (§7.3's
+    /// class/interface-level row), or the binder's name collides with the effect
+    /// taxonomy, which would make that code unwritable inside the declaration
+    /// (§7.2(c)). An ordinary type parameter named after a code — <b>Z6</b>'s
+    /// <c>&lt;T, cw&gt;</c> — is untouched by both: the ban is on <c>eff</c> names.
+    /// </summary>
+    private void RecordEffectBinder(
+        Token nameToken,
+        List<EffectParameterInfo>? effectParameters,
+        int typeParameterCount,
+        string owner)
+    {
+        var name = nameToken.Text;
+
+        if (effectParameters is null)
+        {
+            _diagnostics.ReportError(
+                nameToken.Span,
+                DiagnosticCode.EffectVariableScope,
+                $"An 'eff' effect variable cannot be declared on {owner}. In 0.15 an effect "
+                + "variable may only be bound by a function or method declaration — write it on "
+                + "the member's own type-parameter list, for example §MT{mt001:Handle:pub}<eff e>.");
+            return;
+        }
+
+        if (EffectCodes.KnownCompactCodes.Contains(name, StringComparer.OrdinalIgnoreCase)
+            || EffectCodes.ColonPrefixes.Contains(name, StringComparer.OrdinalIgnoreCase))
+        {
+            _diagnostics.ReportError(
+                nameToken.Span,
+                DiagnosticCode.EffectVariableScope,
+                $"Effect variable 'eff {name}' is named after the effect code '{name}'. "
+                + "Effect variables are resolved before the effect taxonomy, so this name would "
+                + "make the code unwritable inside this declaration. Rename the variable.");
+            return;
+        }
+
+        effectParameters.Add(new EffectParameterInfo(
+            name,
+            typeParameterCount + effectParameters.Count,
+            nameToken.Span));
+    }
+
+    /// <summary>
+    /// Pushes an <c>eff</c> binder scope for the declaration being parsed. Dispose
+    /// pops it, so nesting is correct even when a declaration's body throws.
+    /// </summary>
+    private EffectVariableScope PushEffectVariableScope(IReadOnlyList<EffectParameterInfo> binders)
+    {
+        _effectVariableScopes.Add(binders);
+        return new EffectVariableScope(this);
+    }
+
+    private readonly struct EffectVariableScope : IDisposable
+    {
+        private readonly Parser _parser;
+
+        internal EffectVariableScope(Parser parser) => _parser = parser;
+
+        public void Dispose() => _parser._effectVariableScopes.RemoveAt(
+            _parser._effectVariableScopes.Count - 1);
     }
 
     /// <summary>
@@ -8430,7 +8532,13 @@ public sealed class Parser
         }
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // --- Compact syntax: inline signature ---
         var parameters = new List<ParameterNode>();
@@ -8502,7 +8610,10 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs);
+        return new MethodSignatureNode(span, id, name, typeParameters, parameters, output, effects, preconditions, postconditions, attrs, csharpAttrs)
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     /// <summary>
@@ -8615,7 +8726,9 @@ public sealed class Parser
         var implementedInterfaceSpans = new List<TextSpan>();
 
         // NEW: Parse optional type parameters §CL{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectOwner: "a class");
 
         // Also support legacy: Extract type parameters from class name if present (e.g., Repository<T>)
         if (typeParameters.Count == 0)
@@ -8974,7 +9087,13 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         // NEW: Parse optional type parameters §MT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // Also support legacy: Extract type parameters from method name if present (e.g., Create<T>)
         if (typeParameters.Count == 0)
@@ -9074,7 +9193,10 @@ public sealed class Parser
         var span = startToken.Span.Union(endToken.Span);
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
-            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name));
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     /// <summary>
@@ -9119,7 +9241,13 @@ public sealed class Parser
         var modifiers = ParseMethodModifiers(modStr);
 
         // Parse optional type parameters §AMT{...}<T, U>
-        var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
+        var effectParameters = new List<EffectParameterInfo>();
+        var typeParameters = ParseOptionalTypeParameterList(
+            startToken.Span,
+            effectParameters: effectParameters);
+        // §7.3 position 1: this declaration binds its own effect variables, and they
+        // stay in scope for its own row and its parameters' rows until it is parsed out.
+        using var effectScope = PushEffectVariableScope(effectParameters);
 
         // Support legacy: Extract type parameters from method name if present
         if (typeParameters.Count == 0)
@@ -9220,7 +9348,10 @@ public sealed class Parser
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
             output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
             isAsync: true,
-            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name));
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name))
+        {
+            EffectParameters = effectParameters,
+        };
     }
 
     private static MethodModifiers ParseMethodModifiers(string modStr)
@@ -11593,7 +11724,7 @@ public sealed class Parser
         EffectsNode? effects = null;
         if (Check(TokenKind.Effects))
         {
-            effects = ParseEffects();
+            effects = ParseEffects(EffectRowPosition.Lambda);
         }
 
         // Parse body - either expression or statements
@@ -11773,7 +11904,7 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Effects))
             {
-                effects = ParseEffects();
+                effects = ParseEffects(EffectRowPosition.Delegate);
             }
             else
             {
