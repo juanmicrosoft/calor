@@ -80,6 +80,82 @@ public class EffectSubtypingTests
         Assert.True(EffectSubtyping.Encompasses(declared, required));
     }
 
+    // -------------------------------------------------------------- P7 -----
+    // Design-doc §4.1, 0.15's WIDENING: a bare family code encompasses its
+    // narrow siblings. 0.14 did not relate them at all, which under rows would
+    // surface at every binding site instead of only at a declaration.
+    //
+    // Discriminating revert: remove the "io:database" entry from
+    // EffectRow.FamilySubtypes and FamilyCodeEncompassesNarrowCode goes red
+    // while the fs:rw regression below stays green.
+
+    [Theory]
+    // database
+    [InlineData("database", "database_read")]
+    [InlineData("database", "database_write")]
+    [InlineData("database", "database_readwrite")]
+    // network
+    [InlineData("network", "network_read")]
+    [InlineData("network", "network_write")]
+    [InlineData("network", "network_readwrite")]
+    // environment
+    [InlineData("environment", "environment_read")]
+    [InlineData("environment", "environment_write")]
+    [InlineData("environment", "environment_readwrite")]
+    public void FamilyCodeEncompassesNarrowCode(string family, string narrow)
+    {
+        Assert.True(EffectSubtyping.Encompasses(
+            (EffectKind.IO, family),
+            (EffectKind.IO, narrow)));
+    }
+
+    [Fact]
+    public void FamilyCodeWidening_IsOneWay()
+    {
+        // The narrow code does NOT encompass the family — a §E{db:r} declaration
+        // must not admit an operation that does arbitrary database work.
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "database_read"),
+            (EffectKind.IO, "database")));
+    }
+
+    [Fact]
+    public void FilesystemHasNoBareFamilyCode_SoReadWriteStaysItsTop()
+    {
+        // §4.1: `filesystem` is not in the registry, so fs:rw remains the
+        // filesystem top. This is the regression half of P7 — it must keep
+        // passing while the three families above start passing.
+        Assert.True(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "filesystem_readwrite"),
+            (EffectKind.IO, "filesystem_write")));
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "filesystem"),
+            (EffectKind.IO, "filesystem_write")));
+    }
+
+    [Fact]
+    public void ProcAndHttpHaveNoNarrowSiblings()
+    {
+        // §4.1 names them explicitly. Nothing to widen, and nothing that widens
+        // into them.
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "process"),
+            (EffectKind.IO, "environment_read")));
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "network"),
+            (EffectKind.IO, "http")));
+    }
+
+    [Fact]
+    public void FamilyWidening_ReachesEffectSetIsSubsetOf()
+    {
+        // The widening is not a private fact about Encompasses: it is what a
+        // §E{db} declaration ADMITS. This is the sentence §4.1 writes.
+        Assert.True(EffectSet.From("db:r").IsSubsetOf(EffectSet.From("db")));
+        Assert.True(EffectSet.From("net:w", "env:r").IsSubsetOf(EffectSet.From("net", "env")));
+        Assert.False(EffectSet.From("db").IsSubsetOf(EffectSet.From("db:r")));
+    }
+
     [Fact]
     public void ExactMatch_IsEncompassed()
     {
