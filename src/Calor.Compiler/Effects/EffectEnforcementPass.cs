@@ -892,7 +892,12 @@ public sealed class EffectEnforcementPass
                         var (typeName, methodName) = ParseCallTargetForChain(calleeName);
                         if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
                         {
-                            var resolution = _resolver.Resolve(typeName, methodName);
+                            // v0.15 E1 slice 2c — the call-chain BFS walks the
+                            // legacy name graph, which holds target STRINGS and
+                            // no receiver identity at all. String fallback,
+                            // counted.
+                            var resolution = _resolver.Resolve(
+                                EffectResolverKey.FromStrings(typeName, methodName));
                             if (resolution.Status != EffectResolutionStatus.Unknown &&
                                 resolution.Effects.Contains(targetKind, targetValue))
                             {
@@ -1231,27 +1236,36 @@ public sealed class EffectEnforcementPass
             var (typeName, methodName) = ParseCallTarget(target);
             if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
             {
-                var resolution = _context.Resolver.Resolve(typeName, methodName, argumentTypes);
+                // Step 1 keys on the receiver EXACTLY AS WRITTEN — "System.IO.File"
+                // in `File`-qualified source, "r" in `r.Next`. That is a
+                // string-fallback key by construction: at this point the pass
+                // has not asked anything about the receiver's type yet.
+                var resolution = _context.Resolver.Resolve(
+                    EffectResolverKey.FromStrings(typeName, methodName, argumentTypes));
                 if (resolution.Status != EffectResolutionStatus.Unknown)
                 {
                     return resolution.Effects;
                 }
 
                 // If type didn't resolve, try variable type resolution:
-                // "r.Next" where "r" is a variable declared as "new Random()"
+                // "r.Next" where "r" is a variable declared as "new Random()".
+                // v0.15 E1 slice 2c — THIS is the symbol-identity site: the
+                // receiver's type has just been asked of the bound tree, so the
+                // key is built from the receiver's BoundType whenever the binder
+                // typed it, and from ResolveVariableType's string otherwise.
                 var resolvedVarType = ResolveVariableType(typeName);
                 if (resolvedVarType != null && resolvedVarType != typeName)
                 {
-                    resolution = _context.Resolver.Resolve(resolvedVarType, methodName, argumentTypes);
+                    resolution = _context.Resolver.Resolve(
+                        ResolverKey(typeName, resolvedVarType, methodName, argumentTypes));
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                     {
                         return resolution.Effects;
                     }
 
-                    resolution = _context.Resolver.ResolveExtension(
-                        resolvedVarType,
-                        methodName,
-                        argumentTypes);
+                    resolution = _context.Resolver.Resolve(ResolverKey(
+                        typeName, resolvedVarType, methodName, argumentTypes,
+                        EffectMemberKind.Extension));
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return resolution.Effects;
                 }
@@ -1260,15 +1274,12 @@ public sealed class EffectEnforcementPass
                 if (chainedReceiverType != null)
                 {
                     resolution = _context.Resolver.Resolve(
-                        chainedReceiverType,
-                        methodName,
-                        argumentTypes);
+                        ResolverKey(typeName, chainedReceiverType, methodName, argumentTypes));
                     if (resolution.Status == EffectResolutionStatus.Unknown)
                     {
-                        resolution = _context.Resolver.ResolveExtension(
-                            chainedReceiverType,
-                            methodName,
-                            argumentTypes);
+                        resolution = _context.Resolver.Resolve(ResolverKey(
+                            typeName, chainedReceiverType, methodName, argumentTypes,
+                            EffectMemberKind.Extension));
                     }
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return chainedEffects.Union(resolution.Effects);
@@ -1318,10 +1329,39 @@ public sealed class EffectEnforcementPass
         ///     fails loud under the strict policy (Calor0411 + unknown effects)
         ///     instead of the pre-W2 behavior of silently assuming purity.
         /// </summary>
+        /// <summary>
+        /// The AST search's answer for "there is a value with this name, and I
+        /// cannot type it" (<see cref="FindLocalDeclarationType"/>, and
+        /// <c>§USING</c> without a declared type). It is a real answer on the
+        /// property-read paths — <c>InferFromReference</c> and
+        /// <c>InferSetterEffects</c> use it to report an unknown operation
+        /// rather than silently charging nothing — which is why it is named
+        /// here instead of deleted.
+        /// </summary>
+        private const string UnknownLocalTypeSentinel = "?";
+
         private EffectSet InferFromBareNameTarget(string target, TextSpan span)
         {
             var valueType = ResolveLocalValueType(target);
-            if (valueType != null)
+
+            // v0.15 E1 slice 2c — the sentinel is NOT a type, and this is the
+            // one site where treating it as one is a decision rather than a
+            // formatting detail. `§C{u}` on a `§B{u}` the pass cannot type used
+            // to take the delegate-invocation arm and report Calor0418
+            // "declared type '?'", charging EffectSet.Empty — a guess that
+            // launders the call. It now falls through to the unknown-call chain
+            // and fails closed as Calor0411, which is what the SAME fixture with
+            // a receiver use already did through AskBoundTree's veto.
+            //
+            // Slice 2b recorded this as debt and refused to do it as a
+            // drive-by, because it SUBSUMES that veto: with the guard here, the
+            // veto's fixture reaches Calor0411 by this path too, so
+            // E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel no
+            // longer fails when the veto branch is deleted. The veto is kept
+            // anyway — it is the fail-closed rule stated at the layer that owns
+            // it, and E2 needs it there when chains become typed — but design
+            // doc §8.1 now records plainly that it has no discriminating pin.
+            if (valueType != null && valueType != UnknownLocalTypeSentinel)
             {
                 var severity = _context.Policy == UnknownCallPolicy.Permissive
                     ? DiagnosticSeverity.Warning
@@ -1659,49 +1699,66 @@ public sealed class EffectEnforcementPass
             // fallback still performs. Measured: 05-02/05-03.approved.calr go
             // from clean to Calor0411 + Calor0410 on '_chainWhere005.ToList'.
             //
-            // CORPUS-UNREACHABLE BUT OBSERVABLE (review round 2, correcting
-            // round 1, which wrongly called this branch unreachable and said
-            // deleting it changed nothing).
+            // ───────────────────────────────────────────────────────────────
+            // v0.15 E1 slice 2c, review round 1 (MAJOR 2) — READ THIS BEFORE
+            // TRUSTING ANY OLDER COMMENT HERE. Everything slice 2b wrote about
+            // this branch being pinned is now FALSE, and the previous text said
+            // otherwise. Corrected in place rather than deleted, because "this
+            // is retained without a pin" is exactly the kind of claim that has
+            // to survive in the source.
             //
-            // Pinned by
-            // EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel,
-            // which FAILS if this branch is deleted, with its control
-            // _SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel.
+            // THIS BRANCH HAS NO DISCRIMINATING PIN. Delete it and the whole
+            // Enforcement suite stays green (381/381 at slice 2c; the number will drift, the greenness is the claim). Slice 2b's
+            // E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel is
+            // RETAINED as a behavioural pin — it asserts the fixture's outcome
+            // — but it no longer fails when this branch goes, and its control
+            // was renamed (see
+            // E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse).
+            //
+            // Why it stopped discriminating: slice 2c guards the AST's "?"
+            // sentinel at InferFromBareNameTarget (UnknownLocalTypeSentinel), so
+            // the sentinel is no longer mistaken for a type there. Slice 2b's
+            // comment said "InferFromBareNameTarget tests != null, not the
+            // sentinel" — that is no longer true, and it was the mechanism the
+            // whole 0418-vs-0411 argument rested on. The outer guard now answers
+            // the same question this branch answers, so the fixture reaches
+            // Calor0411 either way. Round 1 probed four more shapes looking for
+            // one where the two layers disagree and found none.
+            //
+            // WHY IT IS KEPT ANYWAY. It states the fail-closed rule at the layer
+            // that OWNS it: "the binder looked, told the author it could not name
+            // the type (Calor0270), and the AST does not get to guess in its
+            // place". The outer guard is a sentinel check in one consumer; this
+            // is the rule. E2 needs the rule here the moment chains carry types,
+            // because then AskBoundTree starts answering Typed for dotted paths
+            // and every consumer — not just the bare-target one — depends on
+            // Unresolved meaning Unresolved.
+            //
+            // WHAT E2 OWES: a pin that fails when this branch is deleted, i.e. a
+            // shape where a Reported UnresolvedBoundType reaches a consumer whose
+            // AST fallback returns a REAL type rather than the sentinel. That
+            // shape does not exist today; when chain typing lands it will.
             //
             // The reachability path is the NAME-KEYED side channel (see
             // CallGraphAnalysis.BoundValueTypes). A name used as a receiver
             // ANYWHERE in the function answers from here at EVERY occurrence,
-            // including positions the channel never collects. So:
+            // including positions the channel never collects:
             //
             //     §B{u} §C{Mystery.Make} §/C
             //     §C{u.Run} §/C     <- receiver use: puts u's Reported
             //                          UnresolvedBoundType into the channel
             //     §C{u} §/C         <- bare target: reads it back
             //
-            // Without this branch the bare target falls through to the AST
-            // search, which hands back the SENTINEL "?" for a §B it cannot type
-            // (FindLocalDeclarationType, "known value, unknown type").
-            // InferFromBareNameTarget tests `!= null`, not the sentinel, so "?"
-            // is treated as a type and the call takes the delegate-invocation
-            // arm: Calor0418 "declared type '?'", charging EffectSet.Empty.
-            // Measured: 0411,0411,0418,0410 without the branch vs
-            // 0411,0411,0411,0410 with it. Guessing here would launder effects,
-            // so the veto is load-bearing, not decorative.
-            //
-            // ResolveVariableType guards `declared == "?"`; the other
-            // ResolveLocalValueType call sites do not. Adding that guard here
-            // kept every pre-existing suite green but SUBSUMES this branch — the pin above
-            // then passes with the branch deleted, because both answer the same
-            // question at different layers. Unifying them is slice-2c work, not
-            // a drive-by. Recorded as debt in design doc §8.1.
-            //
-            // CORPUS claim, and only that: over all 301 committed .calr files
+            // CORPUS claim, and only that: over all 886 committed .calr files
             // every unresolved receiver arriving here is Reported=false — 32
-            // sites, all _chainNNN or member chains, zero Reported=true. So the
+            // sites, all _chainNNN or member chains, zero Reported=true. (Slice
+            // 2b's comment said 301; that was the count of a narrower sweep and
+            // is corrected here to the demand ledger's denominator.) So the
             // branch changes nothing on the committed corpus, which is why the
-            // ledgers and transcripts are unmoved; it is NOT evidence that the
-            // branch is unobservable. Reproduce the sweep by tracing
+            // ledgers and transcripts are unmoved; it is NOT evidence about
+            // observability either way. Reproduce the sweep by tracing
             // (name, Reported, ResolveLocalValueTypeFromAst(name)) here.
+            // ───────────────────────────────────────────────────────────────
             if (type is Binding.BoundTypes.UnresolvedBoundType unresolved)
             {
                 return unresolved.Reported
@@ -1730,6 +1787,79 @@ public sealed class EffectEnforcementPass
 
             typeName = display;
             return BoundValueAnswerKind.Typed;
+        }
+
+        /// <summary>
+        /// v0.15 E1 slice 2c — the BOUND receiver behind a receiver path, when
+        /// the binder typed it well enough to key a manifest lookup on.
+        ///
+        /// <para>The accepted set is exactly <see cref="AskBoundTree"/>'s
+        /// <c>Typed</c> answer MINUS function types. That is not an arbitrary
+        /// narrowing: <c>ResolveVariableType</c> — the string path this key
+        /// replaces — returns null for <c>"Func&lt;&gt;"</c> and <c>"?"</c>, so
+        /// accepting them here would resolve members the pre-slice compiler
+        /// never resolved, and the effects of a function value are E2/E4's
+        /// business, not a manifest lookup's.</para>
+        ///
+        /// <para>A <c>Reported</c> <c>UnresolvedBoundType</c> is excluded for
+        /// the same fail-closed reason slice 2b gives, and an unreported one is
+        /// excluded because there is nothing to key on either way — both fall
+        /// through to the caller's AST-derived string.</para>
+        /// </summary>
+        private Binding.BoundTypes.BoundType? KeyableBoundReceiver(string? receiverPath)
+        {
+            if (string.IsNullOrEmpty(receiverPath))
+                return null;
+            if (!BoundValueTypes.TryGetValue(receiverPath, out var type))
+                return null;
+            if (type is Binding.BoundTypes.UnresolvedBoundType)
+                return null;
+            if (IsFunctionBoundType(type))
+                return null;
+
+            var display = type.DisplayString;
+            if (string.IsNullOrWhiteSpace(display)
+                || display is "?" or "OBJECT"
+                || display.StartsWith("LAMBDA(", StringComparison.Ordinal)
+                || display.StartsWith("ASYNC_LAMBDA(", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return type;
+        }
+
+        /// <summary>
+        /// v0.15 E1 slice 2c — the resolver key for a member reached through
+        /// <paramref name="receiverPath"/>.
+        ///
+        /// <para>When the binder typed that receiver the key is built from its
+        /// <c>BoundType</c> — symbol identity, which is the whole point of E1
+        /// exit pin (c). Otherwise it is built from
+        /// <paramref name="declaringType"/>, the manifest-ready string the AST
+        /// fallbacks produce, through the single
+        /// <see cref="EffectResolverKey.FromStrings"/> factory so the fallback
+        /// is COUNTED rather than invisible.</para>
+        ///
+        /// <para>The two keys name the same type by construction:
+        /// <see cref="EffectResolverKey.FromBoundReceiver"/> applies the same
+        /// <c>MapShortTypeNameToFullName</c> that
+        /// <see cref="ResolveVariableType"/> applies to the bound tree's own
+        /// answer. Re-keying therefore moves no diagnostic — which is what the
+        /// unchanged D-A demand ledger, Calor0270 ledger and
+        /// <c>LosslessFormattingTests</c> observe.</para>
+        /// </summary>
+        private EffectResolverKey ResolverKey(
+            string? receiverPath,
+            string declaringType,
+            string memberName,
+            IReadOnlyList<string>? parameterTypes = null,
+            EffectMemberKind kind = EffectMemberKind.Method)
+        {
+            var bound = KeyableBoundReceiver(receiverPath);
+            return bound != null
+                ? EffectResolverKey.FromBoundReceiver(bound, memberName, parameterTypes, kind)
+                : EffectResolverKey.FromStrings(declaringType, memberName, parameterTypes, kind);
         }
 
         /// <summary>
@@ -1912,7 +2042,20 @@ public sealed class EffectEnforcementPass
                         {
                             return callResultType;
                         }
-                        return "?"; // known value, unknown type
+                        // Known value, unknown type. v0.15 E1 slice 2c: this
+                        // stays a sentinel rather than becoming null, because
+                        // null here means "no such value" and the two are
+                        // consumed differently — InferFromReference /
+                        // InferSetterEffects report an unknown operation for the
+                        // first and charge nothing for the second. Collapsing
+                        // them was implemented and rejected: it turns an
+                        // untyped receiver's property read from a reported
+                        // unknown operation into EffectSet.Empty, which is a
+                        // fail-OPEN change and the opposite of what this slice
+                        // is for. The one site where the sentinel was a guess —
+                        // a bare call target — guards it explicitly
+                        // (InferFromBareNameTarget, UnknownLocalTypeSentinel).
+                        return UnknownLocalTypeSentinel;
                     case IfStatementNode ifStmt:
                         var inIf = FindLocalDeclarationType(name, ifStmt.ThenBody)
                             ?? ifStmt.ElseIfClauses.Select(c => FindLocalDeclarationType(name, c.Body)).FirstOrDefault(t => t != null)
@@ -1974,15 +2117,12 @@ public sealed class EffectEnforcementPass
                 return null;
             var argumentTypes = call.Arguments.Select(InferExpressionType).ToArray();
             var resolution = _context.Resolver.Resolve(
-                receiverType,
-                methodName,
-                argumentTypes);
+                ResolverKey(receiver, receiverType, methodName, argumentTypes));
             if (resolution.Status == EffectResolutionStatus.Unknown)
             {
-                resolution = _context.Resolver.ResolveExtension(
-                    receiverType,
-                    methodName,
-                    argumentTypes);
+                resolution = _context.Resolver.Resolve(ResolverKey(
+                    receiver, receiverType, methodName, argumentTypes,
+                    EffectMemberKind.Extension));
             }
             if (resolution.Status == EffectResolutionStatus.Unknown)
                 return null;
@@ -2169,7 +2309,11 @@ public sealed class EffectEnforcementPass
             for (var i = 1; i < parts.Length; i++)
             {
                 var member = parts[i];
-                var getter = _context.Resolver.ResolveGetter(currentType, member);
+                // Only the FIRST step has a receiver the binder may have typed
+                // (the chain head). Every later step's receiver is a member type
+                // this walk derived itself, so it can only be keyed on text.
+                var getter = _context.Resolver.Resolve(ResolverKey(
+                    i == 1 ? parts[0] : null, currentType, member, null, EffectMemberKind.Getter));
                 if (getter.Status == EffectResolutionStatus.Unknown)
                     return (null, effects);
                 effects = effects.Union(getter.Effects);
@@ -2188,8 +2332,25 @@ public sealed class EffectEnforcementPass
         /// <see cref="ResolveReceiverChain"/>'s member walk does could charge
         /// any effect. Used to decide whether the bound-type shortcut above is
         /// safe: if no getter on the way contributes effects, skipping the walk
-        /// loses nothing. FIXME(E2) — remove once chain types carry rows and the
-        /// walk's effects can be read off the type instead of re-derived.
+        /// loses nothing.
+        ///
+        /// <para><b>FIXME(E2) — this method is UNTESTED and needs a pin the
+        /// moment E2 types chains.</b> Nothing observes it today, and nothing
+        /// can: its only caller is the bound-type shortcut in
+        /// <see cref="ResolveReceiverChain"/>, and that shortcut is unreachable
+        /// because slice 2a types EVERY member chain
+        /// <c>UnresolvedBoundType</c>, so <see cref="AskBoundTree"/> never
+        /// answers <c>Typed</c> for a dotted path. Deleting this method's body
+        /// and returning a constant would therefore fail no test — which is
+        /// exactly the condition that makes it dangerous, because the day E2
+        /// gives chain expressions real types the shortcut goes live and a
+        /// wrong answer here silently UNDER-CHARGES: it would skip a member
+        /// walk that runs property getters with effects. E2 must land a pin
+        /// that (a) drives a chain the binder types, (b) puts an effectful
+        /// getter partway along it, and (c) asserts the effect is charged —
+        /// before, not after, chain typing merges. Remove the method entirely
+        /// once chain types carry rows and the walk's effects can be read off
+        /// the type instead of re-derived.</para>
         /// </summary>
         private bool ChainWalkCouldChargeEffects(string[] parts)
         {
@@ -2199,7 +2360,8 @@ public sealed class EffectEnforcementPass
 
             for (var i = 1; i < parts.Length; i++)
             {
-                var getter = _context.Resolver.ResolveGetter(currentType, parts[i]);
+                var getter = _context.Resolver.Resolve(ResolverKey(
+                    i == 1 ? parts[0] : null, currentType, parts[i], null, EffectMemberKind.Getter));
                 if (getter.Status == EffectResolutionStatus.Unknown)
                     return false;
                 if (!getter.Effects.IsEmpty)
@@ -2277,7 +2439,12 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(resourceType);
-            var resolution = _context.Resolver.Resolve(manifestType, "Dispose");
+            // §USING's resource: bound when the resource is a plain reference the
+            // binder typed, text when it is a §NEW or an explicit §USING{Type:name}.
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                (usingStatement.Resource as ReferenceNode)?.Name,
+                manifestType,
+                "Dispose"));
             return effects.Union(
                 resolution.Status == EffectResolutionStatus.Unknown
                     ? UnknownResolvedOperation($"{manifestType}.Dispose", usingStatement.Span)
@@ -2349,10 +2516,11 @@ public sealed class EffectEnforcementPass
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
             var handlerType = InferExpressionType(handler);
-            var resolution = _context.Resolver.Resolve(
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                lastDot < 0 ? null : eventPath[..lastDot],
                 manifestType,
                 $"{(isAdd ? "add" : "remove")}_{eventName}",
-                handlerType);
+                [handlerType]));
             return effects.Union(
                 resolution.Status == EffectResolutionStatus.Unknown
                     ? UnknownResolvedOperation(
@@ -2450,7 +2618,12 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(targetType);
-            var resolution = _context.Resolver.ResolveGetter(manifestType, field.FieldName);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                GetReferencePath(field.Target),
+                manifestType,
+                field.FieldName,
+                null,
+                EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? effects.Union(UnknownResolvedOperation(
                     $"{manifestType}.get_{field.FieldName}",
@@ -2484,7 +2657,12 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(targetType);
-            var resolution = _context.Resolver.ResolveSetter(manifestType, field.FieldName);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                GetReferencePath(field.Target),
+                manifestType,
+                field.FieldName,
+                null,
+                EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     $"{manifestType}.set_{field.FieldName}",
@@ -2500,10 +2678,14 @@ public sealed class EffectEnforcementPass
             var receiverType = ResolveLocalValueType(receiver);
             return receiverType == null
                 ? EffectSet.Empty
-                : InferGetterEffects(receiverType, member, reference.Span);
+                : InferGetterEffects(receiverType, member, reference.Span, receiver);
         }
 
-        private EffectSet InferGetterEffects(string receiverType, string member, TextSpan span)
+        private EffectSet InferGetterEffects(
+            string receiverType,
+            string member,
+            TextSpan span,
+            string? receiverPath = null)
         {
             if (TryResolveClass(receiverType, out var cls))
             {
@@ -2531,7 +2713,8 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
-            var resolution = _context.Resolver.ResolveGetter(manifestType, member);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                receiverPath, manifestType, member, null, EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.get_{member}", span)
                 : resolution.Effects;
@@ -2565,7 +2748,8 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
-            var resolution = _context.Resolver.ResolveSetter(manifestType, member);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                receiver, manifestType, member, null, EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.set_{member}", span)
                 : resolution.Effects;
@@ -2988,7 +3172,10 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(typeName);
-            var resolution = _context.Resolver.ResolveConstructor(manifestType, argumentTypes);
+            // A constructor has no receiver — the type is named outright, so this
+            // key is text by construction, not by a missing binder answer.
+            var resolution = _context.Resolver.Resolve(EffectResolverKey.FromStrings(
+                manifestType, ".ctor", argumentTypes, EffectMemberKind.Constructor));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     $"{manifestType}..ctor({string.Join(",", argumentTypes)})",
@@ -3058,12 +3245,15 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(typeName);
+            // An object-initializer member sits on a type just named by §NEW;
+            // there is no receiver path to ask the binder about.
             var resolution = initializer.PropertyName.StartsWith("_item", StringComparison.Ordinal)
-                ? _context.Resolver.Resolve(
+                ? _context.Resolver.Resolve(EffectResolverKey.FromStrings(
                     manifestType,
                     "Add",
-                    InferExpressionType(initializer.Value))
-                : _context.Resolver.ResolveSetter(manifestType, initializer.PropertyName);
+                    [InferExpressionType(initializer.Value)]))
+                : _context.Resolver.Resolve(EffectResolverKey.FromStrings(
+                    manifestType, initializer.PropertyName, kind: EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     initializer.PropertyName.StartsWith("_item", StringComparison.Ordinal)

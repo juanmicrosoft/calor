@@ -457,13 +457,8 @@ public sealed class Issue785ClosureTests
             "generic-signature");
         var resolver = new EffectResolver(loader);
 
-        Assert.True(resolver.Resolve(
-            "Example.GenericApi",
-            "Transform",
-            "List<i32>").Effects.Contains(EffectKind.IO, "console_write"));
-        Assert.True(resolver.ResolveConstructor(
-            "Example.GenericApi",
-            "List<i32>").Effects.Contains(EffectKind.IO, "filesystem_read"));
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.GenericApi", "Transform", ["List<i32>"])).Effects.Contains(EffectKind.IO, "console_write"));
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.GenericApi", ".ctor", ["List<i32>"], EffectMemberKind.Constructor)).Effects.Contains(EffectKind.IO, "filesystem_read"));
     }
 
     [Fact]
@@ -604,14 +599,8 @@ public sealed class Issue785ClosureTests
             "namespaced-generics");
         var resolver = new EffectResolver(loader);
 
-        Assert.True(resolver.Resolve(
-            "Example.Api",
-            "Transform",
-            "A.Box<i32>").Effects.Contains(EffectKind.IO, "console_write"));
-        Assert.True(resolver.Resolve(
-            "Example.Api",
-            "Transform",
-            "B.Box<i32>").Effects.Contains(EffectKind.IO, "filesystem_read"));
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.Api", "Transform", ["A.Box<i32>"])).Effects.Contains(EffectKind.IO, "console_write"));
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.Api", "Transform", ["B.Box<i32>"])).Effects.Contains(EffectKind.IO, "filesystem_read"));
     }
 
     [Fact]
@@ -634,7 +623,7 @@ public sealed class Issue785ClosureTests
 
         Assert.Equal(
             EffectResolutionStatus.Unknown,
-            resolver.ResolveExtension("Vendor.Writer", "Select").Status);
+            resolver.Resolve(EffectResolverKey.FromStrings("Vendor.Writer", "Select", kind: EffectMemberKind.Extension)).Status);
     }
 
     [Fact]

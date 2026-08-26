@@ -42,13 +42,24 @@ public sealed class ILEffectAnalyzer : IDisposable
     /// Returns null if the method is not found, analysis is Incomplete,
     /// or the method is not in any loaded assembly.
     /// </summary>
-    public EffectResolution? TryResolve(string fullyQualifiedType, string methodName,
-        string[]? parameterTypes = null)
+    /// <param name="resolverKey">
+    /// v0.15 E1 slice 2c — the member's identity, replacing the
+    /// <c>(string type, string method, string[] parameters)</c> triple. IL
+    /// lookup semantics are unchanged: an empty or absent parameter list is a
+    /// name-only lookup (<c>"*"</c>), which unions the effects of every
+    /// overload.
+    /// </param>
+    public EffectResolution? TryResolve(EffectResolverKey resolverKey)
     {
+        ArgumentNullException.ThrowIfNull(resolverKey);
         if (_disposed) return null;
 
+        var fullyQualifiedType = resolverKey.DeclaringType;
+        var methodName = resolverKey.MemberName;
+        var parameterTypes = resolverKey.ParameterTypes;
+
         // Build parameter signature for lookup
-        var paramSig = parameterTypes != null && parameterTypes.Length > 0
+        var paramSig = parameterTypes is { Count: > 0 }
             ? $"({string.Join(",", parameterTypes)})"
             : "*"; // Name-only lookup
 

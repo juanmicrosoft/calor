@@ -351,13 +351,29 @@ public sealed class PackageManifestGenerator
     private static EffectResolution ResolveCurated(EffectResolver resolver, PublicMethod method)
     {
         var parameterTypes = EffectResolver.ParseParameterSignature(method.Key.ParameterSig);
-        return method.Kind switch
+
+        // v0.15 E1 slice 2c — `calor import` reads a package's PUBLIC surface
+        // out of metadata as text; there is no Calor call site and therefore no
+        // bound receiver. String fallback, counted.
+        var kind = method.Kind switch
         {
-            ImportMemberKind.Getter => resolver.ResolveGetter(method.Key.TypeName, method.DisplayMember),
-            ImportMemberKind.Setter => resolver.ResolveSetter(method.Key.TypeName, method.DisplayMember),
-            ImportMemberKind.Constructor => resolver.ResolveConstructor(method.Key.TypeName, parameterTypes),
-            _ => resolver.Resolve(method.Key.TypeName, method.DisplayMember, parameterTypes)
+            ImportMemberKind.Getter => EffectMemberKind.Getter,
+            ImportMemberKind.Setter => EffectMemberKind.Setter,
+            ImportMemberKind.Constructor => EffectMemberKind.Constructor,
+            _ => EffectMemberKind.Method,
         };
+
+        return resolver.Resolve(kind switch
+        {
+            // Accessors are keyed on the PROPERTY name, with no parameter list.
+            EffectMemberKind.Getter or EffectMemberKind.Setter =>
+                EffectResolverKey.FromStrings(method.Key.TypeName, method.DisplayMember, kind: kind),
+            EffectMemberKind.Constructor =>
+                EffectResolverKey.FromStrings(
+                    method.Key.TypeName, ".ctor", parameterTypes, EffectMemberKind.Constructor),
+            _ => EffectResolverKey.FromStrings(
+                method.Key.TypeName, method.DisplayMember, parameterTypes),
+        });
     }
 
     private static Dictionary<MethodKey, ILMethodOutcome> AnalyzeBodied(

@@ -1065,17 +1065,25 @@ public class EffectEnforcementTests
     /// documented on <c>CallGraphAnalysis.BoundValueTypes</c> is exactly the
     /// veto's reachability path.</para>
     ///
-    /// <para>Without the veto, <c>ResolveLocalValueType</c> falls through to the
-    /// AST search, which returns the SENTINEL <c>"?"</c> for a binding it cannot
-    /// type. <c>InferFromBareNameTarget</c> branches on <c>!= null</c>, so the
-    /// sentinel is treated as a type and the bare call takes the
-    /// delegate-invocation arm — <c>Calor0418: Invocation of value 'u' (declared
-    /// type '?')</c>, returning <c>EffectSet.Empty</c>. That is a guess, and a
-    /// laundering one: it charges nothing. With the veto the call stays
-    /// <c>Calor0411</c> and fails closed.</para>
+    /// <para><b>v0.15 E1 slice 2c, review round 1 (MAJOR 2) — this test no
+    /// longer discriminates, and saying so is the point.</b> Slice 2b's version
+    /// of this comment claimed "delete the veto and re-run: <c>0411, 0411, 0418,
+    /// 0410</c> instead of <c>0411, 0411, 0411, 0410</c>". That was true then
+    /// and is false now. Slice 2c guards the AST's <c>"?"</c> sentinel at
+    /// <c>InferFromBareNameTarget</c>
+    /// (<c>EffectEnforcementPass.UnknownLocalTypeSentinel</c>), so the sentinel
+    /// is no longer mistaken for a type at the bare target and this fixture
+    /// reaches <c>Calor0411</c> whether or not the veto branch exists. Deleting
+    /// the veto leaves the Enforcement suite at 358/358.</para>
     ///
-    /// <para>MEASURED — delete the veto and re-run: <c>0411, 0411, 0418,
-    /// 0410</c> instead of <c>0411, 0411, 0411, 0410</c>.</para>
+    /// <para>The test is RETAINED as a behavioural pin — it asserts what this
+    /// fixture does, which is still worth holding — but it is <b>not</b> the
+    /// veto's discriminating pin, and nothing currently is. The veto is kept
+    /// because it states the fail-closed rule at the layer that owns it
+    /// (<c>AskBoundTree</c>); E2 owes the pin that observes it, once chain
+    /// typing makes <c>AskBoundTree</c> answer <c>Typed</c> for dotted paths.
+    /// The branch comment in <c>EffectEnforcementPass</c> carries the same
+    /// statement, and so does design doc §8.1.</para>
     /// </summary>
     [Fact]
     public void E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel()
@@ -1100,40 +1108,64 @@ public class EffectEnforcementTests
     }
 
     /// <summary>
-    /// The control for
+    /// v0.15 E1 slice 2c — RE-SPECIFIED. This was slice 2b's control for
     /// <see cref="E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel"/>,
-    /// making the discriminator explicit: the SAME binding and the SAME bare
-    /// call, with the receiver use removed. Nothing then puts <c>u</c> into the
-    /// side channel, the veto cannot fire, and the AST sentinel reaches
-    /// <c>InferFromBareNameTarget</c> — Calor0418, on this branch and on
-    /// <c>main</c> alike. One receiver use is the only difference between the
-    /// two fixtures, and it is the difference between failing closed and
-    /// guessing.
+    /// and it pinned the OLD behaviour: the same binding and the same bare call
+    /// with the receiver use removed produced <c>Calor0418 "declared type
+    /// '?'"</c>, because nothing put <c>u</c> into the side channel, the veto
+    /// could not fire, and the AST's <c>"?"</c> sentinel reached
+    /// <c>InferFromBareNameTarget</c>, which tested <c>!= null</c>.
     ///
-    /// <para>This also records why the <c>"?"</c> sentinel is NOT guarded at
-    /// this call site the way <c>ResolveVariableType</c> guards it (round 2,
-    /// item 4). Adding <c>valueType != "?"</c> kept every pre-existing suite green —
-    /// measured — but it turns this control into Calor0411 as well, and with it
-    /// the veto's only observable path disappears: the pin above then passes
-    /// with the veto deleted. The sentinel guard and the veto answer the same
-    /// question at two layers. Unifying them is a deliberate slice-2c change,
-    /// not a drive-by that silently un-pins the test above.</para>
+    /// <para>Slice 2c resolves that debt. The sentinel is now guarded at the
+    /// bare-target site
+    /// (<c>EffectEnforcementPass.UnknownLocalTypeSentinel</c>), so the answer no
+    /// longer depends on whether the name happened to be used as a receiver
+    /// somewhere else in the function: <b>a bare call on an unknown-typed
+    /// <c>§B</c> is Calor0411 either way</b>. That symmetry is what this test
+    /// now pins, and it is the point — Calor0418 charged
+    /// <c>EffectSet.Empty</c> on a value the pass could not type at all, which
+    /// is laundering; Calor0411 fails closed.</para>
+    ///
+    /// <para><b>What this costs, stated rather than hidden.</b> The guard
+    /// SUBSUMES the veto for this shape, so
+    /// <c>E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel</c> now
+    /// passes even with the veto branch deleted — it is retained as a
+    /// behavioural pin, not a discriminating one. The veto itself is kept
+    /// because it states the fail-closed rule at the layer that owns it
+    /// (<c>AskBoundTree</c>), and E2 needs it there once chains carry types.
+    /// Design doc §8.1 records the same thing.</para>
     /// </summary>
     [Fact]
-    public void E1Slice2b_SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel()
+    public void E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse()
     {
-        var source = @"
+        var withoutReceiverUse = @"
 §M{m001:VetoControl}
   §F{f001:Go:pub}
     §E{}
     §B{u} §C{Mystery.Make} §/C
     §C{u} §/C
 ";
-        var result = TestHarness.Compile(source);
+        var withReceiverUse = @"
+§M{m001:VetoReach}
+  §F{f001:Go:pub}
+    §E{}
+    §B{u} §C{Mystery.Make} §/C
+    §C{u.Run} §/C
+    §C{u} §/C
+";
 
-        var delegateInvocation = Assert.Single(
-            result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.DelegateInvocation));
-        Assert.Contains("declared type '?'", delegateInvocation.Message);
+        foreach (var source in new[] { withoutReceiverUse, withReceiverUse })
+        {
+            var result = TestHarness.Compile(source);
+
+            Assert.DoesNotContain(
+                result.Diagnostics.ToList(),
+                d => d.Code == DiagnosticCode.DelegateInvocation);
+            Assert.Contains(
+                result.Diagnostics.ToList(),
+                d => d.Code == DiagnosticCode.UnknownExternalCall
+                     && d.Message.Contains("'u'"));
+        }
     }
 
     /// <summary>

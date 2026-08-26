@@ -519,7 +519,43 @@ renegotiation; DEFERRED items are named so their absence is a decision.
 
 **MUST**
 
-- **E1 — Foundation (the never-merged metadata S6, plus the lambda type).**
+- **E1 — Foundation (the never-merged metadata S6, plus the lambda type). — COMPLETE.**
+  Slices 1 (#1089), 2a (#1095), 2b (#1099) and 2c have all merged, and **all three exit pins
+  below are MET**. Pin (c) closed with slice 2c: `EffectResolver` has one entry point,
+  `Resolve(EffectResolverKey)`, keyed on the member's identity — declaring type (generic
+  definition plus arity, the spelling manifests use), member name, parameter types, member kind
+  — with `ResolveExtension`/`ResolveGetter`/`ResolveSetter`/`ResolveConstructor` deleted
+  alongside the string `Resolve`, manifests parsed into keys once at load, and
+  `ILEffectAnalyzer.TryResolve` taking the key. The six-step resolution order and `"*"` wildcard
+  semantics are unchanged, and nothing moved: gate 6's ledger (817/1248), the D-A demand ledger
+  (3), the Calor0270 volume ledger and the P29 transcripts are all byte-identical, with
+  `LosslessFormattingTests` green. Because a structural pin can be satisfied cosmetically — an
+  API keyed on identity whose callers all funnel text through one factory — slice 2c also
+  registers `bench/phase0-agent-native/effect-resolver-key-ledger.json`
+  (`EffectResolverKeyLedgerTests`, compiler shard, exact per-subject equality), freezing the
+  bound-key/string-key split at **202 / 751** over 844 measured committed `.calr`. That is a
+  baseline for E2 to move, not a target E1 claims to have hit: the resolution ceiling of design
+  doc §2.2 is untouched. The slice also resolves 2b's `"?"`-sentinel debt — a bare call on an
+  unknown-typed `§B` is now Calor0411 whether or not the name was also a receiver, with a
+  measured corpus delta of **zero** — at the cost, stated in design doc §8.1, that
+  `E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel` is no longer discriminating.
+
+  **"COMPLETE" means the three exit pins are met. The MUST body above has two named
+  residuals, and they are carried to E2 rather than claimed** (review round 1, MINOR 10).
+  *(i) "IL summaries key on symbol identity" is not literally true.* `ILEffectAnalyzer`
+  takes an `EffectResolverKey`, but every key on that path is built by
+  `EffectResolverKey.FromStrings` from IL metadata TEXT — a `MethodKey`'s type name, member
+  name and parameter signature. Symbol identity for IL callees needs the IL reader to hand
+  back resolved type references instead of names, which is E2 work; today the ledger counts
+  those keys honestly as string fallbacks. *(ii) The key's parameter component is inferred
+  ARGUMENT types, not the callee's signature.* The declaring type is symbol-derived; the
+  parameter list is still `InferExpressionType`'s answer, because `BclCallResolution` is
+  private to `Binder` and the effect pass never holds a `BoundCallExpression`. Overload
+  discrimination is therefore exactly as good as before the slice. Design doc §8.4 carries
+  both, and the key ledger measures declaring-type provenance only — not parameter-type
+  provenance.
+
+  The remainder of this bullet is the scope as written when E1 opened.
   `ExternalCallCollector` and the enforcement pass resolve receivers and callees from
   `BoundExpression.Type` / bound symbols; `_variableTypeMap` is deleted; `EffectResolver`,
   manifests, and IL summaries key on symbol identity so external effects attach to typed external
@@ -546,6 +582,12 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   type is available **only** through metadata (no AST type string anywhere in the module)
   resolves its effects; (c) a structural pin that the string path is deleted, not bypassed — no
   `EffectResolver.Resolve(string, string, …)` overload remains.
+  **All three landed. (a)** `EffectsSuggestTests.cs:159`. **(b)**
+  `EffectEnforcementTests.E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee`.
+  **(c)** `ArchitectureTests.EffectResolver_ExposesNoStringTypeNameResolveOverload` — reflection
+  over `EffectResolver`'s public surface, so it catches the overload wherever and however it is
+  re-added, with a positive half asserting `Resolve(EffectResolverKey)` still exists (the pin
+  cannot be satisfied by deleting resolution outright).
 - **E2 — Effect rows** on function, delegate, and lambda types (monomorphic MUST; rank-1
   polymorphism behind the §4.1 ramp).
 - **E3 — Effect-compatibility checking** at assignment, argument, return, override, and

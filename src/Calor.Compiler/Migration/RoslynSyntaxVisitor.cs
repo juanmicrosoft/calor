@@ -12389,15 +12389,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     InferEffectsFromExpression(argument, effects);
                 var typeName = EffectEnforcementPass.MapShortTypeNameToFullName(creation.TypeName);
                 var argumentTypes = creation.Arguments.Select(InferMigrationExpressionType).ToArray();
+                // v0.15 E1 slice 2c — the C# → Calor converter runs before any
+                // Calor binder exists, so its keys are string fallbacks by
+                // construction, and the ledger counts them as such.
                 AddResolvedEffects(
-                    _migrationResolver.Value.ResolveConstructor(typeName, argumentTypes),
+                    _migrationResolver.Value.Resolve(EffectResolverKey.FromStrings(
+                        typeName, ".ctor", argumentTypes, EffectMemberKind.Constructor)),
                     effects);
                 foreach (var initializer in creation.Initializers)
                 {
                     InferEffectsFromExpression(initializer.Value, effects);
                     AddEffect(effects, "mutation", "heap_write");
                     AddResolvedEffects(
-                        _migrationResolver.Value.ResolveSetter(typeName, initializer.PropertyName),
+                        _migrationResolver.Value.Resolve(EffectResolverKey.FromStrings(
+                            typeName, initializer.PropertyName, kind: EffectMemberKind.Setter)),
                         effects);
                 }
                 break;
@@ -12511,13 +12516,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         var argumentTypes = arguments.Select(InferMigrationExpressionType).ToArray();
-        var resolution = _migrationResolver.Value.Resolve(typePart, methodName, argumentTypes);
+        // v0.15 E1 slice 2c — string fallback: the converter's own
+        // `_variableTypeMap` is the only receiver type source on this path, and
+        // there is no bound tree at migration time.
+        var resolution = _migrationResolver.Value.Resolve(
+            EffectResolverKey.FromStrings(typePart, methodName, argumentTypes));
         if (resolution.Status == EffectResolutionStatus.Unknown && instanceReceiver)
         {
-            resolution = _migrationResolver.Value.ResolveExtension(
-                typePart,
-                methodName,
-                argumentTypes);
+            resolution = _migrationResolver.Value.Resolve(EffectResolverKey.FromStrings(
+                typePart, methodName, argumentTypes, EffectMemberKind.Extension));
         }
         AddResolvedEffects(resolution, effects);
         // Don't add wildcard for unknown calls — let the enforcement pass handle them

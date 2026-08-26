@@ -41,6 +41,24 @@ All notable changes to this project will be documented in this file.
   sign, and any whitespace inside the braces.
 
 ### Changed
+- **The part of the compiler that looks up what a .NET method does now
+  identifies that method properly, instead of by a handful of loose text
+  strings.** Before, asking "what does `File.ReadAllText` do?" meant passing
+  around a type name, a method name and a list of argument types as plain text,
+  and hoping the spellings lined up. Now there is one thing that names the
+  method — where it comes from, what it is called, what it takes, and whether it
+  is a normal method, a property read or write, a constructor, or an extension
+  method — and every lookup goes through it. Nothing about your code compiles
+  differently: the same answers come back, in the same order, and the project's
+  measurement records confirm it. What changes is that the compiler can no
+  longer quietly disagree with itself about which method it is asking about.
+  - **One message does change, in one situation.** If you call something by a
+    bare name — `§C{u}` — and the compiler cannot work out what `u` is at all,
+    it used to say "you cannot invoke a function-typed value of type `?`". That
+    was a guess dressed up as an answer, and it let the call through without
+    counting any of its effects. It now says the call target is unknown, and
+    counts it as unknown, which is the safe answer. No file in this repository
+    is affected; the record that counts these messages did not move.
 - **The effect checker now asks the type checker what a method call is being
   made on, instead of hunting through the source text for a type name.** When
   the compiler works out the effects of `sb.AppendLine(...)`, it needs to know

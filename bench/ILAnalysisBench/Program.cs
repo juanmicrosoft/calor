@@ -78,7 +78,7 @@ for (var i = 0; i < Iterations; i++)
         // Count resolution outcomes
         foreach (var (type, method) in callSites)
         {
-            var result = analyzer.TryResolve(type, method);
+            var result = analyzer.TryResolve(EffectResolverKey.FromStrings(type, method));
             if (result == null)
                 incompleteCount++;
             else if (result.Status == EffectResolutionStatus.PureExplicit)
@@ -114,7 +114,7 @@ Console.WriteLine("====================");
 
     foreach (var (type, method) in callSites)
     {
-        var result = analyzer.TryResolve(type, method);
+        var result = analyzer.TryResolve(EffectResolverKey.FromStrings(type, method));
         var status = result == null ? "Incomplete"
             : result.Status == EffectResolutionStatus.PureExplicit ? "Pure"
             : $"Resolved: {result.Effects}";

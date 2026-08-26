@@ -152,7 +152,7 @@ public class ILAnalysisTests : IDisposable
         // Verify the manifest actually covers DbCommand.ExecuteNonQuery as a prerequisite
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Data.Common.DbCommand", "ExecuteNonQuery");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Data.Common.DbCommand", "ExecuteNonQuery"));
         Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
         Assert.False(result.Effects.IsEmpty); // Should contain db:w
     }
@@ -180,7 +180,7 @@ public class ILAnalysisTests : IDisposable
         var unresolvedCallees = result.Edges
             .Where(e =>
             {
-                var res = resolver.Resolve(e.Callee.TypeName, e.Callee.MethodName);
+                var res = resolver.Resolve(EffectResolverKey.FromStrings(e.Callee.TypeName, e.Callee.MethodName));
                 return res.Status == EffectResolutionStatus.Unknown;
             })
             .Select(e => e.Callee.ToString())
@@ -192,7 +192,7 @@ public class ILAnalysisTests : IDisposable
             .Where(e => !e.Callee.MethodName.StartsWith("set_") && !e.Callee.MethodName.StartsWith("get_"))
             .Where(e =>
             {
-                var res = resolver.Resolve(e.Callee.TypeName, e.Callee.MethodName);
+                var res = resolver.Resolve(EffectResolverKey.FromStrings(e.Callee.TypeName, e.Callee.MethodName));
                 return res.Status == EffectResolutionStatus.Unknown;
             })
             .Select(e => e.Callee.ToString())
@@ -223,7 +223,7 @@ public class ILAnalysisTests : IDisposable
         resolver.Initialize();
         foreach (var edge in result.Edges.Where(e => e.Callee.MethodName == "ExecuteNonQuery"))
         {
-            var res = resolver.Resolve(edge.Callee.TypeName, edge.Callee.MethodName);
+            var res = resolver.Resolve(EffectResolverKey.FromStrings(edge.Callee.TypeName, edge.Callee.MethodName));
             Assert.NotEqual(EffectResolutionStatus.Unknown, res.Status);
         }
     }
@@ -243,7 +243,7 @@ public class ILAnalysisTests : IDisposable
         var results = propagator.Propagate([entryPoint]);
 
         // Verify the resolver works directly
-        var directCheck = resolver.Resolve("System.Data.Common.DbCommand", "ExecuteNonQuery");
+        var directCheck = resolver.Resolve(EffectResolverKey.FromStrings("System.Data.Common.DbCommand", "ExecuteNonQuery"));
         Assert.NotEqual(EffectResolutionStatus.Unknown, directCheck.Status);
         Assert.False(directCheck.Effects.IsEmpty, $"Direct resolver check: {directCheck.Status}, {directCheck.Effects}");
 
@@ -263,7 +263,7 @@ public class ILAnalysisTests : IDisposable
         // UserService.CreateUser() → UserRepository.Save() → DbCommand.ExecuteNonQuery()
         analyzer.AnalyzeFromCallSites([("TestAssembly.DataAccess.UserService", "CreateUser")]);
 
-        var result = analyzer.TryResolve("TestAssembly.DataAccess.UserService", "CreateUser");
+        var result = analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.DataAccess.UserService", "CreateUser"));
         // 3-hop chain should propagate db:w all the way back
         Assert.NotNull(result);
         Assert.False(result.Effects.IsEmpty, "Transitive call should propagate db effects");
@@ -276,7 +276,7 @@ public class ILAnalysisTests : IDisposable
 
         analyzer.AnalyzeFromCallSites([("TestAssembly.DataAccess.MathHelper", "Add")]);
 
-        var result = analyzer.TryResolve("TestAssembly.DataAccess.MathHelper", "Add");
+        var result = analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.DataAccess.MathHelper", "Add"));
         // MathHelper.Add is pure (just returns a + b) — no effects
         Assert.NotNull(result);
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
@@ -365,7 +365,7 @@ public class ILAnalysisTests : IDisposable
         Assert.True(analyzer.CachedMethodCount >= 1);
 
         // TryResolve with name-only should return a result (union of overloads or first match)
-        var result = analyzer.TryResolve("TestAssembly.Scenarios.OverloadService", "Process");
+        var result = analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.Scenarios.OverloadService", "Process"));
         // Analysis ran — cached something
         Assert.True(analyzer.CachedMethodCount >= 1);
     }
@@ -418,7 +418,7 @@ public class ILAnalysisTests : IDisposable
         _analyzer.AnalyzeFromCallSites([("TestAssembly.Scenarios.DeepChain", "Level0")]);
 
         // The result should be null (Incomplete), NOT a PureExplicit resolution
-        var result = _analyzer.TryResolve("TestAssembly.Scenarios.DeepChain", "Level0");
+        var result = _analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.Scenarios.DeepChain", "Level0"));
         // If analysis was incomplete, TryResolve returns null (falls through to Unknown)
         // It should NOT return a resolution claiming the method is pure
         if (result != null)
@@ -449,9 +449,9 @@ public class ILAnalysisTests : IDisposable
         Assert.True(analyzer.CachedMethodCount >= 5);
 
         // Multiple TryResolve calls should work
-        analyzer.TryResolve("TestAssembly.DataAccess.UserService", "CreateUser");
-        analyzer.TryResolve("TestAssembly.DataAccess.UserService", "GetUser");
-        analyzer.TryResolve("TestAssembly.Scenarios.DeepChain", "Level0");
+        analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.DataAccess.UserService", "CreateUser"));
+        analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.DataAccess.UserService", "GetUser"));
+        analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.Scenarios.DeepChain", "Level0"));
     }
 
     [Fact]
@@ -476,7 +476,7 @@ public class ILAnalysisTests : IDisposable
         var analyzer = new ILEffectAnalyzer([DataAccessDll], resolver);
         analyzer.Dispose();
 
-        var result = analyzer.TryResolve("TestAssembly.DataAccess.UserRepository", "Save");
+        var result = analyzer.TryResolve(EffectResolverKey.FromStrings("TestAssembly.DataAccess.UserRepository", "Save"));
         Assert.Null(result);
     }
 
@@ -490,7 +490,7 @@ public class ILAnalysisTests : IDisposable
         resolver.Initialize();
 
         // A type not in manifests but in the IL analyzer
-        var result = resolver.Resolve("TestAssembly.DataAccess.UserRepository", "Save");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("TestAssembly.DataAccess.UserRepository", "Save"));
         // Should either be resolved via IL or fall through to Unknown
         // The key: it doesn't crash and returns a valid resolution
         Assert.NotNull(result);

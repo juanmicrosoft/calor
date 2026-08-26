@@ -788,4 +788,75 @@ public class ArchitectureTests
                 break;
         }
     }
+
+    /// <summary>
+    /// v0.15 E1 slice 2c — roadmap §4.2 E1 **exit pin (c)**: "a structural pin
+    /// that the string path is deleted, not bypassed — no
+    /// <c>EffectResolver.Resolve(string, string, …)</c> overload remains".
+    ///
+    /// <para>Reflection, not grep, because the thing being pinned is the public
+    /// SHAPE of the type: an overload can be re-added in any file, spelled any
+    /// way, and this still catches it. Every public resolution entry point on
+    /// <see cref="Calor.Compiler.Effects.EffectResolver"/> must take its
+    /// subject as an <see cref="Calor.Compiler.Effects.EffectResolverKey"/>;
+    /// a <c>string</c> parameter on any of them means a caller can once again
+    /// name an external member by text and skip
+    /// <see cref="Calor.Compiler.Effects.EffectResolverKey.FromStrings"/>,
+    /// which is what makes the key ledger's bound-vs-string split
+    /// meaningful.</para>
+    ///
+    /// <para>Deleting the check and re-adding
+    /// <c>Resolve(string, string, params string[])</c> is the discriminating
+    /// experiment: this test goes red, and nothing else does.</para>
+    ///
+    /// <para><b>Review round 1 (MAJOR 4) — the filter is on the RETURN TYPE,
+    /// not the name.</b> The first version of this pin selected methods whose
+    /// name started with <c>"Resolve"</c>, which meant a freshly added
+    /// <c>public EffectResolution TryResolve(string, string, params string[])</c>
+    /// walked straight past it: the string path would be back under a different
+    /// verb and the pin would still be green. What the roadmap is actually
+    /// asking is "can a caller obtain an <c>EffectResolution</c> by naming a
+    /// member in text?", so the predicate is now exactly that — any public
+    /// member returning an <c>EffectResolution</c> (or a nullable one) that
+    /// accepts a <c>string</c>. Renaming the method no longer helps.</para>
+    /// </summary>
+    [Fact]
+    public void EffectResolver_ExposesNoStringTypeNameResolveOverload()
+    {
+        var resolverType = typeof(Calor.Compiler.Effects.EffectResolver);
+        var resolution = typeof(Calor.Compiler.Effects.EffectResolution);
+
+        var offenders = resolverType
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+            // Any verb, not just "Resolve": what matters is that the member
+            // HANDS BACK a resolution, since that is the capability exit pin (c)
+            // says must not be reachable from a string.
+            .Where(method => method.ReturnType == resolution
+                || Nullable.GetUnderlyingType(method.ReturnType) == resolution)
+            .Where(method => method.GetParameters().Any(p =>
+                p.ParameterType == typeof(string)
+                // Any string sequence, under any collection shape: string[],
+                // List<string>, IReadOnlyList<string>, IEnumerable<string>, ...
+                || typeof(System.Collections.Generic.IEnumerable<string>).IsAssignableFrom(p.ParameterType)))
+            .Select(method =>
+                $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})")
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "roadmap §4.2 E1 exit pin (c): no public member of EffectResolver may return an "
+            + "EffectResolution while accepting a string — under ANY name. Callers holding only "
+            + "text build a key through EffectResolverKey.FromStrings, which marks "
+            + "FromStringFallback so the key ledger can count it. Offending members: "
+            + string.Join(", ", offenders));
+
+        // Positive half: the keyed entry point actually exists, so the pin
+        // cannot be satisfied by deleting resolution altogether.
+        var keyed = resolverType.GetMethod(
+            "Resolve",
+            BindingFlags.Public | BindingFlags.Instance,
+            [typeof(Calor.Compiler.Effects.EffectResolverKey)]);
+        Assert.NotNull(keyed);
+    }
 }
