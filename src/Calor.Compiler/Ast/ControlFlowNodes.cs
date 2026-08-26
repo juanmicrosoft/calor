@@ -168,6 +168,14 @@ public sealed class BindStatementNode : StatementNode
     public ExpressionNode? Initializer { get; }
     public AttributeCollection Attributes { get; }
 
+    /// <summary>
+    /// Optional effect row annotating the bound type, written same-line-adjacent to
+    /// the header group: <c>§B{f:Func&lt;i32,i32&gt;} §E{cw} &lt;init&gt;</c>.
+    /// Position 7 of docs/design/effect-rows-in-the-type-system.md §3.3. A <c>§E</c>
+    /// on a later line is Calor0405 — the statement loop has no <c>§E</c> arm.
+    /// </summary>
+    public EffectsNode? Row { get; }
+
     public BindStatementNode(
         TextSpan span,
         string name,
@@ -176,9 +184,11 @@ public sealed class BindStatementNode : StatementNode
         ExpressionNode? initializer,
         AttributeCollection attributes,
         TextSpan? identifierSpan = null,
-        TextSpan? typeNameSpan = null)
+        TextSpan? typeNameSpan = null,
+        EffectsNode? row = null)
         : base(span)
     {
+        Row = row;
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName;

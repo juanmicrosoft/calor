@@ -157,6 +157,16 @@ public sealed class MethodSignatureNode : AstNode
     public string Id { get; }
     public string Name { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+
+    /// <summary>
+    /// Effect variables this interface member binds with an <c>eff</c> modifier —
+    /// <c>§MT{mt001:Handle}&lt;eff e&gt;</c>. This is the member-level spelling the
+    /// emitter spike chose (spike-verdict.json a3MiddlewareSpelling); an
+    /// <c>eff</c> binder on the <c>§IFACE</c> itself is Calor0404 in 0.15.
+    /// </summary>
+    public IReadOnlyList<EffectParameterInfo> EffectParameters { get; init; }
+        = Array.Empty<EffectParameterInfo>();
+
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     public EffectsNode? Effects { get; }
@@ -570,6 +580,14 @@ public sealed class ClassFieldNode : AstNode
     /// </summary>
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
+    /// <summary>
+    /// Optional effect row annotating the field type, written same-line-adjacent to
+    /// the header group: <c>§FLD{Action&lt;i32&gt;:onChange:pri} §E{cw}</c>.
+    /// Position 8 of docs/design/effect-rows-in-the-type-system.md §3.3. A <c>§E</c>
+    /// on a later line is Calor0405 — the class-member loop has no <c>§E</c> arm.
+    /// </summary>
+    public EffectsNode? Row { get; }
+
     public ClassFieldNode(
         TextSpan span,
         string name,
@@ -603,7 +621,8 @@ public sealed class ClassFieldNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         TextSpan? identifierSpan = null,
-        TextSpan? typeNameSpan = null)
+        TextSpan? typeNameSpan = null,
+        EffectsNode? row = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -613,6 +632,7 @@ public sealed class ClassFieldNode : AstNode
         Visibility = visibility;
         Modifiers = modifiers;
         DefaultValue = defaultValue;
+        Row = row;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
@@ -635,6 +655,15 @@ public sealed class MethodNode : AstNode
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+
+    /// <summary>
+    /// Effect variables this method binds with an <c>eff</c> modifier in its
+    /// type-parameter list — <c>§MT{mt001:Handle:pub}&lt;eff e&gt;</c>. Kept out of
+    /// <see cref="TypeParameters"/> so codegen erases them by construction.
+    /// </summary>
+    public IReadOnlyList<EffectParameterInfo> EffectParameters { get; init; }
+        = Array.Empty<EffectParameterInfo>();
+
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     public EffectsNode? Effects { get; }

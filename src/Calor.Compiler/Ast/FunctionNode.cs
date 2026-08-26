@@ -23,10 +23,19 @@ public sealed class OutputNode : AstNode
     public string TypeName { get; }
     public TextSpan TypeNameSpan { get; }
 
-    public OutputNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null) : base(span)
+    /// <summary>
+    /// Optional effect row annotating the return type, written same-line-adjacent to
+    /// it: <c>§O{Func&lt;i32&gt;} §E{cw}</c> or <c>-&gt; Func&lt;i32&gt; §E{cw}</c>.
+    /// Position 6 of docs/design/effect-rows-in-the-type-system.md §3.3.
+    /// A <c>§E</c> on a later line is the declaration's own row, not this.
+    /// </summary>
+    public EffectsNode? Row { get; }
+
+    public OutputNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null, EffectsNode? row = null) : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
+        Row = row;
     }
 
 
@@ -39,9 +48,22 @@ public sealed class EffectsNode : AstNode
 {
     public IReadOnlyDictionary<string, string> Effects { get; }
 
-    public EffectsNode(TextSpan span, IReadOnlyDictionary<string, string> effects) : base(span)
+    /// <summary>
+    /// Bare-identifier effect variables written inside this row — <c>§E{cw, e}</c>
+    /// carries concrete code <c>cw</c> in <see cref="Effects"/> and variable
+    /// <c>e</c> here. A name lands here only when an enclosing declaration binds it
+    /// with an <c>eff</c> modifier; an unbound name stays an unknown effect code.
+    /// See docs/design/effect-rows-in-the-type-system.md §7.2.
+    /// </summary>
+    public IReadOnlyList<string> EffectVariables { get; }
+
+    public EffectsNode(
+        TextSpan span,
+        IReadOnlyDictionary<string, string> effects,
+        IReadOnlyList<string>? effectVariables = null) : base(span)
     {
         Effects = effects ?? throw new ArgumentNullException(nameof(effects));
+        EffectVariables = effectVariables ?? Array.Empty<string>();
     }
 
 
@@ -58,6 +80,15 @@ public sealed class FunctionNode : AstNode
     public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+
+    /// <summary>
+    /// Effect variables this declaration binds with an <c>eff</c> modifier in its
+    /// type-parameter list. Kept separate from <see cref="TypeParameters"/> so the
+    /// binders are erased at codegen by construction — see
+    /// <see cref="EffectParameterInfo"/> and design-doc §7.2.
+    /// </summary>
+    public IReadOnlyList<EffectParameterInfo> EffectParameters { get; init; }
+        = Array.Empty<EffectParameterInfo>();
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     public EffectsNode? Effects { get; }
@@ -274,6 +305,14 @@ public sealed class ParameterNode : AstNode
     /// </summary>
     public InlineRefinementInfo? InlineRefinement { get; }
 
+    /// <summary>
+    /// Optional effect row annotating the parameter type, written same-line-adjacent
+    /// to it: <c>§I{Func&lt;i32,i32&gt;:f} §E{cw}</c> (tag form, position 4) or
+    /// <c>(Func&lt;i32,i32&gt;:f §E{cw}, i32:v)</c> (inline form, position 5).
+    /// See docs/design/effect-rows-in-the-type-system.md §3.3.
+    /// </summary>
+    public EffectsNode? Row { get; }
+
     public ParameterNode(
         TextSpan span,
         string name,
@@ -314,7 +353,8 @@ public sealed class ParameterNode : AstNode
         ExpressionNode? defaultValue,
         InlineRefinementInfo? inlineRefinement = null,
         TextSpan? identifierSpan = null,
-        TextSpan? typeNameSpan = null)
+        TextSpan? typeNameSpan = null,
+        EffectsNode? row = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -326,6 +366,7 @@ public sealed class ParameterNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         DefaultValue = defaultValue;
         InlineRefinement = inlineRefinement;
+        Row = row;
     }
 
 

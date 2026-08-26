@@ -398,6 +398,20 @@ public static class DiagnosticCode
     public const string EffectMismatch = "Calor0402";
     public const string UnknownEffectCode = "Calor0403";
 
+    /// <summary>
+    /// An effect variable was declared or used where the effect-row scope rules
+    /// forbid it, or an <c>eff</c> binder was named after a live effect code.
+    /// See docs/design/effect-rows-in-the-type-system.md §7.2(c) and §7.3.
+    /// </summary>
+    public const string EffectVariableScope = "Calor0404";
+
+    /// <summary>
+    /// A <c>§E{…}</c> effect row appears where a row cannot be attached: on its own
+    /// line at a position with no declaration-level <c>§E</c> arm to fall through to.
+    /// See docs/design/effect-rows-in-the-type-system.md §3.1.
+    /// </summary>
+    public const string EffectRowMisplaced = "Calor0405";
+
     // Effect enforcement (Calor0410-0429)
     public const string ForbiddenEffect = "Calor0410";
     public const string UnknownExternalCall = "Calor0411";
