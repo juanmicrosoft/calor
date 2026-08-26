@@ -15,8 +15,14 @@ src file — Calor-first guard forbids new `src/*.cs`).
       `Effects/*.cs` file list at 10)
   NOTE: heredocs are refused by the worktree guard — use the Edit/Write tools, not
   `python3 - <<EOF`. Run `src/Calor.Compiler/scripts/download-z3.sh` once per fresh clone.
-- [ ] Resolve(key) / manifests parsed to keys once / ILEffectAnalyzer.TryResolve(key)
-- [ ] delete string overloads + architecture reflection Fact
+- [x] Resolve(key) is the SINGLE entry point (Method/Extension/Getter/Setter/Constructor by
+      `EffectMemberKind`); manifests parsed into keys once in `BuildTypeCache`; four per-type
+      dictionaries collapsed to one `Members` dict; `ILEffectAnalyzer.TryResolve(key)`
+- [x] string overloads DELETED (Resolve/ResolveExtension/ResolveGetter/ResolveSetter/
+      ResolveConstructor) + architecture pin
+      `ArchitectureTests.EffectResolver_ExposesNoStringTypeNameResolveOverload`
+      (appended at END of the file so `facts.py`'s `ArchitectureTests.cs:158` pin does not shift)
+- [x] all src + test + bench callers migrated; Enforcement suite 358/358 green
 - [ ] key ledger bench/phase0-agent-native/effect-resolver-key-ledger.json
 - [ ] "?" sentinel decision
 - [ ] ChainWalkCouldChargeEffects FIXME(E2)
