@@ -382,6 +382,38 @@ public class EffectRowSyntaxTests
         Assert.Empty(ErrorsOf(diagnostics, DiagnosticCode.EffectRowMisplaced));
     }
 
+    [Theory]
+    // Tag form. On main this is SILENT and wrong: the first §E becomes the parameter's
+    // row and the second falls through to the §F section loop's §E arm and becomes the
+    // DECLARATION's row — two meanings from one line, reported only as a downstream
+    // Calor0410 about an effect the author plainly declared.
+    [InlineData("""
+        §M{m001:F7}
+          §F{f001:Log:pub}
+            §I{str:m} §E{cw} §E{net}
+            §O{void}
+            §P m
+        """)]
+    // Inline form. On main this is a 12-diagnostic cascade.
+    [InlineData("""
+        §M{m001:F7}
+          §F{f001:Apply:pub} (Func<i32,i32>:f §E{cw} §E{net}, i32:v) -> i32
+            §E{cw}
+            §R INT:0
+        """)]
+    public void SecondAdjacentRow_IsCalor0405(string source)
+    {
+        Parse(source, out var diagnostics);
+
+        var error = Assert.Single(ErrorsOf(diagnostics, DiagnosticCode.EffectRowMisplaced));
+        Assert.Contains("only one §E{…} effect row", error.Message);
+        // The message names the repair that actually expresses what was meant.
+        Assert.Contains("§E{cw, net}", error.Message);
+
+        // …and it is the only thing wrong: no cascade behind it.
+        Assert.Empty(ErrorsOf(diagnostics, DiagnosticCode.UnexpectedToken));
+    }
+
     [Fact]
     public void EmptyRow_IsRecordedAndIsNotTheSameAsNoRow()
     {

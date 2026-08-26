@@ -1968,7 +1968,28 @@ public sealed class Parser
         if (Current.Span.Line != PreviousToken.Span.Line)
             return null;
 
-        return ParseEffects(position);
+        var row = ParseEffects(position);
+
+        // A type carries at most ONE row. Without this, a second adjacent §E is not
+        // merely unhelpful, it is silent and wrong: in `§I{str:m} §E{cw} §E{net}` the
+        // first becomes the parameter's row and the second falls through to the §F
+        // section loop's §E arm and becomes the DECLARATION's row — two different
+        // meanings from one line, with no diagnostic. Inline, the same shape cascades.
+        // A row mixing effects is written `§E{cw, net}`, which is what the message says.
+        while (Check(TokenKind.Effects) && Current.Span.Line == PreviousToken.Span.Line)
+        {
+            _diagnostics.ReportError(
+                Current.Span,
+                DiagnosticCode.EffectRowMisplaced,
+                "A type can carry only one §E{…} effect row. Combine the codes into a single "
+                + "row — §E{cw, net} — or, if this is meant to be the function's own effect "
+                + "declaration, move it onto its own line in the §F body.");
+
+            Advance();
+            ParseAttributes();
+        }
+
+        return row;
     }
 
     /// <summary>
