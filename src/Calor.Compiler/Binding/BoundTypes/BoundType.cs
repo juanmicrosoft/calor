@@ -215,14 +215,31 @@ public sealed class FunctionBoundType : BoundType
     public BoundType ReturnType { get; }
     public override string DisplayString { get; }
 
-    public FunctionBoundType(ImmutableArray<BoundType> parameterTypes, BoundType returnType)
+    /// <param name="displayOverride">v0.15 E1 slice 2b. Lambdas bind to this kind
+    /// now, and their historical <c>LAMBDA(str)-&gt;i32</c> spelling is
+    /// load-bearing: <c>Binder.BindStatement</c> infers an untyped <c>§B</c>'s
+    /// <c>TypeName</c> from the initializer's <see cref="DisplayString"/>
+    /// (<c>Binder.cs:1320</c>), so the lambda's string becomes a
+    /// <see cref="BoundVariableExpression"/>'s type string, the verifier cache
+    /// key, and the LSP call-graph key. Changing it would break
+    /// <c>DisplayString</c> byte-identity for expressions that are not lambdas,
+    /// which is exactly what the corpus golden pins. So the KIND changes and the
+    /// STRING does not; §8.3's canonical <c>(p1, p2) -&gt; ret</c> stays the
+    /// default for every other construction. Note <see cref="Equals"/> compares
+    /// shape only — two function types with the same parameters and return type
+    /// are equal whatever they display as. E2 decides whether to unify the
+    /// spelling when rows land.</param>
+    public FunctionBoundType(
+        ImmutableArray<BoundType> parameterTypes,
+        BoundType returnType,
+        string? displayOverride = null)
     {
         if (returnType is null) throw new ArgumentNullException(nameof(returnType));
         if (parameterTypes.IsDefault) parameterTypes = ImmutableArray<BoundType>.Empty;
         ParameterTypes = parameterTypes;
         ReturnType = returnType;
         var parms = string.Join(", ", parameterTypes.Select(p => p.DisplayString));
-        DisplayString = $"({parms}) -> {returnType.DisplayString}";
+        DisplayString = displayOverride ?? $"({parms}) -> {returnType.DisplayString}";
     }
 
     public override bool Equals(BoundType? other) =>
@@ -250,9 +267,33 @@ public sealed class UnresolvedBoundType : BoundType
     public string Reason { get; }
     public override string DisplayString { get; }
 
-    public UnresolvedBoundType(string reason)
+    /// <summary>
+    /// v0.15 E1 slice 2b — true when the binder REPORTED this unresolvedness to
+    /// the author (Calor0270). PR #1095 already split marking from reporting:
+    /// every unresolved receiver is marked, but only the shapes an author can
+    /// act on — an inferred local with no explicit type, a type string that
+    /// cannot be canonicalized — are reported. Member chains and
+    /// converter-synthesized <c>_chainNNN</c> temporaries are marked silently,
+    /// because they are binder LIMITATIONS rather than facts about the program.
+    ///
+    /// <para>Consumers that want to fail closed on "the binder looked and could
+    /// not name this" must key on this flag, not on the type alone. Measured:
+    /// treating every <c>UnresolvedBoundType</c> as authoritative and
+    /// suppressing the effect pass's AST fallback deletes resolution the
+    /// fallback still performs — <c>tests/Calor.Conversion.Tests/Snapshots/05-02
+    /// .approved.calr</c> and <c>05-03</c> go from clean to Calor0411 +
+    /// Calor0410 on <c>_chainWhere005.ToList</c>.</para>
+    ///
+    /// <para>Deliberately NOT part of <see cref="Equals"/>: two unresolved types
+    /// with the same reason are the same type whether or not one of them was
+    /// also reported. Reporting is a diagnostic decision, not type identity.</para>
+    /// </summary>
+    public bool Reported { get; }
+
+    public UnresolvedBoundType(string reason, bool reported = false)
     {
         Reason = reason ?? throw new ArgumentNullException(nameof(reason));
+        Reported = reported;
         DisplayString = $"<unresolved: {reason}>";
     }
 

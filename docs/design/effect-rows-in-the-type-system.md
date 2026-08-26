@@ -1005,10 +1005,115 @@ Roadmap §4.1: *"`UnresolvedBoundType` → `Unknown` row, `FunctionBoundType`'s 
 symbol-identity keying are E1 decisions, made in §4.2, not design-doc decisions."* Status:
 receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed** (#1089);
 receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
-**executed** (#1095 — E1 slice 2a); the `Unknown`-row contribution, symbol-identity keying in
-`EffectResolver`/manifests/IL summaries, and `BoundLambdaExpression`'s `FunctionBoundType` all
-**pending** (evidence in §2.2). E2 consumes all six; roadmap §4.2's cut line already prices the
-risk.
+**executed** (#1095 — E1 slice 2a); the enforcement pass's string resolvers reading receivers
+from the bound tree and `BoundLambdaExpression`'s `FunctionBoundType` **executed**
+(PR #1099 — E1 slice 2b, below). Still **pending**: the `Unknown`-row contribution (E2 — there
+is no `EffectRow` type yet, so an unresolved receiver contributes `EffectSet.Unknown`, not an
+`Unknown` *row*), and symbol-identity keying in `EffectResolver`/manifests/IL summaries
+(slice 2c — `EffectResolver.cs:48` intact, so roadmap §4.2's E1 exit pin (c) is still unmet).
+**E2 consumes all six.** Separately, and not one of the six: the `Binder` → `Effects` layering
+hole is closed by PR #1099 (§4.2 E1's `Binding/**` cleanliness pin, below).
+
+**E1 exit pins (roadmap §4.2).** (a) the `_variableTypeMap` grep pin — **MET**,
+`Calor.Enforcement.Tests/EffectsSuggestTests.cs:159`. (b) the original S6 behavioural criterion,
+"a receiver whose type is available **only** through metadata (no AST type string anywhere in the
+module) resolves its effects" — **MET by PR #1099**,
+`EffectEnforcementTests.E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee`,
+which fails on a clean `main` worktree and passes here. (c) no
+`EffectResolver.Resolve(string, string, …)` overload remains — **UNMET**, slice 2c.
+
+**What slice 2b did.** Unlike 2a, it **does** resolve receivers that did not resolve before —
+measured against a clean `main` worktree (f7cd1c46), not asserted. Two of the four behavioural
+pins added in `EffectEnforcementTests.cs` FAIL there and pass here:
+
+- `E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee` — an inferred `§B`
+  whose initializer is a BCL call (`§B{g} §C{System.Guid.NewGuid}`) has no type string anywhere
+  in the AST. On `main` the following `g.ToString` is an unknown call and fail-closed produces
+  `Calor0410: Function 'Go' uses effect 'unknown'`. Here the bound receiver is `System.Guid` and
+  the manifest resolves it.
+- `E1Slice2b_LocalShadowsFieldAndTheStringPathIsWrong_TheBoundTypeWins` — a local shadowing a
+  field of a different type. The AST search misses the local and falls through to the FIELD, so
+  the string path answers with the wrong scope's type; `main` emits `Calor0411` on `x.ToString`.
+  The bound receiver is the local's real type.
+
+The remaining two are equivalence pins and say so. **Ceiling unchanged:** gate 6's ledger
+(817/1248, aggregate and per subject) is byte-identical, the D-A demand ledger is unmoved at 3,
+the Calor0270 volume ledger is unmoved, and the P29 transcripts are untouched — the newly
+resolved receivers are Calor-side, not new `MetadataBinder` resolutions.
+
+- `CallGraphAnalysis.ResolveBoundCallSites` returns, per legacy caller id, the bound
+  `BoundType` of the **receiver** of every call site, keyed by the receiver path as the target
+  spells it. `ResolveLocalValueType` / `ResolveVariableType` / `ResolveReceiverChain`
+  (`EEP:1719-1744` and its callers, pre-slice numbering) consult it first; the AST string
+  searches survive as fallbacks, each with a comment naming the shape it covers.
+- Fail-closed, scoped to **reported** unresolvedness. `UnresolvedBoundType` gains a `Reported`
+  bit carrying #1095's existing marking-vs-reporting split (`ShouldReportUnresolvedReceiver`).
+  Where the binder told the author it could not name the type (Calor0270), the pass ends the
+  lookup with null and the call reaches `ReportUnknownCall` / `EffectSet.Unknown` rather than a
+  guessed nominal type. Where it marked silently — member chains, converter-synthesized
+  `_chainNNN` temporaries — the AST fallback still decides.
+
+  **This scoping is measured, not stylistic.** An unconditional veto was implemented first and
+  deleted resolution the fallback still performs: `tests/Calor.Conversion.Tests/Snapshots/
+  05-02.approved.calr` and `05-03` went from clean to `Calor0411` + `Calor0410` on
+  `_chainWhere005.ToList`, failing `LosslessFormattingTests` (which passes on `main`). The
+  `Reported` bit is the discriminator #1095 already computes, so no new judgement was invented.
+
+  **The veto branch is CORPUS-UNREACHABLE BUT OBSERVABLE** — correcting round 1, which called it
+  unreachable and claimed deleting it changed no diagnostic. That was false. It is pinned by
+  `EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel`, which fails
+  when the branch is deleted, with an explicit control
+  (`_SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel`).
+
+  The reachability path is the **name-keyed side channel** (§8.1 below, and
+  `CallGraphAnalysis.BoundValueTypes`): a name used as a receiver anywhere in a function answers
+  from the channel at *every* occurrence, including positions the channel never collects. A name
+  that is both a receiver and a bare call target therefore carries its `Reported`
+  `UnresolvedBoundType` into `InferFromBareNameTarget`:
+
+  ```
+  §B{u} §C{Mystery.Make} §/C
+  §C{u.Run} §/C     ← receiver use: records u's Reported UnresolvedBoundType
+  §C{u} §/C         ← bare target: reads it back
+  ```
+
+  Without the veto the bare target falls through to the AST search, which returns the **sentinel**
+  `"?"` for a `§B` it cannot type. `InferFromBareNameTarget` tests `!= null`, not the sentinel, so
+  `"?"` is treated as a type and the call takes the delegate-invocation arm — `Calor0418
+  "declared type '?'"`, charging `EffectSet.Empty`. Measured: `0411, 0411, 0418, 0410` without the
+  branch versus `0411, 0411, 0411, 0410` with it. Guessing there launders effects, so the veto is
+  load-bearing.
+
+  **Corpus claim, and only that:** over all 301 committed `.calr` files every unresolved receiver
+  arriving at the resolver is `Reported=false` — 32 sites, all `_chainNNN` or member chains, zero
+  `Reported=true`. That is why the ledgers and transcripts are unmoved. It is **not** evidence
+  that the branch is unobservable, which is the inference round 1 got wrong.
+
+  **Slice-2c debt.** `ResolveVariableType` guards `declared == "?"`; the other
+  `ResolveLocalValueType` call sites do not. Adding that guard kept every pre-existing suite green (measured before the control existed)
+  but **subsumes** the veto — the pin above then passes with the branch deleted, because the guard
+  and the veto answer the same question at two layers. Unifying them is a deliberate slice-2c
+  change, not a drive-by that silently un-pins the test.
+- **Receivers only.** An earlier revision recorded every bound name; that made the side channel
+  answer in non-receiver positions and regressed the method-group-argument charging arm
+  (`StrictnessBatchTests` C2/C4). Names outside receiver positions keep resolving through the
+  AST, because the string the pass gets back is quoted verbatim in Calor0418's message.
+- `BoundLambdaExpression.Type` is a `FunctionBoundType` carrying real parameter and return
+  `BoundType`s. Its `DisplayString` is deliberately **unchanged** (`LAMBDA(i32)->INT`):
+  `Binder.cs:1320` infers an untyped `§B`'s `TypeName` from the initializer's `DisplayString`, so
+  the lambda's string escapes into other expressions' types, the verifier cache and the LSP
+  call-graph key. `FunctionBoundType` gains an optional `displayOverride` for exactly that;
+  §8.3's canonical `(p1, p2) -> ret` stays the default for every other construction, and
+  `BoundTypeTests.cs:139`/`:150` are untouched.
+- Function-typedness is asked of the bound type first (`EffectEnforcementPass.IsFunctionBoundType`
+  — a `FunctionBoundType`, or a `NominalBoundType` whose declaration is a `§DEL`, marked by the
+  new `TypeSymbol.IsDelegate`). The prefix-string test survives as the fallback for types that
+  reach a consumer only as text, which is what keeps Calor0418 byte-stable.
+- `MapShortTypeNameToFullName` and `IsTypeQualifiedReference` moved to `Binding/TypeIdentity`
+  (`Binding/Scope.cs`), with forwarders left in `Effects/`. `Binding/` no longer references
+  `Effects/`, pinned by `ArchitectureTests.BindingLayer_HasNoReferenceToEffectsNamespace` — the
+  existing `compiler-components.json` contract matched only the fully-qualified spelling and was
+  blind to the namespace-relative `Effects.EffectEnforcementPass` reference in `Binder.cs`.
 
 **What slice 2a did and did not do — stated so E2 does not over-read it.** The slice moved a
 decision and added structure. It resolved **no** receiver that did not resolve before.
@@ -1055,11 +1160,41 @@ Both default to `EffectRow.Unknown` when the source omits them, **never** to pur
 are different types, which is the claim of TIER2D. Note `Equals` is *equality* and `fits` is
 *assignability* — deliberately different relations.
 
+**Two E1-slice-2b carry-overs E2 must decide (review round 1, findings 7 and 9).**
+
+1. **`Equals` is shape-only while `DisplayString` can differ.** Slice 2b gave
+   `FunctionBoundType` an optional `displayOverride` (§8.3) so lambdas keep their
+   `LAMBDA(i32)->INT` spelling. `Equals` compares `ParameterTypes` and `ReturnType` only, so a
+   lambda's type and a structurally identical `(i32) -> INT` are **equal but print differently**.
+   That is deliberate today — printing is a diagnostic decision, not type identity — but once
+   rows join `Equals`, E2 should decide explicitly whether display participates too, because a
+   cache keyed on `DisplayString` and a set keyed on `Equals` would then disagree about the same
+   two types.
+2. **A lambda's `ParameterTypes` are surface spellings, its `ReturnType` is bound.** The
+   parameters are `NominalBoundType(parameter.TypeName)` — the source's own `i32`, `str` — while
+   an expression lambda's return is the body's real bound type (`INT`). So one
+   `FunctionBoundType` can mix vocabularies. Slice 2b did not normalise, because the parameter
+   spellings feed the `DisplayString` that must stay byte-identical. **Pending for E2:**
+   normalise parameters through the binder (not by canonicalising the string), keeping the
+   display string as a separate, frozen artifact.
+
+Both are recorded rather than fixed because fixing either moves `DisplayString`, which §8.3 and
+the corpus golden pin.
+
 ### 8.3 `DisplayString` — rows do not appear
 
 > **Decision.** `FunctionBoundType.DisplayString` stays `"(p1, p2) -> ret"`
 > (`BoundType.cs:224-225`). A separate `RowDisplayString` carries the row for diagnostics and
 > hover.
+>
+> **Exception, added by E1 slice 2b (PR #1099).** The constructor takes an optional
+> `displayOverride`, used by exactly one caller: `BoundLambdaExpression`, which passes the
+> pre-slice `LAMBDA(i32)->INT` / `ASYNC_LAMBDA(…)->…` spelling. Every other construction still
+> gets `"(p1, p2) -> ret"`, so `BoundTypeTests.cs:139`/`:150` are untouched. The exception exists
+> because a lambda's display string is **not private to lambdas**: `Binder.cs:1320` infers an
+> untyped `§B`'s `TypeName` from the initializer's `DisplayString`, so changing it would move the
+> display string of `BoundVariableExpression`s — the byte-identity this section exists to
+> protect. E2 decides whether to unify the spelling when rows land (§8.2, carry-over 1).
 
 This is already enforced by **existing exact-equality pins** — 
 `tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs:139`

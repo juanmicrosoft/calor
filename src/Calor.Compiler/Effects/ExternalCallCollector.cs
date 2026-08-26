@@ -386,23 +386,14 @@ public sealed class ExternalCallCollector
     /// capitalized identifier — the shape of a namespace/type reference written
     /// in source. Variables, fields, <c>this</c>, and member chains through them
     /// fail this test.
+    ///
+    /// <para>v0.15 E1 slice 2b — the predicate itself now lives in
+    /// <see cref="TypeIdentity"/> so <c>Binding/</c> can use it without
+    /// referencing <c>Effects/</c> (PR #1095 review finding 10). This forwarder
+    /// keeps the collector's own call site and its tests on the current name.</para>
     /// </summary>
-    internal static bool IsTypeQualifiedReference(string receiver)
-    {
-        if (string.IsNullOrEmpty(receiver))
-            return false;
-        foreach (var segment in receiver.Split('.'))
-        {
-            if (segment.Length == 0 || !char.IsUpper(segment[0]))
-                return false;
-            for (var i = 1; i < segment.Length; i++)
-            {
-                if (!(char.IsLetterOrDigit(segment[i]) || segment[i] == '_' || segment[i] == '`'))
-                    return false;
-            }
-        }
-        return true;
-    }
+    internal static bool IsTypeQualifiedReference(string receiver) =>
+        TypeIdentity.IsTypeQualifiedReference(receiver);
 
     /// <summary>
     /// Classifies a receiver's <see cref="BoundType"/>.
@@ -417,9 +408,17 @@ public sealed class ExternalCallCollector
     ///
     /// <para>The function-type guard stays: invoking a function-typed value is
     /// not a nominal receiver, and effect rows on function types are E2/E4.
-    /// <see cref="FunctionBoundType"/> is still unreachable — lambdas remain
-    /// <c>NominalBoundType("LAMBDA(...)")</c> until the E1 lambda-type item
-    /// lands — so the string guard below is what actually fires today.</para>
+    /// Since E1 slice 2b it is answered STRUCTURALLY first — a lambda binds to
+    /// <see cref="FunctionBoundType"/> and a Calor <c>§DEL</c> type carries
+    /// <c>TypeSymbol.IsDelegate</c>, both tested by
+    /// <see cref="EffectEnforcementPass.IsFunctionBoundType"/>. The string test
+    /// below survives as the fallback for the shapes where a function type
+    /// reaches this method only as text (§2.2's surviving fallbacks): a
+    /// declared <c>Func&lt;…&gt;</c>/<c>Action</c> parameter or field, whose
+    /// BoundType is a plain <c>NominalBoundType</c> built from the symbol's type
+    /// string; and an untyped <c>§B</c> whose TypeName the binder inferred from
+    /// a lambda's <c>DisplayString</c> (<c>Binder.cs:1320</c>), which is why the
+    /// <c>LAMBDA(</c> prefixes stay in the list.</para>
     /// </summary>
     private static BoundReceiver FromBoundType(BoundType type)
     {
@@ -427,7 +426,7 @@ public sealed class ExternalCallCollector
         {
             case UnresolvedBoundType:
                 return BoundReceiver.Unresolved;
-            case FunctionBoundType:
+            case var _ when EffectEnforcementPass.IsFunctionBoundType(type):
                 return BoundReceiver.Unresolved;
             case NominalBoundType nominal when IsFunctionTypeName(nominal.QualifiedName):
                 return BoundReceiver.Unresolved;

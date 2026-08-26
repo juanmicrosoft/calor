@@ -825,175 +825,42 @@ public sealed class EffectEnforcementPass
 
     /// <summary>
     /// Maps common short type names to fully-qualified names for manifest resolution.
-    /// Used by both ParseCallTarget (in EffectInferrer) and ParseCallTargetForChain.
+    /// The table itself lives in <see cref="Binding.TypeIdentity"/> (E1 slice 2b):
+    /// the binder needs the same expansion, and <c>Binding/</c> must not reference
+    /// <c>Effects/</c>. This forwarder keeps the pass's ~20 call sites and the
+    /// existing external callers on their current name.
     /// </summary>
-    internal static string MapShortTypeNameToFullName(string shortName)
-    {
-        // Calor surface syntax for the runtime's Option/Result types:
-        // ?T is Option<T>; T!E is Result<T,E>. Their combinators are
-        // manifest-entered as pure-modulo-arguments (delegate arguments are
-        // charged at the lambda definition site by the effect pass).
-        if (shortName.StartsWith('?') || shortName.StartsWith("Option<"))
-            return "Calor.Runtime.Option`1";
-        if (shortName.StartsWith("Result<"))
-            return "Calor.Runtime.Result`2";
-        if (shortName.Contains('!') && !shortName.Contains('.') && !shortName.Contains('('))
-            return "Calor.Runtime.Result`2";
+    internal static string MapShortTypeNameToFullName(string shortName) =>
+        TypeIdentity.MapShortTypeNameToFullName(shortName);
 
-        // Normalize declared generic collection types ("List<i32>") to their
-        // manifest identities so typed receivers resolve to the correct entries
-        // (e.g. List`1.Add = mut) instead of hitting the unknown-call chain.
-        var genericIdx = shortName.IndexOf('<');
-        if (genericIdx > 0 && shortName.EndsWith('>'))
-        {
-            var baseName = shortName[..genericIdx];
-            var mapped = baseName switch
-            {
-                "List" or "System.Collections.Generic.List" =>
-                    "System.Collections.Generic.List`1",
-                "Dictionary" or "Dict" or "System.Collections.Generic.Dictionary" =>
-                    "System.Collections.Generic.Dictionary`2",
-                "HashSet" or "Set" or "System.Collections.Generic.HashSet" =>
-                    "System.Collections.Generic.HashSet`1",
-                "Task" or "System.Threading.Tasks.Task" =>
-                    "System.Threading.Tasks.Task`1",
-                _ => null
-            };
-            if (mapped != null)
-                return mapped;
-        }
-
-        return MapKnownShortTypeName(shortName);
-    }
-
-    private static string MapKnownShortTypeName(string shortName) => shortName switch
-    {
-        // Calor runtime static helper classes
-        "Option" => "Calor.Runtime.Option",
-        "Result" => "Calor.Runtime.Result",
-        // BCL types
-        "Console" => "System.Console",
-        // Generic collections referenced by bare name (e.g. §NEW{List<i32>}
-        // stores TypeName "List" with separate type arguments)
-        "List" => "System.Collections.Generic.List`1",
-        "System.Collections.Generic.List" => "System.Collections.Generic.List`1",
-        "Dictionary" => "System.Collections.Generic.Dictionary`2",
-        "Dict" => "System.Collections.Generic.Dictionary`2",
-        "System.Collections.Generic.Dictionary" => "System.Collections.Generic.Dictionary`2",
-        "HashSet" => "System.Collections.Generic.HashSet`1",
-        "Set" => "System.Collections.Generic.HashSet`1",
-        "System.Collections.Generic.HashSet" => "System.Collections.Generic.HashSet`1",
-        "File" => "System.IO.File",
-        "Directory" => "System.IO.Directory",
-        "Path" => "System.IO.Path",
-        "StreamReader" => "System.IO.StreamReader",
-        "StreamWriter" => "System.IO.StreamWriter",
-        "FileStream" => "System.IO.FileStream",
-        "BinaryReader" => "System.IO.BinaryReader",
-        "BinaryWriter" => "System.IO.BinaryWriter",
-        "Random" => "System.Random",
-        "DateTime" => "System.DateTime",
-        "Environment" => "System.Environment",
-        "Process" => "System.Diagnostics.Process",
-        "HttpClient" => "System.Net.Http.HttpClient",
-        "Math" => "System.Math",
-        "Guid" => "System.Guid",
-        "Enumerable" => "System.Linq.Enumerable",
-        "str" => "System.String",
-        "string" => "System.String",
-        "STRING" => "System.String",
-        "String" => "System.String",
-        "i32" => "System.Int32",
-        "int" => "System.Int32",
-        "INT" => "System.Int32",
-        "Int32" => "System.Int32",
-        "i64" => "System.Int64",
-        "long" => "System.Int64",
-        "Int64" => "System.Int64",
-        "f64" => "System.Double",
-        "double" => "System.Double",
-        "FLOAT" => "System.Double",
-        "Double" => "System.Double",
-        "bool" => "System.Boolean",
-        "BOOL" => "System.Boolean",
-        "Boolean" => "System.Boolean",
-        "Convert" => "System.Convert",
-        "Array" => "System.Array",
-        "StringBuilder" => "System.Text.StringBuilder",
-        "Stopwatch" => "System.Diagnostics.Stopwatch",
-        "Debug" => "System.Diagnostics.Debug",
-        "Trace" => "System.Diagnostics.Trace",
-        "Thread" => "System.Threading.Thread",
-        "Task" => "System.Threading.Tasks.Task",
-        "JsonSerializer" => "System.Text.Json.JsonSerializer",
-        "JsonDocument" => "System.Text.Json.JsonDocument",
-        "Regex" => "System.Text.RegularExpressions.Regex",
-        "Exception" => "System.Exception",
-        "ArgumentException" => "System.ArgumentException",
-        "ArgumentNullException" => "System.ArgumentNullException",
-        "ArgumentOutOfRangeException" => "System.ArgumentOutOfRangeException",
-        "InvalidOperationException" => "System.InvalidOperationException",
-        "NotSupportedException" => "System.NotSupportedException",
-        "NotImplementedException" => "System.NotImplementedException",
-        "IndexOutOfRangeException" => "System.IndexOutOfRangeException",
-        "FormatException" => "System.FormatException",
-        "ObjectDisposedException" => "System.ObjectDisposedException",
-        // Microsoft.Extensions.Logging
-        "ILogger" => "Microsoft.Extensions.Logging.ILogger",
-        "LoggerExtensions" => "Microsoft.Extensions.Logging.LoggerExtensions",
-        "ILoggerFactory" => "Microsoft.Extensions.Logging.ILoggerFactory",
-        // Microsoft.Extensions.Configuration
-        "IConfiguration" => "Microsoft.Extensions.Configuration.IConfiguration",
-        "IConfigurationRoot" => "Microsoft.Extensions.Configuration.IConfigurationRoot",
-        "IConfigurationSection" => "Microsoft.Extensions.Configuration.IConfigurationSection",
-        "ConfigurationExtensions" => "Microsoft.Extensions.Configuration.ConfigurationExtensions",
-        // Microsoft.Extensions.DependencyInjection
-        "IServiceProvider" => "Microsoft.Extensions.DependencyInjection.IServiceProvider",
-        "IServiceCollection" => "Microsoft.Extensions.DependencyInjection.IServiceCollection",
-        "IServiceScopeFactory" => "Microsoft.Extensions.DependencyInjection.IServiceScopeFactory",
-        // Microsoft.Extensions.Options
-        "IOptions" => "Microsoft.Extensions.Options.IOptions`1",
-        "IOptionsSnapshot" => "Microsoft.Extensions.Options.IOptionsSnapshot`1",
-        "IOptionsMonitor" => "Microsoft.Extensions.Options.IOptionsMonitor`1",
-        // Microsoft.Extensions.Hosting
-        "IHost" => "Microsoft.Extensions.Hosting.IHost",
-        "IHostBuilder" => "Microsoft.Extensions.Hosting.IHostBuilder",
-        "IHostedService" => "Microsoft.Extensions.Hosting.IHostedService",
-        // Microsoft.EntityFrameworkCore
-        "DbContext" => "Microsoft.EntityFrameworkCore.DbContext",
-        "DbSet" => "Microsoft.EntityFrameworkCore.DbSet`1",
-        "DatabaseFacade" => "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade",
-        // Microsoft.AspNetCore
-        "HttpContext" => "Microsoft.AspNetCore.Http.HttpContext",
-        "HttpRequest" => "Microsoft.AspNetCore.Http.HttpRequest",
-        "HttpResponse" => "Microsoft.AspNetCore.Http.HttpResponse",
-        "ControllerBase" => "Microsoft.AspNetCore.Mvc.ControllerBase",
-        "Results" => "Microsoft.AspNetCore.Http.Results",
-        "TypedResults" => "Microsoft.AspNetCore.Http.TypedResults",
-        // Serilog
-        "Log" => "Serilog.Log",
-        "SerilogLog" => "Serilog.Log",
-        // Newtonsoft.Json
-        "JsonConvert" => "Newtonsoft.Json.JsonConvert",
-        "JObject" => "Newtonsoft.Json.Linq.JObject",
-        "JArray" => "Newtonsoft.Json.Linq.JArray",
-        "JToken" => "Newtonsoft.Json.Linq.JToken",
-        // Dapper
-        "SqlMapper" => "Dapper.SqlMapper",
-        // MediatR
-        "IMediator" => "MediatR.IMediator",
-        "ISender" => "MediatR.ISender",
-        "Mediator" => "MediatR.Mediator",
-        // AutoMapper
-        "IMapper" => "AutoMapper.IMapper",
-        "Mapper" => "AutoMapper.Mapper",
-        // FluentValidation
-        "IValidator" => "FluentValidation.IValidator",
-        // Polly
-        "Policy" => "Polly.Policy",
-        "ResiliencePipeline" => "Polly.ResiliencePipeline",
-        _ => shortName
-    };
+    /// <summary>
+    /// v0.15 E1 slice 2b — "is this a function type?" answered from the BOUND
+    /// TYPE instead of a prefix test on a type name.
+    ///
+    /// <para>Two structural answers, both produced by the binder:
+    /// <see cref="FunctionBoundType"/> (what a <c>§LAM</c> binds to since this
+    /// slice) and a <see cref="NominalBoundType"/> whose
+    /// <see cref="NominalBoundType.Declaration"/> is a <c>§DEL</c> type
+    /// (<c>TypeSymbol.IsDelegate</c>). Neither can be spelled around: an alias,
+    /// a metadata return, or a type parameter that resolves to a function type
+    /// answers true here and answers false to every string test.</para>
+    ///
+    /// <para>It is deliberately NOT a superset of the string tests. Where the
+    /// binder hands over only a type string — a declared <c>Func&lt;i32&gt;</c>
+    /// parameter, whose BoundType is a bare <c>NominalBoundType("Func&lt;i32&gt;")</c>
+    /// with no <c>Declaration</c> — this returns false and the caller's string
+    /// test still decides. That keeps Calor0418's behaviour byte-stable
+    /// (<c>StrictnessBatchTests.cs:29,47,64,749</c>;
+    /// <c>EffectEnforcementTests.cs:354,378</c>) while making the structural
+    /// answer the one that is asked first.</para>
+    /// </summary>
+    // Fully qualified rather than a file-level `using`: adding one shifts every
+    // line in this file, and the effect-rows spike transcripts pin
+    // EffectEnforcementPass.cs:377/:533/:571 by line number (facts.py).
+    internal static bool IsFunctionBoundType(Binding.BoundTypes.BoundType? type) =>
+        type is Binding.BoundTypes.FunctionBoundType
+        || (type is Binding.BoundTypes.NominalBoundType nominal
+            && nominal.Declaration is { IsDelegate: true });
 
     private List<string> FindCallChain(string startFunctionId, EffectKind targetKind, string targetValue)
     {
@@ -1277,7 +1144,8 @@ public sealed class EffectEnforcementPass
                         effects = effects.Union(GetDeclaredEffects(internalFunc.Effects));
                     }
                 }
-                else if (IsFunctionTypeName(valueType) && callTarget.Contains('.'))
+                else if (IsFunctionValued(reference.Name, valueType)
+                         && callTarget.Contains('.'))
                 {
                     RecordAssumption(
                         $"passes function-typed value '{reference.Name}' to '{callTarget}', " +
@@ -1339,9 +1207,10 @@ public sealed class EffectEnforcementPass
             // shadowed pure function's effects).
             if (!target.Contains('.'))
             {
-                if (ResolveLocalValueType(target) != null)
-                    return InferFromBareNameTarget(target, span);
-
+                // InferFromBareNameTarget re-runs the value lookup itself and
+                // branches on it there; both arms of the old `if` called it
+                // unconditionally, so the test was dead. Collapsed in E1 slice 2b
+                // (review round 2, nit 5) — behaviour unchanged.
                 return InferFromBareNameTarget(target, span);
             }
 
@@ -1457,7 +1326,7 @@ public sealed class EffectEnforcementPass
                 var severity = _context.Policy == UnknownCallPolicy.Permissive
                     ? DiagnosticSeverity.Warning
                     : DiagnosticSeverity.Error;
-                var typeDescription = IsFunctionTypeName(valueType)
+                var typeDescription = IsFunctionValued(target, valueType)
                     ? $"function-typed value '{target}' (type '{valueType}')"
                     : $"value '{target}' (declared type '{valueType}')";
                 _context.Diagnostics.Report(
@@ -1710,23 +1579,219 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
-        /// Resolves a bare name to the declared type of the value it denotes:
-        /// current-function parameter, §B binding (anywhere in the body, including
-        /// nested blocks), or enclosing-class field. Returns null for free names.
-        /// A lambda-initialized binding without an explicit type reports the marker
-        /// type "Func&lt;&gt;" (function-typed by construction).
+        /// v0.15 E1 slice 2b — the binder's RECEIVER types for the current
+        /// function, fetched once from the side channel
+        /// (<see cref="CallGraphAnalysis.BoundValueTypes"/>), keyed by the
+        /// receiver path as the call target spells it. Empty when binding threw,
+        /// in which case every resolver below behaves exactly as it did before
+        /// this slice.
+        ///
+        /// <para>Receivers only, in the sense of what is COLLECTED: a name that
+        /// is never a receiver anywhere in this function is absent here and
+        /// resolves through the AST as before — the string this pass gets back
+        /// is quoted verbatim in Calor0418's message, so the source spelling has
+        /// to survive.</para>
+        ///
+        /// <para><b>But the map is keyed by name, not by position</b> (review
+        /// round 1, finding 6): a name used as a receiver ONCE answers from here
+        /// at EVERY occurrence in the function, receiver or not. The ambiguity
+        /// rule in <see cref="CallGraphAnalysis.BoundValueTypes"/> is what makes
+        /// that sound — a name the binder types two ways is dropped. The spread
+        /// is also load-bearing rather than merely tolerated: it is how the
+        /// Unresolved branch below is reachable at a BARE call target, which is
+        /// what <c>E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel</c>
+        /// pins. Keying by position would need a position argument threaded
+        /// through eleven call sites AND that veto re-established at the
+        /// bare-target position; deferred.</para>
+        /// </summary>
+        private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>? _boundValueTypes;
+
+        private IReadOnlyDictionary<string, Binding.BoundTypes.BoundType> BoundValueTypes =>
+            _boundValueTypes ??= _context.CallGraph.BoundValueTypes(_context.CurrentFunctionId);
+
+        /// <summary>What the bound tree said about a name.</summary>
+        private enum BoundValueAnswerKind
+        {
+            /// <summary>The binder has nothing for this name — use the AST strings.</summary>
+            NoAnswer,
+
+            /// <summary>
+            /// <c>UnresolvedBoundType</c>: the binder LOOKED and could not name
+            /// the type. Fail closed — the AST strings must not supply a guess in
+            /// its place, because the whole point of §D6's exit ramp is that
+            /// "unresolved" stops being spelled like a type.
+            /// </summary>
+            Unresolved,
+
+            /// <summary>A type the binder can name.</summary>
+            Typed,
+        }
+
+        /// <summary>
+        /// v0.15 E1 slice 2b — asks the bound tree for a value's type before any
+        /// AST string is consulted.
+        ///
+        /// <para>The answer is normalized into the vocabulary the rest of this
+        /// pass already speaks, so that consulting the binder first cannot move
+        /// a diagnostic's TEXT: a function type answers with the pass's existing
+        /// <c>"Func&lt;&gt;"</c> marker — the same string
+        /// <see cref="FindLocalDeclarationType"/> produces for a lambda-initialized
+        /// <c>§B</c> — and every other kind answers with its
+        /// <c>DisplayString</c>, which for a bound variable IS the symbol's type
+        /// string, i.e. the same text the AST search would have found.</para>
+        ///
+        /// <para><c>OBJECT</c> and <c>?</c> are treated as NO answer rather than
+        /// as a type: they are the binder's non-answers, and returning them as
+        /// types would let a placeholder be keyed as a manifest type. A receiver
+        /// the binder actually looked at and could not name arrives as
+        /// <c>UnresolvedBoundType</c> instead, since slice 2a.</para>
+        /// </summary>
+        private BoundValueAnswerKind AskBoundTree(string name, out string typeName)
+        {
+            typeName = "";
+            if (!BoundValueTypes.TryGetValue(name, out var type))
+                return BoundValueAnswerKind.NoAnswer;
+
+            // Authoritative only when the binder REPORTED it (Calor0270). An
+            // unreported UnresolvedBoundType is a binder limitation — a member
+            // chain, or a converter-synthesized _chainNNN temporary — and
+            // suppressing the AST fallback for those deletes resolution the
+            // fallback still performs. Measured: 05-02/05-03.approved.calr go
+            // from clean to Calor0411 + Calor0410 on '_chainWhere005.ToList'.
+            //
+            // CORPUS-UNREACHABLE BUT OBSERVABLE (review round 2, correcting
+            // round 1, which wrongly called this branch unreachable and said
+            // deleting it changed nothing).
+            //
+            // Pinned by
+            // EffectEnforcementTests.E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel,
+            // which FAILS if this branch is deleted, with its control
+            // _SameBindingWithoutAReceiverUse_StillTakesTheAstSentinel.
+            //
+            // The reachability path is the NAME-KEYED side channel (see
+            // CallGraphAnalysis.BoundValueTypes). A name used as a receiver
+            // ANYWHERE in the function answers from here at EVERY occurrence,
+            // including positions the channel never collects. So:
+            //
+            //     §B{u} §C{Mystery.Make} §/C
+            //     §C{u.Run} §/C     <- receiver use: puts u's Reported
+            //                          UnresolvedBoundType into the channel
+            //     §C{u} §/C         <- bare target: reads it back
+            //
+            // Without this branch the bare target falls through to the AST
+            // search, which hands back the SENTINEL "?" for a §B it cannot type
+            // (FindLocalDeclarationType, "known value, unknown type").
+            // InferFromBareNameTarget tests `!= null`, not the sentinel, so "?"
+            // is treated as a type and the call takes the delegate-invocation
+            // arm: Calor0418 "declared type '?'", charging EffectSet.Empty.
+            // Measured: 0411,0411,0418,0410 without the branch vs
+            // 0411,0411,0411,0410 with it. Guessing here would launder effects,
+            // so the veto is load-bearing, not decorative.
+            //
+            // ResolveVariableType guards `declared == "?"`; the other
+            // ResolveLocalValueType call sites do not. Adding that guard here
+            // kept every pre-existing suite green but SUBSUMES this branch — the pin above
+            // then passes with the branch deleted, because both answer the same
+            // question at different layers. Unifying them is slice-2c work, not
+            // a drive-by. Recorded as debt in design doc §8.1.
+            //
+            // CORPUS claim, and only that: over all 301 committed .calr files
+            // every unresolved receiver arriving here is Reported=false — 32
+            // sites, all _chainNNN or member chains, zero Reported=true. So the
+            // branch changes nothing on the committed corpus, which is why the
+            // ledgers and transcripts are unmoved; it is NOT evidence that the
+            // branch is unobservable. Reproduce the sweep by tracing
+            // (name, Reported, ResolveLocalValueTypeFromAst(name)) here.
+            if (type is Binding.BoundTypes.UnresolvedBoundType unresolved)
+            {
+                return unresolved.Reported
+                    ? BoundValueAnswerKind.Unresolved
+                    : BoundValueAnswerKind.NoAnswer;
+            }
+
+            var display = type.DisplayString;
+            if (IsFunctionBoundType(type)
+                || display.StartsWith("LAMBDA(", StringComparison.Ordinal)
+                || display.StartsWith("ASYNC_LAMBDA(", StringComparison.Ordinal))
+            {
+                // The pass's existing marker for "function-typed by construction".
+                // The LAMBDA( spellings appear on a §B whose TypeName the binder
+                // inferred from a lambda's DisplayString (Binder.cs:1320), which
+                // is a NominalBoundType carrying that text, not a function type.
+                typeName = "Func<>";
+                return BoundValueAnswerKind.Typed;
+            }
+
+            if (string.IsNullOrWhiteSpace(display)
+                || display is "?" or "OBJECT")
+            {
+                return BoundValueAnswerKind.NoAnswer;
+            }
+
+            typeName = display;
+            return BoundValueAnswerKind.Typed;
+        }
+
+        /// <summary>
+        /// Resolves a bare name to the declared type of the value it denotes.
+        ///
+        /// <para>v0.15 E1 slice 2b — the BOUND TREE answers first
+        /// (<see cref="AskBoundTree"/>). An <c>UnresolvedBoundType</c> ends the
+        /// lookup with null: the binder looked and could not name the type, and
+        /// the AST strings do not get to guess one in its place (fail-closed,
+        /// design doc §8.1 / P17).</para>
+        ///
+        /// <para>The AST search below is the FALLBACK, for every shape the
+        /// receiver side channel does not carry:</para>
+        /// <list type="bullet">
+        ///   <item><description><c>function.Parameters[].TypeName</c> — the name
+        ///   is not used as a call receiver anywhere in this function (it is a
+        ///   bare call target, a method-group argument, or simply read), so no
+        ///   bound receiver exists to read a type off.</description></item>
+        ///   <item><description><c>FindLocalDeclarationType</c> /
+        ///   <c>FindForeachVariableType</c> — a <c>§B</c> or <c>§FE</c> variable
+        ///   in a statement shape the binder does not bind (interop content,
+        ///   unsupported constructs), a module whose binding threw, and a
+        ///   receiver path whose bound answers disagreed between two call sites
+        ///   and were dropped as ambiguous.</description></item>
+        ///   <item><description><c>OwnerClass.Fields[].TypeName</c> — a field of
+        ///   the enclosing class used somewhere other than a receiver
+        ///   position.</description></item>
+        /// </list>
+        /// <para>A lambda-initialized binding without an explicit type reports the
+        /// marker type "Func&lt;&gt;" on both paths.</para>
         /// </summary>
         private string? ResolveLocalValueType(string name)
+        {
+            switch (AskBoundTree(name, out var boundTypeName))
+            {
+                case BoundValueAnswerKind.Unresolved:
+                    return null;
+                case BoundValueAnswerKind.Typed:
+                    return boundTypeName;
+            }
+
+            return ResolveLocalValueTypeFromAst(name);
+        }
+
+        /// <summary>
+        /// The pre-slice-2b AST search, extracted so the resolver order above
+        /// reads as "bound first, then this" and so the fallback can be probed
+        /// on its own.
+        /// </summary>
+        private string? ResolveLocalValueTypeFromAst(string name)
         {
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
                 return null;
 
+            // FALLBACK: declared parameter type string.
             foreach (var parameter in function.Parameters)
             {
                 if (parameter.Name.Equals(name, StringComparison.Ordinal))
                     return parameter.TypeName;
             }
 
+            // FALLBACK: §B declaration / §FE variable type string, found lexically.
             var declaredType = FindLocalDeclarationType(name, function.Body);
             if (declaredType != null)
                 return declaredType;
@@ -1735,6 +1800,7 @@ public sealed class EffectEnforcementPass
             if (foreachType != null)
                 return foreachType;
 
+            // FALLBACK: enclosing-class field type string.
             var field = _context.OwnerClass?.Fields.FirstOrDefault(
                 f => f.Name.Equals(name, StringComparison.Ordinal));
             if (field != null)
@@ -1936,6 +2002,30 @@ public sealed class EffectEnforcementPass
             };
         }
 
+        /// <summary>
+        /// v0.15 E1 slice 2b — "is the value called <paramref name="name"/> a
+        /// function value?", asked of the BOUND TYPE first
+        /// (<see cref="EffectEnforcementPass.IsFunctionBoundType"/>: a
+        /// <c>FunctionBoundType</c>, or a nominal type whose declaration is a
+        /// <c>§DEL</c>) and only then of the type string.
+        ///
+        /// <para>SURVIVING FALLBACK — <see cref="IsFunctionTypeName"/>, for the
+        /// shapes whose function-typedness exists only as text: a declared
+        /// <c>Func&lt;…&gt;</c>/<c>Action</c>/<c>Predicate&lt;…&gt;</c>
+        /// parameter, binding or field (the binder builds a plain nominal type
+        /// from the type string, with no declaration attached), and a
+        /// module-level <c>§DEL</c> name reached through
+        /// <c>_context.DelegateTypeNames</c>.</para>
+        /// </summary>
+        /// <para>The structural half answers for a receiver the side channel
+        /// carries (<c>f.Invoke</c> where <c>f</c> is a lambda or a <c>§DEL</c>
+        /// value); a bare call target is not a receiver, so that site reduces to
+        /// the string test today — which is what keeps Calor0418 byte-stable.
+        /// </para>
+        private bool IsFunctionValued(string name, string typeName) =>
+            IsFunctionBoundType(BoundValueTypes.GetValueOrDefault(name))
+            || IsFunctionTypeName(typeName);
+
         private bool IsFunctionTypeName(string typeName)
         {
             var t = typeName.Trim().TrimEnd('?');
@@ -2025,11 +2115,51 @@ public sealed class EffectEnforcementPass
             return MapShortTypeNameToFullName(declared);
         }
 
+        /// <summary>
+        /// Resolves a dotted receiver path (<c>a.b</c> in <c>a.b.M</c>) to a
+        /// manifest-ready type, charging any property getters walked on the way.
+        ///
+        /// <para>v0.15 E1 slice 2b — the BOUND TREE answers first: the whole
+        /// path is a receiver the binder attached to the call node, so if it can
+        /// name that receiver's type there is nothing to walk.</para>
+        ///
+        /// <para>An <c>UnresolvedBoundType</c> here does NOT end the lookup, and
+        /// that is deliberate. Slice 2a types EVERY member chain
+        /// <c>UnresolvedBoundType</c> — PR #1095 records the shape as "binder
+        /// limitation, unactionable", which is why it is marked but never
+        /// reported as Calor0270. Treating a binder limitation as an
+        /// authoritative "not a type" would delete resolution the property walk
+        /// below still performs. The fail-closed rule applies where slice 2a's
+        /// exit ramp is an actual DECISION: a bare receiver head, handled in
+        /// <see cref="ResolveLocalValueType"/>.</para>
+        ///
+        /// <para>SURVIVING FALLBACK: the member-by-member property/field walk,
+        /// for chains the binder does not type.</para>
+        /// </summary>
         private (string? Type, EffectSet Effects) ResolveReceiverChain(string receiverPath)
         {
             var parts = receiverPath.Split('.');
             if (parts.Length < 2)
                 return (null, EffectSet.Empty);
+
+            // FIXME(E2): this branch returns EffectSet.Empty, discarding the
+            // property-getter effects the member walk below charges as it steps
+            // through `a.b.c`. Knowing the END type is not the same as knowing
+            // that reaching it ran a getter with effects. Dead today — slice 2a
+            // types every member chain UnresolvedBoundType, so AskBoundTree
+            // never answers Typed for a dotted path — but it goes live the
+            // moment E2 types chains, and would then silently under-charge.
+            //
+            // Guarded rather than left as a comment: the shortcut is taken only
+            // when the walk could not have charged anything anyway, i.e. when no
+            // segment after the head resolves to a property getter with effects.
+            // Otherwise fall through and let the walk charge them.
+            if (AskBoundTree(receiverPath, out var boundPathType) == BoundValueAnswerKind.Typed
+                && boundPathType != "Func<>"
+                && !ChainWalkCouldChargeEffects(parts))
+            {
+                return (MapShortTypeNameToFullName(boundPathType), EffectSet.Empty);
+            }
 
             var currentType = ResolveVariableType(parts[0]);
             if (currentType == null)
@@ -2051,6 +2181,37 @@ public sealed class EffectEnforcementPass
             }
 
             return (currentType, effects);
+        }
+
+        /// <summary>
+        /// Whether stepping through <paramref name="parts"/> the way
+        /// <see cref="ResolveReceiverChain"/>'s member walk does could charge
+        /// any effect. Used to decide whether the bound-type shortcut above is
+        /// safe: if no getter on the way contributes effects, skipping the walk
+        /// loses nothing. FIXME(E2) — remove once chain types carry rows and the
+        /// walk's effects can be read off the type instead of re-derived.
+        /// </summary>
+        private bool ChainWalkCouldChargeEffects(string[] parts)
+        {
+            var currentType = ResolveVariableType(parts[0]);
+            if (currentType == null)
+                return false;
+
+            for (var i = 1; i < parts.Length; i++)
+            {
+                var getter = _context.Resolver.ResolveGetter(currentType, parts[i]);
+                if (getter.Status == EffectResolutionStatus.Unknown)
+                    return false;
+                if (!getter.Effects.IsEmpty)
+                    return true;
+
+                var nextType = ResolveKnownMemberType(currentType, parts[i]);
+                if (nextType == null)
+                    return false;
+                currentType = nextType;
+            }
+
+            return false;
         }
 
         private string? ResolveKnownMemberType(string receiverType, string memberName)

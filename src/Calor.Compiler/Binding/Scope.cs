@@ -557,6 +557,213 @@ public static class TypeIdentity
         arguments = result;
         return true;
     }
+
+    /// <summary>
+    /// Maps common short type names to fully-qualified names for manifest resolution.
+    /// Used by both ParseCallTarget (in EffectInferrer) and ParseCallTargetForChain.
+    /// </summary>
+    /// <remarks>
+    /// v0.15 E1 slice 2b — moved here from <c>Effects/EffectEnforcementPass.cs</c>.
+    /// The binder needs this expansion (a short BCL receiver spelling such as
+    /// <c>Random</c> must reach <c>System.Random</c>) and <c>Binding/</c> is not
+    /// allowed to reference <c>Effects/</c>; the pass keeps an internal forwarder
+    /// so its own call sites are unchanged. Pure string function, no state.
+    /// </remarks>
+    public static string MapShortTypeNameToFullName(string shortName)
+    {
+        // Calor surface syntax for the runtime's Option/Result types:
+        // ?T is Option<T>; T!E is Result<T,E>. Their combinators are
+        // manifest-entered as pure-modulo-arguments (delegate arguments are
+        // charged at the lambda definition site by the effect pass).
+        if (shortName.StartsWith('?') || shortName.StartsWith("Option<"))
+            return "Calor.Runtime.Option`1";
+        if (shortName.StartsWith("Result<"))
+            return "Calor.Runtime.Result`2";
+        if (shortName.Contains('!') && !shortName.Contains('.') && !shortName.Contains('('))
+            return "Calor.Runtime.Result`2";
+
+        // Normalize declared generic collection types ("List<i32>") to their
+        // manifest identities so typed receivers resolve to the correct entries
+        // (e.g. List`1.Add = mut) instead of hitting the unknown-call chain.
+        var genericIdx = shortName.IndexOf('<');
+        if (genericIdx > 0 && shortName.EndsWith('>'))
+        {
+            var baseName = shortName[..genericIdx];
+            var mapped = baseName switch
+            {
+                "List" or "System.Collections.Generic.List" =>
+                    "System.Collections.Generic.List`1",
+                "Dictionary" or "Dict" or "System.Collections.Generic.Dictionary" =>
+                    "System.Collections.Generic.Dictionary`2",
+                "HashSet" or "Set" or "System.Collections.Generic.HashSet" =>
+                    "System.Collections.Generic.HashSet`1",
+                "Task" or "System.Threading.Tasks.Task" =>
+                    "System.Threading.Tasks.Task`1",
+                _ => null
+            };
+            if (mapped != null)
+                return mapped;
+        }
+
+        return MapKnownShortTypeName(shortName);
+    }
+
+    private static string MapKnownShortTypeName(string shortName) => shortName switch
+    {
+        // Calor runtime static helper classes
+        "Option" => "Calor.Runtime.Option",
+        "Result" => "Calor.Runtime.Result",
+        // BCL types
+        "Console" => "System.Console",
+        // Generic collections referenced by bare name (e.g. §NEW{List<i32>}
+        // stores TypeName "List" with separate type arguments)
+        "List" => "System.Collections.Generic.List`1",
+        "System.Collections.Generic.List" => "System.Collections.Generic.List`1",
+        "Dictionary" => "System.Collections.Generic.Dictionary`2",
+        "Dict" => "System.Collections.Generic.Dictionary`2",
+        "System.Collections.Generic.Dictionary" => "System.Collections.Generic.Dictionary`2",
+        "HashSet" => "System.Collections.Generic.HashSet`1",
+        "Set" => "System.Collections.Generic.HashSet`1",
+        "System.Collections.Generic.HashSet" => "System.Collections.Generic.HashSet`1",
+        "File" => "System.IO.File",
+        "Directory" => "System.IO.Directory",
+        "Path" => "System.IO.Path",
+        "StreamReader" => "System.IO.StreamReader",
+        "StreamWriter" => "System.IO.StreamWriter",
+        "FileStream" => "System.IO.FileStream",
+        "BinaryReader" => "System.IO.BinaryReader",
+        "BinaryWriter" => "System.IO.BinaryWriter",
+        "Random" => "System.Random",
+        "DateTime" => "System.DateTime",
+        "Environment" => "System.Environment",
+        "Process" => "System.Diagnostics.Process",
+        "HttpClient" => "System.Net.Http.HttpClient",
+        "Math" => "System.Math",
+        "Guid" => "System.Guid",
+        "Enumerable" => "System.Linq.Enumerable",
+        "str" => "System.String",
+        "string" => "System.String",
+        "STRING" => "System.String",
+        "String" => "System.String",
+        "i32" => "System.Int32",
+        "int" => "System.Int32",
+        "INT" => "System.Int32",
+        "Int32" => "System.Int32",
+        "i64" => "System.Int64",
+        "long" => "System.Int64",
+        "Int64" => "System.Int64",
+        "f64" => "System.Double",
+        "double" => "System.Double",
+        "FLOAT" => "System.Double",
+        "Double" => "System.Double",
+        "bool" => "System.Boolean",
+        "BOOL" => "System.Boolean",
+        "Boolean" => "System.Boolean",
+        "Convert" => "System.Convert",
+        "Array" => "System.Array",
+        "StringBuilder" => "System.Text.StringBuilder",
+        "Stopwatch" => "System.Diagnostics.Stopwatch",
+        "Debug" => "System.Diagnostics.Debug",
+        "Trace" => "System.Diagnostics.Trace",
+        "Thread" => "System.Threading.Thread",
+        "Task" => "System.Threading.Tasks.Task",
+        "JsonSerializer" => "System.Text.Json.JsonSerializer",
+        "JsonDocument" => "System.Text.Json.JsonDocument",
+        "Regex" => "System.Text.RegularExpressions.Regex",
+        "Exception" => "System.Exception",
+        "ArgumentException" => "System.ArgumentException",
+        "ArgumentNullException" => "System.ArgumentNullException",
+        "ArgumentOutOfRangeException" => "System.ArgumentOutOfRangeException",
+        "InvalidOperationException" => "System.InvalidOperationException",
+        "NotSupportedException" => "System.NotSupportedException",
+        "NotImplementedException" => "System.NotImplementedException",
+        "IndexOutOfRangeException" => "System.IndexOutOfRangeException",
+        "FormatException" => "System.FormatException",
+        "ObjectDisposedException" => "System.ObjectDisposedException",
+        // Microsoft.Extensions.Logging
+        "ILogger" => "Microsoft.Extensions.Logging.ILogger",
+        "LoggerExtensions" => "Microsoft.Extensions.Logging.LoggerExtensions",
+        "ILoggerFactory" => "Microsoft.Extensions.Logging.ILoggerFactory",
+        // Microsoft.Extensions.Configuration
+        "IConfiguration" => "Microsoft.Extensions.Configuration.IConfiguration",
+        "IConfigurationRoot" => "Microsoft.Extensions.Configuration.IConfigurationRoot",
+        "IConfigurationSection" => "Microsoft.Extensions.Configuration.IConfigurationSection",
+        "ConfigurationExtensions" => "Microsoft.Extensions.Configuration.ConfigurationExtensions",
+        // Microsoft.Extensions.DependencyInjection
+        "IServiceProvider" => "Microsoft.Extensions.DependencyInjection.IServiceProvider",
+        "IServiceCollection" => "Microsoft.Extensions.DependencyInjection.IServiceCollection",
+        "IServiceScopeFactory" => "Microsoft.Extensions.DependencyInjection.IServiceScopeFactory",
+        // Microsoft.Extensions.Options
+        "IOptions" => "Microsoft.Extensions.Options.IOptions`1",
+        "IOptionsSnapshot" => "Microsoft.Extensions.Options.IOptionsSnapshot`1",
+        "IOptionsMonitor" => "Microsoft.Extensions.Options.IOptionsMonitor`1",
+        // Microsoft.Extensions.Hosting
+        "IHost" => "Microsoft.Extensions.Hosting.IHost",
+        "IHostBuilder" => "Microsoft.Extensions.Hosting.IHostBuilder",
+        "IHostedService" => "Microsoft.Extensions.Hosting.IHostedService",
+        // Microsoft.EntityFrameworkCore
+        "DbContext" => "Microsoft.EntityFrameworkCore.DbContext",
+        "DbSet" => "Microsoft.EntityFrameworkCore.DbSet`1",
+        "DatabaseFacade" => "Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade",
+        // Microsoft.AspNetCore
+        "HttpContext" => "Microsoft.AspNetCore.Http.HttpContext",
+        "HttpRequest" => "Microsoft.AspNetCore.Http.HttpRequest",
+        "HttpResponse" => "Microsoft.AspNetCore.Http.HttpResponse",
+        "ControllerBase" => "Microsoft.AspNetCore.Mvc.ControllerBase",
+        "Results" => "Microsoft.AspNetCore.Http.Results",
+        "TypedResults" => "Microsoft.AspNetCore.Http.TypedResults",
+        // Serilog
+        "Log" => "Serilog.Log",
+        "SerilogLog" => "Serilog.Log",
+        // Newtonsoft.Json
+        "JsonConvert" => "Newtonsoft.Json.JsonConvert",
+        "JObject" => "Newtonsoft.Json.Linq.JObject",
+        "JArray" => "Newtonsoft.Json.Linq.JArray",
+        "JToken" => "Newtonsoft.Json.Linq.JToken",
+        // Dapper
+        "SqlMapper" => "Dapper.SqlMapper",
+        // MediatR
+        "IMediator" => "MediatR.IMediator",
+        "ISender" => "MediatR.ISender",
+        "Mediator" => "MediatR.Mediator",
+        // AutoMapper
+        "IMapper" => "AutoMapper.IMapper",
+        "Mapper" => "AutoMapper.Mapper",
+        // FluentValidation
+        "IValidator" => "FluentValidation.IValidator",
+        // Polly
+        "Policy" => "Polly.Policy",
+        "ResiliencePipeline" => "Polly.ResiliencePipeline",
+        _ => shortName
+    };
+
+    /// <summary>
+    /// True when every dot-separated segment of <paramref name="receiver"/> is a
+    /// capitalized identifier — the shape of a namespace/type reference written
+    /// in source. Variables, fields, <c>this</c>, and member chains through them
+    /// fail this test.
+    ///
+    /// <para>v0.15 E1 slice 2b — moved here from
+    /// <c>Effects.ExternalCallCollector</c>, which is where the binder used to
+    /// reach for it (PR #1095 review finding 10). The collector keeps an internal
+    /// forwarder.</para>
+    /// </summary>
+    public static bool IsTypeQualifiedReference(string receiver)
+    {
+        if (string.IsNullOrEmpty(receiver))
+            return false;
+        foreach (var segment in receiver.Split('.'))
+        {
+            if (segment.Length == 0 || !char.IsUpper(segment[0]))
+                return false;
+            for (var i = 1; i < segment.Length; i++)
+            {
+                if (!(char.IsLetterOrDigit(segment[i]) || segment[i] == '_' || segment[i] == '`'))
+                    return false;
+            }
+        }
+        return true;
+    }
 }
 
 /// <summary>
@@ -758,17 +965,31 @@ public sealed class TypeSymbol : Symbol
     public string QualifiedName { get; }
     public Visibility Visibility { get; }
 
+    /// <summary>
+    /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is
+    /// how a <see cref="BoundTypes.NominalBoundType"/> gets marked as
+    /// delegate-typed, so consumers can answer "is this a function type?"
+    /// structurally instead of prefix-matching <c>"Func&lt;"</c> on a type name
+    /// (see <c>EffectEnforcementPass.IsFunctionBoundType</c>). Only reachable
+    /// when the nominal type carries its <c>Declaration</c>; a receiver whose
+    /// BoundType was built from a bare type string still falls back to the
+    /// string test.
+    /// </summary>
+    public bool IsDelegate { get; }
+
     public TypeSymbol(
         SymbolId id,
         string name,
         string qualifiedName,
         Visibility visibility,
         TextSpan declarationSpan,
-        TextSpan? definitionSpan = null)
+        TextSpan? definitionSpan = null,
+        bool isDelegate = false)
         : base(id, name, declarationSpan, definitionSpan)
     {
         QualifiedName = qualifiedName ?? throw new ArgumentNullException(nameof(qualifiedName));
         Visibility = visibility;
+        IsDelegate = isDelegate;
     }
 }
 

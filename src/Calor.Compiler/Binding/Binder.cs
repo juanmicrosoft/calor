@@ -196,7 +196,7 @@ public sealed class Binder
         // Argument types: use each BoundExpression's Type.DisplayString to
         // find a Roslyn type. The Calor short names (STRING/INT/BOOL/…) are
         // mapped to their BCL equivalents (System.String/System.Int32/…) via
-        // EffectEnforcementPass.MapShortTypeNameToFullName — otherwise
+        // TypeIdentity.MapShortTypeNameToFullName — otherwise
         // GetTypeByMetadataName ("STRING") returns null and overload
         // resolution silently degrades to System.Object placeholders. A
         // trailing '?' (Roslyn's Annotated display, e.g. "string?" from
@@ -233,7 +233,7 @@ public sealed class Binder
                 trimmed = trimmed[..^1];
             if (trimmed.StartsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
                 trimmed = trimmed[1..];
-            var mapped = Effects.EffectEnforcementPass.MapShortTypeNameToFullName(trimmed);
+            var mapped = TypeIdentity.MapShortTypeNameToFullName(trimmed);
             var t = ctx.TryResolveType(mapped)
                     ?? ctx.TryResolveType(trimmed)
                     ?? ctx.TryResolveType("System.Object");
@@ -479,7 +479,10 @@ public sealed class Binder
             qualifiedName,
             visibility,
             declarationSpan,
-            definitionSpan));
+            definitionSpan,
+            // E1 slice 2b: §DEL declarations are function types. Marking the
+            // symbol is what lets a consumer ask the type instead of the string.
+            isDelegate: kind == "delegate"));
     }
 
     private void RegisterClassTree(
@@ -2560,7 +2563,11 @@ public sealed class Binder
             lambda.IsStatic,
             expressionBody,
             statementBody,
-            returnType);
+            returnType,
+            // E1 slice 2b: hand the expression body's real BoundType to the
+            // lambda's FunctionBoundType. A statement body has no single bound
+            // expression, so the node falls back to the string it just computed.
+            expressionBody?.Type);
     }
 
     private BoundExpression BindMatchExpression(MatchExpressionNode match)
@@ -3350,20 +3357,16 @@ public sealed class Binder
                 receiverTypeSymbol);
         }
 
-        // NOTE (review round 1, finding 10 — deferred to slice 2b): reaching into
-        // Effects.ExternalCallCollector from Binding/ widens an existing layering
-        // hole (GetResolvedCallIdentity already calls into
-        // Effects.EffectEnforcementPass). IsTypeQualifiedReference is a pure
-        // string predicate with no Effects dependency and belongs in Binding/,
-        // but moving it also means moving its callers' expectations, so it is
-        // slice-2b work rather than an unreviewed drive-by here.
+        // E1 slice 2b (PR #1095 review round 1, finding 10): the predicate and the
+        // short-name table both live in Binding/TypeIdentity now, so Binding/ no
+        // longer reaches into Effects/. ArchitectureTests pins that direction.
         //
         // Not a bound variable and not a Calor-declared type. GetResolvedCallIdentity's
         // name for this shape is the source text with short BCL names expanded, so it
         // only counts when the receiver is WRITTEN as a type reference — Console,
         // System.IO.File, OrderRepo. A lowercase head (foo.Bar, this.sb.Append,
         // _items.Add) is not vouched for and yields null.
-        return Effects.ExternalCallCollector.IsTypeQualifiedReference(receiverPath)
+        return TypeIdentity.IsTypeQualifiedReference(receiverPath)
                && resolvedTypeName is { } sourceQualifiedType
             ? new BoundTypeReferenceExpression(
                 receiverSpan, receiverPath, new BoundTypes.NominalBoundType(sourceQualifiedType))
@@ -3398,7 +3401,13 @@ public sealed class Binder
                 "give the binding an explicit type, or call through the declaring type.");
         }
 
-        return new BoundTypes.UnresolvedBoundType($"receiver '{receiverPath}' {reason}");
+        // E1 slice 2b: carry the report decision onto the type. A consumer that
+        // fails closed on "the binder looked and could not name this" needs to
+        // tell an authoritative answer from a binder limitation, and `report` is
+        // exactly that split.
+        return new BoundTypes.UnresolvedBoundType(
+            $"receiver '{receiverPath}' {reason}",
+            reported: report);
     }
 
     /// <summary>
@@ -3461,12 +3470,12 @@ public sealed class Binder
         return (
             receiverSymbol != null
                 ? ResolveTypeSymbol(receiverSymbol.TypeName)?.QualifiedName
-                    ?? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
+                    ?? TypeIdentity.MapShortTypeNameToFullName(
                         receiverSymbol.TypeName)
                 : receiverTypeSymbol != null
                     ? receiverTypeSymbol.QualifiedName
                     : !typePart.Contains('.')
-                        ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
+                        ? TypeIdentity.MapShortTypeNameToFullName(typePart)
                         : typePart,
             target[(lastDot + 1)..]);
     }
