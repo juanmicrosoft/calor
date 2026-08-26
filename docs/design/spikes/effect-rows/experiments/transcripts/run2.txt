@@ -65,6 +65,7 @@ CASE Y3a-B-with-sameline-E  args: (none)  exit: 0
     §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
 ------------------------------------------------------------------------------
 Compilation successful: Y3a-B-with-sameline-E.g.cs
+Y3a-B-with-sameline-E.calr(4,25): warning Calor0425: Initializer of binding 'f' has effect row [unknown] and binding 'f' declares row cw, so it cannot be decided whether the row fits. State a row on both sides, or compile with --permissive-effects.
 
 ==============================================================================
 CASE Y3b-B-plain  args: (none)  exit: 0
@@ -86,6 +87,7 @@ CASE Y4a-O-sameline-E-decl-later  args: (none)  exit: 0
     §R §LAM{lam1} §R INT:1 §/LAM{lam1}
 ------------------------------------------------------------------------------
 Compilation successful: Y4a-O-sameline-E-decl-later.g.cs
+Y4a-O-sameline-E-decl-later.calr(5,8): warning Calor0425: Returned value lambda has effect row [unknown] and the return of 'Make' declares row cw, so it cannot be decided whether the row fits. State a row on both sides, or compile with --permissive-effects.
 
 ==============================================================================
 CASE Y5a-arrow-sameline-E  args: (none)  exit: 1
@@ -124,10 +126,10 @@ CASE Y7a-IFACE-E  args: (none)  exit: 1
       §E{cw}
       §P "rendering"
 ------------------------------------------------------------------------------
-Y7a-IFACE-E.calr(10,7): error Calor0421: Implementation 'ConsoleRenderer.Render' of interface method 'IRenderer.Render' on class 'ConsoleRenderer' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+Y7a-IFACE-E.calr(10,7): error Calor0421: Implementation 'ConsoleRenderer.Render' of interface method 'IRenderer.Render' on class 'ConsoleRenderer' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw does not fit the interface's row [pure]. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
 
 ==============================================================================
-CASE Y8a-override-broader-permissive  args: --permissive-effects  exit: 0
+CASE Y8a-override-broader-permissive  args: --permissive-effects  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Y8}
   §CL{c001:Base:pub}
@@ -141,8 +143,7 @@ CASE Y8a-override-broader-permissive  args: --permissive-effects  exit: 0
       §E{cw}
       §P "laundered"
 ------------------------------------------------------------------------------
-Compilation successful: Y8a-override-broader-permissive.g.cs
-Y8a-override-broader-permissive.calr(10,7): warning Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
+Y8a-override-broader-permissive.calr(10,7): error Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). Effect row cw does not fit the base method's row [pure]. An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
 
 ==============================================================================
 CASE Y8b-override-broader-strict  args: (none)  exit: 1
@@ -159,7 +160,7 @@ CASE Y8b-override-broader-strict  args: (none)  exit: 1
       §E{cw}
       §P "laundered"
 ------------------------------------------------------------------------------
-Y8b-override-broader-strict.calr(10,7): error Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
+Y8b-override-broader-strict.calr(10,7): error Calor0420: Override 'Derived.Render' declares effect(s) [cw] not declared by base method 'Base.Render' (base declares: [pure]). Effect row cw does not fit the base method's row [pure]. An override may not broaden its base method's effect set — broader effects would launder through dynamic dispatch.
 
 ==============================================================================
 CASE Y9a-B-untyped-lambda-then-invoke-permissive  args: --permissive-effects  exit: 0

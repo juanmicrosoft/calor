@@ -11,10 +11,7 @@ eng/ast-schema.json exists: True
 1
 
 ### cross-module IsSubsetOf site
-src/Calor.Compiler/Effects/CrossModuleEffectEnforcementPass.cs:162:        if (resolution.DeclaredEffects.IsSubsetOf(declaredEffects))
-src/Calor.Compiler/Effects/EffectEnforcementPass.cs:377:        if (!computedEffects.IsSubsetOf(declaredEffects))
-src/Calor.Compiler/Effects/EffectEnforcementPass.cs:533:                    if (!overrideDeclared.IsSubsetOf(baseDeclared))
-src/Calor.Compiler/Effects/EffectEnforcementPass.cs:571:                        if (!implDeclared.IsSubsetOf(ifaceDeclared))
+src/Calor.Compiler/Effects/EffectEnforcementPass.cs:384:        if (!computedEffects.IsSubsetOf(declaredEffects))
 src/Calor.Compiler/Effects/EffectSet.cs:97:    public bool IsSubsetOf(EffectSet other)
 
 ### ProjectIndex references outside Commands/
