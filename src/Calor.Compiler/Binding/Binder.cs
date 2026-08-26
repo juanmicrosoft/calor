@@ -5350,9 +5350,8 @@ public sealed class Binder
 
     /// <summary>
     /// The <see cref="BoundTypes.EffectRow"/> an <c>§E{…}</c> denotes, resolving
-    /// any effect VARIABLES it mentions against the binders of the declaration
-    /// that owns the row (§7.2, index-based per the spike's alpha-equivalence
-    /// finding).
+    /// checking that any effect VARIABLES it mentions are bound by the
+    /// declaration that owns the row (§7.2).
     ///
     /// <para>A row that mentions a variable is <see cref="BoundTypes.EffectRow.Unknown"/>
     /// in slice b: until §7.4's instantiation lands (E3) the variable's
@@ -5378,8 +5377,7 @@ public sealed class Binder
         var mentionsVariable = false;
         foreach (var variable in row.EffectVariables)
         {
-            var ordinal = ResolveEffectVariable(variable, binders);
-            if (ordinal < 0)
+            if (!IsEffectVariableBound(variable, binders))
             {
                 _diagnostics.ReportError(
                     row.Span,
@@ -5397,22 +5395,32 @@ public sealed class Binder
     }
 
     /// <summary>
-    /// The ordinal of <paramref name="name"/> in the declaration's <c>eff</c>
-    /// binder list, or -1 when it binds nothing. Index-based, not name-based:
-    /// two declarations that spell their binders differently but use them in the
-    /// same positions denote the same polymorphic type (alpha-equivalence).
+    /// True when <paramref name="name"/> is bound by an <c>eff</c> binder on the
+    /// declaration that owns the row. Comparison is by name and case-sensitive,
+    /// because effect variables are ordinary identifiers.
+    ///
+    /// <para><b>This is a boundness CHECK, not a resolution.</b> An earlier
+    /// revision returned the binder's ordinal and threw it away, while the
+    /// working notes claimed E3 "inherits the resolution" — it does not, and
+    /// review round 1 (MINOR 6) caught the mismatch. Slice b needs one bit
+    /// ("is this bound?") because a row mentioning any variable becomes
+    /// <see cref="BoundTypes.EffectRow.Unknown"/> until §7.4's instantiation
+    /// lands. The ordinal, and the alpha-equivalence that makes it the right key
+    /// rather than the name, belong to <b>E3</b>, which is the slice that
+    /// substitutes an argument's row for a binder and therefore the first slice
+    /// with somewhere to put it.</para>
     /// </summary>
-    private static int ResolveEffectVariable(
+    private static bool IsEffectVariableBound(
         string name,
         IReadOnlyList<EffectParameterInfo>? binders)
     {
-        if (binders == null) return -1;
-        for (var index = 0; index < binders.Count; index++)
+        if (binders == null) return false;
+        foreach (var binder in binders)
         {
-            if (string.Equals(binders[index].Name, name, StringComparison.Ordinal))
-                return index;
+            if (string.Equals(binder.Name, name, StringComparison.Ordinal))
+                return true;
         }
-        return -1;
+        return false;
     }
 
     // ===== Effect extraction =====
