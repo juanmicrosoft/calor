@@ -787,4 +787,124 @@ public class EffectResolverTests
     {
         Assert.Equal(expected, EffectEnforcementPass.MapShortTypeNameToFullName(surface));
     }
+
+    /// <summary>
+    /// The extension-provider manifest both tests below resolve against: one
+    /// name-only <c>Select</c> entry, reachable ONLY through
+    /// <c>IsCompatibleExtensionReceiver</c>. There is no signature entry, so the
+    /// signature probe cannot answer and the receiver-compatibility decision is
+    /// the whole result.
+    /// </summary>
+    private const string LinqExtensionProviderManifest =
+        """
+        {
+          "version": "1.0",
+          "mappings": [{
+            "type": "System.Linq.Enumerable",
+            "extensionProvider": true,
+            "methods": { "Select": ["cw"] }
+          }]
+        }
+        """;
+
+    private static EffectResolver LinqExtensionResolver()
+    {
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(LinqExtensionProviderManifest, "linq-extension");
+        return new EffectResolver(loader);
+    }
+
+    /// <summary>
+    /// v0.15 E1 slice 2c, review round 1 (CRITICAL 1) — the DISCRIMINATING pin
+    /// for <c>EffectResolverKey.ReceiverInterfaces</c>.
+    ///
+    /// <para>The slice claims extension-receiver compatibility is asked of the
+    /// BINDER first ("does the receiver implement <c>IEnumerable</c>?") and only
+    /// then of <c>IsCompatibleExtensionReceiver</c>'s name-shape list. Round 1
+    /// found that claim unobservable: replacing <c>InterfacesOf</c> with
+    /// <c>Array.Empty</c> left every suite green, because every shape that
+    /// answered through the interface branch ALSO satisfied the name-shape list,
+    /// so the two routes never disagreed on anything a test looked at.</para>
+    ///
+    /// <para><c>IReadOnlyList&lt;T&gt;</c> is the shape where they disagree, and
+    /// that is the point of choosing it. Its key's declaring type is
+    /// <c>IReadOnlyList`1</c> — the generic definition plus arity, which is how
+    /// manifests spell generics. The name-shape list tests for <c>[]</c>,
+    /// <c>System.Collections.</c>, and the ANGLE-BRACKET spellings
+    /// (<c>IEnumerable&lt;</c>, <c>IList&lt;</c>, <c>List&lt;</c>, …); the
+    /// backtick form matches none of them, and <c>IReadOnlyList</c> is not on
+    /// the list under any spelling. So the name-shape route says NO and the
+    /// interface route says YES, and only one of them can be producing the
+    /// result below.</para>
+    ///
+    /// <para>Neutralise <c>InterfacesOf</c> and this test fails while its
+    /// control keeps passing. That is the experiment round 1 asked for.</para>
+    /// </summary>
+    [Fact]
+    public void BoundReceiverInterfaces_DecideExtensionCompatibility_WhereTheNameShapeListSaysNo()
+    {
+        var resolver = LinqExtensionResolver();
+
+        var boundReceiver = new Calor.Compiler.Binding.BoundTypes.GenericInstantiationBoundType(
+            new Calor.Compiler.Binding.BoundTypes.NominalBoundType("IReadOnlyList"),
+            [new Calor.Compiler.Binding.BoundTypes.NominalBoundType("STRING")]);
+
+        var boundKey = EffectResolverKey.FromBoundReceiver(
+            boundReceiver, "Select", kind: EffectMemberKind.Extension);
+
+        // The premise: the declaring type is the backtick form, which is exactly
+        // what the name-shape list cannot match. If this ever becomes
+        // "IReadOnlyList<STRING>" the test stops discriminating and must be
+        // rewritten rather than deleted.
+        Assert.Equal("IReadOnlyList`1", boundKey.DeclaringType);
+        Assert.Contains("System.Collections.Generic.IEnumerable`1", boundKey.ReceiverInterfaces);
+
+        var throughInterfaces = resolver.Resolve(boundKey);
+        Assert.Equal(EffectResolutionStatus.Resolved, throughInterfaces.Status);
+        Assert.True(throughInterfaces.Effects.Contains(EffectKind.IO, "console_write"));
+    }
+
+    /// <summary>
+    /// The control for
+    /// <see cref="BoundReceiverInterfaces_DecideExtensionCompatibility_WhereTheNameShapeListSaysNo"/>:
+    /// the IDENTICAL declaring type and member, keyed from TEXT instead of from
+    /// a bound receiver. No interfaces, so the name-shape list decides — and it
+    /// says no. One key carries the binder's answer and the other does not, and
+    /// that is the only difference between resolving and not.
+    /// </summary>
+    [Fact]
+    public void SameTypeKeyedFromText_HasNoInterfaces_AndTheNameShapeListRefusesIt()
+    {
+        var resolver = LinqExtensionResolver();
+
+        var stringKey = EffectResolverKey.FromStrings(
+            "IReadOnlyList`1", "Select", kind: EffectMemberKind.Extension);
+
+        Assert.Empty(stringKey.ReceiverInterfaces);
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(stringKey).Status);
+    }
+
+    /// <summary>
+    /// The language-guaranteed half: an array implements <c>IEnumerable&lt;T&gt;</c>,
+    /// and a bound array receiver says so structurally.
+    ///
+    /// <para>Stated plainly because it matters for reading the pin above: for
+    /// arrays the two routes AGREE — <c>STRING[]</c> also satisfies the
+    /// name-shape list's <c>[]</c> test — so this case is coverage, not a
+    /// discriminator. <c>IReadOnlyList`1</c> is the discriminator.</para>
+    /// </summary>
+    [Fact]
+    public void BoundArrayReceiver_CarriesTheEnumerableInterface()
+    {
+        var resolver = LinqExtensionResolver();
+
+        var arrayKey = EffectResolverKey.FromBoundReceiver(
+            new Calor.Compiler.Binding.BoundTypes.ArrayBoundType(
+                new Calor.Compiler.Binding.BoundTypes.NominalBoundType("STRING")),
+            "Select",
+            kind: EffectMemberKind.Extension);
+
+        Assert.Contains("System.Collections.Generic.IEnumerable`1", arrayKey.ReceiverInterfaces);
+        Assert.Equal(EffectResolutionStatus.Resolved, resolver.Resolve(arrayKey).Status);
+    }
 }
