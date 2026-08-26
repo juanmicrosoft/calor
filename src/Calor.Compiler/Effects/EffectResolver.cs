@@ -109,13 +109,6 @@ public sealed class EffectResolver
     public EffectResolverKeyOrigins KeyOrigins =>
         new(_keysFromBoundReceiver, _keysFromStringFallback);
 
-    /// <summary>Zeroes <see cref="KeyOrigins"/>, so one resolver can be measured per subject.</summary>
-    public void ResetKeyOrigins()
-    {
-        _keysFromBoundReceiver = 0;
-        _keysFromStringFallback = 0;
-    }
-
     private EffectResolution ResolveExtensionInternal(EffectResolverKey key)
     {
         // The receiver type is the first signature parameter, exactly as before.
@@ -773,12 +766,14 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// <summary>Which member family this key names.</summary>
     public EffectMemberKind Kind { get; }
 
-    /// <summary>
-    /// True when the call site is static (a type-reference receiver), false for
-    /// an instance receiver, null when the caller could not say. Provenance
-    /// only — outside equality, because no manifest entry records it.
-    /// </summary>
-    public bool? IsStatic { get; }
+    // v0.15 E1 slice 2c, review round 1 (MINOR 8) — there is deliberately NO
+    // IsStatic here. The slice's first revision carried one, computed at every
+    // call site from IsTypeQualifiedReference and read by nothing: no manifest
+    // entry records staticness, so no lookup could consult it. Write-only state
+    // on a key that exists to BE the identity is worse than an absent field,
+    // because it reads as though the identity is finer than it is. If a future
+    // slice needs static-vs-instance (extension methods cannot apply to a type
+    // reference, for one), it lands with the code that reads it.
 
     /// <summary>
     /// Interfaces the BINDER knows the receiver implements, fully qualified.
@@ -798,9 +793,6 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// </summary>
     public bool FromStringFallback { get; }
 
-    /// <summary>True for an extension-method key.</summary>
-    public bool IsExtension => Kind == EffectMemberKind.Extension;
-
     /// <summary>
     /// Whether every named parameter type is usable for overload matching.
     /// The pre-slice path gated its signature probe on exactly this
@@ -815,7 +807,6 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
         string declaringType,
         string memberName,
         IReadOnlyList<string>? parameterTypes,
-        bool? isStatic,
         IReadOnlyList<string> receiverInterfaces,
         bool fromStringFallback)
     {
@@ -823,7 +814,6 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
         DeclaringType = declaringType;
         MemberName = memberName;
         ParameterTypes = parameterTypes;
-        IsStatic = isStatic;
         ReceiverInterfaces = receiverInterfaces;
         FromStringFallback = fromStringFallback;
     }
@@ -843,14 +833,12 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
         string declaringType,
         string memberName,
         IReadOnlyList<string>? parameterTypes = null,
-        EffectMemberKind kind = EffectMemberKind.Method,
-        bool? isStatic = null) =>
+        EffectMemberKind kind = EffectMemberKind.Method) =>
         new(
             kind,
             NormalizeDeclaringType(declaringType),
             memberName ?? string.Empty,
             NormalizeParameters(parameterTypes ?? Array.Empty<string>()),
-            isStatic,
             Array.Empty<string>(),
             fromStringFallback: true);
 
@@ -866,8 +854,7 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
         Binding.BoundTypes.BoundType receiverType,
         string memberName,
         IReadOnlyList<string>? parameterTypes = null,
-        EffectMemberKind kind = EffectMemberKind.Method,
-        bool? isStatic = null)
+        EffectMemberKind kind = EffectMemberKind.Method)
     {
         ArgumentNullException.ThrowIfNull(receiverType);
         return new EffectResolverKey(
@@ -875,7 +862,6 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             NormalizeDeclaringType(DeclaringTypeOf(receiverType)),
             memberName ?? string.Empty,
             NormalizeParameters(parameterTypes ?? Array.Empty<string>()),
-            isStatic,
             InterfacesOf(receiverType),
             fromStringFallback: false);
     }
@@ -895,46 +881,31 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             NormalizeDeclaringType(declaringType),
             memberName ?? string.Empty,
             parameterTypes == null ? null : NormalizeParameters(parameterTypes),
-            isStatic: null,
             Array.Empty<string>(),
             fromStringFallback: false);
 
-    /// <summary>This key with its parameter list dropped — the step-2b name probe.</summary>
+    /// <summary>
+    /// This key with its parameter list dropped — the step-2b name probe.
+    ///
+    /// <para>This and <see cref="WithMemberName"/> are the ONLY derivation
+    /// helpers, and both exist because the resolution order needs them
+    /// (step 2b, and the <c>get_X</c>/<c>set_X</c> spelling the IL fallback
+    /// uses). Review round 1 (MINOR 8) deleted <c>WithDeclaringType</c>,
+    /// <c>WithKind</c> and <c>WithParameterTypes</c>: they had no caller, and
+    /// <c>WithDeclaringType</c> in particular was a ledger-defeating back door
+    /// — it re-pointed a key at a different type while preserving
+    /// <see cref="FromStringFallback"/> = false, so a string-derived type could
+    /// be counted as bound-derived.</para>
+    /// </summary>
     public EffectResolverKey WithoutParameterList() =>
         ParameterTypes == null
             ? this
             : new EffectResolverKey(
-                Kind, DeclaringType, MemberName, null, IsStatic, ReceiverInterfaces, FromStringFallback);
+                Kind, DeclaringType, MemberName, null, ReceiverInterfaces, FromStringFallback);
 
     /// <summary>This key with a different member name, keeping type and provenance.</summary>
     public EffectResolverKey WithMemberName(string memberName) =>
-        new(Kind, DeclaringType, memberName, ParameterTypes, IsStatic, ReceiverInterfaces, FromStringFallback);
-
-    /// <summary>This key re-pointed at a different declaring type, keeping provenance.</summary>
-    public EffectResolverKey WithDeclaringType(string declaringType) =>
-        new(
-            Kind,
-            NormalizeDeclaringType(declaringType),
-            MemberName,
-            ParameterTypes,
-            IsStatic,
-            ReceiverInterfaces,
-            FromStringFallback);
-
-    /// <summary>This key as a different member kind, keeping everything else.</summary>
-    public EffectResolverKey WithKind(EffectMemberKind kind) =>
-        new(kind, DeclaringType, MemberName, ParameterTypes, IsStatic, ReceiverInterfaces, FromStringFallback);
-
-    /// <summary>This key with an explicit parameter list.</summary>
-    public EffectResolverKey WithParameterTypes(IReadOnlyList<string> parameterTypes) =>
-        new(
-            Kind,
-            DeclaringType,
-            MemberName,
-            NormalizeParameters(parameterTypes),
-            IsStatic,
-            ReceiverInterfaces,
-            FromStringFallback);
+        new(Kind, DeclaringType, memberName, ParameterTypes, ReceiverInterfaces, FromStringFallback);
 
     /// <summary>
     /// The one spelling rule for a declaring type: trimmed, with <c>global::</c>

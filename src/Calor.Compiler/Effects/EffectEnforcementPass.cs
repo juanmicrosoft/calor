@@ -1856,18 +1856,9 @@ public sealed class EffectEnforcementPass
             IReadOnlyList<string>? parameterTypes = null,
             EffectMemberKind kind = EffectMemberKind.Method)
         {
-            // Static-vs-instance is recorded from how the receiver is WRITTEN:
-            // a type-qualified reference (System.IO.File, Console) is a static
-            // call site, a bound value is an instance one. Null when there is
-            // no receiver path to judge. Provenance only — no manifest entry
-            // records staticness, so it never changes a lookup.
-            bool? isStatic = string.IsNullOrEmpty(receiverPath)
-                ? null
-                : Binding.TypeIdentity.IsTypeQualifiedReference(receiverPath);
-
             var bound = KeyableBoundReceiver(receiverPath);
             return bound != null
-                ? EffectResolverKey.FromBoundReceiver(bound, memberName, parameterTypes, kind, isStatic)
+                ? EffectResolverKey.FromBoundReceiver(bound, memberName, parameterTypes, kind)
                 : EffectResolverKey.FromStrings(declaringType, memberName, parameterTypes, kind);
         }
 
@@ -3184,7 +3175,7 @@ public sealed class EffectEnforcementPass
             // A constructor has no receiver — the type is named outright, so this
             // key is text by construction, not by a missing binder answer.
             var resolution = _context.Resolver.Resolve(EffectResolverKey.FromStrings(
-                manifestType, ".ctor", argumentTypes, EffectMemberKind.Constructor, isStatic: true));
+                manifestType, ".ctor", argumentTypes, EffectMemberKind.Constructor));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     $"{manifestType}..ctor({string.Join(",", argumentTypes)})",
