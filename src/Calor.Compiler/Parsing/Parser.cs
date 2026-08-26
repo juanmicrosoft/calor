@@ -74,6 +74,38 @@ public sealed class Parser
     private bool _insideRefinementPredicate;
 
     /// <summary>
+    /// Stack of <c>eff</c> binder scopes, innermost last. A scope is pushed when a
+    /// declaration form that may bind effect variables (<c>§F</c>, <c>§AF</c>,
+    /// <c>§MT</c>, <c>§AMT</c>, and an interface member's <c>§MT</c>) has parsed its
+    /// type-parameter list, and popped in a <c>finally</c> when that declaration is
+    /// done. Nesting is real — an interface member sits inside a <c>§IFACE</c> and a
+    /// <c>§LAM</c> sits inside a function body — which is why this is a stack and not
+    /// the spike prototype's single list reset by every type-parameter list.
+    /// </summary>
+    private readonly List<IReadOnlyList<EffectParameterInfo>> _effectVariableScopes = new();
+
+    /// <summary>
+    /// The most recently parsed row-bearing declaration — its name, what to call it,
+    /// and the line it started on. Calor0405's recovery names it so the author is told
+    /// which line to move the row onto. Only used when the stray <c>§E</c> sits on a
+    /// <i>later</i> line than the recorded declaration, so the message can never point
+    /// forward at something the author has not written yet.
+    /// </summary>
+    private (string Name, string Kind, int Line)? _lastRowBearingDeclaration;
+
+    private void RecordRowBearingDeclaration(string name, string kind, TextSpan span)
+        => _lastRowBearingDeclaration = string.IsNullOrEmpty(name) ? null : (name, kind, span.Line);
+
+    /// <summary>Calor0405 recovery at a position whose enclosing loop has no <c>§E</c> arm.</summary>
+    private void ReportMisplacedEffectRowInLoop()
+    {
+        var recorded = _lastRowBearingDeclaration;
+        var subject = recorded is { } d && d.Line < Current.Span.Line ? d.Name : null;
+        var kind = recorded?.Kind ?? "declaration";
+        ReportMisplacedEffectRow(subject, kind);
+    }
+
+    /// <summary>
     /// Phase 1 of v0.6 call-closer-elision RFC: tracks the number of
     /// pending outer-call <c>§A</c> argument contexts that the inner
     /// expression is being parsed inside. Used by
@@ -1711,6 +1743,13 @@ public sealed class Parser
 
         var csharpAttrs = ParseCSharpAttributes();
 
+        // Position 4 (§3.3): §I{Func<i32,i32>:f} §E{cw} — the row must sit on the same
+        // line as the tag it annotates. A §E on a later line is left for the enclosing
+        // §F/§MT/§DEL section loop's own §E arm, where it is the declaration's row.
+        // Covers all 9 §I dispatch arms, because the check lives in the shared production.
+        RecordRowBearingDeclaration(paramName, "parameter", startToken.Span);
+        var row = TryParseSameLineRow(EffectRowPosition.Parameter);
+
         // Parse optional inline refinement: §I{type:name | (predicate using #)}
         InlineRefinementInfo? inlineRefinement = null;
         if (Check(TokenKind.Pipe))
@@ -1748,7 +1787,8 @@ public sealed class Parser
             defaultValue,
             inlineRefinement,
             identifierSpan,
-            attrs.GetSpan("_pos0"));
+            attrs.GetSpan("_pos0"),
+            row);
     }
 
     private OutputNode ParseOutput()
@@ -1764,13 +1804,76 @@ public sealed class Parser
             typeName = "";
         }
 
-        return new OutputNode(startToken.Span, typeName, attrs.GetSpan("_pos0"));
+        // Position 6, §O spelling (§3.3): §O{Func<i32>} §E{cw}. Same line rule; a §E on
+        // a later line is the declaration's row and is the canonical two-line corpus
+        // form (54 occurrences across 23 files), so it must NOT be consumed here.
+        // Covers all 7 §O dispatch arms.
+        var row = TryParseSameLineRow(EffectRowPosition.Return);
+
+        return new OutputNode(startToken.Span, typeName, attrs.GetSpan("_pos0"), row);
     }
 
-    private EffectsNode ParseEffects()
+    /// <summary>
+    /// Where a <c>§E{…}</c> is being read. Governs one thing only in this slice:
+    /// whether an in-scope effect variable may be <i>mentioned</i> here
+    /// (design-doc §7.3's partition of the eight positions).
+    /// </summary>
+    private enum EffectRowPosition
+    {
+        /// <summary>Position 1 — the declaration's own row. Variables permitted.</summary>
+        Declaration,
+        /// <summary>Positions 4 and 5 — a parameter's row. Variables permitted.</summary>
+        Parameter,
+        /// <summary>Position 6 — a return row. Forbidden: it would be rank-2.</summary>
+        Return,
+        /// <summary>Position 7 — a binding's row. Nothing binds a variable there.</summary>
+        Binding,
+        /// <summary>Position 8 — a field's row. Nothing binds a variable there.</summary>
+        Field,
+        /// <summary>Position 2 — a lambda literal has no type-parameter list (Z8b).</summary>
+        Lambda,
+        /// <summary>Position 3 — a delegate declaration has no type-parameter list (Z8).</summary>
+        Delegate,
+    }
+
+    private static bool PermitsEffectVariables(EffectRowPosition position)
+        => position is EffectRowPosition.Declaration or EffectRowPosition.Parameter;
+
+    private static string DescribeEffectRowPosition(EffectRowPosition position) => position switch
+    {
+        EffectRowPosition.Return => "a return row — a returned function mentioning the caller's effect variable would be rank-2 polymorphism",
+        EffectRowPosition.Binding => "a binding's row — a §B binds no effect variable",
+        EffectRowPosition.Field => "a field's row — a §FLD binds no effect variable",
+        EffectRowPosition.Lambda => "a lambda literal's row — a §LAM has no type-parameter list to bind one",
+        EffectRowPosition.Delegate => "a delegate declaration's row — a §DEL has no type-parameter list to bind one",
+        _ => "this position",
+    };
+
+    /// <summary>
+    /// True when <paramref name="name"/> is bound as an effect variable by some
+    /// enclosing declaration. Effect variables are ordinary identifiers, so the
+    /// comparison is case-sensitive — unlike the effect taxonomy's lookup.
+    /// </summary>
+    private bool IsEffectVariableInScope(string name)
+    {
+        for (var i = _effectVariableScopes.Count - 1; i >= 0; i--)
+        {
+            foreach (var binder in _effectVariableScopes[i])
+            {
+                if (string.Equals(binder.Name, name, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private EffectsNode ParseEffects(EffectRowPosition position = EffectRowPosition.Declaration)
     {
         var startToken = Expect(TokenKind.Effects);
         var attrs = ParseAttributes();
+
+        var variables = new List<string>();
 
         // Interpret positional attributes
         var effects = AttributeHelper.InterpretEffectsAttributes(
@@ -1778,9 +1881,77 @@ public sealed class Parser
             code => _diagnostics.Report(
                 startToken.Span,
                 DiagnosticCode.UnknownEffectCode,
-                $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."));
+                $"Unknown effect code '{code}'. Use a code from the authoritative effect taxonomy."),
+            IsEffectVariableInScope,
+            variables);
 
-        return new EffectsNode(startToken.Span, effects);
+        if (variables.Count > 0 && !PermitsEffectVariables(position))
+        {
+            // §7.3: the variable is bound, but not usable here.
+            foreach (var variable in variables)
+            {
+                _diagnostics.ReportError(
+                    startToken.Span,
+                    DiagnosticCode.EffectVariableScope,
+                    $"Effect variable '{variable}' cannot be used in {DescribeEffectRowPosition(position)}. "
+                    + "An effect variable may appear only in the row of the declaration that binds it "
+                    + "and in the rows of that declaration's parameters.");
+            }
+
+            variables.Clear();
+        }
+
+        return new EffectsNode(startToken.Span, effects, variables);
+    }
+
+    /// <summary>
+    /// The token most recently consumed, or the current token when nothing has been
+    /// consumed yet. <see cref="Peek"/> indexes without a lower bound, so this is the
+    /// safe spelling of <c>Peek(-1)</c>.
+    /// </summary>
+    private Token PreviousToken => _position > 0 ? _tokens[_position - 1] : Current;
+
+    /// <summary>
+    /// Reads a <c>§E{…}</c> as the effect row of the type just consumed, if and only
+    /// if it is <b>same-line adjacent</b> to that type — design-doc §3 Decision 1.
+    /// A <c>§E</c> on a later line is deliberately left unconsumed: at a position
+    /// whose enclosing section loop has a <c>§E</c> arm it is the declaration's own
+    /// row (the 2948/471-occurrence two-line arrow corpus depends on this), and at a
+    /// position with no such arm the enclosing loop's recovery reports Calor0405.
+    /// </summary>
+    private EffectsNode? TryParseSameLineRow(EffectRowPosition position)
+    {
+        if (!Check(TokenKind.Effects))
+            return null;
+
+        if (Current.Span.Line != PreviousToken.Span.Line)
+            return null;
+
+        return ParseEffects(position);
+    }
+
+    /// <summary>
+    /// Reports Calor0405 for a <c>§E{…}</c> that is not same-line adjacent to any type
+    /// and sits at a position with no declaration-level <c>§E</c> arm to fall through
+    /// to, then <b>consumes the whole group</b> so the rest of the enclosing production
+    /// still parses. That recovery is what collapses the executed baselines from four
+    /// (Z1) and eight (Z3) diagnostics to one.
+    /// </summary>
+    private void ReportMisplacedEffectRow(string? subject, string subjectKind)
+    {
+        var target = subject is { Length: > 0 }
+            ? $"the end of the '{subject}' {subjectKind} line"
+            : "the end of the line whose type it annotates";
+
+        _diagnostics.ReportError(
+            Current.Span,
+            DiagnosticCode.EffectRowMisplaced,
+            $"A §E{{…}} effect row must be on the same line as the type it annotates. Move it onto {target}, "
+            + "or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.");
+
+        // Consume §E and its attribute group(s) so the caller resumes cleanly.
+        Advance();
+        ParseAttributes();
     }
 
     private RequiresNode ParseRequires()
@@ -2181,6 +2352,14 @@ public sealed class Parser
         else if (Check(TokenKind.ElseIf) || Check(TokenKind.Else))
         {
             return ParseMisalignedElseClause();
+        }
+        // A §E in statement position is an effect row that missed its line (§3.1).
+        // The statement loop has no §E arm to fall through to, so today this is a
+        // four-diagnostic cascade (executed baseline Z2). Collapse it to one Calor0405.
+        else if (Check(TokenKind.Effects))
+        {
+            ReportMisplacedEffectRowInLoop();
+            return null;
         }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
@@ -5474,6 +5653,12 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "BIND", "name");
         }
 
+        // Position 7 (§3.3): §B{f:Func<i32,i32>} §E{cw} <init>. The row sits between the
+        // header group and the initializer. TokenKind.Effects is not an expression start
+        // (pinned), so the initializer parse below can never swallow one.
+        RecordRowBearingDeclaration(name, "§B", startToken.Span);
+        var row = TryParseSameLineRow(EffectRowPosition.Binding);
+
         // Parse optional initializer expression.
         // Don't consume a following §IF as the initializer when it's a block IF statement
         // (no → arrow after the condition). Block IFs are separate statements.
@@ -5520,7 +5705,8 @@ public sealed class Parser
             initializer,
             attrs,
             identifierSpan,
-            GetBindTypeSpan(attrs, typeName));
+            GetBindTypeSpan(attrs, typeName),
+            row);
     }
 
     /// <summary>
@@ -8612,6 +8798,13 @@ public sealed class Parser
                 // Skip orphaned collection literals at class level (converter artifact)
                 SkipCollectionLiteral();
             }
+            // A §E in class-member position is a field row that missed its line (§3.1).
+            // The class-member loop has no §E arm; executed baseline Z1 is four
+            // diagnostics, none of which mentions effects. Collapse it to one Calor0405.
+            else if (Check(TokenKind.Effects))
+            {
+                ReportMisplacedEffectRowInLoop();
+            }
             else
             {
                 _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS", Current.Kind);
@@ -8706,6 +8899,12 @@ public sealed class Parser
         var visibility = ParseVisibility(visStr);
         var fieldModifiers = ParseMethodModifiers(modStr);
 
+        // Position 8 (§3.3): §FLD{Action<i32>:onChange:pri} §E{cw}. Read BEFORE the
+        // default-value branch. X9b is the executed proof this did not already parse:
+        // the class-member loop rejected Effects four diagnostics earlier.
+        RecordRowBearingDeclaration(name, "field", startToken.Span);
+        var row = TryParseSameLineRow(EffectRowPosition.Field);
+
         // Check for optional default value (can be prefixed with = or just a direct expression)
         ExpressionNode? defaultValue = null;
         if (Check(TokenKind.Equals))
@@ -8729,7 +8928,8 @@ public sealed class Parser
             attrs,
             csharpAttrs,
             GetIdentifierSpan(attrs, "_pos1", name),
-            attrs.GetSpan("_pos0"));
+            attrs.GetSpan("_pos0"),
+            row);
     }
 
     /// <summary>
@@ -13573,6 +13773,16 @@ public sealed class Parser
                     parameterIdentifierSpan = nameToken.Span;
                 }
 
+                // Position 5 (§3.3): (Func<i32,i32>:f §E{cw}, i32:v). The inline
+                // parameter list is one of the four positions with no §E arm behind it,
+                // so a non-adjacent §E here is Calor0405 with recovery rather than the
+                // twelve-diagnostic cascade of the executed X9c/Z3 baselines.
+                var inlineRow = TryParseSameLineRow(EffectRowPosition.Parameter);
+                if (inlineRow == null && Check(TokenKind.Effects))
+                {
+                    ReportMisplacedEffectRow(paramName, "parameter");
+                }
+
                 // Parse optional default value: = expression
                 ExpressionNode? defaultValue = null;
                 if (Match(TokenKind.Equals))
@@ -13592,7 +13802,8 @@ public sealed class Parser
                     Array.Empty<CalorAttributeNode>(),
                     defaultValue,
                     identifierSpan: parameterIdentifierSpan,
-                    typeNameSpan: parameterTypeSpan));
+                    typeNameSpan: parameterTypeSpan,
+                    row: inlineRow));
             }
             while (Match(TokenKind.Comma));
         }
@@ -13618,7 +13829,12 @@ public sealed class Parser
             }
             var typeStartPosition = _position;
             var returnType = prefix + ReadInlineTypeToken();
-            output = new OutputNode(span, returnType, GetConsumedSpan(typeStartPosition));
+
+            // Position 6, arrow spelling (§3.3): ) -> Func<i32> §E{cw}. A §E on a later
+            // line is left alone: that is the 2948-occurrence / 471-file compact corpus
+            // form and it must keep meaning the declaration's own row.
+            var arrowRow = TryParseSameLineRow(EffectRowPosition.Return);
+            output = new OutputNode(span, returnType, GetConsumedSpan(typeStartPosition), arrowRow);
         }
     }
 
