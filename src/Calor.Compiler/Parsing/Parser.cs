@@ -97,13 +97,30 @@ public sealed class Parser
     private void RecordRowBearingDeclaration(string name, string kind, TextSpan span)
         => _lastRowBearingDeclaration = string.IsNullOrEmpty(name) ? null : (name, kind, span.Line);
 
-    /// <summary>Calor0405 recovery at a position whose enclosing loop has no <c>§E</c> arm.</summary>
-    private void ReportMisplacedEffectRowInLoop()
+    /// <summary>
+    /// Calor0405 recovery at a position whose enclosing loop has no <c>§E</c> arm —
+    /// the statement loop (executed baseline <b>Z2</b>) and the class-member loop
+    /// (<b>Z1</b>).
+    /// </summary>
+    /// <returns>
+    /// <c>false</c> when the <c>§E</c> is <b>not</b> the first token on its line, in
+    /// which case nothing is reported or consumed and the caller falls through to its
+    /// ordinary unexpected-token path. Calor0405's whole claim is that a row is on the
+    /// wrong <i>line</i>; a <c>§E</c> sitting mid-line after other tokens is not a
+    /// misplaced row. This is what keeps the diagnostic out of a call's argument list,
+    /// where §3.3 says it must not go — executed baseline <b>Z10</b>
+    /// (<c>§R §C{Helper} §A INT:1 §E{cw} §/C</c>) keeps its `Expected EndCall` rejection.
+    /// </returns>
+    private bool TryReportMisplacedEffectRowInLoop()
     {
+        if (_position > 0 && PreviousToken.Span.Line == Current.Span.Line)
+            return false;
+
         var recorded = _lastRowBearingDeclaration;
         var subject = recorded is { } d && d.Line < Current.Span.Line ? d.Name : null;
         var kind = recorded?.Kind ?? "declaration";
         ReportMisplacedEffectRow(subject, kind);
+        return true;
     }
 
     /// <summary>
@@ -2375,9 +2392,8 @@ public sealed class Parser
         // A §E in statement position is an effect row that missed its line (§3.1).
         // The statement loop has no §E arm to fall through to, so today this is a
         // four-diagnostic cascade (executed baseline Z2). Collapse it to one Calor0405.
-        else if (Check(TokenKind.Effects))
+        else if (Check(TokenKind.Effects) && TryReportMisplacedEffectRowInLoop())
         {
-            ReportMisplacedEffectRowInLoop();
             return null;
         }
 
@@ -8914,9 +8930,9 @@ public sealed class Parser
             // A §E in class-member position is a field row that missed its line (§3.1).
             // The class-member loop has no §E arm; executed baseline Z1 is four
             // diagnostics, none of which mentions effects. Collapse it to one Calor0405.
-            else if (Check(TokenKind.Effects))
+            else if (Check(TokenKind.Effects) && TryReportMisplacedEffectRowInLoop())
             {
-                ReportMisplacedEffectRowInLoop();
+                // reported and consumed
             }
             else
             {

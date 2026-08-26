@@ -23,7 +23,7 @@ CASE X1b-twoline-O-then-E-pure  args: (none)  exit: 1
 X1b-twoline-O-then-E-pure.calr(5,5): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
-CASE X2a-sameline-O-and-E  args: (none)  exit: 0
+CASE X2a-sameline-O-and-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:X2}
   §F{f001:Log:pub}
@@ -31,7 +31,7 @@ CASE X2a-sameline-O-and-E  args: (none)  exit: 0
     §O{void} §E{cw}
     §P m
 ------------------------------------------------------------------------------
-Compilation successful: X2a-sameline-O-and-E.g.cs
+X2a-sameline-O-and-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
 CASE X2b-sameline-O-and-E-pure  args: (none)  exit: 1
@@ -42,7 +42,7 @@ CASE X2b-sameline-O-and-E-pure  args: (none)  exit: 1
     §O{void} §E{}
     §P m
 ------------------------------------------------------------------------------
-X2b-sameline-O-and-E-pure.calr(4,14): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
+X2b-sameline-O-and-E-pure.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
 CASE X3-bang-sigil-in-E  args: (none)  exit: 1
@@ -74,9 +74,7 @@ CASE X4-fallible-type-suffix  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 X4-fallible-type-suffix.calr(2,36): error Calor0100: Expected statement but found Exclamation
 X4-fallible-type-suffix.calr(2,37): error Calor0100: Expected statement but found Identifier
-X4-fallible-type-suffix.calr(3,5): error Calor0100: Expected statement but found Effects
-X4-fallible-type-suffix.calr(3,7): error Calor0100: Expected statement but found OpenBrace
-X4-fallible-type-suffix.calr(3,8): error Calor0100: Expected statement but found CloseBrace
+X4-fallible-type-suffix.calr(3,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the line whose type it annotates, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
 
 ==============================================================================
 CASE X5a-caret-sigil  args: (none)  exit: 1
@@ -106,20 +104,7 @@ CASE X6a-eff-modifier-in-typaram-list  args: (none)  exit: 1
     §E{}
     §R §ARR{U} INT:0
 ------------------------------------------------------------------------------
-X6a-eff-modifier-in-typaram-list.calr(2,30): error Calor0100: Expected Greater but found Identifier
-X6a-eff-modifier-in-typaram-list.calr(2,30): error Calor0100: Expected statement but found Identifier
-X6a-eff-modifier-in-typaram-list.calr(2,31): error Calor0100: Expected statement but found Greater
-X6a-eff-modifier-in-typaram-list.calr(2,34): error Calor0114: Expected operator in Lisp expression, found '['. Valid operators: arithmetic (+, -, *, /, %), comparison (==, !=, <, <=, >, >=), logical (&&, ||, !), string (len, contains, substr, ...), char (char-at, is-letter, ...), or type (cast, is, as)
-X6a-eff-modifier-in-typaram-list.calr(2,36): error Calor0114: Unexpected token ']' in expression argument. Expected a value (number, string, variable) or nested expression
-X6a-eff-modifier-in-typaram-list.calr(2,37): error Calor0114: Keyword argument ':xs' is not valid here. A comparison-mode keyword is only allowed as the final argument of a built-in string operation (e.g. starts, contains, equals -- the lowercase forms).
-X6a-eff-modifier-in-typaram-list.calr(2,34): error Calor0106: Unknown operator '['. Did you mean '+'?
-X6a-eff-modifier-in-typaram-list.calr(2,42): error Calor0100: Expected statement but found Arrow
-X6a-eff-modifier-in-typaram-list.calr(2,45): error Calor0100: Expected statement but found OpenBracket
-X6a-eff-modifier-in-typaram-list.calr(2,46): error Calor0100: Expected statement but found Identifier
-X6a-eff-modifier-in-typaram-list.calr(2,47): error Calor0100: Expected statement but found CloseBracket
-X6a-eff-modifier-in-typaram-list.calr(3,5): error Calor0100: Expected statement but found Effects
-X6a-eff-modifier-in-typaram-list.calr(3,7): error Calor0100: Expected statement but found OpenBrace
-X6a-eff-modifier-in-typaram-list.calr(3,8): error Calor0100: Expected statement but found CloseBrace
+X6a-eff-modifier-in-typaram-list.calr(3,5): error Calor0410: Function 'Map' uses effect 'alloc' but does not declare it
 
 ==============================================================================
 CASE X6b-variance-modifier-on-function  args: (none)  exit: 1
@@ -177,10 +162,7 @@ CASE X9b-FLD-with-sameline-E  args: (none)  exit: 1
       §E{cw}
       §C{onChange} §A n §/C
 ------------------------------------------------------------------------------
-X9b-FLD-with-sameline-E.calr(3,36): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Effects
-X9b-FLD-with-sameline-E.calr(3,38): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace
-X9b-FLD-with-sameline-E.calr(3,39): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier
-X9b-FLD-with-sameline-E.calr(3,41): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace
+X9b-FLD-with-sameline-E.calr(6,7): error Calor0418: Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
 
 ==============================================================================
 CASE X9c-inline-param-with-E  args: (none)  exit: 1
@@ -190,18 +172,7 @@ CASE X9c-inline-param-with-E  args: (none)  exit: 1
     §E{cw}
     §R §C{transform} §A value §/C
 ------------------------------------------------------------------------------
-X9c-inline-param-with-E.calr(2,47): error Calor0100: Expected CloseParen but found Effects
-X9c-inline-param-with-E.calr(2,53): error Calor0100: Expected statement but found Comma
-X9c-inline-param-with-E.calr(2,55): error Calor0100: Expected statement but found Identifier
-X9c-inline-param-with-E.calr(2,58): error Calor0100: Expected statement but found Colon
-X9c-inline-param-with-E.calr(2,59): error Calor0100: Expected statement but found Identifier
-X9c-inline-param-with-E.calr(2,64): error Calor0100: Expected statement but found CloseParen
-X9c-inline-param-with-E.calr(2,66): error Calor0100: Expected statement but found Arrow
-X9c-inline-param-with-E.calr(2,69): error Calor0100: Expected statement but found Identifier
-X9c-inline-param-with-E.calr(3,5): error Calor0100: Expected statement but found Effects
-X9c-inline-param-with-E.calr(3,7): error Calor0100: Expected statement but found OpenBrace
-X9c-inline-param-with-E.calr(3,8): error Calor0100: Expected statement but found Identifier
-X9c-inline-param-with-E.calr(3,10): error Calor0100: Expected statement but found CloseBrace
+X9c-inline-param-with-E.calr(4,8): error Calor0418: Invocation of function-typed value 'transform' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
 
 ==============================================================================
 CASE X10-E1-before-calor0418  args: (none)  exit: 1

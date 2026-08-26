@@ -8,10 +8,7 @@ CASE Z1-FLD-nextline-E  args: (none)  exit: 1
     §MT{mt001:M:pub} () -> void
       §E{}
 ------------------------------------------------------------------------------
-Z1-FLD-nextline-E.calr(4,5): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Effects
-Z1-FLD-nextline-E.calr(4,7): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace
-Z1-FLD-nextline-E.calr(4,8): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier
-Z1-FLD-nextline-E.calr(4,10): error Calor0100: Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace
+Z1-FLD-nextline-E.calr(4,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'x' field line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
 
 ==============================================================================
 CASE Z2-B-nextline-E  args: (none)  exit: 1
@@ -22,10 +19,7 @@ CASE Z2-B-nextline-E  args: (none)  exit: 1
     §B{y:i32} INT:1
     §E{cw}
 ------------------------------------------------------------------------------
-Z2-B-nextline-E.calr(5,5): error Calor0100: Expected statement but found Effects
-Z2-B-nextline-E.calr(5,7): error Calor0100: Expected statement but found OpenBrace
-Z2-B-nextline-E.calr(5,8): error Calor0100: Expected statement but found Identifier
-Z2-B-nextline-E.calr(5,10): error Calor0100: Expected statement but found CloseBrace
+Z2-B-nextline-E.calr(5,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'y' §B line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
 
 ==============================================================================
 CASE Z3-wrapped-inline-sig-E-inside-parens  args: (none)  exit: 1
@@ -38,14 +32,7 @@ CASE Z3-wrapped-inline-sig-E-inside-parens  args: (none)  exit: 1
     §E{cw}
     §R INT:0
 ------------------------------------------------------------------------------
-Z3-wrapped-inline-sig-E-inside-parens.calr(4,7): error Calor0100: Expected CloseParen but found Effects
-Z3-wrapped-inline-sig-E-inside-parens.calr(5,5): error Calor0100: Expected statement but found CloseParen
-Z3-wrapped-inline-sig-E-inside-parens.calr(5,7): error Calor0100: Expected statement but found Arrow
-Z3-wrapped-inline-sig-E-inside-parens.calr(5,10): error Calor0100: Expected statement but found Identifier
-Z3-wrapped-inline-sig-E-inside-parens.calr(6,5): error Calor0100: Expected statement but found Effects
-Z3-wrapped-inline-sig-E-inside-parens.calr(6,7): error Calor0100: Expected statement but found OpenBrace
-Z3-wrapped-inline-sig-E-inside-parens.calr(6,8): error Calor0100: Expected statement but found Identifier
-Z3-wrapped-inline-sig-E-inside-parens.calr(6,10): error Calor0100: Expected statement but found CloseBrace
+Z3-wrapped-inline-sig-E-inside-parens.calr(4,7): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'transform' parameter line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
 
 ==============================================================================
 CASE Z4-typeparam-named-eff  args: (none)  exit: 0
@@ -137,16 +124,16 @@ CASE Z7b-IFACE-typeparam-reaches-member  args: (none)  exit: 0
 Compilation successful: Z7b-IFACE-typeparam-reaches-member.g.cs
 
 ==============================================================================
-CASE Z9-arrow-void-sameline-E  args: (none)  exit: 0
+CASE Z9-arrow-void-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Z9}
   §F{f001:Log:pub} (i32:x) -> void §E{cw}
     §P x
 ------------------------------------------------------------------------------
-Compilation successful: Z9-arrow-void-sameline-E.g.cs
+Z9-arrow-void-sameline-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
-CASE Z9b-I-i32-sameline-E  args: (none)  exit: 0
+CASE Z9b-I-i32-sameline-E  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:Z9}
   §F{f001:Log:pub}
@@ -154,7 +141,7 @@ CASE Z9b-I-i32-sameline-E  args: (none)  exit: 0
     §O{void}
     §P x
 ------------------------------------------------------------------------------
-Compilation successful: Z9b-I-i32-sameline-E.g.cs
+Z9b-I-i32-sameline-E.calr(2,3): error Calor0410: Function 'Log' uses effect 'cw' but does not declare it
 
 ==============================================================================
 CASE Z9c-O-i32-sameline-E  args: (none)  exit: 0
