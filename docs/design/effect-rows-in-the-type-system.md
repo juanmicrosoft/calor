@@ -1785,6 +1785,25 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 
 ### 13.2 New pins — home and freeze
 
+> **P1 and P6 contradict each other, and slice b re-specifies P1.** Recorded in review round 1 of
+> PR #1101 rather than discovered when slice b turns a green pin red.
+>
+> P1's own case is **Y1b** — `§I{str:m} §E{cw}` over a `str` parameter — and P1 says it must be
+> **Calor0410** after E2. But `str` is not a function type, so under §3.5 that row is a row on a
+> position that cannot carry one, and **P6 says it must be Calor0405**. The two pins name
+> different answers for the same source.
+>
+> Five more cases are the same shape and the same collision: **Y5a** and **X2a**/**X2b**
+> (`-> void §E{cw}` and `§O{void} §E{cw}`) and **Z9**/**Z9b**. §13.5(a) lists all six as having
+> moved to Calor0410 in slice a; **all six move again, to Calor0405, when P6 lands in slice b.**
+>
+> This is not a defect in either pin — it is the seam between a slice that consumes rows and a
+> slice that checks what they are attached to. But it means **P1 as written is a state slice b
+> must break**, so slice b re-specifies P1 onto a function-typed subject
+> (`§I{Func<i32,i32>:f} §E{cw}` against a pure declaration) and hands the non-function-typed
+> cases to P6. A slice-b PR that merely regenerates these six transcripts without saying that has
+> silently changed what P1 asserts.
+
 | # | Pin | Home | Freeze | Discriminating revert |
 |---|---|---|---|---|
 | P1 | `RowSuffix_SameLineOnI_IsParameterRow_NotDeclarationRow` — case **Y1b**: compiles today, must be Calor0410 after | `Calor.Enforcement.Tests/EffectRowSyntaxTests.cs` | with E2 | drop the `Span.Line` comparison → Y1b compiles again |
@@ -1877,8 +1896,15 @@ the transcripts are E2's frozen evidence base and a throwaway prototype does not
 **If E2's regeneration moves any other line, that is a behaviour change the spike did not make,
 and it needs its own justification in the E2 PR body.**
 
-> **EXECUTED, E2 slice a, PR #1101 — the count is FIFTEEN, not seven, and every extra is
-> accounted for.** The seven above were produced by a prototype that implemented **only**
+> **EXECUTED, E2 slice a, PR #1101 — FIFTEEN moved items, not seven, and every extra is
+> accounted for.** Counted from a full diff of all six transcripts, not from this table:
+> `run.py` **5** (X2a, X2b, X6a, X9b, X9c), `run2.py` **3** (Y1b, Y3a, Y5a), `run3.py` **5**
+> (Z1, Z2, Z3, Z9, Z9b), `facts.py` **2** file:line probes — **13 named cases plus 2 probes**.
+> The `IsSubsetOf` row below is the sixteenth line of the table and did **not** move; it is
+> listed because the spike obliged E2 to say what happened to it, not because anything changed.
+> (Review round 1 caught this table being read as if every row were a divergence — the same
+> summary-instead-of-measurement error §13.5(a)'s own closing note warns about. Re-derived from
+> the diff.) The seven above were produced by a prototype that implemented **only**
 > positions 5 and 8 (`spike-verdict.json.prototype.notImplemented`). Slice a implements **all
 > eight**, so every case that exercises a position the prototype skipped moves too. The full
 > accounting, by script:
@@ -1899,21 +1925,31 @@ and it needs its own justification in the E2 PR body.**
 > | `run3.py` **Z9**, **Z9b** | — | `Compilation successful` → `Calor0410`. These are §3.5's non-function-typed cases, whose **final** answer is Calor0405. Slice a consumes the row but does not yet check function-typedness (pin **P6**), so they land on 0410 in between. Slice b moves them to their final state |
 > | `run2.py` **Y3a** | — | 16 × `Calor0100` → compiles. **Position 7**, the `§B` row, which §3.3 lists and the prototype did not implement |
 > | `run3.py` **Z2** | — | 4 × `Calor0100` → 1 Calor0405. Position 7's recovery — listed explicitly by **P2(b)**, absent from the spike's table only because the prototype had no position 7 |
-> | `run.py` **X4** | — | 3 → 1. A broken `§O{str!str}` parse leaves a stray `§E` in statement position, which the new recovery catches. Collateral, on a case that is a hard parse error either way |
 >
 > `run2.py`'s remaining cases, `facts2.py` and **`compile53.py` are CLEAN** — so
 > `o53/baseline.json`'s 23 files / 54 occurrences / 1 green / 22 red are **unchanged**, which is
 > gate 5's line-adjacency leg discharged.
 >
-> **One case was a real defect, found by this accounting and fixed.** `run3.py` **Z10**
-> (`§R §C{Helper} §A INT:1 §E{cw} §/C`) initially gained a Calor0405, which §3.3 explicitly
-> forbids: *"Arguments are values, not declarations; they have no row, and Calor0405 is not
-> extended there."* The recovery now fires only when the `§E` **starts its line** — a rule that
-> follows from what Calor0405 claims (a row on the wrong *line*) — and Z10's transcript is
-> byte-identical to the committed one again.
- `spike-verdict.json`'s
-`transcriptDivergences.e2Obligation` carries the same sentence in machine-readable form, and
-P27 asserts that the case list holds exactly seven rows.
+> **Two defects were found this way and fixed; both were the same mistake.** A first draft put
+> the Calor0405 recovery in the statement and class-member **loops** rather than in the
+> productions that own a row. That made it fire on any stray `§E`, and two cases proved it wrong:
+> **Z10** (`§R §C{Helper} §A INT:1 §E{cw} §/C`) gained a Calor0405 inside an argument list, which
+> §3.3 forbids outright — *"Arguments are values, not declarations; they have no row, and
+> Calor0405 is not extended there"* — and **X4** had the function's own perfectly correct `§E{}`
+> line reported as misplaced, because a broken `§O{str!str}` parse had left it in statement
+> position. A "the row must start its line" guard fixed Z10's single-line spelling and hid the
+> rest: review round 1 found the **multi-line** call (`§C{Helper}` ⏎ `§A INT:1` ⏎ `§E{cw}`) still
+> reporting Calor0405, since that `§E` does start its line. Anchoring the recovery to the `§B` /
+> `§FLD` production that owns the row closes all of it by construction, and **X4's and Z10's
+> transcripts are byte-identical to the committed ones**.
+>
+> **A third came out of the same review.** A type carries at most one row, but nothing said so:
+> `§I{str:m} §E{cw} §E{net}` was silently reading the first as the parameter's row and the second
+> as the *declaration's*, via the `§F` loop's `§E` arm. Now one Calor0405, naming the repair
+> (`§E{cw, net}`).
+
+`spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
+machine-readable form, and P27 asserts that the case list holds exactly seven rows.
 
 > **How the count was wrong the first time, and why that matters.** The spike PR first recorded
 > **three**. They had been read off P29's failure message, which prints the **first** difference

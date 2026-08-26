@@ -74,7 +74,9 @@ CASE X4-fallible-type-suffix  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 X4-fallible-type-suffix.calr(2,36): error Calor0100: Expected statement but found Exclamation
 X4-fallible-type-suffix.calr(2,37): error Calor0100: Expected statement but found Identifier
-X4-fallible-type-suffix.calr(3,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the line whose type it annotates, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
+X4-fallible-type-suffix.calr(3,5): error Calor0100: Expected statement but found Effects
+X4-fallible-type-suffix.calr(3,7): error Calor0100: Expected statement but found OpenBrace
+X4-fallible-type-suffix.calr(3,8): error Calor0100: Expected statement but found CloseBrace
 
 ==============================================================================
 CASE X5a-caret-sigil  args: (none)  exit: 1
