@@ -926,25 +926,40 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             : parameterTypes.Select(EffectResolver.NormalizeParameterType).ToArray();
 
     /// <summary>
-    /// The declaring-type name a bound receiver contributes.
+    /// The declaring-type name a bound receiver contributes, in the spelling
+    /// the manifests use.
     ///
-    /// <para>A <see cref="Binding.BoundTypes.GenericInstantiationBoundType"/>
-    /// answers with its generic DEFINITION plus arity, because that is how
-    /// every committed manifest names a generic type
-    /// (<c>System.Collections.Generic.List`1</c>,
-    /// <c>FluentValidation.AbstractValidator`1</c>); the instantiated display
-    /// form matches no manifest entry at all. Every other shape answers with
-    /// its <c>DisplayString</c>, which is byte-for-byte the string the
-    /// pre-slice AST path handed the resolver — so nothing but the generic case
-    /// can move.</para>
+    /// <para>Every shape runs through
+    /// <see cref="Binding.TypeIdentity.MapShortTypeNameToFullName"/> — the same
+    /// mapping the pre-slice AST path applied to
+    /// <c>ResolveLocalValueType</c>'s answer — so a bound key and the string
+    /// key it replaces name the SAME type. That equality is what lets this
+    /// slice re-key the resolver without moving a diagnostic.</para>
+    ///
+    /// <para>The one addition is generic instantiation. When the legacy
+    /// name-shape map already knows the type (it hard-codes <c>List</c>,
+    /// <c>Dictionary</c>, <c>HashSet</c>, <c>Task</c>) its answer wins, byte for
+    /// byte. Otherwise the key falls back to the generic DEFINITION plus arity
+    /// (<c>Microsoft.Extensions.Logging.ILogger`1</c>), because that is how
+    /// every committed manifest names a generic type and the instantiated
+    /// display form <c>ILogger&lt;Foo&gt;</c> matches no entry at all. That
+    /// fallback can only ADD a resolution the string path never had; it cannot
+    /// take one away, since the form it replaces was a guaranteed miss.</para>
     /// </summary>
-    private static string DeclaringTypeOf(Binding.BoundTypes.BoundType type) =>
-        type switch
+    private static string DeclaringTypeOf(Binding.BoundTypes.BoundType type)
+    {
+        if (type is Binding.BoundTypes.GenericInstantiationBoundType generic)
         {
-            Binding.BoundTypes.GenericInstantiationBoundType generic =>
-                WithArity(generic.Definition.QualifiedName, generic.TypeArguments.Length),
-            _ => type.DisplayString,
-        };
+            var mappedDisplay = Binding.TypeIdentity.MapShortTypeNameToFullName(generic.DisplayString);
+            if (mappedDisplay.Contains('`'))
+                return mappedDisplay;
+
+            return Binding.TypeIdentity.MapShortTypeNameToFullName(
+                WithArity(generic.Definition.QualifiedName, generic.TypeArguments.Length));
+        }
+
+        return Binding.TypeIdentity.MapShortTypeNameToFullName(type.DisplayString);
+    }
 
     private static string WithArity(string qualifiedName, int arity) =>
         string.IsNullOrEmpty(qualifiedName) || qualifiedName.Contains('`') || arity == 0

@@ -892,7 +892,12 @@ public sealed class EffectEnforcementPass
                         var (typeName, methodName) = ParseCallTargetForChain(calleeName);
                         if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
                         {
-                            var resolution = _resolver.Resolve(typeName, methodName);
+                            // v0.15 E1 slice 2c — the call-chain BFS walks the
+                            // legacy name graph, which holds target STRINGS and
+                            // no receiver identity at all. String fallback,
+                            // counted.
+                            var resolution = _resolver.Resolve(
+                                EffectResolverKey.FromStrings(typeName, methodName));
                             if (resolution.Status != EffectResolutionStatus.Unknown &&
                                 resolution.Effects.Contains(targetKind, targetValue))
                             {
@@ -1231,27 +1236,36 @@ public sealed class EffectEnforcementPass
             var (typeName, methodName) = ParseCallTarget(target);
             if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
             {
-                var resolution = _context.Resolver.Resolve(typeName, methodName, argumentTypes);
+                // Step 1 keys on the receiver EXACTLY AS WRITTEN — "System.IO.File"
+                // in `File`-qualified source, "r" in `r.Next`. That is a
+                // string-fallback key by construction: at this point the pass
+                // has not asked anything about the receiver's type yet.
+                var resolution = _context.Resolver.Resolve(
+                    EffectResolverKey.FromStrings(typeName, methodName, argumentTypes));
                 if (resolution.Status != EffectResolutionStatus.Unknown)
                 {
                     return resolution.Effects;
                 }
 
                 // If type didn't resolve, try variable type resolution:
-                // "r.Next" where "r" is a variable declared as "new Random()"
+                // "r.Next" where "r" is a variable declared as "new Random()".
+                // v0.15 E1 slice 2c — THIS is the symbol-identity site: the
+                // receiver's type has just been asked of the bound tree, so the
+                // key is built from the receiver's BoundType whenever the binder
+                // typed it, and from ResolveVariableType's string otherwise.
                 var resolvedVarType = ResolveVariableType(typeName);
                 if (resolvedVarType != null && resolvedVarType != typeName)
                 {
-                    resolution = _context.Resolver.Resolve(resolvedVarType, methodName, argumentTypes);
+                    resolution = _context.Resolver.Resolve(
+                        ResolverKey(typeName, resolvedVarType, methodName, argumentTypes));
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                     {
                         return resolution.Effects;
                     }
 
-                    resolution = _context.Resolver.ResolveExtension(
-                        resolvedVarType,
-                        methodName,
-                        argumentTypes);
+                    resolution = _context.Resolver.Resolve(ResolverKey(
+                        typeName, resolvedVarType, methodName, argumentTypes,
+                        EffectMemberKind.Extension));
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return resolution.Effects;
                 }
@@ -1260,15 +1274,12 @@ public sealed class EffectEnforcementPass
                 if (chainedReceiverType != null)
                 {
                     resolution = _context.Resolver.Resolve(
-                        chainedReceiverType,
-                        methodName,
-                        argumentTypes);
+                        ResolverKey(typeName, chainedReceiverType, methodName, argumentTypes));
                     if (resolution.Status == EffectResolutionStatus.Unknown)
                     {
-                        resolution = _context.Resolver.ResolveExtension(
-                            chainedReceiverType,
-                            methodName,
-                            argumentTypes);
+                        resolution = _context.Resolver.Resolve(ResolverKey(
+                            typeName, chainedReceiverType, methodName, argumentTypes,
+                            EffectMemberKind.Extension));
                     }
                     if (resolution.Status != EffectResolutionStatus.Unknown)
                         return chainedEffects.Union(resolution.Effects);
@@ -1733,6 +1744,88 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
+        /// v0.15 E1 slice 2c — the BOUND receiver behind a receiver path, when
+        /// the binder typed it well enough to key a manifest lookup on.
+        ///
+        /// <para>The accepted set is exactly <see cref="AskBoundTree"/>'s
+        /// <c>Typed</c> answer MINUS function types. That is not an arbitrary
+        /// narrowing: <c>ResolveVariableType</c> — the string path this key
+        /// replaces — returns null for <c>"Func&lt;&gt;"</c> and <c>"?"</c>, so
+        /// accepting them here would resolve members the pre-slice compiler
+        /// never resolved, and the effects of a function value are E2/E4's
+        /// business, not a manifest lookup's.</para>
+        ///
+        /// <para>A <c>Reported</c> <c>UnresolvedBoundType</c> is excluded for
+        /// the same fail-closed reason slice 2b gives, and an unreported one is
+        /// excluded because there is nothing to key on either way — both fall
+        /// through to the caller's AST-derived string.</para>
+        /// </summary>
+        private Binding.BoundTypes.BoundType? KeyableBoundReceiver(string? receiverPath)
+        {
+            if (string.IsNullOrEmpty(receiverPath))
+                return null;
+            if (!BoundValueTypes.TryGetValue(receiverPath, out var type))
+                return null;
+            if (type is Binding.BoundTypes.UnresolvedBoundType)
+                return null;
+            if (IsFunctionBoundType(type))
+                return null;
+
+            var display = type.DisplayString;
+            if (string.IsNullOrWhiteSpace(display)
+                || display is "?" or "OBJECT"
+                || display.StartsWith("LAMBDA(", StringComparison.Ordinal)
+                || display.StartsWith("ASYNC_LAMBDA(", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return type;
+        }
+
+        /// <summary>
+        /// v0.15 E1 slice 2c — the resolver key for a member reached through
+        /// <paramref name="receiverPath"/>.
+        ///
+        /// <para>When the binder typed that receiver the key is built from its
+        /// <c>BoundType</c> — symbol identity, which is the whole point of E1
+        /// exit pin (c). Otherwise it is built from
+        /// <paramref name="declaringType"/>, the manifest-ready string the AST
+        /// fallbacks produce, through the single
+        /// <see cref="EffectResolverKey.FromStrings"/> factory so the fallback
+        /// is COUNTED rather than invisible.</para>
+        ///
+        /// <para>The two keys name the same type by construction:
+        /// <see cref="EffectResolverKey.FromBoundReceiver"/> applies the same
+        /// <c>MapShortTypeNameToFullName</c> that
+        /// <see cref="ResolveVariableType"/> applies to the bound tree's own
+        /// answer. Re-keying therefore moves no diagnostic — which is what the
+        /// unchanged D-A demand ledger, Calor0270 ledger and
+        /// <c>LosslessFormattingTests</c> observe.</para>
+        /// </summary>
+        private EffectResolverKey ResolverKey(
+            string? receiverPath,
+            string declaringType,
+            string memberName,
+            IReadOnlyList<string>? parameterTypes = null,
+            EffectMemberKind kind = EffectMemberKind.Method)
+        {
+            // Static-vs-instance is recorded from how the receiver is WRITTEN:
+            // a type-qualified reference (System.IO.File, Console) is a static
+            // call site, a bound value is an instance one. Null when there is
+            // no receiver path to judge. Provenance only — no manifest entry
+            // records staticness, so it never changes a lookup.
+            bool? isStatic = string.IsNullOrEmpty(receiverPath)
+                ? null
+                : Binding.TypeIdentity.IsTypeQualifiedReference(receiverPath);
+
+            var bound = KeyableBoundReceiver(receiverPath);
+            return bound != null
+                ? EffectResolverKey.FromBoundReceiver(bound, memberName, parameterTypes, kind, isStatic)
+                : EffectResolverKey.FromStrings(declaringType, memberName, parameterTypes, kind);
+        }
+
+        /// <summary>
         /// Resolves a bare name to the declared type of the value it denotes.
         ///
         /// <para>v0.15 E1 slice 2b — the BOUND TREE answers first
@@ -1974,15 +2067,12 @@ public sealed class EffectEnforcementPass
                 return null;
             var argumentTypes = call.Arguments.Select(InferExpressionType).ToArray();
             var resolution = _context.Resolver.Resolve(
-                receiverType,
-                methodName,
-                argumentTypes);
+                ResolverKey(receiver, receiverType, methodName, argumentTypes));
             if (resolution.Status == EffectResolutionStatus.Unknown)
             {
-                resolution = _context.Resolver.ResolveExtension(
-                    receiverType,
-                    methodName,
-                    argumentTypes);
+                resolution = _context.Resolver.Resolve(ResolverKey(
+                    receiver, receiverType, methodName, argumentTypes,
+                    EffectMemberKind.Extension));
             }
             if (resolution.Status == EffectResolutionStatus.Unknown)
                 return null;
@@ -2169,7 +2259,11 @@ public sealed class EffectEnforcementPass
             for (var i = 1; i < parts.Length; i++)
             {
                 var member = parts[i];
-                var getter = _context.Resolver.ResolveGetter(currentType, member);
+                // Only the FIRST step has a receiver the binder may have typed
+                // (the chain head). Every later step's receiver is a member type
+                // this walk derived itself, so it can only be keyed on text.
+                var getter = _context.Resolver.Resolve(ResolverKey(
+                    i == 1 ? parts[0] : null, currentType, member, null, EffectMemberKind.Getter));
                 if (getter.Status == EffectResolutionStatus.Unknown)
                     return (null, effects);
                 effects = effects.Union(getter.Effects);
@@ -2199,7 +2293,8 @@ public sealed class EffectEnforcementPass
 
             for (var i = 1; i < parts.Length; i++)
             {
-                var getter = _context.Resolver.ResolveGetter(currentType, parts[i]);
+                var getter = _context.Resolver.Resolve(ResolverKey(
+                    i == 1 ? parts[0] : null, currentType, parts[i], null, EffectMemberKind.Getter));
                 if (getter.Status == EffectResolutionStatus.Unknown)
                     return false;
                 if (!getter.Effects.IsEmpty)
@@ -2277,7 +2372,12 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(resourceType);
-            var resolution = _context.Resolver.Resolve(manifestType, "Dispose");
+            // §USING's resource: bound when the resource is a plain reference the
+            // binder typed, text when it is a §NEW or an explicit §USING{Type:name}.
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                (usingStatement.Resource as ReferenceNode)?.Name,
+                manifestType,
+                "Dispose"));
             return effects.Union(
                 resolution.Status == EffectResolutionStatus.Unknown
                     ? UnknownResolvedOperation($"{manifestType}.Dispose", usingStatement.Span)
@@ -2349,10 +2449,11 @@ public sealed class EffectEnforcementPass
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
             var handlerType = InferExpressionType(handler);
-            var resolution = _context.Resolver.Resolve(
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                lastDot < 0 ? null : eventPath[..lastDot],
                 manifestType,
                 $"{(isAdd ? "add" : "remove")}_{eventName}",
-                handlerType);
+                [handlerType]));
             return effects.Union(
                 resolution.Status == EffectResolutionStatus.Unknown
                     ? UnknownResolvedOperation(
@@ -2450,7 +2551,12 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(targetType);
-            var resolution = _context.Resolver.ResolveGetter(manifestType, field.FieldName);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                GetReferencePath(field.Target),
+                manifestType,
+                field.FieldName,
+                null,
+                EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? effects.Union(UnknownResolvedOperation(
                     $"{manifestType}.get_{field.FieldName}",
@@ -2484,7 +2590,12 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(targetType);
-            var resolution = _context.Resolver.ResolveSetter(manifestType, field.FieldName);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                GetReferencePath(field.Target),
+                manifestType,
+                field.FieldName,
+                null,
+                EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     $"{manifestType}.set_{field.FieldName}",
@@ -2500,10 +2611,14 @@ public sealed class EffectEnforcementPass
             var receiverType = ResolveLocalValueType(receiver);
             return receiverType == null
                 ? EffectSet.Empty
-                : InferGetterEffects(receiverType, member, reference.Span);
+                : InferGetterEffects(receiverType, member, reference.Span, receiver);
         }
 
-        private EffectSet InferGetterEffects(string receiverType, string member, TextSpan span)
+        private EffectSet InferGetterEffects(
+            string receiverType,
+            string member,
+            TextSpan span,
+            string? receiverPath = null)
         {
             if (TryResolveClass(receiverType, out var cls))
             {
@@ -2531,7 +2646,8 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
-            var resolution = _context.Resolver.ResolveGetter(manifestType, member);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                receiverPath, manifestType, member, null, EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.get_{member}", span)
                 : resolution.Effects;
@@ -2565,7 +2681,8 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(receiverType);
-            var resolution = _context.Resolver.ResolveSetter(manifestType, member);
+            var resolution = _context.Resolver.Resolve(ResolverKey(
+                receiver, manifestType, member, null, EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation($"{manifestType}.set_{member}", span)
                 : resolution.Effects;
@@ -2988,7 +3105,10 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(typeName);
-            var resolution = _context.Resolver.ResolveConstructor(manifestType, argumentTypes);
+            // A constructor has no receiver — the type is named outright, so this
+            // key is text by construction, not by a missing binder answer.
+            var resolution = _context.Resolver.Resolve(EffectResolverKey.FromStrings(
+                manifestType, ".ctor", argumentTypes, EffectMemberKind.Constructor, isStatic: true));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     $"{manifestType}..ctor({string.Join(",", argumentTypes)})",
@@ -3058,12 +3178,15 @@ public sealed class EffectEnforcementPass
             }
 
             var manifestType = MapShortTypeNameToFullName(typeName);
+            // An object-initializer member sits on a type just named by §NEW;
+            // there is no receiver path to ask the binder about.
             var resolution = initializer.PropertyName.StartsWith("_item", StringComparison.Ordinal)
-                ? _context.Resolver.Resolve(
+                ? _context.Resolver.Resolve(EffectResolverKey.FromStrings(
                     manifestType,
                     "Add",
-                    InferExpressionType(initializer.Value))
-                : _context.Resolver.ResolveSetter(manifestType, initializer.PropertyName);
+                    [InferExpressionType(initializer.Value)]))
+                : _context.Resolver.Resolve(EffectResolverKey.FromStrings(
+                    manifestType, initializer.PropertyName, kind: EffectMemberKind.Setter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? UnknownResolvedOperation(
                     initializer.PropertyName.StartsWith("_item", StringComparison.Ordinal)
