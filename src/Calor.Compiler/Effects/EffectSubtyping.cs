@@ -30,10 +30,19 @@ public static class EffectSubtyping
             entry => ToInternal(entry.Key),
             entry => entry.Value.Select(ToInternal).ToList());
 
-    private static (EffectKind Kind, string Value) ToInternal(string compactCode)
+    /// <summary>
+    /// Splits an <c>EffectRow</c> code — internal <c>"category:value"</c>
+    /// spelling — into the <c>(kind, value)</c> pair this table is keyed on.
+    /// Splits on the FIRST colon only: values never contain one, categories
+    /// never do either, and a compact code such as <c>fs:rw</c> is not what
+    /// <c>EffectRow</c> carries.
+    /// </summary>
+    private static (EffectKind Kind, string Value) ToInternal(string code)
     {
-        var parsed = EffectCodes.ParseCompact(compactCode);
-        return (parsed.Kind, parsed.Value);
+        var separator = code.IndexOf(':');
+        var category = separator < 0 ? string.Empty : code[..separator];
+        var value = separator < 0 ? code : code[(separator + 1)..];
+        return (EffectCodes.ParseKind(category), value);
     }
 
     /// <summary>

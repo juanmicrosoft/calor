@@ -408,13 +408,22 @@ public enum EffectRowKind
 /// forbids <c>Binding/</c> from naming the <c>Effects</c> namespace at all —
 /// the binder is upstream of effect enforcement. A row whose carrier were
 /// <c>Effects.EffectSet</c> would force exactly that reference. So the carrier
-/// is a canonically ordered set of <b>compact surface codes</b> (<c>"cw"</c>,
-/// <c>"db:r"</c>) — the same vocabulary <c>BoundFunction.DeclaredEffects</c>
-/// already uses — and the family/narrow relation (<see cref="FamilySubtypes"/>)
-/// moves here with it, exactly as <c>MapShortTypeNameToFullName</c> moved to
+/// is a canonically ordered set of <b>internal effect codes</b> spelled
+/// <c>"category:value"</c> (<c>"io:console_write"</c>, <c>"io:database_read"</c>)
+/// — the vocabulary <c>BoundFunction.DeclaredEffects</c> and
+/// <c>BoundLambdaExpression.DeclaredEffects</c> already use, so <c>Binding/</c>
+/// gains no new dependency at all. The compact surface spelling (<c>"cw"</c>,
+/// <c>"db:r"</c>) is a rendering, not the identity: projecting it needs
+/// <c>Effects.EffectCodes.Registry</c>, so it lives on the <c>Effects</c> side
+/// as <c>EffectRowDisplay.ToCompactDisplayString</c>. This is the one place
+/// slice b departs from §8.3's literal wording, and it departs in the direction
+/// the architecture pin requires.</para>
+///
+/// <para>The family/narrow relation (<see cref="FamilySubtypes"/>) moves here
+/// with the carrier, exactly as <c>MapShortTypeNameToFullName</c> moved to
 /// <c>Binding/TypeIdentity</c> in E1 slice 2b. <c>Effects.EffectSubtyping</c>
-/// now DERIVES its internal table from <see cref="FamilySubtypes"/>, so there
-/// is one source of truth rather than two that can drift.</para>
+/// now DERIVES its table from <see cref="FamilySubtypes"/>, so there is one
+/// source of truth rather than two that can drift.</para>
 ///
 /// <para><b>Reasons are an ordered SET, not a list.</b> Draft v1 concatenated
 /// them, which made <see cref="Join"/> non-commutative and the semilattice
@@ -583,10 +592,10 @@ public sealed class EffectRow : IEquatable<EffectRow>
     }
 
     /// <summary>
-    /// The family/narrow table of design-doc §4.1, over compact surface codes,
-    /// and the single source of truth for effect subtyping —
-    /// <c>Effects.EffectSubtyping</c> derives its internal <c>(kind, value)</c>
-    /// table from this one.
+    /// The family/narrow table of design-doc §4.1, over internal
+    /// <c>"category:value"</c> effect codes, and the single source of truth for
+    /// effect subtyping — <c>Effects.EffectSubtyping</c> derives its
+    /// <c>(kind, value)</c> table from this one by splitting on the first colon.
     ///
     /// <para>0.15 WIDENS it: a bare family code (<c>db</c>, <c>net</c>,
     /// <c>env</c>) now encompasses its narrow siblings, which 0.14 did not.
@@ -602,14 +611,15 @@ public sealed class EffectRow : IEquatable<EffectRow>
     /// </summary>
     public static readonly IReadOnlyList<KeyValuePair<string, IReadOnlyList<string>>> FamilySubtypes =
     [
-        new("fs:rw", new[] { "fs:r", "fs:w" }),
-        new("net:rw", new[] { "net:r", "net:w" }),
-        new("db:rw", new[] { "db:r", "db:w" }),
-        new("env:rw", new[] { "env:r", "env:w" }),
-        // 0.15 §4.1 — the bare family codes.
-        new("net", new[] { "net:r", "net:w", "net:rw" }),
-        new("db", new[] { "db:r", "db:w", "db:rw" }),
-        new("env", new[] { "env:r", "env:w", "env:rw" }),
+        new("io:filesystem_readwrite", new[] { "io:filesystem_read", "io:filesystem_write" }),
+        new("io:network_readwrite", new[] { "io:network_read", "io:network_write" }),
+        new("io:database_readwrite", new[] { "io:database_read", "io:database_write" }),
+        new("io:environment_readwrite", new[] { "io:environment_read", "io:environment_write" }),
+        // 0.15 §4.1 — the bare family codes (db, net, env), which 0.14 did not
+        // relate to their narrow siblings at all. filesystem has no bare code.
+        new("io:network", new[] { "io:network_read", "io:network_write", "io:network_readwrite" }),
+        new("io:database", new[] { "io:database_read", "io:database_write", "io:database_readwrite" }),
+        new("io:environment", new[] { "io:environment_read", "io:environment_write", "io:environment_readwrite" }),
     ];
 
     private static readonly Dictionary<string, HashSet<string>> FamilyIndex =
@@ -653,9 +663,13 @@ public sealed class EffectRow : IEquatable<EffectRow>
     }
 
     /// <summary>
-    /// Extends <c>EffectSet.ToDisplayString()</c>'s <c>[unknown]</c> /
-    /// <c>[pure]</c> / <c>"cw, fs:w"</c> with <c>[assumed: cw]</c> (§8.3).
-    /// Never appears in a <see cref="BoundType.DisplayString"/>.
+    /// The row's shape in <c>[unknown]</c> / <c>[pure]</c> / <c>[assumed: …]</c>
+    /// form (§8.3), spelled in the INTERNAL <c>category:value</c> vocabulary this
+    /// type carries. User-facing text wants the compact surface codes, and
+    /// projecting those needs the effect-code registry, so
+    /// <c>Effects.EffectRowDisplay.ToCompactDisplayString</c> is the spelling
+    /// diagnostics use. Never appears in a
+    /// <see cref="BoundType.DisplayString"/>.
     /// </summary>
     public string ToDisplayString()
     {
