@@ -571,7 +571,259 @@ public class EffectRowLatticeTests
         Assert.True(EffectRow.Unknown.ToEffectSet().IsUnknown);
     }
 
+    // ================================================================ P12 ====
+
+    [Fact]
+    public void Calor0424_NotDefeatableByDeletingSourceE()
+    {
+        // §4.5. "Is Calor0424 defeatable by deleting the source's §E?" No, and
+        // the reason is the COMPOSITION: soundness is
+        //   body ⊑ declaration (Calor0410)  ∧  declaration ⊑ destination (Calor0424).
+        // Deleting §E{cw} from Shout makes its declared row pure, so it would
+        // fit — but its body still prints, so Calor0410 rejects the source
+        // itself. Discriminating revert: skip the body check on rowed sources
+        // and one of the two diagnostics disappears.
+        const string withE = """
+            §M{m001:M}
+              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+                §E{}
+                §R value
+              §F{f002:Shout:pub} (i32:x) -> i32
+                §E{cw}
+                §P x
+                §R x
+              §F{f003:Main:pub} () -> i32
+                §E{}
+                §R §C{Apply} §A Shout §A INT:1 §/C
+            """;
+
+        var declared = TestHarness.Compile(withE);
+        Assert.Contains(declared.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.EffectRowMismatch && d.Message.Contains("Shout"));
+
+        // The same program with the source's §E deleted. It does NOT compile:
+        // the row now fits, and the BODY check rejects it instead.
+        var deleted = TestHarness.Compile(withE.Replace("    §E{cw}\n", "    §E{}\n"));
+        Assert.True(deleted.HasErrors);
+        Assert.Contains(deleted.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("Shout"));
+    }
+
+    // ================================================================ P13 ====
+
+    [Fact]
+    public void ParameterRowsAreContravariant()
+    {
+        // §4.6. A destination that promises "the callback I hand you may print"
+        // is NOT satisfied by a source accepting only pure callbacks: the
+        // DESTINATION's parameter row must fit into the SOURCE's.
+        // Discriminating revert: flip the argument order in the parameter
+        // conjunct and these two assertions swap.
+        var acceptsPrinting = FunctionOf(parameterRow: Concrete(Cw));
+        var acceptsPureOnly = FunctionOf(parameterRow: EffectRow.Pure);
+
+        Assert.Equal(EffectFit.Fits, EffectRow.FitsFunction(acceptsPrinting, acceptsPureOnly));
+        Assert.Equal(EffectFit.DoesNotFit, EffectRow.FitsFunction(acceptsPureOnly, acceptsPrinting));
+    }
+
+    [Fact]
+    public void OwnRowIsCovariant()
+    {
+        // The other half of §4.6: a function type's OWN row is covariant, so a
+        // pure function fits where a printing one is expected and not the
+        // reverse.
+        var pure = FunctionOf(ownRow: EffectRow.Pure);
+        var printing = FunctionOf(ownRow: Concrete(Cw));
+
+        Assert.Equal(EffectFit.Fits, EffectRow.FitsFunction(pure, printing));
+        Assert.Equal(EffectFit.DoesNotFit, EffectRow.FitsFunction(printing, pure));
+    }
+
+    [Fact]
+    public void FunctionTypesAreInvariantInTypes()
+    {
+        // §4.6 — parameter and return TYPES stay invariant in 0.15. Making them
+        // variant is a GENERICS change (calor-direction.md:33), not an
+        // effect-row one, so a differing type is DoesNotFit even when every row
+        // agrees.
+        var intToInt = FunctionOf(parameterType: "INT", returnType: "INT");
+        var strToInt = FunctionOf(parameterType: "STRING", returnType: "INT");
+        var intToBool = FunctionOf(parameterType: "INT", returnType: "BOOL");
+        var arityTwo = new FunctionBoundType(
+            ImmutableArray.Create<BoundType>(new NominalBoundType("INT"), new NominalBoundType("INT")),
+            new NominalBoundType("INT"),
+            row: EffectRow.Pure);
+
+        Assert.Equal(EffectFit.DoesNotFit, EffectRow.FitsFunction(intToInt, strToInt));
+        Assert.Equal(EffectFit.DoesNotFit, EffectRow.FitsFunction(intToInt, intToBool));
+        Assert.Equal(EffectFit.DoesNotFit, EffectRow.FitsFunction(intToInt, arityTwo));
+    }
+
+    [Fact]
+    public void UnknownRowInAFunctionTypeYieldsCannotTell_NeverFits()
+    {
+        // The whole-function relation inherits §4.3's absorbing Unknown on both
+        // the own-row and the parameter-row conjuncts, and DoesNotFit still
+        // dominates CannotTell.
+        var unknownOwn = FunctionOf(ownRow: EffectRow.Unknown);
+        var pure = FunctionOf(ownRow: EffectRow.Pure);
+
+        Assert.Equal(EffectFit.CannotTell, EffectRow.FitsFunction(unknownOwn, pure));
+        Assert.Equal(EffectFit.CannotTell, EffectRow.FitsFunction(pure, unknownOwn));
+        Assert.Equal(EffectFit.CannotTell, EffectRow.FitsFunction(null, pure));
+
+        var unknownParameter = FunctionOf(parameterRow: EffectRow.Unknown);
+        Assert.Equal(EffectFit.CannotTell, EffectRow.FitsFunction(pure, unknownParameter));
+
+        // …but a shape miss is still a hard miss, whatever the rows say.
+        var wrongReturn = FunctionOf(ownRow: EffectRow.Unknown, returnType: "BOOL");
+        Assert.Equal(EffectFit.DoesNotFit, EffectRow.FitsFunction(unknownOwn, wrongReturn));
+    }
+
+    // ================================================================ P17 ====
+
+    [Fact]
+    public void UnresolvedReceiver_YieldsCalor0425_NeverConcrete()
+    {
+        // THE pin the whole design rests on. A function value whose row the
+        // compiler cannot name — here a row-less function-typed parameter, the
+        // §3.5 shape an unresolved receiver and a BCL-returned delegate also
+        // land on — must reach a checking site as Unknown and surface as
+        // Calor0425. It must NEVER arrive as Concrete(∅), because a Concrete(∅)
+        // source fits every destination silently, which is exactly the
+        // laundering rows exist to close.
+        //
+        // Discriminating revert: make the unresolved branch return Concrete(∅)
+        // and this fixture goes SILENT — no Calor0425, no Calor0424, a clean
+        // compile of a program nothing was ever known about.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+                §E{}
+                §R value
+              §F{f002:Main:pub} (Func<i32,i32>:opaque) -> i32
+                §E{}
+                §R §C{Apply} §A opaque §A INT:1 §/C
+            """);
+
+        var unknown = result.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown)
+            .ToList();
+        Assert.Single(unknown);
+        Assert.Contains("opaque", unknown[0].Message, StringComparison.Ordinal);
+        Assert.Contains("[unknown]", unknown[0].Message, StringComparison.Ordinal);
+
+        // "Cannot tell" is not "wrong": the verdict is CannotTell, so the code
+        // is 0425 and never 0424.
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMismatch);
+
+        // The control. Give the very same argument a row it can be judged on and
+        // the site goes quiet — without this half, a checker that emitted
+        // Calor0425 unconditionally would pass every assertion above.
+        var rowed = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{}, i32:value) -> i32
+                §E{}
+                §R value
+              §F{f002:Main:pub} (Func<i32,i32>:opaque §E{}) -> i32
+                §E{}
+                §R §C{Apply} §A opaque §A INT:1 §/C
+            """);
+        Assert.DoesNotContain(rowed.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              || d.Code == DiagnosticCode.EffectRowMismatch);
+    }
+
+    // ============================================ P10(b), now a DIAGNOSTIC ===
+
+    [Fact]
+    public void AssumedSource_ReportsExactlyOneCalor0425_AtTheHop()
+    {
+        // §4.3's third sentence, as an EMISSION: "Assumed fits like its
+        // underlying set and ALWAYS propagates 0425". `Interop`'s effects are
+        // assumed (a §RAW body the pass cannot verify), so the method group
+        // naming it carries Assumed({cw}, reasons). Its row FITS `transform`'s
+        // declared §E{cw} — so this is not a mismatch — and it reports anyway,
+        // once, carrying the reason.
+        //
+        // Discriminating revert: read the reasons off AtDestination instead of
+        // CarriedReasons, or drop the Fits-with-reasons arm, and this goes
+        // silent while the program keeps compiling on an unverified assumption.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Interop:pub} (i32:x) -> i32
+                §E{cw}
+                §RAW
+            System.Console.WriteLine(x);
+            §/RAW
+                §R x
+              §F{f002:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+                §E{}
+                §R value
+              §F{f003:Main:pub} () -> i32
+                §E{cw}
+                §R §C{Apply} §A Interop §A INT:1 §/C
+            """);
+
+        var hops = result.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown)
+            .ToList();
+        var hop = Assert.Single(hops);
+        Assert.Contains("Argument 'Interop' fits parameter 'transform' of 'Apply' only under an "
+            + "assumption", hop.Message, StringComparison.Ordinal);
+        Assert.Contains("raw C# interop", hop.Message, StringComparison.Ordinal);
+
+        // Fits-with-reasons is not a mismatch.
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMismatch);
+    }
+
+    [Fact]
+    public void EveryUndecidableHopReportsExactlyOnce()
+    {
+        // §4.4's cardinality claim — ONE Calor0425 per hop, not two, and not one
+        // for the whole body. Two independent undecidable hops here: the
+        // argument `a` (site 2) and the return of `Pick` (site 3), each with an
+        // Unknown source against a declared row.
+        //
+        // Discriminating revert: report at both the source and the destination
+        // of a hop and this reads 4.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+                §E{cw}
+                §R value
+              §F{f002:Pick:pub} (Func<i32,i32>:a) -> Func<i32,i32> §E{cw}
+                §E{cw}
+                §B{used:i32} §C{Apply} §A a §A INT:1 §/C
+                §R a
+            """);
+
+        Assert.Equal(2, result.Diagnostics.Count(d => d.Code == DiagnosticCode.EffectRowUnknown));
+    }
+
+    // §4.4's TWO-HOP story — bind an Assumed value, then pass it on — has NO
+    // source-level witness in slice a, and that is recorded here rather than
+    // implied by the pins above. The only producer of an Assumed row is a method
+    // group, and the binder rejects a bare method group as a §B initializer
+    // (Calor0200, "Undefined variable 'Interop'"), so site 1 can never see one.
+    // The relation itself is pinned at row level by
+    // AssumedSurvivesTheDestination_TwoHop (P10(a)); the source spelling that
+    // reaches it is a lambda whose ρ_body is Assumed, which is slice b's.
+
     // ------------------------------------------------------------ helpers ---
+
+    private static FunctionBoundType FunctionOf(
+        EffectRow? ownRow = null,
+        EffectRow? parameterRow = null,
+        string parameterType = "INT",
+        string returnType = "INT")
+        => new(
+            ImmutableArray.Create<BoundType>(new NominalBoundType(parameterType)),
+            new NominalBoundType(returnType),
+            row: ownRow ?? EffectRow.Pure,
+            parameterRows: ImmutableArray.Create(parameterRow ?? EffectRow.Pure));
 
     private static EffectRow RowOf(Calor.Compiler.Binding.VariableSymbol symbol)
         => symbol.FunctionType?.Row ?? EffectRow.Unknown;
