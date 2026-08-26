@@ -33,19 +33,19 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        Assert.True(resolver.Resolve("Example.Widget", "Transform", "i32")
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.Widget", "Transform", ["i32"]))
             .Effects.Contains(EffectKind.IO, "console_write"));
-        Assert.True(resolver.Resolve("Example.Widget", "Transform", "str")
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.Widget", "Transform", ["str"]))
             .Effects.Contains(EffectKind.IO, "filesystem_read"));
         Assert.Equal(EffectResolutionStatus.Unknown,
-            resolver.Resolve("Example.Widget", "Transform", "bool").Status);
+            resolver.Resolve(EffectResolverKey.FromStrings("Example.Widget", "Transform", ["bool"])).Status);
 
-        Assert.True(resolver.ResolveConstructor("Example.Widget", "i32")
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.Widget", ".ctor", ["i32"], EffectMemberKind.Constructor))
             .Effects.Contains(EffectKind.IO, "network_write"));
-        Assert.True(resolver.ResolveConstructor("Example.Widget", "str")
+        Assert.True(resolver.Resolve(EffectResolverKey.FromStrings("Example.Widget", ".ctor", ["str"], EffectMemberKind.Constructor))
             .Effects.Contains(EffectKind.IO, "database_read"));
         Assert.Equal(EffectResolutionStatus.Unknown,
-            resolver.ResolveConstructor("Example.Widget", "bool").Status);
+            resolver.Resolve(EffectResolverKey.FromStrings("Example.Widget", ".ctor", ["bool"], EffectMemberKind.Constructor)).Status);
 
         Assert.Equal(
             new[] { "System.String", "System.Collections.Generic.List`1<System.Int32>" },
@@ -59,7 +59,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("System.Console", "WriteLine");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("System.Console", "WriteLine"));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "console_write");
@@ -72,7 +72,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("System.Math", "Max");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("System.Math", "Max"));
 
         // Math.Max should be pure (no effects)
         Assert.True(resolution.Effects.IsEmpty || resolution.Status == EffectResolutionStatus.PureExplicit);
@@ -84,7 +84,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("UnknownNamespace.UnknownType", "UnknownMethod");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("UnknownNamespace.UnknownType", "UnknownMethod"));
 
         Assert.Equal(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.True(resolution.Effects.IsUnknown);
@@ -111,7 +111,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("MyApp.CustomService", "DoWork");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.CustomService", "DoWork"));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "network_write");
@@ -139,7 +139,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("MyApp.PureService", "AnyMethod");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.PureService", "AnyMethod"));
 
         Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
         Assert.True(resolution.Effects.IsEmpty);
@@ -164,7 +164,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("MyApp.IoService", "SomeMethod");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.IoService", "SomeMethod"));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "filesystem_readwrite");
@@ -187,7 +187,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("MyApp.Data.Repository", "GetAll");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.Data.Repository", "GetAll"));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "database_readwrite");
@@ -215,8 +215,8 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var specificResolution = resolver.Resolve("MyApp.Service", "SpecificMethod");
-        var otherResolution = resolver.Resolve("MyApp.Service", "OtherMethod");
+        var specificResolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.Service", "SpecificMethod"));
+        var otherResolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.Service", "OtherMethod"));
 
         Assert.Contains(specificResolution.Effects.Effects, e => e.Value == "console_write");
         Assert.DoesNotContain(specificResolution.Effects.Effects, e => e.Value == "filesystem_readwrite");
@@ -245,7 +245,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.ResolveGetter("MyApp.Config", "Value");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.Config", "Value", kind: EffectMemberKind.Getter));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "environment_read");
@@ -272,7 +272,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.ResolveSetter("MyApp.Config", "Value");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.Config", "Value", kind: EffectMemberKind.Setter));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "environment_write");
@@ -299,7 +299,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver(loader);
         resolver.Initialize();
 
-        var resolution = resolver.ResolveConstructor("MyApp.FileService", "String");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("MyApp.FileService", ".ctor", ["String"], EffectMemberKind.Constructor));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "filesystem_read");
@@ -311,8 +311,8 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution1 = resolver.Resolve("System.Console", "WriteLine");
-        var resolution2 = resolver.Resolve("System.Console", "WriteLine");
+        var resolution1 = resolver.Resolve(EffectResolverKey.FromStrings("System.Console", "WriteLine"));
+        var resolution2 = resolver.Resolve(EffectResolverKey.FromStrings("System.Console", "WriteLine"));
 
         // Should return same reference due to caching
         Assert.Same(resolution1, resolution2);
@@ -346,7 +346,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
@@ -358,7 +358,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("Microsoft.Extensions.Logging.ILogger", "IsEnabled");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.Extensions.Logging.ILogger", "IsEnabled"));
 
         Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
     }
@@ -373,7 +373,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
@@ -388,7 +388,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
@@ -404,7 +404,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
@@ -419,7 +419,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
@@ -431,7 +431,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("Microsoft.Extensions.DependencyInjection.IServiceProvider", "GetService");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.Extensions.DependencyInjection.IServiceProvider", "GetService"));
 
         Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
     }
@@ -445,7 +445,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == expectedValue);
@@ -457,7 +457,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.ResolveGetter("Microsoft.Extensions.Options.IOptions`1", "Value");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.Extensions.Options.IOptions`1", "Value", kind: EffectMemberKind.Getter));
 
         Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
     }
@@ -471,7 +471,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve(type, method);
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
 
         Assert.Equal(EffectResolutionStatus.PureExplicit, resolution.Status);
     }
@@ -482,7 +482,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("Microsoft.AspNetCore.Http.HttpResponse", "WriteAsync");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.AspNetCore.Http.HttpResponse", "WriteAsync"));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "network_write");
@@ -494,7 +494,7 @@ public class EffectResolverTests
         var resolver = new EffectResolver();
         resolver.Initialize();
 
-        var resolution = resolver.Resolve("Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade", "Migrate");
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings("Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade", "Migrate"));
 
         Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "database_write");
@@ -512,7 +512,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -521,7 +521,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Text.Json.JsonSerializer", "SerializeAsync");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Text.Json.JsonSerializer", "SerializeAsync"));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == "filesystem_write");
     }
@@ -531,7 +531,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Text.Json.JsonSerializer", "DeserializeAsync");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Text.Json.JsonSerializer", "DeserializeAsync"));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == "filesystem_read");
     }
@@ -541,7 +541,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Text.Json.JsonElement", "GetString");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Text.Json.JsonElement", "GetString"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -558,7 +558,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -576,7 +576,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
@@ -589,7 +589,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -606,7 +606,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -617,7 +617,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
@@ -638,7 +638,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
@@ -648,7 +648,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("Serilog.ILogger", "IsEnabled");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("Serilog.ILogger", "IsEnabled"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -666,7 +666,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -679,7 +679,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
@@ -699,7 +699,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
@@ -711,7 +711,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == expectedValue);
     }
@@ -733,7 +733,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -742,7 +742,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("FluentValidation.AbstractValidator`1", "ValidateAndThrow");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("FluentValidation.AbstractValidator`1", "ValidateAndThrow"));
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == "intentional");
     }
@@ -768,7 +768,7 @@ public class EffectResolverTests
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve(type, method);
+        var result = resolver.Resolve(EffectResolverKey.FromStrings(type, method));
         Assert.True(result.Effects.IsEmpty,
             $"{type}.{method} should be effect-free (pure modulo arguments), got: {result.Effects}");
         Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);

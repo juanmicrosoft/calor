@@ -38,7 +38,7 @@ public class InteropEffectCoverageCalculator : IMetricCalculator
 
         foreach (var call in allCalls)
         {
-            var resolution = resolver.Resolve(call.TypeName, call.MethodName);
+            var resolution = resolver.Resolve(EffectResolverKey.FromStrings(call.TypeName, call.MethodName));
             if (resolution.Status == EffectResolutionStatus.Unknown)
             {
                 unknown++;

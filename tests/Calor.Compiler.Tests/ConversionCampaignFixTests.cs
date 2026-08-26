@@ -519,7 +519,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.IO.TextWriter", "WriteLineAsync");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.IO.TextWriter", "WriteLineAsync"));
         Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
     }
 
@@ -528,7 +528,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.IO.StreamReader", "ReadLineAsync");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.IO.StreamReader", "ReadLineAsync"));
         Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
     }
 
@@ -537,7 +537,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.IO.TextWriter", "FlushAsync");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.IO.TextWriter", "FlushAsync"));
         Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
     }
 
@@ -550,7 +550,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Math", "Floor");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Math", "Floor"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -559,7 +559,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Math", "Clamp");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Math", "Clamp"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -568,7 +568,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Math", "Sin");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Math", "Sin"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -577,7 +577,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Math", "Round");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Math", "Round"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 
@@ -586,7 +586,7 @@ public class Example
     {
         var resolver = new EffectResolver();
         resolver.Initialize();
-        var result = resolver.Resolve("System.Math", "Log");
+        var result = resolver.Resolve(EffectResolverKey.FromStrings("System.Math", "Log"));
         Assert.Equal(EffectResolutionStatus.PureExplicit, result.Status);
     }
 

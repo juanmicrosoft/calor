@@ -289,7 +289,7 @@ public class EffectsSuggestTests
         // The unresolved call is still visible to the resolver as Unknown — never silently pure.
         var resolver = new EffectResolver();
         resolver.Initialize();
-        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(run.TypeName, run.MethodName).Status);
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(EffectResolverKey.FromStrings(run.TypeName, run.MethodName)).Status);
     }
 
     /// <summary>
@@ -783,7 +783,7 @@ public class EffectsSuggestTests
 
         var unresolvedExternal = allCalls
             .Where(c => !callGraph.FunctionNameToId.ContainsKey(c.MethodName))
-            .Where(c => resolver.Resolve(c.TypeName, c.MethodName).Status == EffectResolutionStatus.Unknown)
+            .Where(c => resolver.Resolve(EffectResolverKey.FromStrings(c.TypeName, c.MethodName)).Status == EffectResolutionStatus.Unknown)
             .ToList();
 
         // Console.WriteLine resolves from manifests → not in unresolved
@@ -815,7 +815,7 @@ public class EffectsSuggestTests
         resolver.Initialize();
 
         var unresolved = allCalls
-            .Where(c => resolver.Resolve(c.TypeName, c.MethodName).Status == EffectResolutionStatus.Unknown)
+            .Where(c => resolver.Resolve(EffectResolverKey.FromStrings(c.TypeName, c.MethodName)).Status == EffectResolutionStatus.Unknown)
             .ToList();
 
         Assert.Empty(unresolved);
@@ -1019,7 +1019,7 @@ public class EffectsSuggestTests
 
         var unresolved = allCalls
             .Where(c => !callGraph.FunctionNameToId.ContainsKey(c.MethodName))
-            .Where(c => resolver.Resolve(c.TypeName, c.MethodName).Status == EffectResolutionStatus.Unknown)
+            .Where(c => resolver.Resolve(EffectResolverKey.FromStrings(c.TypeName, c.MethodName)).Status == EffectResolutionStatus.Unknown)
             .Distinct()
             .ToList();
 
@@ -1047,7 +1047,7 @@ public class EffectsSuggestTests
         resolverWithManifest.Initialize();
 
         // Step 5: Verify OrderRepo.Save now resolves
-        var resolution = resolverWithManifest.Resolve("OrderRepo", "Save");
+        var resolution = resolverWithManifest.Resolve(EffectResolverKey.FromStrings("OrderRepo", "Save"));
         Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
         Assert.Contains(resolution.Effects.Effects, e => e.Value == "database_write");
 
@@ -1069,7 +1069,7 @@ public class EffectsSuggestTests
         // the suggest output → user fills effects → resolver resolves = the loop is valid.
         var unresolvedAfter = allCalls
             .Where(c => !callGraph.FunctionNameToId.ContainsKey(c.MethodName))
-            .Where(c => resolverWithManifest.Resolve(c.TypeName, c.MethodName).Status == EffectResolutionStatus.Unknown)
+            .Where(c => resolverWithManifest.Resolve(EffectResolverKey.FromStrings(c.TypeName, c.MethodName)).Status == EffectResolutionStatus.Unknown)
             .ToList();
 
         Assert.Empty(unresolvedAfter);
@@ -1116,7 +1116,7 @@ public class EffectsSuggestTests
 
         var unresolved = callsB
             .Where(c => !combinedFunctionNames.Contains(c.MethodName))
-            .Where(c => resolver.Resolve(c.TypeName, c.MethodName).Status == EffectResolutionStatus.Unknown)
+            .Where(c => resolver.Resolve(EffectResolverKey.FromStrings(c.TypeName, c.MethodName)).Status == EffectResolutionStatus.Unknown)
             .ToList();
 
         // FormatName is in file A's function map → should be filtered out
