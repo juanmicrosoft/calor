@@ -733,4 +733,116 @@ public sealed class SpikeVerdictTests
 
     private static string Normalize(string text)
         => text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
+
+    // ========================================================================
+    // v0.15 E3 slice a — PP-E1 leg A's NEGATIVE CONTROL, the half this slice can
+    // honestly assert.
+    //
+    // The gate row (docs/plans/agent-native-gates.md, A-1.11) freezes five
+    // fixtures and bars "any of {Calor0405, Calor0420, Calor0421, Calor0424}
+    // anywhere in a control compile". Calor0424 and Calor0425 are E3's ONLY new
+    // emissions, so this asserts they are absent from all five — which is the
+    // clause of the control that E3 can put at risk and therefore the clause E3
+    // owes.
+    //
+    // What this test deliberately does NOT assert is the control's FULL frozen
+    // multiset (A2 = 1× Calor0410 at (23,9) + 3× Calor0411; the four A3 = exit 0
+    // with zero diagnostics). That baseline does not reproduce on today's
+    // compiler and did not before this branch either:
+    //
+    //   * the four A3 fixtures draw Calor0418 at each invocation, because
+    //     invoking a row-less value is still Calor0418 until E4 — the gate row
+    //     says so itself ("Calor0425 … is E4's and owns all five L7 cells");
+    //   * A2 draws 2× Calor0405, because E2 slice b's P6 check reads
+    //     `RequestHandlerDelegate<TResponse>` — a §CSHARP-declared delegate, not
+    //     a §DEL — as not function-typed and reports the row on `next` as
+    //     misplaced.
+    //
+    // The second of those IS a live negative-control failure, created by
+    // PR #1102 and inherited here. PP-E1 is adjudicated at the 0.15.0 release
+    // commit and its leg-A instrument (EffectRowsProbeLedgerTests) is
+    // registered-not-built, so this is reported rather than repaired in a slice
+    // that did not cause it. Fixing it means teaching
+    // TypeIdentity.IsFunctionTypeName about §CSHARP-declared delegates, which is
+    // a change with its own blast radius.
+    // ========================================================================
+
+    /// <summary>The five §12.1 fixtures PP-E1 leg A freezes, by path.</summary>
+    private static readonly string[] PpE1ControlFixtures =
+    [
+        "A2", "A3-map", "A3-match", "A3-middleware", "A3-callback",
+    ];
+
+    [Fact]
+    public void PpE1NegativeControl_NoEffectRowDiagnosticOnAnyUnmutatedFixture()
+    {
+        var failures = new List<string>();
+
+        foreach (var fixture in PpE1ControlFixtures)
+        {
+            var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+            Assert.True(File.Exists(path), $"PP-E1 control fixture missing: {path}");
+
+            var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
+            var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+            var module = new Compiler.Parsing.Parser(
+                new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(),
+                diagnostics).Parse();
+            new Compiler.Binding.Binder(diagnostics, fixture + ".calr").Bind(module);
+            if (!diagnostics.HasErrors)
+            {
+                // The pinned invocation is the CLI default: enforcement on,
+                // UnknownCallPolicy.Strict, NO --permissive-effects. The gate row
+                // forbids the flag here, because it waives Calor0425 and would
+                // satisfy every L7 cell for free.
+                new Compiler.Effects.EffectEnforcementPass(diagnostics).Enforce(module);
+            }
+
+            foreach (var diagnostic in diagnostics)
+            {
+                if (diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMismatch
+                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowUnknown
+                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.OverrideEffectVariance
+                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InterfaceEffectVariance)
+                {
+                    failures.Add($"{fixture}: {diagnostic.Code} — {diagnostic.Message}");
+                }
+            }
+        }
+
+        Assert.True(failures.Count == 0,
+            "PP-E1 leg A's negative control is FROZEN: an unmutated fixture must draw no "
+            + "row-family diagnostic. E3's emission put one there, which means the L5/L7 "
+            + "detection cells can no longer discriminate the feature under test. STOP and "
+            + "report before pushing — do not regenerate the baseline.\n  "
+            + string.Join("\n  ", failures));
+    }
+
+    [Fact]
+    public void PpE1NegativeControl_A2StillDrawsTheCalor0405ThatSliceBIntroduced()
+    {
+        // The failure above is asserted as a FACT so it cannot be forgotten, and
+        // so the slice that fixes it has a test to flip. PP-E1's row bars
+        // Calor0405 "anywhere in a control compile"; A2 draws two, from E2 slice
+        // b's P6 check, on a delegate declared in a §CSHARP block.
+        //
+        // When IsFunctionTypeName learns about §CSHARP-declared delegates this
+        // goes red, and the right response is to DELETE it — the control is
+        // clean again — not to weaken it.
+        var path = Path.Combine(SpikeDirectory(), "after", "A2.calr");
+        var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(),
+            diagnostics).Parse();
+        new Compiler.Binding.Binder(diagnostics, "A2.calr").Bind(module);
+
+        var misplaced = diagnostics
+            .Where(d => d.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMisplaced)
+            .ToList();
+
+        Assert.Equal(2, misplaced.Count);
+        Assert.All(misplaced, d =>
+            Assert.Contains("RequestHandlerDelegate", d.Message, StringComparison.Ordinal));
+    }
 }
