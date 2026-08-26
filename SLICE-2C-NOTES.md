@@ -41,8 +41,15 @@ src file — Calor-first guard forbids new `src/*.cs`).
       COST: `_VetoesTheAstSentinel` is no longer discriminating (guard subsumes veto).
 - [x] ChainWalkCouldChargeEffects FIXME(E2) — states it is untested, unreachable today, and
       what pin E2 must land before chain typing merges
-- [ ] docs (design §8.1/§8.4, roadmap §4.2, CHANGELOG)
-- [ ] suites
+- [x] docs — design §2.2 superseded-note, §8.1 (pin (c) MET + slice-2c debts resolved + key
+      ledger numbers), §8.4 (what a manifest lookup is keyed on); roadmap §4.2 E1 COMPLETE +
+      exit-pin citations; CHANGELOG `[Unreleased]` `### Changed`
+- [x] suites: Enforcement 358/358, Conversion 439/439, LanguageServer 486/486, Ids 390/390,
+      ILAnalysis 42/42, Evaluation 206/206, Compiler.Tests 7683 passed / 3 skipped / 7686 total.
+      Gates: gate 6 ledger 817/1248 unmoved, D-A = 3 unmoved, Calor0270 ledger unmoved,
+      LosslessFormattingTests green, P29 ExperimentTranscripts_MatchARerun green.
+      `python3 scripts/check_test_quality.py` green.
+- [ ] push + PR
 
 ## Key facts gathered
 - `src/Calor.Compiler/Effects/EffectResolver.cs` — `Resolve(string,string,params string[])` :48,

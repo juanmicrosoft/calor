@@ -150,6 +150,12 @@ but the binder does not emit it); the enforcement pass's string resolvers (`EEP:
 §4.2's E1 exit pin (c) is unmet); the lambda `FunctionBoundType`
 (`Binding/BoundNodes.cs:2178` is still `NominalBoundType("LAMBDA(…)")`).
 
+> **Superseded, and left as written on purpose.** Every row above, and §2's table, is a
+> snapshot at `82338e37` — the state E1 was scoped against, not a claim about the tree today.
+> All four items are now executed: slice 2a (#1095), slice 2b (#1099), and slice 2c, which
+> deleted `Resolve(string, string, params string[])` and every sibling string overload. §8.1
+> carries the current state and the pins that hold it.
+
 `FunctionBoundType` exists with the slot reserved:
 `Binding/BoundTypes/BoundType.cs:209-211` — *"Kind 5: function type (for lambdas / delegates).
 Effect rows attach here in 0.15 (§4.2)"* — carrying `ParameterTypes`/`ReturnType` (`:214-226`)
@@ -1007,20 +1013,65 @@ receiver-from-`BoundExpression.Type` and `_variableTypeMap` deletion **executed*
 receiver `BoundExpression` on the call nodes and binder-emitted `UnresolvedBoundType`
 **executed** (#1095 — E1 slice 2a); the enforcement pass's string resolvers reading receivers
 from the bound tree and `BoundLambdaExpression`'s `FunctionBoundType` **executed**
-(PR #1099 — E1 slice 2b, below). Still **pending**: the `Unknown`-row contribution (E2 — there
-is no `EffectRow` type yet, so an unresolved receiver contributes `EffectSet.Unknown`, not an
-`Unknown` *row*), and symbol-identity keying in `EffectResolver`/manifests/IL summaries
-(slice 2c — `EffectResolver.cs:48` intact, so roadmap §4.2's E1 exit pin (c) is still unmet).
+(PR #1099 — E1 slice 2b, below); symbol-identity keying in `EffectResolver`/manifests/IL
+summaries **executed** (E1 slice 2c, below). Still **pending**: the `Unknown`-row contribution
+(E2 — there is no `EffectRow` type yet, so an unresolved receiver contributes
+`EffectSet.Unknown`, not an `Unknown` *row*).
 **E2 consumes all six.** Separately, and not one of the six: the `Binder` → `Effects` layering
 hole is closed by PR #1099 (§4.2 E1's `Binding/**` cleanliness pin, below).
 
-**E1 exit pins (roadmap §4.2).** (a) the `_variableTypeMap` grep pin — **MET**,
+**E1 exit pins (roadmap §4.2). All three are now MET, so E1 is complete.**
+(a) the `_variableTypeMap` grep pin — **MET**,
 `Calor.Enforcement.Tests/EffectsSuggestTests.cs:159`. (b) the original S6 behavioural criterion,
 "a receiver whose type is available **only** through metadata (no AST type string anywhere in the
 module) resolves its effects" — **MET by PR #1099**,
 `EffectEnforcementTests.E1Slice2b_InferredLocalReceiverTypedOnlyByTheBinder_ChargesTheRealCallee`,
 which fails on a clean `main` worktree and passes here. (c) no
-`EffectResolver.Resolve(string, string, …)` overload remains — **UNMET**, slice 2c.
+`EffectResolver.Resolve(string, string, …)` overload remains — **MET by slice 2c**, pinned by
+`ArchitectureTests.EffectResolver_ExposesNoStringTypeNameResolveOverload`
+(`tests/Calor.Compiler.Tests/ArchitectureTests.cs`), a reflection pin rather than a grep: it
+fails if ANY public `Resolve*` member on `EffectResolver` takes a `string`, wherever and however
+that overload is re-added, and its positive half asserts the keyed
+`Resolve(EffectResolverKey)` still exists so the pin cannot be satisfied by deleting resolution.
+
+**What slice 2c did.** `EffectResolver` has ONE resolution entry point,
+`Resolve(EffectResolverKey)`, and the key is the member's identity: declaring type (generic
+DEFINITION plus arity for a `GenericInstantiationBoundType` — the spelling every committed
+manifest uses; the instantiated `ILogger<Foo>` form matches no entry at all), member name,
+parameter types, `EffectMemberKind`, plus provenance the lookup never reads (`IsStatic`,
+`ReceiverInterfaces`, `FromStringFallback`). `ResolveExtension`, `ResolveGetter`, `ResolveSetter`
+and `ResolveConstructor` are gone with it; `Kind` is the structural replacement for the
+`"m:"`/`"g:"`/`"s:"`/`"c:"` cache-key prefixes, so the setter-vs-`set_X` collision those prefixes
+worked around is now unrepresentable. Manifests are parsed into keys ONCE at load, and the four
+per-type dictionaries collapse into one. `ILEffectAnalyzer.TryResolve` takes the key.
+The six-step order and `"*"` wildcard semantics are unchanged, statement for statement.
+
+- **The hardcoded Linq receiver list is now the documented FALLBACK, not the rule.**
+  `IsCompatibleExtensionReceiver` asks `EffectResolverKey.ReceiverInterfaces` first — "does the
+  receiver implement `IEnumerable`?", which is the real predicate the name-shape list was a
+  proxy for. The list survives because bound types carry no interface set today (`TypeSymbol`
+  has none; that is E2 work), so the binder has nothing to say at most call sites, and deleting
+  the list would delete resolution — the mistake slice 2b measured and reverted. What the bound
+  path answers structurally is the set the LANGUAGE guarantees: arrays, and the generic
+  collection definitions the manifests already name.
+- **Nothing moved, and that is measured, not asserted.** Gate 6's ledger (817/1248, aggregate and
+  per subject) is byte-identical; the D-A demand ledger is unmoved at 3; the Calor0270 volume
+  ledger is unmoved; `LosslessFormattingTests` is green; the P29 transcripts
+  (`ExperimentTranscripts_MatchARerun`) are untouched — including `facts.py`'s
+  `Effects/*.cs` file-count row, which is why `EffectResolverKey` lives inside
+  `EffectResolver.cs` rather than in a file of its own.
+- **A new ledger, because the structural pin alone can be satisfied cosmetically.** An API can
+  be keyed on symbol identity while every caller still funnels text through one factory. So
+  `bench/phase0-agent-native/effect-resolver-key-ledger.json` records, per subject, how many
+  keys the compiler builds from a bound receiver versus from
+  `EffectResolverKey.FromStrings` — the single string-fallback factory, which stamps
+  `FromStringFallback` on everything it produces. **At registration: 202 bound / 751 string**
+  over 844 measured committed `.calr` (42 not measured and counted as such, never dropped);
+  `bench` 176/551, `tests` 22/135, `samples` 1/36, `src` 3/26, `tools` 0/3, `benchmarks` 0/0,
+  `scripts` 0/0. Exact per-subject equality, `[SkippableFact]`, compiler shard
+  (`tests/Calor.Compiler.Tests/Effects/EffectResolverKeyLedgerTests.cs`). The numbers are a
+  BASELINE, not a target: slice 2c re-keys the resolver, it does not widen what the binder can
+  type, and §2.2's resolution ceiling is untouched. E2 is what moves them.
 
 **What slice 2b did.** Unlike 2a, it **does** resolve receivers that did not resolve before —
 measured against a clean `main` worktree (f7cd1c46), not asserted. Two of the four behavioural
@@ -1089,11 +1140,44 @@ resolved receivers are Calor-side, not new `MetadataBinder` resolutions.
   `Reported=true`. That is why the ledgers and transcripts are unmoved. It is **not** evidence
   that the branch is unobservable, which is the inference round 1 got wrong.
 
-  **Slice-2c debt.** `ResolveVariableType` guards `declared == "?"`; the other
-  `ResolveLocalValueType` call sites do not. Adding that guard kept every pre-existing suite green (measured before the control existed)
-  but **subsumes** the veto — the pin above then passes with the branch deleted, because the guard
-  and the veto answer the same question at two layers. Unifying them is a deliberate slice-2c
-  change, not a drive-by that silently un-pins the test.
+  **Slice-2c debt — RESOLVED, and here is what it cost.** The debt was: `ResolveVariableType`
+  guards `declared == "?"`, the other `ResolveLocalValueType` call sites do not. Slice 2c
+  adds the guard at the ONE site where the sentinel was a decision rather than a formatting
+  detail — `InferFromBareNameTarget`, named `UnknownLocalTypeSentinel` — so a bare `§C{u}` on a
+  `§B{u}` the pass cannot type is **Calor0411 whether or not `u` was also used as a receiver**.
+  It used to be Calor0418 `"declared type '?'"` in the no-receiver case, charging
+  `EffectSet.Empty` on a value with no type at all, which is laundering.
+
+  **The corpus delta is ZERO, measured.** The D-A demand ledger is an exact-equality pin over
+  all 886 committed `.calr` and counts Calor0418 firings; it is unmoved at 3 (0418 = 1,
+  0419-function-typed = 2). A single 0418→0411 conversion anywhere in the corpus would have
+  decremented it. So the shape does not occur in committed Calor, and the change is observable
+  only through the fixtures that pin it.
+
+  **A blanket removal was rejected on a code-path argument, not a preference.** Making
+  `FindLocalDeclarationType` return `null` instead of the sentinel changes what
+  `ResolveLocalValueType` hands to `InferFromReference` and `InferSetterEffects`, both of which
+  branch `receiverType == null → EffectSet.Empty`. An untyped receiver's property read would go
+  from a REPORTED unknown operation to silence — a fail-OPEN change, the exact opposite of what
+  this slice is for. The sentinel therefore survives on the paths where it still carries
+  information ("there is a value here, of unknown type"), and is named rather than left as a
+  bare `"?"`.
+
+  **What it cost: `_VetoesTheAstSentinel` is no longer a discriminating pin.** The guard
+  subsumes the veto for that fixture, so the test now passes even with the veto branch deleted.
+  The veto is retained anyway — it states the fail-closed rule at the layer that owns it
+  (`AskBoundTree`), and E2 needs it there the moment chains carry types — but it is a
+  behavioural pin, not a discriminating one, and this document says so rather than leaving the
+  reader to assume otherwise. Slice 2b's control test is re-specified accordingly as
+  `E1Slice2c_BareCallOnUnknownTypedBinding_IsCalor0411WithOrWithoutAReceiverUse`, which runs
+  both fixtures and asserts they agree.
+
+  **`ChainWalkCouldChargeEffects` is untested, and its `FIXME(E2)` now says so.** Its only
+  caller is `ResolveReceiverChain`'s bound-type shortcut, which is unreachable because slice 2a
+  types every member chain `UnresolvedBoundType`. Deleting its body would fail no test. E2 must
+  land a pin — a chain the binder types, an effectful getter partway along it, the effect
+  asserted as charged — **before** chain typing merges, because the day the shortcut goes live a
+  wrong answer there silently under-charges.
 - **Receivers only.** An earlier revision recorded every bound name; that made the side channel
   answer in non-receiver positions and regressed the method-group-argument charging arm
   (`StrictnessBatchTests` C2/C4). Names outside receiver positions keep resolving through the
@@ -1216,10 +1300,30 @@ already `[unknown]`/`[pure]`/`"cw, fs:w"`) with `[assumed: cw]`.
 
 A manifest resolution yields an `EffectRow`: `EffectResolutionStatus.Resolved` →
 `Concrete(S)`, `PureExplicit` → `Concrete(∅)`, `Unknown` → `EffectRow.Unknown`
-(`EffectResolver.cs:596-612`). A BCL method that **returns** a delegate yields
-`EffectRow.Unknown` on that return and is a frozen gate-1 residual (roadmap §4.2 DEFERRED); the
-manifest schema gains no row-on-return field in 0.15. With 431 of 1248 BCL call sites unresolved,
-roughly a third will produce Unknown rows — §13.4 registers the ledger that counts it.
+(the three-valued `EffectResolutionStatus`, unchanged by slice 2c). A BCL method that
+**returns** a delegate yields `EffectRow.Unknown` on that return and is a frozen gate-1
+residual (roadmap §4.2 DEFERRED); the manifest schema gains no row-on-return field in 0.15.
+With 431 of 1248 BCL call sites unresolved, roughly a third will produce Unknown rows —
+§13.4 registers the ledger that counts it.
+
+**What a manifest resolution is keyed on, since E1 slice 2c.** The subject of a lookup is an
+`EffectResolverKey`, not a `(type, method, parameters)` string triple: declaring type in the
+manifest's own spelling (generic definition plus arity), member name, parameter types, and an
+`EffectMemberKind` that separates methods, extension methods, getters, setters and
+constructors. Manifest entries are parsed into keys once at load, so a lookup is a dictionary
+hit on an identity rather than a signature string rebuilt per call site. Two consequences for
+E2. First, `EffectRow` attaches to the key's answer, and the key is stable across the AST
+spellings of one call — which is what lets a row be cached and compared rather than
+re-derived. Second, the manifest schema is unchanged: keys are a lookup-side refactor, and no
+committed manifest was edited to land them.
+
+**The key also records what the manifest cannot.** `IsStatic`, `ReceiverInterfaces` and
+`FromStringFallback` sit outside key equality on purpose — no manifest entry names them, so
+letting them split the cache would let a bound-receiver key and a string-fallback key for one
+member disagree. They are provenance: `ReceiverInterfaces` is what
+`IsCompatibleExtensionReceiver` consults before falling back to its name-shape list, and
+`FromStringFallback` is what the key ledger (§8.1) counts. E2 widens the first — bound types
+carrying interface sets — and should move the second.
 
 ### 8.5 `EffectSummary` — a projection, index-independent
 
