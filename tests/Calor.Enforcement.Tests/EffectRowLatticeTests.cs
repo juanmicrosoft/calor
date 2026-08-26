@@ -87,9 +87,13 @@ public class EffectRowLatticeTests
     }
 
     [Fact]
-    public void OmittedRow_OnABindingWithNoInitializer_IsUnknown()
+    public void OmittedRow_OnABindingWithAPureLambdaInitializer_IsPureNotUnknown()
     {
-        // §3.5 row 4 again: nothing to infer from.
+        // §3.5 row 3, the other half of the inference: the initializer's row is
+        // taken VERBATIM, so a lambda that declares §E{} gives the binding
+        // Concrete(∅) — a promise — and not Unknown. Renamed in review round 1
+        // (MAJOR 2): it was called _OnABindingWithNoInitializer_IsUnknown while
+        // plainly having one, which left §3.5's bare-binding row unpinned.
         var binding = BindSingleLocal("""
             §M{m001:M}
               §F{f001:Main:pub} () -> void
@@ -97,11 +101,29 @@ public class EffectRowLatticeTests
                 §B{f:Func<i32,i32>} §LAM{lam1:x:i32} §E{} x §/LAM{lam1}
             """);
 
-        // The binding takes the lambda's declared row, which here is pure —
-        // Concrete(∅), a promise, and distinguishable from Unknown.
         Assert.NotNull(binding.FunctionType);
         Assert.Equal(EffectRow.Pure, binding.FunctionType!.Row);
         Assert.False(binding.FunctionType.Row.IsUnknown);
+    }
+
+    [Fact]
+    public void OmittedRow_OnABindingWithNoInitializerAtAll_IsUnknown()
+    {
+        // §3.5 row 4, the case the rename above uncovered: a function-typed
+        // binding with NO row and NO initializer. Nothing is declared and there
+        // is nothing to infer from, so the answer is Unknown — no
+        // FunctionBoundType at all, which RowOf reads as EffectRow.Unknown.
+        // Defaulting it to pure would let a later assignment of a printing
+        // lambda pass a check that believed the binding provably pure.
+        var binding = BindSingleLocal("""
+            §M{m001:M}
+              §F{f001:Main:pub} () -> void
+                §E{}
+                §B{~f:Func<i32,i32>}
+            """);
+
+        Assert.Null(binding.FunctionType);
+        Assert.True(RowOf(binding).IsUnknown);
     }
 
     // (b) RowOnNonFunctionTypedPosition_IsCalor0405 — one case per position,
