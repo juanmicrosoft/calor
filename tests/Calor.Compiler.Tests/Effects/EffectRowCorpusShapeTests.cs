@@ -41,6 +41,32 @@ public sealed class EffectRowCorpusShapeTests
         ("inline parameter row",    @"\([^)]*§E\{"),
     ];
 
+    /// <summary>
+    /// The patterns above are line-scoped, and an inline parameter list may WRAP.
+    /// Executed case <b>Z5</b> confirms wrapped lists are really written, which is why
+    /// §3.1 calls Z3 "not hypothetical" — a row on a continuation line inside an open
+    /// <c>(</c> is exactly the Z3 shape, and it is invisible to a per-line regex. The
+    /// sweep would report zero while the corpus held one. This walks each file tracking
+    /// paren depth instead.
+    /// </summary>
+    private static IEnumerable<string> WrappedInlineParameterRows(string relative, string[] lines)
+    {
+        var depth = 0;
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+
+            if (depth > 0 && line.Contains("§E{", StringComparison.Ordinal))
+                yield return $"{relative}:{i + 1}: [wrapped inline parameter row] {line.Trim()}";
+
+            foreach (var c in line)
+            {
+                if (c == '(') depth++;
+                else if (c == ')' && depth > 0) depth--;
+            }
+        }
+    }
+
     [Fact]
     public void NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges()
     {
@@ -63,6 +89,8 @@ public sealed class EffectRowCorpusShapeTests
                         offenders.Add($"{relative}:{i + 1}: [{name}] {lines[i].Trim()}");
                 }
             }
+
+            offenders.AddRange(WrappedInlineParameterRows(relative, lines));
         }
 
         Assert.True(offenders.Count == 0,
