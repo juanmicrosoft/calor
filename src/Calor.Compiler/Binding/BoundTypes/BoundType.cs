@@ -561,6 +561,74 @@ public sealed class EffectRow : IEquatable<EffectRow>
     }
 
     /// <summary>
+    /// v0.15 E3 slice a — design-doc §4.6, <c>fits</c> lifted from ROWS to whole
+    /// FUNCTION TYPES:
+    ///
+    /// <code>
+    /// fits(F₁, F₂) = Fits  iff  arity equal
+    ///                      and  P₁ⱼ ≡ P₂ⱼ ∀j  and  T₁ ≡ T₂     (types INVARIANT)
+    ///                      and  fits(ρ₁,  ρ₂ ) = Fits            (own row COvariant)
+    ///                      and  fits(ρ₂ⱼ, ρ₁ⱼ) = Fits ∀j        (param rows CONTRAvariant)
+    /// </code>
+    ///
+    /// <para>Read the contravariance aloud: a destination
+    /// <c>(Func&lt;i32,i32&gt;:g §E{cw}) -&gt; void</c> promises its caller "the
+    /// <c>g</c> I hand you may print". A source that accepts only a pure
+    /// <c>g</c> does NOT fit — it accepts fewer functions than the destination
+    /// promises to supply. So the DESTINATION's parameter row must fit into the
+    /// SOURCE's, which is why the arguments are swapped in that conjunct.</para>
+    ///
+    /// <para>Parameter and return TYPES stay invariant in 0.15:
+    /// <see cref="FunctionBoundType.Equals(BoundType)"/> is structural equality,
+    /// and making them variant is a generics change
+    /// (<c>calor-direction.md:33</c>) rather than an effect-row one.</para>
+    ///
+    /// <para><b>No production caller in slice a</b>, and that is stated rather
+    /// than hidden. The five monomorphic sites compare a value's row against a
+    /// position's row, never two whole function types: a row on a nested generic
+    /// argument is unreachable from source in 0.15 (E2 slice a, deviation 4), so
+    /// <see cref="FunctionBoundType.ParameterRows"/> is all
+    /// <see cref="Unknown"/> at every position the binder builds. The relation
+    /// lands here because §4.6 is normative and P13 freezes with E3; site 6 and
+    /// E4 are its first callers.</para>
+    ///
+    /// <para><c>CannotTell</c> propagates through the conjunction and
+    /// <c>DoesNotFit</c> dominates it (§4.3), so a shape mismatch — differing
+    /// arity, or a differing parameter/return type — is
+    /// <see cref="EffectFit.DoesNotFit"/> and not merely undecided.</para>
+    /// </summary>
+    public static EffectFit FitsFunction(
+        FunctionBoundType? source,
+        FunctionBoundType? destination)
+    {
+        if (source is null || destination is null) return EffectFit.CannotTell;
+
+        // Shape first: types are INVARIANT, so any disagreement is a hard miss.
+        if (source.ParameterTypes.Length != destination.ParameterTypes.Length)
+            return EffectFit.DoesNotFit;
+        if (!source.ReturnType.Equals(destination.ReturnType))
+            return EffectFit.DoesNotFit;
+        for (var index = 0; index < source.ParameterTypes.Length; index++)
+        {
+            if (!source.ParameterTypes[index].Equals(destination.ParameterTypes[index]))
+                return EffectFit.DoesNotFit;
+        }
+
+        // The own row is COvariant; each parameter row is CONTRAvariant.
+        var verdict = Fits(source.Row, destination.Row);
+        if (verdict == EffectFit.DoesNotFit) return EffectFit.DoesNotFit;
+
+        for (var index = 0; index < source.ParameterRows.Length; index++)
+        {
+            var parameter = Fits(destination.ParameterRows[index], source.ParameterRows[index]);
+            if (parameter == EffectFit.DoesNotFit) return EffectFit.DoesNotFit;
+            if (parameter == EffectFit.CannotTell) verdict = EffectFit.CannotTell;
+        }
+
+        return verdict;
+    }
+
+    /// <summary>
     /// The reasons a hop must carry, from whichever side the assumption came —
     /// §4.3's "Assumed … always propagates 0425". Empty when neither side is
     /// assumed.
