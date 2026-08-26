@@ -808,16 +808,35 @@ public class ArchitectureTests
     /// <para>Deleting the check and re-adding
     /// <c>Resolve(string, string, params string[])</c> is the discriminating
     /// experiment: this test goes red, and nothing else does.</para>
+    ///
+    /// <para><b>Review round 1 (MAJOR 4) — the filter is on the RETURN TYPE,
+    /// not the name.</b> The first version of this pin selected methods whose
+    /// name started with <c>"Resolve"</c>, which meant a freshly added
+    /// <c>public EffectResolution TryResolve(string, string, params string[])</c>
+    /// walked straight past it: the string path would be back under a different
+    /// verb and the pin would still be green. What the roadmap is actually
+    /// asking is "can a caller obtain an <c>EffectResolution</c> by naming a
+    /// member in text?", so the predicate is now exactly that — any public
+    /// member returning an <c>EffectResolution</c> (or a nullable one) that
+    /// accepts a <c>string</c>. Renaming the method no longer helps.</para>
     /// </summary>
     [Fact]
     public void EffectResolver_ExposesNoStringTypeNameResolveOverload()
     {
         var resolverType = typeof(Calor.Compiler.Effects.EffectResolver);
+        var resolution = typeof(Calor.Compiler.Effects.EffectResolution);
 
         var offenders = resolverType
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
-            .Where(method => method.Name.StartsWith("Resolve", StringComparison.Ordinal))
-            .Where(method => method.GetParameters().Any(p => p.ParameterType == typeof(string)))
+            // Any verb, not just "Resolve": what matters is that the member
+            // HANDS BACK a resolution, since that is the capability exit pin (c)
+            // says must not be reachable from a string.
+            .Where(method => method.ReturnType == resolution
+                || Nullable.GetUnderlyingType(method.ReturnType) == resolution)
+            .Where(method => method.GetParameters().Any(p =>
+                p.ParameterType == typeof(string)
+                || p.ParameterType == typeof(string[])
+                || p.ParameterType == typeof(IReadOnlyList<string>)))
             .Select(method =>
                 $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})")
             .OrderBy(name => name, StringComparer.Ordinal)
@@ -825,10 +844,11 @@ public class ArchitectureTests
 
         Assert.True(
             offenders.Count == 0,
-            "roadmap §4.2 E1 exit pin (c): EffectResolver must expose no Resolve* overload that "
-            + "names an external member by string. Callers holding only text build a key through "
-            + "EffectResolverKey.FromStrings, which marks FromStringFallback so the key ledger can "
-            + "count it. Offending members: " + string.Join(", ", offenders));
+            "roadmap §4.2 E1 exit pin (c): no public member of EffectResolver may return an "
+            + "EffectResolution while accepting a string — under ANY name. Callers holding only "
+            + "text build a key through EffectResolverKey.FromStrings, which marks "
+            + "FromStringFallback so the key ledger can count it. Offending members: "
+            + string.Join(", ", offenders));
 
         // Positive half: the keyed entry point actually exists, so the pin
         // cannot be satisfied by deleting resolution altogether.
