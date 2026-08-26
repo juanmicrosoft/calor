@@ -610,3 +610,386 @@ public enum EffectResolutionStatus
     /// </summary>
     Unknown
 }
+
+/// <summary>
+/// v0.15 E1 slice 2c (roadmap §4.2 E1 exit pin (c)) — the member kind an
+/// <see cref="EffectResolverKey"/> names. This is the discriminator that used
+/// to be a string prefix on the resolver's cache key (<c>"m:"</c>/<c>"g:"</c>/
+/// <c>"s:"</c>/<c>"c:"</c>), and it is what keeps <c>Resolve(T, "set_X")</c>
+/// and the setter of <c>X</c> from colliding.
+/// </summary>
+public enum EffectMemberKind
+{
+    /// <summary>An ordinary method call on the declaring type.</summary>
+    Method,
+
+    /// <summary>
+    /// An extension-method call. <see cref="EffectResolverKey.DeclaringType"/>
+    /// is the RECEIVER's type, not the provider's; the resolver searches the
+    /// manifest-declared extension providers.
+    /// </summary>
+    Extension,
+
+    /// <summary>A property getter. <see cref="EffectResolverKey.MemberName"/> is the property name.</summary>
+    Getter,
+
+    /// <summary>A property setter. <see cref="EffectResolverKey.MemberName"/> is the property name.</summary>
+    Setter,
+
+    /// <summary>A constructor. <see cref="EffectResolverKey.MemberName"/> is <c>".ctor"</c>.</summary>
+    Constructor,
+}
+
+/// <summary>
+/// v0.15 E1 slice 2c — the identity of an external member, as the effect
+/// resolver keys on it. This replaces the
+/// <c>Resolve(string type, string method, params string[] parameterTypes)</c>
+/// family (roadmap §4.2 E1 exit pin (c): "no
+/// <c>EffectResolver.Resolve(string, string, …)</c> overload remains").
+///
+/// <para><b>What is in the identity, and what is only provenance.</b> Equality
+/// and hashing cover exactly <see cref="Kind"/>, <see cref="DeclaringType"/>,
+/// <see cref="MemberName"/> and <see cref="ParameterTypes"/> — the four things
+/// a manifest entry can name. <see cref="IsStatic"/>,
+/// <see cref="ReceiverInterfaces"/> and <see cref="FromStringFallback"/> are
+/// deliberately OUTSIDE equality: manifests record none of them, so letting
+/// them split the cache would make two spellings of one member resolve twice
+/// and, worse, let a bound-receiver key and a string-fallback key for the same
+/// member disagree. They are provenance and side information, read where the
+/// resolver needs them (extension-receiver compatibility) and reported by the
+/// key ledger.</para>
+///
+/// <para><b><see cref="ParameterTypes"/> is nullable, and the two states are
+/// not the same.</b> <c>null</c> means "no parameter list was named" — the
+/// manifest's name-only entry (<c>"ReadAllText"</c>) and the wildcard
+/// (<c>"*"</c>). An EMPTY list means "explicitly zero parameters"
+/// (<c>"ReadLine()"</c>). The pre-slice string path drew exactly the same
+/// distinction between its <c>"Name(…)"</c> and <c>"Name"</c> dictionary keys,
+/// and the six-step resolution order depends on it: step 2a probes the
+/// signature form, step 2b the name form.</para>
+///
+/// <para><b>Two factories, and only two.</b> <see cref="FromBoundReceiver"/>
+/// builds a key from a bound receiver's
+/// <see cref="Binding.BoundTypes.BoundType"/> — the symbol-identity path E1
+/// exists to create. <see cref="FromStrings"/> is the SINGLE entry point for
+/// every caller that has only text (the enforcement pass's surviving AST
+/// fallbacks, <c>calor effects suggest</c>, the migration converter, the IL
+/// propagator), and it stamps <see cref="FromStringFallback"/> so the split is
+/// countable rather than asserted:
+/// <c>bench/phase0-agent-native/effect-resolver-key-ledger.json</c> freezes it
+/// per subject.</para>
+/// </summary>
+public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
+{
+    /// <summary>
+    /// The fully-qualified declaring type, normalized the way the manifests
+    /// spell it. For a generic instantiation this is the generic DEFINITION
+    /// plus arity (<c>Microsoft.Extensions.Logging.ILogger`1</c>), never the
+    /// instantiated display form (<c>ILogger&lt;Foo&gt;</c>) — no committed
+    /// manifest names a type with angle brackets.
+    /// </summary>
+    public string DeclaringType { get; }
+
+    /// <summary>
+    /// The member name: a method name, a property name for
+    /// <see cref="EffectMemberKind.Getter"/>/<see cref="EffectMemberKind.Setter"/>,
+    /// <c>".ctor"</c> for <see cref="EffectMemberKind.Constructor"/>, or the
+    /// wildcard <c>"*"</c> for a manifest catch-all entry.
+    /// </summary>
+    public string MemberName { get; }
+
+    /// <summary>
+    /// Normalized parameter types, or null when no parameter list was named.
+    /// See the class remarks: null and empty are different lookups.
+    /// </summary>
+    public IReadOnlyList<string>? ParameterTypes { get; }
+
+    /// <summary>Which member family this key names.</summary>
+    public EffectMemberKind Kind { get; }
+
+    /// <summary>
+    /// True when the call site is static (a type-reference receiver), false for
+    /// an instance receiver, null when the caller could not say. Provenance
+    /// only — outside equality, because no manifest entry records it.
+    /// </summary>
+    public bool? IsStatic { get; }
+
+    /// <summary>
+    /// Interfaces the BINDER knows the receiver implements, fully qualified.
+    /// Empty when the binder has nothing to say — which is the common case
+    /// today, because <c>TypeSymbol</c> carries no interface list (that is E2
+    /// work). The resolver reads this to decide extension-method receiver
+    /// compatibility, and falls back to its documented name-shape list when it
+    /// is empty. Outside equality.
+    /// </summary>
+    public IReadOnlyList<string> ReceiverInterfaces { get; }
+
+    /// <summary>
+    /// True when this key was built from text rather than from a bound
+    /// receiver — i.e. through <see cref="FromStrings"/>. Outside equality;
+    /// counted by <c>EffectResolver.KeyOrigins</c> and frozen per subject by
+    /// the key ledger.
+    /// </summary>
+    public bool FromStringFallback { get; }
+
+    /// <summary>True for an extension-method key.</summary>
+    public bool IsExtension => Kind == EffectMemberKind.Extension;
+
+    /// <summary>
+    /// Whether every named parameter type is usable for overload matching.
+    /// The pre-slice path gated its signature probe on exactly this
+    /// (<c>parameterTypes.All(IsKnownParameterType)</c>); step 2a still does.
+    /// </summary>
+    public bool HasKnownParameterTypes =>
+        ParameterTypes is { } parameters
+        && parameters.All(p => !string.IsNullOrWhiteSpace(p) && p != "?");
+
+    private EffectResolverKey(
+        EffectMemberKind kind,
+        string declaringType,
+        string memberName,
+        IReadOnlyList<string>? parameterTypes,
+        bool? isStatic,
+        IReadOnlyList<string> receiverInterfaces,
+        bool fromStringFallback)
+    {
+        Kind = kind;
+        DeclaringType = declaringType;
+        MemberName = memberName;
+        ParameterTypes = parameterTypes;
+        IsStatic = isStatic;
+        ReceiverInterfaces = receiverInterfaces;
+        FromStringFallback = fromStringFallback;
+    }
+
+    /// <summary>
+    /// THE string-fallback factory. Every caller that holds only text goes
+    /// through here, and every key it produces carries
+    /// <see cref="FromStringFallback"/> = true.
+    ///
+    /// <para><paramref name="parameterTypes"/> follows the pre-slice
+    /// <c>params string[]</c> semantics: omitting it yields an EMPTY list
+    /// ("explicitly zero parameters"), which is what
+    /// <c>Resolve(type, method)</c> meant. Call
+    /// <see cref="WithoutParameterList"/> afterwards for a name-only key.</para>
+    /// </summary>
+    public static EffectResolverKey FromStrings(
+        string declaringType,
+        string memberName,
+        IReadOnlyList<string>? parameterTypes = null,
+        EffectMemberKind kind = EffectMemberKind.Method,
+        bool? isStatic = null) =>
+        new(
+            kind,
+            NormalizeDeclaringType(declaringType),
+            memberName ?? string.Empty,
+            NormalizeParameters(parameterTypes ?? Array.Empty<string>()),
+            isStatic,
+            Array.Empty<string>(),
+            fromStringFallback: true);
+
+    /// <summary>
+    /// The symbol-identity factory: a key built from the BOUND receiver's type.
+    /// <see cref="DeclaringType"/> comes from the bound type (generic definition
+    /// + arity for a
+    /// <see cref="Binding.BoundTypes.GenericInstantiationBoundType"/>), and
+    /// <see cref="ReceiverInterfaces"/> from what the bound type structurally
+    /// implies. <see cref="FromStringFallback"/> is false.
+    /// </summary>
+    public static EffectResolverKey FromBoundReceiver(
+        Binding.BoundTypes.BoundType receiverType,
+        string memberName,
+        IReadOnlyList<string>? parameterTypes = null,
+        EffectMemberKind kind = EffectMemberKind.Method,
+        bool? isStatic = null)
+    {
+        ArgumentNullException.ThrowIfNull(receiverType);
+        return new EffectResolverKey(
+            kind,
+            NormalizeDeclaringType(DeclaringTypeOf(receiverType)),
+            memberName ?? string.Empty,
+            NormalizeParameters(parameterTypes ?? Array.Empty<string>()),
+            isStatic,
+            InterfacesOf(receiverType),
+            fromStringFallback: false);
+    }
+
+    /// <summary>
+    /// The manifest-side factory: one key per parsed manifest entry, built once
+    /// at load. <paramref name="parameterTypes"/> is null for a name-only or
+    /// wildcard entry.
+    /// </summary>
+    internal static EffectResolverKey ForManifestEntry(
+        EffectMemberKind kind,
+        string declaringType,
+        string memberName,
+        IReadOnlyList<string>? parameterTypes) =>
+        new(
+            kind,
+            NormalizeDeclaringType(declaringType),
+            memberName ?? string.Empty,
+            parameterTypes == null ? null : NormalizeParameters(parameterTypes),
+            isStatic: null,
+            Array.Empty<string>(),
+            fromStringFallback: false);
+
+    /// <summary>This key with its parameter list dropped — the step-2b name probe.</summary>
+    public EffectResolverKey WithoutParameterList() =>
+        ParameterTypes == null
+            ? this
+            : new EffectResolverKey(
+                Kind, DeclaringType, MemberName, null, IsStatic, ReceiverInterfaces, FromStringFallback);
+
+    /// <summary>This key with a different member name, keeping type and provenance.</summary>
+    public EffectResolverKey WithMemberName(string memberName) =>
+        new(Kind, DeclaringType, memberName, ParameterTypes, IsStatic, ReceiverInterfaces, FromStringFallback);
+
+    /// <summary>This key re-pointed at a different declaring type, keeping provenance.</summary>
+    public EffectResolverKey WithDeclaringType(string declaringType) =>
+        new(
+            Kind,
+            NormalizeDeclaringType(declaringType),
+            MemberName,
+            ParameterTypes,
+            IsStatic,
+            ReceiverInterfaces,
+            FromStringFallback);
+
+    /// <summary>This key as a different member kind, keeping everything else.</summary>
+    public EffectResolverKey WithKind(EffectMemberKind kind) =>
+        new(kind, DeclaringType, MemberName, ParameterTypes, IsStatic, ReceiverInterfaces, FromStringFallback);
+
+    /// <summary>This key with an explicit parameter list.</summary>
+    public EffectResolverKey WithParameterTypes(IReadOnlyList<string> parameterTypes) =>
+        new(
+            Kind,
+            DeclaringType,
+            MemberName,
+            NormalizeParameters(parameterTypes),
+            IsStatic,
+            ReceiverInterfaces,
+            FromStringFallback);
+
+    private static string NormalizeDeclaringType(string declaringType) =>
+        string.IsNullOrWhiteSpace(declaringType)
+            ? string.Empty
+            : declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
+
+    private static IReadOnlyList<string> NormalizeParameters(IReadOnlyList<string> parameterTypes) =>
+        parameterTypes.Count == 0
+            ? Array.Empty<string>()
+            : parameterTypes.Select(EffectResolver.NormalizeParameterType).ToArray();
+
+    /// <summary>
+    /// The declaring-type name a bound receiver contributes.
+    ///
+    /// <para>A <see cref="Binding.BoundTypes.GenericInstantiationBoundType"/>
+    /// answers with its generic DEFINITION plus arity, because that is how
+    /// every committed manifest names a generic type
+    /// (<c>System.Collections.Generic.List`1</c>,
+    /// <c>FluentValidation.AbstractValidator`1</c>); the instantiated display
+    /// form matches no manifest entry at all. Every other shape answers with
+    /// its <c>DisplayString</c>, which is byte-for-byte the string the
+    /// pre-slice AST path handed the resolver — so nothing but the generic case
+    /// can move.</para>
+    /// </summary>
+    private static string DeclaringTypeOf(Binding.BoundTypes.BoundType type) =>
+        type switch
+        {
+            Binding.BoundTypes.GenericInstantiationBoundType generic =>
+                WithArity(generic.Definition.QualifiedName, generic.TypeArguments.Length),
+            _ => type.DisplayString,
+        };
+
+    private static string WithArity(string qualifiedName, int arity) =>
+        string.IsNullOrEmpty(qualifiedName) || qualifiedName.Contains('`') || arity == 0
+            ? qualifiedName
+            : $"{qualifiedName}`{arity}";
+
+    /// <summary>
+    /// Interfaces the receiver's bound type structurally implies. Deliberately
+    /// small and deliberately honest: the binder's <c>TypeSymbol</c> carries no
+    /// interface list today, so the only things derivable here are the ones the
+    /// LANGUAGE guarantees — an array implements <c>IEnumerable`1</c> of its
+    /// element type — plus the generic collection definitions the manifests
+    /// already name. Everything else returns empty and the resolver falls back
+    /// to its documented name-shape test. Widening this is E2 work (interface
+    /// sets on bound types).
+    /// </summary>
+    private static IReadOnlyList<string> InterfacesOf(Binding.BoundTypes.BoundType type) =>
+        type switch
+        {
+            Binding.BoundTypes.ArrayBoundType => EnumerableShape,
+            Binding.BoundTypes.GenericInstantiationBoundType generic
+                when IsEnumerableDefinition(generic.Definition.QualifiedName) => EnumerableShape,
+            _ => Array.Empty<string>(),
+        };
+
+    private static readonly string[] EnumerableShape =
+    [
+        "System.Collections.Generic.IEnumerable`1",
+        "System.Collections.IEnumerable",
+    ];
+
+    private static bool IsEnumerableDefinition(string qualifiedName)
+    {
+        var name = qualifiedName;
+        var lastDot = name.LastIndexOf('.');
+        if (lastDot >= 0)
+            name = name[(lastDot + 1)..];
+        var tick = name.IndexOf('`');
+        if (tick > 0)
+            name = name[..tick];
+        return name is "IEnumerable" or "ICollection" or "IList" or "IReadOnlyList"
+            or "IReadOnlyCollection" or "List" or "HashSet" or "Dictionary" or "Queue" or "Stack";
+    }
+
+    public bool Equals(EffectResolverKey? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        if (Kind != other.Kind) return false;
+        if (!string.Equals(DeclaringType, other.DeclaringType, StringComparison.Ordinal)) return false;
+        if (!string.Equals(MemberName, other.MemberName, StringComparison.Ordinal)) return false;
+        if (ParameterTypes is null) return other.ParameterTypes is null;
+        if (other.ParameterTypes is null) return false;
+        return ParameterTypes.SequenceEqual(other.ParameterTypes, StringComparer.Ordinal);
+    }
+
+    public override bool Equals(object? obj) => Equals(obj as EffectResolverKey);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add((int)Kind);
+        hash.Add(DeclaringType, StringComparer.Ordinal);
+        hash.Add(MemberName, StringComparer.Ordinal);
+        if (ParameterTypes is null)
+        {
+            hash.Add(-1);
+        }
+        else
+        {
+            hash.Add(ParameterTypes.Count);
+            foreach (var parameter in ParameterTypes)
+                hash.Add(parameter, StringComparer.Ordinal);
+        }
+        return hash.ToHashCode();
+    }
+
+    /// <summary>A human-readable rendering, used in resolver diagnostics and test failure text.</summary>
+    public override string ToString()
+    {
+        var parameters = ParameterTypes is null ? "" : $"({string.Join(",", ParameterTypes)})";
+        var prefix = Kind switch
+        {
+            EffectMemberKind.Method => "m",
+            EffectMemberKind.Extension => "x",
+            EffectMemberKind.Getter => "g",
+            EffectMemberKind.Setter => "s",
+            EffectMemberKind.Constructor => "c",
+            _ => "?",
+        };
+        return $"{prefix}:{DeclaringType}::{MemberName}{parameters}";
+    }
+}

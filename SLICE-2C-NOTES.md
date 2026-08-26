@@ -9,7 +9,12 @@ src file — Calor-first guard forbids new `src/*.cs`).
 
 ## Status
 - [x] branch created
-- [ ] EffectResolverKey type
+- [x] EffectResolverKey type + EffectMemberKind, FromStrings (the ONE string factory,
+      FromStringFallback=true) / FromBoundReceiver / ForManifestEntry — appended to
+      `Effects/EffectResolver.cs` (no new src file: facts.py transcript pins the
+      `Effects/*.cs` file list at 10)
+  NOTE: heredocs are refused by the worktree guard — use the Edit/Write tools, not
+  `python3 - <<EOF`. Run `src/Calor.Compiler/scripts/download-z3.sh` once per fresh clone.
 - [ ] Resolve(key) / manifests parsed to keys once / ILEffectAnalyzer.TryResolve(key)
 - [ ] delete string overloads + architecture reflection Fact
 - [ ] key ledger bench/phase0-agent-native/effect-resolver-key-ledger.json
