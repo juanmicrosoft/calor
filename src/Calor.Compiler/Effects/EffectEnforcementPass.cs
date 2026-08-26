@@ -1708,7 +1708,7 @@ public sealed class EffectEnforcementPass
             // to survive in the source.
             //
             // THIS BRANCH HAS NO DISCRIMINATING PIN. Delete it and the whole
-            // Enforcement suite stays green (358/358). Slice 2b's
+            // Enforcement suite stays green (381/381 at slice 2c; the number will drift, the greenness is the claim). Slice 2b's
             // E1Slice2b_ReportedUnresolvedReceiver_VetoesTheAstSentinel is
             // RETAINED as a behavioural pin — it asserts the fixture's outcome
             // — but it no longer fails when this branch goes, and its control

@@ -835,8 +835,9 @@ public class ArchitectureTests
                 || Nullable.GetUnderlyingType(method.ReturnType) == resolution)
             .Where(method => method.GetParameters().Any(p =>
                 p.ParameterType == typeof(string)
-                || p.ParameterType == typeof(string[])
-                || p.ParameterType == typeof(IReadOnlyList<string>)))
+                // Any string sequence, under any collection shape: string[],
+                // List<string>, IReadOnlyList<string>, IEnumerable<string>, ...
+                || typeof(System.Collections.Generic.IEnumerable<string>).IsAssignableFrom(p.ParameterType)
             .Select(method =>
                 $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})")
             .OrderBy(name => name, StringComparer.Ordinal)
