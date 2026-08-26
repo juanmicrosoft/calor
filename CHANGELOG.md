@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **You can now write down what a callback is allowed to do.** Until now, if a
+  function took another function as a parameter — a callback, a handler, a
+  comparison — Calor had no way to say what that inner function was permitted to
+  do. Print to the console? Write a file? Nobody could say, so the compiler
+  refused to allow the call at all. Now you can write it, using the same `§E{…}`
+  tag effects have always used, placed **on the same line** as the type it
+  describes: `§I{Func<i32,i32>:transform} §E{cw}` says "this callback may write to
+  the console". You can write one on a parameter, a return type, a `§B` binding, a
+  `§FLD` field, a `§LAM` lambda and a `§DEL` delegate — eight places in all. A
+  function or method can also declare a *placeholder* effect, written
+  `<eff e>` in its type-parameter list, which stands for "whatever the caller's
+  function does" and lets one definition serve callers with different effects.
+
+  **This release only lets you write them; it does not yet check them.** The
+  compiler now reads, remembers and re-prints every one of these annotations
+  faithfully, and `calor fmt` preserves them. Comparing two of them — noticing that
+  a callback does more than the parameter allowed — arrives in the next release.
+  Writing one today is documentation that the compiler has agreed to carry.
+
+  **One thing changed meaning.** An `§E{…}` written on the *same line* as a type
+  used to be read as the whole function's effect declaration; now it belongs to
+  that type. Written on its **own line**, as almost everyone writes it and as the
+  docs have always recommended, nothing changes at all. Every one of the 886 Calor
+  files in this repository was compiled before and after: not one produced a
+  different result.
+
+  Two new messages come with it. **Calor0405** appears when an effect row is on the
+  wrong line, and it names both ways to fix it — before, the same mistake produced
+  four to sixteen confusing errors that never mentioned effects. **Calor0404**
+  appears when an `eff` placeholder is declared somewhere it cannot be, or is named
+  after a real effect code such as `cw`.
 - **The test that will judge the next release's effects feature was written down
   before the feature was built.** It is called `PP-E1`, and it lives in the
   project's proof-point registry (`docs/plans/agent-native-gates.md`, entry

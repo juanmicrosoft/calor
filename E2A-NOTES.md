@@ -71,6 +71,42 @@ resolves each reconstructed code against the in-scope binder set **before**
    Calor0405. Recorded as slice b's debt, and listed in the PR body as an extra transcript
    divergence with this cause.
 
+## Results
+
+| Gate | Result |
+|---|---|
+| **Corpus regression** — all 886 committed `.calr` compiled with main's build and this branch's, comparing exit code and the set of diagnostic codes per file | **0 files differ.** Both runs: 886 files, 233 non-zero exit |
+| `compile53.py` transcript / `o53/baseline.json` | **CLEAN** — 23 files / 54 occurrences / 1 green / 22 red unchanged |
+| `facts2.py` transcript | **CLEAN** |
+| Transcript divergences | **15 cases**, all accounted for in design-doc §13.5(a) and the PR body |
+| All 13 test projects | green. `Calor.Compiler.Tests` 7693 passed / 8 skipped (+15 vs main), `Calor.Enforcement.Tests` 416 (+35), rest unchanged |
+| `LosslessFormattingTests` | green — `FormatSource` is source-preserving, so rows survive `calor fmt` without a code change |
+| `HigherOrderDemandLedgerTests` | green, D-A unchanged — no row checking, so nothing moved off Calor0418 |
+| `MetadataBinderCorpusMeasurementTests` (gate 6) | unmoved |
+| New `src/` files | **0** (Calor-first guard) |
+
+## Two defects this work found
+
+1. **`Z10` — Calor0405 leaked into a call's argument list.** §3.3 forbids it explicitly. Fixed by
+   requiring the stray `§E` to **start its line** before the loop-level recovery fires; that
+   follows from what the diagnostic claims (a row on the wrong *line*), and it restored Z10's
+   transcript byte-for-byte.
+2. **`§DEL`'s row and `§LAM`'s row never survived a round trip.** The delegate emitter wrote
+   `string.Join(",", node.Effects.Effects)` — a stringified `KeyValuePair`, `§E{[console, write]}`
+   — and the lambda emitter dropped the tag entirely. Both pre-date this work; P4 pins positions
+   2 and 3, so both are fixed here.
+
+Also found: **`§F{f001:Map<T>:pub}`** — the emitter writes a declaration's type-parameter list
+*inside* the header group, where re-parsing absorbs it into the NAME and `TypeParameters` comes
+back empty. Textually stable, so harmless for plain type parameters and untouched here. **Not**
+harmless for an `eff` binder — an absorbed binder is no longer bound and the re-parsed program
+fails Calor0403 on its own rows — so a list carrying a binder is now written *after* the group,
+where the branch that understands `eff` reads it. Lists with no binder keep the old placement
+byte for byte. The underlying in-name absorption is a pre-existing defect, recorded not fixed.
+
 ## Transcript divergences (§13.5(a) obligation table)
 
-Filled in after the harness run — see the PR body for the final accounting.
+The full table is in design-doc §13.5(a) and the PR body. Headline: **4 of the 7 obligations
+discharged exactly, 2 partially (X9b/X9c reach Calor0418 rather than `exit 0`, because acceptance
+needs row CHECKING), 1 correctly not moved (the `IsSubsetOf` sweep is E3's), and 8 extra cases —
+every one of them a position the spike prototype did not implement.**
