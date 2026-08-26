@@ -595,13 +595,25 @@ renegotiation; DEFERRED items are named so their absence is a decision.
     keeps a type parameter named `eff` working, and **Calor0404** / **Calor0405** are allocated
     and raised. Zero diagnostic changes across all 886 committed `.calr`. Rows can be **written**;
     nothing compares two of them yet.
-  - **slice b — owes the checking half:** §3.5 / pin **P6** (a row on a non-function-typed
-    position is Calor0405, and the omitted-row lattice), §8.2 (`FunctionBoundType.Row` /
-    `ParameterRows` — rows live only on the AST today), §7.2(b)'s second half (an *unbound*
-    `§E{e}` routing to Calor0404 rather than today's Calor0403), and §5's Calor0410 on a lambda
-    whose body exceeds its declared row. **P6 re-specifies P1**: six cases slice a moved to
-    Calor0410 (Y1b, Y5a, X2a, X2b, Z9, Z9b) are rows on non-function types and move again to
-    Calor0405 — see the §13.2 note.
+  - **slice b (types + lattice + binder plumbing) — LANDED, PR #1102.** `EffectRow`
+    (`Concrete | Assumed | Unknown`, with `Join`, the three-valued `Fits`, `AtDestination` and
+    `AtDeclarationBoundary`) lives in `Binding/BoundTypes/BoundType.cs`; `FunctionBoundType`
+    gains `Row` and `ParameterRows`, in `Equals`/`GetHashCode` and out of `DisplayString`; §4.1's
+    `db`/`net`/`env` family widening lands, with `EffectSubtyping` DERIVED from the row's table;
+    the binder attaches rows to parameters, fields, `§B`s, returns and `§LAM`s, and raises **P6**'s
+    Calor0405 for a row on a position that is not function-typed. **P1 re-specified** onto a
+    function-typed subject, as §13.2's blockquote required. **Nine** harness cases move — the six
+    the roadmap named (Y1b, Y5a, X2a, X2b, Z9, Z9b) plus **Y1a**, **Y1c** and **Z9c**, which are
+    the same non-function-typed shape and were missed by this list; Z9c is named by P6 itself.
+    Corpus delta over all 886 committed `.calr`: **zero files differ**.
+  - **slice c (E3) owes the checking half:** the six §6.2 sites reading `EffectRow.Fits` and
+    emitting **Calor0424/0425**, §4.6's parameter contravariance, §5's Calor0410 on a lambda
+    whose body exceeds its declared row (slice b leaves an un-annotated lambda's row `Unknown`
+    because ρ_body is the effect pass's to compute), §7.4's rank-1 instantiation (slice b makes a
+    row that mentions an effect variable `Unknown` until then), and §7.2(b)'s second half — an
+    *unbound* `§E{e}` still reaches Calor0403 from the parser, because the parser's own scope
+    tracker decides it before the binder sees it (slice b's Calor0404 is a defensive check on the
+    binder's resolution helper, unreachable from source today, and says so).
 - **E3 — Effect-compatibility checking** at assignment, argument, return, override, and
   interface-implementation sites, as one row-subtyping rule — plus rank-1 generic-instantiation
   sites **unless the §4.1 ramp fires**. Calor0420/0421 either fold into it or are re-pinned
