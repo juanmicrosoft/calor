@@ -5312,7 +5312,10 @@ public sealed class Binder
         // move FunctionNode.Output.TypeName for every arrow-form function in the
         // corpus, which is a change with a blast radius and nothing to do with
         // rows.
-        var displayed = typeName is null
+        // Canonicalize throws on an empty/whitespace name (Binding/Scope.cs:323) --
+        // a `§FLD{:c:pri}` parses with an empty type, so guard on whitespace, not null
+        // (review round 2 of PR #1102, R2-A).
+        var displayed = string.IsNullOrWhiteSpace(typeName)
             ? "?"
             : TypeIdentity.Canonicalize(typeName);
 

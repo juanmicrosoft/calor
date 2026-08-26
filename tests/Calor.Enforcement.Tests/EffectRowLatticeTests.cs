@@ -153,6 +153,13 @@ public class EffectRowLatticeTests
             §O{i32} §E{cw}
             §R INT:1
         """)]
+    // R2-A (PR #1102 review round 2) -- an EMPTY-typed field with a row must report
+    // Calor0405, not throw from TypeIdentity.Canonicalize on the empty type string.
+    [InlineData("""
+        §M{m001:R2A}
+          §CL{c001:Box:pub}
+            §FLD{:c:pri} §E{cw}
+        """)]
     public void RowOnNonFunctionTypedPosition_IsCalor0405(string source)
     {
         var compiled = TestHarness.Compile(source);

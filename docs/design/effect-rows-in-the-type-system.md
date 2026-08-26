@@ -1347,13 +1347,13 @@ that rank-1 rows *type-check* and *erase at codegen*, not that the representatio
 > §8.3's canonical `(p1, p2) -> ret`, for the same byte-identity reason lambdas keep
 > `LAMBDA(i32)->INT`.
 >
-> **That name is the parser-EXPANDED spelling, at both parameter and return positions.**
-> `ExpandType` rewrites `Func<i32,i32>` to `Func<INT, INT>` before it reaches
-> `ParameterNode.TypeName` / `OutputNode.TypeName`, so `§I{Func<i32,i32>:cb} §E{cw}` and
-> `§O{Func<i32,i32>} §E{fs:w}` both display `Func<INT, INT>`, not the source text. An earlier
-> revision of this note said "keeps its SURFACE spelling `Func<i32,i32>`"; that was wrong, and
-> review round 1 (MINOR 4) caught it — though it read as return-only, and measurement shows it is
-> **both** positions, because both go through `ExpandType`. The expanded name is still the right
+> **That name is the parser-EXPANDED spelling for the BLOCK forms and the raw source text for the INLINE forms.**
+> `ExpandType` rewrites `Func<i32,i32>` to `Func<INT, INT>` before it reaches `ParameterNode.TypeName` /
+> `OutputNode.TypeName` in the block forms (`§I{Func<i32,i32>:cb} §E{cw}`, `§O{Func<i32,i32>} §E{fs:w}`
+> both display `Func<INT, INT>`), but the inline signature `(Func<i32,i32>:g §E{cw})` and the arrow form
+> `-> Func<i32,i32> §E{fs:w}` keep the raw `Func<i32,i32>` (measured in review round 2 of PR #1102, R2-B).
+> The split is block-vs-inline, not parameter-vs-return. Two earlier revisions of this note were wrong
+> in different ways ("keeps its SURFACE spelling"; then "both positions expand"). The expanded name is the right
 > string to use: it is exactly what `VariableSymbol.TypeName` and every existing consumer of these
 > positions already carry, so nothing moves. Reaching for the raw source text would be the change
 > with a blast radius.
