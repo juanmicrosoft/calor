@@ -134,6 +134,32 @@ public class EffectSubtypingTests
     }
 
     [Fact]
+    public void LegacyInternalValues_AreOutsideTheFamilyTable_AndThatIsE3s()
+    {
+        // Review round 1, MINOR 8. The registry carries LEGACY internal values
+        // whose compact code duplicates a modern one — ("io","dbr") and
+        // ("io","dbw") both spell db:r / db:w — and EffectRow.FamilySubtypes
+        // does not list them, so the family widening does not reach them.
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "database"), (EffectKind.IO, "dbr")));
+        Assert.False(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "filesystem_readwrite"), (EffectKind.IO, "file_write")));
+
+        // It is not reachable by PARSING: EffectCodes groups by compact code and
+        // prefers the non-legacy entry, so §E{db:r} and EffectSet.From("db:r")
+        // both produce ("io","database_read"), which the table does cover.
+        Assert.True(EffectSet.From("db:r").IsSubsetOf(EffectSet.From("db")));
+        Assert.True(EffectSubtyping.Encompasses(
+            (EffectKind.IO, "database"), (EffectKind.IO, "database_read")));
+
+        // Adding the aliases is a WIDENING beyond §4.1's nine pairs, so it is
+        // not slice b's: this PR's reviewed property is "EffectSubtyping is main
+        // plus exactly the nine §4.1 pairs", and a Calor0410 could disappear from
+        // the corpus on the back of it. This pin exists so the gap is observed
+        // rather than latent — E3 flips it deliberately, and updates this test.
+    }
+
+    [Fact]
     public void ProcAndHttpHaveNoNarrowSiblings()
     {
         // §4.1 names them explicitly. Nothing to widen, and nothing that widens

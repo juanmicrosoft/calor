@@ -532,6 +532,22 @@ and any Calor0410 that *disappears* is listed by name in the E2 PR body and coun
 `Calor0401 UnusedEffectDeclaration` is declared and never reported (`Diagnostic.cs:376`), so the
 widening has no 0401 blast radius.
 
+**The widening does NOT reach the registry's LEGACY internal values, and that gap is E3's**
+(E2 slice b, review round 1 MINOR 8). `EffectCodes.Registry` carries legacy entries whose compact
+code duplicates a modern one — `("io","dbr")` and `("io","dbw")` both spell `db:r`/`db:w`, and
+`("io","file_write"/"file_read"/"file_delete")` spell `fw`/`fr`/`fd` — and
+`EffectRow.FamilySubtypes` lists none of them, so `Encompasses(("io","database"), ("io","dbr"))`
+is **False**. It is **not reachable by parsing**: `EffectCodes` groups by compact code and prefers
+the non-legacy entry, so `§E{db:r}` and `EffectSet.From("db:r")` both yield
+`("io","database_read")`, which the table does cover. It is reachable only by a caller that
+constructs the legacy internal value directly — `EffectSet.FromInternal`, or a manifest written
+against the legacy spelling — and no production caller does so today. Slice b deliberately leaves
+it: adding the aliases is a widening **beyond** this section's nine pairs, and a Calor0410 could
+disappear from the corpus on the back of it, which would break the reviewed property that
+`EffectSubtyping` is main plus exactly those nine.
+`EffectSubtypingTests.LegacyInternalValues_AreOutsideTheFamilyTable_AndThatIsE3s` pins the gap so
+it is observed rather than latent.
+
 ### 4.2 The join `⊔` (inference)
 
 ```
