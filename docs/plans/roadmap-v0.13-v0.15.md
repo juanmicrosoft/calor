@@ -618,6 +618,23 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   interface-implementation sites, as one row-subtyping rule — plus rank-1 generic-instantiation
   sites **unless the §4.1 ramp fires**. Calor0420/0421 either fold into it or are re-pinned
   against it (design-doc decision; pins retained either way).
+  - **slice a — LANDED (PR #1103).** The **five monomorphic** sites. Calor0424 `EffectRowMismatch`
+    (Error, never waived by any flag) and Calor0425 `EffectRowUnknown` (Warning; Error under
+    `--strict-effects`; suppressed by `--permissive-effects`) are allocated and emitted; sites 1–3
+    live in `EffectEnforcementPass.CheckRowCompatibility`; sites 4/5 keep Calor0420/0421 and are
+    re-implemented on `EffectRow.Fits`, **losing their `--permissive-effects` demotion** (§4.5);
+    `CrossModuleEffectEnforcementPass.cs:162` routes through the same relation; `FunctionBoundType`
+    is now built at **every** function-typed position (§8.2), measured inert (Calor0418 unchanged at
+    619 over the 886). `EffectRow.FitsFunction` lands §4.6's whole-function variance rule with no
+    production caller yet and says so. Corpus delta: **one file of 886**, gaining one Calor0425 at a
+    real site 3. P32's ledger reads **zero Calor0425** across all three converted subjects.
+  - **slice b owes:** §7.4's rank-1 instantiation (site 6 — slice a DECLINES any position whose row
+    mentions an `eff` variable, which is what keeps the four A3 fixtures at their frozen zero),
+    §5's ρ_body and its Calor0410 on a lambda whose body exceeds its declared row,
+    **alpha-equivalence** of `eff` binders (slice a never compares two variable rows, so
+    `A3-middleware-alpha` passes without it), and §6.2's two external-base Calor0419 → Calor0425
+    retirements, which must move together because the override arm is an `AddAssumption` whose
+    propagation feeds every caller's computed effect set.
 - **E4 — Calor0418 replaced.** Accepted when the function value's row fits; Calor0424 on
   mismatch; Calor0425 when the row is Unknown/Assumed because metadata is incomplete. The
   `DelegateInvocation_*` pins (`StrictnessBatchTests.cs:29,47,64,749`;

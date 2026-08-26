@@ -20,10 +20,34 @@ All notable changes to this project will be documented in this file.
   saying "yes" there is how effects quietly escape. So "I don't know" is now a
   thing the compiler can say, and it never counts as a yes.
 
-  **Mismatches are still not reported.** The compiler can now decide whether a
-  callback fits where it is being used; it does not yet complain when it does not.
-  That is the next release, and it is the last piece. All 886 Calor files in this
-  repository compile to byte-for-byte the same result as before.
+  ~~**Mismatches are still not reported.**~~ They are now — see the next entry.
+  All 886 Calor files in this repository compile to byte-for-byte the same result
+  as before this change.
+
+- **Now the compiler tells you when a callback doesn't fit.** If you pass a
+  callback that prints to something that promised not to print, that is an error:
+  **Calor0424**. It names both sides — what the callback may do, what the
+  destination allows, and exactly which extra permissions are the problem — and it
+  suggests the two fixes: widen the destination's `§E{…}`, or pass a different
+  callback. This is checked in five places: when you bind a callback to a name,
+  when you pass one as an argument, when you return one, when a method overrides
+  another, and when a class implements an interface.
+
+  When the compiler *can't tell* — because one side carries no annotation at all,
+  so nothing is known about it — you get **Calor0425** instead, as a warning. Same
+  five places. "I don't know" and "that's wrong" are different answers and now have
+  different codes.
+
+- **`--permissive-effects` does less than it used to, on purpose.** It used to turn
+  effect mismatches on overrides and interface implementations into warnings. It no
+  longer does, and it will never soften a Calor0424 either. The one job it keeps is
+  silencing Calor0425 — the "I can't tell" warnings. Waiving *we don't know* is
+  honest; waiving *we know it's wrong* isn't.
+
+- **Calling a callback is still Calor0418 for one more release.** Annotating one and
+  passing it around is fully checked now. *Invoking* it still isn't allowed under
+  effect enforcement, because charging the call to the caller needs the last piece of
+  this work. That is the next release.
 
 - **`§E{db}` now covers `§E{db:r}`, and the same for `net` and `env`.** If a
   function declared the broad "touches the database" effect, and the code inside it

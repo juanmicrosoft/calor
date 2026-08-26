@@ -722,6 +722,45 @@ after E4 it compiles, with `{}` charged. That is §13.1's rewrite of
 
 ## 6. Decision 4 — Compatibility checking sites (E3)
 
+> **LANDED (five of six) — E3 slice a, PR #1103.** Calor0424 and Calor0425 are allocated
+> (`Diagnostics/Diagnostic.cs`), sites **1, 2, 3** are adjudicated by
+> `EffectEnforcementPass.CheckRowCompatibility` / `RowSiteChecker`, sites **4 and 5** keep
+> Calor0420/0421 and are re-implemented on `EffectRow.Fits` (§6.3), the
+> `--permissive-effects` demotion at `EEP:517-519` is **deleted** (§4.5), and
+> `CrossModuleEffectEnforcementPass.cs:162` routes through the same relation. `EffectRow.FitsFunction`
+> lands §4.6's whole-function variance rule with no production caller yet, stated as such.
+> Site **6** (rank-1 instantiation) is **slice b's**, and
+> `StrictnessBatchTests.RowMismatch_AtGenericInstantiation_IsSliceBs_AndTheGapIsObserved` observes
+> the gap rather than leaving it absent from gate 1's denominator.
+>
+> **Three scope decisions the slice took, recorded because none is obvious from this section.**
+>
+> 1. **A site exists only where a DESTINATION DECLARATION is visible.** An external callee has no
+>    destination row at all — §8.4 freezes the manifest schema without a row field in 0.15 — so a
+>    BCL parameter is *not a site*, rather than a site with an Unknown destination. The alternative
+>    puts a Calor0425 on every BCL argument in every converted file, which is the noise §13.4's
+>    ledger exists to bound.
+> 2. **An effect-POLYMORPHIC position is skipped.** A row mentioning an `eff` variable is site 6.
+>    Treating it as Unknown here would put a Calor0425 on every call in the four A3 combinator
+>    fixtures, whose PP-E1 leg-A negative-control baseline is zero effect-family diagnostics. Sites
+>    4/5 keep computing from `EffectSet` (where an `eff` name contributes nothing), which is
+>    byte-identical to today's answer — so `A3-middleware-alpha` passes **without** alpha-equivalence
+>    being implemented. Slice a does not unify `e` with `f`; it never compares them.
+> 3. **Neither external-base Calor0419 is retired**, against this section's own text, and they must
+>    move together. The interface arm is a direct report and is trivially convertible; the override
+>    arm is an `AddAssumption` whose propagation feeds every caller's *computed* effect set, so
+>    converting it deletes that propagation and moves Calor0410 across the corpus. Converting only
+>    one would make sites 4 and 5 disagree about what an unresolvable base means. Owed by the slice
+>    that redesigns the assumption channel; §13.1's `:260` and `:607` rewrites are **not** discharged,
+>    and §6.4's **third** message sample ships with them.
+>
+> **Corpus differential: ONE file of 886 moves**, gaining one Calor0425 at a real site 3
+> (`tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr`, `GetComparer` returning a row-less
+> `§LAM` into a row-less `Func<…>` return). Calor0418 is unchanged at 619 and Calor0419 at 4, which
+> is §8.2's widening measured rather than feared. This section's earlier expectation of **zero** was
+> one file too strong: a site can be `CannotTell` because *neither* side carries a row, which is
+> §6.4's second message sample and PP-E1's `L7` class.
+
 > **Decision.** **Six** sites, one shared relation, and **Calor0420/0421 stay as distinct codes**
 > re-implemented on top of it. The gate-1 denominator frozen by this document is **six classes,
 > dropping to five if the §7.5 ramp fires**.
@@ -1973,6 +2012,33 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 > P32 entirely. Naming this rather than treating the substitutes as P17 is the point: the two
 > pins are E3's, and E3's PR body must say so.
 
+> **EXECUTED — E3 slice a, PR #1103.** Status of every pin this slice owed:
+>
+> | Pin | Status | Home |
+> |---|---|---|
+> | **P11** | **LANDED.** `NeverWaived_DoesNotFit_AtEveryMonomorphicSite` (all three DoesNotFit codes stay ERRORS under the flag, including **Y8a's flip**), `PermissiveWaivesUnknown_BothPolarities`, `StrictEffectsRaisesCalor0425ToAnError` | `StrictnessBatchTests.cs` |
+> | **P12** | **LANDED.** Two fixtures: the mismatch, and the Calor0410 that catches the "fix" of deleting the source's `§E` | `EffectRowLatticeTests.cs` |
+> | **P13** | **LANDED**, on `EffectRow.FitsFunction` — contravariance, covariance, type invariance, and Unknown's absorption, both polarities each | `EffectRowLatticeTests.cs` |
+> | **P14** | **NOT LANDED — slice b's.** ρ_body needs the effect pass to compute a lambda's inferred row; in slice a an un-annotated lambda's row is Unknown | — |
+> | **P15** | **LANDED for five of six.** Site 6 gets `RowMismatch_AtGenericInstantiation_IsSliceBs_AndTheGapIsObserved`, which asserts the class is **not** closed | `StrictnessBatchTests.cs` |
+> | **P16** | **LANDED.** The structural half counts the surviving `IsSubsetOf` occurrences under `Effects/` — **two**, neither a compatibility site — plus two behavioural halves on the cross-module site | `CrossModuleEffectTests.cs` |
+> | **P17** | **LANDED**, with a rowed control so an unconditional emitter cannot pass it | `EffectRowLatticeTests.cs` |
+> | **P21** | **LANDED**, plus a literal pin on §6.1's code allocation | `EffectResolverTests.cs` |
+> | **P22** | **LANDED** for §6.4's first and second samples, as FULL message equality. §10.1's and §10.3's strings are E4's and slice b's | `StrictnessBatchTests.cs` |
+> | **P32** | **LANDED, and it reads ZERO** — 0 Calor0425 across MediatR (26 modules), Serilog (47) and FluentValidation (26). §13.4's worry is answered NO at slice a; if the hundreds come they come with E4 | `Calor0425CorpusLedgerTests.cs` |
+>
+> **P10 gains its diagnostic half** — `AssumedSource_ReportsExactlyOneCalor0425_AtTheHop` and
+> `EveryUndecidableHopReportsExactlyOnce` — but §4.4's **two-hop** shape has no source-level witness
+> in slice a and the file says so rather than implying otherwise: the only producer of an `Assumed`
+> row is a method group, and the binder rejects a bare method group as a `§B` initializer
+> (Calor0200). A lambda whose ρ_body is `Assumed` is the spelling that reaches it, and that is
+> slice b's.
+>
+> **Everything appended to `StrictnessBatchTests.cs` sits past line 745** on purpose:
+> `facts.py` probes that file by line number and §13.5(a) permits E3 exactly one regeneration.
+> Verified — `facts.py`'s output is byte-identical to its committed transcript apart from the
+> `IsSubsetOf` sweep.
+
 > **Why P19/P20 do not live in `BoundTypeTests.cs`** (E2 slice b). `facts.py` probes
 > `grep -n 'DisplayString' tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs` and pins
 > the result as a transcript line. A pin named `DisplayStringIsRowFree` in that file moves that
@@ -2130,6 +2196,27 @@ and it needs its own justification in the E2 PR body.**
 > (2) It says *"Remove the `§E{…}`"* rather than quoting the author's codes. Quoting them needs
 > the compact projection, which is an `Effects` table `Binding/` may not reach (§4's deviation
 > note). Naming the row's position is enough to find it.
+
+> **EXECUTED, E3 slice a, PR #1103 — EIGHT moved items across FOUR scripts.** Counted from a full
+> diff of all six, not from P29's first-difference message. `facts2.py` and `compile53.py` are
+> **CLEAN**, so `o53/baseline.json`'s 23 files / 54 occurrences / 1 green / 22 red are unchanged and
+> only its `measuredCommit` is re-stamped — gate 5's line-adjacency leg re-run.
+>
+> | Case | Obligation | Result |
+> |---|---|---|
+> | `facts.py` `IsSubsetOf` sweep | **#7** | **as predicted, and it is the slice's headline claim moving a pinned fact.** `EffectEnforcementPass.cs:533` and `:571` and `CrossModuleEffectEnforcementPass.cs:162` all **vanish** into `EffectRow.Fits`; `:377` → `:384`. One deviation from the spike's forecast: it expected "five `EffectSet.cs` lines appear instead" — **one** does. The prototype re-expressed `fits` over `EffectSet`; the shipping relation calls its own element test (`EffectRow.Encompasses`), so `EffectSet.IsSubsetOf` gains no caller |
+> | `run.py` **X11-E3** | — | `Compilation successful` gains **one Calor0425** at the argument. **This is E-3, the silent-laundering case, becoming audible.** The transcript is where the design's central claim is now observable |
+> | `run2.py` **Y3a-B** | — | site 1, new Calor0425 |
+> | `run2.py` **Y4a-O** | — | site 3, new Calor0425 |
+> | `run2.py` **Y7a-IFACE-E** | — | Calor0421 message gains the row clause |
+> | `run2.py` **Y8a** | — | **§4.5's own executed proof coming true.** `exit 0` + `warning Calor0420` → `exit 1` + `error Calor0420`: `--permissive-effects` stops demoting |
+> | `run2.py` **Y8b** | — | Calor0420 message gains the row clause |
+> | `run3.py` **W1c** | — | Calor0421 message gains the row clause |
+>
+> **Obligations #2 (X9b) and #3 (X9c) are NOT discharged.** Slice a made both reach one diagnostic
+> instead of a cascade, but neither reaches `exit 0`: both end at **Calor0418**, because what they
+> need is acceptance of an *invocation*, and that is E4's — not site 2's. The design's own note on
+> them ("the acceptance half is E3's") was one slice too optimistic and is corrected here.
 
 `spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
 machine-readable form, and P27 asserts that the case list holds exactly seven rows.
