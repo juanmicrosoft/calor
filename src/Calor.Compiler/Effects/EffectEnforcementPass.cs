@@ -789,8 +789,39 @@ public sealed class EffectEnforcementPass
                 Walk(statement);
         }
 
-        private void Walk(AstNode node)
+        /// <summary>
+        /// Guard on the structural walk. <see cref="RecursiveAstWalker"/> is
+        /// reflection-driven and a converted corpus module can nest expressions
+        /// far deeper than hand-written Calor does; a StackOverflowException is
+        /// not catchable, so the depth is capped rather than trusted. 256 is well
+        /// past anything the 886-file corpus reaches and well short of the frame
+        /// budget. Declining below the cap loses sites, never invents them.
+        /// </summary>
+        private const int MaxWalkDepth = 256;
+
+        /// <summary>
+        /// Every node is walked AT MOST ONCE. <see cref="RecursiveAstWalker"/>
+        /// enumerates a node's children by reflecting over its public properties,
+        /// and several AST nodes expose the same child through more than one
+        /// property — a receiver that is also the head of an argument list, a
+        /// clause reachable both directly and through its container. Without
+        /// this set the walk is exponential in the number of such aliases, which
+        /// is invisible on hand-written Calor and fatal on a converted 1,400-line
+        /// corpus module (measured: the effect pass never returned on
+        /// <c>serilog/src/Serilog/Core/Logger.cs</c>). Reference identity, not
+        /// equality: two structurally identical sub-expressions at different
+        /// places are different sites.
+        /// </summary>
+        private readonly HashSet<AstNode> _walked =
+            new(ReferenceEqualityComparer.Instance as IEqualityComparer<AstNode>);
+
+        private void Walk(AstNode node) => Walk(node, depth: 0);
+
+        private void Walk(AstNode node, int depth)
         {
+            if (depth > MaxWalkDepth || !_walked.Add(node))
+                return;
+
             // A §LAM's interior is the LAMBDA's body, not this callable's: its §R
             // is a lambda return (site 3 against the lambda's own row, which is
             // ρ_body and therefore slice b). The lambda itself is still adjudicated
@@ -815,7 +846,7 @@ public sealed class EffectEnforcementPass
             }
 
             foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-                Walk(child);
+                Walk(child, depth + 1);
         }
 
         // ===== Site 1 — assignment (§B initializer) =====
