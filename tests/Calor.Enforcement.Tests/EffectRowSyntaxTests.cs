@@ -302,24 +302,83 @@ public class EffectRowSyntaxTests
         Assert.NotNull(field.Row);
     }
 
-    [Fact]
-    public void Row_IsNotExtendedIntoACallArgumentList()
+    [Theory]
+    // Z10 — the single-line spelling the design doc names.
+    [InlineData("""
+        §M{m001:Z10}
+          §F{f001:Helper:pub} (i32:n) -> i32
+            §E{}
+            §R n
+          §F{f002:Main:pub} () -> void
+            §E{}
+            §R §C{Helper} §A INT:1 §E{cw} §/C
+        """)]
+    // The MULTI-LINE, closer-elided spelling. This is the discriminating case: it puts
+    // the §E at the START of its own line, inside an argument list. An earlier draft of
+    // this slice guarded the recovery on "the §E starts its line" and therefore reported
+    // Calor0405 here — extending the diagnostic into exactly the place §3.3 forbids,
+    // while the single-line Z10 above stayed green and hid it. Anchoring the recovery to
+    // the §B / §FLD production that owns the row is what actually closes it.
+    [InlineData("""
+        §M{m001:Z10b}
+          §F{f001:Helper:pub} (i32:n) -> i32
+            §E{}
+            §R n
+          §F{f002:Main:pub} () -> void
+            §E{}
+            §R §C{Helper}
+              §A INT:1
+              §E{cw}
+        """)]
+    public void Row_IsNotExtendedIntoACallArgumentList(string source)
     {
         // §3.3's explicit carve-out: "Arguments are values, not declarations; they
-        // have no row, and Calor0405 is not extended there." Executed baseline Z10.
-        const string source = """
-            §M{m001:Z10}
-              §F{f001:Helper:pub} (i32:n) -> i32
-                §E{}
-                §R n
-              §F{f002:Main:pub} () -> void
-                §E{}
-                §R §C{Helper} §A INT:1 §E{cw} §/C
-            """;
-
+        // have no row, and Calor0405 is not extended there."
         Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
+        Assert.Empty(ErrorsOf(diagnostics, DiagnosticCode.EffectRowMisplaced));
+    }
+
+    [Fact]
+    public void Row_IsNotExtendedOntoADeclarationsOwnEWhenItsSignatureFailedToParse()
+    {
+        // Executed case X4. The inline signature `-> str!str` does not parse, which
+        // leaves the function's own — entirely correct — §E{} line sitting in statement
+        // position. Telling the author to move THAT is worse than useless. Anchoring
+        // the recovery to §B / §FLD means it cannot fire here at all, and X4's committed
+        // transcript is unchanged by this slice.
+        Parse("""
+            §M{m001:X4}
+              §F{f001:M:pub} (i32:x) -> str!str
+                §E{}
+                §R "x"
+            """, out var diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Empty(ErrorsOf(diagnostics, DiagnosticCode.EffectRowMisplaced));
+    }
+
+    [Fact]
+    public void Row_RecoverySubjectNeverNamesADeclarationInAnotherScope()
+    {
+        // The recovery names a declaration so the author knows which line to move the
+        // row onto. An earlier draft remembered that declaration in a parser field,
+        // which outlived its scope: a stray §E at the top of class D was told to move
+        // onto a field line in class C. The subject is now the declaration in hand, so
+        // a §E with no §B or §FLD before it produces no Calor0405 at all.
+        Parse("""
+            §M{m001:F5}
+              §CL{c001:C:pub}
+                §FLD{i32:x:pri}
+                §MT{mt001:M:pub} () -> void
+                  §E{}
+              §CL{c002:D:pub}
+                §E{cw}
+                §MT{mt002:N:pub} () -> void
+                  §E{}
+            """, out var diagnostics);
+
         Assert.Empty(ErrorsOf(diagnostics, DiagnosticCode.EffectRowMisplaced));
     }
 

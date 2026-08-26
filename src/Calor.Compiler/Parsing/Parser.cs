@@ -86,41 +86,47 @@ public sealed class Parser
     private readonly List<IReadOnlyList<EffectParameterInfo>> _effectVariableScopes = new();
 
     /// <summary>
-    /// The most recently parsed row-bearing declaration — its name, what to call it,
-    /// and the line it started on. Calor0405's recovery names it so the author is told
-    /// which line to move the row onto. Only used when the stray <c>§E</c> sits on a
-    /// <i>later</i> line than the recorded declaration, so the message can never point
-    /// forward at something the author has not written yet.
+    /// Calor0405 recovery for the <b>declaration that just finished parsing</b>: a
+    /// <c>§E{…}</c> now sitting at the start of the following line, at a position whose
+    /// enclosing loop has no <c>§E</c> arm to fall through to. Executed baselines
+    /// <b>Z1</b> (<c>§FLD</c> ⏎ <c>§E</c>, 4× Calor0100) and <b>Z2</b> (<c>§B</c> ⏎
+    /// <c>§E</c>, 4× Calor0100).
     /// </summary>
-    private (string Name, string Kind, int Line)? _lastRowBearingDeclaration;
-
-    private void RecordRowBearingDeclaration(string name, string kind, TextSpan span)
-        => _lastRowBearingDeclaration = string.IsNullOrEmpty(name) ? null : (name, kind, span.Line);
-
-    /// <summary>
-    /// Calor0405 recovery at a position whose enclosing loop has no <c>§E</c> arm —
-    /// the statement loop (executed baseline <b>Z2</b>) and the class-member loop
-    /// (<b>Z1</b>).
-    /// </summary>
-    /// <returns>
-    /// <c>false</c> when the <c>§E</c> is <b>not</b> the first token on its line, in
-    /// which case nothing is reported or consumed and the caller falls through to its
-    /// ordinary unexpected-token path. Calor0405's whole claim is that a row is on the
-    /// wrong <i>line</i>; a <c>§E</c> sitting mid-line after other tokens is not a
-    /// misplaced row. This is what keeps the diagnostic out of a call's argument list,
-    /// where §3.3 says it must not go — executed baseline <b>Z10</b>
-    /// (<c>§R §C{Helper} §A INT:1 §E{cw} §/C</c>) keeps its `Expected EndCall` rejection.
-    /// </returns>
-    private bool TryReportMisplacedEffectRowInLoop()
+    /// <remarks>
+    /// <para>Called at the END of <c>ParseBindStatement</c> and <c>ParseClassField</c>,
+    /// which is where §3.1 puts it — "each of the six insertion points carries the
+    /// Calor0405 recovery on its non-adjacent branch". An earlier draft of this slice
+    /// hoisted it into the statement and class-member LOOPS instead, on the reasoning
+    /// that the production could not see a token it had already returned past. That
+    /// reasoning was wrong — <c>Current</c> IS the <c>§E</c> when these productions
+    /// return — and hoisting it cost three separate defects, all found in review:</para>
+    /// <list type="number">
+    /// <item>a broken multi-line call (<c>§C{Helper}</c> ⏎ <c>§A INT:1</c> ⏎
+    /// <c>§E{cw}</c>) reached the statement loop and was told its row was on the wrong
+    /// line, extending Calor0405 into an argument list — which §3.3 forbids outright;</item>
+    /// <item>a failed inline signature left the function's own perfectly correct
+    /// <c>§E{…}</c> line in statement position, where it was reported as misplaced
+    /// (executed case <b>X4</b>);</item>
+    /// <item>the "which declaration?" subject had to be remembered in a parser field,
+    /// which leaked across scopes and could name a field in a different class.</item>
+    /// </list>
+    /// <para>Anchoring the recovery to the production that owns the row removes all
+    /// three by construction: it cannot fire unless a <c>§B</c> or <c>§FLD</c> was the
+    /// thing immediately before the <c>§E</c>, and the subject is the declaration in
+    /// hand rather than a remembered one.</para>
+    /// </remarks>
+    private void TryRecoverTrailingEffectRow(string subject, string subjectKind)
     {
-        if (_position > 0 && PreviousToken.Span.Line == Current.Span.Line)
-            return false;
+        if (!Check(TokenKind.Effects))
+            return;
 
-        var recorded = _lastRowBearingDeclaration;
-        var subject = recorded is { } d && d.Line < Current.Span.Line ? d.Name : null;
-        var kind = recorded?.Kind ?? "declaration";
-        ReportMisplacedEffectRow(subject, kind);
-        return true;
+        // Calor0405's whole claim is that a row is on the wrong LINE. A §E still on
+        // the declaration's own line was already taken as its row by
+        // TryParseSameLineRow; anything else here belongs to the enclosing production.
+        if (_position > 0 && PreviousToken.Span.Line == Current.Span.Line)
+            return;
+
+        ReportMisplacedEffectRow(subject, subjectKind);
     }
 
     /// <summary>
@@ -1783,7 +1789,6 @@ public sealed class Parser
         // line as the tag it annotates. A §E on a later line is left for the enclosing
         // §F/§MT/§DEL section loop's own §E arm, where it is the declaration's row.
         // Covers all 9 §I dispatch arms, because the check lives in the shared production.
-        RecordRowBearingDeclaration(paramName, "parameter", startToken.Span);
         var row = TryParseSameLineRow(EffectRowPosition.Parameter);
 
         // Parse optional inline refinement: §I{type:name | (predicate using #)}
@@ -2389,14 +2394,6 @@ public sealed class Parser
         {
             return ParseMisalignedElseClause();
         }
-        // A §E in statement position is an effect row that missed its line (§3.1).
-        // The statement loop has no §E arm to fall through to, so today this is a
-        // four-diagnostic cascade (executed baseline Z2). Collapse it to one Calor0405.
-        else if (Check(TokenKind.Effects) && TryReportMisplacedEffectRowInLoop())
-        {
-            return null;
-        }
-
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
         return null;
@@ -5691,7 +5688,6 @@ public sealed class Parser
         // Position 7 (§3.3): §B{f:Func<i32,i32>} §E{cw} <init>. The row sits between the
         // header group and the initializer. TokenKind.Effects is not an expression start
         // (pinned), so the initializer parse below can never swallow one.
-        RecordRowBearingDeclaration(name, "§B", startToken.Span);
         var row = TryParseSameLineRow(EffectRowPosition.Binding);
 
         // Parse optional initializer expression.
@@ -5726,6 +5722,10 @@ public sealed class Parser
                 }
             }
         }
+
+        // §3.1 recovery for position 7. Executed baseline Z2: four Calor0100 today,
+        // none of which mentions effects.
+        TryRecoverTrailingEffectRow(name, "§B");
 
         var span = initializer != null ? startToken.Span.Union(initializer.Span) : startToken.Span;
         var rawPos0 = attrs["_pos0"] ?? "";
@@ -8927,13 +8927,6 @@ public sealed class Parser
                 // Skip orphaned collection literals at class level (converter artifact)
                 SkipCollectionLiteral();
             }
-            // A §E in class-member position is a field row that missed its line (§3.1).
-            // The class-member loop has no §E arm; executed baseline Z1 is four
-            // diagnostics, none of which mentions effects. Collapse it to one Calor0405.
-            else if (Check(TokenKind.Effects) && TryReportMisplacedEffectRowInLoop())
-            {
-                // reported and consumed
-            }
             else
             {
                 _diagnostics.ReportUnexpectedToken(Current.Span, "TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS", Current.Kind);
@@ -9031,7 +9024,6 @@ public sealed class Parser
         // Position 8 (§3.3): §FLD{Action<i32>:onChange:pri} §E{cw}. Read BEFORE the
         // default-value branch. X9b is the executed proof this did not already parse:
         // the class-member loop rejected Effects four diagnostics earlier.
-        RecordRowBearingDeclaration(name, "field", startToken.Span);
         var row = TryParseSameLineRow(EffectRowPosition.Field);
 
         // Check for optional default value (can be prefixed with = or just a direct expression)
@@ -9045,6 +9037,9 @@ public sealed class Parser
         {
             defaultValue = ParseExpression();
         }
+
+        // §3.1 recovery for position 8. Executed baseline Z1: four Calor0100 today.
+        TryRecoverTrailingEffectRow(name, "field");
 
         var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
         return new ClassFieldNode(
