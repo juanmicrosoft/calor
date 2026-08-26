@@ -4165,11 +4165,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         => row == null ? "" : " " + FormatEffectsTag(row);
 
     /// <summary>
-    /// Renders a declaration's <c>&lt;…&gt;</c> list, interleaving ordinary type
-    /// parameters with <c>eff</c> binders at the ordinals they were written at, so
-    /// <c>&lt;T, eff e&gt;</c> and <c>&lt;eff e, T&gt;</c> both round-trip.
-    /// </summary>
-    /// <summary>
     /// Splits a declaration's <c>&lt;…&gt;</c> list into the part that goes INSIDE the
     /// header group — where <c>§F</c> and <c>§MT</c> have always written it — and the
     /// part that goes after it.
@@ -4194,6 +4189,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return effectParameters.Count > 0 ? ("", rendered) : (rendered, "");
     }
 
+    /// <summary>
+    /// Renders a declaration's <c>&lt;…&gt;</c> list, interleaving ordinary type
+    /// parameters with <c>eff</c> binders at the ordinals they were written at, so
+    /// <c>&lt;T, eff e&gt;</c> and <c>&lt;eff e, T&gt;</c> both round-trip.
+    /// </summary>
     private string FormatTypeParameterList(
         IReadOnlyList<TypeParameterNode> typeParameters,
         IReadOnlyList<EffectParameterInfo> effectParameters)

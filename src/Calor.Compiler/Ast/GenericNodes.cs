@@ -16,11 +16,6 @@ public enum VarianceKind
 }
 
 /// <summary>
-/// Represents a type parameter declaration.
-/// New syntax: §F{id:name:pub}&lt;T&gt; or §CL{id:name:pub}&lt;T, U&gt;
-/// Legacy: §TP[T] (no longer supported in new code)
-/// </summary>
-/// <summary>
 /// An effect variable bound by an <c>eff</c> modifier in a declaration's
 /// type-parameter list: <c>§F{f001:Map:pub}&lt;T, U, eff e&gt;</c>.
 /// </summary>
@@ -39,6 +34,11 @@ public enum VarianceKind
 /// </remarks>
 public sealed record EffectParameterInfo(string Name, int Ordinal, TextSpan Span);
 
+/// <summary>
+/// Represents a type parameter declaration.
+/// New syntax: §F{id:name:pub}&lt;T&gt; or §CL{id:name:pub}&lt;T, U&gt;
+/// Legacy: §TP[T] (no longer supported in new code)
+/// </summary>
 public sealed class TypeParameterNode : AstNode
 {
     /// <summary>
