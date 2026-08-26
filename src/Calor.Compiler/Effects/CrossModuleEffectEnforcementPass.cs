@@ -159,11 +159,43 @@ public sealed class CrossModuleEffectEnforcementPass
         EffectSet declaredEffects,
         List<Diagnostic> diagnostics)
     {
-        if (resolution.DeclaredEffects.IsSubsetOf(declaredEffects))
+        // v0.15 E3 slice a, design-doc §6.2 — the FOURTH compatibility site in the
+        // tree, and the one that is NOT one of the six: it compares a cross-module
+        // callee's DECLARED effects against the CALLER's declaration, which is the
+        // cross-module leg of the body-vs-declaration rule, so it keeps Calor0410
+        // semantics. It is nonetheless re-implemented on the shared relation so an
+        // Assumed or Unknown row from another module PROPAGATES (as Calor0425)
+        // instead of collapsing into silence or a false Calor0410. P16 pins that a
+        // change to EffectRow.Fits moves this site together with 0424/0420/0421.
+        var calleeRow = resolution.DeclaredEffects.ToRow();
+        var callerRow = declaredEffects.ToRow();
+        var verdict = Binding.BoundTypes.EffectRow.Fits(calleeRow, callerRow);
+        if (verdict == Binding.BoundTypes.EffectFit.Fits)
             return;
 
+        var span = new TextSpan(0, 0, caller.DiagnosticLine, caller.DiagnosticColumn);
+        if (verdict == Binding.BoundTypes.EffectFit.CannotTell)
+        {
+            // --permissive-effects waives "we cannot tell" (§4.5), and it waives
+            // it by suppression.
+            if (_policy == UnknownCallPolicy.Permissive)
+                return;
+
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCode.EffectRowUnknown,
+                $"Cross-module call to '{resolution.FunctionName}' (in module "
+                + $"'{resolution.ModuleName}') has effect row {calleeRow.ToCompactDisplayString()} and "
+                + $"'{caller.CallerName}' declares row {callerRow.ToCompactDisplayString()}, so it cannot "
+                + "be decided whether the callee's effects fit. State a row on both sides, or compile "
+                + "with --permissive-effects.",
+                span,
+                DiagnosticSeverity.Warning,
+                callerFilePath));
+            return;
+        }
+
         var forbidden = resolution.DeclaredEffects.Except(declaredEffects).ToList();
-        var diagnosticSpan = new TextSpan(0, 0, caller.DiagnosticLine, caller.DiagnosticColumn);
+        var diagnosticSpan = span;
         // Caller names for class methods are formatted "ClassName.MethodName".
         var callerKind = caller.CallerName.Contains('.') ? "Method" : "Function";
         // Permissive mode demotes cross-module violations to warnings, mirroring the

@@ -159,6 +159,13 @@ public sealed class EffectEnforcementPass
         // of an assumed-effect function inherits the assumption transitively.
         PropagateAssumptions();
 
+        // Phase 3d (v0.15 E3 slice a): effect-row compatibility at §6.2 sites 1-3
+        // (assignment, argument, return). AFTER PropagateAssumptions, because a
+        // method group's row is Assumed exactly when this pass could only assume
+        // its declaration, and that fact is not settled until assumptions have
+        // propagated through the call graph.
+        CheckRowCompatibility();
+
         // Phase 4: Check every executable body. Constructors and custom accessors
         // have no §E declaration surface, so they use an explicit fail-closed
         // contract: intrinsic initialization/accessor mutation is allowed; every
@@ -514,9 +521,13 @@ public sealed class EffectEnforcementPass
     /// </summary>
     private void CheckEffectVariance(ModuleNode module)
     {
-        var varianceSeverity = _policy == UnknownCallPolicy.Permissive
-            ? DiagnosticSeverity.Warning
-            : DiagnosticSeverity.Error;
+        // v0.15 E3 slice a, design-doc §4.5 — the permissive DEMOTION is GONE.
+        // A `DoesNotFit` verdict is never waived, at any of the six sites, by any
+        // flag: `--permissive-effects` waives only "we cannot tell" (Calor0425).
+        // These two sites are sites 4 and 5, so their verdict is an Error whatever
+        // the policy is. (Priced before the change: no test asserted the demotion,
+        // and no committed .calr depends on it — gate 5's corpus legs.)
+        const DiagnosticSeverity varianceSeverity = DiagnosticSeverity.Error;
 
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
@@ -530,7 +541,14 @@ public sealed class EffectEnforcementPass
                 {
                     var overrideDeclared = GetDeclaredEffects(method.Effects);
                     var baseDeclared = GetDeclaredEffects(baseMethod.Effects);
-                    if (!overrideDeclared.IsSubsetOf(baseDeclared))
+                    // Site 4 (§6.2). ONE relation across all three codes: the same
+                    // EffectRow.Fits that answers Calor0424 at sites 1-3 answers
+                    // here, and Calor0420 is the site-specific spelling of its
+                    // DoesNotFit (§6.3). P16 pins that they move together.
+                    var overrideRow = overrideDeclared.ToRow();
+                    var baseRow = baseDeclared.ToRow();
+                    var verdict = Binding.BoundTypes.EffectRow.Fits(overrideRow, baseRow);
+                    if (verdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                     {
                         var extra = overrideDeclared.Except(baseDeclared)
                             .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
@@ -540,9 +558,21 @@ public sealed class EffectEnforcementPass
                             $"Override '{cls.Name}.{method.Name}' declares effect(s) [{string.Join(", ", extra)}] " +
                             $"not declared by base method '{baseClassName}.{method.Name}' " +
                             $"(base declares: {baseDeclared.ToDisplayString()}). " +
+                            $"Effect row {overrideRow.ToCompactDisplayString()} does not fit the base method's " +
+                            $"row {baseRow.ToCompactDisplayString()}. " +
                             "An override may not broaden its base method's effect set — broader effects " +
                             "would launder through dynamic dispatch.",
                             varianceSeverity);
+                    }
+                    else if (verdict == Binding.BoundTypes.EffectFit.CannotTell)
+                    {
+                        ReportRowUnknown(
+                            method.Effects?.Span ?? method.Span,
+                            $"Override '{cls.Name}.{method.Name}' has effect row "
+                            + $"{overrideRow.ToCompactDisplayString()} and base method "
+                            + $"'{baseClassName}.{method.Name}' has row "
+                            + $"{baseRow.ToCompactDisplayString()}, so effect variance cannot be decided. "
+                            + "State a row on both, or compile with --permissive-effects.");
                     }
                 }
                 else if (baseClassName != null)
@@ -568,7 +598,21 @@ public sealed class EffectEnforcementPass
                     {
                         var implDeclared = GetDeclaredEffects(impl.Effects);
                         var ifaceDeclared = GetDeclaredEffects(sig.Effects);
-                        if (!implDeclared.IsSubsetOf(ifaceDeclared))
+                        // Site 5 (§6.2) — same relation, site-specific code.
+                        var implRow = implDeclared.ToRow();
+                        var ifaceRow = ifaceDeclared.ToRow();
+                        var implVerdict = Binding.BoundTypes.EffectRow.Fits(implRow, ifaceRow);
+                        if (implVerdict == Binding.BoundTypes.EffectFit.CannotTell)
+                        {
+                            ReportRowUnknown(
+                                impl.Effects?.Span ?? impl.Span,
+                                $"Implementation '{implOwnerName ?? cls.Name}.{impl.Name}' of interface method "
+                                + $"'{iface.Name}.{sig.Name}' has effect row "
+                                + $"{implRow.ToCompactDisplayString()} and the interface declares row "
+                                + $"{ifaceRow.ToCompactDisplayString()}, so effect variance cannot be decided. "
+                                + "State a row on both, or compile with --permissive-effects.");
+                        }
+                        else if (implVerdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                         {
                             var extra = implDeclared.Except(ifaceDeclared)
                                 .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
@@ -588,6 +632,8 @@ public sealed class EffectEnforcementPass
                                 $"'{iface.Name}.{sig.Name}' on class '{cls.Name}'{inheritedNote} declares effect(s) " +
                                 $"[{string.Join(", ", extra)}] not declared by the interface " +
                                 $"(interface declares: {ifaceDeclared.ToDisplayString()}). " +
+                                $"Effect row {implRow.ToCompactDisplayString()} does not fit the interface's " +
+                                $"row {ifaceRow.ToCompactDisplayString()}. " +
                                 "An implementation may not broaden the interface's declared effect set — interface " +
                                 "dispatch launders effects identically to overrides.",
                                 varianceSeverity);
@@ -596,23 +642,431 @@ public sealed class EffectEnforcementPass
                     else if (externalBaseName != null)
                     {
                         // The §IMPL is satisfied (if at all) by a member inherited
-                        // from an EXTERNAL base: variance cannot be checked, so the
-                        // interface's declared effect set is only an assumption —
-                        // surfaced like external-base overrides (Calor0419).
-                        var assumedSeverity = _strictEffects
-                            ? DiagnosticSeverity.Error
-                            : DiagnosticSeverity.Warning;
-                        _diagnostics.Report(
+                        // from an EXTERNAL base: the destination row is Unknown, so
+                        // site 5's verdict is CannotTell. v0.15 E3 slice a retires
+                        // this Calor0419 in favour of Calor0425 (§6.2), with §6.4's
+                        // third message sample — which NAMES the row rather than
+                        // merely re-coding the old text.
+                        ReportRowUnknown(
                             cls.Span,
-                            DiagnosticCode.AssumedEffects,
-                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member that is " +
-                            $"not visible in this module (inherited from external base '{externalBaseName}'). " +
-                            "The interface's declared effect set is ASSUMED for this implementation, not verified.",
-                            assumedSeverity);
+                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member "
+                            + "not visible in this module (inherited from external base "
+                            + $"'{externalBaseName}'), so its effect row is Unknown. The interface's "
+                            + $"declared row {GetDeclaredEffects(sig.Effects).ToRow().ToCompactDisplayString()} "
+                            + "is assumed here, not verified.");
                     }
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// v0.15 E3 slice a, design-doc §6.1/§4.5 — reports Calor0425
+    /// <c>EffectRowUnknown</c>. The ONE thing <c>--permissive-effects</c> still
+    /// does in 0.15 is waive this, and it waives it by SUPPRESSION, not by
+    /// demotion: "we cannot tell" is the honest thing to silence.
+    /// <c>--strict-effects</c> raises it to an error, exactly as it does for
+    /// Calor0419. A <c>DoesNotFit</c> verdict never comes through here.
+    /// </summary>
+    private void ReportRowUnknown(TextSpan span, string message)
+    {
+        if (_policy == UnknownCallPolicy.Permissive)
+            return;
+
+        _diagnostics.Report(
+            span,
+            DiagnosticCode.EffectRowUnknown,
+            message,
+            _strictEffects ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning);
+    }
+
+    /// <summary>
+    /// v0.15 E3 slice a — design-doc §6.2 sites <b>1 (assignment)</b>,
+    /// <b>2 (argument)</b> and <b>3 (return)</b>, the three sites whose
+    /// destination is a declared position rather than a declared MEMBER. Sites 4
+    /// and 5 live in <see cref="CheckEffectVariance"/> because their destination
+    /// is a base method / interface member; site 6 (rank-1 instantiation) is
+    /// slice b's.
+    ///
+    /// <para><b>What makes a site.</b> A site exists when a function VALUE the
+    /// pass can name — a <c>§LAM</c>, a function-typed local/parameter/field, or
+    /// a method group naming an in-module callable — flows into a function-typed
+    /// DESTINATION whose declaration this module contains. An external callee has
+    /// no destination at all: the manifest schema gains no row field in 0.15
+    /// (§8.4), so there is nothing to check against and the site does not exist,
+    /// rather than existing with an Unknown destination that would put a
+    /// Calor0425 on every BCL argument in the corpus.</para>
+    ///
+    /// <para><b>Effect-POLYMORPHIC positions are skipped, and that is the slice
+    /// boundary.</b> A row that mentions an <c>eff</c> variable is site 6, whose
+    /// verdict needs §7.4's instantiation and the alpha-equivalence that goes
+    /// with it. Slice a is the FIVE MONOMORPHIC sites; treating a variable row as
+    /// Unknown here would put a Calor0425 on every call in the four A3 combinator
+    /// fixtures, whose frozen baseline (PP-E1 leg A's negative control) is zero
+    /// effect-family diagnostics.</para>
+    ///
+    /// <para><b>§4.4's destination rule is applied at site 1</b>: a binding whose
+    /// initializer fits while carrying assumption reasons takes
+    /// <c>Assumed(declared, reasons)</c>, not <c>Concrete(declared)</c>, so
+    /// passing it onward reports a SECOND Calor0425 rather than laundering the
+    /// assumption away. One Calor0425 per hop, which is P10(b).</para>
+    /// </summary>
+    private void CheckRowCompatibility()
+    {
+        foreach (var function in _callGraphAnalysis.Functions.Values)
+        {
+            new RowSiteChecker(this, function).Check();
+        }
+    }
+
+    /// <summary>The row a declared <c>§E{…}</c> annotation denotes, in the
+    /// <see cref="Binding.BoundTypes.EffectRow"/> lattice. A missing annotation is
+    /// <see cref="Binding.BoundTypes.EffectRow.Unknown"/> at a binding POSITION
+    /// (§3.5) — never pure, which is the laundering hole rows exist to close.</summary>
+    private static Binding.BoundTypes.EffectRow PositionRow(EffectsNode? row) =>
+        row == null
+            ? Binding.BoundTypes.EffectRow.Unknown
+            : GetDeclaredEffects(row).ToRow();
+
+    /// <summary>True when a row is effect-POLYMORPHIC — it mentions an
+    /// <c>eff</c> variable, so its verdict is site 6's and not this slice's.</summary>
+    private static bool IsPolymorphicRow(EffectsNode? row) =>
+        row is { EffectVariables.Count: > 0 };
+
+    /// <summary>
+    /// Walks ONE callable body and adjudicates sites 1-3 inside it. A fresh
+    /// instance per callable, so the in-scope function-valued names cannot leak
+    /// between callables.
+    /// </summary>
+    private sealed class RowSiteChecker
+    {
+        private readonly EffectEnforcementPass _pass;
+        private readonly FunctionNode _function;
+
+        /// <summary>Function-valued names in scope — parameters, fields of the
+        /// owning class, and <c>§B</c> bindings as they are met — mapped to the
+        /// row they carry AT THIS POINT. Site 1 rewrites an entry through
+        /// <c>EffectRow.AtDestination</c>, which is how §4.4's assumption
+        /// survives to the next hop.</summary>
+        private readonly Dictionary<string, Binding.BoundTypes.EffectRow> _scope =
+            new(StringComparer.Ordinal);
+
+        public RowSiteChecker(EffectEnforcementPass pass, FunctionNode function)
+        {
+            _pass = pass;
+            _function = function;
+        }
+
+        public void Check()
+        {
+            if (_pass._ownerClassByFunctionId.TryGetValue(_function.Id, out var owner))
+            {
+                foreach (var field in owner.Fields)
+                {
+                    if (IsFunctionTyped(field.TypeName) && !IsPolymorphicRow(field.Row))
+                        _scope[field.Name] = PositionRow(field.Row);
+                }
+            }
+
+            foreach (var parameter in _function.Parameters)
+            {
+                if (IsFunctionTyped(parameter.TypeName) && !IsPolymorphicRow(parameter.Row))
+                    _scope[parameter.Name] = PositionRow(parameter.Row);
+            }
+
+            foreach (var statement in _function.Body)
+                Walk(statement);
+        }
+
+        private void Walk(AstNode node)
+        {
+            // A §LAM's interior is the LAMBDA's body, not this callable's: its §R
+            // is a lambda return (site 3 against the lambda's own row, which is
+            // ρ_body and therefore slice b). The lambda itself is still adjudicated
+            // where it appears, as a source, before we decline to descend.
+            if (node is LambdaExpressionNode)
+                return;
+
+            switch (node)
+            {
+                case BindStatementNode bind:
+                    CheckAssignmentSite(bind);
+                    break;
+                case ReturnStatementNode { Expression: { } returned }:
+                    CheckReturnSite(returned);
+                    break;
+                case CallStatementNode call:
+                    CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames);
+                    break;
+                case CallExpressionNode call:
+                    CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames);
+                    break;
+            }
+
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                Walk(child);
+        }
+
+        // ===== Site 1 — assignment (§B initializer) =====
+
+        private void CheckAssignmentSite(BindStatementNode bind)
+        {
+            var declaresRow = bind.Row != null;
+            var functionTyped = declaresRow || IsFunctionTyped(bind.TypeName);
+            if (!functionTyped || IsPolymorphicRow(bind.Row))
+                return;
+
+            var source = SourceRow(bind.Initializer);
+            if (source == null)
+            {
+                // No nameable function value on the right. §3.5: a row-less §B
+                // takes its initializer's row, and there is nothing to check.
+                if (declaresRow)
+                    _scope[bind.Name] = PositionRow(bind.Row);
+                return;
+            }
+
+            var destination = PositionRow(bind.Row);
+
+            // §3.5 — a §B with NO row of its own INFERS one from its initializer.
+            // That is not a site: there is no declared destination to disagree
+            // with. The inferred row is what the next hop sees.
+            if (!declaresRow)
+            {
+                _scope[bind.Name] = source.Value.Row;
+                return;
+            }
+
+            Adjudicate(
+                bind.Row!.Span,
+                source.Value.Row,
+                destination,
+                sourceDescription: $"Initializer of binding '{bind.Name}'",
+                destinationDescription: $"binding '{bind.Name}'",
+                destinationName: bind.Name,
+                destinationIsPosition: true,
+                positionDescription: $"Binding '{bind.Name}'",
+                owner: _function.Name);
+
+            // §4.4 — the row the value HAS at its destination. An Assumed source
+            // that fits produces an Assumed destination, so the assumption is
+            // reported again at the next hop instead of vanishing.
+            _scope[bind.Name] =
+                Binding.BoundTypes.EffectRow.Fits(source.Value.Row, destination)
+                    == Binding.BoundTypes.EffectFit.Fits
+                    ? Binding.BoundTypes.EffectRow.AtDestination(source.Value.Row, destination)
+                    : destination;
+        }
+
+        // ===== Site 2 — argument =====
+
+        private void CheckArgumentSite(
+            string target,
+            IReadOnlyList<ExpressionNode> arguments,
+            IReadOnlyList<string?>? argumentNames)
+        {
+            if (arguments.Count == 0)
+                return;
+
+            // Named arguments would need overload-accurate positional mapping,
+            // which this AST walk does not have. Declining is the honest answer.
+            if (argumentNames != null && argumentNames.Any(name => name != null))
+                return;
+
+            var callee = ResolveInModuleCallee(target);
+            if (callee == null)
+                return;
+
+            for (var index = 0; index < arguments.Count && index < callee.Parameters.Count; index++)
+            {
+                var parameter = callee.Parameters[index];
+                if (!IsFunctionTyped(parameter.TypeName) || IsPolymorphicRow(parameter.Row))
+                    continue;
+
+                var source = SourceRow(arguments[index]);
+                if (source == null)
+                    continue;
+
+                Adjudicate(
+                    arguments[index].Span,
+                    source.Value.Row,
+                    PositionRow(parameter.Row),
+                    sourceDescription: $"Argument {source.Value.Description}",
+                    destinationDescription: $"parameter '{parameter.Name}' of '{callee.Name}'",
+                    destinationName: parameter.Name,
+                    destinationIsPosition: parameter.Row == null,
+                    positionDescription: $"Parameter '{parameter.Name}' of '{callee.Name}'",
+                    owner: callee.Name);
+            }
+        }
+
+        // ===== Site 3 — return =====
+
+        private void CheckReturnSite(ExpressionNode returned)
+        {
+            var output = _function.Output;
+            if (output == null || IsPolymorphicRow(output.Row))
+                return;
+            if (output.Row == null && !IsFunctionTyped(output.TypeName))
+                return;
+
+            var source = SourceRow(returned);
+            if (source == null)
+                return;
+
+            Adjudicate(
+                returned.Span,
+                source.Value.Row,
+                PositionRow(output.Row),
+                sourceDescription: $"Returned value {source.Value.Description}",
+                destinationDescription: $"the return of '{_function.Name}'",
+                destinationName: "the return type",
+                destinationIsPosition: output.Row == null,
+                positionDescription: $"The return of '{_function.Name}'",
+                owner: _function.Name);
+        }
+
+        // ===== The shared verdict =====
+
+        private void Adjudicate(
+            TextSpan span,
+            Binding.BoundTypes.EffectRow source,
+            Binding.BoundTypes.EffectRow destination,
+            string sourceDescription,
+            string destinationDescription,
+            string destinationName,
+            bool destinationIsPosition,
+            string positionDescription,
+            string owner)
+        {
+            switch (Binding.BoundTypes.EffectRow.Fits(source, destination))
+            {
+                case Binding.BoundTypes.EffectFit.DoesNotFit:
+                {
+                    var extra = string.Join(", ",
+                        source.ToEffectSet().Except(destination.ToEffectSet())
+                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
+                            .OrderBy(code => code, StringComparer.Ordinal));
+                    _pass._diagnostics.Report(
+                        span,
+                        DiagnosticCode.EffectRowMismatch,
+                        $"{sourceDescription} has effect row {source.ToCompactDisplayString()}, which does "
+                        + $"not fit {destinationDescription} (declared row: "
+                        + $"{destination.ToCompactDisplayString()}). Extra effect(s): {extra}. Widen "
+                        + $"'{destinationName}' to §E{{{extra}}}, or pass a function whose row fits. "
+                        + "An effect row that does not fit is never waived.",
+                        DiagnosticSeverity.Error);
+                    break;
+                }
+
+                case Binding.BoundTypes.EffectFit.CannotTell when destinationIsPosition && destination.IsUnknown:
+                    // §6.4's second sample: the destination POSITION carries no row
+                    // at all, so nothing is known about what may be passed.
+                    _pass.ReportRowUnknown(
+                        span,
+                        $"{positionDescription} is function-typed with no effect row, so its effects are "
+                        + "Unknown. Add §E{…} on the same line as the type to state what callers may pass, "
+                        + "or compile with --permissive-effects. Invoking a value whose row is Unknown "
+                        + $"charges Unknown to '{owner}'.");
+                    break;
+
+                case Binding.BoundTypes.EffectFit.CannotTell:
+                    _pass.ReportRowUnknown(
+                        span,
+                        $"{sourceDescription} has effect row {source.ToCompactDisplayString()} and "
+                        + $"{destinationDescription} declares row {destination.ToCompactDisplayString()}, "
+                        + "so it cannot be decided whether the row fits. State a row on both sides, or "
+                        + "compile with --permissive-effects.");
+                    break;
+
+                case Binding.BoundTypes.EffectFit.Fits:
+                {
+                    // §4.3 — Assumed fits like its underlying set and ALWAYS
+                    // propagates a Calor0425, from whichever side the assumption
+                    // came. Read through CarriedReasons, which is total; reading it
+                    // off AtDestination would lose them on an Unknown destination.
+                    var reasons = Binding.BoundTypes.EffectRow.CarriedReasons(source, destination);
+                    if (reasons.IsEmpty)
+                        break;
+
+                    var shown = string.Join("; ", reasons.Take(3));
+                    if (reasons.Count > 3)
+                        shown += $"; and {reasons.Count - 3} more";
+                    _pass.ReportRowUnknown(
+                        span,
+                        $"{sourceDescription} fits {destinationDescription} only under an assumption: "
+                        + $"{shown}. The row is accepted as an assumption, not a proof.");
+                    break;
+                }
+            }
+        }
+
+        // ===== Source rows =====
+
+        private readonly record struct RowSource(
+            Binding.BoundTypes.EffectRow Row,
+            string Description);
+
+        /// <summary>
+        /// The row of a function VALUE, or <c>null</c> when the expression is not
+        /// a function value this slice can name — in which case there is no site.
+        ///
+        /// <para>P17, "no silent Unknown": an unresolved receiver, an
+        /// unknown-typed name and a call result all yield
+        /// <see cref="Binding.BoundTypes.EffectRow.Unknown"/> or no site at all;
+        /// none of them ever yields a <c>Concrete</c> row. A <c>Concrete</c> row
+        /// here would mean the compiler claiming to know what a value does when it
+        /// does not.</para>
+        /// </summary>
+        private RowSource? SourceRow(ExpressionNode? expression)
+        {
+            switch (expression)
+            {
+                case LambdaExpressionNode lambda:
+                    if (IsPolymorphicRow(lambda.Effects))
+                        return null;
+                    // §5 — the §LAM's §E IS the lambda's declared row. With no
+                    // annotation the row is ρ_body, which slice b computes; in
+                    // slice a it stays Unknown, which fits nothing and is fitted
+                    // by nothing, so nothing slips through.
+                    return new RowSource(PositionRow(lambda.Effects), "lambda");
+
+                case ReferenceNode reference:
+                {
+                    if (_scope.TryGetValue(reference.Name, out var inScope))
+                        return new RowSource(inScope, $"'{reference.Name}'");
+
+                    // A method group naming an in-module callable: its row is its
+                    // DECLARED §E — and Assumed, with the reasons, when the effect
+                    // pass could only assume that declaration (§4.5's composition:
+                    // soundness is body ⊑ declaration ∧ declaration ⊑ destination).
+                    var callee = ResolveInModuleCallee(reference.Name);
+                    if (callee == null)
+                        return null;
+
+                    var declared = GetDeclaredEffects(callee.Effects).ToRow();
+                    var row =
+                        _pass._assumedEffects.TryGetValue(callee.Id, out var reasons) && reasons.Count > 0
+                            ? Binding.BoundTypes.EffectRow.Assumed(declared.Codes, reasons)
+                            : declared;
+                    return new RowSource(row, $"'{callee.Name}'");
+                }
+
+                default:
+                    return null;
+            }
+        }
+
+        private FunctionNode? ResolveInModuleCallee(string target)
+        {
+            var id = _pass.ResolveToInternalId(target);
+            return id != null && _pass._callGraphAnalysis.Functions.TryGetValue(id, out var callee)
+                ? callee
+                : null;
+        }
+
+        private bool IsFunctionTyped(string? typeName) =>
+            TypeIdentity.IsFunctionTypeName(typeName, _pass._delegateTypeNames.Contains);
     }
 
     /// <summary>
