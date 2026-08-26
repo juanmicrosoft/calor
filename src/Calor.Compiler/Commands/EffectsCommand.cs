@@ -155,7 +155,11 @@ public static class EffectsCommand
         var resolver = new EffectResolver(loader);
         resolver.Initialize(project?.FullName, solution?.FullName);
 
-        var resolution = resolver.Resolve(typeName, methodName);
+        // v0.15 E1 slice 2c — `calor effects explain <Type.Method>` is given a
+        // signature as TEXT on the command line; there is no bound receiver to
+        // key on, and the ledger counts it honestly as a string fallback.
+        var resolution = resolver.Resolve(
+            EffectResolverKey.FromStrings(typeName, methodName));
 
         if (json)
         {
@@ -479,9 +483,19 @@ public static class EffectsCommand
             .Where(call => !IsInternalCall(call, combinedFunctionNames, combinedMethodNames))
             .Where(call =>
             {
+                // v0.15 E1 slice 2c — `calor effects suggest` works from
+                // CollectedCall, which is (text, text, kind). String fallback,
+                // and the key ledger says so.
                 if (call.Kind == CallKind.Constructor)
-                    return resolver.ResolveConstructor(call.TypeName).Status == EffectResolutionStatus.Unknown;
-                return resolver.Resolve(call.TypeName, call.MethodName).Status == EffectResolutionStatus.Unknown;
+                {
+                    return resolver.Resolve(EffectResolverKey.FromStrings(
+                        call.TypeName, ".ctor", kind: EffectMemberKind.Constructor))
+                        .Status == EffectResolutionStatus.Unknown;
+                }
+
+                return resolver.Resolve(
+                    EffectResolverKey.FromStrings(call.TypeName, call.MethodName))
+                    .Status == EffectResolutionStatus.Unknown;
             })
             .Distinct()
             .ToList();

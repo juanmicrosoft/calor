@@ -38,7 +38,10 @@ public class InteropEffectCoverageCalculator : IMetricCalculator
 
         foreach (var call in allCalls)
         {
-            var resolution = resolver.Resolve(call.TypeName, call.MethodName);
+            // v0.15 E1 slice 2c — a CollectedCall carries only text, so this is
+            // a string-fallback key by construction. Counted as such.
+            var resolution = resolver.Resolve(
+                EffectResolverKey.FromStrings(call.TypeName, call.MethodName));
             if (resolution.Status == EffectResolutionStatus.Unknown)
             {
                 unknown++;

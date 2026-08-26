@@ -210,33 +210,41 @@ public sealed class TransitiveEffectPropagator
         var typeName = BareTypeName(method.TypeName);
         var parameterTypes = EffectResolver.ParseParameterSignature(method.ParameterSig);
 
-        // Try standard method resolution first
-        var result = _manifestResolver.Resolve(typeName, method.MethodName, parameterTypes);
+        // v0.15 E1 slice 2c — an IL MethodKey is metadata TEXT (type name,
+        // member name, parameter signature), so every key built here is a
+        // string fallback and the ledger counts it that way. Symbol identity
+        // for IL callees is an E2 question: it needs the IL reader to hand back
+        // resolved type references rather than names.
+        var result = _manifestResolver.Resolve(
+            EffectResolverKey.FromStrings(typeName, method.MethodName, parameterTypes));
         if (result.Status != EffectResolutionStatus.Unknown)
             return result;
 
-        // Property setter: set_PropertyName → ResolveSetter(type, PropertyName)
+        // Property setter: set_PropertyName → a Setter-kind key on PropertyName
         if (method.MethodName.StartsWith("set_") && method.MethodName.Length > 4)
         {
             var propertyName = method.MethodName[4..];
-            result = _manifestResolver.ResolveSetter(typeName, propertyName);
+            result = _manifestResolver.Resolve(EffectResolverKey.FromStrings(
+                typeName, propertyName, kind: EffectMemberKind.Setter));
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }
 
-        // Property getter: get_PropertyName → ResolveGetter(type, PropertyName)
+        // Property getter: get_PropertyName → a Getter-kind key on PropertyName
         if (method.MethodName.StartsWith("get_") && method.MethodName.Length > 4)
         {
             var propertyName = method.MethodName[4..];
-            result = _manifestResolver.ResolveGetter(typeName, propertyName);
+            result = _manifestResolver.Resolve(EffectResolverKey.FromStrings(
+                typeName, propertyName, kind: EffectMemberKind.Getter));
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }
 
-        // Constructor: .ctor → ResolveConstructor(type)
+        // Constructor: .ctor → a Constructor-kind key
         if (method.MethodName == ".ctor")
         {
-            result = _manifestResolver.ResolveConstructor(typeName, parameterTypes);
+            result = _manifestResolver.Resolve(EffectResolverKey.FromStrings(
+                typeName, ".ctor", parameterTypes, EffectMemberKind.Constructor));
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }
