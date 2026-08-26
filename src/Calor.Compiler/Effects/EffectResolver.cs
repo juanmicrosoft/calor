@@ -17,8 +17,19 @@ public sealed class EffectResolver
     private readonly ManifestLoader _manifestLoader;
     private readonly IL.ILEffectAnalyzer? _ilAnalyzer;
     private readonly Dictionary<string, ResolvedTypeInfo> _typeCache = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, EffectResolution> _methodCache = new(StringComparer.Ordinal);
+
+    // v0.15 E1 slice 2c — keyed by EffectResolverKey, whose equality includes
+    // the member Kind. That is the STRUCTURAL replacement for the "m:"/"g:"/
+    // "s:"/"c:" string prefixes this cache used to carry: without them
+    // Resolve(T, "set_X") and the setter of X built the IDENTICAL key and
+    // whichever ran first poisoned the other's result (observed: the IL
+    // propagator probed the method form first and cached Unknown, making
+    // manifest-covered setters look like assumptions). Kind now makes that
+    // collision unrepresentable rather than merely avoided.
+    private readonly Dictionary<EffectResolverKey, EffectResolution> _resolutionCache = new();
     private readonly HashSet<string> _extensionProviders = new(StringComparer.Ordinal);
+    private long _keysFromBoundReceiver;
+    private long _keysFromStringFallback;
     private bool _initialized;
 
     public EffectResolver(ManifestLoader? manifestLoader = null, IL.ILEffectAnalyzer? ilAnalyzer = null)
@@ -40,72 +51,132 @@ public sealed class EffectResolver
     }
 
     /// <summary>
-    /// Resolves effects for a method call.
+    /// v0.15 E1 slice 2c — THE resolution entry point. One method, one
+    /// argument, and that argument is a symbol identity
+    /// (<see cref="EffectResolverKey"/>) rather than a bag of strings.
+    ///
+    /// <para>Roadmap §4.2 E1 exit pin (c) is the deletion this replaces: no
+    /// <c>Resolve(string, string, …)</c> overload remains, and
+    /// <c>ArchitectureTests.EffectResolver_ExposesNoStringTypeNameResolveOverload</c>
+    /// asserts it by reflection so the overload cannot come back by accident.
+    /// Callers that genuinely hold only text build their key through the single
+    /// <see cref="EffectResolverKey.FromStrings"/> factory, which stamps
+    /// <see cref="EffectResolverKey.FromStringFallback"/>; the split between
+    /// that and <see cref="EffectResolverKey.FromBoundReceiver"/> is counted in
+    /// <see cref="KeyOrigins"/> and frozen per subject by the key ledger.</para>
+    ///
+    /// <para>The six-step order of the class remarks is preserved exactly, and
+    /// so is <c>"*"</c> wildcard semantics.</para>
     /// </summary>
-    /// <param name="fullyQualifiedType">The fully-qualified type name (e.g., "System.IO.File")</param>
-    /// <param name="methodName">The method name (e.g., "ReadAllText")</param>
-    /// <param name="parameterTypes">Optional parameter types for overload resolution</param>
-    public EffectResolution Resolve(string fullyQualifiedType, string methodName, params string[] parameterTypes)
+    public EffectResolution Resolve(EffectResolverKey key)
     {
+        ArgumentNullException.ThrowIfNull(key);
         EnsureInitialized();
-        parameterTypes = parameterTypes.Select(NormalizeParameterType).ToArray();
 
-        // Build cache key. The "m:" prefix keeps this entry point's cache
-        // disjoint from ResolveSetter/ResolveGetter/ResolveConstructor —
-        // without it, Resolve(T, "set_X") and ResolveSetter(T, "X") build the
-        // IDENTICAL key, and whichever runs first poisons the other's result
-        // (observed: the IL propagator probed Resolve(...) first and cached
-        // Unknown, making manifest-covered setters look like assumptions).
-        var signature = "m:" + BuildSignature(fullyQualifiedType, methodName, parameterTypes);
-        if (_methodCache.TryGetValue(signature, out var cached))
+        // Counted per CALL SITE, before the cache, because the ledger measures
+        // how the compiler ASKS — not how often the answer had to be computed.
+        if (key.FromStringFallback)
+            _keysFromStringFallback++;
+        else
+            _keysFromBoundReceiver++;
+
+        // Extension resolution is deliberately UNCACHED, as it was before this
+        // slice. Its answer depends on ReceiverInterfaces, which is outside key
+        // equality: caching it would let one receiver's interface set decide
+        // another receiver's extension lookup.
+        if (key.Kind == EffectMemberKind.Extension)
+            return ResolveExtensionInternal(key);
+
+        if (_resolutionCache.TryGetValue(key, out var cached))
             return cached;
 
-        var resolution = ResolveInternal(fullyQualifiedType, methodName, parameterTypes, signature);
-        _methodCache[signature] = resolution;
+        var resolution = key.Kind switch
+        {
+            EffectMemberKind.Getter or EffectMemberKind.Setter => ResolveAccessorInternal(key),
+            EffectMemberKind.Constructor => ResolveConstructorInternal(key),
+            _ => ResolveMethodInternal(key),
+        };
+        _resolutionCache[key] = resolution;
         return resolution;
     }
 
     /// <summary>
-    /// Resolves an extension-method call from manifest-declared extension providers.
-    /// The receiver type is included as the first signature parameter.
+    /// How many keys this resolver has been asked with, split by provenance.
+    /// Read by <c>EffectResolverKeyLedgerTests</c>, which freezes the split per
+    /// corpus subject so a silent regression from bound keys back to string
+    /// keys is a red test rather than an unnoticed drift.
     /// </summary>
-    public EffectResolution ResolveExtension(
-        string receiverType,
-        string methodName,
-        params string[] parameterTypes)
-    {
-        EnsureInitialized();
+    public EffectResolverKeyOrigins KeyOrigins =>
+        new(_keysFromBoundReceiver, _keysFromStringFallback);
 
-        var allParameterTypes = new[] { receiverType }.Concat(parameterTypes).ToArray();
+    /// <summary>Zeroes <see cref="KeyOrigins"/>, so one resolver can be measured per subject.</summary>
+    public void ResetKeyOrigins()
+    {
+        _keysFromBoundReceiver = 0;
+        _keysFromStringFallback = 0;
+    }
+
+    private EffectResolution ResolveExtensionInternal(EffectResolverKey key)
+    {
+        // The receiver type is the first signature parameter, exactly as before.
+        var allParameterTypes = new[] { key.DeclaringType }
+            .Concat(key.ParameterTypes ?? Array.Empty<string>())
+            .Select(NormalizeParameterType)
+            .ToArray();
+
         foreach (var provider in _extensionProviders.OrderBy(p => p, StringComparer.Ordinal))
         {
             if (!_typeCache.TryGetValue(provider, out var typeInfo))
                 continue;
 
-            var normalizedParameters = allParameterTypes
-                .Select(NormalizeParameterType)
-                .ToArray();
-            if (normalizedParameters.All(IsKnownParameterType))
+            if (allParameterTypes.All(IsKnownParameterType))
             {
-                var signature = $"{methodName}({string.Join(",", normalizedParameters)})";
-                if (typeInfo.Methods.TryGetValue(signature, out var signatureEffects))
+                var signatureProbe = EffectResolverKey.ForManifestEntry(
+                    EffectMemberKind.Method, provider, key.MemberName, allParameterTypes);
+                if (typeInfo.Members.TryGetValue(signatureProbe, out var signatureEffects))
                     return CreateResolution(signatureEffects, typeInfo.Source);
             }
 
-            if (IsCompatibleExtensionReceiver(provider, receiverType)
-                && typeInfo.Methods.TryGetValue(methodName, out var methodEffects))
+            var nameProbe = EffectResolverKey.ForManifestEntry(
+                EffectMemberKind.Method, provider, key.MemberName, null);
+            if (IsCompatibleExtensionReceiver(provider, key)
+                && typeInfo.Members.TryGetValue(nameProbe, out var methodEffects))
                 return CreateResolution(methodEffects, typeInfo.Source);
         }
 
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
-    private static bool IsCompatibleExtensionReceiver(string provider, string receiverType)
+    /// <summary>
+    /// Whether an extension provider's name-only entry applies to this receiver.
+    ///
+    /// <para>v0.15 E1 slice 2c — asked of the BINDER first. When the bound
+    /// receiver carries interfaces
+    /// (<see cref="EffectResolverKey.ReceiverInterfaces"/>) the question is
+    /// answered structurally: does the receiver implement <c>IEnumerable</c>?
+    /// That is the real predicate; the list below was only ever a proxy for
+    /// it.</para>
+    ///
+    /// <para>The name-shape list SURVIVES as the documented fallback, and will
+    /// keep surviving until bound types carry interface sets (E2). It is
+    /// reached whenever the binder has nothing to say — a receiver typed only
+    /// by an AST string, a member chain, a module whose binding threw — which
+    /// is still the majority of call sites today. Deleting it now would delete
+    /// resolution, which is the mistake slice 2b measured and reverted.</para>
+    /// </summary>
+    private static bool IsCompatibleExtensionReceiver(string provider, EffectResolverKey key)
     {
         if (!provider.Equals("System.Linq.Enumerable", StringComparison.Ordinal))
             return false;
 
-        var normalized = receiverType.Replace("global::", "", StringComparison.Ordinal);
+        if (key.ReceiverInterfaces.Count > 0)
+        {
+            return key.ReceiverInterfaces.Any(name =>
+                name.Equals("System.Collections.Generic.IEnumerable`1", StringComparison.Ordinal)
+                || name.Equals("System.Collections.IEnumerable", StringComparison.Ordinal));
+        }
+
+        var normalized = key.DeclaringType;
         return normalized.EndsWith("[]", StringComparison.Ordinal)
             || normalized.StartsWith("System.Collections.", StringComparison.Ordinal)
             || normalized.StartsWith("IEnumerable<", StringComparison.Ordinal)
@@ -117,84 +188,33 @@ public sealed class EffectResolver
     }
 
     /// <summary>
-    /// Resolves effects for a property getter.
-    /// </summary>
-    public EffectResolution ResolveGetter(string fullyQualifiedType, string propertyName)
-    {
-        EnsureInitialized();
-
-        var signature = $"g:{fullyQualifiedType}::get_{propertyName}()";
-        if (_methodCache.TryGetValue(signature, out var cached))
-            return cached;
-
-        var resolution = ResolveGetterInternal(fullyQualifiedType, propertyName, signature);
-        _methodCache[signature] = resolution;
-        return resolution;
-    }
-
-    /// <summary>
-    /// Resolves effects for a property setter.
-    /// </summary>
-    public EffectResolution ResolveSetter(string fullyQualifiedType, string propertyName)
-    {
-        EnsureInitialized();
-
-        var signature = $"s:{fullyQualifiedType}::set_{propertyName}()";
-        if (_methodCache.TryGetValue(signature, out var cached))
-            return cached;
-
-        var resolution = ResolveSetterInternal(fullyQualifiedType, propertyName, signature);
-        _methodCache[signature] = resolution;
-        return resolution;
-    }
-
-    /// <summary>
-    /// Resolves effects for a constructor.
-    /// </summary>
-    public EffectResolution ResolveConstructor(string fullyQualifiedType, params string[] parameterTypes)
-    {
-        EnsureInitialized();
-        parameterTypes = parameterTypes.Select(NormalizeParameterType).ToArray();
-
-        var paramSig = $"({string.Join(",", parameterTypes)})";
-        var signature = $"c:{fullyQualifiedType}::.ctor{paramSig}";
-
-        if (_methodCache.TryGetValue(signature, out var cached))
-            return cached;
-
-        var resolution = ResolveConstructorInternal(fullyQualifiedType, parameterTypes, signature);
-        _methodCache[signature] = resolution;
-        return resolution;
-    }
-
-    /// <summary>
     /// Gets any errors encountered during manifest loading.
     /// </summary>
     public IReadOnlyList<string> LoadErrors => _manifestLoader.LoadErrors;
 
-    private EffectResolution ResolveInternal(string type, string method, string[] parameterTypes, string signature)
+    private EffectResolution ResolveMethodInternal(EffectResolverKey key)
     {
         // 1. Check type cache from manifests
-        if (_typeCache.TryGetValue(type, out var typeInfo))
+        if (_typeCache.TryGetValue(key.DeclaringType, out var typeInfo))
         {
-            // 2a. Try specific method with parameters
-            if (parameterTypes.All(IsKnownParameterType))
+            // 2a. Try specific method with parameters. `key` IS the signature
+            //     probe: its parameter list is non-null and normalized, and key
+            //     equality ignores provenance, so a bound key and a string key
+            //     for one member hit the same manifest entry.
+            if (key.HasKnownParameterTypes
+                && typeInfo.Members.TryGetValue(key, out var specificEffects))
             {
-                var paramSig = $"{method}({string.Join(",", parameterTypes)})";
-                if (typeInfo.Methods.TryGetValue(paramSig, out var specificEffects))
-                {
-                    return CreateResolution(specificEffects, typeInfo.Source);
-                }
+                return CreateResolution(specificEffects, typeInfo.Source);
             }
 
             // 2b. Try method name without parameters
-            if (typeInfo.Methods.TryGetValue(method, out var methodEffects))
+            if (typeInfo.Members.TryGetValue(key.WithoutParameterList(), out var methodEffects))
             {
                 return CreateResolution(methodEffects, typeInfo.Source);
             }
 
             // 2c. Try wildcard
-            if (typeInfo.Methods.TryGetValue("*", out var wildcardEffects))
+            if (typeInfo.Members.TryGetValue(WildcardProbe(key), out var wildcardEffects))
             {
                 return CreateResolution(wildcardEffects, typeInfo.Source);
             }
@@ -207,12 +227,12 @@ public sealed class EffectResolver
         }
 
         // 3. Check namespace defaults
-        var nsResolution = ResolveFromNamespaceDefaults(type);
+        var nsResolution = ResolveFromNamespaceDefaults(key.DeclaringType);
         if (nsResolution != null)
             return nsResolution;
 
         // 4. IL analysis fallback (after all manifest layers, before Unknown)
-        var ilResolution = TryILAnalysis(type, method, parameterTypes);
+        var ilResolution = TryILAnalysis(key);
         if (ilResolution != null)
             return ilResolution;
 
@@ -220,14 +240,22 @@ public sealed class EffectResolver
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
-    private EffectResolution ResolveGetterInternal(string type, string propertyName, string signature)
+    /// <summary>
+    /// Getters and setters share one shape: a name-keyed manifest entry, then
+    /// the type default, then namespace defaults, then IL analysis under the
+    /// CLR accessor spelling (<c>get_X</c> / <c>set_X</c>).
+    /// </summary>
+    private EffectResolution ResolveAccessorInternal(EffectResolverKey key)
     {
-        // Check type cache from manifests
-        if (_typeCache.TryGetValue(type, out var typeInfo))
+        // Accessor entries are name-only in every manifest, so the probe drops
+        // the parameter list even when the caller supplied an empty one.
+        var probe = key.WithoutParameterList();
+
+        if (_typeCache.TryGetValue(key.DeclaringType, out var typeInfo))
         {
-            if (typeInfo.Getters.TryGetValue(propertyName, out var getterEffects))
+            if (typeInfo.Members.TryGetValue(probe, out var accessorEffects))
             {
-                return CreateResolution(getterEffects, typeInfo.Source);
+                return CreateResolution(accessorEffects, typeInfo.Source);
             }
 
             // Fall back to default effects
@@ -238,55 +266,26 @@ public sealed class EffectResolver
         }
 
         // Check namespace defaults
-        var nsResolution = ResolveFromNamespaceDefaults(type);
+        var nsResolution = ResolveFromNamespaceDefaults(key.DeclaringType);
         if (nsResolution != null)
             return nsResolution;
 
         // IL analysis fallback
-        var ilResolution = TryILAnalysis(type, $"get_{propertyName}");
+        var accessorPrefix = key.Kind == EffectMemberKind.Getter ? "get_" : "set_";
+        var ilResolution = TryILAnalysis(
+            key.WithMemberName($"{accessorPrefix}{key.MemberName}").WithoutParameterList());
         if (ilResolution != null)
             return ilResolution;
 
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
-    private EffectResolution ResolveSetterInternal(string type, string propertyName, string signature)
+    private EffectResolution ResolveConstructorInternal(EffectResolverKey key)
     {
         // Check type cache from manifests
-        if (_typeCache.TryGetValue(type, out var typeInfo))
+        if (_typeCache.TryGetValue(key.DeclaringType, out var typeInfo))
         {
-            if (typeInfo.Setters.TryGetValue(propertyName, out var setterEffects))
-            {
-                return CreateResolution(setterEffects, typeInfo.Source);
-            }
-
-            // Fall back to default effects
-            if (typeInfo.DefaultEffects != null)
-            {
-                return CreateResolution(typeInfo.DefaultEffects, typeInfo.Source);
-            }
-        }
-
-        // Check namespace defaults
-        var nsResolution = ResolveFromNamespaceDefaults(type);
-        if (nsResolution != null)
-            return nsResolution;
-
-        // IL analysis fallback
-        var ilResolution = TryILAnalysis(type, $"set_{propertyName}");
-        if (ilResolution != null)
-            return ilResolution;
-
-        return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
-    }
-
-    private EffectResolution ResolveConstructorInternal(string type, string[] parameterTypes, string signature)
-    {
-        // Check type cache from manifests
-        if (_typeCache.TryGetValue(type, out var typeInfo))
-        {
-            var paramSig = $"({string.Join(",", parameterTypes)})";
-            if (typeInfo.Constructors.TryGetValue(paramSig, out var ctorEffects))
+            if (typeInfo.Members.TryGetValue(key, out var ctorEffects))
             {
                 return CreateResolution(ctorEffects, typeInfo.Source);
             }
@@ -299,21 +298,31 @@ public sealed class EffectResolver
         }
 
         // Check namespace defaults
-        var nsResolution = ResolveFromNamespaceDefaults(type);
+        var nsResolution = ResolveFromNamespaceDefaults(key.DeclaringType);
         if (nsResolution != null)
             return nsResolution;
 
         // IL analysis fallback
-        var ilResolution = TryILAnalysis(type, ".ctor", parameterTypes);
+        var ilResolution = TryILAnalysis(key);
         if (ilResolution != null)
             return ilResolution;
 
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
-    private EffectResolution? TryILAnalysis(string type, string method, string[]? parameterTypes = null)
+    /// <summary>
+    /// The manifest wildcard probe: the same declaring type, member name
+    /// <c>"*"</c>, no parameter list. Wildcard semantics are unchanged — a
+    /// <c>"*"</c> methods entry answers for any method on the type, after the
+    /// signature and name probes and before the type default.
+    /// </summary>
+    private static EffectResolverKey WildcardProbe(EffectResolverKey key) =>
+        EffectResolverKey.ForManifestEntry(
+            EffectMemberKind.Method, key.DeclaringType, "*", null);
+
+    private EffectResolution? TryILAnalysis(EffectResolverKey key)
     {
-        return _ilAnalyzer?.TryResolve(type, method, parameterTypes);
+        return _ilAnalyzer?.TryResolve(key);
     }
 
     private EffectResolution? ResolveFromNamespaceDefaults(string type)
@@ -370,39 +379,41 @@ public sealed class EffectResolver
                     typeInfo.DefaultEffects = mapping.DefaultEffects;
                 }
 
-                // Copy methods
+                // v0.15 E1 slice 2c — every manifest entry is parsed into an
+                // EffectResolverKey exactly ONCE, here, at load. Lookup is then
+                // a dictionary hit on a key, never a signature string rebuilt
+                // and re-parsed per call site.
                 if (mapping.Methods != null)
                 {
                     foreach (var (method, effects) in mapping.Methods)
                     {
-                        typeInfo.Methods[NormalizeMethodManifestKey(method)] = effects;
+                        typeInfo.Members[ParseMethodManifestKey(mapping.Type, method)] = effects;
                     }
                 }
 
-                // Copy getters
                 if (mapping.Getters != null)
                 {
                     foreach (var (prop, effects) in mapping.Getters)
                     {
-                        typeInfo.Getters[prop] = effects;
+                        typeInfo.Members[EffectResolverKey.ForManifestEntry(
+                            EffectMemberKind.Getter, mapping.Type, prop, null)] = effects;
                     }
                 }
 
-                // Copy setters
                 if (mapping.Setters != null)
                 {
                     foreach (var (prop, effects) in mapping.Setters)
                     {
-                        typeInfo.Setters[prop] = effects;
+                        typeInfo.Members[EffectResolverKey.ForManifestEntry(
+                            EffectMemberKind.Setter, mapping.Type, prop, null)] = effects;
                     }
                 }
 
-                // Copy constructors
                 if (mapping.Constructors != null)
                 {
                     foreach (var (sig, effects) in mapping.Constructors)
                     {
-                        typeInfo.Constructors[NormalizeConstructorManifestKey(sig)] = effects;
+                        typeInfo.Members[ParseConstructorManifestKey(mapping.Type, sig)] = effects;
                     }
                 }
 
@@ -412,26 +423,45 @@ public sealed class EffectResolver
         }
     }
 
-    private static string NormalizeMethodManifestKey(string method)
+    /// <summary>
+    /// A manifest <c>methods</c> entry, parsed into a key. A bare name
+    /// (<c>"ReadAllText"</c>) and the wildcard (<c>"*"</c>) yield a key with NO
+    /// parameter list; a signature (<c>"ReadAllText(String)"</c>) yields one
+    /// with a normalized list. That is the same two-form distinction the
+    /// pre-slice string dictionary drew, and steps 2a/2b depend on it.
+    /// </summary>
+    private static EffectResolverKey ParseMethodManifestKey(string type, string method)
     {
         var open = method.IndexOf('(');
         if (open <= 0 || !method.EndsWith(')'))
-            return method;
+            return EffectResolverKey.ForManifestEntry(EffectMemberKind.Method, type, method, null);
 
-        var name = method[..open];
-        var parameters = ParseParameterSignature(method[open..])
-            .Select(NormalizeParameterType);
-        return $"{name}({string.Join(",", parameters)})";
+        return EffectResolverKey.ForManifestEntry(
+            EffectMemberKind.Method,
+            type,
+            method[..open],
+            ParseParameterSignature(method[open..]));
     }
 
-    private static string NormalizeConstructorManifestKey(string signature)
+    /// <summary>
+    /// A manifest <c>constructors</c> entry, parsed into a key. A signature
+    /// that is not parenthesized keeps its text as the member name and carries
+    /// NO parameter list, so — exactly as before this slice — it matches no
+    /// constructor lookup (every lookup names a parameter list). Preserved
+    /// rather than "fixed": turning such an entry live would change effects on
+    /// the corpus, which is E2's decision to make, not this slice's.
+    /// </summary>
+    private static EffectResolverKey ParseConstructorManifestKey(string type, string signature)
     {
         if (!signature.StartsWith('(') || !signature.EndsWith(')'))
-            return signature;
+            return EffectResolverKey.ForManifestEntry(
+                EffectMemberKind.Constructor, type, signature, null);
 
-        var parameters = ParseParameterSignature(signature)
-            .Select(NormalizeParameterType);
-        return $"({string.Join(",", parameters)})";
+        return EffectResolverKey.ForManifestEntry(
+            EffectMemberKind.Constructor,
+            type,
+            ".ctor",
+            ParseParameterSignature(signature));
     }
 
     private static EffectResolution CreateResolution(List<string> effectCodes, string source)
@@ -445,12 +475,6 @@ public sealed class EffectResolver
             : EffectResolutionStatus.Resolved;
 
         return new EffectResolution(status, effectSet, source);
-    }
-
-    private static string BuildSignature(string type, string method, string[] parameterTypes)
-    {
-        var parameters = string.Join(",", parameterTypes.Select(NormalizeParameterType));
-        return $"{type}::{method}({parameters})";
     }
 
     /// <summary>
@@ -565,21 +589,42 @@ public sealed class EffectResolver
 
     /// <summary>
     /// Cached type information from manifests.
+    ///
+    /// <para>v0.15 E1 slice 2c — the four string dictionaries (methods,
+    /// getters, setters, constructors) collapse into ONE keyed by
+    /// <see cref="EffectResolverKey"/>, because
+    /// <see cref="EffectResolverKey.Kind"/> already separates the families.
+    /// Four tables were how the pre-slice code kept <c>set_X</c>-as-a-method
+    /// from colliding with <c>X</c>-as-a-setter; the key does it structurally
+    /// now.</para>
     /// </summary>
     private sealed class ResolvedTypeInfo
     {
         public string Source { get; }
         public List<string>? DefaultEffects { get; set; }
-        public Dictionary<string, List<string>> Methods { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, List<string>> Getters { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, List<string>> Setters { get; } = new(StringComparer.Ordinal);
-        public Dictionary<string, List<string>> Constructors { get; } = new(StringComparer.Ordinal);
+        public Dictionary<EffectResolverKey, List<string>> Members { get; } = new();
 
         public ResolvedTypeInfo(string source)
         {
             Source = source;
         }
     }
+}
+
+/// <summary>
+/// v0.15 E1 slice 2c — how many keys an <see cref="EffectResolver"/> was asked
+/// with, split by where the key's declaring type came from. The whole point of
+/// E1 is that the first number grows and the second shrinks, so the ledger
+/// records both rather than asserting the direction.
+/// </summary>
+/// <param name="FromBoundReceiver">Keys built from a bound receiver's <c>BoundType</c>.</param>
+/// <param name="FromStringFallback">Keys built from text through <see cref="EffectResolverKey.FromStrings"/>.</param>
+public readonly record struct EffectResolverKeyOrigins(
+    long FromBoundReceiver,
+    long FromStringFallback)
+{
+    /// <summary>Every key the resolver was asked with.</summary>
+    public long Total => FromBoundReceiver + FromStringFallback;
 }
 
 /// <summary>
