@@ -5156,14 +5156,25 @@ public sealed class Binder
     /// position denotes, or <c>null</c> when the position is not function-typed
     /// (the Calor0405 case) or carries no row.
     ///
-    /// <para>The DISPLAY STRING is the declared spelling, not §8.3's canonical
+    /// <para>The DISPLAY STRING is the position's <b>declared type name as the
+    /// binder already holds it</b> — not §8.3's canonical
     /// <c>(p1, p2) -&gt; ret</c>. Consumers compare display strings
     /// byte-for-byte — <c>Binder.BindStatement</c> infers an untyped <c>§B</c>'s
     /// <c>TypeName</c> from one, the verifier caches on one, the LSP builds a
-    /// call-graph key from one — so a position that used to print
-    /// <c>Func&lt;i32,i32&gt;</c> keeps printing it. The KIND becomes a function
-    /// type; the string does not move. That is the same trade E1 slice 2b made
-    /// for lambdas.</para>
+    /// call-graph key from one — so the string a position prints does not move.
+    /// The KIND becomes a function type; the string does not. Same trade E1
+    /// slice 2b made for lambdas.</para>
+    ///
+    /// <para><b>That name is the parser-EXPANDED spelling, not the source
+    /// text.</b> <c>ExpandType</c> rewrites <c>Func&lt;i32,i32&gt;</c> to
+    /// <c>Func&lt;INT, INT&gt;</c> before it reaches
+    /// <c>ParameterNode.TypeName</c> / <c>OutputNode.TypeName</c>, at BOTH
+    /// positions — an earlier revision of this comment and of design-doc §8.2
+    /// said "keeps its surface spelling <c>Func&lt;i32,i32&gt;</c>", which was
+    /// wrong (review round 1, MINOR 4). It is the right string regardless,
+    /// because it is the same one <c>VariableSymbol.TypeName</c> and every
+    /// existing consumer of these positions already carries; using the raw
+    /// source text here would be the change that moves things.</para>
     ///
     /// <para><see cref="BoundTypes.FunctionBoundType.ParameterRows"/> is all
     /// <see cref="BoundTypes.EffectRow.Unknown"/> here, and that is not a

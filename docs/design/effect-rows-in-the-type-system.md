@@ -1320,8 +1320,20 @@ that rank-1 rows *type-check* and *erase at codegen*, not that the representatio
 > `BoundLambdaExpression` (the `§LAM`'s declared row, §5), `VariableSymbol.FunctionType` (a rowed
 > parameter, field or `§B`, plus §3.5's inference from a function-typed initializer) and
 > `FunctionSymbol.ReturnFunctionType` (position 6). `displayOverride` is retained and extended:
-> a rowed declared position keeps its SURFACE spelling (`Func<i32,i32>`) rather than §8.3's
-> canonical `(p1, p2) -> ret`, for the same byte-identity reason lambdas keep `LAMBDA(i32)->INT`.
+> a rowed declared position keeps **the type name the binder already holds for it** rather than
+> §8.3's canonical `(p1, p2) -> ret`, for the same byte-identity reason lambdas keep
+> `LAMBDA(i32)->INT`.
+>
+> **That name is the parser-EXPANDED spelling, at both parameter and return positions.**
+> `ExpandType` rewrites `Func<i32,i32>` to `Func<INT, INT>` before it reaches
+> `ParameterNode.TypeName` / `OutputNode.TypeName`, so `§I{Func<i32,i32>:cb} §E{cw}` and
+> `§O{Func<i32,i32>} §E{fs:w}` both display `Func<INT, INT>`, not the source text. An earlier
+> revision of this note said "keeps its SURFACE spelling `Func<i32,i32>`"; that was wrong, and
+> review round 1 (MINOR 4) caught it — though it read as return-only, and measurement shows it is
+> **both** positions, because both go through `ExpandType`. The expanded name is still the right
+> string to use: it is exactly what `VariableSymbol.TypeName` and every existing consumer of these
+> positions already carry, so nothing moves. Reaching for the raw source text would be the change
+> with a blast radius.
 >
 > **Carry-over 1 (Equals vs DisplayString) is decided: display does NOT participate in equality.**
 > `Equals` is shape + rows; `DisplayString` stays a diagnostic artifact. Two structurally
