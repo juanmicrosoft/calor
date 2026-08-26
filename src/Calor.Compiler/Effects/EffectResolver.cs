@@ -370,8 +370,15 @@ public sealed class EffectResolver
             foreach (var mapping in manifest.Mappings)
             {
                 var typeInfo = new ResolvedTypeInfo(source.FilePath);
+
+                // v0.15 E1 slice 2c, review round 1 (MINOR 7) — the manifest's
+                // type name is normalized ON INSERT, with the same rule the key
+                // applies on lookup. Before this, the cache was keyed on the raw
+                // manifest string while every lookup arrived normalized, so a
+                // mapping written `"type": "global::Foo"` became unreachable.
+                var mappingType = EffectResolverKey.NormalizeDeclaringType(mapping.Type);
                 if (mapping.ExtensionProvider)
-                    _extensionProviders.Add(mapping.Type);
+                    _extensionProviders.Add(mappingType);
 
                 // Copy default effects
                 if (mapping.DefaultEffects != null)
@@ -387,7 +394,7 @@ public sealed class EffectResolver
                 {
                     foreach (var (method, effects) in mapping.Methods)
                     {
-                        typeInfo.Members[ParseMethodManifestKey(mapping.Type, method)] = effects;
+                        typeInfo.Members[ParseMethodManifestKey(mappingType, method)] = effects;
                     }
                 }
 
@@ -396,7 +403,7 @@ public sealed class EffectResolver
                     foreach (var (prop, effects) in mapping.Getters)
                     {
                         typeInfo.Members[EffectResolverKey.ForManifestEntry(
-                            EffectMemberKind.Getter, mapping.Type, prop, null)] = effects;
+                            EffectMemberKind.Getter, mappingType, prop, null)] = effects;
                     }
                 }
 
@@ -405,7 +412,7 @@ public sealed class EffectResolver
                     foreach (var (prop, effects) in mapping.Setters)
                     {
                         typeInfo.Members[EffectResolverKey.ForManifestEntry(
-                            EffectMemberKind.Setter, mapping.Type, prop, null)] = effects;
+                            EffectMemberKind.Setter, mappingType, prop, null)] = effects;
                     }
                 }
 
@@ -413,12 +420,12 @@ public sealed class EffectResolver
                 {
                     foreach (var (sig, effects) in mapping.Constructors)
                     {
-                        typeInfo.Members[ParseConstructorManifestKey(mapping.Type, sig)] = effects;
+                        typeInfo.Members[ParseConstructorManifestKey(mappingType, sig)] = effects;
                     }
                 }
 
                 // This will overwrite if already exists (higher priority wins)
-                _typeCache[mapping.Type] = typeInfo;
+                _typeCache[mappingType] = typeInfo;
             }
         }
     }
@@ -929,7 +936,15 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             ReceiverInterfaces,
             FromStringFallback);
 
-    private static string NormalizeDeclaringType(string declaringType) =>
+    /// <summary>
+    /// The one spelling rule for a declaring type: trimmed, with <c>global::</c>
+    /// removed. <c>EffectResolver.BuildTypeCache</c> applies it to manifest
+    /// mapping names too, so the type cache's outer key and the key's
+    /// <see cref="DeclaringType"/> cannot disagree (review round 1, MINOR 7 — a
+    /// user manifest declaring <c>"type": "global::Foo"</c> otherwise became
+    /// unreachable the moment lookups started normalizing).
+    /// </summary>
+    internal static string NormalizeDeclaringType(string declaringType) =>
         string.IsNullOrWhiteSpace(declaringType)
             ? string.Empty
             : declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);

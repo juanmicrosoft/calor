@@ -789,6 +789,44 @@ public class EffectResolverTests
     }
 
     /// <summary>
+    /// v0.15 E1 slice 2c, review round 1 (MINOR 7) — a manifest mapping written
+    /// with a <c>global::</c> prefix stays reachable.
+    ///
+    /// <para>Keys normalize their declaring type (trim, strip <c>global::</c>),
+    /// so once lookups became key-based the type cache had to normalize on
+    /// INSERT too. It did not, briefly: the cache was keyed on the raw manifest
+    /// string while every lookup arrived normalized, and a user manifest
+    /// declaring <c>"type": "global::Vendor.Widget"</c> — which resolved before
+    /// the slice — silently stopped resolving. Both spellings now answer, which
+    /// is strictly more than the pre-slice behaviour (where only the exact raw
+    /// spelling matched).</para>
+    /// </summary>
+    [Theory]
+    [InlineData("global::Vendor.Widget")]
+    [InlineData("Vendor.Widget")]
+    public void ManifestTypeWrittenWithGlobalPrefix_IsReachableUnderEitherSpelling(string lookupType)
+    {
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(
+            """
+            {
+              "version": "1.0",
+              "mappings": [{
+                "type": "global::Vendor.Widget",
+                "methods": { "Save": ["db:w"] }
+              }]
+            }
+            """,
+            "global-prefixed");
+        var resolver = new EffectResolver(loader);
+
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(lookupType, "Save"));
+
+        Assert.Equal(EffectResolutionStatus.Resolved, resolution.Status);
+        Assert.True(resolution.Effects.Contains(EffectKind.IO, "database_write"));
+    }
+
+    /// <summary>
     /// The extension-provider manifest both tests below resolve against: one
     /// name-only <c>Select</c> entry, reachable ONLY through
     /// <c>IsCompatibleExtensionReceiver</c>. There is no signature entry, so the
