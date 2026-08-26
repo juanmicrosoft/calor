@@ -573,6 +573,14 @@ public sealed class EffectRow : IEquatable<EffectRow>
     /// destination it fits. An <see cref="EffectRowKind.Assumed"/> source
     /// produces an <see cref="EffectRowKind.Assumed"/> destination, so the
     /// assumption cannot be laundered away by one more hop. Pinned by P10(a).
+    ///
+    /// <para><b>An Unknown destination returns Unknown and DISCARDS the source's
+    /// reasons.</b> That is sound only because such a hop is
+    /// <see cref="EffectFit.CannotTell"/>, never
+    /// <see cref="EffectFit.Fits"/>: E3 reports Calor0425 at that hop from the
+    /// verdict itself, so nothing is lost. <b>E3 must not call this on a
+    /// CannotTell hop expecting the reasons to survive</b> — read them from
+    /// <see cref="CarriedReasons"/>, which is total and keeps them.</para>
     /// </summary>
     public static EffectRow AtDestination(EffectRow? source, EffectRow? destination)
     {

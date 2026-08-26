@@ -607,6 +607,13 @@ Concretely, per site (§6.2's numbering): 1 the binding's row; 2 the parameter's
 declaration's return row; 4 the base method's row; 5 the interface member's row; 6 the
 instantiated bound. In every case an `Assumed` source produces an `Assumed` destination.
 
+**One edge, stated so E3 does not trip on it** (E2 slice b). When the DESTINATION is `Unknown`,
+`EffectRow.AtDestination` returns `Unknown` and **discards the source's reasons**. That is sound
+only because such a hop is `CannotTell`, never `Fits` — E3 reports Calor0425 there from the
+verdict itself, so no reason is lost. **E3 must not call `AtDestination` on a `CannotTell` hop
+expecting reasons to survive it**; `EffectRow.CarriedReasons` is the total function that keeps
+them, on every cell.
+
 ### 4.5 `--permissive-effects`
 
 > **Decision.** A `DoesNotFit` verdict is **never waived, at any of the six sites, by any flag**.
