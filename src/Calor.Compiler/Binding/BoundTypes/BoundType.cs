@@ -456,9 +456,16 @@ public sealed class EffectRow : IEquatable<EffectRow>
     public EffectRowKind Kind { get; }
 
     /// <summary>
-    /// The row's effect set, as compact surface codes, ordinal-sorted. Empty for
-    /// <see cref="Unknown"/> — read <see cref="Kind"/>, not <c>Codes.Count</c>,
-    /// to tell "pure" from "no information".
+    /// The row's effect set, as INTERNAL <c>category:value</c> codes
+    /// (<c>"io:console_write"</c>), ordinal-sorted. Not the compact surface
+    /// spelling — that is a registry projection <c>Binding/</c> cannot reach,
+    /// and it lives on <c>Effects.EffectRowDisplay.ToCompactDisplayString</c>
+    /// (see this type's summary). An earlier revision of this comment said
+    /// "compact surface codes", left over from before the carrier changed
+    /// (review round 1, MINOR 7).
+    ///
+    /// <para>Empty for <see cref="Unknown"/> — read <see cref="Kind"/>, not
+    /// <c>Codes.Count</c>, to tell "pure" from "no information".</para>
     /// </summary>
     public ImmutableSortedSet<string> Codes { get; }
 
