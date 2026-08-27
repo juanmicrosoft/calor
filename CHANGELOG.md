@@ -18,6 +18,19 @@ All notable changes to this project will be documented in this file.
   its arithmetic checked in now (and the runner refusing to spend money without an explicit
   confirmation). Until it runs, the scorecard says "not adjudicated", and the test makes sure it
   can't say anything else.
+- **We ran the cost test for the new effect-rows feature, and the scorecard reads HIT.** The
+  paid half of the scorecard above has now run: an AI agent solved the same four small
+  programming tasks five times each against the previous compiler (v0.14.3) and five times each
+  against the new one — 40 runs, every one finishing green. Agents needed about 18 % more output
+  tokens on average to finish the same small tasks with the new compiler. That is a real cost,
+  but it is within the limit we set beforehand (the test only fails when the average is more than
+  35 % higher *and* the statistics say the increase is clearly above zero; here the lower bound is
+  below zero). One task (the inventory one) was 51 % more expensive on its own; another was
+  cheaper. "HIT" means we did not detect a large slowdown — with 40 runs the test cannot prove
+  there is none, and it says so. The runs, the arithmetic and the verdict are all checked in, and
+  the release re-checks them. The 40 finished programs the agents wrote are archived with the
+  run, so the set of checked-in Calor files grew from 886 to 926 and the counters that watch that
+  set were updated to match (the counts that measure the compiler itself did not move).
 - **You can now ask the project index about effects.** `calor query effects Leaky` tells
   you three things about a function: what it *says* it does (`§E{…}`), what the compiler
   worked out its body *actually* does, and whether the two agree — with the exact error

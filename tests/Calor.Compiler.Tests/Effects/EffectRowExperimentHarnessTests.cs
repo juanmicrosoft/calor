@@ -101,17 +101,24 @@ public sealed class EffectRowExperimentHarnessTests
             $"measuredCommit must be a 40-hex commit SHA, was '{sha}'.");
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("scope").GetString()));
 
-        // The four numbers §3.2 and §9 quote. Changing any of them changes the
-        // design doc's "zero corpus occurrences whose meaning changes" argument.
-        Assert.Equal(23, root.GetProperty("fileCount").GetInt32());
-        Assert.Equal(54, root.GetProperty("occurrenceCount").GetInt32());
-        Assert.Equal(1, root.GetProperty("compileGreen").GetInt32());
+        // The four numbers §3.2 and §9 quote — 23 / 54 / 1 / 22 when the doc measured
+        // them. Changing any of them changes the design doc's "zero corpus occurrences
+        // whose meaning changes" argument, so a move is named, never absorbed. PP-E1
+        // leg B (epoch e1-rows-parity-001, design §13.5) archived 40 agent-written
+        // final-src/*.calr; exactly one of them (N1-003 / calor+0.15.0 / run-5 /
+        // CsvRow.calr) writes the canonical two-line §O/§E form, three times, and
+        // compiles green — the form whose meaning the line rule does NOT change. Hence
+        // 24 / 57 / 2 / 22: one more file, three more occurrences, one more green file,
+        // and the 22 already-red files untouched.
+        Assert.Equal(24, root.GetProperty("fileCount").GetInt32());
+        Assert.Equal(57, root.GetProperty("occurrenceCount").GetInt32());
+        Assert.Equal(2, root.GetProperty("compileGreen").GetInt32());
         Assert.Equal(22, root.GetProperty("compileRed").GetInt32());
 
         var files = root.GetProperty("files").EnumerateArray().ToArray();
-        Assert.Equal(23, files.Length);
+        Assert.Equal(24, files.Length);
         Assert.Equal(
-            54,
+            57,
             files.Sum(entry => entry.GetProperty("twoLineOE").GetInt32()));
 
         // §3.2's breakdown of the 22 already-red files: 18 bench/mcp + 3
@@ -121,10 +128,17 @@ public sealed class EffectRowExperimentHarnessTests
         Assert.Equal(18, red.Count(e => FilePath(e).StartsWith("bench/mcp/", StringComparison.Ordinal)));
         Assert.Equal(3, red.Count(e => FilePath(e).StartsWith("benchmarks/", StringComparison.Ordinal)));
 
-        var green = files.Single(entry => entry.GetProperty("exit").GetInt32() == 0);
-        Assert.Equal(
+        var green = files
+            .Where(entry => entry.GetProperty("exit").GetInt32() == 0)
+            .Select(FilePath)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        string[] expectedGreen =
+        [
+            "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor+0.15.0/run-5/final-src/CsvRow.calr",
             "tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr",
-            FilePath(green));
+        ];
+        Assert.Equal(expectedGreen, green);
 
         static string FilePath(System.Text.Json.JsonElement entry)
             => entry.GetProperty("file").GetString() ?? "";

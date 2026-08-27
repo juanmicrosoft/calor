@@ -836,18 +836,20 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   fixture's zero; no Calor0418 anywhere). Leg A's own-goal MISS no longer stands; the
   four-valued verdict is read at the release commit by `EffectRowsProbeLedgerTests`, as
   registered.
-  **Status, 2026-08-27 — instrument BUILT (PR #1109); leg A recomputed 10/10 at
-  `121c6681ecc861d90fc55d455b8a40eedf1fe463`; leg B not run; verdict NOT-ADJUDICATED pending the release-commit
-  epoch.** `bench/phase0-agent-native/effect-rows-probe-ledger.json` exists and is read by exact
-  equality in `EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation`: all ten cells detect
-  with the registered code at the registered declaration (L6-MAP/L6-MATCH name `cw`; L6-MID's
-  message names the instantiation on its `Effect row:` continuation line), **no drift**, the
-  post-E4 control multisets reproduce byte-for-byte, route (a) does not fire, route (b) reads
-  2 + 3121 = 3123 against the floor of 25. Leg B's adjudicator `ppe1-analyze.py` and its epoch
-  runner `run-ppe1-epoch.sh` (refuses without `--confirm-paid-epoch`) are registered but the
-  epoch `e1-rows-parity-001` has **not** run; its arithmetic is pinned by a dry run on
-  `w5-parity-002` (point 1.0016, lower bound 0.8270, realized CV 0.4392 — the derivation's
-  population figures reproduced). Notes: `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md`.
+  **Status, 2026-08-27 — leg B RUN; verdict HIT (PR #1110).** Leg B ran 2026-08-27 as epoch
+  `e1-rows-parity-001` (arm A v0.14.3 @ `63316987`, arm B `b775acb4`, model `claude-opus-4-8` —
+  the `w5-parity-002` pin the margin was derived on — 40/40 valid, 0 % censored): per-pair ratios
+  N1-001 1.1762 · N1-002 1.5118 · N1-003 1.1907 · N1-005 0.8984; point **1.1835**, one-sided 95 %
+  lower bound **0.9012**, realized median within-cell CV **0.2746** (max 0.4259) — leg B does not
+  fail and is not underpowered. Leg A recomputed 10/10 with a clean control and no drift; route
+  (b) reads 2 + 3121 = 3123 over a corpus now 926 files (the epoch's own 40 `final-src` archives
+  included — D-A's counts unmoved, only its denominator). Verdict **HIT** at ledger `measuredCommit`
+  `LEDGER_SHA_TBD`; adjudicated formally at the 0.15.0 release commit by re-running
+  `EffectRowsProbeLedgerTests` there. A HIT means "no large tax detected" (power 0.22 / 0.48 / 0.77
+  at 1.25× / 1.4× / 1.6×), never "proven equal"; N1-002's 1.51 is a real per-pair cost inside the
+  margin. Notes: `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md` ("Leg B — run", "What a
+  HIT means", "Corpus ledgers regenerated"). *Superseded status:* instrument BUILT (PR #1109), leg A
+  10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463`, leg B not run, NOT-ADJUDICATED.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
   discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.
@@ -919,12 +921,15 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    caused by this workstream's own change is adjudicated MISS.
    *Freeze point:* A-1.11, before E2 merges. *Discriminating pin:* the annex append-only check
    rejects an edit to the frozen row; and dropping any one registered mutation from the ledger
-   fails the exact-equality test. *Status (2026-08-27):* **instrument BUILT (PR #1109); leg A
-   recomputed 10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463` with a clean control and no drift; leg B not run;
-   verdict NOT-ADJUDICATED pending the release-commit epoch** — the release PR's author runs
-   `bench/phase0-agent-native/run-ppe1-epoch.sh --confirm-paid-epoch` (see
-   `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md` for the exact commands), then
-   regenerates the ledger, and the test derives the verdict from the frozen map.
+   fails the exact-equality test. *Status (2026-08-27):* **leg B run 2026-08-27 (epoch `e1-rows-parity-001`,
+   arm A v0.14.3 @ `63316987`, arm B `b775acb4`, model `claude-opus-4-8`, 40/40 valid); leg A
+   recomputed 10/10 with a clean control and no drift; verdict HIT at ledger `measuredCommit`
+   `LEDGER_SHA_TBD` (point 1.1835, lower bound 0.9012, CV 0.2746); adjudicated formally at the
+   0.15.0 release commit by re-running `EffectRowsProbeLedgerTests`** (PR #1110;
+   `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md`, "Leg B — run"). The instrument was
+   BUILT in PR #1109 (leg A 10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463`; NOT-ADJUDICATED
+   until the epoch ran); the release PR re-runs the ledger test at its own commit and publishes
+   the verdict in the release notes whatever it says.
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
    migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
    version (§4.0). *Denominator:* the committed `.calr` corpus at the 0.15 branch-cut commit, in

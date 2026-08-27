@@ -21,7 +21,8 @@ namespace Calor.Compiler.Tests;
 /// to be looked at rather than discovered later.</para>
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
-/// 886-file compile is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
+/// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
+/// <c>final-src/*.calr</c>) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
 /// the 23-file two-line <c>§O</c>/<c>§E</c> subset is already pinned by
 /// <c>o53/baseline.json</c> through P30.</para>
 /// </summary>
@@ -92,9 +93,12 @@ public sealed class EffectRowCorpusShapeTests
         var root = RepositoryRoot();
         var files = CommittedCalrFiles(root);
 
-        // §3.2 and §9 both quote 886. A drift here means the sweep below is no
-        // longer measuring the corpus the design doc's argument is about.
-        Assert.Equal(886, files.Count);
+        // §3.2 and §9 both quote 886 — the corpus the design doc's argument was
+        // measured on. PP-E1 leg B (epoch e1-rows-parity-001) archived its 40 declared-done
+        // solutions as final-src/*.calr, exactly as w5-parity-002 does, so the committed
+        // corpus is 926 = 886 + 40 since then; the sweep below still covers every file. A
+        // drift from 926 means the sweep is no longer measuring the corpus it claims to.
+        Assert.Equal(926, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.
