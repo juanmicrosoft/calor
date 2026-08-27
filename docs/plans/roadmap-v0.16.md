@@ -504,3 +504,137 @@ A gate missing any of the three is an aspiration (R:1055-1056); every gate above
 
 ---
 
+## 6. Carried debt — every registered residual, with a trigger and a venue
+
+Sources: the brief's list, R:§4.2/§4.5, D:§13.5/§14, and the residual sections of the seven slice
+notes (72 items collected for this draft; the ones below are the registered, non-discharged ones —
+transcript-regeneration bookkeeping and items discharged in a later slice are omitted).
+
+| Item | Source | Trigger | Venue |
+|---|---|---|---|
+| `FunctionBoundType.Row` has no end-to-end reader; `ResolveInvokedValueRow` span-matches the AST; `Binder.BindRow` collapses variable rows | R:710-720; D:2700-2708; e5:150-164 | W7 needs it, or any second AST-keyed row store appears | **0.16 SHOULD W6**; 0.16.x if §9 abort |
+| Lambda parameters invoked in-lambda → Calor0411; silently pure under permissive | e4:255-259 | — | **0.16 SHOULD W7** |
+| Untyped alias / untyped non-lambda `§B` → Calor0411 + fail-closed 0410 | e4:252-254; R:538-540 | — | 0.16 SHOULD W7 (same slice) |
+| Escaping lambda under row-less `-> Func<…>` inside rank-1: SILENT | e4:230-234 | — | **0.16 MUST W5** (report), rank-2 semantics stay deferred |
+| `PropagateInstantiatedCharges` `10_000` cap stops silently | `EffectEnforcementPass.cs:1129`; e3b:117-123 | — | **0.16 MUST W5** |
+| Calor0421 ordinal-mismatch message ("matched BY POSITION") | e3b:144-148 | user report of confusion | not scheduled; message is pinned and correct |
+| #1104 EffectInferrer unbounded recursion (two Serilog modules) | e3a:252-270; R:652-657 | — | **0.16 MUST W3** |
+| P32 excludes 265/364 modules; no `ExternalBase` bucket until E4 | e3a:252-270; e3b:236-241 | — | 0.16 MUST W3 / gate 9 |
+| Index folds cross-module charges for every bindable file; `calor build` only for compiled ones | e5:265-272 | — | 0.16 SHOULD W8 |
+| Interface methods not indexed (`query effects ILogger.Write` → "no declaration") | e5:273-275 | — | 0.16 SHOULD W8 |
+| Index-build effect pass unmeasured against gate 8's 30 s | e5:259-261 | — | 0.16 SHOULD W8 (measure; nightly `performance.yml`) |
+| `§FLD`/`§B` rows not index positions; `§LAM` rows private; hover shows declared row only; `--json` on `effects` only | e5:168-175 | E7 ships | with E7, else 0.16.x |
+| `impact --effects` compares against the caller's DECLARED row only | e5:252-255 | user report | not scheduled; documented |
+| Solution-level manifests not consulted by the index | e5:256-258 | a solution with manifests in the corpus | 0.16.x |
+| D2: D:§6.2 row 6 spells `DoesNotFit` as Calor0424; unreachable under §7.4's solve | e3b:68-88 | design-doc owner adjudicates | D:§6.2 annotation stands; not code |
+| D5: effect-polymorphic method group answers Unknown (rank-2) | e3b:150-155 | — | DEFERRED (rank-2) |
+| Calor0410 demoted to a warning under `--permissive-effects` | e4:246-248 | — | not scheduled; R:985's inventory extended by this row |
+| Calor0419 "passes function-typed value" at BCL argument sites | e4:249-251; D-A = 2 | D-A `calor0419FunctionTyped` > 10 | 0.17 with IL rows, if triggered |
+| BCL-returned delegates → Unknown; no manifest row-on-return | D:1660-1664; R:741-742 | 0425 `UnknownSource + InvocationUndetermined` > 10 over the W3 denominator | **DEFERRED, demand-triggered** (§3.3) |
+| Key parameter component is inferred ARGUMENT types; IL keys built `FromStrings` | D:1360-1366; D:1677-1687; R:545-556 | gate 6 needs it to move, or IL rows trigger | 0.17 |
+| Bound types carry no interface set (hardcoded Linq receiver fallback) | D:1346-1353 | — | 0.17 |
+| Lambda `ParameterTypes` are surface spellings; one `FunctionBoundType` mixes vocabularies | D:1614-1620 | W6 | with W6 |
+| Async rows | D:1922-1945 | the three-clause test D:1936-1942, adjudicated in writing at the 0.15.0 retro | DEFERRED (§3.3) |
+| `PreconditionSuggester` on the typed CFG | R:739 | #909's double-report fix touches it | 0.16.x with #909, else 0.17 |
+| Reflection / `DynamicInvoke` / `dynamic`; event-handler `+=` | R:740-741 | corpus witness in the W3 denominator | DEFERRED |
+| Q1: a C#-declared interface has no row to check an implementation against | D:2810-2819 | manifest row-on-member schema | 0.17 with IL rows |
+| Q2: `eff` lookahead vs a type parameter named `eff` — pinned by `TypeParamNamedEff_StillWorks` | D:2820-2826 | — | closed by pin; no action |
+| Q3: `Subtypes` widening has no doc-drift guard in `self-check docs` | D:2827-2833 | — | 0.16.x: a `Calor13xx` drift code |
+| Q4: Calor0425 at the parameter span vs invocation | D:2834-2847 | never-invoked fraction dominates in the W3 denominator | re-read at the 0.16 branch cut |
+| PP-E1 negative-control pin skips the effect pass on `A3-map`/`A3-match` (weaker than it reads) | e3b:272-278 | — | 0.16.x: rewrite over the CLI invocation |
+| Route (b)'s denominator includes each epoch's own archives | ppe1:319-323 | — | A-1.12 states it; W2's archives enter the same way |
+| 0.14 §3.3 decisions 2–3 (migrator, golden regen) | R:977; #1084 | a user-reported 1.x file; else re-adjudicate at the 0.16 branch cut | this draft re-adjudicates: **remain demand-driven** (0 of 941 `.calr` declare 1.x) |
+| 3.5.1 null-state slice + adversarial null corpus | R:979 | 0.15.0 retro | not 0.16 MUST; 0.16.x if the retro says so |
+| #845 unsigned obligations; #859/#884 Z3 flake | R:981-983 | 0.15.0 retro with the flake rate attached | 0.16.x instrument debt |
+| #970 tri-state residual counts | R:984 | — | published per release, unchanged |
+| TIER1A "not run" | R:978 | — | release-notes row, unchanged |
+
+---
+
+## 7. Backlog disposition — every open issue on 2026-08-27 (29; none labelled P0/P1; #1082 is `p2`)
+
+| Issue | Disposition |
+|---|---|
+| #1104 EffectEnforcementPass unbounded recursion | **0.16 MUST W3** — the S2 spike bounds it first |
+| #1097 converter bare `?` lambda parameter type (72 ICEs) | **0.16 MUST W3** |
+| #903 converter emits Calor its parser rejects (59/364; 3 clusters) | **0.16 MUST W3** clusters 1–2; cluster 3 (`§EI`, 2 files) with it if trivial, else 0.16.x |
+| #901 `benchmarks/*.calr` stale (7 files) | 0.16.x — 45 files already excluded from the demand ledger as "not reaching the effect pass"; repairing them moves D-A's denominator, so the PR regenerates the ledger with disclosure |
+| #929 module-level `§CT` breaks a later `§IF` dedent | 0.16.x — a parser fix with a named failing fixture; not theme work |
+| #943 no `ref`/`out` call-site syntax | 0.16.x — demand: the metadata spike's fifth call shape; re-read when W3's denominator shows how many subject sites need it |
+| #847 faithful local-function emission | demand-driven (R:1020 stands) |
+| #1094 archive `.calor-build-state.json` per run | **0.16 MUST W1** (same harness change) |
+| #1084 self-migration residue | item 1 done (Calor0701); items 2–3 re-adjudicated here: demand-driven (§6) |
+| #1082 nullability follow-ons (`p2`) | sequenced after W3 (gate 6 makes a mis-sequenced landing visible, R:980); no 0.16 gate |
+| #875 non-null `str` root cause | closes with #1082 items 1–3 (R:982's judgment stands) |
+| #845 unsigned obligations | 0.16.x (§6) |
+| #859, #884 Z3 CI flake | 0.16.x instrument debt with the 0.15-cycle flake rate attached (§6) |
+| #965 perf suite kills the CI runner on the release path | **release-blocking for 0.16.0 if it recurs**; the 0.15.0 release PR's outcome decides whether it is already closed in practice — recorded here so it is not silent |
+| #949 branch protection requires a check that no longer reports | 0.16 kickoff sweep (CI hygiene; a `--admin` merge habit hides real failures) |
+| #948 round-trip gate flake on a MediatR test | 0.16.x — `CHANGELOG.md:383-387` says the known-flake list now flows through; close if it does not recur in the 0.16 cycle |
+| #959 test host `std::system_error` flake | 0.16.x instrument debt, tracked with #859/#884 |
+| #922 LSP rename across partial types | not 0.16 — needs identity groups; re-read with E7 |
+| #906 `${}` interpolation invisible to the binder | 0.16.x — a converter/lexer fix; it widens the F-2 denominator and says so |
+| #909 DivisionByZeroChecker double-report; Calor0926 over-strong | 0.16.x, with the `PreconditionSuggester` residual (§6) |
+| #1011 test-suite audit epic (R1–R14) | continuous; R1/R2 (regression pins for #925, #774, #883) and R9 (round-trip incremental alarm) are the ones 0.16's gates lean on — R9 is what would have caught #948's shape; not release-gated |
+| #1030 round-trip baseline write-back; #1031 shared LSP client; #1032 watch sync-context; #1042 CNF property tests | audit follow-ups, continuous |
+| #851 task-gen filter precision | retired with the venue (R:1043); re-opens under §4.3's conditions |
+| #673 MCP scaffold spine; #709 Codex; #711 Gemini | adoption work, not release-gated (R:1006-1010) |
+
+---
+
+## 8. What "better than C#" means at the end of 0.16 — testable statements
+
+Each is a claim with an instrument; none is wider than what §3 commits to.
+
+1. **An agent writing callback-heavy code with a seeded effect laundering is caught by the
+   compiler** on the four registered shapes, at no large loop tax — PP-W-rows HIT at the 0.16.0
+   release commit, or the release notes carry the other verdict.
+2. **Every effect claim on real code names its denominator, and it is at least the gate-9
+   floor** — the 0425 and 0270 ledgers publish `ModulesEnforced`/`ModulesBound` per subject, and
+   the "BCL-returned delegate" residual is a measured count, not a named fear.
+3. **The compiler never stops checking silently** on the two paths that did in 0.15 (gate 11).
+4. **The cost of the toolchain in the agent loop is attributable per turn**, not per run — every
+   0.16 epoch archives per-turn tool calls (gate 8), and the 0.15 gap is either explained or
+   bounded in writing (W4).
+5. Unchanged from R:1068-1082: the queryable project model (now with an effects facet), null
+   safety for 0.14's closed classes, honest contracts with default-on elision, and no real-scale
+   claim until the re-entry conditions hold.
+
+---
+
+## 9. Cut lines and schedule abort
+
+- **Binder-adjacent rule (the V3/V4 lesson, R:745-748).** Nothing binder-adjacent is MUST: W6
+  and W7 are SHOULD and defer to 0.16.x without renegotiation. W3's only binder-touching piece is
+  #1097, whose fix reuses the existing `UnresolvedBoundType` route; if S2 shows #1104 cannot be
+  bounded without moving gate 6, #1104 moves to SHOULD and gate 9's floor is set from what parse
+  fixes alone reach.
+- **Cut line 1** (§3.1): W3 overrun does not stop W2.
+- **Cut line 2:** if A-1.12 has not registered by the 0.16 branch cut — the entry gate itself
+  slipped — **no** W-item merges (the M1 rule), and 0.16.0 ships as W1 + W5 + whatever of W3
+  reached its floor, under the renamed theme **"Measured Effects"**; PP-W-rows moves to 0.17 with
+  its fixtures frozen where they are.
+- **Schedule abort:** if W1 (the capture) is not merged by the branch cut, no paid epoch runs in
+  0.16 at all — PP-W-rows reads NOT-ADJUDICATED by route (b), which under the own-goal clause is
+  a MISS if the cause is this workstream's, and the release notes say so.
+- **Not a cut line:** the 1.32× benchmark; PP-E1's regression pin (gate 4) — a red there is a
+  0.15 regression, fixed before release.
+
+---
+
+## 10. Review record — Draft v1
+
+*(empty — adversarial reviews run next; findings and their dispositions are recorded here, with
+declined findings and their rationale.)*
+
+**Open questions this draft could not settle from the repository** (for the reviewers):
+
+1. Whether the 0.15.0 release PR's benchmark block moved from the 0.14.3 values — `[Unreleased]`
+   has none at `7d621c0d`.
+2. Whether `EffectInferrer`'s recursion (#1104) can be bounded without changing any resolution
+   answer — S2 decides; this draft assumed it can and priced the alternative in §9.
+3. The exact PP-W-rows margin, CV cap and leg-A minimum detectable difference — produced by S3's
+   scripts, deliberately not written here.
+4. Whether the two `duration` readings differ by field (`duration_ms` here; `duration_api_ms` is
+   also archived) matters for any claim — this draft uses wall-clock and makes no claim on it.
+5. Whether the 0.15.0 retro adjudicated async rows' re-entry test (D:1926) — no record exists yet.
