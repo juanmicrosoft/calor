@@ -2771,6 +2771,14 @@ untrimmed code in `Calor0403`.
 > | `compile53.txt:52` (was `:51`) | `baseline.json verified: 24 files / 57 occurrences / 2 green / 22 red` |
 > | `o53/baseline.json` | `fileCount` 23 → 24, `occurrenceCount` 54 → 57, `compileGreen` 1 → 2, `compileRed` 22 unchanged; one `files[]` entry added (`twoLineOE: 3, exit: 0, codes: []`); `measuredCommit` re-stamped `28727fb5…` → `39ea126d…` by the regeneration script |
 >
+> **Review round 1 added one more, in `facts.py` — a WINDOW SHIFT, not a compiler-output change:**
+> `facts.txt:106-121` — `facts.py:84` prints `sed -n '186,200p'` of `HigherOrderDemandLedgerTests.cs`
+> (the D-A denominator-pinning block E4 recorded as byte-identical), and the review's item 2 made the
+> D-A "corpus size moved" message three lines longer ABOVE that window (it now names the
+> filesystem-walk trap), so four lines of the same block entered at the top and two left at the
+> bottom. The test's assertions did not change; only the fixed line window did. `o53/baseline.json`'s
+> `measuredCommit` is re-stamped again by the regeneration script, counts unchanged.
+>
 > P30 (`O53Baseline_HasLedgerShape_AndTheCountsTheDocQuotes`) pinned the literal 23 / 54 / 1 / 22 and
 > the single green file; it now pins 24 / 57 / 2 / 22 and both green files by path, with the red
 > breakdown (18 `bench/mcp` + 3 `benchmarks` + 1 lint fixture) unchanged. §3.2's argument is
