@@ -291,8 +291,7 @@ public class Calor0425CorpusLedgerTests
             // hand-written Calor: measured, `serilog/src/Serilog/Core/Logger.cs`
             // and `Core/Sinks/Batching/BatchingSink.cs` take the whole test host
             // down. That is PRE-EXISTING — it reproduces with v0.15 E3's row
-            // checking disabled — and is tracked as its own issue (see the E3a
-            // notes doc).
+            // checking disabled — and is tracked as issue #1104.
             //
             // THE CATCH BELOW CANNOT CATCH IT (review round 1, F8). A
             // StackOverflowException in .NET is a fail-fast: the process dies and

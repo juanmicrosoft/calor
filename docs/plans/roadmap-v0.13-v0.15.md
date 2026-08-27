@@ -636,6 +636,13 @@ renegotiation; DEFERRED items are named so their absence is a decision.
     `A3-middleware-alpha` passes without it), and §6.2's two external-base Calor0419 → Calor0425
     retirements, which must move together because the override arm is an `AddAssumption` whose
     propagation feeds every caller's computed effect set.
+- **Issue #1104 — `EffectEnforcementPass.Enforce` crashes the process on Lossy-converted, unbound
+  corpus modules** (found by E3a's P32 ledger work; reproduces on `main` at `b6530fac` with row
+  checking disabled). Unbounded recursion in `EffectInferrer`'s local-type resolution, so it is an
+  uncatchable fail-fast that no thread stack size avoids. It bounds what the Calor0425 corpus
+  ledger can measure — 99 of 364 modules — and it will bound E4's re-measurement the same way
+  unless it is fixed first. Not E3a's to fix; filed rather than absorbed.
+
 - **PP-E1 leg A's negative control does not reproduce today** (E3a review round 1, F3). A2 fails
   for two reasons — its frozen baseline was recorded under `--permissive-effects`, which the probe
   forbids (F1), and E2b's Calor0405 defect, **fixed in E3a** (F2) — and the four A3 fixtures fail
