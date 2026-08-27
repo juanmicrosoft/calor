@@ -58,6 +58,7 @@
     3  bench/mcp/tasks/15-nontarget-read-module/input.calr
     3  bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr
     3  bench/mcp/tasks/16-nontarget-refactor-rename/input.calr
+    3  bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor+0.15.0/run-5/final-src/CsvRow.calr
     2  bench/mcp/tasks/06-add-effect-to-function/expected.calr
     2  bench/mcp/tasks/06-add-effect-to-function/input.calr
     2  bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr
@@ -74,7 +75,7 @@
     1  bench/mcp/tasks/20-fix-unclosed-call/input.calr
     1  tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr
     1  tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr
-total files: 23  total occurrences: 54
+total files: 24  total occurrences: 57
 
 ### conversion snapshots with function-typed shapes, per file
   05-02.approved.calr          shapes=0 §LAM=1 §DEL=0  []

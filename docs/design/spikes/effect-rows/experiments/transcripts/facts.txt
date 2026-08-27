@@ -103,7 +103,10 @@ StrictnessBatchTests.cs:106: public void FreeBareName_FailsClosed_NotSilentlyPur
 StrictnessBatchTests.cs:133: public void OverrideWithBroaderEffects_IsError()
 
 ### demand ledger test exact-equality
-string.Join(", ", measuredFailing.Except(recordedFailing)) +
+Assert.True(recordedFailing.SequenceEqual(measuredFailing),
+            "D-A files failing before the effect pass moved — a parser/binder change shrank or " +
+            "grew the effective denominator; regenerate with the change named.\n  newly failing: " +
+            string.Join(", ", measuredFailing.Except(recordedFailing)) +
             "\n  newly reaching: " + string.Join(", ", recordedFailing.Except(measuredFailing)));
         Assert.Equal(recorded.NotReachingEffectPass, measured.NotReachingEffectPass);
         Assert.Equal(recorded.FilesNotReachingEffectPass, measured.FilesNotReachingEffectPass);
@@ -115,8 +118,6 @@ string.Join(", ", measuredFailing.Except(recordedFailing)) +
             $"D-A totals moved: 0418 {measured.Calor0418} / 0419(function-typed) " +
             $"{measured.Calor0419FunctionTyped} vs ledger {recorded.Calor0418} / " +
             $"{recorded.Calor0419FunctionTyped}. The ledger is the frozen denominator — " +
-            "regenerate in this PR and name the cause (§4.4 gate 2 discriminating pin).");
-    }
 
 ### BoundTypeTests DisplayString pins
 105:        Assert.Equal("Dictionary<STRING, List<INT>>", dictType.DisplayString);

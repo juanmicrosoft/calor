@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "measuredCommit": "28727fb5a9ab381d867ff3ea62929e939cddaf92",
+  "measuredCommit": "0ee5672330a83233a125cb7002ac3f1ed0502f51",
   "scope": "Every committed .calr containing a line matching \u00a7O{...} at end-of-line immediately followed by a line matching \u00a7E{, compiled one file at a time via the CLI default (EnforceEffects on, UnknownCallPolicy.Strict, no --permissive-effects). twoLineOE is the occurrence count in that file; exit and codes are the compiler's verdict at measuredCommit. Design-doc Decision 1 must not disturb any of these.",
-  "fileCount": 23,
-  "occurrenceCount": 54,
-  "compileGreen": 1,
+  "fileCount": 24,
+  "occurrenceCount": 57,
+  "compileGreen": 2,
   "compileRed": 22,
   "files": [
     {
@@ -151,6 +151,12 @@
       "codes": [
         "Calor0830"
       ]
+    },
+    {
+      "file": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor+0.15.0/run-5/final-src/CsvRow.calr",
+      "twoLineOE": 3,
+      "exit": 0,
+      "codes": []
     },
     {
       "file": "benchmarks/security/command-injection.calr",

@@ -1,0 +1,46 @@
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor+0.15.0",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 3252,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armB/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armB",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 56,
+    "output": 18034
+  },
+  "tokenUsage": {
+    "cache_creation_input_tokens_corrected": 96924,
+    "cache_creation_input_tokens_naive": 96924,
+    "cache_read_input_tokens_corrected": 1982349,
+    "cache_read_input_tokens_naive": 1982349,
+    "input_tokens_corrected": 56,
+    "input_tokens_naive": 56,
+    "models_counted": [
+      "claude-opus-4-8"
+    ],
+    "models_excluded": {
+      "claude-haiku-4-5-20251001": 13
+    },
+    "num_turns": 31,
+    "origin_kind": null,
+    "output_tokens_all_models": 18047,
+    "output_tokens_corrected": 18034,
+    "output_tokens_naive": 18034,
+    "source": "modelUsage",
+    "undercount_flagged": false,
+    "undercount_ratio": 1.0
+  },
+  "nullAgent": false
+}

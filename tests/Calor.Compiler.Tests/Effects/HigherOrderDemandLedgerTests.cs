@@ -174,7 +174,10 @@ public class HigherOrderDemandLedgerTests
         Assert.True(recorded.FileCount == measured.FileCount,
             $"D-A corpus size moved: {measured.FileCount} .calr files vs ledger {recorded.FileCount}. " +
             $"Corpus additions/removals regenerate the ledger IN THIS PR ({RegenerateEnvVar}=1) " +
-            "with the change named — never silently.");
+            "with the change named — never silently. This is a filesystem walk: if the count is " +
+            "higher than `git ls-files '*.calr'` (minus docs/design/spikes/), untracked or " +
+            "gitignored .calr are being counted — harness scratch, or epoch run-internals " +
+            "outside a dot-directory — and the tree must be cleaned before regenerating.");
         // Files that never reach the pass are pinned BY NAME and by first error code: a
         // parser/binder regression that silently removes files from the effective
         // denominator (or changes why they fail) fails here, naming them.
@@ -279,13 +282,22 @@ public class HigherOrderDemandLedgerTests
         // Filter on REPO-RELATIVE paths: the checkout itself may live under a
         // directory named like one of the excluded segments (e.g. a worktree under
         // `.claude/worktrees/`), and an absolute-path filter would then match every file.
+        //
+        // Every dot-directory is skipped, not just `.git` / `.claude`: this is a
+        // FILESYSTEM walk, not `git ls-files`, and the agent-native harness leaves
+        // gitignored `.prev-src/` and `.envelope-src/` copies of every run's source
+        // under `bench/phase0-agent-native/epochs/**/` (PP-E1 leg B, PR #1110: a tree
+        // with them present counted 1006 files where a clean checkout counts 926).
+        // No committed .calr lives under a dot-directory, so the rule changes nothing
+        // on a clean tree; it only stops a local regeneration from freezing a
+        // denominator CI can never reproduce.
         return Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
             .Where(rel =>
             {
                 var segments = rel.Split('/');
                 var directories = segments.Take(segments.Length - 1).ToList();
-                return !directories.Any(d => d is "bin" or "obj" or ".git" or ".claude" or "node_modules")
+                return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
                     // Design-spike ARTIFACTS are not corpus. Round 3 moved the
                     // harness's scratch .calr outside the repository for exactly

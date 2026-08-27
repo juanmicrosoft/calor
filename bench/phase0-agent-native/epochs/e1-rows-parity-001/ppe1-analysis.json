@@ -1,0 +1,156 @@
+{
+  "gate": "PP-E1 leg B (annex A-1.11)",
+  "epoch": "e1-rows-parity-001",
+  "dryRun": false,
+  "dryRunNote": null,
+  "registeredEpoch": "e1-rows-parity-001",
+  "rule": "fails iff lowerBound95 > 1.0 AND pointEstimate > 1.35; underpowered iff pointEstimate > 1.35 with the bound not firing, or realizedMedianWithinCellCv > 0.66; per-run figure = token-usage.py output_tokens_corrected (A-1.9.1)",
+  "constants": {
+    "pointGate": 1.35,
+    "lowerBoundGate": 1.0,
+    "cvCap": 0.66,
+    "minRunsPerCell": 2,
+    "minPairs": 3,
+    "minValidPerArm": 12,
+    "censorCap": 0.4,
+    "bootstrapResamples": 2000,
+    "seed": 4537
+  },
+  "armA": {
+    "label": "calor+v0.14.3",
+    "role": "control",
+    "commit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armA",
+    "calorTasksSha": "084e2947cd2da91b8fd4179ff2b5c1fea0682163",
+    "editMechanism": "raw"
+  },
+  "armB": {
+    "label": "calor+0.15.0",
+    "role": "treatment",
+    "commit": "b775acb473de03966dfc7811210dd372f16f7bb4",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armB",
+    "calorTasksSha": "8db5b1b06c989e036f765e7cf4dec90d1e1a4439",
+    "editMechanism": "raw"
+  },
+  "modelPin": "claude-opus-4-8",
+  "pairsRegistered": [
+    "N1-001",
+    "N1-002",
+    "N1-003",
+    "N1-005"
+  ],
+  "pairsSurviving": [
+    "N1-001",
+    "N1-002",
+    "N1-003",
+    "N1-005"
+  ],
+  "pairsDropped": [],
+  "validRuns": {
+    "control": 20,
+    "treatment": 20
+  },
+  "censored": {
+    "control": 0.0,
+    "treatment": 0.0
+  },
+  "tokenSources": {
+    "modelUsage": 40
+  },
+  "perPair": [
+    {
+      "pair": "N1-001",
+      "controlMean": 7935.4,
+      "controlRuns": 5,
+      "treatmentMean": 9334,
+      "treatmentRuns": 5,
+      "ratio": 1.1762
+    },
+    {
+      "pair": "N1-002",
+      "controlMean": 5562.2,
+      "controlRuns": 5,
+      "treatmentMean": 8409.2,
+      "treatmentRuns": 5,
+      "ratio": 1.5118
+    },
+    {
+      "pair": "N1-003",
+      "controlMean": 12579.6,
+      "controlRuns": 5,
+      "treatmentMean": 14978,
+      "treatmentRuns": 5,
+      "ratio": 1.1907
+    },
+    {
+      "pair": "N1-005",
+      "controlMean": 7535.2,
+      "controlRuns": 5,
+      "treatmentMean": 6769.4,
+      "treatmentRuns": 5,
+      "ratio": 0.8984
+    }
+  ],
+  "withinCellCv": [
+    {
+      "pair": "N1-001",
+      "arm": "control",
+      "cv": 0.3768
+    },
+    {
+      "pair": "N1-001",
+      "arm": "treatment",
+      "cv": 0.3288
+    },
+    {
+      "pair": "N1-002",
+      "arm": "control",
+      "cv": 0.4259
+    },
+    {
+      "pair": "N1-002",
+      "arm": "treatment",
+      "cv": 0.2205
+    },
+    {
+      "pair": "N1-003",
+      "arm": "control",
+      "cv": 0.1144
+    },
+    {
+      "pair": "N1-003",
+      "arm": "treatment",
+      "cv": 0.4252
+    },
+    {
+      "pair": "N1-005",
+      "arm": "control",
+      "cv": 0.1131
+    },
+    {
+      "pair": "N1-005",
+      "arm": "treatment",
+      "cv": 0.1172
+    }
+  ],
+  "pointEstimate": 1.1835,
+  "lowerBound95": 0.9012,
+  "realizedMedianWithinCellCv": 0.2746,
+  "maxWithinCellCv": 0.4259,
+  "iterationsToGreen": {
+    "control": {
+      "1": 19,
+      "2": 1
+    },
+    "treatment": {
+      "1": 18,
+      "2": 2
+    }
+  },
+  "harnessValid": true,
+  "blockers": [],
+  "legBFails": false,
+  "underpowered": false,
+  "legBInput": "PASS",
+  "note": "leg B does not adjudicate alone: EffectRowsProbeLedgerTests derives the four-valued verdict from leg A, the routes and this file"
+}

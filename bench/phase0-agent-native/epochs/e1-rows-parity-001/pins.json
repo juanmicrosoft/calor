@@ -1,0 +1,76 @@
+{
+  "epochId": "e1-rows-parity-001",
+  "kind": "pp-e1-rows-parity",
+  "modelPin": "claude-opus-4-8",
+  "agentVersion": "2.1.243 (Claude Code)",
+  "startedAt": "2026-08-27T12:40:52Z",
+  "mode": "live",
+  "runsPerArm": 5,
+  "suiteDirtyFiles": 0,
+  "armA": {
+    "label": "calor+v0.14.3",
+    "role": "control (v0.14.3 release tag)",
+    "commit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armA/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armA",
+    "calorTasksSha": "084e2947cd2da91b8fd4179ff2b5c1fea0682163"
+  },
+  "armB": {
+    "label": "calor+0.15.0",
+    "role": "treatment (0.15.0 release build)",
+    "commit": "b775acb473de03966dfc7811210dd372f16f7bb4",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armB/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/dafc11c4-d0d2-448b-945f-9532842cf44f/scratchpad/ppe1-armB",
+    "calorTasksSha": "8db5b1b06c989e036f765e7cf4dec90d1e1a4439"
+  },
+  "ppL5": {
+    "metric": "tokens-to-green",
+    "threshold": 0.85,
+    "note": ">=15% median paired-ratio reduction, one-sided cluster bootstrap a=0.05 (gates Annex A)",
+    "pairs": [
+      "W2-001",
+      "W2-002",
+      "W2-003",
+      "W2-004",
+      "W2-005",
+      "W3-001",
+      "W3-002",
+      "W3-003",
+      "W3-004"
+    ]
+  },
+  "ppL6": {
+    "check": "neutral iterations-to-green parity + config invariance",
+    "pairs": [
+      "N1-001",
+      "N1-002",
+      "N1-003",
+      "N1-005"
+    ]
+  },
+  "ppW5": null,
+  "suite": [
+    "N1-001",
+    "N1-002",
+    "N1-003",
+    "N1-005"
+  ],
+  "telemetrySchema": "loop-telemetry/2",
+  "ppE1": {
+    "gate": "PP-E1 leg B (annex A-1.11)",
+    "metric": "output-tokens-to-green (token-usage.py corrected, A-1.9.1)",
+    "pointGate": 1.35,
+    "lowerBoundGate": 1.0,
+    "cvCap": 0.66,
+    "note": "FAILS iff BOTH the one-sided 95% cluster-bootstrap LOWER bound of the median paired ratio (0.15.0 / v0.14.3) exceeds 1.0 AND the point estimate exceeds 1.35; UNDERPOWERED if point > 1.35 with the bound not firing or realized median within-cell CV > 0.66",
+    "pairs": [
+      "N1-001",
+      "N1-002",
+      "N1-003",
+      "N1-005"
+    ],
+    "runner": "bench/phase0-agent-native/run-ppe1-epoch.sh"
+  }
+}

@@ -1,0 +1,29 @@
+§M{m001:TextUtils}
+  §F{f001:Slugify:pub} (str:s) -> str
+    §E{}
+    §B{lower:str} §C{s.ToLowerInvariant} §/C
+    §R §C{lower.Replace} §A " " §A "-" §/C
+
+  §F{f002:Truncate:pub} (str:s, i32:maxLen) -> str
+    §E{}
+    §IF{if1} (<= (len s) maxLen)
+      §R s
+    §IF{if2} (> maxLen 3)
+      §R (+ (substr s 0 (- maxLen 3)) "...")
+    §R (substr s 0 maxLen)
+
+  §F{f003:WordCount:pub} (str:s) -> i32
+    §E{}
+    §B{~count:i32} 0
+    §B{~inWord:bool} false
+    §B{~i:i32} 0
+    §WH{w1} (< i (len s))
+      §B{c:str} (substr s i 1)
+      §IF{if3} (|| (equals c " ") (|| (equals c "\t") (|| (equals c "\r") (equals c "\n"))))
+        §ASSIGN inWord false
+      §EL
+        §IF{if4} (! inWord)
+          §ASSIGN count (+ count 1)
+          §ASSIGN inWord true
+      §ASSIGN i (+ i 1)
+    §R count
