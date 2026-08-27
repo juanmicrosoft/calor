@@ -638,15 +638,22 @@ public sealed class SpikeVerdictTests
         return path;
     }
 
+    /// <summary>
+    /// The compiler the pinned invocation runs. When both configurations are
+    /// built (a dev box), the most recently written <c>calor.dll</c> wins, so a
+    /// frozen baseline is never adjudicated against a stale build of the other
+    /// configuration. CI builds one configuration only.
+    /// </summary>
     private static string CompilerDll()
     {
         var root = RepositoryRoot();
-        foreach (var configuration in new[] { "Debug", "Release" })
-        {
-            var candidate = Path.Combine(
-                root, "src", "Calor.Compiler", "bin", configuration, "net10.0", "calor.dll");
-            if (File.Exists(candidate)) return candidate;
-        }
+        var newest = new[] { "Debug", "Release" }
+            .Select(configuration => Path.Combine(
+                root, "src", "Calor.Compiler", "bin", configuration, "net10.0", "calor.dll"))
+            .Where(File.Exists)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (newest is not null) return newest;
 
         throw new InvalidOperationException(
             "calor.dll not found under src/Calor.Compiler/bin/{Debug,Release}/net10.0/. "
@@ -747,7 +754,7 @@ public sealed class SpikeVerdictTests
     //
     // What this test deliberately does NOT assert is the control's full
     // per-fixture multiset. That is asserted separately, by
-    // PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4 below.
+    // PpE1NegativeControls_MatchA1111Baselines_PreE4 below.
     //
     // THE BASELINE A-1.11 FROZE IS SUPERSEDED. A-1.11's leg-A negative control
     // read "A2 = 1x Calor0410 at (23,9) + 3x Calor0411; the four A3 = exit 0
@@ -766,8 +773,8 @@ public sealed class SpikeVerdictTests
     //     E4's and owns all five L7 cells").
     //
     // A-1.11.1 re-freezes A2 under the pinned invocation and registers the
-    // pre-E4 A3 counts; the four A3 fixtures' "exit 0, zero effect-family
-    // diagnostics" STANDS as the post-E4 expectation. Until E4 merges, PP-E1
+    // pre-E4 A3 counts; the four A3 fixtures' "exit 0, zero diagnostics" (A-1.11's
+    // words, verbatim) STANDS as the post-E4 expectation. Until E4 merges, PP-E1
     // leg A is a MISS under A-1.11's own-goal clause if adjudicated;
     // adjudication is at the 0.15.0 release commit.
     //
@@ -836,26 +843,37 @@ public sealed class SpikeVerdictTests
     /// sub-entry <b>A-1.11.1</b> (2026-08-26), measured under the PINNED
     /// invocation (no flags) at <c>main</c> =
     /// <c>9119397e979dfcab3606ee382b16afbdec4b136a</c>. Key is the fixture; the
-    /// value is the sorted multiset of <c>Calor####@line,column</c>.
+    /// value is the expected process exit code plus the sorted multiset of
+    /// <c>severity Calor####@line,column</c>. Severity and exit code are part
+    /// of the pin because they are exactly what the forbidden flag changes on
+    /// the A3 fixtures: the same Calor0418s, demoted from error to warning, and
+    /// exit 0 instead of 1. A code-and-position multiset alone cannot tell the
+    /// pinned invocation from the forbidden one.
     ///
     /// <para><b>E4 MUST UPDATE THIS TABLE.</b> Every entry here contains at
     /// least one Calor0418, and Calor0418 is precisely what E4 replaces. A-1.11.1
     /// registers the post-E4 expectation: A2 becomes
     /// <c>Calor0410@23,9 + Calor0411@26,24 + Calor0411@28,19</c> (the Calor0418
-    /// at (27,27) disappears), and the four A3 fixtures return to exit 0 with
-    /// zero effect-family diagnostics, which is the baseline A-1.11 froze and
-    /// which A-1.11.1 leaves standing. When E4 lands, this test goes red; the E4
+    /// at (27,27) disappears), and the four A3 fixtures return to "exit 0, zero
+    /// diagnostics", which is the baseline A-1.11 froze, verbatim, and which
+    /// A-1.11.1 leaves standing. When E4 lands, this test goes red; the E4
     /// PR flips it to those post-E4 multisets. Do NOT regenerate it to whatever
     /// the compiler happens to emit — A-1.11.1 exists because a baseline was
     /// once recorded that way.</para>
     /// </summary>
-    private static readonly (string Fixture, string[] Expected)[] PpE1PreE4Baselines =
+    private static readonly (string Fixture, int ExitCode, string[] Expected)[] PpE1PreE4Baselines =
     [
-        ("A2", ["Calor0410@23,9", "Calor0411@26,24", "Calor0411@28,19", "Calor0418@27,27"]),
-        ("A3-map", ["Calor0418@7,22"]),
-        ("A3-match", ["Calor0418@5,10", "Calor0418@6,8"]),
-        ("A3-middleware", ["Calor0418@4,19", "Calor0418@5,20"]),
-        ("A3-callback", ["Calor0418@6,7"]),
+        ("A2", 1,
+        [
+            "error Calor0410@23,9",
+            "error Calor0418@27,27",
+            "warning Calor0411@26,24",
+            "warning Calor0411@28,19",
+        ]),
+        ("A3-map", 1, ["error Calor0418@7,22"]),
+        ("A3-match", 1, ["error Calor0418@5,10", "error Calor0418@6,8"]),
+        ("A3-middleware", 1, ["error Calor0418@4,19", "error Calor0418@5,20"]),
+        ("A3-callback", 1, ["error Calor0418@6,7"]),
     ];
 
     /// <summary>
@@ -869,13 +887,18 @@ public sealed class SpikeVerdictTests
     /// <c>docs/plans/agent-native-gates.md</c> §A.3 entry A-1.11.1.</para>
     /// </summary>
     [Fact]
-    public void PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4()
+    public void PpE1NegativeControls_MatchA1111Baselines_PreE4()
     {
         var failures = new List<string>();
 
-        foreach (var (fixture, expected) in PpE1PreE4Baselines)
+        foreach (var (fixture, expectedExitCode, expected) in PpE1PreE4Baselines)
         {
-            var actual = CompileControlFixture(fixture);
+            var (exitCode, actual) = CompileControlFixture(fixture);
+
+            if (exitCode != expectedExitCode)
+            {
+                failures.Add($"{fixture}: expected exit {expectedExitCode} but got exit {exitCode}");
+            }
 
             if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
             {
@@ -889,8 +912,9 @@ public sealed class SpikeVerdictTests
             "PP-E1 leg A's negative control is FROZEN by annex sub-entry A-1.11.1 "
             + "(docs/plans/agent-native-gates.md §A.3). These are the PRE-E4 multisets. "
             + "If you are landing E4: this test is SUPPOSED to go red — replace each entry "
-            + "with A-1.11.1's registered POST-E4 multiset (A2 loses its Calor0418 at (27,27); "
-            + "the four A3 fixtures return to zero diagnostics). If you are NOT landing E4: "
+            + "with A-1.11.1's registered POST-E4 multiset (A2 loses its Calor0418 at (27,27) and "
+            + "stays exit 1; the four A3 fixtures return to exit 0 with zero diagnostics). "
+            + "If you are NOT landing E4: "
             + "STOP and report — do not regenerate the baseline, which is the exact mistake "
             + "A-1.11.1 was written to correct.\n  "
             + string.Join("\n  ", failures));
@@ -901,8 +925,9 @@ public sealed class SpikeVerdictTests
     /// <c>dotnet &lt;calor.dll&gt; -i &lt;source&gt; -o &lt;scratch&gt;</c> with
     /// <b>no flags</b>. <c>--permissive-effects</c> is deliberately NOT passed:
     /// the gate row forbids it in this probe, and A-1.11.1 exists because the
-    /// superseded baseline was recorded with it. Returns the diagnostic multiset
-    /// as sorted <c>Calor####@line,column</c> strings.
+    /// superseded baseline was recorded with it. Returns the process exit code
+    /// and the diagnostic multiset as sorted <c>severity Calor####@line,column</c>
+    /// strings.
     ///
     /// <para>This shells out rather than driving the passes in-process on
     /// purpose. The pinned invocation IS the CLI pipeline, and the in-process
@@ -910,7 +935,7 @@ public sealed class SpikeVerdictTests
     /// filters and, where those are errors, skips the effect pass entirely, so
     /// A3-map and A3-match come back with no Calor0418 at all.</para>
     /// </summary>
-    private static string[] CompileControlFixture(string fixture)
+    private static (int ExitCode, string[] Diagnostics) CompileControlFixture(string fixture)
     {
         var source = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
         Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
@@ -937,9 +962,10 @@ public sealed class SpikeVerdictTests
             var stderr = process.StandardError.ReadToEnd();
             process.WaitForExit();
 
-            return [.. DiagnosticLine.Matches(stdout + "\n" + stderr)
-                .Select(m => $"{m.Groups[2].Value}@{m.Groups[1].Value}")
+            string[] diagnostics = [.. DiagnosticLine.Matches(stdout + "\n" + stderr)
+                .Select(m => $"{m.Groups[2].Value} {m.Groups[3].Value}@{m.Groups[1].Value}")
                 .OrderBy(s => s, StringComparer.Ordinal)];
+            return (process.ExitCode, diagnostics);
         }
         finally
         {
@@ -947,9 +973,9 @@ public sealed class SpikeVerdictTests
         }
     }
 
-    /// <summary>`…/A2.calr(26,24): warning Calor0411: …` → `26,24` and `Calor0411`.</summary>
+    /// <summary>`…/A2.calr(26,24): warning Calor0411: …` → `26,24`, `warning`, `Calor0411`.</summary>
     private static readonly System.Text.RegularExpressions.Regex DiagnosticLine = new(
-        @"\((\d+,\d+)\): (?:error|warning|info) (Calor\d+):",
+        @"\((\d+,\d+)\): (error|warning|info) (Calor\d+):",
         System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     [Fact]

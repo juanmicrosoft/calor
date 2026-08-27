@@ -665,8 +665,8 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   **E4 also owes PP-E1's negative control**, per annex sub-entry
   [A-1.11.1](agent-native-gates.md): it must take A2 from the registered pre-E4 multiset to the
   post-E4 one (the `Calor0418` at (27,27) gone, leaving 1× `Calor0410` (23,9) + 2× `Calor0411`)
-  and return the four A3 fixtures to exit 0 with zero effect-family diagnostics — the baseline
-  A-1.11 froze, which A-1.11.1 leaves standing. `PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4`
+  and return the four A3 fixtures to "exit 0, zero diagnostics" — the baseline A-1.11 froze,
+  verbatim, which A-1.11.1 leaves standing. `PpE1NegativeControls_MatchA1111Baselines_PreE4`
   (`tests/Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs`) pins the **pre**-E4 state and is
   named so that it goes red on E4's own change; **the E4 PR flips it to the post-E4 multisets**.
   Until E4 lands, leg A is a **MISS** under A-1.11's own-goal clause if adjudicated.
@@ -777,11 +777,11 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   (26,24)(28,19), 1× `Calor0418` (27,27) — with the rule that **the `Calor0418` is E4's**, so the
   post-E4 expected multiset is 1× `Calor0410` (23,9) + 2× `Calor0411`, and **that post-E4 multiset
   is the binding one at adjudication** since §4.2 makes E4 non-deferrable. The four A3 fixtures'
-  "exit 0, zero effect-family diagnostics" **stands** as the post-E4 expectation, with today's
+  "exit 0, zero diagnostics" (A-1.11's words) **stands** as the post-E4 expectation, with today's
   pre-E4 `Calor0418` counts recorded (map 1, match 2, middleware 2, callback 1). Everything else in
   A-1.11's control clause — the bar on any further effect-family code, and the one pre-allowed
   Calor0410/0411 → Calor0425/0419 migration at the same declaration — is unchanged. Pinned by
-  `PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4`. It landed before the 0.15.0 release commit,
+  `PpE1NegativeControls_MatchA1111Baselines_PreE4`. It landed before the 0.15.0 release commit,
   which is where PP-E1 is adjudicated.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
