@@ -144,6 +144,20 @@ All notable changes to this project will be documented in this file.
   No product code changes; this is a record, not a feature. One test comes with
   it: a check that the five files it names are still byte-for-byte the files it
   froze, so they cannot drift out from under the record.
+- **We corrected a mistake in how the 0.15 proof point's control was recorded.**
+  `PP-E1` (above) works by breaking one of its five test files on purpose and
+  checking the compiler complains. For that to mean anything, you first need to
+  know what the compiler says about the *unbroken* file — that is the "control".
+  The control we wrote down for one file was copied from an old run that had used
+  an override switch, and the rules for this very test say that switch is not
+  allowed. So the control described something the compiler would never say, and
+  no run could ever have matched it. We measured all five files again the correct
+  way, wrote down what the compiler actually says today, and noted which of those
+  messages is expected to disappear when the next piece of the feature (E4) lands.
+  The original record is left untouched — it cannot be edited — and the new one
+  sits beside it as entry `A-1.11.1`. We also wrote down, in advance, that the
+  proof point would fail if it were judged before E4 arrives, so nobody can be
+  tempted to quietly adjust the numbers later. No product code changes.
 - **CI now refuses any pull request that edits or deletes an already-frozen
   line in the project's proof-point registry; only additions are allowed.**
   The registry is the A-annex of `docs/plans/agent-native-gates.md`. The

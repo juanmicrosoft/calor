@@ -638,15 +638,22 @@ public sealed class SpikeVerdictTests
         return path;
     }
 
+    /// <summary>
+    /// The compiler the pinned invocation runs. When both configurations are
+    /// built (a dev box), the most recently written <c>calor.dll</c> wins, so a
+    /// frozen baseline is never adjudicated against a stale build of the other
+    /// configuration. CI builds one configuration only.
+    /// </summary>
     private static string CompilerDll()
     {
         var root = RepositoryRoot();
-        foreach (var configuration in new[] { "Debug", "Release" })
-        {
-            var candidate = Path.Combine(
-                root, "src", "Calor.Compiler", "bin", configuration, "net10.0", "calor.dll");
-            if (File.Exists(candidate)) return candidate;
-        }
+        var newest = new[] { "Debug", "Release" }
+            .Select(configuration => Path.Combine(
+                root, "src", "Calor.Compiler", "bin", configuration, "net10.0", "calor.dll"))
+            .Where(File.Exists)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (newest is not null) return newest;
 
         throw new InvalidOperationException(
             "calor.dll not found under src/Calor.Compiler/bin/{Debug,Release}/net10.0/. "
@@ -745,29 +752,39 @@ public sealed class SpikeVerdictTests
     // clause of the control that E3 can put at risk and therefore the clause E3
     // owes.
     //
-    // What this test deliberately does NOT assert is the control's FULL frozen
-    // multiset (A2 = 1× Calor0410 at (23,9) + 3× Calor0411; the four A3 = exit 0
-    // with zero diagnostics). That baseline does not reproduce on today's
-    // compiler and did not before this branch either:
+    // What this test deliberately does NOT assert is the control's full
+    // per-fixture multiset. That is asserted separately, by
+    // PpE1NegativeControls_MatchA1111Baselines_PreE4 below.
     //
-    //   * the four A3 fixtures draw Calor0418 at each invocation, because
-    //     invoking a row-less value is still Calor0418 until E4 — the gate row
-    //     says so itself ("Calor0425 … is E4's and owns all five L7 cells");
-    //   * A2 drew 2x Calor0405 before this PR, because E2 slice b's P6 check read
-    //     `RequestHandlerDelegate<TResponse>` -- a §CSHARP-declared delegate, not a
-    //     §DEL -- as not function-typed. FIXED HERE (review round 1, F2): delegate
-    //     declarations inside interop text are collected, and Calor0405 fails OPEN
-    //     via TypeIdentity.IsProvablyNonFunctionType. See
-    //     PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2 below.
+    // THE BASELINE A-1.11 FROZE IS SUPERSEDED. A-1.11's leg-A negative control
+    // read "A2 = 1x Calor0410 at (23,9) + 3x Calor0411; the four A3 = exit 0
+    // with zero diagnostics". That cell carried two defects, both found by the
+    // E3a review (PR #1103, round 1, F1/F3) and both corrected by annex
+    // sub-entry A-1.11.1 (2026-08-26):
     //
-    // A2's frozen multiset itself carries a second defect (F1): the
-    //   after/A2.diagnostics.txt it was read from was recorded with
-    //   --permissive-effects, which the gate row forbids, so it was never
-    //   reproducible under the pinned invocation. The measured no-flag output
-    //   after F2 is 1x Calor0410 at (23,9), 2x Calor0411, 1x Calor0418 at (27,27);
-    //   an A-1.11.x annex sub-entry re-freezes it (separate PR). Until E4
-    //   replaces Calor0418, PP-E1 leg A is a MISS under the own-goal clause
-    //   if adjudicated now; adjudication is at the 0.15.0 release commit.
+    //   * A2's multiset was transcribed from after/A2.diagnostics.txt, whose
+    //     header records `# emit args: --permissive-effects` -- a flag the same
+    //     gate row FORBIDS in this probe. It was never the pinned invocation's
+    //     output, so the control could not have passed on any compiler.
+    //   * all five baselines came from the spike's throwaway, unmerged
+    //     prototype, and the four A3 fixtures draw Calor0418 at each invocation
+    //     on the shipping compiler, because invoking a row-less value is still
+    //     Calor0418 until E4 -- the gate row says so itself ("Calor0425 ... is
+    //     E4's and owns all five L7 cells").
+    //
+    // A-1.11.1 re-freezes A2 under the pinned invocation and registers the
+    // pre-E4 A3 counts; the four A3 fixtures' "exit 0, zero diagnostics" (A-1.11's
+    // words, verbatim) STANDS as the post-E4 expectation. Until E4 merges, PP-E1
+    // leg A is a MISS under A-1.11's own-goal clause if adjudicated;
+    // adjudication is at the 0.15.0 release commit.
+    //
+    // A separate E2b defect on this fixture -- A2 drew 2x Calor0405, because
+    // slice b's P6 check read `RequestHandlerDelegate<TResponse>`, a
+    // §CSHARP-declared delegate rather than a §DEL, as not function-typed --
+    // was fixed in PR #1103 (review round 1, F2): delegate declarations inside
+    // interop text are collected, and Calor0405 fails OPEN via
+    // TypeIdentity.IsProvablyNonFunctionType. Pinned by
+    // PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2 below.
     // ========================================================================
 
     /// <summary>The five §12.1 fixtures PP-E1 leg A freezes, by path.</summary>
@@ -890,6 +907,146 @@ public sealed class SpikeVerdictTests
             string.Join(", ", byCode.OrderBy(e => e.Key, StringComparer.Ordinal)
                 .Select(e => $"{e.Key}x{e.Value}")));
     }
+
+    /// <summary>
+    /// The corrected PP-E1 leg-A negative-control baselines, from annex
+    /// sub-entry <b>A-1.11.1</b> (2026-08-26), measured under the PINNED
+    /// invocation (no flags) at <c>main</c> =
+    /// <c>9119397e979dfcab3606ee382b16afbdec4b136a</c>. Key is the fixture; the
+    /// value is the expected process exit code plus the sorted multiset of
+    /// <c>severity Calor####@line,column</c>. Severity and exit code are part
+    /// of the pin because they are exactly what the forbidden flag changes on
+    /// the A3 fixtures: the same Calor0418s, demoted from error to warning, and
+    /// exit 0 instead of 1. A code-and-position multiset alone cannot tell the
+    /// pinned invocation from the forbidden one.
+    ///
+    /// <para><b>E4 MUST UPDATE THIS TABLE.</b> Every entry here contains at
+    /// least one Calor0418, and Calor0418 is precisely what E4 replaces. A-1.11.1
+    /// registers the post-E4 expectation: A2 becomes
+    /// <c>Calor0410@23,9 + Calor0411@26,24 + Calor0411@28,19</c> (the Calor0418
+    /// at (27,27) disappears), and the four A3 fixtures return to "exit 0, zero
+    /// diagnostics", which is the baseline A-1.11 froze, verbatim, and which
+    /// A-1.11.1 leaves standing. When E4 lands, this test goes red; the E4
+    /// PR flips it to those post-E4 multisets. Do NOT regenerate it to whatever
+    /// the compiler happens to emit — A-1.11.1 exists because a baseline was
+    /// once recorded that way.</para>
+    /// </summary>
+    private static readonly (string Fixture, int ExitCode, string[] Expected)[] PpE1PreE4Baselines =
+    [
+        ("A2", 1,
+        [
+            "error Calor0410@23,9",
+            "error Calor0418@27,27",
+            "warning Calor0411@26,24",
+            "warning Calor0411@28,19",
+        ]),
+        ("A3-map", 1, ["error Calor0418@7,22"]),
+        ("A3-match", 1, ["error Calor0418@5,10", "error Calor0418@6,8"]),
+        ("A3-middleware", 1, ["error Calor0418@4,19", "error Calor0418@5,20"]),
+        ("A3-callback", 1, ["error Calor0418@6,7"]),
+    ];
+
+    /// <summary>
+    /// PP-E1 leg A's negative control, as CORRECTED by annex sub-entry
+    /// <b>A-1.11.1</b>: the full per-fixture diagnostic multiset of every
+    /// unmutated fixture under the pinned invocation, in its PRE-E4 state.
+    ///
+    /// <para>A-1.11's own A2 baseline is superseded and cannot be asserted here:
+    /// it was recorded with <c>--permissive-effects</c>, which that row forbids,
+    /// so it was never reproducible. See the block comment above and
+    /// <c>docs/plans/agent-native-gates.md</c> §A.3 entry A-1.11.1.</para>
+    /// </summary>
+    [Fact]
+    public void PpE1NegativeControls_MatchA1111Baselines_PreE4()
+    {
+        var failures = new List<string>();
+
+        foreach (var (fixture, expectedExitCode, expected) in PpE1PreE4Baselines)
+        {
+            var (exitCode, actual) = CompileControlFixture(fixture);
+
+            if (exitCode != expectedExitCode)
+            {
+                failures.Add($"{fixture}: expected exit {expectedExitCode} but got exit {exitCode}");
+            }
+
+            if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
+            {
+                failures.Add(
+                    $"{fixture}: expected [{string.Join(", ", expected)}] "
+                    + $"but got [{string.Join(", ", actual)}]");
+            }
+        }
+
+        Assert.True(failures.Count == 0,
+            "PP-E1 leg A's negative control is FROZEN by annex sub-entry A-1.11.1 "
+            + "(docs/plans/agent-native-gates.md §A.3). These are the PRE-E4 multisets. "
+            + "If you are landing E4: this test is SUPPOSED to go red — replace each entry "
+            + "with A-1.11.1's registered POST-E4 multiset (A2 loses its Calor0418 at (27,27) and "
+            + "stays exit 1; the four A3 fixtures return to exit 0 with zero diagnostics). "
+            + "If you are NOT landing E4: "
+            + "STOP and report — do not regenerate the baseline, which is the exact mistake "
+            + "A-1.11.1 was written to correct.\n  "
+            + string.Join("\n  ", failures));
+    }
+
+    /// <summary>
+    /// Compiles one control fixture with the PINNED invocation A-1.11 froze —
+    /// <c>dotnet &lt;calor.dll&gt; -i &lt;source&gt; -o &lt;scratch&gt;</c> with
+    /// <b>no flags</b>. <c>--permissive-effects</c> is deliberately NOT passed:
+    /// the gate row forbids it in this probe, and A-1.11.1 exists because the
+    /// superseded baseline was recorded with it. Returns the process exit code
+    /// and the diagnostic multiset as sorted <c>severity Calor####@line,column</c>
+    /// strings.
+    ///
+    /// <para>This shells out rather than driving the passes in-process on
+    /// purpose. The pinned invocation IS the CLI pipeline, and the in-process
+    /// shortcut measures something else: it reports binder diagnostics the CLI
+    /// filters and, where those are errors, skips the effect pass entirely, so
+    /// A3-map and A3-match come back with no Calor0418 at all.</para>
+    /// </summary>
+    private static (int ExitCode, string[] Diagnostics) CompileControlFixture(string fixture)
+    {
+        var source = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+        Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
+
+        var output = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{Guid.NewGuid():N}.g.cs");
+        try
+        {
+            var start = new ProcessStartInfo("dotnet")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                WorkingDirectory = RepositoryRoot(),
+            };
+            start.ArgumentList.Add(CompilerDll());
+            start.ArgumentList.Add("-i");
+            start.ArgumentList.Add(source);
+            start.ArgumentList.Add("-o");
+            start.ArgumentList.Add(output);
+
+            using var process = Process.Start(start);
+            Assert.NotNull(process);
+            var stdout = process!.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            string[] diagnostics = [.. DiagnosticLine.Matches(stdout + "\n" + stderr)
+                .Select(m => $"{m.Groups[2].Value} {m.Groups[3].Value}@{m.Groups[1].Value}")
+                .OrderBy(s => s, StringComparer.Ordinal)];
+            return (process.ExitCode, diagnostics);
+        }
+        finally
+        {
+            if (File.Exists(output)) File.Delete(output);
+        }
+    }
+
+    /// <summary>`…/A2.calr(26,24): warning Calor0411: …` → `26,24`, `warning`, `Calor0411`.</summary>
+    private static readonly System.Text.RegularExpressions.Regex DiagnosticLine = new(
+        @"\((\d+,\d+)\): (error|warning|info) (Calor\d+):",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     [Fact]
     public void PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2()
