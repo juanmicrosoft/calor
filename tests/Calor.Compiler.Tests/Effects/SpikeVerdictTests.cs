@@ -839,37 +839,34 @@ public sealed class SpikeVerdictTests
     }
 
     /// <summary>
-    /// v0.15 E3 slice b — the FULL frozen multiset of the four A3 combinator
-    /// fixtures, asserted exactly, under the pinned invocation.
+    /// v0.15 E3 slice b, flipped by <b>E4</b> — the FULL multiset of the four A3
+    /// combinator fixtures, asserted exactly, in-process.
     ///
-    /// <para>Slice a could only assert the absence of row-family diagnostics
-    /// (above). Slice b implements site 6, which is the mechanism these four
-    /// fixtures exist to exercise, so the honest pin is the whole multiset: the
-    /// PRE-E4 state is <b>exactly Calor0418 once per invocation of a row-less
-    /// value, and nothing else</b>. Anything that this slice adds or removes on
-    /// these five files is a change to PP-E1's frozen control, and the gate row
-    /// says STOP rather than regenerate.</para>
-    ///
-    /// <para><b>What E4 owes.</b> Replace Calor0418 and every count below goes to
-    /// zero, which is the frozen A-1.11 baseline (exit 0, zero diagnostics)
-    /// restored. Until then PP-E1 leg A is a MISS under the own-goal clause,
-    /// stated here rather than papered over.</para>
+    /// <para>Slice b pinned the PRE-E4 state: exactly Calor0418 once per
+    /// invocation of a row-less value, and nothing else. E4 replaces Calor0418
+    /// with fits-at-invocation, so every one of those counts is now
+    /// <b>ZERO</b> — the frozen A-1.11 baseline (exit 0, zero diagnostics)
+    /// restored, which is what E4 owed PP-E1's negative control. The two
+    /// non-control fixtures keep their site-5 answer: alpha zero, broadening
+    /// one Calor0421. Anything that adds or removes a diagnostic on these six
+    /// files is a change to PP-E1's control, and the gate row says STOP rather
+    /// than regenerate.</para>
     /// </summary>
     [Theory]
-    [InlineData("A3-callback", 1, 0)]
-    [InlineData("A3-map", 1, 0)]
-    [InlineData("A3-match", 2, 0)]
-    [InlineData("A3-middleware", 2, 0)]
+    [InlineData("A3-callback", 0)]
+    [InlineData("A3-map", 0)]
+    [InlineData("A3-match", 0)]
+    [InlineData("A3-middleware", 0)]
     // The alpha-equivalence fixture: `eff e` on the interface member, `eff f` on
-    // the implementation. Zero Calor0421 is §7.5's R2, and it now holds because
+    // the implementation. Zero Calor0421 is §7.5's R2, and it holds because
     // sites 4/5 compare binders by ORDINAL — not, as in slice a, because they
     // never compared them at all.
-    [InlineData("A3-middleware-alpha", 1, 0)]
+    [InlineData("A3-middleware-alpha", 0)]
     // The negative control for the same mechanism: same shape, impl row {e, cw}
     // against interface row {e}. The ORDINARY fits relation rejects it.
-    [InlineData("A3-middleware-broadening", 1, 1)]
-    public void A3Fixtures_AreExactlyCalor0418PerInvocation(
-        string fixture, int expected0418, int expected0421)
+    [InlineData("A3-middleware-broadening", 1)]
+    public void A3Fixtures_AreExactlyZeroCalor0418_PostE4(
+        string fixture, int expected0421)
     {
         var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
         Assert.True(File.Exists(path), $"A3 fixture missing: {path}");
@@ -896,8 +893,6 @@ public sealed class SpikeVerdictTests
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
 
         var expected = new Dictionary<string, int>(StringComparer.Ordinal);
-        if (expected0418 > 0)
-            expected[Compiler.Diagnostics.DiagnosticCode.DelegateInvocation] = expected0418;
         if (expected0421 > 0)
             expected[Compiler.Diagnostics.DiagnosticCode.InterfaceEffectVariance] = expected0421;
 
@@ -920,36 +915,41 @@ public sealed class SpikeVerdictTests
     /// exit 0 instead of 1. A code-and-position multiset alone cannot tell the
     /// pinned invocation from the forbidden one.
     ///
-    /// <para><b>E4 MUST UPDATE THIS TABLE.</b> Every entry here contains at
-    /// least one Calor0418, and Calor0418 is precisely what E4 replaces. A-1.11.1
-    /// registers the post-E4 expectation: A2 becomes
-    /// <c>Calor0410@23,9 + Calor0411@26,24 + Calor0411@28,19</c> (the Calor0418
-    /// at (27,27) disappears), and the four A3 fixtures return to "exit 0, zero
-    /// diagnostics", which is the baseline A-1.11 froze, verbatim, and which
-    /// A-1.11.1 leaves standing. When E4 lands, this test goes red; the E4
-    /// PR flips it to those post-E4 multisets. Do NOT regenerate it to whatever
-    /// the compiler happens to emit — A-1.11.1 exists because a baseline was
-    /// once recorded that way.</para>
+    /// <para><b>FLIPPED BY E4 (v0.15, this table is the POST-E4 one).</b> The
+    /// pre-E4 table carried one Calor0418 per entry — A2 at (27,27); A3-map
+    /// (7,22); A3-match (5,10)(6,8); A3-middleware (4,19)(5,20); A3-callback
+    /// (6,7), every fixture exit 1 — and A-1.11.1 registered that as a recorded
+    /// measurement, not a satisfying alternative. E4 replaces Calor0418 with
+    /// fits-at-invocation, and this table is now A-1.11.1's registered post-E4
+    /// expectation, which is the BINDING control at adjudication: A2 is
+    /// <c>Calor0410@23,9 + Calor0411@26,24 + Calor0411@28,19</c>, exit 1; the
+    /// four A3 fixtures are exit 0 with zero diagnostics — A-1.11's own words,
+    /// verbatim, which A-1.11.1 left standing. Do NOT regenerate this table to
+    /// whatever the compiler happens to emit — A-1.11.1 exists because a
+    /// baseline was once recorded that way. The one pre-allowed migration
+    /// (A2's Calor0410-'unknown'/Calor0411 → Calor0425/Calor0419 at the same
+    /// declaration) did NOT happen at E4: A2's multiset is byte-for-byte the
+    /// registered one.</para>
     /// </summary>
-    private static readonly (string Fixture, int ExitCode, string[] Expected)[] PpE1PreE4Baselines =
+    private static readonly (string Fixture, int ExitCode, string[] Expected)[] PpE1PostE4Baselines =
     [
         ("A2", 1,
         [
             "error Calor0410@23,9",
-            "error Calor0418@27,27",
             "warning Calor0411@26,24",
             "warning Calor0411@28,19",
         ]),
-        ("A3-map", 1, ["error Calor0418@7,22"]),
-        ("A3-match", 1, ["error Calor0418@5,10", "error Calor0418@6,8"]),
-        ("A3-middleware", 1, ["error Calor0418@4,19", "error Calor0418@5,20"]),
-        ("A3-callback", 1, ["error Calor0418@6,7"]),
+        ("A3-map", 0, []),
+        ("A3-match", 0, []),
+        ("A3-middleware", 0, []),
+        ("A3-callback", 0, []),
     ];
 
     /// <summary>
     /// PP-E1 leg A's negative control, as CORRECTED by annex sub-entry
     /// <b>A-1.11.1</b>: the full per-fixture diagnostic multiset of every
-    /// unmutated fixture under the pinned invocation, in its PRE-E4 state.
+    /// unmutated fixture under the pinned invocation, in its POST-E4 state —
+    /// the control RESTORED, which is what E4 owed (roadmap §4.2 E4).
     ///
     /// <para>A-1.11's own A2 baseline is superseded and cannot be asserted here:
     /// it was recorded with <c>--permissive-effects</c>, which that row forbids,
@@ -957,11 +957,11 @@ public sealed class SpikeVerdictTests
     /// <c>docs/plans/agent-native-gates.md</c> §A.3 entry A-1.11.1.</para>
     /// </summary>
     [Fact]
-    public void PpE1NegativeControls_MatchA1111Baselines_PreE4()
+    public void PpE1NegativeControls_MatchA1111Baselines_PostE4()
     {
         var failures = new List<string>();
 
-        foreach (var (fixture, expectedExitCode, expected) in PpE1PreE4Baselines)
+        foreach (var (fixture, expectedExitCode, expected) in PpE1PostE4Baselines)
         {
             var (exitCode, actual) = CompileControlFixture(fixture);
 
@@ -980,14 +980,89 @@ public sealed class SpikeVerdictTests
 
         Assert.True(failures.Count == 0,
             "PP-E1 leg A's negative control is FROZEN by annex sub-entry A-1.11.1 "
-            + "(docs/plans/agent-native-gates.md §A.3). These are the PRE-E4 multisets. "
-            + "If you are landing E4: this test is SUPPOSED to go red — replace each entry "
-            + "with A-1.11.1's registered POST-E4 multiset (A2 loses its Calor0418 at (27,27) and "
-            + "stays exit 1; the four A3 fixtures return to exit 0 with zero diagnostics). "
-            + "If you are NOT landing E4: "
-            + "STOP and report — do not regenerate the baseline, which is the exact mistake "
-            + "A-1.11.1 was written to correct.\n  "
+            + "(docs/plans/agent-native-gates.md §A.3). These are the registered POST-E4 "
+            + "multisets, restored by E4 (v0.15) and BINDING at the 0.15.0 adjudication. "
+            + "The only pre-allowed move is A2's Calor0410-'unknown'/Calor0411 → "
+            + "Calor0425/Calor0419 at the SAME declaration; anything else — a Calor0418 "
+            + "anywhere, a code from the barred set, a diagnostic on an A3 fixture — fails "
+            + "the control. STOP and report; do not regenerate the baseline, which is the "
+            + "exact mistake A-1.11.1 was written to correct.\n  "
             + string.Join("\n  ", failures));
+    }
+
+    /// <summary>
+    /// PP-E1 leg A's five <b>L7 row-erasure</b> cells (annex A-1.11's mutation
+    /// catalogue, quoted): <i>"delete the row from a function-typed position
+    /// that is then invoked … registered code Calor0425 in every case … `L7`
+    /// detection requires Calor0425 specifically and requires the mutant's
+    /// Calor0425 count at the registered declaration to RISE above the
+    /// unmutated fixture's frozen baseline"</i> — and <i>"Calor0418 at an `L7`
+    /// declaration is NOT detection"</i>.
+    ///
+    /// <para>Pre-E4 these cells could not discriminate: the unmutated fixture
+    /// and the mutant both drew Calor0418 at the same invocation. E4 is what
+    /// makes them discriminate — the unmutated fixture is exit 0 with zero
+    /// diagnostics (the pin above), and each mutant draws Calor0425 at the
+    /// registered invocation. Applied TEXTUALLY to a copy of the frozen fixture
+    /// (blob SHAs untouched) with each anchor asserted to occur exactly once,
+    /// as the catalogue registers, and compiled with the pinned invocation.
+    /// The registered declaration is the callable containing the invocation;
+    /// the assertion is on the invocation's line, which the catalogue names
+    /// (`at §C{f} in f001`). This is leg A's detection for L7, not the ledger
+    /// (`EffectRowsProbeLedgerTests`) that A-1.11 registers for adjudication.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("L7-A2", "A2",
+        "next §E{e}, CancellationToken:cancellationToken) -> TResponse",
+        "next, CancellationToken:cancellationToken) -> TResponse", 27)]
+    [InlineData("L7-MAP", "A3-map", "Func<i32,i32>:f §E{e}", "Func<i32,i32>:f", 7)]
+    [InlineData("L7-MATCH", "A3-match", "Func<i32,i32>:onSome §E{e}", "Func<i32,i32>:onSome", 5)]
+    [InlineData("L7-MID", "A3-middleware", "(Func<i32>:g §E{e})", "(Func<i32>:g)", 4)]
+    [InlineData("L7-CB", "A3-callback",
+        "§FLD{Action<i32>:onChange:pri} §E{cw}", "§FLD{Action<i32>:onChange:pri}", 6)]
+    public void PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4(
+        string cell, string fixture, string anchor, string replacement, int invocationLine)
+    {
+        var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+        var source = File.ReadAllText(path);
+        Assert.True(CountOccurrences(source, anchor) == 1,
+            $"{cell}: the registered anchor must occur exactly once in {fixture}.calr");
+
+        var mutant = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{cell}-{Guid.NewGuid():N}.calr");
+        try
+        {
+            File.WriteAllText(mutant, source.Replace(anchor, replacement, StringComparison.Ordinal));
+
+            var (_, baseline) = CompileControlFixture(fixture);
+            var (_, mutated) = CompileControlSource(mutant);
+
+            var registeredPrefix = $"Calor0425@{invocationLine},";
+            var baselineCount = baseline.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal));
+            var mutantCount = mutated.Count(d => d.Contains(registeredPrefix, StringComparison.Ordinal));
+
+            Assert.Equal(0, baselineCount);
+            Assert.True(mutantCount > baselineCount,
+                $"{cell}: expected Calor0425 at line {invocationLine} to RISE above the unmutated "
+                + $"fixture's {baselineCount}; mutant drew [{string.Join(", ", mutated)}]");
+            Assert.DoesNotContain(mutated, d => d.Contains("Calor0418", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (File.Exists(mutant)) File.Delete(mutant);
+        }
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var at = haystack.IndexOf(needle, StringComparison.Ordinal);
+             at >= 0;
+             at = haystack.IndexOf(needle, at + needle.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
     }
 
     /// <summary>
@@ -1009,7 +1084,13 @@ public sealed class SpikeVerdictTests
     {
         var source = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
         Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
+        return CompileControlSource(source);
+    }
 
+    /// <summary>The pinned invocation over an arbitrary source path — the L7
+    /// mutants are copies of a frozen fixture, compiled exactly as the control is.</summary>
+    private static (int ExitCode, string[] Diagnostics) CompileControlSource(string source)
+    {
         var output = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{Guid.NewGuid():N}.g.cs");
         try
         {

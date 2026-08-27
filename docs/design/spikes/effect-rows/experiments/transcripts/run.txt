@@ -142,7 +142,7 @@ CASE X8-DEL-with-E  args: (none)  exit: 0
 Compilation successful: X8-DEL-with-E.g.cs
 
 ==============================================================================
-CASE X9a-I-with-sameline-E  args: (none)  exit: 1
+CASE X9a-I-with-sameline-E  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:X9}
   §F{f001:Apply:pub}
@@ -152,10 +152,10 @@ CASE X9a-I-with-sameline-E  args: (none)  exit: 1
     §E{cw}
     §R §C{transform} §A value §/C
 ------------------------------------------------------------------------------
-X9a-I-with-sameline-E.calr(7,8): error Calor0418: Invocation of function-typed value 'transform' (type 'Func<INT, INT>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+Compilation successful: X9a-I-with-sameline-E.g.cs
 
 ==============================================================================
-CASE X9b-FLD-with-sameline-E  args: (none)  exit: 1
+CASE X9b-FLD-with-sameline-E  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:X9}
   §CL{c001:Counter:pub}
@@ -164,17 +164,17 @@ CASE X9b-FLD-with-sameline-E  args: (none)  exit: 1
       §E{cw}
       §C{onChange} §A n §/C
 ------------------------------------------------------------------------------
-X9b-FLD-with-sameline-E.calr(6,7): error Calor0418: Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+Compilation successful: X9b-FLD-with-sameline-E.g.cs
 
 ==============================================================================
-CASE X9c-inline-param-with-E  args: (none)  exit: 1
+CASE X9c-inline-param-with-E  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:X9}
   §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
     §E{cw}
     §R §C{transform} §A value §/C
 ------------------------------------------------------------------------------
-X9c-inline-param-with-E.calr(4,8): error Calor0418: Invocation of function-typed value 'transform' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+Compilation successful: X9c-inline-param-with-E.g.cs
 
 ==============================================================================
 CASE X10-E1-before-calor0418  args: (none)  exit: 1
@@ -184,7 +184,8 @@ CASE X10-E1-before-calor0418  args: (none)  exit: 1
     §E{cw}
     §R §C{transform} §A value §/C
 ------------------------------------------------------------------------------
-X10-E1-before-calor0418.calr(4,8): error Calor0418: Invocation of function-typed value 'transform' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+X10-E1-before-calor0418.calr(4,8): warning Calor0425: Invocation of 'transform' in 'Apply' cannot be charged: its effect row is Unknown (parameter 'transform' of 'Apply' (type 'Func<i32,i32>') carries no effect row). Add §E{…} on the same line as the type to state what 'transform' may do, or compile with --permissive-effects. 'Apply' is charged Unknown.
+X10-E1-before-calor0418.calr(3,5): error Calor0410: Function 'Apply' uses effect 'unknown' but does not declare it
 
 ==============================================================================
 CASE X11-E3-before-silent-laundering  args: (none)  exit: 0
@@ -239,10 +240,11 @@ CASE X13-field-delegate-invocation  args: (none)  exit: 1
       §E{}
       §C{onChange} §A n §/C
 ------------------------------------------------------------------------------
-X13-field-delegate-invocation.calr(6,7): error Calor0418: Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+X13-field-delegate-invocation.calr(6,7): warning Calor0425: Invocation of 'onChange' in 'Bump' cannot be charged: its effect row is Unknown (field 'onChange' of 'Counter' (type 'Action<i32>') carries no effect row). Add §E{…} on the same line as the type to state what 'onChange' may do, or compile with --permissive-effects. 'Bump' is charged Unknown.
+X13-field-delegate-invocation.calr(5,7): error Calor0410: Function 'Bump' uses effect 'unknown' but does not declare it
 
 ==============================================================================
-CASE X14-lambda-bound-local  args: (none)  exit: 1
+CASE X14-lambda-bound-local  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:X14}
   §F{f001:UseLambda:pub} () -> i32
@@ -250,5 +252,5 @@ CASE X14-lambda-bound-local  args: (none)  exit: 1
     §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
     §R §C{f} §A INT:1 §/C
 ------------------------------------------------------------------------------
-X14-lambda-bound-local.calr(5,8): error Calor0418: Invocation of function-typed value 'f' (type 'Func<>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
+Compilation successful: X14-lambda-bound-local.g.cs
 

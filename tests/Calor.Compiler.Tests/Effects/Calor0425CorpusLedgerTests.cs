@@ -37,8 +37,27 @@ namespace Calor.Compiler.Tests;
 /// <item><c>Assumed</c> — the row FITS, but only under an assumption whose
 /// reasons the hop carries (§4.3).</item>
 /// </list>
-/// The E4 slice that retires Calor0418 must widen this ledger to §13.4's own
-/// three-way split, and its PR is where the two causes above get separated.</para>
+/// <b>v0.15 E4 widened the split</b>, as §13.4 and the paragraph above said it
+/// must, to the causes the pass can now distinguish (schema 2):
+/// <list type="bullet">
+/// <item><c>ExternalBase</c> — §6.4's third sample: an override or interface
+/// implementation reaching an external base (E3b's 0419 → 0425 retirement).
+/// These were the four <c>UnknownSource</c> entries of schema 1; they are not
+/// a SOURCE row at a binding site at all, and the ELSE arm mislabelled them.</item>
+/// <item><c>InvocationRowless</c> — E4's invocation of a function-typed value
+/// declared with no row (§13.4's "row-less function-typed declaration", seen
+/// from the INVOKING side, where it costs something).</item>
+/// <item><c>InvocationUndetermined</c> — E4's invocation of a value whose row
+/// cannot be determined from its initializer or its producing call (§13.4's
+/// "BCL-returned delegate": the value came back from a callee this pass cannot
+/// see, or from a return that carries no row).</item>
+/// <item><c>InvocationAssumed</c> — E4's invocation of an <c>Assumed</c> row,
+/// charged and reported once.</item>
+/// </list>
+/// §13.4's "unresolved receiver" is NOT a bucket, and honestly so: an invoked
+/// value whose type came from an unresolved receiver never reaches Calor0425 —
+/// the bare-target guard sends it through the unknown-call chain as Calor0411
+/// (E1 slice 2c), which is the older fail-closed path and is not this ledger's.</para>
 ///
 /// <para><b>The fourth split ships too</b> (§13.4's closing paragraph): for each
 /// row-less destination, whether the position is ever INVOKED in its module or
@@ -59,7 +78,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class Calor0425CorpusLedgerTests
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
 
     private const string ScopeText =
         "Calor0425 (EffectRowUnknown) emitted by EffectEnforcementPass over the three A-1.5.3 "
@@ -68,8 +87,10 @@ public class Calor0425CorpusLedgerTests
         + "enforced with UnknownCallPolicy.Strict and no --permissive-effects; modules that fail "
         + "conversion or whose converted output fails to parse are excluded from the denominator "
         + "and counted separately. Causes are the ones the FIVE MONOMORPHIC SITES of design-doc "
-        + "§6.2 can distinguish; §13.4's unresolved-receiver / BCL-returned-delegate split is "
-        + "E4's, because both reach a site as the same Unknown";
+        + "§6.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of sites 4/5 and "
+        + "the three verdicts an INVOCATION of a function-typed value can draw — row-less "
+        + "declaration, undetermined source (a BCL-returned or row-less-returned value), and an "
+        + "Assumed row; §13.4's unresolved-receiver cause is Calor0411's, not this ledger's";
 
     private static readonly string[] Subjects = ["MediatR", "serilog", "FluentValidation"];
 
@@ -102,9 +123,12 @@ public class Calor0425CorpusLedgerTests
                 $"Calor0425-corpus {subject.Subject}: {subject.Diagnostics} across "
                 + $"{subject.ModulesWithDiagnostics} of {subject.ModulesEnforced} enforced modules "
                 + $"(rowless {subject.RowlessDestination}, unknown-source {subject.UnknownSource}, "
-                + $"assumed {subject.Assumed}; of the rowless, invoked {subject.RowlessInvoked} / "
-                + $"never invoked {subject.RowlessNeverInvoked}; Calor0418 witness "
-                + $"{subject.Calor0418Witness}; excluded {subject.ModulesNotMeasured} "
+                + $"assumed {subject.Assumed}, external-base {subject.ExternalBase}, "
+                + $"invocation rowless {subject.InvocationRowless} / undetermined "
+                + $"{subject.InvocationUndetermined} / assumed {subject.InvocationAssumed}; "
+                + $"of the rowless, invoked {subject.RowlessInvoked} / "
+                + $"never invoked {subject.RowlessNeverInvoked}; invocation witness "
+                + $"{subject.InvocationWitness}; excluded {subject.ModulesNotMeasured} "
                 + $"= convert {subject.ExcludedConversionFailed} / parse {subject.ExcludedParseFailed} "
                 + $"/ bind {subject.ExcludedBindFailed})");
         }
@@ -158,17 +182,20 @@ public class Calor0425CorpusLedgerTests
             "Zero exclusions would mean the conversion+bind gate stopped filtering, which "
             + "changes what the headline zero is a zero OVER.");
 
-        // The zero this ledger records is only worth recording if the pass ran
-        // and SAW higher-order code. It did — but only barely: the witness is
-        // FOUR Calor0418 across all three subjects (2/1/1), not "hundreds". That
-        // is a weak witness and it is written down as one: it establishes that
-        // the pass reached higher-order code at all, and it does NOT establish
-        // that the measured subset is representative of the corpus. Read the
-        // exclusion rate below before drawing any conclusion from the zero.
-        Assert.True(measured.PerSubject.Sum(s => s.Calor0418Witness) > 0,
-            "No Calor0418 anywhere in the measured corpus — the effect pass did not reach the "
-            + "higher-order code it is supposed to be measuring, so a Calor0425 count of zero "
-            + "would mean nothing.");
+        // The number this ledger records is only worth recording if the pass ran
+        // and SAW higher-order code. Pre-E4 the witness was FOUR Calor0418 across
+        // all three subjects (2/1/1), not "hundreds"; E4 retired that code for
+        // function-typed values, and the witness is now the number of INVOCATIONS
+        // of function-typed values the pass adjudicated — which in converted code,
+        // where no row is ever written, is exactly the invocation-bucket
+        // Calor0425s. Still a weak witness and still written down as one: it
+        // establishes that the pass reached higher-order code at all, and it does
+        // NOT establish that the measured subset is representative of the corpus.
+        // Read the exclusion rate below before drawing any conclusion.
+        Assert.True(measured.PerSubject.Sum(s => s.InvocationWitness) > 0,
+            "No invocation of a function-typed value anywhere in the measured corpus — the "
+            + "effect pass did not reach the higher-order code it is supposed to be measuring, "
+            + "so the Calor0425 counts would mean nothing.");
 
         Assert.Equal(SchemaVersion, committed.SchemaVersion);
         Assert.Equal(ScopeText, committed.Scope);
@@ -238,7 +265,7 @@ public class Calor0425CorpusLedgerTests
 
         int diagnostics = 0, modulesWith = 0, enforced = 0, notMeasured = 0;
         int rowless = 0, unknownSource = 0, assumed = 0, rowlessInvoked = 0, rowlessNever = 0;
-        int delegateInvocationWitness = 0;
+        int externalBase = 0, invocationRowless = 0, invocationUndetermined = 0, invocationAssumed = 0;
         // F7 — WHY a module was excluded, not just how many were.
         int excludedConversionFailed = 0, excludedParseFailed = 0, excludedBindFailed = 0;
 
@@ -349,16 +376,11 @@ public class Calor0425CorpusLedgerTests
 
             enforced++;
 
-            // ANTI-VACUITY WITNESS. The headline number below is ZERO, and a
-            // zero is only meaningful if the pass actually ran and actually saw
-            // higher-order code. Calor0418 is the diagnostic today's compiler
-            // emits for exactly the values rows are about, so a non-zero witness
-            // proves the effect pass reached these modules and found function
-            // values in them — and that the zero is "no row SITE", not "no
-            // measurement".
-            delegateInvocationWitness += effectDiagnostics
-                .Count(d => d.Code == DiagnosticCode.DelegateInvocation);
-
+            // ANTI-VACUITY WITNESS (schema 2): the invocation-bucket Calor0425s
+            // counted below. Pre-E4 this was the Calor0418 count, which E4 drove
+            // to zero for function-typed values; the SAME invocations now draw
+            // the invocation-shaped Calor0425 (no converted module writes a
+            // row), so the witness measures the same thing under its new code.
             var rows = effectDiagnostics
                 .Where(d => d.Code == DiagnosticCode.EffectRowUnknown)
                 .ToList();
@@ -370,9 +392,35 @@ public class Calor0425CorpusLedgerTests
 
             foreach (var row in rows)
             {
-                if (row.Message.Contains("only under an assumption", StringComparison.Ordinal))
+                // Named per site so a regeneration can be spot-checked by hand
+                // (E4's PR did: is Calor0425 the honest code at each one?).
+                Console.WriteLine(
+                    $"Calor0425-corpus site {name}/{Path.GetRelativePath(srcRoot, file)}"
+                    + $"({row.Span.Line},{row.Span.Column}): {row.Message}");
+
+                if (row.Message.StartsWith("Invocation of ", StringComparison.Ordinal))
+                {
+                    // v0.15 E4 — the three invocation verdicts, by the clause the
+                    // message quotes (pinned by full equality in
+                    // StrictnessBatchTests.MessageTexts_Calor0425_AtInvocation_*).
+                    if (row.Message.Contains("under an assumption", StringComparison.Ordinal))
+                        invocationAssumed++;
+                    else if (row.Message.Contains("carries no effect row", StringComparison.Ordinal))
+                        invocationRowless++;
+                    else
+                        invocationUndetermined++;
+                }
+                else if (row.Message.Contains("only under an assumption", StringComparison.Ordinal))
                 {
                     assumed++;
+                }
+                else if (row.Message.Contains("not visible in this module", StringComparison.Ordinal))
+                {
+                    // E3b's two external-base arms of sites 4/5: the interface arm
+                    // (§6.4's third sample, "through a member not visible in this
+                    // module") and the override arm ("overrides a member of external
+                    // base class 'X', which is not visible in this module").
+                    externalBase++;
                 }
                 else if (row.Message.Contains("with no effect row", StringComparison.Ordinal))
                 {
@@ -392,7 +440,8 @@ public class Calor0425CorpusLedgerTests
         return new SubjectVolume(
             name, diagnostics, modulesWith, enforced, notMeasured,
             rowless, unknownSource, assumed, rowlessInvoked, rowlessNever,
-            delegateInvocationWitness,
+            externalBase, invocationRowless, invocationUndetermined, invocationAssumed,
+            invocationRowless + invocationUndetermined + invocationAssumed,
             excludedConversionFailed, excludedParseFailed, excludedBindFailed);
     }
 
@@ -435,7 +484,14 @@ public class Calor0425CorpusLedgerTests
         int Assumed,
         int RowlessInvoked,
         int RowlessNeverInvoked,
-        int Calor0418Witness,
+        /// <summary>v0.15 E4 (schema 2) — §13.4's widened split; see the class
+        /// comment. <c>InvocationWitness</c> is the sum of the three invocation
+        /// buckets and replaces schema 1's <c>Calor0418Witness</c>.</summary>
+        int ExternalBase,
+        int InvocationRowless,
+        int InvocationUndetermined,
+        int InvocationAssumed,
+        int InvocationWitness,
         /// <summary>F7 — the exclusion-reason histogram. These three sum to
         /// <c>ModulesNotMeasured</c>.</summary>
         int ExcludedConversionFailed,
