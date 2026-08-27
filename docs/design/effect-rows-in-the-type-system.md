@@ -849,7 +849,7 @@ a change to `Fits` moves all of them together.
 ### 6.4 Message samples (new text; §13.2 pins it)
 
 ```
-Calor0424: Argument 'Shout' has effect row [cw], which does not fit parameter
+Calor0424: Argument 'Shout' has effect row cw, which does not fit parameter
 'transform' of 'Apply' (declared row: [pure]). Extra effect(s): cw. Widen
 'transform' to §E{cw}, or pass a function whose row fits. An effect row that does
 not fit is never waived.
@@ -864,6 +864,14 @@ not visible in this module (inherited from external base 'RendererBase'), so its
 effect row is Unknown. The interface's declared row [cw] is assumed here, not
 verified.
 ```
+
+> **Corrected, E3a review round 1 (F6).** These samples first wrote the source row **bracketed**
+> — `has effect row [cw]` — which is not what `EffectRowDisplay.ToCompactDisplayString` emits.
+> §8.3 froze that spelling as `EffectSet.ToDisplayString()`'s: brackets mark the three SHAPES
+> (`[unknown]`, `[pure]`, `[assumed: cw]`) and a concrete non-empty row is bare (`cw`, `cw, fs:w`).
+> Bracketing every row would have made the shape marker meaningless and moved `EffectRowDisplay`
+> and its pins, so the DOC was corrected to the emitter and not the reverse. P22 asserts these
+> strings by full equality, so the two can no longer drift.
 
 The third **re-words** today's Calor0419 text (`EEP:605-611`) rather than merely re-coding it —
 Draft v1 claimed otherwise. The re-wording is deliberate (it names the row) and pinned.
@@ -1647,7 +1655,7 @@ AFTER: `Register`'s `FunctionSymbol` carries
 Row: Concrete({mut}))`. Site 2 fires:
 
 ```
-Calor0424: Argument 'ReadsAndLogs' has effect row [cw, fs:r], which does not fit
+Calor0424: Argument 'ReadsAndLogs' has effect row cw, fs:r, which does not fit
 parameter 'handler' of 'Register' (declared row: [fs:r]). Extra effect(s): cw.
 ```
 
