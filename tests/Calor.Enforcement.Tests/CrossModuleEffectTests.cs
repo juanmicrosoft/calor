@@ -634,7 +634,8 @@ public class CrossModuleEffectTests
                 {
                     new()
                     {
-                        CallerName = $"Func{i}",
+                        CallerId = $"f{i}",
+                        DisplayName = $"Func{i}",
                         DiagnosticLine = 2,
                         DiagnosticColumn = 1,
                         DeclaredEffects = i % 2 == 0

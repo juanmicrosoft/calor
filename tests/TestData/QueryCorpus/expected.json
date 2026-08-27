@@ -1,5 +1,5 @@
 {
-  "note": "Ground truth for the index/query gate (roadmap §2.5 gate 3), authored by reading project/*.calr — NOT recorded from the implementation's output. Results are 'file:line:name' for the declaration, sorted ordinal. 'partial' is true when the residual could change what the answer means.",
+  "note": "Ground truth for the index/query gate (roadmap §2.5 gate 3), authored by reading project/*.calr — NOT recorded from the implementation's output. Results are 'file:line:name' for the declaration, sorted ordinal. 'partial' is true when the residual could change what the answer means. v0.15 E5: 'effects' answers are 'file:line:name:declared=…;inferred=…;verdict=…;code=…;undeclared=…' for the declaration; 'impact-effects' takes a hypothetical 'row' (comma-separated codes, empty = pure) and answers 'file:line:name:verdict' over the impact closure.",
   "queries": [
     {
       "why": "A single declaration, found by name.",
@@ -160,6 +160,95 @@
         "contracts.calr:2:module"
       ],
       "partial": false
+    },
+    {
+      "why": "The effects facet's discriminating case (gate 7). Leaky declares nothing — a declaration without §E is pure (design §3.5) — but calls Log, which prints. The index must say the body does NOT fit the declaration, that Calor0410 fires, and that cw is the undeclared effect. A facet that copied the declared row into the inferred one, or one built from the declaration text alone, answers 'fits' here; a facet that inferred without the callee's effects answers '[pure]'.",
+      "facet": "effects",
+      "name": "Leaky",
+      "inFile": "effects.calr",
+      "expect": [
+        "effects.calr:5:Leaky:declared=[pure];inferred=cw;verdict=does-not-fit;code=Calor0410;undeclared=cw"
+      ],
+      "partial": false
+    },
+    {
+      "why": "A declaration whose body does exactly what it declares: §P charges cw, §E{cw} covers it, nothing fires.",
+      "facet": "effects",
+      "name": "Log",
+      "inFile": "effects.calr",
+      "expect": [
+        "effects.calr:2:Log:declared=cw;inferred=cw;verdict=fits;code=none;undeclared="
+      ],
+      "partial": false
+    },
+    {
+      "why": "No §E at all means pure, not unknown (design §3.5): Quiet's declared row is [pure], its body is pure, and it fits. An index that recorded an omitted declaration row as [unknown] would answer cannot-tell.",
+      "facet": "effects",
+      "name": "Quiet",
+      "inFile": "effects.calr",
+      "expect": [
+        "effects.calr:14:Quiet:declared=[pure];inferred=[pure];verdict=fits;code=none;undeclared="
+      ],
+      "partial": false
+    },
+    {
+      "why": "A call that resolves to nothing charges an unknown effect. The inferred row is [unknown], the verdict is cannot-tell — and, because enforcement fails closed, Calor0410 still fires naming 'unknown'. Answering fits or does-not-fit here invents knowledge; answering cannot-tell WITHOUT the code hides that the build fails. The answer is partial because the unresolved call sits inside the subject.",
+      "facet": "effects",
+      "name": "AsksMissing",
+      "inFile": "asks-across.calr",
+      "expect": [
+        "asks-across.calr:5:AsksMissing:declared=[pure];inferred=[unknown];verdict=cannot-tell;code=Calor0410;undeclared=unknown"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Cross-module: Run calls Scale, declared in another file. The per-module pass charges nothing for that call; the index folds Scale's DECLARED row in through the cross-module pass's own resolution (design §8.5, one producer). Scale is pure, so Run infers [pure] and fits — the answer `calor build` gives. An index that treated the cross-file call as unknown would answer cannot-tell.",
+      "facet": "effects",
+      "name": "Run",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:2:Run:declared=[pure];inferred=[pure];verdict=fits;code=none;undeclared="
+      ],
+      "partial": false
+    },
+    {
+      "why": "Effect-change blast radius over the impact closure (design §8.6). If Log's row became fs:w, every transitive caller — Leaky and Relay directly, Fan through Relay — declares a row fs:w does not fit. A facet that looked only at direct callers misses Fan; one that compared against the callers' INFERRED rows instead of their DECLARED ones would still say Relay and Fan fit. Partial for the reason every impact answer is: an unresolved call anywhere might have reached the change.",
+      "facet": "impact-effects",
+      "name": "Log",
+      "inFile": "effects.calr",
+      "row": "fs:w",
+      "expect": [
+        "effects.calr:11:Fan:does-not-fit",
+        "effects.calr:5:Leaky:does-not-fit",
+        "effects.calr:8:Relay:does-not-fit"
+      ],
+      "partial": true
+    },
+    {
+      "why": "The same closure with Log's current row, cw: only Leaky, which declares nothing, stops fitting; Relay and Fan declare cw. This pair separates 'which callers exist' (three, both times) from 'which callers would break' (three, then one).",
+      "facet": "impact-effects",
+      "name": "Log",
+      "inFile": "effects.calr",
+      "row": "cw",
+      "expect": [
+        "effects.calr:11:Fan:fits",
+        "effects.calr:5:Leaky:does-not-fit",
+        "effects.calr:8:Relay:fits"
+      ],
+      "partial": true
+    },
+    {
+      "why": "A pure hypothetical row fits every caller: narrowing a callee's row never breaks a caller (fits is a subset relation, and the empty set is a subset of everything).",
+      "facet": "impact-effects",
+      "name": "Log",
+      "inFile": "effects.calr",
+      "row": "",
+      "expect": [
+        "effects.calr:11:Fan:fits",
+        "effects.calr:5:Leaky:fits",
+        "effects.calr:8:Relay:fits"
+      ],
+      "partial": true
     }
   ]
 }

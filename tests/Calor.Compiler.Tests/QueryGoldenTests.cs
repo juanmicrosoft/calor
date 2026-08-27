@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Indexing;
 using Xunit;
 
@@ -32,7 +33,8 @@ public sealed class QueryGoldenTests : IDisposable
         string Name,
         string? InFile,
         string[] Expect,
-        bool Partial);
+        bool Partial,
+        string? Row);
 
     public static TheoryData<int, string> Goldens()
     {
@@ -83,6 +85,61 @@ public sealed class QueryGoldenTests : IDisposable
             Assert.Equal(
                 golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
                 rendered.OrderBy(entry => entry, StringComparer.Ordinal).ToArray());
+            return;
+        }
+
+        if (golden.Facet == "effects")
+        {
+            // v0.15 E5, gate 7 (roadmap §4.4; design §8.6/§13.3). The answer is
+            // the enforcement pass's own per-declaration result as the index
+            // recorded it — declared row, inferred row, verdict, the code that
+            // fires — plus the rows of the positions the declaration owns.
+            // Authored from the fixture, not recorded: alter one expected
+            // answer and this fails (the gate's discriminating pin).
+            var owners = index.FindDeclarations(golden.Name);
+            var owner = golden.InFile == null
+                ? Assert.Single(owners)
+                : Assert.Single(owners.Where(
+                    declaration => declaration.File == golden.InFile));
+
+            var rendered = index.FindEffectRows(owner.SymbolId)
+                .Select(row => row.OwnerSymbolId.Length == 0 && row.Kind is not ("parameter" or "return")
+                    ? $"{row.File}:{row.Line}:{row.Name}:declared={row.DeclaredRow.Display};"
+                        + $"inferred={row.InferredRow?.Display ?? "none"};verdict={row.Verdict};"
+                        + $"code={row.DiagnosticCode ?? "none"};undeclared={string.Join(",", row.Forbidden)}"
+                    : $"{row.File}:{row.Line}:{row.Name}:position={row.Kind};"
+                        + $"declared={row.DeclaredRow.Display};bound={row.BoundRow ?? "none"}");
+
+            Assert.Equal(
+                golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
+                rendered.OrderBy(entry => entry, StringComparer.Ordinal).ToArray());
+            Assert.Equal(golden.Partial, index.EffectsAnswerIsPartial(owner.SymbolId, owner.File));
+            return;
+        }
+
+        if (golden.Facet == "impact-effects")
+        {
+            // v0.15 E5 — blast radius: FindImpactOfDeclarations' closure, unchanged,
+            // joined with the verdict of fitting the hypothetical row into each
+            // affected caller's DECLARED row.
+            Assert.NotNull(golden.Row);
+            var subjectDeclarations = index.FindDeclarations(golden.Name);
+            var target = golden.InFile == null
+                ? Assert.Single(subjectDeclarations)
+                : Assert.Single(subjectDeclarations.Where(
+                    declaration => declaration.File == golden.InFile));
+            var codes = golden.Row!.Split(
+                ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var impacts = index.FindEffectImpact(target.SymbolId, EffectSet.From(codes).ToRow());
+            Assert.Equal(
+                golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
+                impacts
+                    .Select(impact =>
+                        $"{impact.Declaration.File}:{impact.Declaration.Line}:{impact.Declaration.Name}:"
+                            + ProjectIndexBuilder.VerdictText(impact.Verdict))
+                    .OrderBy(entry => entry, StringComparer.Ordinal)
+                    .ToArray());
+            Assert.Equal(golden.Partial, index.ImpactAnswerIsPartial());
             return;
         }
 
@@ -158,6 +215,25 @@ public sealed class QueryGoldenTests : IDisposable
             Assert.False(string.IsNullOrWhiteSpace(golden.Why));
     }
 
+    /// <summary>
+    /// Gate 7's anti-vacuity: the effects leg must contain each of the three
+    /// verdicts and a firing code, or an index that answered "fits" for
+    /// everything would pass the effects goldens that happen to fit.
+    /// </summary>
+    [Fact]
+    public void TheEffectsGoldensExerciseEveryVerdict()
+    {
+        var effects = LoadGoldens().Where(golden => golden.Facet == "effects").ToArray();
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("verdict=fits", StringComparison.Ordinal)));
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("verdict=does-not-fit", StringComparison.Ordinal)));
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("verdict=cannot-tell", StringComparison.Ordinal)));
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("code=Calor0410", StringComparison.Ordinal)));
+
+        var blast = LoadGoldens().Where(golden => golden.Facet == "impact-effects").ToArray();
+        Assert.Contains(blast, golden => golden.Expect.Any(entry => entry.EndsWith(":does-not-fit", StringComparison.Ordinal)));
+        Assert.Contains(blast, golden => golden.Expect.Any(entry => entry.EndsWith(":fits", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void TheCorpusExercisesPartialAnswers()
     {
@@ -199,7 +275,10 @@ public sealed class QueryGoldenTests : IDisposable
                 entry.GetProperty("expect").EnumerateArray()
                     .Select(value => value.GetString()!)
                     .ToArray(),
-                entry.GetProperty("partial").GetBoolean()))
+                entry.GetProperty("partial").GetBoolean(),
+                entry.TryGetProperty("row", out var row) && row.ValueKind == JsonValueKind.String
+                    ? row.GetString()
+                    : null))
             .ToArray();
     }
 

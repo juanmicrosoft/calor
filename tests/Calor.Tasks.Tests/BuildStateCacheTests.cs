@@ -191,7 +191,8 @@ public class BuildStateCacheTests : IDisposable
             {
                 new()
                 {
-                    CallerName = "SaveOrder",
+                    CallerId = "f001",
+                    DisplayName = "SaveOrder",
                     DiagnosticLine = 4,
                     DiagnosticColumn = 3,
                     DeclaredEffects = new List<EffectEntry>
@@ -253,7 +254,8 @@ public class BuildStateCacheTests : IDisposable
         Assert.Empty(pm.DeclaredEffects);
 
         var caller = Assert.Single(s.Callers);
-        Assert.Equal("SaveOrder", caller.CallerName);
+        Assert.Equal("f001", caller.CallerId);
+        Assert.Equal("SaveOrder", caller.DisplayName);
         Assert.Equal(4, caller.DiagnosticLine);
         Assert.Single(caller.DeclaredEffects);
         Assert.Equal(2, caller.Calls.Count);

@@ -70,6 +70,47 @@ public sealed class CrossModuleEffectEnforcementPass
         return Enforce(summaries, registry);
     }
 
+    /// <summary>
+    /// v0.15 E5 (design-doc §8.5, "one producer, two consumers") — the declared
+    /// effects of every cross-module callee each caller in <paramref name="summary"/>
+    /// resolves to, keyed by <see cref="EffectCallerSummary.CallerId"/>. This is
+    /// exactly the set <see cref="Enforce(IReadOnlyList{ValueTuple{EffectSummary, string}}, CrossModuleEffectRegistry)"/>
+    /// verifies a caller's declaration against, produced by the same resolution
+    /// (<see cref="ResolveCallerCallees"/>) and exposed so the project index can
+    /// fold cross-module charges into a declaration's inferred row without a
+    /// second resolver. A callee whose declared row is Unknown contributes
+    /// <see cref="EffectSet.Unknown"/>, which is what the pass reports as
+    /// Calor0425 for that caller.
+    /// </summary>
+    public IReadOnlyDictionary<string, EffectSet> ResolveCrossModuleEffects(
+        EffectSummary summary,
+        string filePath,
+        CrossModuleEffectRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(summary);
+        ArgumentNullException.ThrowIfNull(registry);
+
+        var result = new Dictionary<string, EffectSet>(StringComparer.Ordinal);
+        var internalNames = BuildInternalNameSet(summary);
+        if (summary.Callers == null)
+            return result;
+
+        foreach (var caller in summary.Callers)
+        {
+            if (caller == null || string.IsNullOrEmpty(caller.CallerId))
+                continue;
+
+            var charged = EffectSet.Empty;
+            foreach (var resolution in ResolveCallerCallees(caller, filePath, internalNames, registry))
+                charged = charged.Union(resolution.DeclaredEffects);
+
+            if (!charged.IsEmpty)
+                result[caller.CallerId] = charged;
+        }
+
+        return result;
+    }
+
     private void CheckCaller(
         EffectCallerSummary caller,
         string filePath,
@@ -78,8 +119,23 @@ public sealed class CrossModuleEffectEnforcementPass
         List<Diagnostic> diagnostics)
     {
         var declaredEffects = EffectSummaryBuilder.ToEffectSet(caller.DeclaredEffects);
+        foreach (var resolution in ResolveCallerCallees(caller, filePath, internalNames, registry))
+            VerifyEffects(caller, filePath, resolution, declaredEffects, diagnostics);
+    }
+
+    /// <summary>
+    /// The cross-module callees one caller's recorded call targets resolve to —
+    /// the single resolution both <see cref="CheckCaller"/> and
+    /// <see cref="ResolveCrossModuleEffects"/> consume.
+    /// </summary>
+    private static IEnumerable<CrossModuleResolution> ResolveCallerCallees(
+        EffectCallerSummary caller,
+        string filePath,
+        HashSet<string> internalNames,
+        CrossModuleEffectRegistry registry)
+    {
         if (caller.Calls == null)
-            return;
+            yield break;
 
         foreach (var call in caller.Calls)
         {
@@ -110,7 +166,7 @@ public sealed class CrossModuleEffectEnforcementPass
             if (string.Equals(resolution.ModulePath, filePath, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            VerifyEffects(caller, filePath, resolution, declaredEffects, diagnostics);
+            yield return resolution;
         }
     }
 
@@ -185,7 +241,7 @@ public sealed class CrossModuleEffectEnforcementPass
                 DiagnosticCode.EffectRowUnknown,
                 $"Cross-module call to '{resolution.FunctionName}' (in module "
                 + $"'{resolution.ModuleName}') has effect row {calleeRow.ToCompactDisplayString()} and "
-                + $"'{caller.CallerName}' declares row {callerRow.ToCompactDisplayString()}, so it cannot "
+                + $"'{caller.DisplayName}' declares row {callerRow.ToCompactDisplayString()}, so it cannot "
                 + "be decided whether the callee's effects fit. State a row on both sides, or compile "
                 + "with --permissive-effects.",
                 span,
@@ -196,8 +252,8 @@ public sealed class CrossModuleEffectEnforcementPass
 
         var forbidden = resolution.DeclaredEffects.Except(declaredEffects).ToList();
         var diagnosticSpan = span;
-        // Caller names for class methods are formatted "ClassName.MethodName".
-        var callerKind = caller.CallerName.Contains('.') ? "Method" : "Function";
+        // Display names for class methods are formatted "ClassName.MethodName".
+        var callerKind = caller.DisplayName.Contains('.') ? "Method" : "Function";
         // Permissive mode demotes cross-module violations to warnings, mirroring the
         // per-file pass's permissive handling of forbidden effects.
         var severity = _policy == UnknownCallPolicy.Permissive
@@ -208,7 +264,7 @@ public sealed class CrossModuleEffectEnforcementPass
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCode.ForbiddenEffect,
-                $"{callerKind} '{caller.CallerName}' uses effect '{EffectSetExtensions.ToSurfaceCode(kind, value)}' " +
+                $"{callerKind} '{caller.DisplayName}' uses effect '{EffectSetExtensions.ToSurfaceCode(kind, value)}' " +
                 $"via cross-module call to '{resolution.FunctionName}' (in module '{resolution.ModuleName}') " +
                 $"but does not declare it.",
                 diagnosticSpan,

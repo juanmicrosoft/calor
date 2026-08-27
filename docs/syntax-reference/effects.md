@@ -167,6 +167,40 @@ charges nothing for it; it never silences a row the compiler *does* know. **Calo
 reported for one thing only: invoking a value whose type is provably not a function (`i32`,
 `str`, an array).
 
+### Asking the index
+
+The project index records, for every function and method, the row it **declares**, the row
+the compiler **inferred** for its body, and the **verdict** between them — the same answer
+`calor build` reaches, read off the same pass, never re-inferred. Ask for it by name:
+
+```
+calor query effects Leaky
+  effects.calr:5:11 function Leaky
+    declared: [pure]
+    inferred: cw
+    verdict:  does not fit — Calor0410 fires (undeclared: cw)
+```
+
+The verdict is one of `fits`, `does not fit`, or `cannot tell` (the body calls something
+the compiler knows nothing about; Calor0410 still fires, because enforcement fails closed).
+When the inferred row is only *assumed* — the body contains interop the compiler cannot
+see through — the answer lists why. A parameter or return that carries its own `§E{…}` is
+listed after the declaration's row. `--json` returns the same rows as a document.
+
+To see what a change to a row would break, ask for the blast radius. It walks every function
+that calls the one you name, directly or through others, and checks whether the row you
+propose still fits each caller's declared row:
+
+```
+calor query impact Log --effects --row fs:w
+  effects.calr:5:11 function Leaky — declares [pure]: does-not-fit
+  effects.calr:8:11 function Relay — declares cw: does-not-fit
+  effects.calr:11:11 function Fan — declares cw: does-not-fit
+impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on effects.calr:2:11 function Log
+```
+
+Leave off `--row` to use the declaration's current row; `--row ""` asks about a pure one.
+
 ---
 
 ## Effect Codes

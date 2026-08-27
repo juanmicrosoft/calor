@@ -118,7 +118,12 @@ internal static class BuildStateCache
 {
     // 3.0 adds an explicit compiler-semantics surface and canonical MSBuild input
     // fingerprinting. Older state is intentionally rebuilt and overwritten.
-    public const string CurrentFormatVersion = "3.0";
+    // 4.0 (v0.15 E5, design-doc §8.5 / P23): BuildFileEntry.EffectSummary's shape
+    // changed — EffectCallerSummary is keyed by structural id (CallerId +
+    // DisplayName replace CallerName). One cold rebuild on the first 0.15 build.
+    // CurrentCompilerSemanticsVersion does NOT move: effect rows change no
+    // emitted byte (G-CODEGEN, §12.2).
+    public const string CurrentFormatVersion = "4.0";
     public const string CurrentCompilerSemanticsVersion = "calor-compile-semantics-v1";
     public const string CurrentOptionsSerializerVersion = "compile-inputs-v3";
     private const string CacheFileName = ".calor-build-state.json";

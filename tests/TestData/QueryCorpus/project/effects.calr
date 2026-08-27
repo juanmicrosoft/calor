@@ -1,0 +1,15 @@
+§M{m007:Effectful}
+  §F{f001:Log:pub} (str:s) -> void
+    §E{cw}
+    §P s
+  §F{f002:Leaky:pub} () -> void
+    §E{}
+    §C{Log} §A STR:"x" §/C
+  §F{f003:Relay:pub} () -> void
+    §E{cw}
+    §C{Log} §A STR:"y" §/C
+  §F{f005:Fan:pub} () -> void
+    §E{cw}
+    §C{Relay} §/C
+  §F{f006:Quiet:pub} () -> i32
+    §R INT:1

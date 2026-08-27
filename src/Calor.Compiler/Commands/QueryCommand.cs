@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Indexing;
 
 namespace Calor.Compiler.Commands;
@@ -31,9 +33,24 @@ public static class QueryCommand
             CreateImpactCommand(),
             CreateFacetCommand("contracts", "Contracts declared on a declaration"),
             CreateFacetCommand("assumptions", "Assumptions in force for a declaration"),
+            CreateFacetCommand(
+                "effects",
+                "Declared and inferred effect rows of a declaration, and the verdict between them",
+                withJson: true),
         };
         return command;
     }
+
+    /// <summary>
+    /// v0.15 E5 — the payload <c>calor query effects --json</c> carries under
+    /// the envelope's <c>data</c>. The rows are the index's own records, so
+    /// the JSON and the text answer cannot disagree.
+    /// </summary>
+    private sealed record EffectsAnswer(
+        string Subject,
+        string SymbolId,
+        IReadOnlyList<IndexedEffectRow> Rows,
+        bool Partial);
 
     private static Command CreateImpactCommand()
     {
@@ -53,10 +70,20 @@ public static class QueryCommand
         var noBuildOption = new Option<bool>(
             aliases: ["--no-build"],
             description: "Refuse a missing or stale index instead of rebuilding it");
+        var effectsOption = new Option<bool>(
+            aliases: ["--effects"],
+            description: "Effect-row blast radius: which affected callers' declared rows the "
+                + "subject's row would stop fitting");
+        var rowOption = new Option<string?>(
+            aliases: ["--row"],
+            description: "With --effects: the row the subject would carry after the change, as "
+                + "comma-separated effect codes (e.g. \"cw,fs:w\"; \"\" for pure). "
+                + "Default: the subject's current declared row");
 
         var command = new Command("impact", "What a change could affect")
         {
             subjectArgument, pathOption, inFileOption, fileOption, noBuildOption,
+            effectsOption, rowOption,
         };
 
         command.SetHandler((InvocationContext context) =>
@@ -66,7 +93,9 @@ public static class QueryCommand
                 context.ParseResult.GetValueForOption(pathOption)!,
                 context.ParseResult.GetValueForOption(inFileOption),
                 context.ParseResult.GetValueForOption(fileOption),
-                context.ParseResult.GetValueForOption(noBuildOption));
+                context.ParseResult.GetValueForOption(noBuildOption),
+                context.ParseResult.GetValueForOption(effectsOption),
+                context.ParseResult.GetValueForOption(rowOption));
         });
 
         return command;
@@ -77,7 +106,9 @@ public static class QueryCommand
         string projectDirectory,
         string? inFile,
         bool wholeFile,
-        bool noBuild)
+        bool noBuild,
+        bool effects = false,
+        string? row = null)
     {
         if (!Directory.Exists(projectDirectory))
         {
@@ -138,8 +169,17 @@ public static class QueryCommand
                 target = matches[0];
             }
 
+            if (effects)
+                return ExecuteEffectImpact(index, target, row);
+
             affected = index.FindImpactOfDeclarations([target.SymbolId]);
             described = Describe(target);
+        }
+
+        if (effects)
+        {
+            Console.Error.WriteLine("Error: --effects asks about one declaration's row; it cannot be combined with --file.");
+            return 1;
         }
 
         foreach (var declaration in affected.OrderBy(
@@ -170,7 +210,68 @@ public static class QueryCommand
         return 0;
     }
 
-    private static Command CreateFacetCommand(string facet, string description)
+    /// <summary>
+    /// v0.15 E5 (design-doc §8.6) — effect-change blast radius. The closure is
+    /// <see cref="ProjectIndex.FindImpactOfDeclarations"/>'s, unchanged; the
+    /// effects dimension is the verdict of fitting the row the subject WOULD
+    /// carry into each affected caller's DECLARED row. A caller that stops
+    /// fitting is where a Calor0410 would land after the change.
+    /// </summary>
+    private static int ExecuteEffectImpact(ProjectIndex index, IndexedDeclaration target, string? row)
+    {
+        var own = index.FindEffectRow(target.SymbolId);
+        EffectRow hypothetical;
+        string rowDescribed;
+        if (row != null)
+        {
+            var codes = row.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            try
+            {
+                hypothetical = EffectSet.From(codes).ToRow();
+            }
+            catch (ArgumentException exception)
+            {
+                Console.Error.WriteLine($"Error: --row '{row}' is not a row of effect codes: {exception.Message}");
+                return 1;
+            }
+            rowDescribed = hypothetical.ToCompactDisplayString();
+        }
+        else if (own != null)
+        {
+            hypothetical = own.DeclaredRow.Row;
+            rowDescribed = own.DeclaredRow.Display + " (its current declared row)";
+        }
+        else
+        {
+            Console.Error.WriteLine(
+                $"Error: no effect row is recorded for {Describe(target)}; pass --row to ask about a hypothetical one.");
+            return 1;
+        }
+
+        var impacts = index.FindEffectImpact(target.SymbolId, hypothetical);
+        var stopFitting = 0;
+        foreach (var impact in impacts.OrderBy(
+                     impact => $"{impact.Declaration.File}:{impact.Declaration.Line}",
+                     StringComparer.Ordinal))
+        {
+            var declared = impact.Row?.DeclaredRow.Display ?? "(no row recorded)";
+            var verdict = ProjectIndexBuilder.VerdictText(impact.Verdict);
+            if (impact.Verdict != EffectFit.Fits)
+                stopFitting++;
+            Console.WriteLine(
+                $"  {Describe(impact.Declaration)} — declares {declared}: {verdict}");
+        }
+
+        Console.WriteLine(
+            impacts.Count == 0
+                ? $"impact: nothing calls into {Describe(target)}, so no declared row is affected by a row of {rowDescribed}"
+                : $"impact: {stopFitting} of {impacts.Count} affected declaration(s) would stop fitting "
+                    + $"a row of {rowDescribed} on {Describe(target)}");
+        ReportResidual(index, index.ImpactAnswerIsPartial());
+        return 0;
+    }
+
+    private static Command CreateFacetCommand(string facet, string description, bool withJson = false)
     {
         var nameArgument = new Argument<string>(
             name: "name",
@@ -185,11 +286,16 @@ public static class QueryCommand
         var noBuildOption = new Option<bool>(
             aliases: ["--no-build"],
             description: "Refuse a missing or stale index instead of rebuilding it");
+        var jsonOption = new Option<bool>(
+            aliases: ["--json"],
+            description: "Emit the answer as an envelope document (schema v1.1) instead of text");
 
         var command = new Command(facet, description)
         {
             nameArgument, pathOption, inFileOption, noBuildOption,
         };
+        if (withJson)
+            command.AddOption(jsonOption);
 
         command.SetHandler((InvocationContext context) =>
         {
@@ -198,7 +304,8 @@ public static class QueryCommand
                 context.ParseResult.GetValueForArgument(nameArgument),
                 context.ParseResult.GetValueForOption(pathOption)!,
                 context.ParseResult.GetValueForOption(inFileOption),
-                context.ParseResult.GetValueForOption(noBuildOption));
+                context.ParseResult.GetValueForOption(noBuildOption),
+                withJson && context.ParseResult.GetValueForOption(jsonOption));
         });
 
         return command;
@@ -209,7 +316,8 @@ public static class QueryCommand
         string name,
         string projectDirectory,
         string? inFile,
-        bool noBuild)
+        bool noBuild,
+        bool json = false)
     {
         if (!Directory.Exists(projectDirectory))
         {
@@ -285,6 +393,9 @@ public static class QueryCommand
             return 0;
         }
 
+        if (facet == "effects")
+            return ExecuteEffects(index, subject, json);
+
         if (facet == "assumptions")
         {
             var assumptions = index.FindAssumptions(subject.SymbolId, subject.File);
@@ -326,6 +437,88 @@ public static class QueryCommand
                 : $"query: {answer.Count} {noun}(s) of {Describe(subject)}");
         ReportResidual(index, partial);
         return 0;
+    }
+
+    /// <summary>
+    /// v0.15 E5 (design-doc §8.6) — <c>calor query effects</c>: the declared
+    /// row, the inferred row, the verdict between them and the diagnostic code
+    /// that fires, plus the assumption reasons when the inferred row is only
+    /// assumed; then the rows of the function-typed positions the declaration
+    /// owns. Read off the index, which read it off the enforcement pass: no
+    /// inference runs here.
+    /// </summary>
+    private static int ExecuteEffects(ProjectIndex index, IndexedDeclaration subject, bool json)
+    {
+        var rows = index.FindEffectRows(subject.SymbolId);
+        var partial = index.EffectsAnswerIsPartial(subject.SymbolId, subject.File);
+
+        if (json)
+        {
+            Console.WriteLine(EnvelopeWriter.Serialize(
+                "query",
+                new EffectsAnswer(Describe(subject), subject.SymbolId, rows, partial)));
+            return 0;
+        }
+
+        if (rows.Count == 0)
+        {
+            var unavailable = index.Residual.EffectRowsUnavailable
+                .FirstOrDefault(entry => entry.StartsWith(subject.File + ":", StringComparison.Ordinal));
+            Console.WriteLine(
+                unavailable != null
+                    ? $"query: no effect row for {Describe(subject)} — {unavailable[(subject.File.Length + 2)..]}"
+                    : $"query: no effect row is recorded for {Describe(subject)} (only functions, methods, "
+                        + "constructors, accessors and rowed parameters/returns carry one)");
+            ReportResidual(index, partial);
+            return 1;
+        }
+
+        IndexedEffectRow? own = null;
+        foreach (var row in rows)
+        {
+            if (row.OwnerSymbolId.Length == 0 && row.Kind is not ("parameter" or "return"))
+            {
+                own = row;
+                Console.WriteLine($"  {Describe(subject)}");
+                Console.WriteLine($"    declared: {row.DeclaredRow.Display}"
+                    + (row.Declared ? "" : "  (no §E written — a declaration without one is pure)"));
+                Console.WriteLine($"    inferred: {row.InferredRow?.Display ?? "(not inferred)"}");
+                Console.WriteLine($"    verdict:  {DescribeVerdict(row)}");
+                foreach (var reason in row.InferredRow?.Reasons ?? [])
+                    Console.WriteLine($"    assumed because: {reason}");
+                continue;
+            }
+
+            var bound = row.BoundRow == null ? "" : $"; bound type carries {row.BoundRow}";
+            var position = row.Kind == "return" ? "return" : $"parameter {row.Name}";
+            Console.WriteLine($"  {row.File}:{row.Line} {position} declares {row.DeclaredRow.Display}{bound}");
+        }
+
+        Console.WriteLine(
+            own == null
+                ? $"query: {rows.Count} position row(s) on {Describe(subject)}"
+                : $"query: effect row of {Describe(subject)} — declared {own.DeclaredRow.Display}, "
+                    + $"inferred {own.InferredRow?.Display ?? "(not inferred)"}, {DescribeVerdict(own)}");
+        ReportResidual(index, partial);
+        return 0;
+    }
+
+    private static string DescribeVerdict(IndexedEffectRow row)
+    {
+        var text = row.Verdict switch
+        {
+            "fits" => "fits",
+            "does-not-fit" => "does not fit",
+            "cannot-tell" => "cannot tell",
+            _ => row.Verdict,
+        };
+        if (row.DiagnosticCode != null)
+        {
+            text += $" — {row.DiagnosticCode} fires";
+            if (row.Forbidden.Count > 0)
+                text += $" (undeclared: {string.Join(", ", row.Forbidden)})";
+        }
+        return text;
     }
 
     private static ProjectIndex? Resolve(

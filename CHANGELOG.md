@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **You can now ask the project index about effects.** `calor query effects Leaky` tells
+  you three things about a function: what it *says* it does (`§E{…}`), what the compiler
+  worked out its body *actually* does, and whether the two agree — with the exact error
+  that fires when they don't. It is the same answer `calor build` gives, read from the
+  same place, so the two can never disagree. If the compiler had to *assume* something
+  (say, because the body contains C# it can't see into), the answer says what it assumed
+  and why. Add `--json` to get the answer as data.
+
+  There is a "what would break" question too. `calor query impact Log --effects --row fs:w`
+  walks every function that calls `Log`, directly or through others, and tells you which
+  of them would stop compiling if `Log` were allowed to write files. That used to mean
+  editing, building and reading the errors.
+
+  Along the way, two things got fixed that you might have hit: `calor query callers` and
+  `impact` could not see a call written on its own line (`§C{Log} §A x §/C`) — only calls
+  used inside an expression — so they now see both; and the build cache's effect summary
+  used to file functions under their *name*, which meant two methods with the same name in
+  one class were squashed into one. It files them by identity now. Both the index and the
+  build cache rebuild once from scratch the first time you run this version; nothing you
+  wrote changes, and no Calor file in this repository compiles differently.
 - **Those callback annotations now mean something to the compiler.** Last time you
   could write `§I{Func<i32,i32>:transform} §E{cw}` — "this callback may print" — and
   the compiler would faithfully remember the words. Now the annotation is part of

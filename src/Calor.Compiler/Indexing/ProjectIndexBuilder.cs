@@ -1,4 +1,9 @@
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Refactoring;
@@ -216,9 +221,320 @@ public static class ProjectIndexBuilder
         foreach (var ambiguous in symbols.Residual.AmbiguousCallees)
             index.Residual.AmbiguousCallees.Add(ambiguous);
 
+        RecordEffectRows(index, options, symbols);
+
         index.Canonicalize();
         return index;
     }
+
+    // --- v0.15 E5: the effects facet (design-doc §8.5/§8.6) -------------------
+
+    /// <summary>
+    /// Records one <see cref="IndexedEffectRow"/> per declaration and per
+    /// function-typed parameter/return position, from the SAME two producers
+    /// <c>calor build</c> runs — the per-module <see cref="EffectEnforcementPass"/>
+    /// (its <see cref="EffectEnforcementPass.DeclarationFacts"/>) and the
+    /// cross-module pass's resolution over the symbol-keyed
+    /// <see cref="EffectSummary"/> projection. Nothing here infers an effect: the
+    /// index is a consumer of the compilation's answer (§8.5), and
+    /// <c>EffectSummaryIsIndexIndependent</c> pins that the dependency does not
+    /// run the other way.
+    ///
+    /// <para>A file the binder reported errors for gets no rows and a residual
+    /// entry, because the CLI skips the effect pass there and rows the CLI never
+    /// computed would be an answer with no producer.</para>
+    /// </summary>
+    private static void RecordEffectRows(
+        ProjectIndex index,
+        Options options,
+        ProjectSymbolIndex symbols)
+    {
+        var projectDirectory = Path.GetFullPath(options.ProjectDirectory);
+        var resolver = new EffectResolver();
+        resolver.Initialize(projectDirectory);
+
+        // The driver's own cross-module qualification map and registry, over
+        // every module the index holds — so a call to another file's public
+        // function is charged the way `calor build` charges it, not as unknown.
+        var modules = symbols.Documents
+            .Select(document => (document.Ast, document.FilePath))
+            .ToList();
+        var crossModuleNames = CompilationDriver
+            .BuildCrossModuleFunctionMap(modules.Select(module => module.Ast).ToList())
+            .Keys
+            .ToArray();
+        var registry = CrossModuleEffectRegistry.Build(modules);
+        var crossPass = new CrossModuleEffectEnforcementPass(UnknownCallPolicy.Strict);
+
+        foreach (var document in symbols.Documents)
+        {
+            var relative = Relative(options.ProjectDirectory, document.FilePath);
+            if (document.BindHadErrors)
+            {
+                index.Residual.EffectRowsUnavailable.Add(
+                    $"{relative}: the binder reported errors, so the effect pass did not run");
+                continue;
+            }
+
+            IReadOnlyDictionary<string, EffectEnforcementPass.DeclarationEffectFact> facts;
+            IReadOnlyDictionary<string, EffectSet> crossCharges;
+            try
+            {
+                var pass = new EffectEnforcementPass(
+                    new DiagnosticBag(),
+                    UnknownCallPolicy.Strict,
+                    resolver: resolver,
+                    projectDirectory: projectDirectory,
+                    crossModuleFunctionNames: crossModuleNames);
+                pass.Enforce(document.Ast);
+                facts = pass.DeclarationFacts;
+                crossCharges = crossPass.ResolveCrossModuleEffects(
+                    EffectSummaryBuilder.Build(document.Ast), document.FilePath, registry);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                index.Residual.EffectRowsUnavailable.Add(
+                    $"{relative}: the effect pass failed ({exception.GetType().Name})");
+                continue;
+            }
+
+            var functionSymbols = document.BoundModule.SymbolsById.Values
+                .OfType<FunctionSymbol>()
+                .Where(symbol => !symbol.Id.IsNone)
+                .ToLookup(symbol => symbol.DefinitionSpan.Start);
+
+            foreach (var fact in facts.Values)
+            {
+                var symbol = MatchSymbol(functionSymbols[fact.Span.Start], fact);
+                if (symbol == null)
+                    continue;
+
+                var (line, _) = LineColumn(document.Source, symbol.DeclarationSpan.Start);
+                index.EffectRows.Add(ToDeclarationRow(
+                    fact, symbol, crossCharges.GetValueOrDefault(fact.FunctionId), relative, line));
+            }
+
+            foreach (var function in document.Ast.Functions)
+            {
+                var symbol = functionSymbols[function.Span.Start].FirstOrDefault();
+                if (symbol != null)
+                    RecordPositionRows(index, document, relative, symbol, function.Parameters, function.Output);
+            }
+            foreach (var cls in CallGraphAnalysis.EnumerateClasses(document.Ast))
+            {
+                foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
+                {
+                    var symbol = functionSymbols[method.Span.Start].FirstOrDefault();
+                    if (symbol != null)
+                        RecordPositionRows(index, document, relative, symbol, method.Parameters, method.Output);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The bound symbol a pass fact belongs to: the one whose definition starts
+    /// where the fact's declaration does. Event accessors share their event's
+    /// span, so a span collision is settled by the accessor's name.
+    /// </summary>
+    private static FunctionSymbol? MatchSymbol(
+        IEnumerable<FunctionSymbol> candidates,
+        EffectEnforcementPass.DeclarationEffectFact fact)
+    {
+        FunctionSymbol? first = null;
+        var count = 0;
+        foreach (var candidate in candidates)
+        {
+            first ??= candidate;
+            count++;
+            if (string.Equals(candidate.Name, fact.Name, StringComparison.Ordinal)
+                || candidate.Name.EndsWith("." + fact.Name, StringComparison.Ordinal))
+                return candidate;
+        }
+
+        return count == 1 ? first : null;
+    }
+
+    private static IndexedEffectRow ToDeclarationRow(
+        EffectEnforcementPass.DeclarationEffectFact fact,
+        FunctionSymbol symbol,
+        EffectSet? crossCharges,
+        string relative,
+        int line)
+    {
+        var inferred = fact.InferredRow;
+        var verdict = fact.Verdict;
+        var code = fact.DiagnosticCode;
+        var forbidden = new List<string>(fact.Forbidden);
+
+        // Cross-module callees: the per-module pass charges nothing for a call
+        // to another file's function (the cross-module pass checks it against
+        // the caller's DECLARED row, on the same `EffectRow.Fits` relation used
+        // here — P16). Fold its charge into the inferred row and its verdict
+        // into ours, so `calor query effects` says what `calor build` says.
+        if (crossCharges != null && !crossCharges.IsEmpty)
+        {
+            var crossRow = crossCharges.ToRow();
+            inferred = EffectRow.Join(inferred, crossRow);
+            if (verdict != EffectFit.DoesNotFit)
+            {
+                var crossVerdict = EffectRow.Fits(crossRow, fact.DeclaredRow);
+                if (crossVerdict == EffectFit.DoesNotFit)
+                {
+                    verdict = EffectFit.DoesNotFit;
+                    code = DiagnosticCode.ForbiddenEffect;
+                    foreach (var (kind, value) in crossCharges.Except(fact.DeclaredRow.ToEffectSet()))
+                        forbidden.Add(EffectCodes.ToCompact(kind, value));
+                }
+                else if (crossVerdict == EffectFit.CannotTell && verdict == EffectFit.Fits)
+                {
+                    verdict = EffectFit.CannotTell;
+                    code ??= DiagnosticCode.EffectRowUnknown;
+                }
+            }
+        }
+
+        return new IndexedEffectRow
+        {
+            SymbolId = symbol.Id.Value,
+            OwnerSymbolId = "",
+            Name = symbol.Name,
+            Kind = fact.Kind,
+            Declared = fact.HasDeclaration,
+            DeclaredRow = ToIndexedRow(fact.DeclaredRow, fact.DeclaredVariables),
+            InferredRow = ToIndexedRow(inferred, []),
+            Verdict = VerdictText(verdict),
+            DiagnosticCode = code,
+            Forbidden = forbidden.Distinct(StringComparer.Ordinal).ToList(),
+            BoundRow = null,
+            File = relative,
+            Line = line,
+        };
+    }
+
+    /// <summary>
+    /// Position rows (design-doc §3.3 positions 4/5/6): a parameter or return
+    /// that WRITES a row. The declared row is read off the <c>§E</c> node
+    /// exactly as the pass reads it (<see cref="EffectEnforcementPass.GetDeclaredEffects"/>
+    /// plus the node's binders); <see cref="IndexedEffectRow.BoundRow"/> is what
+    /// the binder's <c>FunctionBoundType.Row</c> says for the same position —
+    /// its first production reader — and the two are pinned to agree wherever
+    /// the row mentions no <c>eff</c> variable (the binder collapses those to
+    /// Unknown; E2b's decision, still registered on roadmap §4.2 E5).
+    /// Fields and <c>§B</c> bindings are deferred: the index models them as
+    /// declarations, but their bound function types are not on a symbol the
+    /// builder can reach without a second bind.
+    /// </summary>
+    private static void RecordPositionRows(
+        ProjectIndex index,
+        IndexedDocument document,
+        string relative,
+        FunctionSymbol symbol,
+        IReadOnlyList<ParameterNode> parameters,
+        OutputNode? output)
+    {
+        if (symbol.Parameters.Count == parameters.Count)
+        {
+            for (var ordinal = 0; ordinal < parameters.Count; ordinal++)
+            {
+                var parameter = parameters[ordinal];
+                if (parameter.Row == null)
+                    continue;
+
+                var parameterSymbol = symbol.Parameters[ordinal];
+                var (line, _) = LineColumn(document.Source, parameter.Span.Start);
+                index.EffectRows.Add(new IndexedEffectRow
+                {
+                    SymbolId = parameterSymbol.Id.IsNone ? symbol.Id.Value : parameterSymbol.Id.Value,
+                    OwnerSymbolId = symbol.Id.Value,
+                    Name = parameter.Name,
+                    Kind = "parameter",
+                    Declared = true,
+                    DeclaredRow = ToIndexedRow(
+                        EffectEnforcementPass.GetDeclaredEffects(parameter.Row).ToRow(),
+                        Binders(parameter.Row)),
+                    InferredRow = null,
+                    Verdict = "declared-only",
+                    DiagnosticCode = null,
+                    BoundRow = parameterSymbol.FunctionType?.Row.ToCompactDisplayString(),
+                    File = relative,
+                    Line = line,
+                });
+            }
+        }
+
+        if (output?.Row != null)
+        {
+            var (line, _) = LineColumn(document.Source, output.Span.Start);
+            index.EffectRows.Add(new IndexedEffectRow
+            {
+                SymbolId = symbol.Id.Value,
+                OwnerSymbolId = symbol.Id.Value,
+                Name = symbol.Name,
+                Kind = "return",
+                Declared = true,
+                DeclaredRow = ToIndexedRow(
+                    EffectEnforcementPass.GetDeclaredEffects(output.Row).ToRow(),
+                    Binders(output.Row)),
+                InferredRow = null,
+                Verdict = "declared-only",
+                DiagnosticCode = null,
+                BoundRow = symbol.ReturnFunctionType?.Row.ToCompactDisplayString(),
+                File = relative,
+                Line = line,
+            });
+        }
+    }
+
+    private static IReadOnlyList<KeyValuePair<int, string>> Binders(EffectsNode row)
+    {
+        var binders = new List<KeyValuePair<int, string>>();
+        for (var index = 0; index < row.EffectVariables.Count; index++)
+        {
+            var ordinal = index < row.EffectVariableOrdinals.Count ? row.EffectVariableOrdinals[index] : -1;
+            binders.Add(new KeyValuePair<int, string>(ordinal, row.EffectVariables[index]));
+        }
+        return binders;
+    }
+
+    private static IndexedRow ToIndexedRow(
+        EffectRow row,
+        IReadOnlyList<KeyValuePair<int, string>> variables)
+    {
+        var indexed = new IndexedRow
+        {
+            State = row.IsUnknown ? "unknown" : row.IsAssumed ? "assumed" : "concrete",
+            Effects = row.IsUnknown
+                ? []
+                : row.ToEffectSet().Effects
+                    .Select(effect => EffectCodes.ToCompact(effect.Kind, effect.Value))
+                    .OrderBy(code => code, StringComparer.Ordinal)
+                    .ToList(),
+            Variables = variables
+                .OrderBy(variable => variable.Key)
+                .Select(variable => new IndexedEffectVariable { Ordinal = variable.Key, Name = variable.Value })
+                .ToList(),
+            Reasons = [.. row.Reasons],
+        };
+
+        // EffectRowDisplay's spelling, with the row's `eff` binders appended —
+        // a polymorphic declared row is written `e` or `cw, e`, never `[pure]`.
+        var display = row.ToCompactDisplayString();
+        if (indexed.Variables.Count > 0 && !row.IsUnknown && !row.IsAssumed)
+        {
+            var names = string.Join(", ", indexed.Variables.Select(variable => variable.Name));
+            display = display == "[pure]" ? names : $"{display}, {names}";
+        }
+        indexed.Display = display;
+        return indexed;
+    }
+
+    internal static string VerdictText(EffectFit verdict) => verdict switch
+    {
+        EffectFit.Fits => "fits",
+        EffectFit.DoesNotFit => "does-not-fit",
+        _ => "cannot-tell",
+    };
 
     private static void AddContracts(
         ProjectIndex index,

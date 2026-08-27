@@ -30,11 +30,16 @@ public sealed record SymbolOccurrence(
 /// <summary>
 /// One parsed and bound file in the project.
 /// </summary>
+/// <param name="BindHadErrors">v0.15 E5 — whether the binder reported an error
+/// for this file. The CLI skips the effect pass on such a file, so the index's
+/// effects facet skips it too (and says so in its residual) rather than
+/// recording rows the CLI would never have computed.</param>
 public sealed record IndexedDocument(
     string FilePath,
     string Source,
     ModuleNode Ast,
-    BoundModule BoundModule);
+    BoundModule BoundModule,
+    bool BindHadErrors = false);
 
 /// <summary>
 /// A call resolved to a declaration, attributed to the function containing it.
@@ -152,7 +157,7 @@ public sealed class ProjectSymbolIndex
                 continue;
             }
 
-            documents.Add(new IndexedDocument(path, source, ast, bound));
+            documents.Add(new IndexedDocument(path, source, ast, bound, bindDiagnostics.HasErrors));
         }
 
         skipped = failed;
@@ -275,7 +280,7 @@ public sealed class ProjectSymbolIndex
                                 }
                             }
                         }
-                        else if (ResolveAcrossDocuments(call) is { } crossModule)
+                        else if (ResolveAcrossDocuments(call.Target) is { } crossModule)
                         {
                             Add(document, crossModule.Id, call.CalleeSpan,
                                 SymbolOccurrenceKind.Reference, false);
@@ -304,16 +309,36 @@ public sealed class ProjectSymbolIndex
             {
                 foreach (var node in Descendants(function))
                 {
-                    if (node is not BoundCallExpression call)
-                        continue;
+                    // v0.15 E5 — a call STATEMENT (`§C{Log} §A x §/C` on its own
+                    // line, the common shape of an effectful call) is an edge
+                    // too. Before E5 only call expressions were, so `callers`
+                    // and `impact` were blind to exactly the calls the effects
+                    // blast radius (gate 7) has to see. Occurrences are not
+                    // touched: rename's corpus oracle, not this switch, decides
+                    // what rename edits.
+                    string target;
+                    IReadOnlyList<FunctionSymbol> resolved;
+                    TextSpan calleeSpan;
+                    switch (node)
+                    {
+                        case BoundCallExpression call:
+                            (target, resolved, calleeSpan) = (call.Target, call.ResolvedSymbols, call.CalleeSpan);
+                            break;
+                        case BoundCallStatement statement:
+                            (target, resolved, calleeSpan) =
+                                (statement.Target, statement.ResolvedSymbols, statement.CalleeSpan);
+                            break;
+                        default:
+                            continue;
+                    }
 
-                    var callee = call.ResolvedSymbols.Count > 0
-                        ? call.ResolvedSymbols[0]
-                        : ResolveAcrossDocuments(call);
+                    var callee = resolved.Count > 0
+                        ? resolved[0]
+                        : ResolveAcrossDocuments(target);
                     if (callee is { Id.IsNone: false })
                     {
                         _callEdges.Add(new ProjectCallEdge(
-                            function.Symbol.Id, callee.Id, document.FilePath, call.CalleeSpan));
+                            function.Symbol.Id, callee.Id, document.FilePath, calleeSpan));
                     }
                     else
                     {
@@ -322,9 +347,9 @@ public sealed class ProjectSymbolIndex
                         // recorded too, so "what does X call?" can tell whether
                         // its own answer is partial.
                         _unresolvedCalls.Add(new ProjectUnresolvedCall(
-                            function.Symbol.Id, call.Target, document.FilePath));
-                        if (IsAmbiguousAcrossDocuments(call))
-                            _ambiguousCallees.Add(call.Target);
+                            function.Symbol.Id, target, document.FilePath));
+                        if (IsAmbiguousAcrossDocuments(target))
+                            _ambiguousCallees.Add(target);
                     }
                 }
             }
@@ -350,9 +375,8 @@ public sealed class ProjectSymbolIndex
         // longer exists. Matching is by bare callee name across the project and
         // requires exactly one candidate: ambiguity yields no occurrence, which
         // makes the rename refuse rather than guess.
-        FunctionSymbol? ResolveAcrossDocuments(BoundCallExpression call)
+        FunctionSymbol? ResolveAcrossDocuments(string target)
         {
-            var target = call.Target;
             if (string.IsNullOrEmpty(target) || target.Contains('.', StringComparison.Ordinal))
                 return null;
 
@@ -374,9 +398,8 @@ public sealed class ProjectSymbolIndex
         // Distinguishes "no such name" from "several declarations share it".
         // Both drop the edge, but only the second is a resolution *limit* worth
         // reporting separately — it is what 0.14's typed signatures fix.
-        bool IsAmbiguousAcrossDocuments(BoundCallExpression call)
+        bool IsAmbiguousAcrossDocuments(string target)
         {
-            var target = call.Target;
             if (string.IsNullOrEmpty(target) || target.Contains('.', StringComparison.Ordinal))
                 return false;
 

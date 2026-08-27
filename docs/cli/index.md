@@ -41,6 +41,8 @@ dotnet tool update -g calor
 | [`calor convert`](/calor/cli/convert/) | Convert single files between C# and Calor |
 | [`calor migrate`](/calor/cli/migrate/) | Migrate entire projects between C# and Calor |
 | [`calor ids`](/calor/cli/ids/) | Manage unique identifiers (check, assign, index) |
+| `calor index` | Build (`build`) or check (`status`) the persistent project index under `obj/calor` |
+| `calor query` | Ask the index: `symbol`, `callers`, `callees`, `impact` (`--effects [--row …]` for effect-row blast radius), `contracts`, `assumptions`, `effects` (declared / inferred row and verdict; `--json`) |
 | [`calor benchmark`](/calor/cli/benchmark/) | Compare Calor vs C# across evaluation metrics |
 | [`calor format`](/calor/cli/format/) | Format Calor source files to canonical style |
 | [`calor fix`](/calor/cli/fix/) | Bulk, reversible source rewrites (e.g. drop legacy closing-tag IDs) |

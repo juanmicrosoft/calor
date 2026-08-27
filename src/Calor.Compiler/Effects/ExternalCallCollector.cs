@@ -45,7 +45,12 @@ public sealed record CollectedCall(
 /// resolved to (type, method) pairs — it is the input to cross-module resolution
 /// which needs to see bare-name calls as-is.
 /// </summary>
-public sealed record RawCall(string CallerName, string Target, bool IsConstructor);
+/// <param name="CallerId">The enclosing declaration's STRUCTURAL id — <c>FunctionNode.Id</c>,
+/// class-qualified for members (<c>Cls.m001</c>): the key <c>CallGraphAnalysis</c> and
+/// <c>EffectEnforcementPass.DeclarationFacts</c> use. v0.15 E5 (design-doc §8.5, P26):
+/// this is what the effect summary groups by; the name is display only.</param>
+/// <param name="CallerName">The enclosing declaration's display name. Not a key.</param>
+public sealed record RawCall(string CallerId, string CallerName, string Target, bool IsConstructor);
 
 /// <summary>
 /// Walks the Calor AST to collect external method invocations.
@@ -132,6 +137,7 @@ public sealed class ExternalCallCollector
     // so TryAddCall can tag RawCalls with the enclosing caller identity.
     // Null in standard mode.
     private string? _currentCaller;
+    private string? _currentCallerId;
 
     // True when this instance is operating in raw per-function mode. Set once at
     // construction by the factory and never toggled.
@@ -177,6 +183,7 @@ public sealed class ExternalCallCollector
 
         foreach (var function in module.Functions)
         {
+            collector._currentCallerId = function.Id;
             collector._currentCaller = function.Name;
             collector.CollectFromFunctionBody(function.Body);
         }
@@ -185,11 +192,14 @@ public sealed class ExternalCallCollector
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
             {
+                // The same qualified id CallGraphAnalysis.ToFunctionNode assigns.
+                collector._currentCallerId = $"{cls.Name}.{method.Id}";
                 collector._currentCaller = $"{cls.Name}.{method.Name}";
                 collector.CollectFromFunctionBody(method.Body);
             }
             foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
             {
+                collector._currentCallerId = $"{cls.Name}.{ctor.Id}";
                 collector._currentCaller =
                     $"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}";
                 collector.CollectFromFunctionBody(ctor.Body);
@@ -236,9 +246,9 @@ public sealed class ExternalCallCollector
     {
         // Record the raw target (including bare names) when running in per-function mode.
         // The cross-module pass needs to see bare-name calls to resolve them against the registry.
-        if (_rawMode && _currentCaller != null && !string.IsNullOrEmpty(target))
+        if (_rawMode && _currentCaller != null && _currentCallerId != null && !string.IsNullOrEmpty(target))
         {
-            _rawCalls.Add(new RawCall(_currentCaller, target, defaultKind == CallKind.Constructor));
+            _rawCalls.Add(new RawCall(_currentCallerId, _currentCaller, target, defaultKind == CallKind.Constructor));
         }
 
         if (defaultKind == CallKind.Constructor)

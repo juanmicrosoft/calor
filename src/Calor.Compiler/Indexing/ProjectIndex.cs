@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
 
 namespace Calor.Compiler.Indexing;
@@ -86,6 +88,109 @@ public sealed class IndexedAssumption
 }
 
 /// <summary>
+/// v0.15 E5 (design-doc §8.6) — one effect row as the index records it: the
+/// compact display authors read, plus the structured form a tool can compare.
+/// </summary>
+public sealed class IndexedRow
+{
+    /// <summary>
+    /// The row as <c>EffectRowDisplay.ToCompactDisplayString</c> spells it —
+    /// <c>[pure]</c>, <c>cw, fs:w</c>, <c>[assumed: cw]</c>, <c>[unknown]</c> —
+    /// with any <c>eff</c> binders the row mentions listed after the codes.
+    /// </summary>
+    public string Display { get; set; } = "";
+
+    /// <summary><c>concrete</c>, <c>assumed</c> or <c>unknown</c> (§4.1's three states).</summary>
+    public string State { get; set; } = "";
+
+    /// <summary>Compact surface codes, ordinal-sorted. Empty for a pure or an Unknown row.</summary>
+    public List<string> Effects { get; set; } = [];
+
+    /// <summary>The <c>eff</c> binders the row mentions, by ordinal in the declaration's own <c>eff</c> list (§7).</summary>
+    public List<IndexedEffectVariable> Variables { get; set; } = [];
+
+    /// <summary>Why the row is only assumed — empty unless <see cref="State"/> is <c>assumed</c>.</summary>
+    public List<string> Reasons { get; set; } = [];
+
+    /// <summary>The <see cref="EffectRow"/> this record denotes; the variable part is not carried (it is a §7 instantiation input, not a lattice element).</summary>
+    [JsonIgnore]
+    public EffectRow Row => State switch
+    {
+        "unknown" => EffectRow.Unknown,
+        "assumed" => EffectRow.Assumed(EffectSet.From([.. Effects]).ToRow().Codes, Reasons),
+        _ => EffectSet.From([.. Effects]).ToRow(),
+    };
+}
+
+/// <summary>An <c>eff</c> binder mention, by ordinal and by the name the author wrote.</summary>
+public sealed class IndexedEffectVariable
+{
+    public int Ordinal { get; set; }
+    public string Name { get; set; } = "";
+}
+
+/// <summary>
+/// v0.15 E5 (design-doc §8.5/§8.6) — the effect-row fact for one declaration or
+/// one function-typed position, keyed by symbol id and never by name.
+///
+/// For a declaration (<see cref="Kind"/> <c>function</c>, <c>method</c>,
+/// <c>constructor</c>, <c>accessor</c>) the fact is the enforcement pass's own
+/// per-declaration result (<c>EffectEnforcementPass.DeclarationFacts</c>): the
+/// declared row, the inferred row and the verdict between them, together with
+/// the diagnostic code that fires. Nothing here re-runs inference.
+///
+/// For a position (<c>parameter</c>, <c>return</c>) there is no inference: the
+/// fact is the declared row, and <see cref="BoundRow"/> is what the binder's
+/// <c>FunctionBoundType.Row</c> carries for it — the first production reader
+/// of that row (E4's 0.15.x obligation, roadmap §4.2 E5), recorded so the two
+/// can be pinned against each other.
+/// </summary>
+public sealed class IndexedEffectRow
+{
+    /// <summary>The declaration's symbol id; for a <c>return</c> position, the owning function's.</summary>
+    public string SymbolId { get; set; } = "";
+
+    /// <summary>The owning declaration's symbol id for a position; empty for a declaration.</summary>
+    public string OwnerSymbolId { get; set; } = "";
+
+    public string Name { get; set; } = "";
+
+    /// <summary><c>function</c>, <c>method</c>, <c>constructor</c>, <c>accessor</c>, <c>parameter</c> or <c>return</c>.</summary>
+    public string Kind { get; set; } = "";
+
+    /// <summary>Whether a <c>§E</c> was written. An omitted declaration row is pure (§3.5); an omitted position row is Unknown.</summary>
+    public bool Declared { get; set; }
+
+    public IndexedRow DeclaredRow { get; set; } = new();
+
+    /// <summary>What the enforcement pass computed for the body; null for a position.</summary>
+    public IndexedRow? InferredRow { get; set; }
+
+    /// <summary><c>fits</c>, <c>does-not-fit</c>, <c>cannot-tell</c>; <c>declared-only</c> for a position.</summary>
+    public string Verdict { get; set; } = "";
+
+    /// <summary>The diagnostic code the pass reports for this declaration, or null.</summary>
+    public string? DiagnosticCode { get; set; }
+
+    /// <summary>Surface codes the body uses that the declaration does not cover.</summary>
+    public List<string> Forbidden { get; set; } = [];
+
+    /// <summary>For a position: <c>FunctionBoundType.Row</c>'s compact display; null for a declaration.</summary>
+    public string? BoundRow { get; set; }
+
+    public string File { get; set; } = "";
+    public int Line { get; set; }
+}
+
+/// <summary>
+/// v0.15 E5 — one affected caller of an effect-change blast-radius answer.
+/// </summary>
+public sealed record IndexedEffectImpact(
+    IndexedDeclaration Declaration,
+    IndexedEffectRow? Row,
+    EffectFit Verdict);
+
+/// <summary>
 /// A call site that resolved to nothing.
 /// </summary>
 public sealed class IndexedUnresolvedCall
@@ -117,15 +222,24 @@ public sealed class IndexResidual
     /// <summary>Callee names matching more than one declaration, so the edge was dropped.</summary>
     public List<string> AmbiguousCallees { get; set; } = [];
 
+    /// <summary>
+    /// v0.15 E5 — files whose declarations have NO effect rows: the binder
+    /// reported errors (the CLI skips the effect pass there, so the index does
+    /// too) or the pass threw. Each entry is <c>file: reason</c>.
+    /// </summary>
+    public List<string> EffectRowsUnavailable { get; set; } = [];
+
     [JsonIgnore]
     public bool IsEmpty =>
         UnreadableFiles.Count == 0
         && UnresolvedCalls.Count == 0
-        && AmbiguousCallees.Count == 0;
+        && AmbiguousCallees.Count == 0
+        && EffectRowsUnavailable.Count == 0;
 
     [JsonIgnore]
     public int Total =>
-        UnreadableFiles.Count + UnresolvedCalls.Count + AmbiguousCallees.Count;
+        UnreadableFiles.Count + UnresolvedCalls.Count + AmbiguousCallees.Count
+        + EffectRowsUnavailable.Count;
 }
 
 /// <summary>
@@ -142,7 +256,10 @@ public sealed class IndexResidual
 /// </summary>
 public sealed class ProjectIndex
 {
-    public const string CurrentFormatVersion = "3.0";
+    // 4.0 (v0.15 E5, design-doc §8.5 / P24): the effects facet (EffectRows,
+    // Residual.EffectRowsUnavailable). Gate 3's instrument compares serialized
+    // index bytes, so a facet added without a bump would move them silently.
+    public const string CurrentFormatVersion = "4.0";
 
     public string FormatVersion { get; set; } = CurrentFormatVersion;
     public string CompilerSemanticsVersion { get; set; } =
@@ -165,6 +282,9 @@ public sealed class ProjectIndex
     public List<IndexedCallEdge> CallEdges { get; set; } = [];
     public List<IndexedContract> Contracts { get; set; } = [];
     public List<IndexedAssumption> Assumptions { get; set; } = [];
+
+    /// <summary>v0.15 E5 — the effects facet (design-doc §8.6). See <see cref="IndexedEffectRow"/>.</summary>
+    public List<IndexedEffectRow> EffectRows { get; set; } = [];
     public IndexResidual Residual { get; set; } = new();
 
     public static string PathFor(string outputDirectory) =>
@@ -456,6 +576,77 @@ public sealed class ProjectIndex
     }
 
     /// <summary>
+    /// v0.15 E5 — the effect-row facts recorded for a symbol: its own
+    /// declaration-level fact (first, when there is one) and the rows of the
+    /// function-typed positions it owns. A parameter's own symbol id answers with
+    /// its position row.
+    /// </summary>
+    public IReadOnlyList<IndexedEffectRow> FindEffectRows(string symbolId)
+    {
+        ArgumentNullException.ThrowIfNull(symbolId);
+        return EffectRows
+            .Where(row =>
+                (string.Equals(row.SymbolId, symbolId, StringComparison.Ordinal)
+                    && row.OwnerSymbolId.Length == 0)
+                || string.Equals(row.OwnerSymbolId, symbolId, StringComparison.Ordinal)
+                || (string.Equals(row.SymbolId, symbolId, StringComparison.Ordinal)
+                    && row.Kind == "parameter"))
+            .OrderBy(row => row.OwnerSymbolId.Length == 0 ? 0 : 1)
+            .ThenBy(row => row.Line)
+            .ThenBy(row => row.Kind, StringComparer.Ordinal)
+            .ThenBy(row => row.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    /// <summary>The declaration-level effect fact of a symbol, or null when none was recorded.</summary>
+    public IndexedEffectRow? FindEffectRow(string symbolId)
+    {
+        ArgumentNullException.ThrowIfNull(symbolId);
+        return EffectRows.FirstOrDefault(row =>
+            string.Equals(row.SymbolId, symbolId, StringComparison.Ordinal)
+            && row.OwnerSymbolId.Length == 0
+            && row.Kind is not ("parameter" or "return"));
+    }
+
+    /// <summary>
+    /// v0.15 E5 — effect-change blast radius (design-doc §8.6). Every
+    /// transitive caller <see cref="FindImpactOfDeclarations"/> names — that
+    /// closure is reused unchanged — paired with the verdict of fitting
+    /// <paramref name="hypotheticalRow"/> (the row the seed would carry after the
+    /// change) into the caller's DECLARED row. A caller whose verdict is not
+    /// <see cref="EffectFit.Fits"/> is one the change would stop fitting; a
+    /// caller with no recorded row answers <see cref="EffectFit.CannotTell"/>.
+    /// </summary>
+    public IReadOnlyList<IndexedEffectImpact> FindEffectImpact(
+        string seedSymbolId,
+        EffectRow hypotheticalRow)
+    {
+        ArgumentNullException.ThrowIfNull(seedSymbolId);
+        ArgumentNullException.ThrowIfNull(hypotheticalRow);
+        var affected = FindImpactOfDeclarations([seedSymbolId]);
+        var result = new List<IndexedEffectImpact>(affected.Count);
+        foreach (var declaration in affected)
+        {
+            var row = FindEffectRow(declaration.SymbolId);
+            var verdict = row == null
+                ? EffectFit.CannotTell
+                : EffectRow.Fits(hypotheticalRow, row.DeclaredRow.Row);
+            result.Add(new IndexedEffectImpact(declaration, row, verdict));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// v0.15 E5 — an effects answer is partial when a call INSIDE the subject
+    /// failed to resolve (its inferred row rests on an unknown), when its file's
+    /// rows could not be recorded at all, or when a file was unreadable.
+    /// </summary>
+    public bool EffectsAnswerIsPartial(string symbolId, string file) =>
+        CalleesAnswerIsPartial(symbolId)
+        || Residual.EffectRowsUnavailable.Any(entry =>
+            entry.StartsWith(file + ":", StringComparison.Ordinal));
+
+    /// <summary>
     /// Impact is partial whenever ANY call failed to resolve anywhere in the
     /// project: an unresolved edge might have been the one that reached this
     /// change. Unlike callers/callees this cannot be narrowed to the subject —
@@ -519,7 +710,27 @@ public sealed class ProjectIndex
             .OrderBy(item => item.File, StringComparer.Ordinal)
             .ThenBy(item => item.Line)
             .ThenBy(item => item.Description, StringComparer.Ordinal)];
+        EffectRows = [.. EffectRows
+            .OrderBy(item => item.File, StringComparer.Ordinal)
+            .ThenBy(item => item.Line)
+            .ThenBy(item => item.OwnerSymbolId, StringComparer.Ordinal)
+            .ThenBy(item => item.Kind, StringComparer.Ordinal)
+            .ThenBy(item => item.SymbolId, StringComparer.Ordinal)
+            .ThenBy(item => item.Name, StringComparer.Ordinal)];
+        foreach (var row in EffectRows)
+        {
+            row.DeclaredRow.Effects.Sort(StringComparer.Ordinal);
+            row.DeclaredRow.Reasons.Sort(StringComparer.Ordinal);
+            row.DeclaredRow.Variables = [.. row.DeclaredRow.Variables.OrderBy(v => v.Ordinal)];
+            if (row.InferredRow != null)
+            {
+                row.InferredRow.Effects.Sort(StringComparer.Ordinal);
+                row.InferredRow.Reasons.Sort(StringComparer.Ordinal);
+            }
+            row.Forbidden.Sort(StringComparer.Ordinal);
+        }
         Residual.UnreadableFiles.Sort(StringComparer.Ordinal);
+        Residual.EffectRowsUnavailable.Sort(StringComparer.Ordinal);
         Residual.UnresolvedCalls = [.. Residual.UnresolvedCalls
             .OrderBy(item => item.File, StringComparer.Ordinal)
             .ThenBy(item => item.Target, StringComparer.Ordinal)

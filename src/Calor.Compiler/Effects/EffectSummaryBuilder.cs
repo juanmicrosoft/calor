@@ -49,31 +49,39 @@ public static class EffectSummaryBuilder
             }
         }
 
-        // Per-caller listings — group raw calls by caller name, then attach them with
-        // the caller's declared effects + a diagnostic span for any cross-module errors.
+        // Per-caller listings — group raw calls by the caller's STRUCTURAL id
+        // (v0.15 E5, design-doc §8.5 / P26: the name keys that used to live here
+        // are gone; `NoNameKeyedEffectStoreRemains` pins it), then attach them
+        // with the caller's declared effects + a diagnostic span for any
+        // cross-module errors.
         var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module);
         var callsByCaller = new Dictionary<string, List<RawCall>>(StringComparer.Ordinal);
         foreach (var call in rawCalls)
         {
-            if (!callsByCaller.TryGetValue(call.CallerName, out var list))
+            if (!callsByCaller.TryGetValue(call.CallerId, out var list))
             {
                 list = new List<RawCall>();
-                callsByCaller[call.CallerName] = list;
+                callsByCaller[call.CallerId] = list;
             }
             list.Add(call);
         }
 
         foreach (var function in module.Functions)
         {
-            AppendCallerSummary(summary, function.Effects, function.Span, function.Name, callsByCaller);
+            AppendCallerSummary(
+                summary, function.Effects, function.Span,
+                callerId: function.Id, displayName: function.Name, callsByCaller);
         }
 
         foreach (var cls in module.Classes)
         {
             foreach (var method in cls.Methods)
             {
-                var callerName = $"{cls.Name}.{method.Name}";
-                AppendCallerSummary(summary, method.Effects, method.Span, callerName, callsByCaller);
+                AppendCallerSummary(
+                    summary, method.Effects, method.Span,
+                    callerId: $"{cls.Name}.{method.Id}",
+                    displayName: $"{cls.Name}.{method.Name}",
+                    callsByCaller);
             }
         }
 
@@ -135,16 +143,18 @@ public static class EffectSummaryBuilder
         EffectSummary summary,
         EffectsNode? effectsNode,
         TextSpan functionSpan,
-        string callerName,
+        string callerId,
+        string displayName,
         Dictionary<string, List<RawCall>> callsByCaller)
     {
-        if (!callsByCaller.TryGetValue(callerName, out var calls) || calls.Count == 0)
+        if (!callsByCaller.TryGetValue(callerId, out var calls) || calls.Count == 0)
             return;
 
         var diagnosticSpan = effectsNode?.Span ?? functionSpan;
         var callerSummary = new EffectCallerSummary
         {
-            CallerName = callerName,
+            CallerId = callerId,
+            DisplayName = displayName,
             DiagnosticLine = diagnosticSpan.Line,
             DiagnosticColumn = diagnosticSpan.Column,
             DeclaredEffects = ParseEffectsToEntries(effectsNode)

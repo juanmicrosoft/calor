@@ -103,6 +103,59 @@ public sealed class QueryCommandTests : IDisposable
                 .ToArray());
     }
 
+    /// <summary>
+    /// v0.15 E5 — <c>calor query effects</c> through the CLI: the text answer
+    /// carries the declared row, the inferred row, the verdict and the code, in
+    /// the same shape as the other facets (lines, then a <c>query:</c> summary),
+    /// and <c>--json</c> carries the same rows under the envelope's <c>data</c>.
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_AnswersWithDeclaredInferredAndVerdict()
+    {
+        var dir = Fixture();
+        var text = CliTestHarness.RunCli(dir, "query", "effects", "Leaky", "--project", dir);
+        Assert.True(text.ExitCode == 0, text.StdOut + text.StdErr);
+        var lines = text.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.TrimEnd('\r')).ToArray();
+        Assert.Equal("  effects.calr:5:11 function Leaky", lines[0]);
+        Assert.Equal("    declared: [pure]", lines[1]);
+        Assert.Equal("    inferred: cw", lines[2]);
+        Assert.Equal("    verdict:  does not fit — Calor0410 fires (undeclared: cw)", lines[3]);
+        Assert.Equal(
+            "query: effect row of effects.calr:5:11 function Leaky — declared [pure], inferred cw, does not fit — Calor0410 fires (undeclared: cw)",
+            lines[4]);
+
+        var json = CliTestHarness.RunCli(dir, "query", "effects", "Leaky", "--project", dir, "--json");
+        Assert.True(json.ExitCode == 0, json.StdOut + json.StdErr);
+        using var envelope = System.Text.Json.JsonDocument.Parse(json.StdOut);
+        Assert.Equal("query", envelope.RootElement.GetProperty("command").GetString());
+        var row = Assert.Single(envelope.RootElement.GetProperty("data").GetProperty("rows").EnumerateArray());
+        Assert.Equal("does-not-fit", row.GetProperty("verdict").GetString());
+        Assert.Equal("Calor0410", row.GetProperty("diagnosticCode").GetString());
+        Assert.Equal("cw", row.GetProperty("inferredRow").GetProperty("display").GetString());
+    }
+
+    /// <summary>
+    /// v0.15 E5 — <c>calor query impact --effects --row</c>: the impact closure,
+    /// with each affected caller's declared row and whether the hypothetical row
+    /// still fits it.
+    /// </summary>
+    [Fact]
+    public void ImpactEffects_ListsTheCallersWhoseDeclaredRowsStopFitting()
+    {
+        var dir = Fixture();
+        var run = CliTestHarness.RunCli(dir, "query", "impact", "Log", "--effects", "--row", "fs:w", "--project", dir);
+        Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
+        Assert.Contains("  effects.calr:5:11 function Leaky — declares [pure]: does-not-fit", run.StdOut);
+        Assert.Contains("  effects.calr:11:11 function Fan — declares cw: does-not-fit", run.StdOut);
+        Assert.Contains(
+            "impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on effects.calr:2:11 function Log",
+            run.StdOut);
+
+        var current = CliTestHarness.RunCli(dir, "query", "impact", "Log", "--effects", "--project", dir);
+        Assert.True(current.ExitCode == 0, current.StdOut + current.StdErr);
+        Assert.Contains("impact: 1 of 3 affected declaration(s) would stop fitting a row of cw (its current declared row)", current.StdOut);
+    }
+
     [Fact]
     public void QueryingAnUnknownNameFindsNothing()
     {

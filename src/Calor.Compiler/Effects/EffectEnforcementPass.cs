@@ -34,6 +34,66 @@ public sealed class EffectEnforcementPass
     private readonly Dictionary<string, List<string>> _assumedEffects = new(StringComparer.Ordinal);
     private readonly HashSet<string> _onDemandInference = new(StringComparer.Ordinal);
 
+    // v0.15 E5 (design-doc §8.5) — the per-declaration RESULT of this pass, keyed
+    // the way the pass keys everything: by the declaration's structural id
+    // (`f001`, `Cls.m001`), never by name. Filled once per Enforce, after phase 4.
+    private readonly Dictionary<string, DeclarationEffectFact> _declarationFacts =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// v0.15 E5, design-doc §8.5 ("one producer, two consumers") — what this pass
+    /// concluded about ONE declaration: the row it declared, the row inference
+    /// computed for its body, and the verdict between them together with the
+    /// diagnostic code phase 4 reports for it. The project index's effects facet
+    /// and <c>calor query effects</c> read this; nothing re-runs inference to
+    /// answer them.
+    ///
+    /// <para><see cref="Verdict"/> is the pass's OWN verdict, not a second
+    /// computation: <see cref="Binding.BoundTypes.EffectFit.DoesNotFit"/> exactly
+    /// when phase 4 reports a forbidden effect, <see cref="Binding.BoundTypes.EffectFit.CannotTell"/>
+    /// when the computed set is <c>Unknown</c> (phase 4 still reports Calor0410
+    /// <c>'unknown'</c> there — the fail-closed answer of §3.5, which is why
+    /// <see cref="DiagnosticCode"/> travels beside the verdict rather than being
+    /// derived from it), and <see cref="Binding.BoundTypes.EffectFit.Fits"/>
+    /// otherwise — with Calor0419 as the code when the fit rests on assumptions.</para>
+    /// </summary>
+    /// <param name="FunctionId">The pass's key: <c>FunctionNode.Id</c>, class-qualified for members.</param>
+    /// <param name="Name">Display name, as the diagnostics spell it. Not a key.</param>
+    /// <param name="Kind"><c>function</c>, <c>method</c>, <c>constructor</c> or <c>accessor</c>.</param>
+    /// <param name="HasDeclaration">Whether a <c>§E</c> was written. Constructors and
+    /// implicit accessors have no <c>§E</c> surface; their declared row is the
+    /// intrinsic contract phase 4 checks against.</param>
+    /// <param name="DeclaredRow">The declared row's concrete part (§3.5: an omitted
+    /// row on a declaration is pure).</param>
+    /// <param name="DeclaredVariables">The <c>eff</c> binders the declared row
+    /// mentions, by ordinal within the declaration's own <c>eff</c> list (§7).</param>
+    /// <param name="InferredRow">The body's computed effects as a row: Concrete,
+    /// Assumed with the D-W2.3 reasons, or Unknown.</param>
+    /// <param name="Verdict">See the summary.</param>
+    /// <param name="DiagnosticCode">The code phase 4 reports for this declaration, or null.</param>
+    /// <param name="Forbidden">Surface codes the body uses and the declaration does not cover.</param>
+    /// <param name="Span">The declaration's span.</param>
+    /// <param name="EffectsSpan">The <c>§E</c> node's span, when one was written.</param>
+    public sealed record DeclarationEffectFact(
+        string FunctionId,
+        string Name,
+        string Kind,
+        bool HasDeclaration,
+        Binding.BoundTypes.EffectRow DeclaredRow,
+        IReadOnlyList<KeyValuePair<int, string>> DeclaredVariables,
+        Binding.BoundTypes.EffectRow InferredRow,
+        Binding.BoundTypes.EffectFit Verdict,
+        string? DiagnosticCode,
+        IReadOnlyList<string> Forbidden,
+        TextSpan Span,
+        TextSpan? EffectsSpan);
+
+    /// <summary>
+    /// v0.15 E5 — the per-declaration facts of the last <see cref="Enforce"/>,
+    /// keyed by structural function id. Empty before the first call.
+    /// </summary>
+    public IReadOnlyDictionary<string, DeclarationEffectFact> DeclarationFacts => _declarationFacts;
+
     // Module-shape lookups for delegate detection (D-W2.1), static-receiver
     // call-site charging and declaration-local effect variance (D-W2.2).
     private Dictionary<string, ClassDefinitionNode> _classesByName = new(StringComparer.Ordinal);
@@ -197,6 +257,110 @@ public sealed class EffectEnforcementPass
                     "intrinsic accessor mutation ('mut')");
             else
                 CheckEffects(function);
+        }
+
+        // Phase 5 (v0.15 E5, design-doc §8.5): project the per-declaration
+        // result. Read-only over what phases 2-4 left behind — this is a
+        // projection of the pass's answer, not a second inference.
+        ProjectDeclarationFacts();
+    }
+
+    /// <summary>
+    /// Fills <see cref="DeclarationFacts"/> from <c>_computedEffects</c>,
+    /// <c>_assumedEffects</c> and each declaration's <c>§E</c>, using the SAME
+    /// conditions <see cref="CheckEffects"/> and <see cref="CheckImplicitEffectBody"/>
+    /// report on, so a fact's verdict and code are what the CLI printed.
+    /// </summary>
+    private void ProjectDeclarationFacts()
+    {
+        _declarationFacts.Clear();
+        foreach (var function in _callGraphAnalysis.Functions.Values)
+        {
+            string kind;
+            string mismatchCode;
+            EffectSet declaredSet;
+            bool hasDeclaration;
+            if (_constructorsByFunctionId.ContainsKey(function.Id))
+            {
+                kind = "constructor";
+                mismatchCode = DiagnosticCode.ConstructorEffectContractUnavailable;
+                declaredSet = EffectSet.From("mut", "alloc");
+                hasDeclaration = false;
+            }
+            else if (_implicitAccessorsByFunctionId.ContainsKey(function.Id))
+            {
+                kind = "accessor";
+                mismatchCode = DiagnosticCode.AccessorEffectContractUnavailable;
+                declaredSet = EffectSet.From("mut");
+                hasDeclaration = false;
+            }
+            else
+            {
+                kind = _ownerClassByFunctionId.ContainsKey(function.Id) ? "method" : "function";
+                mismatchCode = DiagnosticCode.ForbiddenEffect;
+                declaredSet = GetDeclaredEffects(function);
+                hasDeclaration = function.Effects != null;
+            }
+
+            // Except() is the difference CheckEffects reports (subtyping included);
+            // it is empty exactly when the subset test there passes, so the
+            // body-vs-declaration relation is asked once, in phase 4 (P16 counts
+            // its call sites).
+            var computed = _computedEffects.GetValueOrDefault(function.Id, EffectSet.Empty);
+            var forbidden = computed.Except(declaredSet)
+                .Select(effect => EffectSetExtensions.ToSurfaceCode(effect.Kind, effect.Value))
+                .OrderBy(code => code, StringComparer.Ordinal)
+                .ToList();
+            var reasons = _assumedEffects.TryGetValue(function.Id, out var assumed) && assumed.Count > 0
+                ? assumed
+                : (IReadOnlyList<string>)Array.Empty<string>();
+
+            var inferredRow = computed.IsUnknown
+                ? Binding.BoundTypes.EffectRow.Unknown
+                : reasons.Count > 0
+                    ? Binding.BoundTypes.EffectRow.Assumed(computed.ToRow().Codes, reasons)
+                    : computed.ToRow();
+            var verdict = computed.IsUnknown
+                ? Binding.BoundTypes.EffectFit.CannotTell
+                : forbidden.Count > 0
+                    ? Binding.BoundTypes.EffectFit.DoesNotFit
+                    : Binding.BoundTypes.EffectFit.Fits;
+            // Same order as phase 4: a forbidden effect is reported before (and
+            // independently of) an assumption; constructors and accessors fold
+            // both into their one contract-unavailable code.
+            var code = forbidden.Count > 0
+                ? mismatchCode
+                : reasons.Count > 0
+                    ? (hasDeclaration || kind is "function" or "method"
+                        ? DiagnosticCode.AssumedEffects
+                        : mismatchCode)
+                    : null;
+
+            var variables = new List<KeyValuePair<int, string>>();
+            if (function.Effects != null)
+            {
+                for (var index = 0; index < function.Effects.EffectVariables.Count; index++)
+                {
+                    var ordinal = index < function.Effects.EffectVariableOrdinals.Count
+                        ? function.Effects.EffectVariableOrdinals[index]
+                        : -1;
+                    variables.Add(new KeyValuePair<int, string>(ordinal, function.Effects.EffectVariables[index]));
+                }
+            }
+
+            _declarationFacts[function.Id] = new DeclarationEffectFact(
+                function.Id,
+                function.Name,
+                kind,
+                hasDeclaration,
+                declaredSet.ToRow(),
+                variables,
+                inferredRow,
+                verdict,
+                code,
+                forbidden,
+                function.Span,
+                function.Effects?.Span);
         }
     }
 

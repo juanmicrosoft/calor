@@ -1720,6 +1720,27 @@ between them, and the assumption reasons when the row is `Assumed`. `QueryGolden
 throws on an unknown facet, so the E5 PR must add the arm or its golden cannot land.
 Blast radius reuses `impact`'s transitive-caller closure (`ProjectIndex.cs:372-408`) unchanged.
 
+> **EXECUTED — v0.15 E5** (`docs/plans/2026-08-27-v0.15-e5-notes.md`). The facet is
+> `ProjectIndex.EffectRows` — one `IndexedEffectRow` per declaration (function, method,
+> constructor, accessor) and per rowed parameter/return position, keyed by symbol id. The
+> declaration-level fact is a projection of the enforcement pass's own result: a new phase 5
+> (`EffectEnforcementPass.ProjectDeclarationFacts` → `DeclarationFacts`, keyed by the pass's
+> structural function id) records the declared row, the inferred row (Concrete / Assumed with
+> the D-W2.3 reasons / Unknown), the verdict phase 4 reached, the code it reports, and the
+> undeclared codes. Cross-module callees are folded in through the cross-module pass's own
+> resolution (`CrossModuleEffectEnforcementPass.ResolveCrossModuleEffects`, a projection of
+> `CheckCaller`), on the same `EffectRow.Fits` — so `calor query effects Run` says what
+> `calor build` says. Nothing re-infers. `calor query effects <name>` prints declared /
+> inferred / verdict (with the code and the undeclared codes) and the assumption reasons
+> when Assumed, then the position rows the declaration owns; `--json` wraps the same rows in
+> the v1.1 envelope. `calor query impact <name> --effects [--row cw,fs:w]` joins the
+> unchanged closure with the verdict of fitting the hypothetical row into each affected
+> caller's DECLARED row. Two things this section did not foresee: the index recorded call
+> edges for call EXPRESSIONS only, so `callers`/`impact` were blind to `§C{Log} §A x §/C` on
+> its own line — fixed (statement calls are edges now; occurrences untouched); and the
+> position rows give `FunctionBoundType.Row` its first production reader (`BoundRow`),
+> pinned to agree with the `§E` node wherever the row mentions no `eff` variable.
+
 ---
 
 ## 9. Priced blast radius
@@ -2222,8 +2243,34 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P22 | `MessageTexts` — the four new strings: §10.1's `Effect row: charged by invoking …`, §10.3's two, §6.4's 0424 text. Existing pins assert `Message.Contains`; these assert the **full** new clause | `StrictnessBatchTests.cs` | with E3 | reword any clause |
 | P23 | `BuildStateCacheConstants` — `"4.0"`, `CurrentCompilerSemanticsVersion` **unchanged**, `CurrentOptionsSerializerVersion` unchanged (`BuildStateCache.cs:121-123`) | `Calor.Compiler.Tests/Incremental/` | with E5 | bump the semantics stamp → fails, and G-CODEGEN is contradicted |
 | P24 | `ProjectIndexFormatBumped` — `"4.0"` (`ProjectIndex.cs:145`) when the effects facet lands | same | with E5 | add the facet without the bump → gate 3's index bytes move silently |
-| P25 | `EffectSummaryIsIndexIndependent` — a **fresh-clone `calor build`** with no `obj/calor` present produces a complete summary; plus a structural pin that no `Effects/` or `Incremental/` file references `ProjectIndex` | `Calor.Compiler.Tests/Incremental/` | **before E5** | derive the summary from the index → the fresh-clone build fails |
+| P25 | `EffectSummaryIsIndexIndependent` — a **fresh-clone `calor build`** with no `obj/calor` present produces a complete summary; plus a structural pin that no `Effects/` or `Incremental/` file references `ProjectIndex` | `Calor.Compiler.Tests/Incremental/` | ~~before E5~~ **with E5** (landed in the E5 PR; nothing before it had a summary shape to pin against) | derive the summary from the index → the fresh-clone build fails |
 | P26 | `NoNameKeyedEffectStoreRemains` — grep pin, `EffectSummaryBuilder.cs:68,:75` keys gone | same | with E5 | re-introduce one name key |
+
+> **EXECUTED — v0.15 E5.** Status of every pin this slice owed (all in
+> `tests/Calor.Compiler.Tests/`; there is no `Incremental/` subdirectory — P23's home,
+> `IncrementalCliBuildTests.cs`, is where the four live):
+>
+> | Pin | Status | Test |
+> |---|---|---|
+> | **P23** | **LANDED** — `"4.0"` (the summary's caller entries are keyed by structural id, P26, so `BuildFileEntry.EffectSummary`'s shape changed); semantics stamp `calor-compile-semantics-v1` and options stamp `compile-inputs-v3` frozen | `BuildStateCacheConstants_FormatBumpedByE5_SemanticsAndOptionsFrozen` (renamed from `_AreUnchangedByEffectRows`) |
+> | **P24** | **LANDED** — `"4.0"`, and the facet is asserted to be IN the serialized bytes (`"EffectRows"`, `"Verdict"`, `"EffectRowsUnavailable"`) | `ProjectIndexFormatBumped` |
+> | **P25** | **LANDED**, both legs: a CLI `--cache` build of three files (one cross-module call) in a directory with no `obj/` and no `.calor-index.json` anywhere writes a complete, symbol-keyed summary for every file and creates no index; and every `.cs` under `Effects/` and `Incremental/` is scanned for `\bProjectIndex\w*\b` on any line, comments included | `EffectSummaryIsIndexIndependent`, `EffectsAndIncrementalLayers_DoNotReferenceProjectIndex` |
+> | **P26** | **LANDED**, three legs: reflection (`EffectCallerSummary` has `CallerId` + `DisplayName`, no `CallerName`; `RawCall` has `CallerId`), a source regex over `EffectSummaryBuilder.cs` (groups by `call.CallerId`, never passes `.Name` as `callerId:`), and the behavioural discriminator — two overloads `Box.Run(i32)` / `Box.Run(str)` are TWO caller entries (`Box.m001`, `Box.m002`) with one display name, where the name key made them one | `NoNameKeyedEffectStoreRemains` |
+> | gate 7 | **LANDED** — eight `effects` / `impact-effects` goldens authored from the fixture (`tests/TestData/QueryCorpus/project/effects.calr`, new), every verdict and a firing code exercised (`TheEffectsGoldensExerciseEveryVerdict`, anti-vacuity) | `QueryGoldenTests` |
+> | E4's obligation | **half discharged** — `FunctionBoundType.Row` has a production reader (`IndexedEffectRow.BoundRow`), pinned equal to the `§E` node's row wherever no `eff` variable is mentioned and `[unknown]` where one is; the invocation-row span-matching stays registered (roadmap §4.2 E5) | `ProjectIndexTests.BoundPositionRow_AgreesWithTheDeclaredRow_WhereTheBinderDoesNotCollapse` |
+>
+> **Ledgers re-stamped, corpus-size only.** The new fixture is the 887th committed `.calr`
+> (508th that parses; 486th the key ledger measures): `higher-order-demand-ledger.json`
+> (`fileCount` 886 → 887, every class count unchanged, both legs regenerated in one run with the
+> submodules initialized), `binder-incomplete-baseline.json` (`ParsedFiles` 507 → 508,
+> `ExpressionsBound` 4715 → 4719, incomplete count unchanged), `effect-resolver-key-ledger.json`
+> (`filesMeasured` 485 → 486, every origin count unchanged), `o53/baseline.json` (stamp only).
+> `transcripts/facts.txt`: the `IsSubsetOf` site moved `:401` → `:565` (phase 5's record and
+> fields sit above `CheckEffects`); its count stays two — phase 5 uses `Except()`, which is
+> empty exactly when that subset test passes, so P16's structural pin still reads 2. The
+> §9 "0 of 359 function-typed `.calr` goldens under `tests/TestData`" stays 0: the fixture
+> deliberately carries no function-typed position (that golden lives in `ProjectIndexTests`).
+
 | P27 | `SpikeVerdictMatchesRecomputation` — recomputes `gCodegen` (via P28) and the R1 leg; shape-checks `schemaVersion`/`measuredCommit`; asserts R2/R3 are present and well-formed but **does not re-derive them** (§12.3) | `Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs` | **spike PR** | edit a verdict field, or flip an A3 fixture to need `--permissive-effects` |
 | P28 | **`GCodegen_BeforeAfterEmittedCSharpIsByteIdentical`** — the pin G-CODEGEN never had. Re-emits A1's and A2's `before/`/`after/` `.calr` and diffs the `.g.cs` byte-for-byte modulo trailing whitespace. §9's "0 `.cs` goldens" and §8.5's "semantics stamp unchanged" both rest on it | `SpikeVerdictTests.cs` | **spike PR** (blocking, feature-wide) | make a row change codegen → red, and E2 does not ship |
 | P29 | **`ExperimentTranscripts_MatchARerun`** — re-runs all six harness scripts and diffs against the committed transcripts. Closes the round-2 finding that ~40 quoted outputs were reproducible but unobserved. **Never skips**: a missing compiler build is a hard failure | `tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs` — **landed in this PR** | **before E2** (already frozen) | reword any diagnostic the doc quotes → red, naming the script and the first differing line |
@@ -2326,7 +2373,7 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | **5** compatibility over the corpus | leg (a) what CI compiles today — `tests/TestData/Benchmarks` (226, pinned `>= 200`), `samples/` (11), every `.calr` a test project compiles; leg (b) the remainder of the 886 via a **`compile-all-committed-calr` job registered before E2**. **E1-attributable firings separated**: E1 resolves callees string-guessing missed and fires new, correct Calor0410/0419, which are fixed in-corpus and counted. **0.15-specific additions**: the Calor0410s that *disappear* from §4.1's `Subtypes` widening are listed by name; the §3.2 line-adjacency baseline (`o53/baseline.json`, 23 files, 1 green today) is re-run; §4.5's 0420/0421 de-demotion is confirmed to break no committed file | branch cut | revert one in-corpus fix → leg (a) red |
 | **M1** (roadmap §4.2) — *not a gate, a merge precondition* | Roadmap §4.2: *"No effect-row implementation (E2) merges before M1 is done."* v2 omitted it from the before-E2 chain entirely. Status: **COMPLETE.** PR #944 dispositioned and #881 addressed (PRs #1090/#1091/#1092); the annex append-only **guard** half landed as **A-1.10**; the **0.15 PP row registered as `PP-E1` at A-1.11 (2026-08-25)** — the freeze event, verified against an empty `grep -rn "Calor0424" src/` at `f7cd1c46`. Its denominator is the five §12.1 spike fixtures with ten injectable mutations (`L5` interface implementation, `L6` rank-1 instantiation, `L7` row erasure), bar 10/10 with a clean negative control, plus a cost leg whose margin re-derives on `w5-parity-002` to point 1.35 ∧ bootstrap lower bound > 1.0. **Correction, 2026-08-26 — annex sub-entry `A-1.11.1`:** leg A's negative control is re-frozen under the pinned invocation. A-1.11's A2 baseline was transcribed from `after/A2.diagnostics.txt`, recorded with `--permissive-effects` (§12.4 caveat 4) — the flag that same row forbids — so it was never reproducible. A2's baseline is now the measured no-flag multiset at `9119397e` (1× Calor0410 (23,9) + 2× Calor0411 + 1× Calor0418 (27,27)), with the Calor0418 registered as **E4's**: post-E4 the expected multiset drops it, and that post-E4 multiset is the binding one. The four A3 fixtures' "exit 0, zero diagnostics" (A-1.11's words) stands as the post-E4 expectation, their pre-E4 Calor0418 counts recorded. **Until E4 merges, leg A is a MISS under A-1.11's own-goal clause.** Pin: `PpE1NegativeControls_MatchA1111Baselines_PreE4` | **before E2 merges** | E2's PR body must cite **A-1.11**; without it, M1 is unmet and E2 does not merge. **E4's PR must flip the A-1.11.1 pre-E4 pin to its registered post-E4 multisets** |
 | **6** resolution floor | `MetadataBinderCorpusMeasurementTests.cs:37-118`, two-sided exact equality | v0.14.3 values | the test as it stands |
-| **7** index/query effects leg | `QueryGoldenTests` + the `effects` golden authored (not recorded) per `EveryGoldenStatesWhyItExists` (`:152-172`) | E5 PR | alter one expected effects answer |
+| **7** index/query effects leg | `QueryGoldenTests` + the `effects` golden authored (not recorded) per `EveryGoldenStatesWhyItExists` (`:152-172`). **LANDED (E5):** eight goldens over `QueryCorpus/project/effects.calr` — `effects` (Leaky does-not-fit/Calor0410/cw; Log fits; Quiet omitted-row-is-pure; AsksMissing cannot-tell yet Calor0410, partial; Run cross-module fold) and `impact-effects` (row `fs:w` → all three transitive callers stop fitting, incl. Fan through Relay; row `cw` → only Leaky; row pure → none) | E5 PR | alter one expected effects answer |
 
 ### 13.4 The Calor0425 corpus ledger — a decision, not an open question
 
