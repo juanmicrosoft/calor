@@ -81,10 +81,26 @@ All notable changes to this project will be documented in this file.
   compiler previously didn't recognise it as a callback at all and skipped the
   check. It asks the type checker now instead of guessing from the name.
 
-- **Calling a callback is still Calor0418 for one more release.** Annotating one and
-  passing it around is fully checked now. *Invoking* it still isn't allowed under
-  effect enforcement, because charging the call to the caller needs the last piece of
-  this work. That is the next release.
+- **Calling a callback now just works — and is charged to whoever calls it.** This is
+  the last piece. Until now, calling a function value (a callback parameter, a lambda
+  you bound to a name, a callback field) was refused outright under effect enforcement
+  (Calor0418), no matter what you had annotated. Now the compiler reads the callback's
+  annotation and charges it to the function doing the calling, the same way calling a
+  named function charges that function's `§E{…}`. If `transform` may print and `Apply`
+  calls it, `Apply` prints — and if `Apply` didn't say so, the error tells you exactly
+  why: `Effect row: charged by invoking 'transform' (row: cw)`.
+
+  A callback with **no** annotation is a callback the compiler knows nothing about, so
+  calling it is "I can't tell" (Calor0425) and the caller is charged an unknown effect,
+  so the program fails closed — exactly what happens today when you call something from
+  a library the compiler has no information about. `--permissive-effects` silences that
+  warning and charges nothing, which is the one job it has left. A callback the compiler
+  could only *assume* something about is charged and flagged once.
+
+  Calor0418 survives for one thing only: calling something that provably isn't a
+  function at all, like an `i32`. All 886 Calor files in this repository emit the same
+  C# as before; exactly one of them changes its diagnostics (it loses its Calor0418 and
+  gains nothing, because the lambda it calls is pure).
 
 - **`§E{db}` now covers `§E{db:r}`, and the same for `net` and `env`.** If a
   function declared the broad "touches the database" effect, and the code inside it

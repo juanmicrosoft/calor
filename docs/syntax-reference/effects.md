@@ -147,19 +147,25 @@ wide is **Calor0424** (always an error), a row the compiler cannot determine is 
 not a function (`i32`, `str`, an array) is **Calor0405**; a row on a type the compiler does not
 know is accepted, not refused.
 
-**Still to come:** calling a callback through its row. Invoking a function value is refused
-today whatever row it carries, and a lambda's body is not yet compared with its declared row:
+**Calling a callback charges its row.** Invoking a function value — a parameter, a `§B`, a
+field, or the result of a call — charges the value's row to the function doing the calling,
+exactly as calling a named function charges its `§E`. A lambda's body is compared with its
+declared row, and a lambda bound to a row-less `§B` gives the `§B` the body's row:
 
 ```
 §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
   §E{cw}
-  §R §C{transform} §A value §/C     // Calor0418 until the next slice replaces it
+  §R §C{transform} §A value §/C     // charges cw to Apply; Apply declares it — clean
 ```
 
-The row is what will *make* that call legal — the compiler has to compare it against the
-function you actually pass, and that comparison is the next release. Until then a call
-through a function-typed value still needs `§CSHARP` interop or
-`--permissive-effects`, exactly as before.
+Narrow `Apply`'s own row to `§E{}` and you get a **Calor0410** that says where the effect
+came from: `Effect row: charged by invoking 'transform' (row: cw)`. Invoke a value that
+carries **no** row and the compiler cannot tell what it does: that is **Calor0425** at the
+call, and the caller is charged an unknown effect so the program fails closed — the same
+answer an unknown external call gets. `--permissive-effects` silences that Calor0425 and
+charges nothing for it; it never silences a row the compiler *does* know. **Calor0418** is now
+reported for one thing only: invoking a value whose type is provably not a function (`i32`,
+`str`, an array).
 
 ---
 
@@ -400,7 +406,7 @@ Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
 - **Calor0410** — a function uses an effect it does not declare (with call chain).
 - **Calor0411** — an unknown external call; add the callee to a `.calor-effects.json` manifest. Unknown calls contribute worst-case effects, so under the default policy they fail loud rather than being assumed pure.
 - **Calor0403** — an unknown or misspelled source effect code. Source declarations and manifests use the same authoritative taxonomy; unknown codes are rejected.
-- **Calor0418** — invocation of a delegate/function-typed value (a parameter, binding, or field being called). Function-typed values carry no effect contract, so the call is an **error** under enforcement. There is no annotation escape hatch; wrap the call in `§CSHARP` interop (surfaced as an assumption via Calor0419) or compile with `--permissive-effects` (an explicit waiver that demotes the error to a warning).
+- **Calor0418** — invocation of a value whose type is provably not a function type (`i32`, `str`, an array). Since v0.15 (E4) a function-typed value — a parameter, binding, field, or call result — is **charged through its effect row** when invoked, so this code no longer fires for it: a row the compiler knows is charged silently (and shows up in Calor0410's `Effect row: charged by invoking …` line if the caller under-declares), an assumed row is charged and reported once as Calor0425, and a row the compiler cannot determine is Calor0425 at the call plus an unknown-effect charge that fails closed. Calor0418 is an **error** under every policy; `--permissive-effects` does not demote it.
 - **Calor0419** — the effects of a function are **assumed**, not verified: it contains raw C# interop (`§CSHARP`/`§CS`), an unrecognized construct, or calls a function whose effects are assumed. The assumption propagates to callers through the interprocedural pass. Warning by default; error under `--strict-effects`.
 - **Calor0420** — an override declares effects not covered by its base method's declared `§E` (override `§E` must be a subset of base `§E`). Broader override effects would launder through dynamic dispatch.
 - **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.

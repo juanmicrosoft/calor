@@ -68,6 +68,54 @@ public sealed class CallGraphAnalysis
     private IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>
         _declaredReturnFunctionTypes = NoFunctionTypes;
 
+    /// <summary>
+    /// v0.15 E4 (review round 1, F1/F2) — what the BINDER resolved a value
+    /// reference to, keyed by the reference's span, and the declared function
+    /// types of LOCALS keyed by their declaration span. Both exist because a
+    /// name is not an identity: two sibling branches can each bind a <c>§B{f}</c>,
+    /// and the effect pass must charge the row of the one the reference
+    /// actually resolves to, not the first of that name in lexical order.
+    /// Empty when binding threw, in which case the pass falls back to its
+    /// name-keyed AST search and fails CLOSED where that search is ambiguous.
+    /// </summary>
+    public sealed class BoundValueIndex
+    {
+        /// <summary>(callerId, reference start, reference end) → the resolved
+        /// variable's <c>DeclarationSpan</c>.</summary>
+        public Dictionary<(string CallerId, int Start, int End), TextSpan> Declarations { get; } = new();
+
+        /// <summary>callerId → the locals with a declared <c>FunctionBoundType</c>,
+        /// by name and declaration start.</summary>
+        public Dictionary<string, List<(string Name, int DeclarationStart, Binding.BoundTypes.FunctionBoundType Type)>>
+            Locals { get; } = new(StringComparer.Ordinal);
+    }
+
+    private BoundValueIndex _boundValues = new();
+
+    /// <summary>The declaration span of the variable the binder resolved a bare
+    /// value reference (a call target or a <c>ReferenceNode</c>) to, or
+    /// <c>null</c> when binding threw or the reference was not a variable.</summary>
+    public TextSpan? BoundValueDeclaration(string callerId, TextSpan reference) =>
+        _boundValues.Declarations.TryGetValue((callerId, reference.Start, reference.End), out var span)
+            ? span
+            : null;
+
+    /// <summary>The declared <c>FunctionBoundType</c> of the LOCAL named
+    /// <paramref name="name"/> whose declaration lies inside
+    /// <paramref name="bindSpan"/>, or <c>null</c>.</summary>
+    public Binding.BoundTypes.FunctionBoundType? DeclaredLocalFunctionType(
+        string callerId, string name, TextSpan bindSpan)
+    {
+        if (!_boundValues.Locals.TryGetValue(callerId, out var locals)) return null;
+        foreach (var (localName, start, type) in locals)
+        {
+            if (localName.Equals(name, StringComparison.Ordinal)
+                && bindSpan.Start <= start && start <= bindSpan.End)
+                return type;
+        }
+        return null;
+    }
+
     private IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>
         _declaredFieldFunctionTypes = NoFunctionTypes;
 
@@ -526,7 +574,7 @@ public sealed class CallGraphAnalysis
         }
 
         var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
-             declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes) =
+             declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
             ResolveBoundCallSites(ast, functions);
 
         // Build call edges
@@ -585,6 +633,7 @@ public sealed class CallGraphAnalysis
         analysis._declaredFunctionTypes = declaredFunctionTypes;
         analysis._declaredReturnFunctionTypes = declaredReturnTypes;
         analysis._declaredFieldFunctionTypes = declaredFieldTypes;
+        analysis._boundValues = boundValues;
         return analysis;
     }
 
@@ -597,7 +646,8 @@ public sealed class CallGraphAnalysis
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>
             DeclaredFunctionTypes,
         IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredReturnTypes,
-        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredFieldTypes)
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredFieldTypes,
+        BoundValueIndex BoundValues)
         ResolveBoundCallSites(
             ModuleNode ast,
             IReadOnlyDictionary<string, FunctionNode> functions)
@@ -623,6 +673,7 @@ public sealed class CallGraphAnalysis
             new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(StringComparer.Ordinal);
         var declaredFields =
             new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(StringComparer.Ordinal);
+        var boundValues = new BoundValueIndex();
 
         void RecordValue(string callerId, string name, Binding.BoundTypes.BoundType type)
         {
@@ -721,12 +772,31 @@ public sealed class CallGraphAnalysis
                     var expressionTargetCall = false;
                     switch (node)
                     {
+                        // v0.15 E4 — the bound identity of values, for the
+                        // invocation charge (F1/F2): every local with a declared
+                        // function type, and every bare reference's resolved
+                        // declaration.
+                        case BoundBindStatement bind when bind.Variable.FunctionType is { } localType:
+                            if (!boundValues.Locals.TryGetValue(callerId, out var locals))
+                            {
+                                locals = new List<(string, int, Binding.BoundTypes.FunctionBoundType)>();
+                                boundValues.Locals[callerId] = locals;
+                            }
+                            locals.Add((bind.Variable.Name, bind.Variable.DeclarationSpan.Start, localType));
+                            break;
+                        case BoundVariableExpression variable:
+                            boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
+                                variable.Variable.DeclarationSpan;
+                            break;
                         case BoundCallStatement statement:
                             target = statement.Target;
                             callees = statement.ResolvedSymbols;
                             receiver = statement.ReceiverSymbol;
                             inaccessibleCall = statement.IsInaccessibleCall;
                             RecordReceiver(callerId, statement.Target, statement.Receiver);
+                            if (receiver != null && !target.Contains('.'))
+                                boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
+                                    receiver.DeclarationSpan;
                             break;
                         case BoundCallExpression expression:
                             target = expression.Target;
@@ -734,6 +804,9 @@ public sealed class CallGraphAnalysis
                             receiver = expression.ReceiverSymbol;
                             inaccessibleCall = expression.IsInaccessibleCall;
                             RecordReceiver(callerId, expression.Target, expression.Receiver);
+                            if (receiver != null && !target.Contains('.'))
+                                boundValues.Declarations[(callerId, node.Span.Start, node.Span.End)] =
+                                    receiver.DeclarationSpan;
                             break;
                         case BoundNewExpression creation:
                             target = $"{creation.Type.DisplayString}..ctor";
@@ -794,7 +867,8 @@ public sealed class CallGraphAnalysis
                     IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>(
                     StringComparer.Ordinal),
                 NoFunctionTypes,
-                NoFunctionTypes);
+                NoFunctionTypes,
+                new BoundValueIndex());
         }
 
         return (
@@ -807,7 +881,8 @@ public sealed class CallGraphAnalysis
                 entry => (IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>)entry.Value,
                 StringComparer.Ordinal),
             declaredReturns,
-            declaredFields);
+            declaredFields,
+            boundValues);
     }
 
     /// <summary>

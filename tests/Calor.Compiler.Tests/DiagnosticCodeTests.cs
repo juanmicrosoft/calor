@@ -60,6 +60,40 @@ public class DiagnosticCodeTests
     }
 
     [Fact]
+    public void Calor0418_IsRetainedForTheProvablyNonFunctionResidual()
+    {
+        // v0.15 E4 (roadmap §4.2, design-doc §10.1): Calor0418 no longer rejects
+        // the invocation of a function-typed value — the value's effect row is
+        // charged instead. The code is RETAINED, not removed, for exactly one
+        // residual: invoking a value whose type is provably not a function type,
+        // where there is no row to read. This reads the catalogue so that
+        // deleting the constant (or re-purposing its number) is a red test, and
+        // its doc comment must say what the residual is.
+        var field = typeof(DiagnosticCode).GetField(
+            nameof(DiagnosticCode.DelegateInvocation),
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(field);
+        Assert.Equal("Calor0418", (string)field!.GetValue(null)!);
+
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "Calor.Compiler",
+            "Diagnostics", "Diagnostic.cs"));
+        var declaration = source.IndexOf("public const string DelegateInvocation", StringComparison.Ordinal);
+        Assert.True(declaration > 0);
+        var docComment = source[Math.Max(0, declaration - 2000)..declaration];
+        Assert.Contains("PROVABLY not a function type", docComment);
+        Assert.Contains("retained for that residual only", docComment);
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !File.Exists(Path.Combine(dir, "Directory.Build.props")))
+            dir = Path.GetDirectoryName(dir);
+        Assert.NotNull(dir);
+        return dir!;
+    }
+
+    [Fact]
     public void AllDiagnosticCodeConstants_AreUnique()
     {
         // Broader backstop: no two DiagnosticCode constants share a value at all.

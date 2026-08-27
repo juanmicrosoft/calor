@@ -669,21 +669,37 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   `Calor0418` counts, and the own-goal MISS that stands until E4 merges. **E4 remains
   outstanding** and is not E3a's to do.
 
-- **E4 — Calor0418 replaced.** Accepted when the function value's row fits; Calor0424 on
-  mismatch; Calor0425 when the row is Unknown/Assumed because metadata is incomplete. The
-  `DelegateInvocation_*` pins (`StrictnessBatchTests.cs:29,47,64,749`;
-  `EffectEnforcementTests.cs:354,378`) are rewritten from "is an error" to "fits / does not
-  fit"; the `--permissive-effects` waiver survives as the waiver for Calor0425 only (a row that
-  *does not fit* is never waived — §4.5 row).
-  **E4 also owes PP-E1's negative control**, per annex sub-entry
-  [A-1.11.1](agent-native-gates.md): it must take A2 from the registered pre-E4 multiset to the
-  post-E4 one (the `Calor0418` at (27,27) gone, leaving 1× `Calor0410` (23,9) + 2× `Calor0411`)
-  and return the four A3 fixtures to "exit 0, zero diagnostics" — the baseline A-1.11 froze,
-  verbatim, which A-1.11.1 leaves standing. `PpE1NegativeControls_MatchA1111Baselines_PreE4`
-  (`tests/Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs`) pins the **pre**-E4 state and is
-  named so that it goes red on E4's own change; **the E4 PR flips it to the post-E4 multisets**.
-  Until E4 lands, leg A is a **MISS** under A-1.11's own-goal clause if adjudicated.
-- **E5 — Effects facet in the index.** Effect rows per declaration recorded in `ProjectIndex`;
+- **E4 — Calor0418 replaced. LANDED (2026-08-27, `docs/plans/2026-08-27-v0.15-e4-notes.md`).**
+  Invoking a function-typed value charges the value's row to the invoking function inside
+  inference: `Concrete` charged silently (with §10.1's `Effect row: charged by invoking …`
+  provenance in Calor0410); `Assumed` charged and reported once as Calor0425; `Unknown`
+  Calor0425 at the invocation plus the fail-closed Unknown charge — the same answer an unknown
+  external call gets — with nothing charged under `--permissive-effects`, which survives as the
+  waiver for Calor0425 only. **Calor0424 is never reported at an invocation** (design §6.2 has
+  no invocation row: there is no destination row to fit into; the under-declared caller is
+  Calor0410). **Calor0418 is retained for one residual** — invoking a value whose type is
+  provably not a function type — pinned off the catalogue. Every `DelegateInvocation_*` pin
+  (`StrictnessBatchTests.cs:29,47,64,472,728,749`; `EffectEnforcementTests.cs:1175`) is rewritten
+  in place, same programs, to fits / unknown, plus positive controls; `:354,378` stay Calor0411
+  as design §13.1 said. Corpus differential: **one file of 886** moves (loses its Calor0418,
+  gains nothing — the lambda it invokes is pure); every other per-code total identical.
+  Ledgers regenerated with cause: D-A `calor0418` 1 → 0; P32 4 → 8 (four E3b external-base
+  sites re-bucketed, four invocation sites = the four pre-E4 Calor0418 witnesses). Harness
+  obligations #2 (X9b) and #3 (X9c) discharged.
+  **PP-E1's negative control is RESTORED**, per annex sub-entry
+  [A-1.11.1](agent-native-gates.md): A2 measures exactly the registered post-E4 multiset
+  (1× `Calor0410` (23,9) + 2× `Calor0411` (26,24)(28,19), exit 1 — the pre-allowed
+  0410/0411 → 0425/0419 migration did NOT occur) and the four A3 fixtures are exit 0 with zero
+  diagnostics, A-1.11's words verbatim. `PpE1NegativeControls_MatchA1111Baselines_PostE4`
+  (renamed from `_PreE4`) pins it under the pinned CLI invocation, and
+  `PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4` pins that all five
+  L7 cells now discriminate. Adjudication stays at the 0.15.0 release commit.
+- **E5 — Effects facet in the index.** **Carries one obligation from E4's review (PR #1107,
+  F3, 0.15.x):** the invocation row is keyed on the bound symbol end-to-end —
+  `FunctionBoundType.Row` (write-only in 0.15, because `Binder.BindRow` collapses a
+  variable-mentioning row to Unknown) gains a production reader, and
+  `EffectInferrer.ResolveInvokedValueRow`'s AST span-matching goes; design §13.5's E4 block
+  names the pins that must stay green. Effect rows per declaration recorded in `ProjectIndex`;
   `calor query effects`; effect-change blast radius via the existing `impact` closure.
   `EffectSummary` is derived from the index or migrated into it (design-doc decision) — and
   **a structural pin that no name-keyed second store remains** (`EffectSummaryBuilder`'s
@@ -796,6 +812,17 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   Calor0410/0411 → Calor0425/0419 migration at the same declaration — is unchanged. Pinned by
   `PpE1NegativeControls_MatchA1111Baselines_PreE4`. It landed before the 0.15.0 release commit,
   which is where PP-E1 is adjudicated.
+  **Status, 2026-08-27 — control restored by E4, adjudication pending at 0.15.0.** Measured
+  under the pinned invocation at the E4 branch: A2 → exit 1 with exactly `error Calor0410@23,9`
+  + `warning Calor0411@26,24` + `warning Calor0411@28,19` (the registered post-E4 multiset,
+  byte-for-byte; no Calor0418, no pre-allowed migration taken); A3-map / A3-match /
+  A3-middleware / A3-callback → exit 0, zero diagnostics. The pin is renamed
+  `PpE1NegativeControls_MatchA1111Baselines_PostE4`, and the five L7 cells are shown to
+  discriminate (`PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4`:
+  each mutant draws Calor0425 at the registered invocation, rising above the unmutated
+  fixture's zero; no Calor0418 anywhere). Leg A's own-goal MISS no longer stands; the
+  four-valued verdict is read at the release commit by `EffectRowsProbeLedgerTests`, as
+  registered.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
   discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.

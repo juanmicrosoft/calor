@@ -66,6 +66,7 @@ public sealed class EffectEnforcementPass
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _policy = policy;
         _strictEffects = strictEffects;
+        _invocations = new InvocationSink(this);
         // Bare public function names exported by OTHER modules in the same
         // multi-file compilation (unambiguous names only, from the driver's
         // pre-parse). Calls to these are legitimately bare per-module; the
@@ -307,6 +308,8 @@ public sealed class EffectEnforcementPass
         {
             RecordLambdaBody = (lambda, functionId, body, reasons) =>
                 _lambdaBodyRows[lambda] = new LambdaBodyFact(functionId, body, reasons),
+            LambdaBodyRow = LambdaBodyRow,
+            Invocations = _invocations,
         };
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromStatements(function.Body);
@@ -1020,6 +1023,97 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
+    /// v0.15 E4, design-doc §10.1 / roadmap §4.2 E4 — <b>Calor0418 is replaced by
+    /// fits-at-invocation.</b> Invoking a function-typed VALUE (a parameter, a
+    /// <c>§B</c>, a field, or the result of a call) charges the value's effect
+    /// row to the invoking function, exactly as calling a named function charges
+    /// its declared <c>§E</c>. The charge itself happens INSIDE inference
+    /// (<see cref="EffectInferrer.ChargeInvokedRow"/>), so it flows through the
+    /// SCC fixpoint, into a <c>§LAM</c>'s ρ_body when the invocation is inside a
+    /// lambda, and into Calor0410 with no extra propagation step.
+    ///
+    /// <para>What is NOT a charge is a diagnostic, and diagnostics must be
+    /// emitted once: a recursive SCC re-infers every member per iteration, and
+    /// <see cref="ResolveInternalEffectsOnDemand"/> can infer a body before its
+    /// SCC is reached. This sink de-duplicates by (function, span, message), so
+    /// the inferrer can report from wherever it is without knowing whether it
+    /// has been here before.</para>
+    ///
+    /// <para><b>The three verdicts, per §4.3 read at an invocation.</b>
+    /// <c>Concrete(S)</c>: charge <c>S</c>, record §10.1's provenance clause so
+    /// Calor0410 can say <i>charged by invoking …</i>. <c>Assumed(S, R)</c>:
+    /// charge <c>S</c> and report ONE Calor0425 carrying <c>R</c> (§4.4 — an
+    /// assumption is surfaced at every hop, and an invocation is where it is
+    /// finally spent). <c>Unknown</c>: report Calor0425 and charge
+    /// <c>EffectSet.Unknown</c> under the default policy — the same fail-closed
+    /// answer an unknown external call gets today (Calor0411 + Calor0410
+    /// <c>'unknown'</c>), which is what §3.5 means by "defaulting to pure
+    /// re-opens the hole PR #968 closed" and what §6.4's second sample says in
+    /// so many words ("Invoking a value whose row is Unknown charges Unknown to
+    /// 'Run'"). Under <c>--permissive-effects</c> the Calor0425 is suppressed
+    /// and nothing is charged, which is the flag's one remaining job (§4.5):
+    /// waive <i>we cannot tell</i>. A row that does not fit cannot arise at an
+    /// invocation at all — there is no destination row to fit into, so §6.2 has
+    /// no <c>DoesNotFit</c> cell here and Calor0424 is never reported at an
+    /// invocation; the body-vs-declaration check (Calor0410) is what catches an
+    /// under-declared caller.</para>
+    /// </summary>
+    internal sealed class InvocationSink
+    {
+        private readonly EffectEnforcementPass _pass;
+        private readonly HashSet<(string FunctionId, int Line, int Column, string Message)> _reported =
+            new();
+
+        public InvocationSink(EffectEnforcementPass pass) => _pass = pass;
+
+        /// <summary>Calor0425 at an invocation, once per (function, span, message).</summary>
+        public void ReportRowUnknown(string functionId, TextSpan span, string message)
+        {
+            if (_reported.Add((functionId, span.Line, span.Column, message)))
+                _pass.ReportRowUnknown(span, message);
+        }
+
+        /// <summary>
+        /// The residual Calor0418: the invoked value's type is PROVABLY not a
+        /// function type (<c>i32</c>, <c>str</c>, an array …), so there is no row
+        /// to read and the call is not a call. An error under every policy —
+        /// this is "we know it is wrong", not "we cannot tell", so
+        /// <c>--permissive-effects</c> does not demote it (§4.5).
+        /// </summary>
+        public void ReportNotAFunction(string functionId, TextSpan span, string message)
+        {
+            if (_reported.Add((functionId, span.Line, span.Column, message)))
+                _pass._diagnostics.Report(span, DiagnosticCode.DelegateInvocation, message,
+                    DiagnosticSeverity.Error);
+        }
+
+        /// <summary>A variable-mentioning row invoked by a function that does not
+        /// bind the variable. Not reachable from source today (the parser's
+        /// Calor0404 scope check keeps a parameter row inside its own
+        /// declaration's binders); kept so the charge is total.</summary>
+        public void ReportUndeclaredEffectVariable(string functionId, TextSpan span, string message)
+        {
+            if (_reported.Add((functionId, span.Line, span.Column, message)))
+                _pass._diagnostics.Report(span, DiagnosticCode.ForbiddenEffect, message,
+                    DiagnosticSeverity.Error);
+        }
+
+        /// <summary>§10.1's provenance clause, keyed by function and surface code —
+        /// the same table site 6 writes, read by <see cref="CheckEffects"/>.</summary>
+        public void RecordProvenance(string functionId, string code, string why)
+        {
+            if (!_pass._rank1Provenance.TryGetValue(functionId, out var byCode))
+            {
+                byCode = new Dictionary<string, string>(StringComparer.Ordinal);
+                _pass._rank1Provenance[functionId] = byCode;
+            }
+            byCode.TryAdd(code, why);
+        }
+    }
+
+    private readonly InvocationSink _invocations;
+
+    /// <summary>
     /// v0.15 E3 slice b, design-doc §8.2 — the declared <c>FunctionBoundType</c>
     /// of a named position, or <c>null</c>. This is the first PRODUCTION reader
     /// of <c>VariableSymbol.FunctionType</c> and
@@ -1127,6 +1221,14 @@ public sealed class EffectEnforcementPass
         /// </summary>
         public static Binding.BoundTypes.EffectFit Fits(PolyRow source, PolyRow destination)
         {
+            // v0.15 E4 (review round 1, F6): §4.3 — Unknown never yields Fits on
+            // EITHER side, and it never yields DoesNotFit either. The ordinal
+            // test below runs only between two rows that are both known; a
+            // variable-mentioning source into a row-less (Unknown) destination
+            // is CannotTell, not a Calor0424 reading "declared row: [unknown]".
+            if (source.Row.IsUnknown || destination.Row.IsUnknown)
+                return Binding.BoundTypes.EffectRow.Fits(source.Row, destination.Row);
+
             // Spelled as an explicit loop rather than the library containment
             // helper, whose NAME is the token P16's structural half counts under
             // `Effects/`. This is containment over ORDINALS, not the effect-set
@@ -1520,10 +1622,11 @@ public sealed class EffectEnforcementPass
         ///
         /// <para>A variable the arguments could not determine makes the
         /// instantiated row Unknown, which is Calor0425 at the CALL SITE — §10.3's
-        /// second message. Nothing is charged for such a variable: the slice that
-        /// charges an Unknown row is E4, which replaces Calor0418, and inventing
-        /// an <c>unknown</c> effect here would raise a Calor0410 the author cannot
-        /// declare away.</para>
+        /// second message. Nothing is charged for such a variable — E3b's
+        /// disclosed deviation from §10.3's sample, kept as is. E4 (which charges
+        /// an INVOKED Unknown row fail-closed) did not revisit this cell: the
+        /// author of the caller cannot repair an argument's missing row from the
+        /// call site, and the Calor0425 here already names which argument.</para>
         /// </summary>
         private void InstantiateAndCharge(
             FunctionNode callee,
@@ -1798,8 +1901,17 @@ public sealed class EffectEnforcementPass
             _pass.BoundFieldFunctionType(owner.Name, field.Name) != null
             || IsFunctionTyped(field.TypeName);
 
+        // v0.15 E4 (review round 1, F1): an UNTYPED `§B{~f} §LAM …` is
+        // function-valued by construction, and the binder gives it a
+        // FunctionBoundType (inherited from the initializer) that the
+        // parameter-only DeclaredFunctionTypes map never carried. Without this,
+        // site 1 never put the mutable in scope, so re-binding it to an impure
+        // value was silently accepted while the invocation charged the
+        // initializer's row.
         private bool IsBindingFunctionTyped(BindStatementNode bind) =>
             _pass.BoundFunctionType(_function.Id, bind.Name) != null
+            || _pass._callGraphAnalysis.DeclaredLocalFunctionType(_function.Id, bind.Name, bind.Span) != null
+            || bind.Initializer is LambdaExpressionNode
             || IsFunctionTyped(bind.TypeName);
 
         private bool IsReturnFunctionTyped(FunctionNode owner, OutputNode output) =>
@@ -2044,10 +2156,10 @@ public sealed class EffectEnforcementPass
     /// binder hands over only a type string — a declared <c>Func&lt;i32&gt;</c>
     /// parameter, whose BoundType is a bare <c>NominalBoundType("Func&lt;i32&gt;")</c>
     /// with no <c>Declaration</c> — this returns false and the caller's string
-    /// test still decides. That keeps Calor0418's behaviour byte-stable
-    /// (<c>StrictnessBatchTests.cs:29,47,64,749</c>;
-    /// <c>EffectEnforcementTests.cs:354,378</c>) while making the structural
-    /// answer the one that is asked first.</para>
+    /// test still decides. That kept Calor0418's behaviour byte-stable through E1,
+    /// and keeps the E4 invocation charge's notion of "function-typed" the same
+    /// as the string test's where no bound answer exists, while making the
+    /// structural answer the one that is asked first.</para>
     /// </summary>
     // Fully qualified rather than a file-level `using`: adding one shifts every
     // line in this file, and the effect-rows spike transcripts pin
@@ -2162,6 +2274,21 @@ public sealed class EffectEnforcementPass
         /// </summary>
         public Action<LambdaExpressionNode, string, EffectSet, IReadOnlyList<string>>?
             RecordLambdaBody { get; init; }
+
+        /// <summary>
+        /// v0.15 E4 — ρ_body of a <c>§LAM</c> the inferrer has already walked,
+        /// for a lambda-bound local that is then INVOKED (§3.5: a row-less
+        /// <c>§B</c> takes its initializer's row). Unknown when the lambda was
+        /// never reached.
+        /// </summary>
+        public Func<LambdaExpressionNode, PolyRow>? LambdaBodyRow { get; init; }
+
+        /// <summary>
+        /// v0.15 E4 — the invocation verdicts that are DIAGNOSTICS rather than
+        /// charges, reported through the pass so an SCC fixpoint iteration or an
+        /// on-demand re-inference cannot emit the same one twice.
+        /// </summary>
+        public InvocationSink? Invocations { get; init; }
 
         public InferenceContext(
             EffectResolver resolver,
@@ -2368,7 +2495,8 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromCallTarget(
             string target,
             TextSpan span,
-            IReadOnlyList<ExpressionNode>? arguments = null)
+            IReadOnlyList<ExpressionNode>? arguments = null,
+            TextSpan? referenceSpan = null)
         {
             var exactInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
@@ -2421,7 +2549,7 @@ public sealed class EffectEnforcementPass
                 // branches on it there; both arms of the old `if` called it
                 // unconditionally, so the test was dead. Collapsed in E1 slice 2b
                 // (review round 2, nit 5) — behaviour unchanged.
-                return InferFromBareNameTarget(target, span);
+                return InferFromBareNameTarget(target, span, referenceSpan ?? span);
             }
 
             // D-W2.2 (call-site leg): a call through a receiver whose static type is an
@@ -2524,11 +2652,12 @@ public sealed class EffectEnforcementPass
         /// functions/methods:
         /// (a) the name resolves lexically to a parameter of the current function, a
         ///     §B binding in its body, or a field of the enclosing class — a VALUE is
-        ///     being invoked, which is by construction a delegate/function-typed
-        ///     invocation → unconditional Calor0418 error under enforcement (demoted
-        ///     to a warning only under --permissive-effects, the explicit waiver).
-        ///     There is no annotation escape hatch: effect-annotated function types
-        ///     are a Phase 3 design.
+        ///     being invoked. v0.15 E4: its effect ROW is charged to this function
+        ///     (<see cref="ChargeInvokedRow"/>) — Concrete silently, Assumed with one
+        ///     Calor0425, Unknown as Calor0425 plus the fail-closed Unknown charge
+        ///     (nothing under --permissive-effects). Pre-E4 this arm was an
+        ///     unconditional Calor0418; that code survives only for a value whose
+        ///     type is provably not a function type.
         /// (b) the name is a free name the pass cannot see (e.g. an inherited member
         ///     of an external C# base) — routed through the unknown-call chain, which
         ///     fails loud under the strict policy (Calor0411 + unknown effects)
@@ -2545,7 +2674,7 @@ public sealed class EffectEnforcementPass
         /// </summary>
         private const string UnknownLocalTypeSentinel = "?";
 
-        private EffectSet InferFromBareNameTarget(string target, TextSpan span)
+        private EffectSet InferFromBareNameTarget(string target, TextSpan span, TextSpan referenceSpan)
         {
             var valueType = ResolveLocalValueType(target);
 
@@ -2568,21 +2697,35 @@ public sealed class EffectEnforcementPass
             // doc §8.1 now records plainly that it has no discriminating pin.
             if (valueType != null && valueType != UnknownLocalTypeSentinel)
             {
-                var severity = _context.Policy == UnknownCallPolicy.Permissive
-                    ? DiagnosticSeverity.Warning
-                    : DiagnosticSeverity.Error;
-                var typeDescription = IsFunctionValued(target, valueType)
-                    ? $"function-typed value '{target}' (type '{valueType}')"
-                    : $"value '{target}' (declared type '{valueType}')";
-                _context.Diagnostics.Report(
-                    span,
-                    DiagnosticCode.DelegateInvocation,
-                    $"Invocation of {typeDescription} is an error under effect enforcement: " +
-                    "function-typed values carry no effect contract, so the call cannot be charged. " +
-                    "Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or " +
-                    "compile with --permissive-effects (an explicit waiver).",
-                    severity);
-                return EffectSet.Empty;
+                // v0.15 E4 — a VALUE is being invoked. Its effect row is read
+                // from the declaration that put it in scope (the same row node
+                // the binder's FunctionBoundType.Row was built from — read here
+                // as the node rather than the bound projection, because the
+                // bound Row collapses a variable-mentioning row to Unknown and
+                // `f §E{e}` invoked inside a rank-1 `Map` must charge `e`, not
+                // Unknown) and charged to this function. Calor0418 survives for
+                // exactly one shape: a value whose type is PROVABLY not a
+                // function type, where there is no row to read.
+                var invoked = ResolveInvokedValueRow(target, valueType, referenceSpan);
+                if (invoked == null)
+                {
+                    // F10: quote the SOURCE spelling of the type (`i32`), not the
+                    // binder's (`INT`), when the AST has one.
+                    var spelled = ResolveLocalValueTypeFromAst(target) is { } ast
+                                  && ast != UnknownLocalTypeSentinel
+                        ? ast
+                        : valueType;
+                    _context.Invocations?.ReportNotAFunction(
+                        _context.CurrentFunctionId,
+                        span,
+                        $"'{target}' has type '{spelled}', which is not a function type, so "
+                        + "invoking it cannot be charged to any effect row. Calor0418 is reported "
+                        + "only for a value that is provably not a function; a function-typed value "
+                        + "is charged through its effect row.");
+                    return EffectSet.Empty;
+                }
+
+                return ChargeInvokedRow($"'{target}'", invoked.Value, span);
             }
 
             // A bare public function exported by another module of the same
@@ -2609,9 +2752,9 @@ public sealed class EffectEnforcementPass
                     span,
                     DiagnosticCode.UnknownExternalCall,
                     $"Unknown call target '{target}': not an internal function, parameter, binding, or field " +
-                    "visible to the effect pass. If this is a delegate-typed member, delegate invocation is " +
-                    "disallowed under enforcement (Calor0418); otherwise add the callee to a " +
-                    ".calor-effects.json manifest.",
+                    "visible to the effect pass. If this is a delegate-typed member, declare it where this " +
+                    "module can see it with an effect row (§E{…} on the same line as its type); otherwise " +
+                    "add the callee to a .calor-effects.json manifest.",
                     unknownSeverity);
             }
             else if (_context.Policy == UnknownCallPolicy.Warn)
@@ -2623,6 +2766,361 @@ public sealed class EffectEnforcementPass
                     DiagnosticSeverity.Warning);
             }
             return EffectSet.Unknown;
+        }
+
+        /// <summary>
+        /// v0.15 E4 — the row of a VALUE about to be invoked, with the sentence
+        /// a Calor0425 would quote if that row is Unknown; or <c>null</c> when the
+        /// value's type is PROVABLY not a function type (the residual Calor0418).
+        ///
+        /// <para>Resolution order is the declaration that put the name in scope —
+        /// the same lexical order <see cref="ResolveLocalValueTypeFromAst"/> uses,
+        /// so the row and the type come from the same declaration:</para>
+        /// <list type="number">
+        /// <item>a parameter of the current callable — its <c>§E</c> suffix row,
+        /// variables included (§3.3 positions 4/5);</item>
+        /// <item>a <c>§B</c> in the body — its own row, else the initializer's:
+        /// a <c>§LAM</c>'s declared row or ρ_body (§3.5, §5), a call to an
+        /// in-module function's declared RETURN row (position 6), another
+        /// in-scope value's row (aliasing);</item>
+        /// <item>a field of the owning class — its row (position 8);</item>
+        /// <item>anything else the type string alone can vouch for.</item>
+        /// </list>
+        /// <para>A position that IS function-typed but carries no row is
+        /// <c>Unknown</c> (§3.5's fourth row), never pure. Function-typedness is
+        /// asked of the bound <c>FunctionBoundType</c> first and the type string
+        /// second, the same order <c>RowSiteChecker.IsParameterFunctionTyped</c>
+        /// uses — so a <c>§CSHARP</c>-declared delegate (the A2 shape) is a
+        /// function value here exactly when it is a site there. A position whose
+        /// type is not provably EITHER way — an external nominal type the binder
+        /// does not know — is <c>Unknown</c> too: "cannot tell" is the honest
+        /// answer, and fails closed through the same Calor0425.</para>
+        /// </summary>
+        private (PolyRow Row, string Why)? ResolveInvokedValueRow(string name, string valueType, TextSpan reference)
+        {
+            _context.Functions.TryGetValue(_context.CurrentFunctionId, out var function);
+            var ownerName = function?.Name ?? _context.CurrentFunctionId;
+
+            if (function != null)
+            {
+                // v0.15 E4 (review round 1, F2): the reference is resolved to its
+                // BOUND declaration, not to the first `§B` of that name. Two
+                // sibling branches can each bind `f`; the binder knows which one
+                // this `§C{f}` names (`BoundCallStatement.ReceiverSymbol` /
+                // `BoundVariableExpression.Variable`, via `_scope.LookupAll`), and
+                // CallGraphAnalysis records that declaration's span per reference.
+                var declaration = _context.CallGraph.BoundValueDeclaration(_context.CurrentFunctionId, reference);
+                var bindings = CollectLocalBindings(name, function.Body);
+                var parameter = function.Parameters.FirstOrDefault(
+                    p => p.Name.Equals(name, StringComparison.Ordinal));
+
+                BindStatementNode? bind = null;
+                var ambiguous = false;
+                if (declaration is { } declared)
+                {
+                    bind = bindings.FirstOrDefault(b => b.Span.Start <= declared.Start && declared.Start <= b.Span.End)
+                        ?? bindings.FirstOrDefault(b => b.Span.Start == declared.Start);
+                    // A resolved declaration that is not any `§B` is the parameter
+                    // (its span is in the signature) or a field; fall through.
+                }
+                else
+                {
+                    // Binding threw, or the reference was not recorded: the
+                    // name-keyed answer is used only where it is UNAMBIGUOUS.
+                    // More than one candidate — two same-named `§B`s, or a `§B`
+                    // shadowing a parameter — fails CLOSED as Unknown.
+                    var candidates = bindings.Count + (parameter != null ? 1 : 0);
+                    if (candidates > 1)
+                        ambiguous = true;
+                    else if (bindings.Count == 1)
+                        bind = bindings[0];
+                }
+
+                if (ambiguous)
+                {
+                    return (PolyRow.Unknown,
+                        $"more than one declaration named '{name}' is visible in '{ownerName}' and the "
+                        + "binder did not resolve this reference to one of them");
+                }
+
+                if (bind != null)
+                {
+                    if (bind.Row != null)
+                        return (PolyRow.From(bind.Row), string.Empty);
+
+                    if (InitializerRow(bind, ownerName) is { } fromInitializer)
+                        return fromInitializer;
+
+                    var functionTyped =
+                        _context.CallGraph.DeclaredLocalFunctionType(_context.CurrentFunctionId, name, bind.Span) != null
+                        || IsFunctionTypeName(bind.TypeName ?? valueType);
+                    if (!functionTyped && TypeIdentity.IsProvablyNonFunctionType(bind.TypeName ?? valueType))
+                        return null;
+
+                    return (PolyRow.Unknown,
+                        $"binding '{name}' in '{ownerName}' carries no effect row and its "
+                        + "initializer's row cannot be determined");
+                }
+
+                if (parameter != null)
+                {
+                    if (parameter.Row != null)
+                        return (PolyRow.From(parameter.Row), string.Empty);
+
+                    var functionTyped =
+                        _context.CallGraph.DeclaredFunctionTypes(_context.CurrentFunctionId)
+                            .GetValueOrDefault(name) != null
+                        || IsFunctionTypeName(parameter.TypeName);
+                    if (!functionTyped && TypeIdentity.IsProvablyNonFunctionType(parameter.TypeName))
+                        return null;
+
+                    return (PolyRow.Unknown,
+                        $"parameter '{name}' of '{ownerName}' (type '{parameter.TypeName}') carries "
+                        + "no effect row");
+                }
+            }
+
+            var field = _context.OwnerClass?.Fields.FirstOrDefault(
+                f => f.Name.Equals(name, StringComparison.Ordinal));
+            if (field != null)
+            {
+                if (field.Row != null)
+                    return (PolyRow.From(field.Row), string.Empty);
+
+                var functionTyped =
+                    _context.CallGraph.DeclaredFieldFunctionType(_context.OwnerClass!.Name, name) != null
+                    || IsFunctionTypeName(field.TypeName);
+                if (!functionTyped && TypeIdentity.IsProvablyNonFunctionType(field.TypeName))
+                    return null;
+
+                return (PolyRow.Unknown,
+                    $"field '{name}' of '{_context.OwnerClass.Name}' (type '{field.TypeName}') "
+                    + "carries no effect row");
+            }
+
+            // A §FE variable, a §USING binding, or a value the side channel typed:
+            // no row can be written at these positions in 0.15, so a function
+            // type here is Unknown and a provable non-function is the residual.
+            if (!IsFunctionValued(name, valueType) && TypeIdentity.IsProvablyNonFunctionType(valueType))
+                return null;
+
+            return (PolyRow.Unknown,
+                $"'{name}' in '{ownerName}' (type '{valueType}') is declared at a position that "
+                + "carries no effect row");
+        }
+
+        /// <summary>The row a row-less <c>§B</c> INHERITS from its initializer
+        /// (§3.5), or <c>null</c> when the initializer is not something this pass
+        /// can read a row off.</summary>
+        private (PolyRow Row, string Why)? InitializerRow(BindStatementNode bind, string ownerName)
+        {
+            switch (bind.Initializer)
+            {
+                case LambdaExpressionNode lambda:
+                    // §5 — the §LAM's own §E is its row; with none, ρ_body, which
+                    // this same walk recorded when it inferred the initializer.
+                    return lambda.Effects != null
+                        ? (PolyRow.From(lambda.Effects), string.Empty)
+                        : (_context.LambdaBodyRow?.Invoke(lambda) ?? PolyRow.Unknown,
+                            $"the lambda bound to '{bind.Name}' in '{ownerName}' has no "
+                            + "determinable body row");
+
+                case CallExpressionNode call:
+                    return ReturnedValueRow(call.Target, call.Span, bind.Name, ownerName);
+
+                case ReferenceNode reference when !reference.Name.Contains('.')
+                                                   && !reference.Name.Equals(bind.Name, StringComparison.Ordinal):
+                {
+                    // `§B{g} f` — an alias of another value in scope. Bounded to
+                    // one hop: a chain of aliases is rare and a second hop is
+                    // Unknown rather than a loop.
+                    var aliasType = ResolveLocalValueType(reference.Name);
+                    if (aliasType != null && aliasType != UnknownLocalTypeSentinel)
+                    {
+                        var aliased = ResolveInvokedValueRowDirect(reference.Name, reference.Span);
+                        if (aliased != null)
+                            return aliased;
+                    }
+
+                    var internalFunc = FindInternalFunctionByName(reference.Name);
+                    if (internalFunc != null)
+                    {
+                        // A method group. Its row is its declared §E; effect-
+                        // polymorphic declarations are rank-2 as values (§7.3) and
+                        // are Unknown here, as they are at the six sites.
+                        var declared = PolyRow.FromDeclaration(internalFunc.Effects);
+                        return internalFunc.EffectParameters.Count > 0 || declared.IsPolymorphic
+                            ? (PolyRow.Unknown,
+                                $"'{internalFunc.Name}' is effect-polymorphic and its row cannot be "
+                                + "read as a value")
+                            : (declared, string.Empty);
+                    }
+
+                    return null;
+                }
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>One alias hop of <see cref="ResolveInvokedValueRow"/> — the
+        /// same lookup, minus the alias arm, so `§B{g} f` cannot recurse.</summary>
+        private (PolyRow Row, string Why)? ResolveInvokedValueRowDirect(string name, TextSpan reference)
+        {
+            _context.Functions.TryGetValue(_context.CurrentFunctionId, out var function);
+            if (function != null)
+            {
+                var bindings = CollectLocalBindings(name, function.Body);
+                var declaration = _context.CallGraph.BoundValueDeclaration(_context.CurrentFunctionId, reference);
+                var bind = declaration is { } declared
+                    ? bindings.FirstOrDefault(b => b.Span.Start <= declared.Start && declared.Start <= b.Span.End)
+                    : bindings.Count == 1 ? bindings[0] : null;
+
+                if (bind == null)
+                {
+                    foreach (var parameter in function.Parameters)
+                    {
+                        if (parameter.Name.Equals(name, StringComparison.Ordinal))
+                            return parameter.Row != null
+                                ? (PolyRow.From(parameter.Row), string.Empty)
+                                : null;
+                    }
+                }
+
+                if (bind?.Row != null)
+                    return (PolyRow.From(bind.Row), string.Empty);
+                if (bind?.Initializer is LambdaExpressionNode lambda)
+                    return lambda.Effects != null
+                        ? (PolyRow.From(lambda.Effects), string.Empty)
+                        : (_context.LambdaBodyRow?.Invoke(lambda) ?? PolyRow.Unknown, string.Empty);
+            }
+
+            var field = _context.OwnerClass?.Fields.FirstOrDefault(
+                f => f.Name.Equals(name, StringComparison.Ordinal));
+            return field?.Row != null ? (PolyRow.From(field.Row), string.Empty) : null;
+        }
+
+        /// <summary>
+        /// The row of the value a CALL returns, for `§B{f} §C{GetF} §/C` and for
+        /// the immediate `§C §C{GetF} §/C §/C` spelling: an in-module callee's
+        /// declared return row (§3.3 position 6), Unknown when the return
+        /// carries none or the callee is not visible to this pass.
+        /// </summary>
+        private (PolyRow Row, string Why) ReturnedValueRow(
+            string target, TextSpan span, string? boundName, string ownerName)
+        {
+            var subject = boundName != null
+                ? $"binding '{boundName}' in '{ownerName}' takes its row from '{target}', which "
+                : $"'{target}' ";
+
+            var ids = _context.CallGraph.ResolveCallSites(_context.CurrentFunctionId, target, span);
+            FunctionNode? callee = null;
+            if (ids.Count == 1 && _context.Functions.TryGetValue(ids[0], out var resolved))
+                callee = resolved;
+            callee ??= target.Contains('.') ? null : FindInternalFunctionByName(target);
+
+            if (callee == null)
+                return (PolyRow.Unknown, $"{subject}is not visible to the effect pass");
+
+            if (callee.Output?.Row != null)
+                return (PolyRow.From(callee.Output.Row), string.Empty);
+
+            return (PolyRow.Unknown, $"{subject}returns a function type with no effect row");
+        }
+
+        /// <summary>EVERY <c>§B</c> of that name in lexical order, not descending
+        /// into a <c>§LAM</c> (its bindings are the lambda's). The caller picks
+        /// the one the binder resolved a reference to, or fails closed when it
+        /// cannot tell (F2).</summary>
+        private static List<BindStatementNode> CollectLocalBindings(string name, IEnumerable<StatementNode> statements)
+        {
+            var found = new List<BindStatementNode>();
+            foreach (var statement in statements)
+                CollectLocalBindings(name, statement, found);
+            return found;
+        }
+
+        private static void CollectLocalBindings(string name, AstNode node, List<BindStatementNode> found)
+        {
+            if (node is LambdaExpressionNode)
+                return;
+            if (node is BindStatementNode bind && bind.Name.Equals(name, StringComparison.Ordinal))
+                found.Add(bind);
+
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                CollectLocalBindings(name, child, found);
+        }
+
+        /// <summary>
+        /// v0.15 E4 — the verdict at an invocation, read off §4.3 with no
+        /// destination: the invoked value's row IS what the caller performs.
+        /// Returns what is charged; reports through
+        /// <see cref="InvocationSink"/> what is not. See that class for the
+        /// three cells.
+        /// </summary>
+        private EffectSet ChargeInvokedRow(string description, (PolyRow Row, string Why) invoked, TextSpan span)
+        {
+            var functionId = _context.CurrentFunctionId;
+            _context.Functions.TryGetValue(functionId, out var function);
+            var owner = function?.Name ?? functionId;
+            var (row, why) = invoked;
+
+            // A variable the row mentions is the caller's own binder or nothing:
+            // a parameter row can only name its declaration's `eff` list
+            // (Calor0404 at the parser), so this is a totality guard, not a path
+            // a program reaches.
+            if (row.IsPolymorphic && function != null)
+            {
+                foreach (var (ordinal, variable) in row.Variables)
+                {
+                    if (ordinal >= 0 && ordinal < function.EffectParameters.Count)
+                        continue;
+                    _context.Invocations?.ReportUndeclaredEffectVariable(
+                        functionId,
+                        function.Effects?.Span ?? function.Span,
+                        $"Function '{owner}' uses effect variable '{variable}' but does not declare "
+                        + $"it\n  Effect row: charged by invoking {description} (row: {row.Display()})");
+                }
+            }
+
+            if (row.Row.IsUnknown)
+            {
+                _context.Invocations?.ReportRowUnknown(
+                    functionId,
+                    span,
+                    $"Invocation of {description} in '{owner}' cannot be charged: its effect row is "
+                    + $"Unknown ({why}). Add §E{{…}} on the same line as the type to state what "
+                    + $"{description} may do, or compile with --permissive-effects. '{owner}' is "
+                    + "charged Unknown.");
+                return _context.Policy == UnknownCallPolicy.Permissive
+                    ? EffectSet.Empty
+                    : EffectSet.Unknown;
+            }
+
+            var charged = row.Row.ToEffectSet();
+            foreach (var (kind, value) in charged.Effects)
+            {
+                _context.Invocations?.RecordProvenance(
+                    functionId,
+                    EffectSetExtensions.ToSurfaceCode(kind, value),
+                    $"charged by invoking {description} (row: {row.Display()})");
+            }
+
+            if (row.Row.IsAssumed && !row.Row.Reasons.IsEmpty)
+            {
+                var reasons = row.Row.Reasons;
+                var shown = string.Join("; ", reasons.Take(3));
+                if (reasons.Count > 3)
+                    shown += $"; and {reasons.Count - 3} more";
+                _context.Invocations?.ReportRowUnknown(
+                    functionId,
+                    span,
+                    $"Invocation of {description} in '{owner}' is charged {row.Display()} under an "
+                    + $"assumption: {shown}. The row is charged as an assumption, not a proof.");
+            }
+
+            return charged;
         }
 
         private bool IsProvenInternalDottedTarget(string target)
@@ -2834,7 +3332,8 @@ public sealed class EffectEnforcementPass
         /// <para>Receivers only, in the sense of what is COLLECTED: a name that
         /// is never a receiver anywhere in this function is absent here and
         /// resolves through the AST as before — the string this pass gets back
-        /// is quoted verbatim in Calor0418's message, so the source spelling has
+        /// is quoted verbatim in the invocation diagnostics' messages (E4's
+        /// Calor0425 and the residual Calor0418), so the source spelling has
         /// to survive.</para>
         ///
         /// <para><b>But the map is keyed by name, not by position</b> (review
@@ -3365,7 +3864,9 @@ public sealed class EffectEnforcementPass
         /// <para>The structural half answers for a receiver the side channel
         /// carries (<c>f.Invoke</c> where <c>f</c> is a lambda or a <c>§DEL</c>
         /// value); a bare call target is not a receiver, so that site reduces to
-        /// the string test today — which is what keeps Calor0418 byte-stable.
+        /// the string test today — E4's invocation charge asks the declared
+        /// <c>FunctionBoundType</c> (<see cref="CallGraphAnalysis.DeclaredFunctionTypes"/>)
+        /// alongside it, so a §CSHARP-declared delegate is a function value there.
         /// </para>
         private bool IsFunctionValued(string name, string typeName) =>
             IsFunctionBoundType(BoundValueTypes.GetValueOrDefault(name))
@@ -4207,34 +4708,47 @@ public sealed class EffectEnforcementPass
                 case ReferenceNode reference:
                     // `§C f §A x §/C` is the same call as `§C{f} §A x §/C` —
                     // route through the full named-target resolution (value →
-                    // Calor0418; internal function → its effects; free name →
-                    // unknown chain).
-                    return InferFromCallTarget(reference.Name, call.Span, call.Arguments).Union(argEffects);
+                    // its row is charged, E4; internal function → its effects;
+                    // free name → unknown chain).
+                    return InferFromCallTarget(reference.Name, call.Span, call.Arguments, reference.Span)
+                        .Union(argEffects);
 
                 case LambdaExpressionNode lambda:
                     // Immediately-invoked lambda literal: the body IS the callee,
                     // so its effects are fully charged — no delegate opacity.
                     return InferFromLambda(lambda).Union(argEffects);
 
-                case CallExpressionNode or ExpressionCallNode:
+                case CallExpressionNode inner:
                 {
-                    // Invoking the RESULT of a call (`GetF()()`): the invoked
-                    // thing is a delegate value — Calor0418, same rule as a
-                    // named delegate invocation (waived to a warning only under
-                    // --permissive-effects).
-                    var severity = _context.Policy == UnknownCallPolicy.Permissive
-                        ? DiagnosticSeverity.Warning
-                        : DiagnosticSeverity.Error;
-                    _context.Diagnostics.Report(
-                        call.Span,
-                        DiagnosticCode.DelegateInvocation,
-                        "Invocation of a returned delegate value is an error under effect enforcement: " +
-                        "function-typed values carry no effect contract, so the call cannot be charged. " +
-                        "Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or " +
-                        "compile with --permissive-effects (an explicit waiver).",
-                        severity);
-                    return InferFromExpression(call.TargetExpression).Union(argEffects);
+                    // v0.15 E4 — invoking the RESULT of a call (`GetF()()`): the
+                    // invoked thing is a function value whose row is the
+                    // callee's declared RETURN row (§3.3 position 6), Unknown
+                    // when the return carries none or the callee is not visible.
+                    // The producing call is charged as before; the invocation is
+                    // charged through the row, the same rule as a named value.
+                    _context.Functions.TryGetValue(_context.CurrentFunctionId, out var owner);
+                    var returned = ReturnedValueRow(
+                        inner.Target, inner.Span, boundName: null,
+                        owner?.Name ?? _context.CurrentFunctionId);
+                    return InferFromExpression(call.TargetExpression)
+                        .Union(ChargeInvokedRow(
+                            $"the value returned by '{inner.Target}'", returned, call.Span))
+                        .Union(argEffects);
                 }
+
+                case ExpressionCallNode:
+                    // `§C §C f §/C §/C` — the result of an expression-call whose
+                    // own target is not a named function; nothing declares the
+                    // returned value's row, so it is Unknown (P17: never
+                    // Concrete by default).
+                    return InferFromExpression(call.TargetExpression)
+                        .Union(ChargeInvokedRow(
+                            "the value returned by an expression call",
+                            (PolyRow.Unknown,
+                                "the callee is an expression, not a declaration this pass can read a "
+                                + "return row from"),
+                            call.Span))
+                        .Union(argEffects);
 
                 default:
                     // Other expression-valued targets (e.g. method call on a new

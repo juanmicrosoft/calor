@@ -170,5 +170,4 @@ CASE Y9a-B-untyped-lambda-then-invoke-permissive  args: --permissive-effects  ex
     §R §C{f} §A INT:1 §/C
 ------------------------------------------------------------------------------
 Compilation successful: Y9a-B-untyped-lambda-then-invoke-permissive.g.cs
-Y9a-B-untyped-lambda-then-invoke-permissive.calr(5,8): warning Calor0418: Invocation of function-typed value 'f' (type 'Func<>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).
 
