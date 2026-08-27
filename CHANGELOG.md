@@ -21,8 +21,9 @@ All notable changes to this project will be documented in this file.
   thing the compiler can say, and it never counts as a yes.
 
   ~~**Mismatches are still not reported.**~~ They are now — see the next entry.
-  All 886 Calor files in this repository compile to byte-for-byte the same result
-  as before this change.
+  All 886 Calor files in this repository still emit the same C# as before. One of
+  them picks up a new warning (Calor0425, below); none changes whether it
+  compiles.
 
 - **Now the compiler tells you when a callback doesn't fit.** If you pass a
   callback that prints to something that promised not to print, that is an error:

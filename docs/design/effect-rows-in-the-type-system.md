@@ -640,6 +640,39 @@ exactly one job — waiving "we cannot tell". A waiver for *we do not know* is h
 *we know it is wrong* is not. Release notes carry it; §13.4 makes it a checked artifact rather
 than a promise.
 
+> **A residual §4.5 leaves open, recorded by E3a review round 1 (F15).** An **Unknown** source
+> entering a **declared** row is admitted on the author's say-so after exactly one Calor0425, and
+> the declaration then governs every later hop. Executed, at the E3a branch head:
+>
+> ```
+> §F{f002:Main:pub} (Func<i32,i32>:opaque) -> i32     ← no row: Unknown
+>   §E{cw}
+>   §B{g:Func<i32,i32>} §E{cw} opaque                  ← hop 1: CannotTell → ONE Calor0425
+>   §R §C{Apply} §A g §A INT:1 §/C                     ← hop 2: Concrete(cw) vs Concrete(cw) → SILENT
+> ```
+>
+> ```
+> f15.calr(7,25): warning Calor0425: Initializer of binding 'g' has effect row [unknown] and
+> binding 'g' declares row cw, so it cannot be decided whether the row fits. …
+> Compilation successful
+> ```
+>
+> That is §4.4 working as specified — `AtDestination` gives the binding its DECLARED row, and
+> §4.4's note says the Calor0425 at the `CannotTell` hop is where the provenance is surfaced, so
+> nothing is lost. But two consequences follow and neither was stated:
+>
+> 1. **The declaration launders an Unknown into a Concrete after one warning.** It is not the
+>    two-hop laundering M5 closes — that one was silent — but it is a one-hop *annotation*
+>    laundering, and its only guard is a warning.
+> 2. **`--permissive-effects` silences the whole chain**, because it silences the single
+>    Calor0425 that guards it. §4.5's claim that the waiver is "honest" rests on the assumption
+>    being visible somewhere; here, under the flag, it is visible nowhere.
+>
+> This is **not** a defect in slice a — it is the specified behaviour of §4.4 plus §4.5 — and it
+> is left open rather than fixed, because closing it means deciding whether an author may assert a
+> row over an Unknown at all, which is a design question and not an implementation one. E4 owns
+> the answer, since E4 is where an Unknown row starts costing something at every invocation.
+
 **Is Calor0424 defeatable by deleting the source's `§E`?** No, and the reason is the composition.
 Deleting `§E{cw}` from an in-module source makes its declared row pure, so it would fit — but its
 *body* still prints, so Calor0410 rejects the source itself (`EEP:377`). Soundness is
@@ -2248,7 +2281,7 @@ and it needs its own justification in the E2 PR body.**
 >
 > | Case | Obligation | Result |
 > |---|---|---|
-> | `facts.py` `IsSubsetOf` sweep | **#7** | **as predicted, and it is the slice's headline claim moving a pinned fact.** `EffectEnforcementPass.cs:533` and `:571` and `CrossModuleEffectEnforcementPass.cs:162` all **vanish** into `EffectRow.Fits`; `:377` → `:384`. One deviation from the spike's forecast: it expected "five `EffectSet.cs` lines appear instead" — **one** does. The prototype re-expressed `fits` over `EffectSet`; the shipping relation calls its own element test (`EffectRow.Encompasses`), so `EffectSet.IsSubsetOf` gains no caller |
+> | `facts.py` `IsSubsetOf` sweep | **#7** | **as predicted, and it is the slice's headline claim moving a pinned fact.** `EffectEnforcementPass.cs:533` and `:571` and `CrossModuleEffectEnforcementPass.cs:162` all **vanish** into `EffectRow.Fits`; `:377` → `:384`. One deviation from the spike's forecast: it expected "five `EffectSet.cs` lines appear instead" — **none** does. `EffectSet.cs:97` is in both transcripts as `IsSubsetOf`'s own DEFINITION, which was baseline context and not a new caller (review round 1, F12). The prototype re-expressed `fits` over `EffectSet`; the shipping relation calls its own element test (`EffectRow.Encompasses`), so `EffectSet.IsSubsetOf` gains no caller |
 > | `run.py` **X11-E3** | — | `Compilation successful` gains **one Calor0425** at the argument. **This is E-3, the silent-laundering case, becoming audible.** The transcript is where the design's central claim is now observable |
 > | `run2.py` **Y3a-B** | — | site 1, new Calor0425 |
 > | `run2.py` **Y4a-O** | — | site 3, new Calor0425 |
