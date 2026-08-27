@@ -296,7 +296,12 @@ public sealed class EffectEnforcementPass
             }
             else
             {
-                kind = _ownerClassByFunctionId.ContainsKey(function.Id) ? "method" : "function";
+                // Member ids are class-qualified (`Cls.m001`, `Cls.p001.get`); a
+                // getter with a body is a member too, though it is registered in
+                // no owner map (it has no implicit contract to check).
+                kind = _ownerClassByFunctionId.ContainsKey(function.Id) || function.Id.Contains('.')
+                    ? "method"
+                    : "function";
                 mismatchCode = DiagnosticCode.ForbiddenEffect;
                 declaredSet = GetDeclaredEffects(function);
                 hasDeclaration = function.Effects != null;
