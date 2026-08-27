@@ -1,5 +1,5 @@
 {
-  "note": "Ground truth for the index/query gate (roadmap §2.5 gate 3), authored by reading project/*.calr — NOT recorded from the implementation's output. Results are 'file:line:name' for the declaration, sorted ordinal. 'partial' is true when the residual could change what the answer means.",
+  "note": "Ground truth for the index/query gate (roadmap §2.5 gate 3), authored by reading project/*.calr — NOT recorded from the implementation's output. Results are 'file:line:name' for the declaration, sorted ordinal. 'partial' is true when the residual could change what the answer means. v0.15 E5: 'effects' answers are 'file:line:name:written=…;declared=…;inferred=…;verdict=…;code=…;undeclared=…' for the declaration (written = whether a §E was actually written; an omitted one is pure) and 'file:line:name:position=…;declared=…;bound=…' for a rowed parameter/return; 'impact-effects' takes a hypothetical 'row' (comma-separated codes, empty = pure) and answers 'file:line:name:verdict' over the impact closure.",
   "queries": [
     {
       "why": "A single declaration, found by name.",
@@ -158,6 +158,127 @@
       "inFile": "contracts.calr",
       "expect": [
         "contracts.calr:2:module"
+      ],
+      "partial": false
+    },
+    {
+      "why": "The effects facet's discriminating case (gate 7). Leaky WRITES §E{} — an explicit promise of purity (written=true, declared [pure]) — but calls Log, which prints. The index must say the body does NOT fit the declaration, that Calor0410 fires, and that cw is the undeclared effect. A facet that copied the declared row into the inferred one, or one built from the declaration text alone, answers 'fits' here; a facet that inferred without the callee's effects answers '[pure]'. (Quiet, below, is the OTHER pure case: no §E written at all.)",
+      "facet": "effects",
+      "name": "Leaky",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:11:Leaky:written=true;declared=[pure];inferred=cw;verdict=does-not-fit;code=Calor0410;undeclared=cw"
+      ],
+      "partial": false
+    },
+    {
+      "why": "A declaration whose body does exactly what it declares: §P charges cw, §E{cw} covers it, nothing fires.",
+      "facet": "effects",
+      "name": "Log",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:8:Log:written=true;declared=cw;inferred=cw;verdict=fits;code=none;undeclared="
+      ],
+      "partial": false
+    },
+    {
+      "why": "No §E at all means pure, not unknown (design §3.5): Quiet's declared row is [pure] with written=false — distinguishable from Leaky's explicit §E{} — its body is pure, and it fits. An index that recorded an omitted declaration row as [unknown] would answer cannot-tell.",
+      "facet": "effects",
+      "name": "Quiet",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:20:Quiet:written=false;declared=[pure];inferred=[pure];verdict=fits;code=none;undeclared="
+      ],
+      "partial": false
+    },
+    {
+      "why": "A call that resolves to nothing charges an unknown effect. The inferred row is [unknown], the verdict is cannot-tell — and, because enforcement fails closed, Calor0410 still fires naming 'unknown'. Answering fits or does-not-fit here invents knowledge; answering cannot-tell WITHOUT the code hides that the build fails. The answer is partial because the unresolved call sits inside the subject.",
+      "facet": "effects",
+      "name": "AsksMissing",
+      "inFile": "asks-across.calr",
+      "expect": [
+        "asks-across.calr:5:AsksMissing:written=true;declared=[pure];inferred=[unknown];verdict=cannot-tell;code=Calor0410;undeclared=unknown"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Cross-module: Run calls Scale, declared in another file. The per-module pass charges nothing for that call; the index folds Scale's DECLARED row in through the cross-module pass's own resolution (design §8.5, one producer). Scale is pure, so Run infers [pure] and fits — the answer `calor build` gives. An index that treated the cross-file call as unknown would answer cannot-tell.",
+      "facet": "effects",
+      "name": "Run",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:2:Run:written=true;declared=[pure];inferred=[pure];verdict=fits;code=none;undeclared="
+      ],
+      "partial": false
+    },
+    {
+      "why": "Effect-change blast radius over the impact closure (design §8.6). If Log's row became fs:w, every transitive caller — Leaky and Relay directly, Fan through Relay — declares a row fs:w does not fit. A facet that looked only at direct callers misses Fan; one that compared against the callers' INFERRED rows instead of their DECLARED ones would still say Relay and Fan fit. Partial for the reason every impact answer is: an unresolved call anywhere might have reached the change.",
+      "facet": "impact-effects",
+      "name": "Log",
+      "inFile": "app.calr",
+      "row": "fs:w",
+      "expect": [
+        "app.calr:17:Fan:does-not-fit",
+        "app.calr:11:Leaky:does-not-fit",
+        "app.calr:14:Relay:does-not-fit"
+      ],
+      "partial": true
+    },
+    {
+      "why": "The same closure with Log's current row, cw: only Leaky, which declares nothing, stops fitting; Relay and Fan declare cw. This pair separates 'which callers exist' (three, both times) from 'which callers would break' (three, then one).",
+      "facet": "impact-effects",
+      "name": "Log",
+      "inFile": "app.calr",
+      "row": "cw",
+      "expect": [
+        "app.calr:17:Fan:fits",
+        "app.calr:11:Leaky:does-not-fit",
+        "app.calr:14:Relay:fits"
+      ],
+      "partial": true
+    },
+    {
+      "why": "A pure hypothetical row fits every caller: narrowing a callee's row never breaks a caller (fits is a subset relation, and the empty set is a subset of everything).",
+      "facet": "impact-effects",
+      "name": "Log",
+      "inFile": "app.calr",
+      "row": "",
+      "expect": [
+        "app.calr:17:Fan:fits",
+        "app.calr:11:Leaky:fits",
+        "app.calr:14:Relay:fits"
+      ],
+      "partial": true
+    },
+    {
+      "why": "The cross-module FOLD, observed (review round 1, #1). Whisper writes §E{} and calls Shout, declared §E{cw} in ANOTHER file (contracts.calr). The per-module pass charges nothing for a cross-file call; the index folds Shout's DECLARED row in through the cross-module pass's own resolution, so Whisper infers cw, does not fit, and Calor0410 names cw — exactly what `calor build` reports for the pair. Delete the fold (`if (false && crossCharges …)` in ProjectIndexBuilder.ToDeclarationRow) and this answers 'inferred=[pure];verdict=fits' — the Run golden could not see that, because Scale is pure and folding pure changes nothing. Not partial: Shout resolves uniquely across the project.",
+      "facet": "effects",
+      "name": "Whisper",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:22:Whisper:written=true;declared=[pure];inferred=cw;verdict=does-not-fit;code=Calor0410;undeclared=cw"
+      ],
+      "partial": false
+    },
+    {
+      "why": "A rank-1 (effect-polymorphic) body keeps its VARIABLE part (review round 1, #2). Map<eff e> invokes f, whose row is e; the pass's computed EffectSet cannot carry e, so without the pass recording the charged binder the inferred row printed [pure] beside a declared e. The inferred row must read e (ordinal 0, the caller's own binder), the verdict fits, and the parameter position f records declared e with the BOUND row [unknown] — the binder's E2b collapse, in the open. Drop the variable part from the inferred row and this reads 'inferred=[pure]'. Partial: invoking a parameter is not a call the index can resolve to a declaration.",
+      "facet": "effects",
+      "name": "Map",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:25:Map:written=true;declared=e;inferred=e;verdict=fits;code=none;undeclared=",
+        "app.calr:25:f:position=parameter;declared=e;bound=[unknown]"
+      ],
+      "partial": true
+    },
+    {
+      "why": "The OTHER way a body is charged a variable (review round 2, #1): Twice<eff e> never invokes g — it passes g to Map, and Map's `e` instantiates to Twice's `e` at the call (site 6, §7.4). That charge goes through InstantiateAndCharge, not ChargeInvokedRow, so the Map golden cannot see it: remove only the InstantiateAndCharge bookkeeping and Map still reads `inferred=e` while Twice reads `[pure]`. Not partial: the call to Map resolves, and g is an argument here, not an invocation.",
+      "facet": "effects",
+      "name": "Twice",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:28:Twice:written=true;declared=e;inferred=e;verdict=fits;code=none;undeclared=",
+        "app.calr:28:g:position=parameter;declared=e;bound=[unknown]"
       ],
       "partial": false
     }

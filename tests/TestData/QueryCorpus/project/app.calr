@@ -5,3 +5,26 @@
   §F{f002:Unused:pub} () -> i32
     §E{}
     §R INT:0
+  §F{f003:Log:pub} (str:s) -> void
+    §E{cw}
+    §P s
+  §F{f004:Leaky:pub} () -> void
+    §E{}
+    §C{Log} §A STR:"x" §/C
+  §F{f005:Relay:pub} () -> void
+    §E{cw}
+    §C{Log} §A STR:"y" §/C
+  §F{f006:Fan:pub} () -> void
+    §E{cw}
+    §C{Relay} §/C
+  §F{f007:Quiet:pub} () -> i32
+    §R INT:1
+  §F{f008:Whisper:pub} () -> void
+    §E{}
+    §C{Shout} §A STR:"z" §/C
+  §F{f009:Map:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:value) -> i32
+    §E{e}
+    §R §C{f} §A value §/C
+  §F{f010:Twice:pub}<eff e> (Func<i32,i32>:g §E{e}, i32:v) -> i32
+    §E{e}
+    §R §C{Map} §A g §A v §/C

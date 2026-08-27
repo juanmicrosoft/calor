@@ -322,7 +322,11 @@ Measured corpus impact of the rule (`git ls-files '*.calr'`, regex over all 886 
 | `§FLD{…} §E{…}` same line | **0** | 0 | new syntax — does not parse today (**X9b**) |
 
 **Zero corpus occurrences of any form whose meaning changes.** This is the "zero regressions"
-claim, executed rather than asserted. It is still a **breaking change to a form that parses
+claim, executed rather than asserted. *(E5, 2026-08-27: one committed file now writes a same-line
+parameter row — `tests/TestData/QueryCorpus/project/app.calr`, AUTHORED under Decision 1 for gate
+7's polymorphic golden. It is not a regression of the claim, which is about files written before
+the rule; `EffectRowCorpusShapeTests` carries it on an explicit, reasoned allowlist rather than
+widening the sweep.)* It is still a **breaking change to a form that parses
 today** (Y1b, X2b, Y5a all compile now and would mean something else), and the release notes must
 say so; it is not a change to any form anybody has written.
 
@@ -1720,6 +1724,27 @@ between them, and the assumption reasons when the row is `Assumed`. `QueryGolden
 throws on an unknown facet, so the E5 PR must add the arm or its golden cannot land.
 Blast radius reuses `impact`'s transitive-caller closure (`ProjectIndex.cs:372-408`) unchanged.
 
+> **EXECUTED — v0.15 E5** (`docs/plans/2026-08-27-v0.15-e5-notes.md`). The facet is
+> `ProjectIndex.EffectRows` — one `IndexedEffectRow` per declaration (function, method,
+> constructor, accessor) and per rowed parameter/return position, keyed by symbol id. The
+> declaration-level fact is a projection of the enforcement pass's own result: a new phase 5
+> (`EffectEnforcementPass.ProjectDeclarationFacts` → `DeclarationFacts`, keyed by the pass's
+> structural function id) records the declared row, the inferred row (Concrete / Assumed with
+> the D-W2.3 reasons / Unknown), the verdict phase 4 reached, the code it reports, and the
+> undeclared codes. Cross-module callees are folded in through the cross-module pass's own
+> resolution (`CrossModuleEffectEnforcementPass.ResolveCrossModuleEffects`, a projection of
+> `CheckCaller`), on the same `EffectRow.Fits` — so `calor query effects Run` says what
+> `calor build` says. Nothing re-infers. `calor query effects <name>` prints declared /
+> inferred / verdict (with the code and the undeclared codes) and the assumption reasons
+> when Assumed, then the position rows the declaration owns; `--json` wraps the same rows in
+> the v1.1 envelope. `calor query impact <name> --effects [--row cw,fs:w]` joins the
+> unchanged closure with the verdict of fitting the hypothetical row into each affected
+> caller's DECLARED row. Two things this section did not foresee: the index recorded call
+> edges for call EXPRESSIONS only, so `callers`/`impact` were blind to `§C{Log} §A x §/C` on
+> its own line — fixed (statement calls are edges now; occurrences untouched); and the
+> position rows give `FunctionBoundType.Row` its first production reader (`BoundRow`),
+> pinned to agree with the `§E` node wherever the row mentions no `eff` variable.
+
 ---
 
 ## 9. Priced blast radius
@@ -1740,7 +1765,7 @@ Every row measured at `82338e37`; the command is named where it is not a plain `
 | Index / query | **2** | `Indexing/ProjectIndex.cs:145` `"3.0"`→`"4.0"`, `Commands/QueryCommand.cs` |
 | Diagnostics | **1** | `Diagnostics/Diagnostic.cs`: Calor0404, **0405**, 0424, 0425 |
 | Harness + its pin | **2 + 1** | `docs/design/spikes/effect-rows/experiments/` (6 scripts + 6 transcripts + `regenerate-transcripts.py` + `o53/baseline.json`) and `tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs`. **Already landed in this PR** — the evidence base is observed, not merely reproducible |
-| `.calr` goldens under `tests/TestData` | **0** | `grep -rlE 'Func<\|Action<\|Action[}:]\|Predicate<\|§DEL\|§LAM' tests/TestData --include='*.calr'` → **0 of 359**. Draft v1 said "≤8" from a whole-corpus grep |
+| `.calr` goldens under `tests/TestData` | **0** | `grep -rlE 'Func<\|Action<\|Action[}:]\|Predicate<\|§DEL\|§LAM' tests/TestData --include='*.calr'` → **0 of 359**. Draft v1 said "≤8" from a whole-corpus grep. *E5: 1 of 359 — `QueryCorpus/project/app.calr`, authored with a row on purpose (gate 7's polymorphic golden); `facts.txt` records the count as 1* |
 | `.cs` goldens under `tests/TestData` | **0** | 391 exist; rows are erased at codegen — **G-CODEGEN** (§12.2) makes that blocking, not assumed |
 | Conversion snapshots | **0 texts, 0 assertions** | 57 `.calr`; **`Calor.Conversion.Tests` never runs the effect pass** — `TestHelpers.cs:40-70` is Lexer→Parser→`CSharpEmitter`, no binder, no effect pass — so no 0419/0425 assertion exists to move. Draft v1 claimed 2. The **7** snapshots holding function-typed shapes (`05-02`, `05-03`, `07-01`…`07-04`, `13-03`) change diagnostics only where the **demand ledger** compiles them (§13.3) |
 | Committed `.calr` whose meaning changes | **0** | §3.2's table, executed |
@@ -2222,8 +2247,38 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P22 | `MessageTexts` — the four new strings: §10.1's `Effect row: charged by invoking …`, §10.3's two, §6.4's 0424 text. Existing pins assert `Message.Contains`; these assert the **full** new clause | `StrictnessBatchTests.cs` | with E3 | reword any clause |
 | P23 | `BuildStateCacheConstants` — `"4.0"`, `CurrentCompilerSemanticsVersion` **unchanged**, `CurrentOptionsSerializerVersion` unchanged (`BuildStateCache.cs:121-123`) | `Calor.Compiler.Tests/Incremental/` | with E5 | bump the semantics stamp → fails, and G-CODEGEN is contradicted |
 | P24 | `ProjectIndexFormatBumped` — `"4.0"` (`ProjectIndex.cs:145`) when the effects facet lands | same | with E5 | add the facet without the bump → gate 3's index bytes move silently |
-| P25 | `EffectSummaryIsIndexIndependent` — a **fresh-clone `calor build`** with no `obj/calor` present produces a complete summary; plus a structural pin that no `Effects/` or `Incremental/` file references `ProjectIndex` | `Calor.Compiler.Tests/Incremental/` | **before E5** | derive the summary from the index → the fresh-clone build fails |
+| P25 | `EffectSummaryIsIndexIndependent` — a **fresh-clone `calor build`** with no `obj/calor` present produces a complete summary; plus a structural pin that no `Effects/` or `Incremental/` file references `ProjectIndex` | `Calor.Compiler.Tests/Incremental/` | ~~before E5~~ **with E5**. *Disclosed as a late landing by the bound party: P25 was scheduled before E5 and E5 landed it; nothing between E4 and E5 depended on it, and the E5 PR is the first change that could have violated it* | derive the summary from the index → the fresh-clone build fails |
 | P26 | `NoNameKeyedEffectStoreRemains` — grep pin, `EffectSummaryBuilder.cs:68,:75` keys gone | same | with E5 | re-introduce one name key |
+
+> **EXECUTED — v0.15 E5.** Status of every pin this slice owed (all in
+> `tests/Calor.Compiler.Tests/`; there is no `Incremental/` subdirectory — P23's home,
+> `IncrementalCliBuildTests.cs`, is where the four live):
+>
+> | Pin | Status | Test |
+> |---|---|---|
+> | **P23** | **LANDED** — `"4.0"` (the summary's caller entries are keyed by structural id, P26, so `BuildFileEntry.EffectSummary`'s shape changed); semantics stamp `calor-compile-semantics-v1` and options stamp `compile-inputs-v3` frozen | `BuildStateCacheConstants_FormatBumpedByE5_SemanticsAndOptionsFrozen` (renamed from `_AreUnchangedByEffectRows`) |
+> | **P24** | **LANDED** — `"4.0"`, and the facet is asserted to be IN the serialized bytes (`"EffectRows"`, `"Verdict"`, `"EffectRowsUnavailable"`) | `ProjectIndexFormatBumped` |
+> | **P25** | **LANDED**, both legs: a CLI `--cache` build of three files (one cross-module call) in a directory with no `obj/` and no `.calor-index.json` anywhere writes a complete, symbol-keyed summary for every file and creates no index; and every `.cs` under `Effects/` and `Incremental/` is scanned for `\bProjectIndex\w*\b` on any line, comments included | `EffectSummaryIsIndexIndependent`, `EffectsAndIncrementalLayers_DoNotReferenceProjectIndex` |
+> | **P26** | **LANDED**, three legs: reflection (`EffectCallerSummary` has `CallerId` + `DisplayName`, no `CallerName`; `RawCall` has `CallerId`), a source regex over `EffectSummaryBuilder.cs` (groups by `call.CallerId`, never passes `.Name` as `callerId:`), and the behavioural discriminator — two overloads `Box.Run(i32)` / `Box.Run(str)` are TWO caller entries (`Box.m001`, `Box.m002`) with one display name, where the name key made them one | `NoNameKeyedEffectStoreRemains` |
+> | gate 7 | **LANDED** — ten `effects` / `impact-effects` goldens authored from the fixture (`tests/TestData/QueryCorpus/project/app.calr` and `contracts.calr`, extended), every verdict and a firing code exercised (`TheEffectsGoldensExerciseEveryVerdict`, anti-vacuity). Review round 1 added the two that discriminate what the first eight could not: **`Whisper`** (under-declaring caller of an EFFECTFUL cross-file callee — deleting the cross-module fold turns it green-to-red; `Run`'s callee is pure, so folding pure changed nothing) and **`Map<eff e>`** (the inferred row keeps its VARIABLE part; dropping it, in the builder or in the pass's bookkeeping, reads `[pure]`) | `QueryGoldenTests` |
+> | E4's obligation | **half discharged** — `FunctionBoundType.Row` has a production reader (`IndexedEffectRow.BoundRow`), pinned equal to the `§E` node's row wherever no `eff` variable is mentioned and `[unknown]` where one is; the invocation-row span-matching stays registered (roadmap §4.2 E5) | `ProjectIndexTests.BoundPositionRow_AgreesWithTheDeclaredRow_WhereTheBinderDoesNotCollapse` |
+>
+> **No ledger moved.** The effects ground truth was appended to the existing
+> `QueryCorpus/project/app.calr` and `contracts.calr` rather than committed as a new file, so
+> the 886-file corpus §3.2/§9 quote — and `higher-order-demand-ledger.json`,
+> `binder-incomplete-baseline.json`, `effect-resolver-key-ledger.json`,
+> `formatter-corpus-baseline.json` — are byte-identical to main. (A first cut added an 887th
+> file; every one of those instruments went red on the count alone, which is what they are
+> for.) `transcripts/facts.txt`: the `IsSubsetOf` site moved `:401` → `:600` (phase 5's record,
+> fields and variable-charge bookkeeping sit above `CheckEffects`); its count stays two — phase 5
+> uses `Except()`, which is empty exactly when that subset test passes, so P16's structural pin
+> still reads 2. `o53/baseline.json` re-stamped by the regeneration script, as every prior slice
+> did. **The §9 "0 of 359 function-typed `.calr` goldens" moves to 1** (`facts.txt` `count: 0` →
+> `1`; whole-corpus function-typed positions 5 → 7): review round 1 required a rank-1 function IN the golden corpus (`Map<eff e>`, then `Twice<eff e>` in round 2), because
+> the in-process pin had hidden that the inferred row lost its variable part. §3.2's same-line
+> sweep (`EffectRowCorpusShapeTests`) carries `app.calr` on a reasoned allowlist — authored
+> under Decision 1, not a regression of it — and §9's row says so.
+
 | P27 | `SpikeVerdictMatchesRecomputation` — recomputes `gCodegen` (via P28) and the R1 leg; shape-checks `schemaVersion`/`measuredCommit`; asserts R2/R3 are present and well-formed but **does not re-derive them** (§12.3) | `Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs` | **spike PR** | edit a verdict field, or flip an A3 fixture to need `--permissive-effects` |
 | P28 | **`GCodegen_BeforeAfterEmittedCSharpIsByteIdentical`** — the pin G-CODEGEN never had. Re-emits A1's and A2's `before/`/`after/` `.calr` and diffs the `.g.cs` byte-for-byte modulo trailing whitespace. §9's "0 `.cs` goldens" and §8.5's "semantics stamp unchanged" both rest on it | `SpikeVerdictTests.cs` | **spike PR** (blocking, feature-wide) | make a row change codegen → red, and E2 does not ship |
 | P29 | **`ExperimentTranscripts_MatchARerun`** — re-runs all six harness scripts and diffs against the committed transcripts. Closes the round-2 finding that ~40 quoted outputs were reproducible but unobserved. **Never skips**: a missing compiler build is a hard failure | `tests/Calor.Compiler.Tests/Effects/EffectRowExperimentHarnessTests.cs` — **landed in this PR** | **before E2** (already frozen) | reword any diagnostic the doc quotes → red, naming the script and the first differing line |
@@ -2326,7 +2381,7 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | **5** compatibility over the corpus | leg (a) what CI compiles today — `tests/TestData/Benchmarks` (226, pinned `>= 200`), `samples/` (11), every `.calr` a test project compiles; leg (b) the remainder of the 886 via a **`compile-all-committed-calr` job registered before E2**. **E1-attributable firings separated**: E1 resolves callees string-guessing missed and fires new, correct Calor0410/0419, which are fixed in-corpus and counted. **0.15-specific additions**: the Calor0410s that *disappear* from §4.1's `Subtypes` widening are listed by name; the §3.2 line-adjacency baseline (`o53/baseline.json`, 23 files, 1 green today) is re-run; §4.5's 0420/0421 de-demotion is confirmed to break no committed file | branch cut | revert one in-corpus fix → leg (a) red |
 | **M1** (roadmap §4.2) — *not a gate, a merge precondition* | Roadmap §4.2: *"No effect-row implementation (E2) merges before M1 is done."* v2 omitted it from the before-E2 chain entirely. Status: **COMPLETE.** PR #944 dispositioned and #881 addressed (PRs #1090/#1091/#1092); the annex append-only **guard** half landed as **A-1.10**; the **0.15 PP row registered as `PP-E1` at A-1.11 (2026-08-25)** — the freeze event, verified against an empty `grep -rn "Calor0424" src/` at `f7cd1c46`. Its denominator is the five §12.1 spike fixtures with ten injectable mutations (`L5` interface implementation, `L6` rank-1 instantiation, `L7` row erasure), bar 10/10 with a clean negative control, plus a cost leg whose margin re-derives on `w5-parity-002` to point 1.35 ∧ bootstrap lower bound > 1.0. **Correction, 2026-08-26 — annex sub-entry `A-1.11.1`:** leg A's negative control is re-frozen under the pinned invocation. A-1.11's A2 baseline was transcribed from `after/A2.diagnostics.txt`, recorded with `--permissive-effects` (§12.4 caveat 4) — the flag that same row forbids — so it was never reproducible. A2's baseline is now the measured no-flag multiset at `9119397e` (1× Calor0410 (23,9) + 2× Calor0411 + 1× Calor0418 (27,27)), with the Calor0418 registered as **E4's**: post-E4 the expected multiset drops it, and that post-E4 multiset is the binding one. The four A3 fixtures' "exit 0, zero diagnostics" (A-1.11's words) stands as the post-E4 expectation, their pre-E4 Calor0418 counts recorded. **Until E4 merges, leg A is a MISS under A-1.11's own-goal clause.** Pin: `PpE1NegativeControls_MatchA1111Baselines_PreE4` | **before E2 merges** | E2's PR body must cite **A-1.11**; without it, M1 is unmet and E2 does not merge. **E4's PR must flip the A-1.11.1 pre-E4 pin to its registered post-E4 multisets** |
 | **6** resolution floor | `MetadataBinderCorpusMeasurementTests.cs:37-118`, two-sided exact equality | v0.14.3 values | the test as it stands |
-| **7** index/query effects leg | `QueryGoldenTests` + the `effects` golden authored (not recorded) per `EveryGoldenStatesWhyItExists` (`:152-172`) | E5 PR | alter one expected effects answer |
+| **7** index/query effects leg | `QueryGoldenTests` + the `effects` golden authored (not recorded) per `EveryGoldenStatesWhyItExists` (`:152-172`). **LANDED (E5):** ten goldens over `QueryCorpus/project/app.calr` (+ `contracts.calr`) — `effects` (Leaky does-not-fit/Calor0410/cw with `§E{}` written; Log fits; Quiet omitted-row-is-pure, `written=false`; AsksMissing cannot-tell yet Calor0410, partial; Run cross-file pure callee; **Whisper** — the cross-module FOLD, an under-declaring caller of an effectful callee in another file, red when the fold is deleted; **Map<eff e>** — the inferred row keeps its variable part, red when it is dropped) and `impact-effects` (row `fs:w` → all three transitive callers stop fitting, incl. Fan through Relay; row `cw` → only Leaky; row pure → none) | E5 PR | alter one expected effects answer |
 
 ### 13.4 The Calor0425 corpus ledger — a decision, not an open question
 
@@ -2678,6 +2733,23 @@ change on a path rows do not own; it was fixed rather than recorded. E2 should k
 untrimmed code in `Calor0403`.
 
 ---
+
+> **EXECUTED, v0.15 E5, PR #1108 — THREE moved items across ONE script, none of them a
+> compiler-output change.** Counted from `git diff -U0` of all six transcripts after
+> `regenerate-transcripts.py`: `run.py`, `run2.py`, `run3.py`, `facts2.py` and `compile53.py`
+> are **CLEAN**; `o53/baseline.json`'s 23 files / 54 occurrences / 1 green / 22 red are
+> unchanged and only its `measuredCommit` is re-stamped, as every slice before this one did.
+>
+> | Case | Result |
+> |---|---|
+> | `facts.py` `IsSubsetOf` sweep | `EffectEnforcementPass.cs:401` → `:600`, a LINE SHIFT only: phase 5's `DeclarationEffectFact` record, `DeclarationFacts`, and the `_chargedVariables` bookkeeping sit above `CheckEffects`. Still exactly two occurrences (`EffectSet.cs:97` + this one); phase 5 computes its forbidden set with `Except()`, so P16's structural count stays 2 |
+> | `facts.py` "tests/TestData function-typed .calr" + "whole-corpus function-typed positions" | `count: 0` → `1`, and the whole-corpus position count 5 → 7 with one file added to its list — `tests/TestData/QueryCorpus/project/app.calr`, gate 7's fixture, now carries `Map<eff e>` / `Twice<eff e>`, two same-line parameter rows (review round 1, #2 asked for the rank-1 golden IN the corpus). §9's row and §3.2's sweep note say so; `EffectRowCorpusShapeTests` carries the file on a reasoned, anti-staleness-checked allowlist |
+> | `o53/baseline.json` `measuredCommit` | re-stamped `dd4d8f27…` → `d2f7e4bb…` by the regeneration script; counts unchanged |
+>
+> **Every other probe line is byte-identical.** Nothing under `bench/phase0-agent-native/`
+> moved: the ground truth was appended to two EXISTING fixture files rather than committed as
+> an 887th `.calr`, after a first cut with a new file turned four count-pinned instruments red
+> on the count alone (§13.2's E5 block).
 
 ## 14. Open questions
 

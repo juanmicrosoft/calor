@@ -9,3 +9,6 @@
   §F{f002:Plain:pub} () -> i32
     §E{}
     §R INT:0
+  §F{f003:Shout:pub} (str:s) -> void
+    §E{cw}
+    §P s

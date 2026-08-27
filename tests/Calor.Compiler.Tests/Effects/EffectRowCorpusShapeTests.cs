@@ -67,6 +67,25 @@ public sealed class EffectRowCorpusShapeTests
         }
     }
 
+    /// <summary>
+    /// Committed <c>.calr</c> written AFTER Decision 1 landed, in the new syntax, on
+    /// purpose. The sweep below guards §3.2's "zero regressions" claim — that no
+    /// file written BEFORE the line rule changes meaning under it — and a file
+    /// authored under the rule is not a regression of it. Each entry names why it
+    /// exists; adding one is a review event (the sweep's own message says so), not
+    /// a silent widening.
+    ///
+    /// <list type="bullet">
+    /// <item><c>tests/TestData/QueryCorpus/project/app.calr</c> — v0.15 E5 (review
+    /// round 1, #2): gate 7's polymorphic golden, <c>Map&lt;eff e&gt; (Func&lt;i32,i32&gt;:f §E{e}, …)</c>,
+    /// pins that the inferred row of a rank-1 body keeps its variable part.</item>
+    /// </list>
+    /// </summary>
+    private static readonly HashSet<string> AuthoredUnderDecisionOne = new(StringComparer.Ordinal)
+    {
+        "tests/TestData/QueryCorpus/project/app.calr",
+    };
+
     [Fact]
     public void NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges()
     {
@@ -77,9 +96,23 @@ public sealed class EffectRowCorpusShapeTests
         // longer measuring the corpus the design doc's argument is about.
         Assert.Equal(886, files.Count);
 
+        // The allowlist must not go stale: an entry earns its place by actually
+        // writing a same-line row, and it must still be a committed file.
+        foreach (var allowed in AuthoredUnderDecisionOne)
+        {
+            Assert.Contains(allowed, files);
+            var allowedLines = File.ReadAllLines(Path.Combine(root, allowed));
+            Assert.True(
+                allowedLines.Any(line => MeaningChangingForms.Any(form => Regex.IsMatch(line, form.Pattern))),
+                $"{allowed} is allowlisted but writes no same-line row — remove it from AuthoredUnderDecisionOne.");
+        }
+
         var offenders = new List<string>();
         foreach (var relative in files)
         {
+            if (AuthoredUnderDecisionOne.Contains(relative))
+                continue;
+
             var lines = File.ReadAllLines(Path.Combine(root, relative));
             for (var i = 0; i < lines.Length; i++)
             {

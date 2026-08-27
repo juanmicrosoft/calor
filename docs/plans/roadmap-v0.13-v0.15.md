@@ -694,17 +694,30 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   (renamed from `_PreE4`) pins it under the pinned CLI invocation, and
   `PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4` pins that all five
   L7 cells now discriminate. Adjudication stays at the 0.15.0 release commit.
-- **E5 — Effects facet in the index.** **Carries one obligation from E4's review (PR #1107,
-  F3, 0.15.x):** the invocation row is keyed on the bound symbol end-to-end —
-  `FunctionBoundType.Row` (write-only in 0.15, because `Binder.BindRow` collapses a
-  variable-mentioning row to Unknown) gains a production reader, and
-  `EffectInferrer.ResolveInvokedValueRow`'s AST span-matching goes; design §13.5's E4 block
-  names the pins that must stay green. Effect rows per declaration recorded in `ProjectIndex`;
-  `calor query effects`; effect-change blast radius via the existing `impact` closure.
-  `EffectSummary` is derived from the index or migrated into it (design-doc decision) — and
-  **a structural pin that no name-keyed second store remains** (`EffectSummaryBuilder`'s
-  `function.Name` / `"Class.Method"` keys at `:68,75` gone) ships with E5, since gate 7 observes
-  the facet's correctness but not the old store's deletion.
+- **E5 — Effects facet in the index.** **LANDED** (`docs/plans/2026-08-27-v0.15-e5-notes.md`).
+  Effect rows per declaration recorded in `ProjectIndex.EffectRows` — the enforcement pass's
+  own per-declaration result (`EffectEnforcementPass.DeclarationFacts`, phase 5), symbol-keyed,
+  with cross-module callees folded in through the cross-module pass's own resolution;
+  `calor query effects <name>` (declared / inferred / verdict + code / assumption reasons /
+  position rows; `--json`); `calor query impact <name> --effects [--row …]` over the unchanged
+  `impact` closure. `EffectSummary` is neither derived from the index nor migrated into it
+  (design §8.5: one producer, two consumers) — P25 pins a fresh-clone `calor build` producing a
+  complete summary with no index anywhere, and P26 pins that `EffectSummaryBuilder`'s
+  `function.Name` / `"Class.Method"` keys (`:68,75`) are gone (callers are keyed by structural
+  id; two overloads are two entries). Formats: `ProjectIndex` and `BuildStateCache`
+  `"3.0"` → `"4.0"`, semantics/options stamps frozen (P23, P24). Incidental, because gate 7
+  observed it: the index recorded call edges for call EXPRESSIONS only, so `callers`/`impact`
+  were blind to a `§C{…}` statement — fixed. **The obligation carried from E4's review (PR
+  #1107, F3) is HALF discharged and the remainder STAYS REGISTERED for 0.15.x:**
+  `FunctionBoundType.Row` now has a production reader — the index records it as
+  `IndexedEffectRow.BoundRow` for every rowed parameter/return and pins it equal to the `§E`
+  node's row wherever no `eff` variable is mentioned (and `[unknown]` where one is) — but the
+  invocation row in `EffectInferrer.ResolveInvokedValueRow` is still read from the `§E` node by
+  AST span-matching, because `Binder.BindRow` still collapses a variable-mentioning row to
+  Unknown and the A3 fixtures need `e`. Making the bound row carry the variable part (or
+  recording the `EffectsNode` on the symbol) is binder work that moves every E2b/E3/E4 pin;
+  design §13.5's E4 block names the pins that must stay green when it lands. E5 introduced no
+  second name/AST-keyed row store.
 - **M1 — Measurement prerequisites that block E2's merge** (moved here from §4.3 so the chain is
   visible): PR #944 dispositioned; ~~#881 corrected or the cost leg re-registered~~ **done** (PR #1092:
   `bench/phase0-agent-native/token-usage.py`, annex A-1.9.1); ~~the 0.15 PP
@@ -927,7 +940,12 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    the `effects` arm or the golden cannot land. *Denominator:* `tests/TestData/QueryCorpus/`,
    extended with effects ground truth. *Freeze point:* the E5 PR. E5 leg unconditional; E6/E7
    legs conditional. *Discriminating pin:* alter one expected effects answer and the golden
-   fails.
+   fails. **E5 leg FROZEN (E5 PR):** `effects` and `impact-effects` arms added; ten goldens
+   over `QueryCorpus/project/app.calr` + `contracts.calr` (all three verdicts, a firing
+   Calor0410, the cross-module fold observed on an EFFECTFUL cross-file callee — `Whisper` —
+   a rank-1 body whose inferred row keeps its variable part — `Map<eff e>` — and the blast
+   radius at three hypothetical rows), plus `TheEffectsGoldensExerciseEveryVerdict` as the
+   anti-vacuity guard.
 
 ### 4.5 Carried 0.14 debt — dispositioned with a trigger and a venue
 

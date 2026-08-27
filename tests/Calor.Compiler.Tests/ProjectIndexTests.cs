@@ -120,6 +120,115 @@ public sealed class ProjectIndexTests : IDisposable
             index.CheckFreshness(compiler, optionsHash, manifest, files));
     }
 
+    // --- v0.15 E5: the effects facet ---------------------------------------
+
+    /// <summary>
+    /// E4's 0.15.x obligation (roadmap §4.2 E5), the half E5 discharges:
+    /// <c>FunctionBoundType.Row</c> has a production reader — the index records
+    /// it for every rowed parameter/return position as <c>BoundRow</c> — and it
+    /// AGREES with the <c>§E</c> node's row wherever the row mentions no
+    /// <c>eff</c> variable. Where it does, the binder collapses the row to
+    /// Unknown (E2b; <c>Binder.BindRow</c>) and the index says so, in the open:
+    /// <c>declared e</c> beside <c>bound [unknown]</c>. That collapse is the
+    /// half that stays registered. Discriminating revert: make the binder record
+    /// pure for a row-less position, or drop the row from the bound type, and
+    /// the agreement fails.
+    /// </summary>
+    [Fact]
+    public void BoundPositionRow_AgreesWithTheDeclaredRow_WhereTheBinderDoesNotCollapse()
+    {
+        var dir = NewProject(("rows.calr", """
+            §M{m001:Rows}
+              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+                §E{cw}
+                §R §C{transform} §A value §/C
+              §F{f002:Make:pub} (Func<i32,i32>:g §E{fs:w}) -> Func<i32,i32> §E{fs:w}
+                §E{}
+                §R g
+              §F{f003:Map:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:value) -> i32
+                §E{e}
+                §R §C{f} §A value §/C
+            """));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        Assert.Empty(index.Residual.EffectRowsUnavailable);
+        var positions = index.EffectRows.Where(row => row.Kind is "parameter" or "return").ToArray();
+        Assert.Equal(4, positions.Length);
+        foreach (var position in positions)
+        {
+            Assert.NotNull(position.BoundRow);
+            if (position.DeclaredRow.Variables.Count == 0)
+                Assert.Equal(position.DeclaredRow.Display, position.BoundRow);
+            else
+                Assert.Equal("[unknown]", position.BoundRow);
+        }
+
+        var transform = Assert.Single(positions, row => row.Name == "transform");
+        Assert.Equal("cw", transform.DeclaredRow.Display);
+        Assert.Equal("declared-only", transform.Verdict);
+        Assert.NotEqual(transform.SymbolId, transform.OwnerSymbolId);
+
+        var make = Assert.Single(positions, row => row.Kind == "return");
+        Assert.Equal("fs:w", make.DeclaredRow.Display);
+        Assert.Equal(make.SymbolId, make.OwnerSymbolId);
+
+        var polymorphic = Assert.Single(positions, row => row.Name == "f");
+        Assert.Equal("e", polymorphic.DeclaredRow.Display);
+        Assert.Equal(0, Assert.Single(polymorphic.DeclaredRow.Variables).Ordinal);
+
+        var map = Assert.Single(index.EffectRows, row => row.Name == "Map" && row.Kind == "function");
+        Assert.Equal("e", map.DeclaredRow.Display);
+        Assert.Equal("fits", map.Verdict);
+    }
+
+    /// <summary>
+    /// The three-valued row state reaches the facet: interop content makes a
+    /// function's effects ASSUMED, and the index carries the reasons the pass
+    /// would print in Calor0419 — the "assumption reasons when Assumed" of
+    /// design §8.6.
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_RecordsTheAssumedStateWithItsReasons()
+    {
+        var dir = NewProject(("assumed.calr", "\n§M{m001:Interop}\n  §F{f001:UsesInterop:pub}\n      §O{void}\n      §RAW\nvar x = System.Environment.TickCount;\n§/RAW\n"));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        var row = Assert.Single(index.EffectRows, row => row.Name == "UsesInterop");
+        Assert.NotNull(row.InferredRow);
+        Assert.Equal("assumed", row.InferredRow!.State);
+        Assert.StartsWith("[assumed: ", row.InferredRow.Display, StringComparison.Ordinal);
+        Assert.Contains(row.InferredRow.Reasons, reason => reason.Contains("interop", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("fits", row.Verdict);
+        Assert.Equal("Calor0419", row.DiagnosticCode);
+    }
+
+    /// <summary>
+    /// A file the binder reports errors for gets no rows and a residual entry —
+    /// the CLI skips the effect pass on such a file, and an index answering
+    /// with rows the CLI never computed would be an answer with no producer.
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_SkipsAFileWithBinderErrors_AndSaysSo()
+    {
+        var dir = NewProject(
+            ("lib.calr", Library),
+            ("broken.calr", """
+                §M{m002:Broken}
+                  §F{f001:Uses:pub} () -> i32
+                    §E{}
+                    §R (+ undefinedName INT:1)
+                """));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        Assert.DoesNotContain(index.EffectRows, row => row.File == "broken.calr");
+        Assert.Contains(index.EffectRows, row => row.File == "lib.calr" && row.Name == "Double");
+        var entry = Assert.Single(index.Residual.EffectRowsUnavailable);
+        Assert.StartsWith("broken.calr: ", entry, StringComparison.Ordinal);
+        var uses = Assert.Single(index.FindDeclarations("Uses"));
+        Assert.True(index.EffectsAnswerIsPartial(uses.SymbolId, uses.File));
+        Assert.Empty(index.FindEffectRows(uses.SymbolId));
+    }
+
     [Fact]
     public void AddingOrRemovingAFileIsStale()
     {

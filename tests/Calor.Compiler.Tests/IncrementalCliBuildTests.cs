@@ -1,6 +1,8 @@
+using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
+using Calor.Compiler.Indexing;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -479,23 +481,205 @@ public class IncrementalCliEndToEndTests : IDisposable
     /// and an unchanged one cannot both be right — pinning it here means E3 cannot
     /// quietly contradict G-CODEGEN by bumping it.</para>
     ///
-    /// <para><c>CurrentFormatVersion</c> moves <c>"3.0"</c> → <c>"4.0"</c> at
-    /// <b>E5</b>, when <c>BuildFileEntry.EffectSummary</c>'s shape changes; it is
-    /// pinned at <c>"3.0"</c> here because E3 does not touch that shape, and E5's
-    /// PR must flip this line deliberately rather than discover it.</para>
+    /// <para><c>CurrentFormatVersion</c> moved <c>"3.0"</c> → <c>"4.0"</c> at
+    /// <b>E5</b> (v0.15, design §8.5): <c>BuildFileEntry.EffectSummary</c>'s
+    /// shape changed — <c>EffectCallerSummary</c> is keyed by structural id
+    /// (<c>CallerId</c> + <c>DisplayName</c> replaced <c>CallerName</c>, P26).
+    /// One cold rebuild on the first 0.15 build is the mechanism's design.
+    /// <c>CurrentOptionsSerializerVersion</c> is untouched: no compile input
+    /// changed shape.</para>
     ///
     /// <para>Discriminating revert: bump the semantics stamp and this fails,
     /// naming G-CODEGEN.</para>
     /// </summary>
     [Fact]
-    public void BuildStateCacheConstants_AreUnchangedByEffectRows()
+    public void BuildStateCacheConstants_FormatBumpedByE5_SemanticsAndOptionsFrozen()
     {
-        Assert.Equal("3.0", Calor.Compiler.Incremental.BuildStateCache.CurrentFormatVersion);
+        Assert.Equal("4.0", Calor.Compiler.Incremental.BuildStateCache.CurrentFormatVersion);
         Assert.Equal(
             "calor-compile-semantics-v1",
             Calor.Compiler.Incremental.BuildStateCache.CurrentCompilerSemanticsVersion);
         Assert.Equal(
             "compile-inputs-v3",
             Calor.Compiler.Incremental.BuildStateCache.CurrentOptionsSerializerVersion);
+    }
+
+    /// <summary>
+    /// Design-doc pin <b>P24</b> — <c>ProjectIndex.CurrentFormatVersion</c> is
+    /// <c>"4.0"</c> now that the effects facet is in the index, and the facet is
+    /// IN the serialized bytes. Gate 3's instrument compares those bytes between
+    /// full and incremental runs; a facet added without the bump would have
+    /// moved them silently under a header that still said <c>"3.0"</c>.
+    /// Discriminating revert: drop the bump, or serialize the facet under
+    /// another name.
+    /// </summary>
+    [Fact]
+    public void ProjectIndexFormatBumped()
+    {
+        Assert.Equal("4.0", ProjectIndex.CurrentFormatVersion);
+
+        WritePair();
+        var options = new ProjectIndexBuilder.Options(
+            _tempDir, "p24", ProjectIndexBuilder.DiscoverSources(_tempDir));
+        var index = ProjectIndexBuilder.Build(options);
+        Assert.Equal(2, index.EffectRows.Count);
+
+        var output = Path.Combine(_tempDir, "index-out");
+        index.Save(output);
+        var bytes = File.ReadAllText(ProjectIndex.PathFor(output));
+        Assert.Contains("\"FormatVersion\": \"4.0\"", bytes);
+        Assert.Contains("\"EffectRows\": [", bytes);
+        Assert.Contains("\"Verdict\": \"fits\"", bytes);
+        Assert.Contains("\"EffectRowsUnavailable\": []", bytes);
+    }
+
+    /// <summary>Two independent effectful modules, as <c>IncrementalCliBuildTests.WriteIndependentPair</c> writes them.</summary>
+    private (string APath, string BPath) WritePair()
+    {
+        var a = Path.Combine(_tempDir, "a.calr");
+        File.WriteAllText(a, """
+            §M{m001:Alpha}
+              §F{f001:Greet:pub} () -> void
+                §E{cw}
+                §P "hello"
+            """);
+        var b = Path.Combine(_tempDir, "b.calr");
+        File.WriteAllText(b, """
+            §M{m002:Beta}
+              §F{f001:Wave:pub} () -> void
+                §E{cw}
+                §P "wave"
+            """);
+        return (a, b);
+    }
+
+    /// <summary>
+    /// Design-doc pin <b>P25</b>, leg 1 — <c>EffectSummaryIsIndexIndependent</c>.
+    /// A fresh-clone <c>calor build</c> — the CLI, in a directory with NO
+    /// <c>obj/calor</c> and no index anywhere — writes a build state whose
+    /// every file entry carries a COMPLETE effect summary: the caller listing
+    /// is there, symbol-keyed, with the cross-module call recorded. And no
+    /// index appears as a side effect: the summary is a projection of the
+    /// compilation's own facts (§8.5), not something read off <c>calor index</c>.
+    /// Discriminating revert: derive the summary from the index and this build
+    /// either fails or leaves the summary empty.
+    /// </summary>
+    [Fact]
+    public void EffectSummaryIsIndexIndependent()
+    {
+        var (a, b) = WritePair();
+        var c = Path.Combine(_tempDir, "c.calr");
+        File.WriteAllText(c, """
+            §M{m003:Gamma}
+              §F{f001:Call:pub} () -> void
+                §E{cw}
+                §C{Greet} §/C
+            """);
+        Assert.Empty(Directory.EnumerateFiles(_tempDir, ".calor-index.json", SearchOption.AllDirectories));
+        Assert.False(Directory.Exists(Path.Combine(_tempDir, "obj")));
+
+        var run = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--input", c, "--cache");
+        Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
+
+        var state = BuildStateCache.Load(_tempDir);
+        Assert.NotNull(state);
+        Assert.Equal(3, state!.Files.Count);
+        foreach (var (key, entry) in state.Files)
+            Assert.True(entry.EffectSummary != null, $"{key}: no effect summary in the build state");
+
+        var gamma = state.Files.Values.Single(entry => entry.EffectSummary!.ModuleName == "Gamma").EffectSummary!;
+        var caller = Assert.Single(gamma.Callers);
+        Assert.Equal("f001", caller.CallerId);
+        Assert.Equal("Call", caller.DisplayName);
+        Assert.Contains(caller.Calls, call => call.Target == "Greet");
+        Assert.Contains(gamma.PublicFunctions, function => function.Name == "Call" && function.HasEffectDeclaration);
+
+        Assert.Empty(Directory.EnumerateFiles(_tempDir, ".calor-index.json", SearchOption.AllDirectories));
+    }
+
+    /// <summary>
+    /// Design-doc pin <b>P25</b>, leg 2 — the structural half: nothing under
+    /// <c>Effects/</c> or <c>Incremental/</c> names <c>ProjectIndex</c>, in code
+    /// or in a using. Measured before E5 (design §8.5: the index is referenced
+    /// from exactly <c>Commands/IndexCommand.cs</c>, <c>Commands/QueryCommand.cs</c>
+    /// and <c>Indexing/</c>); frozen here so the dependency cannot grow the
+    /// wrong way. Comment lines are not exempt: a doc comment that names the
+    /// type is where a <c>cref</c> starts.
+    /// </summary>
+    [Fact]
+    public void EffectsAndIncrementalLayers_DoNotReferenceProjectIndex()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var offenders = new List<string>();
+        var scanned = 0;
+        foreach (var layer in new[] { "Effects", "Incremental" })
+        {
+            var directory = Path.Combine(root, "src", "Calor.Compiler", layer);
+            foreach (var file in Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories))
+            {
+                scanned++;
+                var lines = File.ReadAllLines(file);
+                for (var index = 0; index < lines.Length; index++)
+                {
+                    if (Regex.IsMatch(lines[index], @"\bProjectIndex\w*\b"))
+                        offenders.Add($"{layer}/{Path.GetFileName(file)}:{index + 1}: {lines[index].Trim()}");
+                }
+            }
+        }
+
+        Assert.True(scanned > 10, $"only {scanned} files scanned — wrong root?");
+        Assert.True(offenders.Count == 0,
+            "Effects/ or Incremental/ references ProjectIndex — the summary must not depend on the index (design §8.5):\n"
+            + string.Join("\n", offenders));
+    }
+
+    /// <summary>
+    /// Design-doc pin <b>P26</b> — <c>NoNameKeyedEffectStoreRemains</c>.
+    /// <c>EffectSummaryBuilder</c> used to group a module's call listings under
+    /// <c>function.Name</c> and <c>"Class.Method"</c> (its lines 68/75 before
+    /// E5): two overloads of one method were ONE caller entry, and the store
+    /// was keyed by a string that a rename or a second overload could collide.
+    /// Three legs: the POCO has no name key; the builder's source groups by
+    /// <c>CallerId</c> and never passes a name as the key; and two overloads
+    /// are two entries with two ids and one display name. Discriminating
+    /// revert: re-introduce one name key and the third leg collapses to one
+    /// entry (and the second leg reads it off the source).
+    /// </summary>
+    [Fact]
+    public void NoNameKeyedEffectStoreRemains()
+    {
+        Assert.Null(typeof(EffectCallerSummary).GetProperty("CallerName"));
+        Assert.NotNull(typeof(EffectCallerSummary).GetProperty("CallerId"));
+        Assert.NotNull(typeof(EffectCallerSummary).GetProperty("DisplayName"));
+        Assert.NotNull(typeof(RawCall).GetProperty("CallerId"));
+
+        var source = File.ReadAllText(Path.Combine(
+            CliTestHarness.FindRepoRoot(), "src", "Calor.Compiler", "Effects", "EffectSummaryBuilder.cs"));
+        Assert.Matches(@"callsByCaller\[call\.CallerId\]", source);
+        Assert.DoesNotMatch(@"callsByCaller\[[^\]]*\.Name\b", source);
+        Assert.DoesNotMatch(@"callerId:\s*(function\.Name|\$""\{cls\.Name\}\.\{method\.Name\}"")", source);
+
+        var diagnostics = new DiagnosticBag();
+        var parser = new Parsing.Parser(
+            new Parsing.Lexer("""
+                §M{m001:Overloads}
+                  §CL{c001:Box:pub}
+                    §MT{m001:Run:pub} (i32:x) -> void
+                      §E{cw}
+                      §C{System.Console.WriteLine} §A x §/C
+                    §MT{m002:Run:pub} (str:s) -> void
+                      §E{cw}
+                      §C{System.Console.WriteLine} §A s §/C
+                """, diagnostics).TokenizeAllForParser(), diagnostics);
+        var module = parser.Parse();
+        Assert.NotNull(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(d => d.Message)));
+
+        var summary = EffectSummaryBuilder.Build(module!);
+        Assert.Equal(
+            new[] { "Box.m001", "Box.m002" },
+            summary.Callers.Select(caller => caller.CallerId).OrderBy(id => id, StringComparer.Ordinal).ToArray());
+        Assert.All(summary.Callers, caller => Assert.Equal("Box.Run", caller.DisplayName));
+        Assert.All(summary.Callers, caller => Assert.Single(caller.Calls));
     }
 }

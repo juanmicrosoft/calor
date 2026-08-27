@@ -42,10 +42,12 @@ public sealed class EffectSummary
     public List<string> InternalMethodNames { get; set; } = new();
 
     /// <summary>
-    /// Per-caller call-target listings. Keyed by caller name (top-level function name,
-    /// or "ClassName.MethodName" for class methods). Each caller tracks its own declared
-    /// effects plus the call targets it issues; the cross-module pass uses this to verify
-    /// that each caller declares the effects of its cross-module callees.
+    /// Per-caller call-target listings, one per declaration, identified by the
+    /// declaration's structural id (<see cref="EffectCallerSummary.CallerId"/>) —
+    /// v0.15 E5, design-doc §8.5 / P26: the name is carried for messages and is
+    /// not a key. Each caller tracks its own declared effects plus the call targets
+    /// it issues; the cross-module pass uses this to verify that each caller
+    /// declares the effects of its cross-module callees.
     /// </summary>
     public List<EffectCallerSummary> Callers { get; set; } = new();
 }
@@ -75,9 +77,21 @@ public sealed class EffectFunctionSummary
 public sealed class EffectCallerSummary
 {
     /// <summary>
-    /// Top-level function name, or "ClassName.MethodName" for class methods.
+    /// The declaration's STRUCTURAL id — <c>FunctionNode.Id</c> for a top-level
+    /// function (<c>f001</c>), <c>ClassName.MethodId</c> for a member
+    /// (<c>Cls.m001</c>): the key <c>CallGraphAnalysis</c> and
+    /// <c>EffectEnforcementPass.DeclarationFacts</c> use, and the <c>ast:</c>
+    /// component the binder's <c>SymbolId</c> embeds. v0.15 E5 (P26) replaced
+    /// the name key that lived here; two members sharing a name in different
+    /// classes are two entries, not one.
     /// </summary>
-    public string CallerName { get; set; } = "";
+    public string CallerId { get; set; } = "";
+
+    /// <summary>
+    /// Top-level function name, or "ClassName.MethodName" for class methods —
+    /// what the cross-module diagnostics print. Display only, never a key.
+    /// </summary>
+    public string DisplayName { get; set; } = "";
 
     /// <summary>
     /// Span where diagnostics should be reported — pointing at the §E declaration
