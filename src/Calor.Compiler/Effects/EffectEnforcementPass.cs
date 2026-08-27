@@ -1614,10 +1614,11 @@ public sealed class EffectEnforcementPass
         ///
         /// <para>A variable the arguments could not determine makes the
         /// instantiated row Unknown, which is Calor0425 at the CALL SITE — §10.3's
-        /// second message. Nothing is charged for such a variable: the slice that
-        /// charges an Unknown row is E4, which replaces Calor0418, and inventing
-        /// an <c>unknown</c> effect here would raise a Calor0410 the author cannot
-        /// declare away.</para>
+        /// second message. Nothing is charged for such a variable — E3b's
+        /// disclosed deviation from §10.3's sample, kept as is. E4 (which charges
+        /// an INVOKED Unknown row fail-closed) did not revisit this cell: the
+        /// author of the caller cannot repair an argument's missing row from the
+        /// call site, and the Calor0425 here already names which argument.</para>
         /// </summary>
         private void InstantiateAndCharge(
             FunctionNode callee,
@@ -2138,10 +2139,10 @@ public sealed class EffectEnforcementPass
     /// binder hands over only a type string — a declared <c>Func&lt;i32&gt;</c>
     /// parameter, whose BoundType is a bare <c>NominalBoundType("Func&lt;i32&gt;")</c>
     /// with no <c>Declaration</c> — this returns false and the caller's string
-    /// test still decides. That keeps Calor0418's behaviour byte-stable
-    /// (<c>StrictnessBatchTests.cs:29,47,64,749</c>;
-    /// <c>EffectEnforcementTests.cs:354,378</c>) while making the structural
-    /// answer the one that is asked first.</para>
+    /// test still decides. That kept Calor0418's behaviour byte-stable through E1,
+    /// and keeps the E4 invocation charge's notion of "function-typed" the same
+    /// as the string test's where no bound answer exists, while making the
+    /// structural answer the one that is asked first.</para>
     /// </summary>
     // Fully qualified rather than a file-level `using`: adding one shifts every
     // line in this file, and the effect-rows spike transcripts pin
@@ -2633,11 +2634,12 @@ public sealed class EffectEnforcementPass
         /// functions/methods:
         /// (a) the name resolves lexically to a parameter of the current function, a
         ///     §B binding in its body, or a field of the enclosing class — a VALUE is
-        ///     being invoked, which is by construction a delegate/function-typed
-        ///     invocation → unconditional Calor0418 error under enforcement (demoted
-        ///     to a warning only under --permissive-effects, the explicit waiver).
-        ///     There is no annotation escape hatch: effect-annotated function types
-        ///     are a Phase 3 design.
+        ///     being invoked. v0.15 E4: its effect ROW is charged to this function
+        ///     (<see cref="ChargeInvokedRow"/>) — Concrete silently, Assumed with one
+        ///     Calor0425, Unknown as Calor0425 plus the fail-closed Unknown charge
+        ///     (nothing under --permissive-effects). Pre-E4 this arm was an
+        ///     unconditional Calor0418; that code survives only for a value whose
+        ///     type is provably not a function type.
         /// (b) the name is a free name the pass cannot see (e.g. an inherited member
         ///     of an external C# base) — routed through the unknown-call chain, which
         ///     fails loud under the strict policy (Calor0411 + unknown effects)
@@ -3269,7 +3271,8 @@ public sealed class EffectEnforcementPass
         /// <para>Receivers only, in the sense of what is COLLECTED: a name that
         /// is never a receiver anywhere in this function is absent here and
         /// resolves through the AST as before — the string this pass gets back
-        /// is quoted verbatim in Calor0418's message, so the source spelling has
+        /// is quoted verbatim in the invocation diagnostics' messages (E4's
+        /// Calor0425 and the residual Calor0418), so the source spelling has
         /// to survive.</para>
         ///
         /// <para><b>But the map is keyed by name, not by position</b> (review
@@ -3800,7 +3803,9 @@ public sealed class EffectEnforcementPass
         /// <para>The structural half answers for a receiver the side channel
         /// carries (<c>f.Invoke</c> where <c>f</c> is a lambda or a <c>§DEL</c>
         /// value); a bare call target is not a receiver, so that site reduces to
-        /// the string test today — which is what keeps Calor0418 byte-stable.
+        /// the string test today — E4's invocation charge asks the declared
+        /// <c>FunctionBoundType</c> (<see cref="CallGraphAnalysis.DeclaredFunctionTypes"/>)
+        /// alongside it, so a §CSHARP-declared delegate is a function value there.
         /// </para>
         private bool IsFunctionValued(string name, string typeName) =>
             IsFunctionBoundType(BoundValueTypes.GetValueOrDefault(name))
@@ -4642,8 +4647,8 @@ public sealed class EffectEnforcementPass
                 case ReferenceNode reference:
                     // `§C f §A x §/C` is the same call as `§C{f} §A x §/C` —
                     // route through the full named-target resolution (value →
-                    // Calor0418; internal function → its effects; free name →
-                    // unknown chain).
+                    // its row is charged, E4; internal function → its effects;
+                    // free name → unknown chain).
                     return InferFromCallTarget(reference.Name, call.Span, call.Arguments).Union(argEffects);
 
                 case LambdaExpressionNode lambda:
