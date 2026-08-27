@@ -4,18 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
+  Effect checking runs in loops that have a safety limit, so a tangle of functions that
+  call each other cannot make the compiler spin forever. Before, hitting that limit in the
+  loop that passes an effect up through a chain of callers was not reported at all — the
+  compiler just stopped and said the program was fine. Now both loops report `Calor0406`
+  as an error naming which loop stopped, the limit, and the functions involved, so a
+  result the compiler did not finish is never passed off as a clean build. The limit for
+  a group of functions that call each other now grows with the size of the group, so a
+  big but ordinary group never trips it. The project index (`calor query effects`) says
+  "did not converge" for such a file instead of recording half-finished rows. Every
+  committed `.calr` in the repository compiles with zero `Calor0406`. (v0.16 W5, gate 11)
+
 ### Changed
 
-- **The compiler now tells you when effect checking gave up early — new error `Calor0406`.**
-  Effect checking runs in loops that have a safety limit, so a tangle of functions that
-  call each other cannot make the compiler spin forever. Before, hitting that limit was
-  either reported under the wrong code (`Calor0600`, which belongs to the API-strictness
-  family) or, in the loop that carries a placeholder effect up to the callers of callers,
-  not reported at all — the compiler just stopped and said the program was fine. Now both
-  loops report `Calor0406` as an error naming which loop stopped, the limit, and the
-  functions involved, so a result the compiler did not finish is never passed off as a
-  clean build. `Calor0600` is no longer emitted for this. No real program in our test
-  corpus comes anywhere near either limit. (v0.16 W5, gate 11)
+- **`Calor0600` is no longer used for effect checking that did not finish.** That code
+  belongs to the API-strictness family; the loop that used to borrow it as a warning now
+  reports `Calor0406` as an error instead. (v0.16 W5)
 
 ## [0.15.0] - 2026-08-27
 

@@ -24,9 +24,14 @@ public sealed class EffectEnforcementPass
     /// Default cap on the <see cref="ProcessScc"/> fixpoint: how many rounds over
     /// a recursive SCC the pass will run before it stops and reports
     /// Calor0406. Effect sets only grow and the effect universe is finite, so a
-    /// converging SCC needs at most (members × distinct effects) rounds and in
-    /// practice about its call-graph diameter; 100 has never been reached on the
-    /// corpus.
+    /// converging SCC needs a bounded number of rounds — but the bound is set by
+    /// the SCC's SIZE, not its effect count: a round processes members in
+    /// Tarjan's order, so an effect travelling along a forward edge arrives in
+    /// the same round while one travelling along a back edge costs a round per
+    /// hop, and a doubly-linked chain of n functions sharing ONE effect needs
+    /// about n rounds (review of #1114 measured n = 101 hitting a flat cap of
+    /// 100). That is why the effective cap, when none is injected, is
+    /// <c>max(this, scc.Count + 1)</c> — see <see cref="SccFixpointIterationCap"/>.
     /// </summary>
     public const int DefaultSccFixpointIterationCap = 100;
 
@@ -39,17 +44,34 @@ public sealed class EffectEnforcementPass
     public const int DefaultInstantiatedChargeIterationCap = 10_000;
 
     /// <summary>
+    /// How many function names a Calor0406 message lists before it says
+    /// "and N more".
+    /// </summary>
+    private const int MaxNamedFunctionsInNonConvergenceMessage = 8;
+
+    /// <summary>
     /// v0.16 W5 (gate 11) — the <see cref="ProcessScc"/> fixpoint cap, injectable
     /// so a pin can drive a three-hop fixture into the cap at 2 rather than
-    /// building a hundred-function SCC. Defaults to
-    /// <see cref="DefaultSccFixpointIterationCap"/>; must be at least 1.
+    /// building a hundred-function SCC. Must be at least 1.
+    ///
+    /// <para>An injected value is used <b>verbatim</b>, so the pins see exactly the
+    /// cap they set. When nothing is injected the cap applied to an SCC is
+    /// <c>max(DefaultSccFixpointIterationCap, scc.Count + 1)</c>: monotone growth
+    /// over an SCC of n members needs at most n − 1 rounds of back-edge travel
+    /// plus one confirming round, so with that floor Calor0406 at this site can
+    /// only fire for an inference that is not monotone — a bug — never for a
+    /// large but well-behaved recursive group.</para>
     /// </summary>
     internal int SccFixpointIterationCap
     {
         get => _sccFixpointIterationCap;
-        init => _sccFixpointIterationCap = value >= 1
-            ? value
-            : throw new ArgumentOutOfRangeException(nameof(SccFixpointIterationCap), value, "The cap must be at least 1.");
+        init
+        {
+            _sccFixpointIterationCap = value >= 1
+                ? value
+                : throw new ArgumentOutOfRangeException(nameof(SccFixpointIterationCap), value, "The cap must be at least 1.");
+            _sccCapInjected = true;
+        }
     }
 
     /// <summary>
@@ -66,7 +88,18 @@ public sealed class EffectEnforcementPass
     }
 
     private readonly int _sccFixpointIterationCap = DefaultSccFixpointIterationCap;
+    private readonly bool _sccCapInjected;
     private readonly int _instantiatedChargeIterationCap = DefaultInstantiatedChargeIterationCap;
+
+    /// <summary>
+    /// The cap <see cref="ProcessScc"/> applies to an SCC of <paramref name="sccSize"/>
+    /// members: the injected value verbatim, else the default floored at
+    /// <c>sccSize + 1</c> (see <see cref="SccFixpointIterationCap"/>).
+    /// </summary>
+    internal int EffectiveSccFixpointIterationCap(int sccSize) =>
+        _sccCapInjected
+            ? _sccFixpointIterationCap
+            : Math.Max(DefaultSccFixpointIterationCap, sccSize + 1);
 
     // Delegated call graph analysis (populated by Enforce)
     private CallGraphAnalysis _callGraphAnalysis = null!;
@@ -500,7 +533,7 @@ public sealed class EffectEnforcementPass
         // For recursive SCCs — mutual, or a single function calling itself — iterate to fixpoint
         var changed = true;
         var iterations = 0;
-        var maxIterations = _sccFixpointIterationCap;
+        var maxIterations = EffectiveSccFixpointIterationCap(scc.Count);
 
         // Initialize with empty effects
         foreach (var functionId in scc)
@@ -539,9 +572,9 @@ public sealed class EffectEnforcementPass
                 _callGraphAnalysis.Functions[scc[0]].Span,
                 "SCC fixpoint",
                 maxIterations,
-                "round(s)",
+                "rounds",
                 scc.Select(id => _callGraphAnalysis.Functions[id].Name),
-                "the effects computed for these mutually recursive functions may be incomplete");
+                "the effects computed for this recursive group may be incomplete");
         }
     }
 
@@ -573,8 +606,6 @@ public sealed class EffectEnforcementPass
             + $"with the effect sets still changing; {consequence}. Functions involved: {list}.",
             DiagnosticSeverity.Error);
     }
-
-    private const int MaxNamedFunctionsInNonConvergenceMessage = 8;
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
@@ -1266,20 +1297,19 @@ public sealed class EffectEnforcementPass
         // propagation, not the growth test. Reported at the declaration of the
         // first function still queued — the one whose callers were never
         // charged — and the message names every function still waiting (a
-        // function can be queued more than once; it is named once).
+        // function can be queued more than once; it is named once). Every id
+        // in the queue is a key of `Functions`: the seeds are the ids inference
+        // charged (ChargeInstantiatedRow) and the rest come from `GetCallers`,
+        // whose reverse graph is built from the same function map.
         if (queue.Count > 0)
         {
             var pending = queue.Distinct(StringComparer.Ordinal).ToList();
-            var first = pending[0];
-            var span = _callGraphAnalysis.Functions.TryGetValue(first, out var firstFunction)
-                ? firstFunction.Span
-                : default;
             ReportDidNotConverge(
-                span,
+                _callGraphAnalysis.Functions[pending[0]].Span,
                 "instantiated-charge propagation",
                 maxIterations,
-                "step(s)",
-                pending.Select(id => _callGraphAnalysis.Functions.TryGetValue(id, out var f) ? f.Name : id),
+                "steps",
+                pending.Select(id => _callGraphAnalysis.Functions[id].Name),
                 "the callers of these functions may not have been charged the effects instantiated in their callees");
         }
     }

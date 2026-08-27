@@ -26,7 +26,23 @@ public static class ProjectIndexBuilder
     public sealed record Options(
         string ProjectDirectory,
         string OptionsToken,
-        IReadOnlyList<string> Files);
+        IReadOnlyList<string> Files)
+    {
+        /// <summary>
+        /// v0.16 W5 — test-only injection of the effect pass's SCC fixpoint cap
+        /// (<see cref="EffectEnforcementPass.SccFixpointIterationCap"/>); null
+        /// keeps the pass's default. Not part of the options hash: it exists so
+        /// a test can drive a small fixture into Calor0406 and observe that the
+        /// index records a residual rather than partial facts.
+        /// </summary>
+        internal int? SccFixpointIterationCap { get; init; }
+
+        /// <summary>
+        /// As above for the instantiated-charge worklist cap
+        /// (<see cref="EffectEnforcementPass.InstantiatedChargeIterationCap"/>).
+        /// </summary>
+        internal int? InstantiatedChargeIterationCap { get; init; }
+    }
 
     /// <summary>
     /// Collects the .calr sources under a directory, in a deterministic order.
@@ -280,13 +296,31 @@ public static class ProjectIndexBuilder
             IReadOnlyDictionary<string, EffectSet> crossCharges;
             try
             {
+                // The bag is held, not discarded: a pass that stopped at a cap
+                // (Calor0406, v0.16 W5) has facts that are partial by its own
+                // account, and the index must not launder them into rows with
+                // no residual — `calor build` fails on that file, so the index
+                // says the same thing.
+                var effectDiagnostics = new DiagnosticBag();
                 var pass = new EffectEnforcementPass(
-                    new DiagnosticBag(),
+                    effectDiagnostics,
                     UnknownCallPolicy.Strict,
                     resolver: resolver,
                     projectDirectory: projectDirectory,
-                    crossModuleFunctionNames: crossModuleNames);
+                    crossModuleFunctionNames: crossModuleNames)
+                {
+                    SccFixpointIterationCap = options.SccFixpointIterationCap
+                        ?? EffectEnforcementPass.DefaultSccFixpointIterationCap,
+                    InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap
+                        ?? EffectEnforcementPass.DefaultInstantiatedChargeIterationCap,
+                };
                 pass.Enforce(document.Ast);
+                if (effectDiagnostics.Any(d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge))
+                {
+                    index.Residual.EffectRowsUnavailable.Add(
+                        $"{relative}: effect inference did not converge (Calor0406), facts not recorded");
+                    continue;
+                }
                 facts = pass.DeclarationFacts;
                 crossCharges = crossPass.ResolveCrossModuleEffects(
                     EffectSummaryBuilder.Build(document.Ast), document.FilePath, registry);
