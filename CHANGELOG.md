@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **We built the scorecard that will judge the new effect-rows feature.** Before any of the
+  effect-rows work was written, we registered a test for it: ten small, deliberate mistakes
+  (a callback allowed to print when its interface says it can't, an effect smuggled through a
+  generic helper, a callback with its effect annotation deleted) planted in five frozen example
+  programs, plus a "nothing else may change" check on the unmodified programs. The compiler
+  has to catch all ten with the exact error we said it would, at the exact place, and stay
+  quiet on the originals. That scorecard now exists as a file the test suite re-checks on every
+  build, and **the deterministic half already scores 10/10** with the originals clean. The
+  other half — does the stricter compiler make an AI agent spend noticeably more tokens to get
+  a program green? — is a paid experiment that **runs before the release**, with its runner and
+  its arithmetic checked in now (and the runner refusing to spend money without an explicit
+  confirmation). Until it runs, the scorecard says "not adjudicated", and the test makes sure it
+  can't say anything else.
 - **You can now ask the project index about effects.** `calor query effects Leaky` tells
   you three things about a function: what it *says* it does (`§E{…}`), what the compiler
   worked out its body *actually* does, and whether the two agree — with the exact error
