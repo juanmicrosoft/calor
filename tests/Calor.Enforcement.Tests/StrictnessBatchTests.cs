@@ -245,7 +245,11 @@ public class StrictnessBatchTests
     public void OverrideOfExternalBase_RoutesToAssumedChannel()
     {
         // Base class is external C# (not in this module): variance cannot be
-        // checked, so the override is surfaced through the assumption channel.
+        // checked, so site 4's verdict is CannotTell. §13.1's `:260` rewrite,
+        // discharged by E3 slice b: the assumption channel here IS Calor0425 now
+        // (§6.2 retires both external-base Calor0419s, together). The method name
+        // is kept so facts.py's `:245` probe does not move; "assumed channel" is
+        // still what this asserts, only spelled with the row code.
         var source = @"
 §M{m001:Test}
   §CL{c001:MyController:pub}
@@ -257,7 +261,9 @@ public class StrictnessBatchTests
         var result = TestHarness.Compile(source);
 
         Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("external base"));
+            d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("external base"));
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
     }
 
     [Fact]
@@ -587,7 +593,9 @@ var x = 1;
     public void C3_ExternalInheritedImplementation_RoutesToAssumed()
     {
         // Review C3 (external arm): §IMPL satisfied only by a member inherited
-        // from an external base is surfaced via the Calor0419 assumption channel.
+        // from an external base is surfaced as Calor0425 — §13.1's `:607`
+        // rewrite, discharged by E3 slice b with its override sibling (§6.2 says
+        // the two must move together). §6.4's THIRD message sample ships here.
         var source = @"
 §M{m001:ExtImpl}
   §IFACE{i001:IQuiet}
@@ -604,8 +612,10 @@ var x = 1;
         var result = TestHarness.Compile(source);
 
         Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects
+            d => d.Code == DiagnosticCode.EffectRowUnknown
                 && d.Message.Contains("SomeExternalBase") && d.Message.Contains("IQuiet.Run"));
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
     }
 
     [Fact]

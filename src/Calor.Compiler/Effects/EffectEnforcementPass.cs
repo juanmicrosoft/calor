@@ -606,9 +606,24 @@ public sealed class EffectEnforcementPass
                 }
                 else if (baseClassName != null)
                 {
-                    // External C# base class — variance cannot be checked declaration-locally.
-                    AddAssumption($"{cls.Name}.{method.Id}",
-                        $"overrides a method of external base class '{baseClassName}', so effect variance cannot be checked");
+                    // v0.15 E3 slice b, design-doc §6.2 — the FIRST of the two
+                    // external-base Calor0419s, retired in favour of Calor0425.
+                    // Slice a took neither, because they must move together: this
+                    // one was an AddAssumption whose reasons propagate through
+                    // PropagateAssumptions into every caller's Calor0419, and
+                    // converting only its interface sibling would make sites 4 and
+                    // 5 disagree about what an unresolvable base means. The
+                    // assumption channel carries REASONS, not effects (see
+                    // AddAssumption), so retiring it removes Calor0419 provenance
+                    // and cannot move a computed effect set or a Calor0410 —
+                    // measured on the committed corpus, not assumed.
+                    var overrideRow = PolyRow.FromDeclaration(method.Effects);
+                    ReportRowUnknown(
+                        method.Effects?.Span ?? method.Span,
+                        $"Override '{cls.Name}.{method.Name}' overrides a member of external base "
+                        + $"class '{baseClassName}', which is not visible in this module, so the base "
+                        + $"method's effect row is Unknown. The override's declared row "
+                        + $"{overrideRow.Display()} is assumed to fit here, not verified.");
                 }
             }
 
@@ -689,16 +704,17 @@ public sealed class EffectEnforcementPass
                         // this one would make sites 4 and 5 disagree about what an
                         // unresolvable base means, for a message improvement.
                         // Owed by the slice that redesigns the assumption channel.
-                        var assumedSeverity = _strictEffects
-                            ? DiagnosticSeverity.Error
-                            : DiagnosticSeverity.Warning;
-                        _diagnostics.Report(
+                        // The SECOND external-base Calor0419, retired with its
+                        // override sibling above (§6.2). §6.4's third message
+                        // sample, which RE-WORDS the old text rather than merely
+                        // re-coding it: it names the row.
+                        var assumedIfaceRow = PolyRow.FromDeclaration(sig.Effects);
+                        ReportRowUnknown(
                             cls.Span,
-                            DiagnosticCode.AssumedEffects,
-                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member that is " +
-                            $"not visible in this module (inherited from external base '{externalBaseName}'). " +
-                            "The interface's declared effect set is ASSUMED for this implementation, not verified.",
-                            assumedSeverity);
+                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member "
+                            + $"not visible in this module (inherited from external base "
+                            + $"'{externalBaseName}'), so its effect row is Unknown. The interface's "
+                            + $"declared row {assumedIfaceRow.Display()} is assumed here, not verified.");
                     }
                 }
             }
