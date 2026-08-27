@@ -38,7 +38,7 @@ public class EpochTurnAttributionTests
     private static string Committed()
         => File.ReadAllText(Rel(ArtifactRelativePath)).Replace("\r\n", "\n", StringComparison.Ordinal);
 
-    [Fact]
+    [SkippableFact]
     public void CommittedAttributionEqualsFreshRecomputation()
     {
         var tmp = Path.Combine(Path.GetTempPath(), "calor-turn-attribution-" + Guid.NewGuid().ToString("N"));
@@ -61,7 +61,7 @@ public class EpochTurnAttributionTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public void CommittedAttributionCoversEveryEntryUnderEpochs()
     {
         using var document = JsonDocument.Parse(Committed());
@@ -71,9 +71,11 @@ public class EpochTurnAttributionTests
             .Select(e => (Name: e.GetProperty("epoch").GetString()!, Reason: e.GetProperty("reason").GetString()!))
             .ToList();
 
+        // Dot-entries (.DS_Store, editor droppings) are not archive entries — the script skips them too.
         var entries = Directory.EnumerateFileSystemEntries(Rel(EpochsRelativePath))
             .Select(Path.GetFileName)
             .Select(n => n!)
+            .Where(n => !n.StartsWith('.'))
             .Order(StringComparer.Ordinal)
             .ToList();
         var listed = analyzed.Concat(skipped.Select(s => s.Name)).Order(StringComparer.Ordinal).ToList();
@@ -98,7 +100,7 @@ public class EpochTurnAttributionTests
     /// Gate 12's pin, executed as a mutation: an epochs root identical to the archive
     /// except for one deleted run recomputes to something other than the committed file.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void DeletingOneArchivedRun_RecomputationDiffersFromCommitted()
     {
         var tmp = Path.Combine(Path.GetTempPath(), "calor-turn-attribution-mut-" + Guid.NewGuid().ToString("N"));
@@ -106,9 +108,13 @@ public class EpochTurnAttributionTests
         Directory.CreateDirectory(epochsRoot);
         try
         {
+            // The scratch root symlinks every other epoch (Directory.CreateSymbolicLink needs
+            // Developer Mode or elevation on Windows; CI runs this on Linux) and copies only the
+            // epoch the mutation touches.
             foreach (var entry in Directory.EnumerateFileSystemEntries(Rel(EpochsRelativePath)))
             {
                 var name = Path.GetFileName(entry);
+                if (name.StartsWith('.')) continue;
                 var target = Path.Combine(epochsRoot, name);
                 if (name == "e1-rows-parity-001")
                 {
@@ -153,7 +159,7 @@ public class EpochTurnAttributionTests
     /// tool classes per run and per arm, lists runs without a transcript as
     /// <c>noTranscript</c>, and renders markdown.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void TranscriptsMode_TabulatesFixturesAndListsRunsWithoutTranscript()
     {
         var tmp = Path.Combine(Path.GetTempPath(), "calor-turn-attribution-tx-" + Guid.NewGuid().ToString("N"));
@@ -186,12 +192,14 @@ public class EpochTurnAttributionTests
 
             var subagent = table.GetProperty("byRun").EnumerateArray()
                 .Single(r => r.GetProperty("directory").GetString() == "W-001-demo/calor+treatment/run-2");
-            Assert.Equal(6, subagent.GetProperty("turns").GetProperty("assistantMessages").GetInt32());
+            // turns.assistantMessages counts TOP-LEVEL assistant messages only (A-1.12); the three
+            // forwarded subagent messages are reported separately.
+            Assert.Equal(3, subagent.GetProperty("turns").GetProperty("assistantMessages").GetInt32());
             Assert.Equal(3, subagent.GetProperty("turns").GetProperty("subagentMessages").GetInt32());
 
             var markdown = File.ReadAllText(mdPath);
             Assert.Contains("| W-001-demo/calor+control/run-2 | noTranscript |", markdown, StringComparison.Ordinal);
-            Assert.Contains("| calor+treatment | 2 | 2 | 13 | 3 |", markdown, StringComparison.Ordinal);
+            Assert.Contains("| calor+treatment | 2 | 2 | 10 | 3 |", markdown, StringComparison.Ordinal);
         }
         finally
         {
@@ -201,6 +209,7 @@ public class EpochTurnAttributionTests
 
     private static (int Exit, string Log) RunScript(params string[] args)
     {
+        Skip.If(!Python3OnPath(), "python3 not on PATH");
         var start = new ProcessStartInfo("python3")
         {
             WorkingDirectory = RepoRoot(),
@@ -219,6 +228,27 @@ public class EpochTurnAttributionTests
         var stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
         return (process.ExitCode, stdout.Result + stderr.Result);
+    }
+
+    private static bool Python3OnPath()
+    {
+        try
+        {
+            var probe = new ProcessStartInfo("python3", "--version")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            using var process = Process.Start(probe);
+            if (process == null) return false;
+            process.WaitForExit();
+            return process.ExitCode == 0;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     private static void CopyDirectory(string source, string target)

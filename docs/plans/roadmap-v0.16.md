@@ -59,7 +59,9 @@ read-only), `v0.13-freeze-registrations.md` (*F:*), the open issue list on 2026-
   statistics, both stated: the reviewers' *pooled mean difference* permutation p = 0.012 (turns) /
   0.08 (tokens) / 0.44 (wall-clock); this draft's *median-over-pairs of the paired mean delta*
   (with four pairs the median is the mean of the two middle deltas) p = 0.0037 / 0.0249 / 0.4375
-  (N:S1.2). Sensitivity: all-naive 1.3490, one-run-corrected 1.3390, registered 1.1835.
+  (N:S1.2) (exact relabelling p: 0.0041 / 0.0262 / 0.4391 medianOverPairs; 0.0133 / 0.0838 / 0.4391
+  pooled — `ppe1-turn-attribution.py`; see `2026-08-27-v0.16-s1-turn-attribution.md`).
+  Sensitivity: all-naive 1.3490, one-run-corrected 1.3390 (N1-003/run-5 alone), registered 1.1835.
 - **S1 steps 1–2 are DONE and null** (N:S1.3): byte-identical C# and CLI text across the arms on
   all 40 archived programs; the arm diff is enumerated; the harness hook is identical across the
   two Calor arms (`run-pair.sh:502-516`, including the `${calr_block}${smoke_block}` clauses at

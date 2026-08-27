@@ -120,6 +120,10 @@
   ],
   "allowedRuntimeSkipSites": [
     {
+      "reason": "python3 not on PATH",
+      "count": 1
+    },
+    {
       "reason": "Benchmark file not found",
       "count": 7
     },

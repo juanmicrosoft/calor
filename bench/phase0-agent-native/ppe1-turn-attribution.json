@@ -1,16 +1,15 @@
 {
   "instrument": "bench/phase0-agent-native/ppe1-turn-attribution.py (v0.16 S1 step 3 / W4; gate 12)",
   "registeredEpoch": "e1-rows-parity-001",
-  "denominator": "every entry under bench/phase0-agent-native/epochs/",
+  "denominator": "every non-dot entry under bench/phase0-agent-native/epochs/, attributed by pins.json kind; shape-eligible runs of other kinds are counted, not attributed",
   "analyzedKinds": [
     "pp-e1-rows-parity",
     "pp-w5-parity"
   ],
   "tokenRule": "token-usage.py output_tokens_corrected (A-1.9.1)",
   "statistics": {
-    "pooledMeanDifference": "mean(all treatment runs) - mean(all control runs)",
-    "medianOverPairsOfPairedMeanDelta": "median over pairs of (mean treatment - mean control); even pair count -> mean of the two middle deltas",
-    "permutation": "one-sided, within-pair label shuffle, 20000 permutations, seed 4537"
+    "pooledMeanDifference": "mean(all treatment runs) - mean(all control runs); exact over every within-pair relabelling",
+    "medianOverPairsOfPairedMeanDelta": "median over pairs of (mean treatment - mean control); even pair count -> mean of the two middle deltas; Monte Carlo, 100000 label-vector shuffles per metric, seed 4537"
   },
   "entries": 27,
   "analyzedEpochs": [
@@ -18,102 +17,129 @@
     "w5-parity-001",
     "w5-parity-002"
   ],
+  "analyzedRuns": 120,
+  "skippedRunsWithinAnalyzedEpochs": 0,
+  "shapeEligibleRunsNotAttributed": 553,
   "skipped": [
     {
       "epoch": "a15-freeze",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "authoring-validation-wave2",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "authoring-validation-wave3",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "e1a-attribution",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 180
     },
     {
       "epoch": "feasibility-dry-001",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "guarantees-probe-001",
-      "reason": "pins.json kind='guarantees-probe' is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind='guarantees-probe' is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 90
     },
     {
       "epoch": "hardness-check-001",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 30
     },
     {
       "epoch": "hardness-check-002",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 24
     },
     {
       "epoch": "loop-calibration-001",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 3
     },
     {
       "epoch": "loop-calibration-001-opus",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 1
     },
     {
       "epoch": "loop-feasibility-dry-002",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 35
     },
     {
       "epoch": "loop-feasibility-dry-002.driver.log",
-      "reason": "not a directory (driver log or stray file)"
+      "reason": "not a directory (driver log or stray file)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "m5-compare-001",
-      "reason": "pins.json kind='m5-comparison' is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind='m5-comparison' is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 130
     },
     {
       "epoch": "m5-compare-001.driver.log",
-      "reason": "not a directory (driver log or stray file)"
+      "reason": "not a directory (driver log or stray file)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "s1-census-001",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "s1-funnel-001",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "s1-ledger-001",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "s1-supply-001",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "s1-supply-002",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "w4-dryrun-001",
-      "reason": "no pins.json (not a harness epoch)"
+      "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "ws2-exit-e2e-001",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 6
     },
     {
       "epoch": "ws2-exit-e2e-001.driver.log",
-      "reason": "not a directory (driver log or stray file)"
+      "reason": "not a directory (driver log or stray file)",
+      "shapeEligibleRuns": 0
     },
     {
       "epoch": "ws5-probe-001",
-      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']"
+      "reason": "pins.json kind=None is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 54
     },
     {
       "epoch": "ws5-probe-001.driver.log",
-      "reason": "not a directory (driver log or stray file)"
+      "reason": "not a directory (driver log or stray file)",
+      "shapeEligibleRuns": 0
     }
   ],
   "epochs": [
@@ -131,12 +157,14 @@
         "commit": "b775acb473de03966dfc7811210dd372f16f7bb4"
       },
       "runs": 40,
+      "skippedRuns": [],
       "validRuns": {
         "control": 20,
         "treatment": 20
       },
       "invalidRuns": 0,
       "unattributedRuns": 0,
+      "runsWithoutNumTurns": [],
       "tokenSources": {
         "modelUsage": 40
       },
@@ -393,48 +421,83 @@
       ],
       "permutation": {
         "pooledMeanDifference": {
-          "seed": 4537,
-          "permutations": 20000,
-          "sided": "one-sided, P[permuted >= observed], labels permuted within pair",
-          "rngConsumption": "one random.Random(seed) per statistic, metrics in order turns -> tokens -> wall",
+          "method": "exact: every within-pair relabelling enumerated through the total treatment sum (strictly monotone in the statistic); one-sided P[permuted >= observed]",
           "byMetric": {
             "turns": {
               "observed": 4.35,
-              "p": 0.0124,
-              "pairs": 4
+              "p": 0.013289,
+              "pExactFraction": "53590270/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "tokens": {
               "observed": 1469.55,
-              "p": 0.0851,
-              "pairs": 4
+              "p": 0.083758,
+              "pExactFraction": "337777535/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "wall": {
               "observed": 4579.2,
-              "p": 0.4451,
-              "pairs": 4
+              "p": 0.439102,
+              "pExactFraction": "1770790660/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             }
           }
         },
         "medianOverPairsOfPairedMeanDelta": {
+          "method": "Monte Carlo: fresh random.Random(seed) per metric; per draw, per pair, random.shuffle of the label vector [1]*nT + [0]*nC; one-sided P[permuted >= observed]; the 4th decimal is noise - read p with standardError",
           "seed": 4537,
-          "permutations": 20000,
-          "sided": "one-sided, P[permuted >= observed], labels permuted within pair",
-          "rngConsumption": "one random.Random(seed) per statistic, metrics in order turns -> tokens -> wall",
+          "draws": 100000,
           "byMetric": {
             "turns": {
               "observed": 5.5,
-              "p": 0.0043,
-              "pairs": 4
+              "p": 0.0041,
+              "hits": 409,
+              "draws": 100000,
+              "standardError": 0.000202,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "tokens": {
               "observed": 1898.5,
-              "p": 0.0249,
-              "pairs": 4
+              "p": 0.0251,
+              "hits": 2513,
+              "draws": 100000,
+              "standardError": 0.000495,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "wall": {
               "observed": 2703.5,
-              "p": 0.4494,
-              "pairs": 4
+              "p": 0.4385,
+              "hits": 43850,
+              "draws": 100000,
+              "standardError": 0.001569,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             }
           }
         }
@@ -457,6 +520,7 @@
             "effectFamilyDiagnostics": 0,
             "journals": 20,
             "missingJournals": 0,
+            "unparsableJournalLines": 0,
             "namedEffectCodes": {
               "Calor0410": 0,
               "Calor0411": 0,
@@ -476,6 +540,7 @@
             "effectFamilyDiagnostics": 0,
             "journals": 20,
             "missingJournals": 0,
+            "unparsableJournalLines": 0,
             "namedEffectCodes": {
               "Calor0410": 0,
               "Calor0411": 0,
@@ -509,7 +574,7 @@
         "costRuns": 40
       },
       "perTurn": {
-        "field": "turns.assistantMessages = distinct assistant message.id (A-1.12)",
+        "field": "turns.assistantMessages = distinct TOP-LEVEL assistant message.id (parent_tool_use_id null; A-1.12); subagentMessages counted separately",
         "toolClasses": {
           "Read": [
             "Read"
@@ -519,7 +584,7 @@
             "Glob"
           ],
           "Bash-build": [
-            "Bash whose input.command matches /dotnet build|dotnet test|calor /"
+            "Bash whose input.command matches /(^|[;&|(]\\s*)(dotnet\\s+(build|test|run)(?![\\w-])|dotnet\\s+\\S*calor\\.dll\\b|calor(?![\\w-]))/ (MULTILINE)"
           ],
           "Bash-other": [
             "every other Bash"
@@ -531,7 +596,7 @@
             "NotebookEdit"
           ],
           "other": [
-            "any other tool name (Agent/Task, WebFetch, TodoWrite, ...)"
+            "any other tool name (Agent/Task, mcp__calor__*, WebFetch, TodoWrite, ...); the raw name is kept in toolNames"
           ]
         },
         "runs": 40,
@@ -614,280 +679,320 @@
         },
         "byRun": [
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+0.15.0",
             "run": 1,
             "directory": "N1-001-string-utils/calor+0.15.0/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+0.15.0",
             "run": 2,
             "directory": "N1-001-string-utils/calor+0.15.0/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+0.15.0",
             "run": 3,
             "directory": "N1-001-string-utils/calor+0.15.0/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+0.15.0",
             "run": 4,
             "directory": "N1-001-string-utils/calor+0.15.0/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+0.15.0",
             "run": 5,
             "directory": "N1-001-string-utils/calor+0.15.0/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+v0.14.3",
             "run": 1,
             "directory": "N1-001-string-utils/calor+v0.14.3/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+v0.14.3",
             "run": 2,
             "directory": "N1-001-string-utils/calor+v0.14.3/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+v0.14.3",
             "run": 3,
             "directory": "N1-001-string-utils/calor+v0.14.3/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+v0.14.3",
             "run": 4,
             "directory": "N1-001-string-utils/calor+v0.14.3/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+v0.14.3",
             "run": 5,
             "directory": "N1-001-string-utils/calor+v0.14.3/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+0.15.0",
             "run": 1,
             "directory": "N1-002-inventory/calor+0.15.0/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+0.15.0",
             "run": 2,
             "directory": "N1-002-inventory/calor+0.15.0/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+0.15.0",
             "run": 3,
             "directory": "N1-002-inventory/calor+0.15.0/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+0.15.0",
             "run": 4,
             "directory": "N1-002-inventory/calor+0.15.0/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+0.15.0",
             "run": 5,
             "directory": "N1-002-inventory/calor+0.15.0/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+v0.14.3",
             "run": 1,
             "directory": "N1-002-inventory/calor+v0.14.3/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+v0.14.3",
             "run": 2,
             "directory": "N1-002-inventory/calor+v0.14.3/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+v0.14.3",
             "run": 3,
             "directory": "N1-002-inventory/calor+v0.14.3/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+v0.14.3",
             "run": 4,
             "directory": "N1-002-inventory/calor+v0.14.3/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+v0.14.3",
             "run": 5,
             "directory": "N1-002-inventory/calor+v0.14.3/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+0.15.0",
             "run": 1,
             "directory": "N1-003-csv-row/calor+0.15.0/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+0.15.0",
             "run": 2,
             "directory": "N1-003-csv-row/calor+0.15.0/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+0.15.0",
             "run": 3,
             "directory": "N1-003-csv-row/calor+0.15.0/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+0.15.0",
             "run": 4,
             "directory": "N1-003-csv-row/calor+0.15.0/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+0.15.0",
             "run": 5,
             "directory": "N1-003-csv-row/calor+0.15.0/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+v0.14.3",
             "run": 1,
             "directory": "N1-003-csv-row/calor+v0.14.3/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+v0.14.3",
             "run": 2,
             "directory": "N1-003-csv-row/calor+v0.14.3/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+v0.14.3",
             "run": 3,
             "directory": "N1-003-csv-row/calor+v0.14.3/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+v0.14.3",
             "run": 4,
             "directory": "N1-003-csv-row/calor+v0.14.3/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+v0.14.3",
             "run": 5,
             "directory": "N1-003-csv-row/calor+v0.14.3/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+0.15.0",
             "run": 1,
             "directory": "N1-005-order-pipeline/calor+0.15.0/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+0.15.0",
             "run": 2,
             "directory": "N1-005-order-pipeline/calor+0.15.0/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+0.15.0",
             "run": 3,
             "directory": "N1-005-order-pipeline/calor+0.15.0/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+0.15.0",
             "run": 4,
             "directory": "N1-005-order-pipeline/calor+0.15.0/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+0.15.0",
             "run": 5,
             "directory": "N1-005-order-pipeline/calor+0.15.0/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+v0.14.3",
             "run": 1,
             "directory": "N1-005-order-pipeline/calor+v0.14.3/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+v0.14.3",
             "run": 2,
             "directory": "N1-005-order-pipeline/calor+v0.14.3/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+v0.14.3",
             "run": 3,
             "directory": "N1-005-order-pipeline/calor+v0.14.3/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+v0.14.3",
             "run": 4,
             "directory": "N1-005-order-pipeline/calor+v0.14.3/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+v0.14.3",
             "run": 5,
             "directory": "N1-005-order-pipeline/calor+v0.14.3/run-5",
@@ -1872,12 +1977,14 @@
         "commit": "87a783dd"
       },
       "runs": 40,
+      "skippedRuns": [],
       "validRuns": {
         "control": 20,
         "treatment": 20
       },
       "invalidRuns": 0,
       "unattributedRuns": 0,
+      "runsWithoutNumTurns": [],
       "tokenSources": {
         "modelUsage": 40
       },
@@ -2137,48 +2244,83 @@
       ],
       "permutation": {
         "pooledMeanDifference": {
-          "seed": 4537,
-          "permutations": 20000,
-          "sided": "one-sided, P[permuted >= observed], labels permuted within pair",
-          "rngConsumption": "one random.Random(seed) per statistic, metrics in order turns -> tokens -> wall",
+          "method": "exact: every within-pair relabelling enumerated through the total treatment sum (strictly monotone in the statistic); one-sided P[permuted >= observed]",
           "byMetric": {
             "turns": {
               "observed": 1.6,
-              "p": 0.1084,
-              "pairs": 4
+              "p": 0.10883,
+              "pExactFraction": "438885430/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "tokens": {
               "observed": 778.5,
-              "p": 0.2384,
-              "pairs": 4
+              "p": 0.234882,
+              "pExactFraction": "947221625/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "wall": {
               "observed": 15713.85,
-              "p": 0.153,
-              "pairs": 4
+              "p": 0.155044,
+              "pExactFraction": "625254510/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             }
           }
         },
         "medianOverPairsOfPairedMeanDelta": {
+          "method": "Monte Carlo: fresh random.Random(seed) per metric; per draw, per pair, random.shuffle of the label vector [1]*nT + [0]*nC; one-sided P[permuted >= observed]; the 4th decimal is noise - read p with standardError",
           "seed": 4537,
-          "permutations": 20000,
-          "sided": "one-sided, P[permuted >= observed], labels permuted within pair",
-          "rngConsumption": "one random.Random(seed) per statistic, metrics in order turns -> tokens -> wall",
+          "draws": 100000,
           "byMetric": {
             "turns": {
               "observed": 1.5,
-              "p": 0.1489,
-              "pairs": 4
+              "p": 0.1486,
+              "hits": 14864,
+              "draws": 100000,
+              "standardError": 0.001125,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "tokens": {
               "observed": 1249.3,
-              "p": 0.0987,
-              "pairs": 4
+              "p": 0.0959,
+              "hits": 9590,
+              "draws": 100000,
+              "standardError": 0.000931,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "wall": {
               "observed": 21038.9,
-              "p": 0.0647,
-              "pairs": 4
+              "p": 0.0645,
+              "hits": 6453,
+              "draws": 100000,
+              "standardError": 0.000777,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             }
           }
         }
@@ -2197,6 +2339,7 @@
             "effectFamilyDiagnostics": 0,
             "journals": 20,
             "missingJournals": 0,
+            "unparsableJournalLines": 0,
             "namedEffectCodes": {
               "Calor0410": 0,
               "Calor0411": 0,
@@ -2218,6 +2361,7 @@
             "effectFamilyDiagnostics": 0,
             "journals": 20,
             "missingJournals": 0,
+            "unparsableJournalLines": 0,
             "namedEffectCodes": {
               "Calor0410": 0,
               "Calor0411": 0,
@@ -2251,7 +2395,7 @@
         "costRuns": 40
       },
       "perTurn": {
-        "field": "turns.assistantMessages = distinct assistant message.id (A-1.12)",
+        "field": "turns.assistantMessages = distinct TOP-LEVEL assistant message.id (parent_tool_use_id null; A-1.12); subagentMessages counted separately",
         "toolClasses": {
           "Read": [
             "Read"
@@ -2261,7 +2405,7 @@
             "Glob"
           ],
           "Bash-build": [
-            "Bash whose input.command matches /dotnet build|dotnet test|calor /"
+            "Bash whose input.command matches /(^|[;&|(]\\s*)(dotnet\\s+(build|test|run)(?![\\w-])|dotnet\\s+\\S*calor\\.dll\\b|calor(?![\\w-]))/ (MULTILINE)"
           ],
           "Bash-other": [
             "every other Bash"
@@ -2273,7 +2417,7 @@
             "NotebookEdit"
           ],
           "other": [
-            "any other tool name (Agent/Task, WebFetch, TodoWrite, ...)"
+            "any other tool name (Agent/Task, mcp__calor__*, WebFetch, TodoWrite, ...); the raw name is kept in toolNames"
           ]
         },
         "runs": 40,
@@ -2356,280 +2500,320 @@
         },
         "byRun": [
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-001-string-utils/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-001-string-utils/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-001-string-utils/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-001-string-utils/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-001-string-utils/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-001-string-utils/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-001-string-utils/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-001-string-utils/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-001-string-utils/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-001-string-utils/calor+treatment/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-002-inventory/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-002-inventory/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-002-inventory/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-002-inventory/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-002-inventory/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-002-inventory/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-002-inventory/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-002-inventory/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-002-inventory/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-002-inventory/calor+treatment/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-003-csv-row/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-003-csv-row/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-003-csv-row/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-003-csv-row/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-003-csv-row/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-003-csv-row/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-003-csv-row/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-003-csv-row/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-003-csv-row/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-003-csv-row/calor+treatment/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-005-order-pipeline/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-005-order-pipeline/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-005-order-pipeline/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-005-order-pipeline/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-005-order-pipeline/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-005-order-pipeline/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-005-order-pipeline/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-005-order-pipeline/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-005-order-pipeline/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-005-order-pipeline/calor+treatment/run-5",
@@ -3614,12 +3798,14 @@
         "commit": "87a783dd"
       },
       "runs": 40,
+      "skippedRuns": [],
       "validRuns": {
         "control": 20,
         "treatment": 20
       },
       "invalidRuns": 0,
       "unattributedRuns": 0,
+      "runsWithoutNumTurns": [],
       "tokenSources": {
         "modelUsage": 40
       },
@@ -3879,48 +4065,83 @@
       ],
       "permutation": {
         "pooledMeanDifference": {
-          "seed": 4537,
-          "permutations": 20000,
-          "sided": "one-sided, P[permuted >= observed], labels permuted within pair",
-          "rngConsumption": "one random.Random(seed) per statistic, metrics in order turns -> tokens -> wall",
+          "method": "exact: every within-pair relabelling enumerated through the total treatment sum (strictly monotone in the statistic); one-sided P[permuted >= observed]",
           "byMetric": {
             "turns": {
               "observed": -0.35,
-              "p": 0.5554,
-              "pairs": 4
+              "p": 0.556112,
+              "pExactFraction": "2242663387/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "tokens": {
               "observed": 2037.6,
-              "p": 0.1862,
-              "pairs": 4
+              "p": 0.187621,
+              "pExactFraction": "756631411/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "wall": {
               "observed": 11937.6,
-              "p": 0.3651,
-              "pairs": 4
+              "p": 0.365387,
+              "pExactFraction": "1473516897/4032758016",
+              "relabellings": 4032758016,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             }
           }
         },
         "medianOverPairsOfPairedMeanDelta": {
+          "method": "Monte Carlo: fresh random.Random(seed) per metric; per draw, per pair, random.shuffle of the label vector [1]*nT + [0]*nC; one-sided P[permuted >= observed]; the 4th decimal is noise - read p with standardError",
           "seed": 4537,
-          "permutations": 20000,
-          "sided": "one-sided, P[permuted >= observed], labels permuted within pair",
-          "rngConsumption": "one random.Random(seed) per statistic, metrics in order turns -> tokens -> wall",
+          "draws": 100000,
           "byMetric": {
             "turns": {
               "observed": -0.3,
-              "p": 0.5483,
-              "pairs": 4
+              "p": 0.5485,
+              "hits": 54854,
+              "draws": 100000,
+              "standardError": 0.001574,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "tokens": {
               "observed": -106.8,
-              "p": 0.5253,
-              "pairs": 4
+              "p": 0.5289,
+              "hits": 52890,
+              "draws": 100000,
+              "standardError": 0.001578,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             },
             "wall": {
               "observed": 9602.9,
-              "p": 0.3841,
-              "pairs": 4
+              "p": 0.381,
+              "hits": 38097,
+              "draws": 100000,
+              "standardError": 0.001536,
+              "pairs": 4,
+              "n": {
+                "treatment": 20,
+                "control": 20
+              }
             }
           }
         }
@@ -3944,6 +4165,7 @@
             "effectFamilyDiagnostics": 1,
             "journals": 20,
             "missingJournals": 0,
+            "unparsableJournalLines": 0,
             "namedEffectCodes": {
               "Calor0410": 1,
               "Calor0411": 0,
@@ -3965,6 +4187,7 @@
             "effectFamilyDiagnostics": 1,
             "journals": 20,
             "missingJournals": 0,
+            "unparsableJournalLines": 0,
             "namedEffectCodes": {
               "Calor0410": 1,
               "Calor0411": 0,
@@ -3998,7 +4221,7 @@
         "costRuns": 40
       },
       "perTurn": {
-        "field": "turns.assistantMessages = distinct assistant message.id (A-1.12)",
+        "field": "turns.assistantMessages = distinct TOP-LEVEL assistant message.id (parent_tool_use_id null; A-1.12); subagentMessages counted separately",
         "toolClasses": {
           "Read": [
             "Read"
@@ -4008,7 +4231,7 @@
             "Glob"
           ],
           "Bash-build": [
-            "Bash whose input.command matches /dotnet build|dotnet test|calor /"
+            "Bash whose input.command matches /(^|[;&|(]\\s*)(dotnet\\s+(build|test|run)(?![\\w-])|dotnet\\s+\\S*calor\\.dll\\b|calor(?![\\w-]))/ (MULTILINE)"
           ],
           "Bash-other": [
             "every other Bash"
@@ -4020,7 +4243,7 @@
             "NotebookEdit"
           ],
           "other": [
-            "any other tool name (Agent/Task, WebFetch, TodoWrite, ...)"
+            "any other tool name (Agent/Task, mcp__calor__*, WebFetch, TodoWrite, ...); the raw name is kept in toolNames"
           ]
         },
         "runs": 40,
@@ -4103,280 +4326,320 @@
         },
         "byRun": [
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-001-string-utils/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-001-string-utils/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-001-string-utils/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-001-string-utils/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-001-string-utils/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-001-string-utils/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-001-string-utils/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-001-string-utils/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-001-string-utils/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-001-string-utils",
+            "pair": "N1-001",
+            "pairDirectory": "N1-001-string-utils",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-001-string-utils/calor+treatment/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-002-inventory/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-002-inventory/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-002-inventory/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-002-inventory/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-002-inventory/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-002-inventory/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-002-inventory/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-002-inventory/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-002-inventory/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-002-inventory",
+            "pair": "N1-002",
+            "pairDirectory": "N1-002-inventory",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-002-inventory/calor+treatment/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-003-csv-row/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-003-csv-row/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-003-csv-row/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-003-csv-row/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-003-csv-row/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-003-csv-row/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-003-csv-row/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-003-csv-row/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-003-csv-row/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-003-csv-row",
+            "pair": "N1-003",
+            "pairDirectory": "N1-003-csv-row",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-003-csv-row/calor+treatment/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 1,
             "directory": "N1-005-order-pipeline/calor+control/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 2,
             "directory": "N1-005-order-pipeline/calor+control/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 3,
             "directory": "N1-005-order-pipeline/calor+control/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 4,
             "directory": "N1-005-order-pipeline/calor+control/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+control",
             "run": 5,
             "directory": "N1-005-order-pipeline/calor+control/run-5",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 1,
             "directory": "N1-005-order-pipeline/calor+treatment/run-1",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 2,
             "directory": "N1-005-order-pipeline/calor+treatment/run-2",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 3,
             "directory": "N1-005-order-pipeline/calor+treatment/run-3",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 4,
             "directory": "N1-005-order-pipeline/calor+treatment/run-4",
             "transcript": "noTranscript"
           },
           {
-            "pair": "N1-005-order-pipeline",
+            "pair": "N1-005",
+            "pairDirectory": "N1-005-order-pipeline",
             "arm": "calor+treatment",
             "run": 5,
             "directory": "N1-005-order-pipeline/calor+treatment/run-5",

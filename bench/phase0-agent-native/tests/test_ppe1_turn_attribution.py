@@ -4,27 +4,30 @@
 `ppe1-turn-attribution.py` reproduces N:S1.1 and N:S1.2 of
 `docs/plans/2026-08-27-v0.16-s1-s2-measurement-notes.md` from the archived
 `e1-rows-parity-001` epoch, and carries W4's per-turn tool-class table. The
-numbers pinned here are what the script DERIVES; where they differ from a
-published figure the difference is stated in the test, never fitted away:
+numbers pinned here are what the script DERIVES:
 
-  * median-over-pairs p (turns / tokens / wall) = 0.0043 / 0.0249 / 0.4494 —
-    the notes' 0.004 / 0.025 / 0.449 at their precision; the roadmap §0.2
-    line quotes 0.0037 / 0.0249 / 0.4375 for the same statistic, which no
-    stdlib draw order reproduces (0.0037 and 0.4375 are within permutation
-    noise of the pinned values).
-  * pooled-mean-difference p = 0.0124 / 0.0851 / 0.4451 — the reviewers'
-    0.012 / 0.08 / 0.44 at two figures except tokens (0.085 vs "0.08"; the
-    reviewers' draw order is not recorded).
-  * "correcting only N1-001/run-3 gives 1.3390" (notes S1.2) is a
-    mis-attribution: correcting only N1-001/run-3 gives 1.1934; correcting
-    only N1-003/run-5 gives 1.3390. The roadmap's unnamed "one-run-corrected
-    1.3390" is the N1-003/run-5 figure.
+  * pooled mean difference p is EXACT over every within-pair relabelling
+    (C(10,5)^4 = 4 032 758 016): 0.013289 / 0.083758 / 0.439102 — the
+    reviewers' 0.012 / 0.08 / 0.44 were a 20 000-draw Monte-Carlo estimate
+    of it.
+  * median-over-pairs p is Monte Carlo (100 000 label-vector shuffles, seed
+    4537); its exact relabelling values, enumerated by review #2 of PR #1117,
+    are 0.004132 / 0.026204 / 0.439069. The MC value is pinned WITHIN THREE
+    STANDARD ERRORS of those — the fourth decimal is noise, not a pin. The
+    notes' 0.004 / 0.025 / 0.449 and the roadmap's 0.0037 / 0.0249 / 0.4375
+    are two 20 000-draw estimates of the same statistic under different
+    shuffle mechanics (the roadmap's is reproduced exactly by this script's
+    scheme at 20 000 draws — `test_roadmap_triple_is_this_scheme_at_20k`).
+  * "correcting only N1-001/run-3 gives 1.3390" (notes S1.2, Draft v2) was a
+    mis-attribution: N1-001/run-3 alone gives 1.1934; N1-003/run-5 alone
+    gives 1.3390.
 
 Run:  python3 -m unittest discover -s bench/phase0-agent-native/tests
 """
 
 import importlib.util
 import json
+import math
 import os
 import shutil
 import tempfile
@@ -35,6 +38,10 @@ BENCH = os.path.dirname(HERE)
 EPOCHS = os.path.join(BENCH, "epochs")
 COMMITTED = os.path.join(BENCH, "ppe1-turn-attribution.json")
 TRANSCRIPT_FIXTURES = os.path.join(HERE, "fixtures", "transcripts")
+E1 = "e1-rows-parity-001"
+
+EXACT_MEDIAN_OVER_PAIRS = {"turns": 0.004132, "tokens": 0.026204, "wall": 0.439069}   # review #2 enumeration
+EXACT_POOLED = {"turns": 0.013289, "tokens": 0.083758, "wall": 0.439102}
 
 
 def _load():
@@ -45,19 +52,34 @@ def _load():
     return module
 
 
+def _scratch_root(tmp, copy=(E1,)):
+    """An epochs root identical to the archive: symlinks, except real copies of `copy`."""
+    root = os.path.join(tmp, "epochs")
+    os.mkdir(root)
+    for name in os.listdir(EPOCHS):
+        if name.startswith("."):
+            continue
+        src = os.path.join(EPOCHS, name)
+        if name in copy:
+            shutil.copytree(src, os.path.join(root, name))
+        else:
+            os.symlink(src, os.path.join(root, name))
+    return root
+
+
 class ArchiveAttribution(unittest.TestCase):
-    """The whole-archive report, computed once (the permutation loops take a few seconds)."""
+    """The whole-archive report, computed once (the permutation loops take ~15 s)."""
 
     @classmethod
     def setUpClass(cls):
         cls.mod = _load()
         cls.report = cls.mod.attribute(EPOCHS)
-        cls.e1 = next(e for e in cls.report["epochs"] if e["epoch"] == "e1-rows-parity-001")
+        cls.e1 = next(e for e in cls.report["epochs"] if e["epoch"] == E1)
 
     # ---- gate 12 denominator -------------------------------------------------
 
     def test_every_entry_under_epochs_is_analyzed_or_skipped_by_name(self):
-        entries = sorted(os.listdir(EPOCHS))
+        entries = sorted(n for n in os.listdir(EPOCHS) if not n.startswith("."))
         listed = sorted(self.report["analyzedEpochs"] + [s["epoch"] for s in self.report["skipped"]])
         self.assertEqual(entries, listed)
         self.assertEqual(self.report["entries"], len(entries))
@@ -65,24 +87,44 @@ class ArchiveAttribution(unittest.TestCase):
             self.assertTrue(skipped["reason"], skipped)
 
     def test_the_three_ppe1_w5_shaped_epochs_are_analyzed(self):
-        self.assertEqual(self.report["analyzedEpochs"],
-                         ["e1-rows-parity-001", "w5-parity-001", "w5-parity-002"])
+        self.assertEqual(self.report["analyzedEpochs"], [E1, "w5-parity-001", "w5-parity-002"])
+        self.assertEqual(self.report["analyzedRuns"], 120)
+        self.assertEqual(self.report["skippedRunsWithinAnalyzedEpochs"], 0)
         for epoch in self.report["epochs"]:
             self.assertEqual(epoch["runs"], 40, epoch["epoch"])
+            self.assertEqual(epoch["skippedRuns"], [], epoch["epoch"])
             self.assertEqual(epoch["unattributedRuns"], 0, epoch["epoch"])
+            self.assertEqual(epoch["runsWithoutNumTurns"], [], epoch["epoch"])
 
-    def test_skip_reasons_name_the_shape_failure(self):
-        reasons = {s["epoch"]: s["reason"] for s in self.report["skipped"]}
-        self.assertIn("kind='m5-comparison'", reasons["m5-compare-001"])
-        self.assertIn("kind='guarantees-probe'", reasons["guarantees-probe-001"])
-        self.assertIn("no pins.json", reasons["w4-dryrun-001"])
-        self.assertIn("not a directory", reasons["m5-compare-001.driver.log"])
+    def test_skip_reasons_name_the_shape_failure_and_count_eligible_runs(self):
+        by_name = {s["epoch"]: s for s in self.report["skipped"]}
+        self.assertIn("kind='m5-comparison'", by_name["m5-compare-001"]["reason"])
+        self.assertIn("kind='guarantees-probe'", by_name["guarantees-probe-001"]["reason"])
+        self.assertIn("no pins.json", by_name["w4-dryrun-001"]["reason"])
+        self.assertIn("not a directory", by_name["m5-compare-001.driver.log"]["reason"])
+        # shape-eligible runs of other kinds are counted, never silently attributed
+        self.assertEqual(by_name["m5-compare-001"]["shapeEligibleRuns"], 130)
+        self.assertEqual(by_name["e1a-attribution"]["shapeEligibleRuns"], 180)
+        self.assertEqual(by_name["w4-dryrun-001"]["shapeEligibleRuns"], 0)   # bundle-runner shape
+        self.assertEqual(by_name["feasibility-dry-001"]["shapeEligibleRuns"], 0)
+        self.assertEqual(self.report["shapeEligibleRunsNotAttributed"], 553)
 
     def test_committed_json_equals_a_fresh_recomputation(self):
         with open(COMMITTED, encoding="utf-8") as fh:
             committed = fh.read()
         self.assertEqual(json.dumps(self.report, indent=2) + "\n", committed,
                          "regenerate with: python3 bench/phase0-agent-native/ppe1-turn-attribution.py")
+
+    def test_dotfiles_in_epochs_root_are_not_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _scratch_root(tmp, copy=())
+            with open(os.path.join(root, ".DS_Store"), "wb") as fh:
+                fh.write(b"\x00Bud1")
+            os.mkdir(os.path.join(root, ".hidden-epoch"))
+            with open(os.path.join(root, ".hidden-epoch", "pins.json"), "w", encoding="utf-8") as fh:
+                fh.write('{"kind": "pp-e1-rows-parity"}')
+            report = self.mod.attribute(root)
+        self.assertEqual(json.dumps(report, indent=2), json.dumps(self.report, indent=2))
 
     # ---- N:S1.2 — agent behaviour per pair ------------------------------------
 
@@ -111,18 +153,57 @@ class ArchiveAttribution(unittest.TestCase):
         self.assertEqual([rows[p]["ratio"] for p in ("N1-001", "N1-002", "N1-003", "N1-005")],
                          [1.1762, 1.5118, 1.1907, 0.8984])
 
-    def test_both_permutation_statistics_are_stated_and_pinned(self):
-        perm = self.e1["permutation"]
-        self.assertEqual(list(perm), ["pooledMeanDifference", "medianOverPairsOfPairedMeanDelta"])
-        for stat in perm.values():
-            self.assertEqual((stat["seed"], stat["permutations"]), (4537, 20000))
-        pooled = perm["pooledMeanDifference"]["byMetric"]
-        self.assertEqual([pooled[m]["p"] for m in ("turns", "tokens", "wall")], [0.0124, 0.0851, 0.4451])
-        median = perm["medianOverPairsOfPairedMeanDelta"]["byMetric"]
-        self.assertEqual([median[m]["p"] for m in ("turns", "tokens", "wall")], [0.0043, 0.0249, 0.4494])
-        # observed statistics: the median of four paired mean deltas is the mean of the two middle ones
-        self.assertEqual(median["turns"]["observed"], 5.5)
-        self.assertEqual(pooled["turns"]["observed"], 4.35)
+    def test_pooled_mean_difference_is_exact(self):
+        pooled = self.e1["permutation"]["pooledMeanDifference"]
+        self.assertIn("exact", pooled["method"])
+        by = pooled["byMetric"]
+        self.assertEqual({m: by[m]["p"] for m in ("turns", "tokens", "wall")}, EXACT_POOLED)
+        self.assertEqual(by["turns"]["relabellings"], 252 ** 4)
+        self.assertEqual(by["turns"]["pExactFraction"], "53590270/4032758016")
+        self.assertEqual(by["turns"]["observed"], 4.35)
+        for m in ("turns", "tokens", "wall"):
+            self.assertEqual(by[m]["n"], {"treatment": 20, "control": 20})
+            self.assertEqual(by[m]["pairs"], 4)
+
+    def test_median_over_pairs_is_monte_carlo_within_three_se_of_exact(self):
+        mc = self.e1["permutation"]["medianOverPairsOfPairedMeanDelta"]
+        self.assertEqual((mc["seed"], mc["draws"]), (4537, 100000))
+        by = mc["byMetric"]
+        self.assertEqual(by["turns"]["observed"], 5.5)   # four pairs: mean of the two middle deltas
+        for m in ("turns", "tokens", "wall"):
+            p, se, hits = by[m]["p"], by[m]["standardError"], by[m]["hits"]
+            self.assertEqual(p, round(hits / 100000, 4))
+            self.assertAlmostEqual(se, math.sqrt((hits / 100000) * (1 - hits / 100000) / 100000), places=6)
+            self.assertLessEqual(abs(p - EXACT_MEDIAN_OVER_PAIRS[m]), 3 * se,
+                                 f"{m}: MC p {p} is more than 3 s.e. ({se}) from the exact {EXACT_MEDIAN_OVER_PAIRS[m]}")
+            self.assertEqual(by[m]["n"], {"treatment": 20, "control": 20})
+        # the committed draw, for the record (noise beyond the s.e. shown)
+        self.assertEqual([by[m]["p"] for m in ("turns", "tokens", "wall")], [0.0041, 0.0251, 0.4385])
+
+    def test_roadmap_triple_is_this_scheme_at_20k(self):
+        ok, reason, pins, _ = self.mod.classify_epoch(os.path.join(EPOCHS, E1))
+        runs, _ = self.mod.collect_runs(os.path.join(EPOCHS, E1), pins)
+        triple = [self.mod.monte_carlo_median_over_pairs_p(self.mod._cells(runs, m), draws=20000)["p"]
+                  for m in ("turns", "tokens", "wall")]
+        self.assertEqual(triple, [0.0037, 0.0249, 0.4375])   # roadmap §0.2, reproduced
+
+    def test_exact_pooled_p_agrees_with_brute_force_on_a_small_case(self):
+        cells = {"A": {"treatment": [5, 7], "control": [1, 2, 3]},
+                 "B": {"treatment": [10], "control": [4, 6]}}
+        import itertools
+        import statistics
+        observed = self.mod.stat_pooled_mean_difference(cells)
+        hits = total = 0
+        for ta in itertools.combinations([5, 7, 1, 2, 3], 2):
+            ca = [v for v in [5, 7, 1, 2, 3] if v not in ta]
+            for tb in itertools.combinations([10, 4, 6], 1):
+                cb = [v for v in [10, 4, 6] if v not in tb]
+                total += 1
+                stat = statistics.mean(list(ta) + list(tb)) - statistics.mean(ca + cb)
+                hits += stat >= observed
+        exact = self.mod.exact_pooled_p(cells)
+        self.assertEqual(exact["relabellings"], total)
+        self.assertEqual(exact["pExactFraction"], f"{hits}/{total}")
 
     def test_token_sensitivity_line(self):
         sens = self.e1["tokenSensitivity"]
@@ -134,7 +215,6 @@ class ArchiveAttribution(unittest.TestCase):
                           singles["N1-001/calor+v0.14.3/run-3"]["corrected"]), (4522, 12821))
         self.assertEqual((singles["N1-003/calor+v0.14.3/run-5"]["naive"],
                           singles["N1-003/calor+v0.14.3/run-5"]["corrected"]), (12547, 13585))
-        # the notes attribute 1.3390 to N1-001/run-3; the arithmetic puts it on N1-003/run-5
         self.assertEqual(singles["N1-003/calor+v0.14.3/run-5"]["pointEstimateCorrectingOnlyThisRun"], 1.339)
         self.assertEqual(singles["N1-001/calor+v0.14.3/run-3"]["pointEstimateCorrectingOnlyThisRun"], 1.1934)
         self.assertEqual(sens["meanTotalCostUsdPerRun"], 1.0048)
@@ -144,6 +224,13 @@ class ArchiveAttribution(unittest.TestCase):
         self.assertEqual(self.e1["resultJsonTokenDisagreements"], [])
         self.assertEqual(self.e1["tokenSources"], {"modelUsage": 40})
         self.assertEqual(self.e1["validRuns"], {"control": 20, "treatment": 20})
+
+    def test_w5_result_json_token_disagreements_are_listed(self):
+        by_epoch = {e["epoch"]: e["resultJsonTokenDisagreements"] for e in self.report["epochs"]}
+        self.assertEqual(by_epoch["w5-parity-001"],
+                         ["N1-002-inventory/calor+control/run-2", "N1-005-order-pipeline/calor+treatment/run-3"])
+        self.assertEqual(by_epoch["w5-parity-002"],
+                         ["N1-001-string-utils/calor+treatment/run-4", "N1-002-inventory/calor+control/run-3"])
 
     # ---- N:S1.1 — the harness compile census ----------------------------------
 
@@ -161,7 +248,7 @@ class ArchiveAttribution(unittest.TestCase):
         for arm in (treatment, control):
             self.assertEqual(arm["effectFamilyDiagnostics"], 0)
             self.assertEqual(set(arm["namedEffectCodes"].values()), {0})
-            self.assertEqual(arm["missingJournals"], 0)
+            self.assertEqual((arm["missingJournals"], arm["unparsableJournalLines"]), (0, 0))
 
     # ---- W4 per-turn table over the archive: nothing archived yet -------------
 
@@ -172,29 +259,92 @@ class ArchiveAttribution(unittest.TestCase):
             self.assertEqual(table["withTranscript"], 0, epoch["epoch"])
             self.assertEqual(len(table["noTranscript"]), 40, epoch["epoch"])
             self.assertEqual(sum(a["noTranscript"] for a in table["byArm"].values()), 40)
+            # perTurn and perRun agree on the short pair id and the int run number
+            self.assertEqual([(r["pair"], r["arm"], r["run"]) for r in table["byRun"]],
+                             [(r["pair"], r["arm"], r["run"]) for r in epoch["perRun"]])
+            self.assertTrue(all(isinstance(r["run"], int) for r in epoch["perRun"]))
 
     # ---- gate 12 discriminating pin: delete one run -> the output changes -----
 
     def test_deleting_one_archived_run_changes_the_report(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = os.path.join(tmp, "epochs")
-            os.mkdir(root)
-            for name in os.listdir(EPOCHS):
-                src = os.path.join(EPOCHS, name)
-                if name == "e1-rows-parity-001":
-                    shutil.copytree(src, os.path.join(root, name))
-                else:
-                    os.symlink(src, os.path.join(root, name))
-            shutil.rmtree(os.path.join(root, "e1-rows-parity-001", "N1-002-inventory",
-                                       "calor+0.15.0", "run-3"))
+            root = _scratch_root(tmp)
+            shutil.rmtree(os.path.join(root, E1, "N1-002-inventory", "calor+0.15.0", "run-3"))
             mutated = self.mod.attribute(root)
-        e1 = next(e for e in mutated["epochs"] if e["epoch"] == "e1-rows-parity-001")
+        e1 = next(e for e in mutated["epochs"] if e["epoch"] == E1)
         self.assertEqual(e1["runs"], 39)
         self.assertEqual(e1["compileCensus"]["totalBuilds"], 47)   # that run carried two builds
         self.assertEqual(e1["perTurn"]["runs"], 39)
         self.assertNotEqual(json.dumps(mutated, indent=2) + "\n", json.dumps(self.report, indent=2) + "\n")
         with open(COMMITTED, encoding="utf-8") as fh:
             self.assertNotEqual(json.dumps(mutated, indent=2) + "\n", fh.read())
+
+    def test_a_damaged_run_is_skipped_per_run_not_per_epoch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _scratch_root(tmp)
+            e1_dir = os.path.join(root, E1)
+            os.remove(os.path.join(e1_dir, "N1-001-string-utils", "calor+0.15.0", "run-2", "agent.json"))
+            with open(os.path.join(e1_dir, "N1-003-csv-row", "calor+v0.14.3", "run-4", "result.json"), "w",
+                      encoding="utf-8") as fh:
+                fh.write("{not json")
+            os.remove(os.path.join(e1_dir, "N1-005-order-pipeline", "calor+0.15.0", "run-1", "result.json"))
+            with open(os.path.join(e1_dir, "N1-005-order-pipeline", "calor+v0.14.3", "run-5", "result.json"),
+                      "w", encoding="utf-8") as fh:
+                fh.write('{"pair": "N1-005-order-pipeline", "arm": "calor+v0.14.3"}')
+            mutated = self.mod.attribute(root)
+        self.assertIn(E1, mutated["analyzedEpochs"])
+        e1 = next(e for e in mutated["epochs"] if e["epoch"] == E1)
+        self.assertEqual(e1["runs"], 36)
+        self.assertEqual([(s["directory"], s["reason"].split(":")[0].split(" (")[0]) for s in e1["skippedRuns"]], [
+            ("N1-001-string-utils/calor+0.15.0/run-2", "no agent.json"),
+            ("N1-003-csv-row/calor+v0.14.3/run-4", "result.json is not valid JSON"),
+            ("N1-005-order-pipeline/calor+0.15.0/run-1", "no result.json"),
+            ("N1-005-order-pipeline/calor+v0.14.3/run-5", "result.json lacks ['run', 'tokens', 'censored', 'invalid']"),
+        ])
+        self.assertEqual(mutated["skippedRunsWithinAnalyzedEpochs"], 4)
+        self.assertEqual(e1["perTurn"]["runs"], 36)
+
+    def test_a_malformed_pins_json_skips_the_epoch_with_a_reason(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _scratch_root(tmp)
+            with open(os.path.join(root, E1, "pins.json"), "w", encoding="utf-8") as fh:
+                fh.write("{broken")
+            mutated = self.mod.attribute(root)
+        self.assertNotIn(E1, mutated["analyzedEpochs"])
+        entry = next(s for s in mutated["skipped"] if s["epoch"] == E1)
+        self.assertTrue(entry["reason"].startswith("pins.json is not valid JSON"), entry)
+        self.assertEqual(entry["shapeEligibleRuns"], 40)
+
+    def test_a_run_without_num_turns_is_visible_in_n(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _scratch_root(tmp)
+            agent = os.path.join(root, E1, "N1-002-inventory", "calor+v0.14.3", "run-1", "agent.json")
+            with open(agent, encoding="utf-8") as fh:
+                envelope = json.load(fh)
+            del envelope["num_turns"]
+            with open(agent, "w", encoding="utf-8") as fh:
+                json.dump(envelope, fh)
+            mutated = self.mod.attribute(root)
+        e1 = next(e for e in mutated["epochs"] if e["epoch"] == E1)
+        self.assertEqual(e1["runsWithoutNumTurns"], ["N1-002-inventory/calor+v0.14.3/run-1"])
+        self.assertEqual(e1["runs"], 40)
+        turns = e1["permutation"]["pooledMeanDifference"]["byMetric"]["turns"]
+        self.assertEqual(turns["n"], {"treatment": 20, "control": 19})
+        tokens = e1["permutation"]["pooledMeanDifference"]["byMetric"]["tokens"]
+        self.assertEqual(tokens["n"], {"treatment": 20, "control": 20})
+
+    def test_a_diagnostic_without_a_code_is_counted_not_crashed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _scratch_root(tmp)
+            journal = os.path.join(root, E1, "N1-001-string-utils", "calor+0.15.0", "run-1", "journal.jsonl")
+            with open(journal, "a", encoding="utf-8") as fh:
+                fh.write('{"cmd": "build", "edited": true, "diagnostics": [{"declarationId": "f9"}, "junk"]}\n')
+                fh.write("not json\n")
+            mutated = self.mod.attribute(root)
+        arm = next(e for e in mutated["epochs"] if e["epoch"] == E1)["compileCensus"]["byArm"]["calor+0.15.0"]
+        self.assertEqual(arm["builds"], 27)
+        self.assertEqual(arm["codes"]["<none>"], 2)
+        self.assertEqual(arm["unparsableJournalLines"], 1)
 
 
 class TranscriptTabulation(unittest.TestCase):
@@ -213,6 +363,9 @@ class TranscriptTabulation(unittest.TestCase):
             "W-001-demo/calor+treatment/run-1", "W-001-demo/calor+treatment/run-2"])
         self.assertEqual(self.table["runs"], 4)
         self.assertEqual(self.table["withTranscript"], 3)
+        run = self.by_dir["W-001-demo/calor+treatment/run-1"]
+        self.assertEqual((run["pair"], run["pairDirectory"], run["arm"], run["run"]),
+                         ("W-001", "W-001-demo", "calor+treatment", 1))
 
     def test_multi_block_messages_count_once_and_tools_are_classified(self):
         run = self.by_dir["W-001-demo/calor+treatment/run-1"]
@@ -229,13 +382,23 @@ class TranscriptTabulation(unittest.TestCase):
         self.assertEqual(run["events"], 19)
         self.assertFalse(run["empty"])
 
-    def test_bash_build_classification_is_the_roadmap_pattern(self):
+    def test_bash_build_pattern_has_word_boundaries(self):
         classify = self.mod.classify_tool
-        self.assertEqual(classify("Bash", {"command": "dotnet build -c Release"}), "Bash-build")
-        self.assertEqual(classify("Bash", {"command": "cd x && dotnet test"}), "Bash-build")
-        self.assertEqual(classify("Bash", {"command": "calor --input a.calr"}), "Bash-build")
-        self.assertEqual(classify("Bash", {"command": "dotnet run"}), "Bash-other")
-        self.assertEqual(classify("Bash", {"command": "ls"}), "Bash-other")
+        build = [
+            "dotnet build -c Release", "cd x && dotnet test tests/Held", "dotnet  test",
+            "dotnet run --project src/Calor.Compiler -- --input a.calr",
+            "calor --input a.calr", "calor", "cd /ws && calor",
+            "dotnet ./calor.dll --input a.calr", "ls\ndotnet build", "(dotnet test) 2>&1 | tail",
+        ]
+        other = [
+            "escalor foo", "echo 'dotnet test' > notes", "echo 'calor '", "grep calor foo",
+            "dotnet build-server shutdown", "which calor", "dotnet run-x", "ls", "dotnet",
+            "cat calor.dll", "",
+        ]
+        for command in build:
+            self.assertEqual(classify("Bash", {"command": command}), "Bash-build", command)
+        for command in other:
+            self.assertEqual(classify("Bash", {"command": command}), "Bash-other", command)
         self.assertEqual(classify("Bash", {}), "Bash-other")
         self.assertEqual(classify("Bash", None), "Bash-other")
         self.assertEqual(classify("Glob", {}), "Grep")
@@ -243,15 +406,45 @@ class TranscriptTabulation(unittest.TestCase):
         self.assertEqual(classify("Agent", {}), "other")
         self.assertEqual(classify("", {}), "other")
 
-    def test_subagent_messages_are_counted_and_flagged(self):
+    def test_mcp_compiles_land_in_other_with_the_raw_name_kept(self):
+        self.assertEqual(self.mod.classify_tool("mcp__calor__compile", {"source": "§M{m:X}"}), "other")
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "P-1-x", "arm", "run-1")
+            os.makedirs(run_dir)
+            with open(os.path.join(run_dir, "transcript.jsonl"), "w", encoding="utf-8") as fh:
+                fh.write('{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1",'
+                         '"name":"mcp__calor__compile","input":{"source":"x"}},{"type":"tool_use","id":"t2",'
+                         '"name":"mcp__calor__query","input":{}}]},"parent_tool_use_id":null}\n')
+            run = self.mod.tabulate_runs([run_dir], base=tmp)["byRun"][0]
+        self.assertEqual(run["toolCalls"]["other"], 2)
+        self.assertEqual(run["toolNames"], {"mcp__calor__compile": 1, "mcp__calor__query": 1})
+
+    def test_subagent_messages_are_counted_separately_from_top_level(self):
         run = self.by_dir["W-001-demo/calor+treatment/run-2"]
-        self.assertEqual(run["turns"]["assistantMessages"], 6)
+        self.assertEqual(run["turns"]["assistantMessages"], 3)   # msg_01mainA, msg_05mainB, msg_06mainC
         self.assertEqual(run["turns"]["subagentMessages"], 3)
         self.assertEqual(run["turns"]["resultNumTurns"], 1)   # the delegation under-count num_turns carries
         # the re-emitted MultiEdit block (same tool_use id) counts once
         self.assertEqual(run["toolCalls"], {"Read": 1, "Grep": 1, "Bash-build": 1,
                                             "Bash-other": 0, "Edit": 1, "other": 1})
         self.assertEqual(run["toolCallsTotal"], 5)
+
+    def test_tool_use_without_id_is_deduplicated_per_event_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "P-1-x", "arm", "run-1")
+            os.makedirs(run_dir)
+            same = ('{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","name":"Read",'
+                    '"input":{"file_path":"a"}}]},"parent_tool_use_id":null}\n')
+            other = ('{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","name":"Read",'
+                     '"input":{"file_path":"b"}}]},"parent_tool_use_id":null}\n')
+            not_dict = '{"type":"assistant","message":"oops"}\n{"type":"assistant"}\n'
+            with open(os.path.join(run_dir, "transcript.jsonl"), "w", encoding="utf-8") as fh:
+                fh.write(same + same + other + not_dict)
+            run = self.mod.tabulate_runs([run_dir], base=tmp)["byRun"][0]
+        self.assertEqual(run["toolCalls"]["Read"], 2)   # the identical re-emission counts once, the other block counts
+        self.assertEqual(run["turns"]["assistantMessages"], 1)
+        self.assertEqual(run["events"], 5)
+        self.assertEqual(run["unparsableLines"], 0)
 
     def test_empty_transcript_is_present_and_zero(self):
         run = self.by_dir["W-001-demo/calor+control/run-1"]
@@ -272,7 +465,7 @@ class TranscriptTabulation(unittest.TestCase):
         self.assertEqual(sorted(arms), ["calor+control", "calor+treatment"])
         self.assertEqual(arms["calor+treatment"]["runs"], 2)
         self.assertEqual(arms["calor+treatment"]["withTranscript"], 2)
-        self.assertEqual(arms["calor+treatment"]["assistantMessages"], 13)
+        self.assertEqual(arms["calor+treatment"]["assistantMessages"], 10)
         self.assertEqual(arms["calor+treatment"]["subagentMessages"], 3)
         self.assertEqual(arms["calor+treatment"]["toolCalls"], {"Read": 2, "Grep": 3, "Bash-build": 4,
                                                                 "Bash-other": 1, "Edit": 3, "other": 2})
@@ -285,7 +478,7 @@ class TranscriptTabulation(unittest.TestCase):
 
     def test_markdown_rendering_lists_every_run(self):
         text = self.mod.render_markdown(self.table)
-        self.assertIn("| calor+treatment | 2 | 2 | 13 | 3 | 2 | 3 | 4 | 1 | 3 | 2 | 15 |", text)
+        self.assertIn("| calor+treatment | 2 | 2 | 10 | 3 | 2 | 3 | 4 | 1 | 3 | 2 | 15 |", text)
         self.assertIn("| W-001-demo/calor+control/run-2 | noTranscript |", text)
         self.assertIn("1 run(s) without transcript.jsonl", text)
 
@@ -307,17 +500,44 @@ class TranscriptTabulation(unittest.TestCase):
         table = self.mod.tabulate_runs([run_dir], base=run_dir)
         self.assertEqual(table["byRun"][0]["turns"]["assistantMessages"], 7)
 
-    def test_run_identity_falls_back_to_the_path_without_result_json(self):
+    def test_nested_runs_below_a_result_json_are_not_pruned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            outer = os.path.join(tmp, "P-2-y", "arm", "run-1")
+            inner = os.path.join(outer, "nested", "P-3-z", "arm", "run-2")
+            os.makedirs(inner)
+            with open(os.path.join(outer, "result.json"), "w", encoding="utf-8") as fh:
+                fh.write('{"pair": "P-2-y", "arm": "arm", "run": "run-1"}')
+            with open(os.path.join(inner, "transcript.jsonl"), "w", encoding="utf-8") as fh:
+                fh.write('{"type":"assistant","message":{"id":"m1","content":[]},"parent_tool_use_id":null}\n')
+            found = self.mod.find_run_dirs([tmp])
+            self.assertEqual(found, [outer, inner])
+            table = self.mod.tabulate_runs(found, base=tmp)
+        self.assertEqual([(r["pair"], r["run"], r["transcript"]) for r in table["byRun"]],
+                         [("P-2", 1, "noTranscript"), ("P-3", 2, "present")])
+
+    def test_run_identity_is_normalised_to_an_int(self):
+        mod = self.mod
+        self.assertEqual([mod._run_number(v) for v in (7, "7", "run-7", "run-12", None, "x", True)],
+                         [7, 7, 7, 12, None, None, None])
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = os.path.join(tmp, "P-9", "arm-x", "run-7")
             os.makedirs(run_dir)
             with open(os.path.join(run_dir, "transcript.jsonl"), "w", encoding="utf-8") as fh:
                 fh.write('{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","name":"Read","input":{}}]}}\n')
             table = self.mod.tabulate_runs(self.mod.find_run_dirs([tmp]), base=tmp)
-        run = table["byRun"][0]
-        self.assertEqual((run["pair"], run["arm"], run["run"]), ("P-9", "arm-x", "run-7"))
-        self.assertEqual(run["turns"]["assistantMessages"], 1)
-        self.assertEqual(run["toolCalls"]["Read"], 1)
+            run = table["byRun"][0]
+            self.assertEqual((run["pair"], run["arm"], run["run"]), ("P-9", "arm-x", 7))
+            self.assertEqual(run["turns"]["assistantMessages"], 1)
+            self.assertEqual(run["toolCalls"]["Read"], 1)
+            with open(os.path.join(run_dir, "result.json"), "w", encoding="utf-8") as fh:
+                fh.write('{"pair": "P-9-long-name", "arm": "arm-y", "run": "run-3"}')
+            run = self.mod.tabulate_runs([run_dir], base=tmp)["byRun"][0]
+            self.assertEqual((run["pair"], run["pairDirectory"], run["arm"], run["run"]),
+                             ("P-9", "P-9-long-name", "arm-y", 3))
+            with open(os.path.join(run_dir, "result.json"), "w", encoding="utf-8") as fh:
+                fh.write("{broken")
+            run = self.mod.tabulate_runs([run_dir], base=tmp)["byRun"][0]
+            self.assertEqual((run["pair"], run["arm"], run["run"]), ("P-9", "arm-x", 7))
 
 
 if __name__ == "__main__":
