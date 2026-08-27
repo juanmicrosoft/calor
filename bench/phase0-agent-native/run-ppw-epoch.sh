@@ -22,7 +22,10 @@
 #   - N runs/arm (set by the A:81 dry run; default 8), INTERLEAVED one run per
 #     arm at a time (run-m5-epoch.sh's non-m5 branch), same pinned model
 #   - edit mechanism `raw` on BOTH arms; identical harness configuration
-#   - arm A = control  = the `v0.14.3` release tag, built as a PRODUCT, run
+#   - arm A = control  = tag `v0.14.3` + commit 283ec9f9 (branch
+#     `arm/v0.14.3-pre-rows`, never merged; diff confined to Calor.Tasks +
+#     Sdk.targets, threading only the existing --permissive-effects policy
+#     through MSBuild; compiler semantics v0.14.3's), built as a PRODUCT, run
 #     under pair.json `arms["calor-pre-rows"]` (permissiveEffects true +
 #     controlArmKind "pre-rows", starter `before/`) — run-pair.sh proves the
 #     arm's Calor.Tasks honours <CalorPermissiveEffects> with a canary first
@@ -67,7 +70,18 @@ ARM_A_LABEL="calor+v0.14.3-pre-rows"; ARM_B_LABEL="calor+v0.15.0"
 ARM_A_ROLE="control (v0.14.3 release tag, pre-rows arm: permissive effects)"
 ARM_B_ROLE="treatment (v0.15.0 release tag, strict)"
 ARM_A_CONFIG="calor-pre-rows"; ARM_B_CONFIG="calor"
+# Arm A is NOT the bare v0.14.3 tag: the tag's Calor.Tasks cannot receive a permissive
+# policy from MSBuild, so the registered control arm is tag v0.14.3 + ONE commit on
+# branch `arm/v0.14.3-pre-rows` (never merged) whose diff is confined to
+# src/Calor.Tasks/CompileCalor.cs and src/Calor.Sdk/Sdk/Sdk.targets and only threads
+# the compiler's EXISTING --permissive-effects policy through MSBuild
+# (<CalorPermissiveEffects>); compiler semantics are v0.14.3's. The runner requires
+# arm A's checkout to be exactly that commit, and run-pair.sh's canary still proves the
+# property is honoured before spend.
 ARM_A_TAG="v0.14.3"; ARM_B_TAG="v0.15.0"
+ARM_A_BASE_TAG="v0.14.3"
+ARM_A_EXPECTED_COMMIT="283ec9f9964ddd5b21da15b646a0dd77d53de99e"
+ARM_A_BRANCH="arm/v0.14.3-pre-rows"
 KIND="pp-w-rows"
 PAIRS=(W-001 W-002 W-003 W-004 W-005 W-006)
 LEG_B_PAIRS="W-001 W-002 W-003 W-004 W-006"
@@ -182,7 +196,7 @@ model:        ${CLAUDE_MODEL:-default}
 mechanism:    raw on both arms
 arm A:        $ARM_A_LABEL  $ARM_A_ROLE
               root   $ARM_A_ROOT
-              commit $ARM_A_COMMIT  tag $ARM_A_DESCRIBE
+              commit $ARM_A_COMMIT  (registered: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT on $ARM_A_BRANCH; describe: $ARM_A_DESCRIBE)
               pair.json arms.$ARM_A_CONFIG (permissive, controlArmKind pre-rows)
               Calor.Tasks ${a_tasks:0:12}
 arm B:        $ARM_B_LABEL  $ARM_B_ROLE
@@ -199,7 +213,19 @@ PLAN
 [[ "$a_tasks" != "$b_tasks" ]] || {
     echo "ERROR: both arms' Calor.Tasks.dll hash to the same value — the agent-visible compiler is identical on both arms. Epoch void before it starts." >&2
     exit 2; }
-[[ "$ARM_A_DESCRIBE" == "$ARM_A_TAG" ]] || echo "WARNING: arm A is not checked out at the $ARM_A_TAG tag (git describe: $ARM_A_DESCRIBE). §4.1 names the $ARM_A_TAG release tag as control." >&2
+# Arm A provenance (A-1.12's exact statement): tag v0.14.3 + commit $ARM_A_EXPECTED_COMMIT,
+# whose diff against the tag touches only Calor.Tasks + Sdk.targets. Both halves are
+# checked here, before spend; a bare v0.14.3 checkout is refused (its Tasks build cannot
+# honour the property — the canary would refuse it too, but this names the cause).
+if [[ "$ARM_A_COMMIT" != "$ARM_A_EXPECTED_COMMIT" ]]; then
+    echo "ERROR: arm A must be checked out at $ARM_A_BRANCH = $ARM_A_EXPECTED_COMMIT (tag $ARM_A_BASE_TAG + the Tasks permissive passthrough); got $ARM_A_COMMIT ($ARM_A_DESCRIBE)." >&2
+    exit 2
+fi
+arm_a_diff="$(git -C "$ARM_A_ROOT" diff --name-only "$ARM_A_BASE_TAG" "$ARM_A_EXPECTED_COMMIT" 2>/dev/null | sort | tr '\n' ' ')"
+[[ "$arm_a_diff" == "src/Calor.Sdk/Sdk/Sdk.targets src/Calor.Tasks/CompileCalor.cs " ]] || {
+    echo "ERROR: arm A's diff against $ARM_A_BASE_TAG is not confined to src/Calor.Tasks/CompileCalor.cs + src/Calor.Sdk/Sdk/Sdk.targets: [$arm_a_diff]" >&2
+    exit 2; }
+echo "arm A provenance verified: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT, diff confined to {$arm_a_diff}"
 [[ "$ARM_B_DESCRIBE" == "$ARM_B_TAG" ]] || echo "WARNING: arm B is not checked out at the $ARM_B_TAG tag (git describe: $ARM_B_DESCRIBE). §4.1 names the $ARM_B_TAG release tag as treatment." >&2
 
 if [[ -z "$NULL_FLAG" && $CONFIRM -ne 1 ]]; then

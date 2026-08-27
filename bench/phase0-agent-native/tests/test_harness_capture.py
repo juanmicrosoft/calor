@@ -510,6 +510,12 @@ class LegBPairsAreRegisteredInPins(unittest.TestCase):
         self.assertIn('--arm-a-config "$ARM_A_CONFIG" --arm-b-config "$ARM_B_CONFIG"', src)
         self.assertIn('ARM_A_CONFIG="calor-pre-rows"; ARM_B_CONFIG="calor"', src)
         self.assertIn('ARM_A_TAG="v0.14.3"; ARM_B_TAG="v0.15.0"', src)
+        # Arm A is tag v0.14.3 + the one Tasks-passthrough commit (branch arm/v0.14.3-pre-rows);
+        # the runner refuses any other commit and re-verifies the diff confinement.
+        self.assertIn('ARM_A_EXPECTED_COMMIT="283ec9f9964ddd5b21da15b646a0dd77d53de99e"', src)
+        self.assertIn('ARM_A_BRANCH="arm/v0.14.3-pre-rows"', src)
+        self.assertIn('[[ "$ARM_A_COMMIT" != "$ARM_A_EXPECTED_COMMIT" ]]', src)
+        self.assertIn('== "src/Calor.Sdk/Sdk/Sdk.targets src/Calor.Tasks/CompileCalor.cs "', src)
         m5 = _read(RUN_M5)
         self.assertIn("--arm-a-config) ARM_A_CONFIG=", m5)
         self.assertIn('--arm-config "$cfg"', m5)

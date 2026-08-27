@@ -82,11 +82,19 @@ arm config. For the pre-rows arm the template is taken from the **harness** chec
 `v0.14.3` tag's template predates the property) with `__REPO_ROOT__` still bound to the arm's
 product; `result.json` records `templateSource`. Before any spend, `run-pair.sh` compiles
 `templates/calor-arm/permissive-canary.calr` through the arm's own Calor.Tasks build and requires a
-successful build carrying `warning Calor0410` — proof the property is honoured, not just set. **As of
-`7d621c0d` neither `src/Calor.Sdk/Sdk/Sdk.targets` nor `src/Calor.Tasks/CompileCalor.cs` threads a
-permissive knob into `CompilationOptions.UnknownCallPolicy`, on main or on the `v0.14.3` tag, so the
-canary fails and the pre-rows arm is refused** until that plumbing exists (a `src/` change outside W1;
-the `v0.14.3` arm additionally needs a registered way to receive it).
+successful build carrying `warning Calor0410` — proof the property is honoured, not just set. At
+`7d621c0d` neither `src/Calor.Sdk/Sdk/Sdk.targets` nor `src/Calor.Tasks/CompileCalor.cs` threaded a
+permissive knob into `CompilationOptions.UnknownCallPolicy`, on main or on the `v0.14.3` tag. The main
+side is the `feat/calor-tasks-permissive-effects` PR (`CalorPermissiveEffects` MSBuild property); the
+`v0.14.3` tag cannot receive it, so the registered control arm is a one-commit branch off the tag.
+
+**The exact statement A-1.12 registers for arm A:** *arm A = tag `v0.14.3` + commit
+`283ec9f9964ddd5b21da15b646a0dd77d53de99e` (branch `arm/v0.14.3-pre-rows`, never merged), whose diff
+is confined to `src/Calor.Tasks/CompileCalor.cs` and `src/Calor.Sdk/Sdk/Sdk.targets` and only threads
+the existing `--permissive-effects` policy through MSBuild (`<CalorPermissiveEffects>`); compiler
+semantics are v0.14.3's — nothing under `src/Calor.Compiler/` is touched.* `run-ppw-epoch.sh` refuses
+any other arm-A commit and re-verifies the diff confinement against the tag before spend; the canary
+against that build emits `warning Calor0410` (permissive) / `error Calor0410` (strict).
 
 `run-ppw-epoch.sh` drives the six `W-001 … W-006` pairs (exact-id directory match; the `W1-`/`W2-`/`W3-`/`W5A-` directories cannot collide), interleaved, arm A = `v0.14.3` under `arms["calor-pre-rows"]`, arm B = `v0.15.0` under `arms.calor`, with the same rails as `run-ppe1-epoch.sh` (`--confirm-paid-epoch`, distinct `Calor.Tasks` hashes, run-once epoch ids, null-agent ids suffixed `-null`). It fails before any spend listing every missing or malformed pair. Its `pins.json` `ppW` block carries the registered leg-B denominator `legBPairs` (default `W-001 W-002 W-003 W-004 W-006`; W-005 is leg A only) and `blindPairs` (`W-001 W-004 W-006`); `ppw-analyze.py` (W2) reads them from there, never from a script default.
 
