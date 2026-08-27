@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "proofPoint": "PP-E1",
   "registration": "docs/plans/agent-native-gates.md §A.2 row PP-E1 + §A.3 entry A-1.11 (2026-08-25); leg-A negative control re-frozen by sub-entry A-1.11.1 (2026-08-26)",
-  "measuredCommit": "121c6681ecc861d90fc55d455b8a40eedf1fe463",
+  "measuredCommit": "58ec42a867b2d6cbbcc87d6f1297006edd338401",
   "pinnedInvocation": "dotnet <calor.dll> -i <source> -o <scratch>; no flags (--permissive-effects and any manifest outside the built-in set are forbidden); diagnostics sorted by (line, column, code, severity, text) under LC_ALL=C",
   "recomputedVsRecorded": "leg A recomputed by EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation (each frozen diff re-applied to the frozen fixture, compiled with the pinned invocation, codes and declarations compared); negative control, routes (a)/(b) and the ramp state recomputed; leg B recorded, with only its arithmetic recomputed by bench/phase0-agent-native/ppe1-analyze.py from the archived per-run result.json files, and its fails/underpowered booleans re-derived here from the recorded point/bound/CV; route (d) and the own-goal flag recorded, but bound to a cut citation / an artifact and to the recomputed mechanical evidence; verdict derived from the frozen outcome map",
   "detectionRule": "a cell is detected iff the registered code appears at the registered declaration; L6-MAP/L6-MATCH must name the laundered effect 'cw' and L6-MID must name the instantiation; L7 requires Calor0425 specifically, rising above the unmutated fixture's count at that declaration; a different code at the registered declaration counts as detected-with-code-drift only if it is in the drift set, and is published by name",
@@ -610,7 +610,7 @@
       "source": "bench/phase0-agent-native/higher-order-demand-ledger.json (dA.total + dB.aggregate.total)"
     },
     "c": {
-      "fires": null,
+      "fires": false,
       "rule": "the PP-W5 validity floor (a cell with < 2 valid runs drops its pair, disclosed; fewer than 3 surviving pairs, or either arm below 12 valid runs), two arms without distinct repo roots and distinct Calor.Tasks hashes, or either arm above §2's 40 % censoring cap — recorded by ppe1-analyze.py as harnessValid; and an analysis whose harness is valid but whose point/bound/CV are not three finite JSON numbers",
       "reason": null
     },
@@ -630,25 +630,25 @@
     "ownGoalClause": "a not-adjudicated route caused by this workstream's own change is adjudicated MISS; the cause must be published with the artifact that shows it — recorded; ownGoal requires ownGoalArtifact, a repository path that exists"
   },
   "legB": {
-    "status": "not-run",
+    "status": "run",
     "epoch": "e1-rows-parity-001",
     "analysisPath": "bench/phase0-agent-native/epochs/e1-rows-parity-001/ppe1-analysis.json",
     "analyzer": "bench/phase0-agent-native/ppe1-analyze.py",
     "rule": "fails iff BOTH the one-sided 95 % two-level cluster-bootstrap lower bound of the median paired per-pair output-tokens-to-green ratio (0.15.0 release build / v0.14.3) exceeds 1.0 AND the point estimate exceeds 1.35; UNDERPOWERED if the point exceeds 1.35 with the bound not firing, or the realized median within-cell CV exceeds 0.66; per-run figure = tokens.output as derived by token-usage.py (A-1.9.1), never usage.output_tokens; fails/underpowered are RE-DERIVED from the recorded numbers by the ledger test and must equal the analysis file's",
-    "pointEstimate": null,
-    "lowerBound95": null,
-    "realizedMedianWithinCellCv": null,
-    "harnessValid": null,
+    "pointEstimate": 1.1835,
+    "lowerBound95": 0.9012,
+    "realizedMedianWithinCellCv": 0.2746,
+    "harnessValid": true,
     "invalidReason": null,
-    "fails": null,
-    "underpowered": null,
-    "recordedFails": null,
-    "recordedUnderpowered": null,
-    "booleansConsistent": null,
-    "controlArm": null,
-    "treatmentArm": null
+    "fails": false,
+    "underpowered": false,
+    "recordedFails": false,
+    "recordedUnderpowered": false,
+    "booleansConsistent": true,
+    "controlArm": "calor+v0.14.3",
+    "treatmentArm": "calor+0.15.0"
   },
   "precedence": "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
-  "verdict": "NOT-ADJUDICATED",
-  "reason": "leg B epoch e1-rows-parity-001 not yet run; adjudication at the 0.15.0 release commit"
+  "verdict": "HIT",
+  "reason": "leg A 10/10, control clean; leg B point 1.1835, lower bound 0.9012, realized median within-cell CV 0.2746; leg B does not fail"
 }
