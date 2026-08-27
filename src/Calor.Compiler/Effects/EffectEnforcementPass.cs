@@ -166,6 +166,11 @@ public sealed class EffectEnforcementPass
         // propagated through the call graph.
         CheckRowCompatibility();
 
+        // Phase 3e (v0.15 E3 slice b): design-doc §5 / P14 — every §LAM's
+        // DECLARED row against its BODY's row. After inference, so ρ_body is the
+        // converged answer and not an SCC iteration's.
+        CheckLambdaDeclaredRows();
+
         // Phase 4: Check every executable body. Constructors and custom accessors
         // have no §E declaration surface, so they use an explicit fail-closed
         // contract: intrinsic initialization/accessor mutation is allowed; every
@@ -293,7 +298,11 @@ public sealed class EffectEnforcementPass
             _ownerClassByFunctionId.GetValueOrDefault(function.Id),
             _constructorsByFunctionId.GetValueOrDefault(function.Id),
             ResolveInternalEffectsOnDemand,
-            assumptions);
+            assumptions)
+        {
+            RecordLambdaBody = (lambda, functionId, body, reasons) =>
+                _lambdaBodyRows[lambda] = new LambdaBodyFact(functionId, body, reasons),
+        };
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromStatements(function.Body);
         if (context.CurrentConstructor is { Constructor.IsStatic: false }
@@ -752,6 +761,59 @@ public sealed class EffectEnforcementPass
         foreach (var function in _callGraphAnalysis.Functions.Values)
         {
             new RowSiteChecker(this, function).Check();
+        }
+    }
+
+    /// <summary>
+    /// v0.15 E3 slice b, design-doc §5 / P14 — a <c>§LAM</c>'s declared row is a
+    /// CONTRACT, checked against the body exactly as a function's <c>§E</c> is.
+    /// <c>DoesNotFit</c> is <b>Calor0410 at the <c>§E</c> span, per effect, in
+    /// today's shape</c>; <c>CannotTell</c> is Calor0425.
+    ///
+    /// <para>Lambdas whose row is effect-POLYMORPHIC do not exist — §7.3 position
+    /// 2 forbids a variable in a lambda row and the parser answers Calor0404 —
+    /// so there is no variable case to handle here.</para>
+    ///
+    /// <para><b>Zero committed <c>.calr</c> is affected</b>: none of the corpus's
+    /// nine <c>§LAM</c> occurrences carries a <c>§E</c> at all (§5), so this can
+    /// only fire on code written after 0.15.</para>
+    /// </summary>
+    private void CheckLambdaDeclaredRows()
+    {
+        foreach (var (lambda, fact) in _lambdaBodyRows)
+        {
+            if (lambda.Effects == null)
+                continue;
+
+            var declared = PolyRow.FromDeclaration(lambda.Effects);
+            var body = LambdaBodyRow(lambda);
+            var owner = _callGraphAnalysis.Functions.TryGetValue(fact.FunctionId, out var function)
+                ? function.Name
+                : fact.FunctionId;
+
+            switch (PolyRow.Fits(body, declared))
+            {
+                case Binding.BoundTypes.EffectFit.DoesNotFit:
+                    foreach (var (kind, value) in body.Row.ToEffectSet().Except(declared.Row.ToEffectSet()))
+                    {
+                        _diagnostics.Report(
+                            lambda.Effects.Span,
+                            DiagnosticCode.ForbiddenEffect,
+                            $"Lambda '{lambda.Id}' in '{owner}' uses effect "
+                            + $"'{EffectSetExtensions.ToSurfaceCode(kind, value)}' but does not declare it",
+                            DiagnosticSeverity.Error);
+                    }
+                    break;
+
+                case Binding.BoundTypes.EffectFit.CannotTell:
+                    ReportRowUnknown(
+                        lambda.Effects.Span,
+                        $"Lambda '{lambda.Id}' in '{owner}' has an inferred body row of "
+                        + $"{body.Display()} against a declared row of {declared.Display()}, so it "
+                        + "cannot be decided whether the body fits the declaration. Resolve the "
+                        + "unknown call the body makes, or compile with --permissive-effects.");
+                    break;
+            }
         }
     }
 
@@ -1922,6 +1984,16 @@ public sealed class EffectEnforcementPass
         /// function (interop content, unrecognized constructs, expression-target calls).
         /// </summary>
         public List<string> Assumptions { get; }
+
+        /// <summary>
+        /// v0.15 E3 slice b, design-doc §5 — receives ρ_body for every
+        /// <c>§LAM</c> the inferrer walks: the lambda, the callable it appears
+        /// in, the body's effect set, and the assumption reasons the body itself
+        /// added. Last write wins, so an SCC's fixpoint leaves the CONVERGED
+        /// row behind rather than the first iteration's.
+        /// </summary>
+        public Action<LambdaExpressionNode, string, EffectSet, IReadOnlyList<string>>?
+            RecordLambdaBody { get; init; }
 
         public InferenceContext(
             EffectResolver resolver,
@@ -4247,16 +4319,27 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromLambda(LambdaExpressionNode lambda)
         {
-            // Lambda body contributes effects to enclosing function
-            if (lambda.ExpressionBody != null)
-            {
-                return InferFromExpression(lambda.ExpressionBody);
-            }
-            if (lambda.StatementBody != null)
-            {
-                return InferFromStatements(lambda.StatementBody);
-            }
-            return EffectSet.Empty;
+            // The body's effects still contribute to the ENCLOSING callable,
+            // exactly as before: whether creating a lambda should charge its
+            // creator is the invocation-charging question, and that is E4's.
+            // What slice b adds is that ρ_body is RECORDED (§5), so §5's two
+            // consumers exist — the declared-row check below, and an
+            // un-annotated lambda's type row at the six binding sites.
+            var before = _context.Assumptions.Count;
+
+            var body = lambda.ExpressionBody != null
+                ? InferFromExpression(lambda.ExpressionBody)
+                : lambda.StatementBody != null
+                    ? InferFromStatements(lambda.StatementBody)
+                    : EffectSet.Empty;
+
+            _context.RecordLambdaBody?.Invoke(
+                lambda,
+                _context.CurrentFunctionId,
+                body,
+                _context.Assumptions.Skip(before).ToList());
+
+            return body;
         }
     }
 }
