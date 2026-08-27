@@ -23,6 +23,7 @@ internal sealed record CompileCalorCacheInputs(
     string CompilerSemanticsVersion,
     bool Verbose,
     bool EnforceEffects,
+    bool PermissiveEffects,
     bool EnableTypeChecking,
     bool UnsafeTranspileOnly,
     bool AllowUnsafeBlocks,
@@ -50,6 +51,7 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "compilerSemanticsVersion", CompilerSemanticsVersion);
         Append(builder, "verbose", Verbose ? "true" : "false");
         Append(builder, "enforceEffects", EnforceEffects ? "true" : "false");
+        Append(builder, "permissiveEffects", PermissiveEffects ? "true" : "false");
         Append(builder, "enableTypeChecking", EnableTypeChecking ? "true" : "false");
         Append(builder, "unsafeTranspileOnly", UnsafeTranspileOnly ? "true" : "false");
         Append(builder, "allowUnsafeBlocks", AllowUnsafeBlocks ? "true" : "false");
@@ -149,6 +151,17 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool EnforceEffects { get; set; } = true;
 
     /// <summary>
+    /// Permissive effect policy — the MSBuild form of the CLI's <c>--permissive-effects</c>:
+    /// unknown calls are assumed pure and forbidden-effect violations are demoted to warnings
+    /// (<see cref="Calor.Compiler.Effects.UnknownCallPolicy.Permissive"/>), single-module and
+    /// cross-module alike. Default false = strict, matching
+    /// <see cref="Calor.Compiler.CompilationOptions.UnknownCallPolicy"/>.
+    /// Set the MSBuild property <c>CalorPermissiveEffects</c> to override. The value is part
+    /// of the build-state options fingerprint, so flipping it invalidates the warm cache.
+    /// </summary>
+    public bool PermissiveEffects { get; set; }
+
+    /// <summary>
     /// Whether to run the type checker. Mirrors
     /// <see cref="Calor.Compiler.CompilationOptions.EnableTypeChecking"/>, default-on since
     /// v0.12. Set the MSBuild property <c>CalorTypeCheck</c> to <c>false</c> to opt out —
@@ -246,6 +259,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             BuildStateCache.CurrentCompilerSemanticsVersion,
             Verbose,
             EnforceEffects,
+            PermissiveEffects,
             !TranspileOnly && TypeCheck && CompilationOptions.TypeCheckingDefault,
             TranspileOnly,
             AllowUnsafeBlocks,
@@ -733,6 +747,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 {
                     Verbose = Verbose,
                     EnforceEffects = EnforceEffects,
+                    UnknownCallPolicy = PermissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                     EnableTypeChecking = !TranspileOnly && TypeCheck && CompilationOptions.TypeCheckingDefault,
                     UnsafeTranspileOnly = TranspileOnly,
                     AllowUnsafeCode = AllowUnsafeBlocks,
@@ -968,7 +983,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                         message: diagnostic.Message);
                 }
 
-                var crossPass = new CrossModuleEffectEnforcementPass();
+                var crossPass = new CrossModuleEffectEnforcementPass(
+                    PermissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict);
                 var crossDiagnostics = crossPass.Enforce(moduleSummaries, registry);
 
                 foreach (var diagnostic in crossDiagnostics)

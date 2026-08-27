@@ -8,6 +8,10 @@
     <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)../tasks/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
     <!-- Effect enforcement: default true, matching CompilationOptions.EnforceEffects -->
     <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
+    <!-- Permissive effect policy (the CLI's permissive-effects flag): unknown calls assumed pure,
+         forbidden-effect violations demoted to warnings. Default false = strict, matching
+         CompilationOptions.UnknownCallPolicy. -->
+    <CalorPermissiveEffects Condition="'$(CalorPermissiveEffects)' == ''">false</CalorPermissiveEffects>
     <!-- Type checking: default true, matching CompilationOptions.EnableTypeChecking (v0.12) -->
     <CalorTypeCheck Condition="'$(CalorTypeCheck)' == ''">true</CalorTypeCheck>
     <CalorTranspileOnly Condition="'$(CalorTranspileOnly)' == ''">false</CalorTranspileOnly>
@@ -73,6 +77,7 @@
         ProjectDirectory="$(MSBuildProjectDirectory)"
         Verbose="$(CalorVerbose)"
         EnforceEffects="$(CalorEnforceEffects)"
+        PermissiveEffects="$(CalorPermissiveEffects)"
         TypeCheck="$(CalorTypeCheck)"
         TranspileOnly="$(CalorTranspileOnly)"
         ProjectSourceFiles="@(Compile)"
