@@ -1,8 +1,8 @@
 {
   "IncompleteCount": 0,
-  "ParsedFiles": 508,
+  "ParsedFiles": 507,
   "ParseFailures": 9,
-  "ExpressionsBound": 4719,
+  "ExpressionsBound": 4715,
   "Scope": "in-repo F-2 plus selected-active native conversion and preserve-all opaque coverage; Roslyn-selected conversion uses genuinely empty default symbols with C# Preview/regular/parse options; legacy source-order 18005 is informational",
   "Conversion": {
     "Incomplete": 0,

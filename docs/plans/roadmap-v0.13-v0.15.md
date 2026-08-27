@@ -941,7 +941,7 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    extended with effects ground truth. *Freeze point:* the E5 PR. E5 leg unconditional; E6/E7
    legs conditional. *Discriminating pin:* alter one expected effects answer and the golden
    fails. **E5 leg FROZEN (E5 PR):** `effects` and `impact-effects` arms added; eight goldens
-   over `QueryCorpus/project/effects.calr` (all three verdicts, a firing Calor0410, a
+   over `QueryCorpus/project/app.calr` (all three verdicts, a firing Calor0410, a
    cross-module fold, and the blast radius at three hypothetical rows), plus
    `TheEffectsGoldensExerciseEveryVerdict` as the anti-vacuity guard.
 

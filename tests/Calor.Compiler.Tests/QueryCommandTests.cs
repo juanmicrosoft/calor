@@ -116,12 +116,12 @@ public sealed class QueryCommandTests : IDisposable
         var text = CliTestHarness.RunCli(dir, "query", "effects", "Leaky", "--project", dir);
         Assert.True(text.ExitCode == 0, text.StdOut + text.StdErr);
         var lines = text.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.TrimEnd('\r')).ToArray();
-        Assert.Equal("  effects.calr:5:11 function Leaky", lines[0]);
+        Assert.Equal("  app.calr:11:11 function Leaky", lines[0]);
         Assert.Equal("    declared: [pure]", lines[1]);
         Assert.Equal("    inferred: cw", lines[2]);
         Assert.Equal("    verdict:  does not fit — Calor0410 fires (undeclared: cw)", lines[3]);
         Assert.Equal(
-            "query: effect row of effects.calr:5:11 function Leaky — declared [pure], inferred cw, does not fit — Calor0410 fires (undeclared: cw)",
+            "query: effect row of app.calr:11:11 function Leaky — declared [pure], inferred cw, does not fit — Calor0410 fires (undeclared: cw)",
             lines[4]);
 
         var json = CliTestHarness.RunCli(dir, "query", "effects", "Leaky", "--project", dir, "--json");
@@ -145,10 +145,10 @@ public sealed class QueryCommandTests : IDisposable
         var dir = Fixture();
         var run = CliTestHarness.RunCli(dir, "query", "impact", "Log", "--effects", "--row", "fs:w", "--project", dir);
         Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
-        Assert.Contains("  effects.calr:5:11 function Leaky — declares [pure]: does-not-fit", run.StdOut);
-        Assert.Contains("  effects.calr:11:11 function Fan — declares cw: does-not-fit", run.StdOut);
+        Assert.Contains("  app.calr:11:11 function Leaky — declares [pure]: does-not-fit", run.StdOut);
+        Assert.Contains("  app.calr:17:11 function Fan — declares cw: does-not-fit", run.StdOut);
         Assert.Contains(
-            "impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on effects.calr:2:11 function Log",
+            "impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on app.calr:8:11 function Log",
             run.StdOut);
 
         var current = CliTestHarness.RunCli(dir, "query", "impact", "Log", "--effects", "--project", dir);

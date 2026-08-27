@@ -165,9 +165,9 @@
       "why": "The effects facet's discriminating case (gate 7). Leaky declares nothing — a declaration without §E is pure (design §3.5) — but calls Log, which prints. The index must say the body does NOT fit the declaration, that Calor0410 fires, and that cw is the undeclared effect. A facet that copied the declared row into the inferred one, or one built from the declaration text alone, answers 'fits' here; a facet that inferred without the callee's effects answers '[pure]'.",
       "facet": "effects",
       "name": "Leaky",
-      "inFile": "effects.calr",
+      "inFile": "app.calr",
       "expect": [
-        "effects.calr:5:Leaky:declared=[pure];inferred=cw;verdict=does-not-fit;code=Calor0410;undeclared=cw"
+        "app.calr:11:Leaky:declared=[pure];inferred=cw;verdict=does-not-fit;code=Calor0410;undeclared=cw"
       ],
       "partial": false
     },
@@ -175,9 +175,9 @@
       "why": "A declaration whose body does exactly what it declares: §P charges cw, §E{cw} covers it, nothing fires.",
       "facet": "effects",
       "name": "Log",
-      "inFile": "effects.calr",
+      "inFile": "app.calr",
       "expect": [
-        "effects.calr:2:Log:declared=cw;inferred=cw;verdict=fits;code=none;undeclared="
+        "app.calr:8:Log:declared=cw;inferred=cw;verdict=fits;code=none;undeclared="
       ],
       "partial": false
     },
@@ -185,9 +185,9 @@
       "why": "No §E at all means pure, not unknown (design §3.5): Quiet's declared row is [pure], its body is pure, and it fits. An index that recorded an omitted declaration row as [unknown] would answer cannot-tell.",
       "facet": "effects",
       "name": "Quiet",
-      "inFile": "effects.calr",
+      "inFile": "app.calr",
       "expect": [
-        "effects.calr:14:Quiet:declared=[pure];inferred=[pure];verdict=fits;code=none;undeclared="
+        "app.calr:20:Quiet:declared=[pure];inferred=[pure];verdict=fits;code=none;undeclared="
       ],
       "partial": false
     },
@@ -215,12 +215,12 @@
       "why": "Effect-change blast radius over the impact closure (design §8.6). If Log's row became fs:w, every transitive caller — Leaky and Relay directly, Fan through Relay — declares a row fs:w does not fit. A facet that looked only at direct callers misses Fan; one that compared against the callers' INFERRED rows instead of their DECLARED ones would still say Relay and Fan fit. Partial for the reason every impact answer is: an unresolved call anywhere might have reached the change.",
       "facet": "impact-effects",
       "name": "Log",
-      "inFile": "effects.calr",
+      "inFile": "app.calr",
       "row": "fs:w",
       "expect": [
-        "effects.calr:11:Fan:does-not-fit",
-        "effects.calr:5:Leaky:does-not-fit",
-        "effects.calr:8:Relay:does-not-fit"
+        "app.calr:17:Fan:does-not-fit",
+        "app.calr:11:Leaky:does-not-fit",
+        "app.calr:14:Relay:does-not-fit"
       ],
       "partial": true
     },
@@ -228,12 +228,12 @@
       "why": "The same closure with Log's current row, cw: only Leaky, which declares nothing, stops fitting; Relay and Fan declare cw. This pair separates 'which callers exist' (three, both times) from 'which callers would break' (three, then one).",
       "facet": "impact-effects",
       "name": "Log",
-      "inFile": "effects.calr",
+      "inFile": "app.calr",
       "row": "cw",
       "expect": [
-        "effects.calr:11:Fan:fits",
-        "effects.calr:5:Leaky:does-not-fit",
-        "effects.calr:8:Relay:fits"
+        "app.calr:17:Fan:fits",
+        "app.calr:11:Leaky:does-not-fit",
+        "app.calr:14:Relay:fits"
       ],
       "partial": true
     },
@@ -241,12 +241,12 @@
       "why": "A pure hypothetical row fits every caller: narrowing a callee's row never breaks a caller (fits is a subset relation, and the empty set is a subset of everything).",
       "facet": "impact-effects",
       "name": "Log",
-      "inFile": "effects.calr",
+      "inFile": "app.calr",
       "row": "",
       "expect": [
-        "effects.calr:11:Fan:fits",
-        "effects.calr:5:Leaky:fits",
-        "effects.calr:8:Relay:fits"
+        "app.calr:17:Fan:fits",
+        "app.calr:11:Leaky:fits",
+        "app.calr:14:Relay:fits"
       ],
       "partial": true
     }

@@ -175,7 +175,7 @@ the compiler **inferred** for its body, and the **verdict** between them — the
 
 ```
 calor query effects Leaky
-  effects.calr:5:11 function Leaky
+  app.calr:11:11 function Leaky
     declared: [pure]
     inferred: cw
     verdict:  does not fit — Calor0410 fires (undeclared: cw)
@@ -193,10 +193,10 @@ propose still fits each caller's declared row:
 
 ```
 calor query impact Log --effects --row fs:w
-  effects.calr:5:11 function Leaky — declares [pure]: does-not-fit
-  effects.calr:8:11 function Relay — declares cw: does-not-fit
-  effects.calr:11:11 function Fan — declares cw: does-not-fit
-impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on effects.calr:2:11 function Log
+  app.calr:11:11 function Leaky — declares [pure]: does-not-fit
+  app.calr:14:11 function Relay — declares cw: does-not-fit
+  app.calr:17:11 function Fan — declares cw: does-not-fit
+impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on app.calr:8:11 function Log
 ```
 
 Leave off `--row` to use the declaration's current row; `--row ""` asks about a pure one.

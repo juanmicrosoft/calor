@@ -5,3 +5,17 @@
   §F{f002:Unused:pub} () -> i32
     §E{}
     §R INT:0
+  §F{f003:Log:pub} (str:s) -> void
+    §E{cw}
+    §P s
+  §F{f004:Leaky:pub} () -> void
+    §E{}
+    §C{Log} §A STR:"x" §/C
+  §F{f005:Relay:pub} () -> void
+    §E{cw}
+    §C{Log} §A STR:"y" §/C
+  §F{f006:Fan:pub} () -> void
+    §E{cw}
+    §C{Relay} §/C
+  §F{f007:Quiet:pub} () -> i32
+    §R INT:1
