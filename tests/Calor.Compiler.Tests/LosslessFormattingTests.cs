@@ -946,6 +946,15 @@ public sealed class LosslessFormattingTests : IDisposable
             // and this line does not change it, because those files were never
             // among the 886.
             .Where(path => !path.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
+            // Harness scratch under bench/phase0-agent-native/ is measurement apparatus,
+            // not product corpus, and is excluded exactly the way the spike artifacts
+            // above are: templates/ holds the arm csproj template and its permissive
+            // canary (v0.16 W1 — a program whose whole purpose is to draw Calor0410),
+            // pairs/W-00x-* are the PP-W-rows per-arm starters and seeded mutants
+            // (§4.1, S3 (c)). Neither was ever among the counted files, so this line
+            // does not change the baseline.
+            .Where(path => !path.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToArray();
     }

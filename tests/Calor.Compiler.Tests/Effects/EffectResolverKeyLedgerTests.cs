@@ -328,7 +328,14 @@ public class EffectResolverKeyLedgerTests
                 var directories = segments.Take(segments.Length - 1).ToList();
                 return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
-                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
+                    // Harness scratch under bench/phase0-agent-native/, excluded like the
+                    // spike artifacts above: templates/ = the arm csproj template and its
+                    // permissive canary (v0.16 W1); pairs/W-00x-* = the PP-W-rows per-arm
+                    // starters and seeded mutants (§4.1, S3 (c)). Measurement apparatus,
+                    // not corpus — the ledger's counts are unchanged by these lines.
+                    && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
+                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

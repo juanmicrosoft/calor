@@ -184,6 +184,13 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
+            // Harness scratch under bench/phase0-agent-native/, excluded for the same
+            // reason as the spike artifacts: templates/ carries the arm csproj template
+            // and its permissive canary (v0.16 W1 — a deliberate Calor0410 program),
+            // pairs/W-00x-* the PP-W-rows starters and seeded mutants (§4.1, S3 (c)).
+            // Measurement fixtures, not corpus; the counted set is unchanged.
+            .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
+            .Where(line => !line.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

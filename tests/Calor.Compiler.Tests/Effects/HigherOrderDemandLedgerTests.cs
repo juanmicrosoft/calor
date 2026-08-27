@@ -306,7 +306,17 @@ public class HigherOrderDemandLedgerTests
                     // committed on purpose, so they cannot be moved and must be
                     // excluded by path instead. The ledger's counts are unchanged
                     // by this line — these files were never part of the 886.
-                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
+                    // Harness scratch under bench/phase0-agent-native/ is the same case:
+                    // templates/ holds the arm csproj template and the permissive canary
+                    // run-pair.sh compiles before a pre-rows epoch (v0.16 W1) — a program
+                    // written to draw Calor0410, never product code — and pairs/W-00x-*
+                    // are the PP-W-rows per-arm starters and seeded mutants (§4.1, S3 (c)).
+                    // The archived epoch outputs under epochs/ and the authored N1/W1..W5
+                    // pairs stay counted, as they are today; the ledger's counts are
+                    // unchanged by these two lines.
+                    && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
+                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))
