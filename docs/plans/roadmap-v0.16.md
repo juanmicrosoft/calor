@@ -249,13 +249,21 @@ power and arms UNDERPOWERED.
 - **W1 — Per-turn capture.** `run-pair.sh` / `run-bundle.sh` archive `transcript.jsonl` per run
   (S1's mechanics), the agent's `dotnet build` stdout, and #1094's `.calor-build-state.json`;
   `pair.json` gains the additive "pre-rows control arm" definition (§4.1) and the template gains
-  `<CalorPermissiveEffects>`. *Touches:* the two runners, `templates/calor-arm/
-  CalorArm.csproj.template:17`, `tests/test_token_usage.py` sibling, `ppe1-margin-derivation.py`
-  (population flag). *Pin:* a run without `transcript.jsonl` is `invalid`;
+  `<CalorPermissiveEffects>`. *Touches:* the two runners — including `run-pair.sh:289-290`,
+  which today rejects any `arms.calor.config` other than `true false debug true` (exit 3) and must
+  admit the registered pre-rows control arm; a `run-ppw-epoch.sh` (or a `W)` arm in
+  `run-m5-epoch.sh:152-162`'s group `case`, whose `*)` fallback already takes explicit ids) that
+  drives the six `W-00x` ids, since `run-ppe1-epoch.sh:56/:169` hardcodes `PAIRS=(N1-…)` /
+  `--pairs "N1"` — the existing `W1-/W2-/W3-/W5A-…` pair directories do not collide (exact-id
+  matching); `templates/calor-arm/CalorArm.csproj.template:17`; `tests/test_token_usage.py`
+  sibling; `ppe1-margin-derivation.py` (population flag). *Pin:* a run without `transcript.jsonl` is `invalid`;
   `turns.assistantMessages` is recorded in `result.json`. *Discriminating:* delete the archive
   step → the first 0.16 epoch run is invalid → PP-W-rows route (b).
 - **W2 — PP-W-rows** run and adjudicated at the 0.16.0 release commit (§4.1). *Touches:*
-  `pairs/W-*`, `ppw-analyze.py`, `effect-rows-benefit-ledger.json`, its exact-equality test.
+  `pairs/W-*`, `ppw-analyze.py` — which, unlike `ppe1-analyze.py:66` (a hardcoded pair list with
+  no per-pair exclusion; `:189` is harness-invalid disclosure only), reads a **`legBPairs`** field
+  from the epoch's `pins.json` so W-005's exclusion from leg B is frozen at A-1.12 rather than a
+  script default — `effect-rows-benefit-ledger.json`, its exact-equality test.
   *Discriminating:* drop one pair from the ledger, or edit one frozen per-arm multiset, and
   `EffectRowsBenefitLedgerTests` fails; the annex guard rejects an edit to the A-1.12 row.
 - **W3 — Converter reach + effect-pass robustness.** (a) #903 clusters 1–2 (Calor0099 dedent in
@@ -373,13 +381,16 @@ Confounds named: on v0.14.3 the waiver also silences Calor0410/0411 (hence "warn
 the title); arm A lacks E1 re-keying and the elision default, both inert on contract-free code
 (N:S1.3; R:530-531). A Calor arm under `--permissive-effects` is invalid under A:13 rule 2
 (`run-pair.sh:289` reads `arms.calor.config.permissiveEffects`; `CalorArm.csproj.template:17`
-hardcodes `CalorEnforceEffects=true`). A:90-92 permits supersession only for a documented
+hardcodes `CalorEnforceEffects=true`; `run-pair.sh:289-290` exits 3 on any other config — W1
+changes that check). A:90-92 permits supersession only for a documented
 empirical defect in the protocol — this is not one. **A-1.12 therefore registers an ADDITIVE arm
 definition** (A-1.9.1's additive-amendment precedent): a **"pre-rows control arm"** pin row that
 scopes A:13's invalidity rule to Calor *treatment* arms; for PP-W-rows only, arm A's `pair.json`
 sets `permissiveEffects: true` and `controlArmKind: "pre-rows"`, the template's
 `<CalorPermissiveEffects>` follows it (W1), and every other pin — model, `raw` edits, distinct
-`Calor.Tasks` hashes, censoring caps — stands. Arm B runs no flags.
+`Calor.Tasks` hashes, censoring caps — stands. Arm B runs no flags. A-1.12 also records
+`pins.json` **`legBPairs`** = {W-001, W-002, W-003, W-004, W-006} — the leg-B denominator, with
+W-005 named as excluded.
 
 **Metric — two legs, nested design (A:§6.1), one verdict.**
 
@@ -700,6 +711,16 @@ Dispositions:
 
 **Declined:** none. **Narrowed:** item 2 — kept W-005 (leg A only) rather than dropping it, with
 the one-sentence reason in §4.1.
+
+### Round 4 (2026-08-27, on Draft v4 @ `417b4d55`) — plan/process APPROVE 92 %, engineering APPROVE 90 %, measurement pending (re-running the 3 000-sim margin)
+
+One engineering minor, applied on the branch without re-review: W1/W2 *Touches* now name the
+harness mechanics the sixth pair and W-005's leg-B exclusion need — a `run-ppw-epoch.sh` (or `W)`
+arm) for the six `W-00x` ids (`run-ppe1-epoch.sh:56/:169` hardcodes N1; `run-m5-epoch.sh:152-162`
+resolves groups by `case` with an explicit-id fallback; no collision with the `W1-…W5C-` pair
+directories), `ppw-analyze.py` reading `legBPairs` from `pins.json` (named in A-1.12; `ppe1-analyze.py:66`
+hardcodes its list), and `run-pair.sh:289-290`'s config rejection cited by the derogation. The
+measurement lens's verdict, and any item it adds, are recorded below when relayed.
 
 **Remaining open questions (none block registration):** (1) whether the 0.15.0 release PR's
 benchmark block moved; (2) whether the A3-match `Calor1002` confound is a converter/emitter
