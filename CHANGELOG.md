@@ -150,8 +150,10 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
   when you bind a callback to a name, when you pass one as an argument, when you return
   one, when a method overrides another, and when a class implements an interface. When the
   compiler *can't tell* — because one side carries no annotation at all — you get
-  **Calor0425** instead, as a warning. Same five places. "I don't know" and "that's wrong"
-  are different answers and now have different codes.
+  **Calor0425** instead, as a warning. Same five places. (The sixth place from the
+  introduction — a generic effect placeholder — is reported as **Calor0410** on the calling
+  function instead; see the `<eff e>` entry below.) "I don't know" and "that's wrong" are
+  different answers and now have different codes.
 - **`--permissive-effects` does less than it used to, on purpose.** It used to turn effect
   mismatches on overrides and interface implementations into warnings. It no longer does,
   and it will never soften a Calor0424 either. The one job it keeps is silencing Calor0425
