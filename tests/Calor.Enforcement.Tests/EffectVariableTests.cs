@@ -309,4 +309,106 @@ public class EffectVariableTests
         Assert.Equal("List<Func<i32,i32>>", parameter.TypeName);
         Assert.NotNull(parameter.Row);
     }
+
+    // -------------------------------------------------- P18, ordinal cases ---
+
+    [Fact]
+    public void EffVariableOrdinal_AlphaEquivalent()
+    {
+        // v0.15 E3 slice b. The IDENTITY of an effect variable is its position in
+        // its declaration's `eff` list, not its spelling: two declarations that
+        // differ only in what they call the binder produce the same ordinals.
+        // This is what makes §7.5's R2 hold without a rank-1-specific branch in
+        // CheckEffectVariance.
+        //
+        // Discriminating revert: stop persisting the ordinal (return the parser
+        // to slice a's boolean `IsEffectVariableInScope`) and both rows read -1,
+        // which unifies with nothing.
+        var module = Parse("""
+            §M{m001:Alpha}
+              §F{f001:A:pub}<eff e> (Func<i32>:f §E{e}) -> i32
+                §E{e}
+                §R INT:0
+              §F{f002:B:pub}<eff zzz> (Func<i32>:f §E{zzz}) -> i32
+                §E{zzz}
+                §R INT:0
+            """, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var a = module.Functions[0];
+        var b = module.Functions[1];
+
+        Assert.Equal(new[] { "e" }, a.Effects!.EffectVariables);
+        Assert.Equal(new[] { "zzz" }, b.Effects!.EffectVariables);
+        // The names differ; the ordinals do not.
+        Assert.Equal(a.Effects!.EffectVariableOrdinals, b.Effects!.EffectVariableOrdinals);
+        Assert.Equal(new[] { 0 }, a.Effects!.EffectVariableOrdinals);
+        Assert.Equal(
+            a.Parameters[0].Row!.EffectVariableOrdinals,
+            b.Parameters[0].Row!.EffectVariableOrdinals);
+    }
+
+    [Fact]
+    public void EffVariableOrdinal_UnifiesAcrossInterfaceAndImpl()
+    {
+        // A3-middleware-alpha's shape, at the AST level: the interface member
+        // binds `eff e`, the implementation binds `eff f`, and site 5 must
+        // identify them. It can, because both are ordinal 0.
+        //
+        // The behavioural half of this pin is
+        // SpikeFixtureDiagnosticsTests.A3Fixtures_AreExactlyCalor0418PerInvocation,
+        // which compiles the frozen fixture and asserts zero Calor0421.
+        var module = Parse("""
+            §M{m001:MiddlewareAlpha}
+              §IFACE{i001:IPipelineBehavior}
+                §MT{mt001:Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+                  §E{e}
+
+              §CL{c001:PassThroughBehavior:pub}
+                §IMPL{IPipelineBehavior}
+                §MT{mt002:Handle:pub}<eff f> (i32:request, Func<i32>:next §E{f}) -> i32
+                  §E{f}
+                  §R §C{next} §/C
+            """, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var signature = module.Interfaces[0].Methods[0];
+        var implementation = module.Classes[0].Methods[0];
+
+        Assert.Equal(new[] { "e" }, signature.Effects!.EffectVariables);
+        Assert.Equal(new[] { "f" }, implementation.Effects!.EffectVariables);
+        Assert.Equal(new[] { 0 }, signature.Effects!.EffectVariableOrdinals);
+        Assert.Equal(new[] { 0 }, implementation.Effects!.EffectVariableOrdinals);
+        Assert.Equal(new[] { 0 }, signature.Parameters[1].Row!.EffectVariableOrdinals);
+        Assert.Equal(new[] { 0 }, implementation.Parameters[1].Row!.EffectVariableOrdinals);
+    }
+
+    [Fact]
+    public void EffVariableOrdinal_IsRelativeToTheEffListNotTheTypeParameterList()
+    {
+        // The ordinal deliberately does NOT reuse EffectParameterInfo.Ordinal,
+        // which is the emitter's interleaving position in the COMBINED list. If
+        // it did, `<T, eff e>` (combined position 1) and `<eff e>` (position 0)
+        // would stop unifying for a reason that has nothing to do with effects.
+        var module = Parse("""
+            §M{m001:Mixed}
+              §F{f001:A:pub}<T, eff e> (Func<i32>:f §E{e}) -> i32
+                §E{e}
+                §R INT:0
+              §F{f002:B:pub}<eff e> (Func<i32>:f §E{e}) -> i32
+                §E{e}
+                §R INT:0
+            """, out var diagnostics);
+
+        Assert.False(diagnostics.HasErrors);
+        var withTypeParameter = module.Functions[0];
+        var without = module.Functions[1];
+
+        // The emitter's interleaving position differs...
+        Assert.Equal(1, withTypeParameter.EffectParameters[0].Ordinal);
+        Assert.Equal(0, without.EffectParameters[0].Ordinal);
+        // ...and the ROW's ordinal, which is the identity, does not.
+        Assert.Equal(new[] { 0 }, withTypeParameter.Effects!.EffectVariableOrdinals);
+        Assert.Equal(new[] { 0 }, without.Effects!.EffectVariableOrdinals);
+    }
 }

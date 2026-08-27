@@ -628,14 +628,27 @@ renegotiation; DEFERRED items are named so their absence is a decision.
     619 over the 886). `EffectRow.FitsFunction` lands §4.6's whole-function variance rule with no
     production caller yet and says so. Corpus delta: **one file of 886**, gaining one Calor0425 at a
     real site 3. P32's ledger reads **zero Calor0425** across all three converted subjects.
-  - **slice b owes:** §7.4's rank-1 instantiation (site 6 — slice a DECLINES any position whose row
-    mentions an `eff` variable, which is what keeps E3a's own emissions off the four A3
-    fixtures; it does **not** restore their frozen zero, see the PP-E1 note below),
-    §5's ρ_body and its Calor0410 on a lambda whose body exceeds its declared row,
-    **alpha-equivalence** of `eff` binders (slice a never compares two variable rows, so
-    `A3-middleware-alpha` passes without it), and §6.2's two external-base Calor0419 → Calor0425
-    retirements, which must move together because the override arm is an `AddAssumption` whose
-    propagation feeds every caller's computed effect set.
+  - **slice b — LANDED (PR #1106).** **Site 6** (§7.4's rank-1 instantiation): one solve per call,
+    no fixpoint in the SOLVE (**R3**), with a separate worklist carrying the resulting charges to
+    **transitive callers** so a multi-hop chain cannot launder an effect (review round 1, finding 1);
+    rows carry effect-variable **ordinals**, so an interface's `eff e` and an
+    implementation's `eff f` unify under the ORDINARY `fits` relation (**R2**), and the four
+    combinators type-check with zero Calor0424/0425/0404 (**R1**) — the §7.5 ramp does **not**
+    fire. **§5's ρ_body** (P14) with Calor0410 on a lambda whose body exceeds its declared row, and
+    an un-annotated lambda's type row now ρ_body instead of Unknown. **Both external-base
+    Calor0419s retired** to Calor0425 together; the override arm's `AddAssumption` carried
+    *reasons*, not effects, so retiring it moved no Calor0410 — Calor0410 unchanged at 464 over the
+    886. **`RowSiteChecker.IsFunctionTyped` reads the bound `FunctionBoundType` first** (§8.2), which
+    makes the A2 `§CSHARP`-delegate shape a site it was not before. **Committed-corpus delta: zero
+    files.** P32's ledger moves **0 → 4**, bisected entirely to the Calor0419 retirement.
+    **One divergence reported, not absorbed:** §6.2's row 6 spells site 6's `DoesNotFit` as
+    Calor0424, and §7.4's solve makes that cell unreachable — the class is closed by **Calor0410
+    plus §10.3's provenance clause**, which is what §10.3's own worked example shows. Gate 1 keeps
+    six closed classes; the code in one cell moves.
+  - **slice b did NOT restore the A3 control**, and could not: invoking a row-less value is still
+    Calor0418 until **E4** replaces it. The four fixtures compile to exactly `Calor0418 × N` and
+    nothing else — asserted as an exact multiset per fixture — so PP-E1 leg A remains a **MISS if
+    adjudicated now**, for E4's reason and not slice b's.
 - **Issue #1104 — `EffectEnforcementPass.Enforce` crashes the process on Lossy-converted, unbound
   corpus modules** (found by E3a's P32 ledger work; reproduces on `main` at `b6530fac` with row
   checking disabled). Unbounded recursion in `EffectInferrer`'s local-type resolution, so it is an

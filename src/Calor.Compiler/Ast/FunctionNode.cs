@@ -57,13 +57,45 @@ public sealed class EffectsNode : AstNode
     /// </summary>
     public IReadOnlyList<string> EffectVariables { get; }
 
+    /// <summary>
+    /// v0.15 E3 slice b, design-doc §7.4 — the INDEX of each entry of
+    /// <see cref="EffectVariables"/> within the binding declaration's own
+    /// <c>eff</c> list, in the same order. This is what makes rank-1
+    /// instantiation alpha-equivalent: an interface member's <c>eff e</c> and its
+    /// implementation's <c>eff f</c> are both ordinal 0, so <c>fits</c> compares
+    /// positions rather than spellings (<c>A3-middleware-alpha</c>). Slice a
+    /// discarded the ordinal and could therefore only DECLINE to compare the two.
+    ///
+    /// <para>Always the same length as <see cref="EffectVariables"/>; a name the
+    /// parser could not place resolves to <c>-1</c>, which unifies with nothing.
+    /// The ordinal is relative to the <c>eff</c> list alone, NOT to the combined
+    /// type-parameter list that <see cref="EffectParameterInfo.Ordinal"/>
+    /// records — that one is the emitter's interleaving position and must not be
+    /// reused here, or <c>&lt;T, eff e&gt;</c> and <c>&lt;eff e&gt;</c> would
+    /// stop unifying for a reason that has nothing to do with effects.</para>
+    /// </summary>
+    public IReadOnlyList<int> EffectVariableOrdinals { get; }
+
     public EffectsNode(
         TextSpan span,
         IReadOnlyDictionary<string, string> effects,
-        IReadOnlyList<string>? effectVariables = null) : base(span)
+        IReadOnlyList<string>? effectVariables = null,
+        IReadOnlyList<int>? effectVariableOrdinals = null) : base(span)
     {
         Effects = effects ?? throw new ArgumentNullException(nameof(effects));
         EffectVariables = effectVariables ?? Array.Empty<string>();
+        EffectVariableOrdinals = AlignOrdinals(EffectVariables, effectVariableOrdinals);
+    }
+
+    private static IReadOnlyList<int> AlignOrdinals(
+        IReadOnlyList<string> variables,
+        IReadOnlyList<int>? ordinals)
+    {
+        if (variables.Count == 0) return Array.Empty<int>();
+        var aligned = new int[variables.Count];
+        for (var index = 0; index < aligned.Length; index++)
+            aligned[index] = ordinals != null && index < ordinals.Count ? ordinals[index] : -1;
+        return aligned;
     }
 
 

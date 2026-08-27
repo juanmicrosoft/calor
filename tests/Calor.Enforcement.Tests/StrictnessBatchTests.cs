@@ -245,7 +245,7 @@ public class StrictnessBatchTests
     public void OverrideOfExternalBase_RoutesToAssumedChannel()
     {
         // Base class is external C# (not in this module): variance cannot be
-        // checked, so the override is surfaced through the assumption channel.
+        // checked, so the assumed channel is Calor0425 (§13.1's `:260` rewrite).
         var source = @"
 §M{m001:Test}
   §CL{c001:MyController:pub}
@@ -257,7 +257,7 @@ public class StrictnessBatchTests
         var result = TestHarness.Compile(source);
 
         Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("external base"));
+            d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("external base"));
     }
 
     [Fact]
@@ -587,7 +587,7 @@ var x = 1;
     public void C3_ExternalInheritedImplementation_RoutesToAssumed()
     {
         // Review C3 (external arm): §IMPL satisfied only by a member inherited
-        // from an external base is surfaced via the Calor0419 assumption channel.
+        // from an external base is surfaced as Calor0425 (§13.1's `:607`).
         var source = @"
 §M{m001:ExtImpl}
   §IFACE{i001:IQuiet}
@@ -604,7 +604,7 @@ var x = 1;
         var result = TestHarness.Compile(source);
 
         Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects
+            d => d.Code == DiagnosticCode.EffectRowUnknown
                 && d.Message.Contains("SomeExternalBase") && d.Message.Contains("IQuiet.Run"));
     }
 
@@ -1156,19 +1156,25 @@ var x = 1;
     // ------------------------------- P15 site 6: rank-1 generic instantiation
 
     [Fact]
-    public void RowMismatch_AtGenericInstantiation_IsSliceBs_AndTheGapIsObserved()
+    public void RowMismatch_AtGenericInstantiation_IsError()
     {
-        // Gate 1's SIXTH class is NOT closed by this slice, and the honest thing
-        // is a test that observes the gap rather than an absent one that hides
-        // it. `Announce` prints; `Map`'s callback row is the effect variable `e`;
-        // `UsePure` declares no `cw`. §7.4 says the instantiation must charge
-        // `cw` to `UsePure` and reject it. Today `Binder.BindRow` makes any row
-        // mentioning a variable Unknown, and CheckRowCompatibility DECLINES a
-        // polymorphic position outright (it is site 6, not one of the five), so
-        // no Calor0424 fires.
+        // Gate 1's SIXTH class, CLOSED by E3 slice b. This test was
+        // `..._IsSliceBs_AndTheGapIsObserved` and asserted that NOTHING fired;
+        // it is flipped here, which is what §13.2 said slice b would do.
         //
-        // When slice b lands, this test flips: it must assert the mismatch, and
-        // its `_Compiles` half is `Double` in place of `Announce`.
+        // **The code is Calor0410, not Calor0424, and that is a divergence from
+        // §6.2's table this PR reports rather than hides.** §6.2 row 6 writes
+        // Calor0424 for site 6's DoesNotFit; §7.4's solve makes that cell
+        // UNREACHABLE, because `e := ⊔ (ρ(argⱼ) ⊖ ρ_declⱼ)` defines the solution
+        // as the join of the residuals — so the substituted parameter row
+        // contains every argument row BY CONSTRUCTION and no argument can fail
+        // `fits` at a variable-mentioning position. What site 6 can catch is the
+        // CALLER under-declaring the instantiated row, and §10.3's own worked
+        // example spells exactly that as Calor0410 with a new provenance clause.
+        // The class is closed; the code that closes it is 0410.
+        //
+        // Discriminating revert: delete the InstantiateAndCharge call in
+        // CheckArgumentSite and `UsePure` is silently charged nothing.
         var result = TestHarness.Compile("""
             §M{m001:M}
               §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
@@ -1183,9 +1189,350 @@ var x = 1;
                 §R §C{Map} §A INT:1 §A Announce §/C
             """);
 
+        var reported = Assert.Single(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+        // P22 — §10.3's FIRST string, by full equality.
+        Assert.Equal(
+            "Function 'UsePure' uses effect 'cw' but does not declare it\n"
+            + "  Effect row: effect variable 'e' of 'Map' instantiated to cw at this call site",
+            reported.Message);
+    }
+
+    [Fact]
+    public void RowMismatch_AtGenericInstantiation_Compiles()
+    {
+        // The `_Compiles` half the gap pin promised: `Double` in place of
+        // `Announce`, so `e := Concrete(∅)` and `Map`'s instantiated row is pure.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+                §E{e}
+                §R x
+              §F{f002:Double:pub} (i32:x) -> i32
+                §E{}
+                §R (* x INT:2)
+              §F{f003:UsePure:pub} () -> i32
+                §E{}
+                §R §C{Map} §A INT:1 §A Double §/C
+            """);
+
         Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.EffectRowMismatch
-              || d.Code == DiagnosticCode.EffectRowUnknown);
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              || d.Code == DiagnosticCode.EffectRowMismatch
+              || d.Code == DiagnosticCode.EffectRowUnknown
+              || d.Code == DiagnosticCode.EffectVariableScope);
+    }
+
+    [Fact]
+    public void RowMismatch_AtGenericInstantiation_CannotTell_IsCalor0425()
+    {
+        // §7.4 — "Any Unknown contributor makes e := Unknown and the site reports
+        // Calor0425." Here `cb` is a function-typed parameter with NO row, so its
+        // row is Unknown (§3.5) and the variable cannot be solved.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+                §E{e}
+                §R x
+              §F{f003:Use:pub} (Func<i32,i32>:cb) -> i32
+                §E{}
+                §R §C{Map} §A INT:1 §A cb §/C
+            """);
+
+        // P22 — §10.3's SECOND string. The doc's sample ends "'UseImpure' is
+        // charged Unknown effects"; the shipped tail says what actually happens
+        // instead, because charging an `unknown` effect would raise a Calor0410
+        // the author cannot declare away. The divergence is recorded in the PR
+        // body and in docs/plans/2026-08-26-v0.15-e3b-notes.md.
+        var reported = Assert.Single(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.StartsWith("Effect variable", StringComparison.Ordinal));
+        Assert.Equal(
+            "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: the row of "
+            + "argument 'cb' could not be determined. The instantiated row of 'Map' is Unknown "
+            + "here, so nothing is charged to 'Use' for it. State a row on the argument's "
+            + "declaration, or compile with --permissive-effects.",
+            reported.Message);
+    }
+
+    [Fact]
+    public void GenericInstantiation_AlphaEquivalentBinders_Unify()
+    {
+        // §7.5's R2 at the level a caller can see: `Outer` binds `eff a` and
+        // passes its own rowed parameter into `Inner`, which binds `eff b`. The
+        // two are identified by ORDINAL, so the instantiated row is `a` again and
+        // `Outer`'s own declaration covers it. Under slice a the polymorphic
+        // position was declined outright and nothing was compared at all.
+        //
+        // Discriminating revert: compare binders by NAME and this reports that
+        // 'Outer' uses effect variable 'b'.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
+                §E{b}
+                §R INT:0
+              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
+                §E{a}
+                §R §C{Inner} §A h §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              || d.Code == DiagnosticCode.EffectRowMismatch
+              || d.Code == DiagnosticCode.EffectRowUnknown
+              || d.Code == DiagnosticCode.EffectVariableScope);
+    }
+
+    [Fact]
+    public void GenericInstantiation_CallerMustDeclareTheVariableItPassesOn()
+    {
+        // The other polarity of the same rule: `Outer` does NOT declare its own
+        // variable in its row, so the instantiated row mentions a variable the
+        // caller has not promised. That is an undeclared effect, spelled in
+        // today's Calor0410 shape.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
+                §E{b}
+                §R INT:0
+              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
+                §E{}
+                §R §C{Inner} §A h §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("uses effect variable 'a' but does not declare it"));
+    }
+
+    [Fact]
+    public void ExternalBaseAssumptions_AreCalor0425_AndNoCalor0419Remains()
+    {
+        // The half of §13.1's `:260`/`:607` rewrites that could not live IN those
+        // two tests without moving facts.py's line probes: both arms must have
+        // stopped emitting Calor0419, not merely started emitting Calor0425.
+        //
+        // §6.2 requires them to move TOGETHER, and slice a declined to move
+        // either for that reason: the override arm was an AddAssumption whose
+        // reasons propagate through PropagateAssumptions into every caller's
+        // Calor0419, while the interface arm was a direct report. Retiring one
+        // alone would make sites 4 and 5 disagree about what an unresolvable base
+        // means. Both are retired here, so this asserts BOTH polarities at once.
+        //
+        // Discriminating revert: restore either AddAssumption/Report and the
+        // matching DoesNotContain fails.
+        var overrideArm = TestHarness.Compile(@"
+§M{m001:Test}
+  §CL{c001:MyController:pub}
+      §EXT{SomeExternalBase}
+      §MT{mt001:Handle:pub:over}
+          §O{void}
+          §E{}
+");
+        Assert.DoesNotContain(overrideArm.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
+        Assert.Contains(overrideArm.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown);
+
+        var interfaceArm = TestHarness.Compile(@"
+§M{m001:ExtImpl}
+  §IFACE{i001:IQuiet}
+      §MT{m001:Run}
+          §O{void}
+          §E{}
+  §CL{c001:Bridge:pub}
+      §EXT{SomeExternalBase}
+      §IMPL{IQuiet}
+      §MT{mt001:Other:pub}
+          §O{void}
+          §E{}
+");
+        Assert.DoesNotContain(interfaceArm.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
+
+        // §6.4's THIRD message sample, by full equality — the string P22's own
+        // enumeration says ships with these two retirements. It RE-WORDS the old
+        // Calor0419 text rather than merely re-coding it: it names the row.
+        var reported = Assert.Single(interfaceArm.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown);
+        Assert.Equal(
+            "Class 'Bridge' implements 'IQuiet.Run' through a member not visible in this module "
+            + "(inherited from external base 'SomeExternalBase'), so its effect row is Unknown. "
+            + "The interface's declared row [pure] is assumed here, not verified.",
+            reported.Message);
+    }
+
+    [Fact]
+    public void GenericInstantiation_ChargePropagatesToTransitiveCallers()
+    {
+        // Review round 1, finding 1 — the soundness hole, closed. `Run` is
+        // rank-1; `Outer` instantiates its variable to {cw} by passing a printing
+        // callback; `Top` calls `Outer` and declares NOTHING.
+        //
+        // The site-6 solve runs in phase 3d, AFTER the SCC fixpoint, and an
+        // in-module call charges its caller the callee's COMPUTED set — so before
+        // PropagateInstantiatedCharges, `Outer` gained `cw` and `Top` saw the
+        // pre-instantiation ∅ and compiled clean. Calor0418 masked it in the
+        // default mode; under --permissive-effects the whole program printed
+        // "Compilation successful", which is precisely the laundering rows exist
+        // to close.
+        //
+        // Asserted on the `Top` diagnostic SPECIFICALLY, not on the whole
+        // multiset: pre-E4 there is also a Calor0418 inside `Run`.
+        //
+        // Discriminating revert: delete the PropagateInstantiatedCharges call and
+        // `Top` goes silent.
+        const string source = """
+            §M{m001:M}
+              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §R §C{g}
+              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+                §E{cw}
+                §R §C{Run} §A h §/C
+              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+                §E{}
+                §R §C{Outer} §A q §/C
+            """;
+
+        var strict = TestHarness.Compile(source);
+        Assert.Contains(strict.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("Function 'Top' uses effect 'cw' but does not declare it"));
+
+        // And under the flag, where the hole was loudest: --permissive-effects
+        // demotes Calor0410 to a warning (that is 0410's own long-standing
+        // policy), but the diagnostic must still FIRE. Before the fix this
+        // compiled clean.
+        var permissive = TestHarness.CompileWithEffects(
+            source, policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
+        Assert.Contains(permissive.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("Function 'Top' uses effect 'cw' but does not declare it"));
+    }
+
+    [Fact]
+    public void GenericInstantiation_ChargePropagatesThroughThreeHops()
+    {
+        // The same hole one level deeper, so what is pinned is the FIXPOINT and
+        // not merely one extra propagation pass: Run → Outer → Top → Top2. A
+        // single-pass fix reaches `Top` and leaves `Top2` silent.
+        //
+        // Discriminating revert: replace the worklist in
+        // PropagateInstantiatedCharges with one sweep over the seed set and this
+        // fails while the two-hop pin above still passes.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §R §C{g}
+              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+                §E{cw}
+                §R §C{Run} §A h §/C
+              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+                §E{cw}
+                §R §C{Outer} §A q §/C
+              §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
+                §E{}
+                §R §C{Top} §A r §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("Function 'Top2' uses effect 'cw' but does not declare it"));
+    }
+
+    [Fact]
+    public void GenericInstantiation_AssumedRow_ReportsOnceAtTheHop()
+    {
+        // Review round 1, finding 2. §4.4: an Assumed source produces an Assumed
+        // destination and every hop that carries an assumption reports it ONCE.
+        // Site 6 was silent — a callee whose own effects could only be ASSUMED
+        // (§CS interop) flowed through the solve and the reasons were charged but
+        // never surfaced, so the caller inherited an assumption with no Calor0425
+        // naming it. The Calor0419 on `Wrapped` is a different statement: it says
+        // *that function* is assumed, not that this HOP carries the assumption.
+        //
+        // Discriminating revert: drop the IsAssumed arm in InstantiateAndCharge
+        // and only the Calor0419 remains.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §R INT:0
+              §F{f002:Wrapped:pub} () -> i32
+                §E{}
+                §R §CS{ 1 + 1 }
+              §F{f003:Caller:pub} () -> i32
+                §E{}
+                §R §C{Run} §A Wrapped §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.Contains("instantiated effect row of 'Run' at this call site rests on an assumption")
+              && d.Message.Contains("raw C# interop expression"));
+    }
+
+    [Fact]
+    public void GenericInstantiation_BinderNoParameterMentions_IsCalor0425_EvenWithZeroArguments()
+    {
+        // Review round 1, finding 3. `CheckArgumentSite` returned early on an
+        // empty argument list, which made InstantiateAndCharge's "no parameter of
+        // 'X' binds it" arm unreachable from source: the ONE shape that reaches it
+        // is a declaration binding a variable no parameter mentions, and such a
+        // declaration is typically called with no arguments at all.
+        //
+        // Discriminating revert: move `if (arguments.Count == 0) return;` back
+        // above the binder-count check and this goes silent.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:NoBinder:pub}<eff e> () -> i32
+                §E{e}
+                §R INT:0
+              §F{f002:Use:pub} () -> i32
+                §E{}
+                §R §C{NoBinder} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.Contains("Effect variable 'e' of 'NoBinder' instantiates to Unknown")
+              && d.Message.Contains("no parameter of 'NoBinder' binds it"));
+    }
+
+    [Fact]
+    public void InterfaceVariance_OrdinalMismatch_NamesTheBinderByPosition()
+    {
+        // Review round 1, finding 4. The interface binds <eff e, eff f> and uses
+        // `f` (ordinal 1); the implementation binds <eff f, eff e> and uses `f`
+        // (ordinal 0). `fits` correctly rejects it — position is the identity —
+        // but the message was computed by NAME, so the extras list came out EMPTY
+        // and the text read "row f does not fit ... row f", which tells the author
+        // nothing. The position must appear.
+        //
+        // Discriminating revert: compute the extras from the names again and both
+        // assertions below fail.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §IFACE{i001:IThing}
+                §MT{mt001:Handle}<eff e, eff f> (Func<i32>:next §E{f}) -> i32
+                  §E{f}
+
+              §CL{c001:Impl:pub}
+                §IMPL{IThing}
+                §MT{mt002:Handle:pub}<eff f, eff e> (Func<i32>:next §E{f}) -> i32
+                  §E{f}
+                  §R INT:0
+            """);
+
+        var reported = Assert.Single(result.Diagnostics,
+            d => d.Code == DiagnosticCode.InterfaceEffectVariance);
+        Assert.Contains("[f (binder #0)]", reported.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "Effect variables are matched BY POSITION in the declaration's 'eff' list, not by name.",
+            reported.Message,
+            StringComparison.Ordinal);
     }
 
     // ================================================================ P11 ====

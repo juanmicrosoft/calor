@@ -839,6 +839,76 @@ public sealed class SpikeVerdictTests
     }
 
     /// <summary>
+    /// v0.15 E3 slice b — the FULL frozen multiset of the four A3 combinator
+    /// fixtures, asserted exactly, under the pinned invocation.
+    ///
+    /// <para>Slice a could only assert the absence of row-family diagnostics
+    /// (above). Slice b implements site 6, which is the mechanism these four
+    /// fixtures exist to exercise, so the honest pin is the whole multiset: the
+    /// PRE-E4 state is <b>exactly Calor0418 once per invocation of a row-less
+    /// value, and nothing else</b>. Anything that this slice adds or removes on
+    /// these five files is a change to PP-E1's frozen control, and the gate row
+    /// says STOP rather than regenerate.</para>
+    ///
+    /// <para><b>What E4 owes.</b> Replace Calor0418 and every count below goes to
+    /// zero, which is the frozen A-1.11 baseline (exit 0, zero diagnostics)
+    /// restored. Until then PP-E1 leg A is a MISS under the own-goal clause,
+    /// stated here rather than papered over.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("A3-callback", 1, 0)]
+    [InlineData("A3-map", 1, 0)]
+    [InlineData("A3-match", 2, 0)]
+    [InlineData("A3-middleware", 2, 0)]
+    // The alpha-equivalence fixture: `eff e` on the interface member, `eff f` on
+    // the implementation. Zero Calor0421 is §7.5's R2, and it now holds because
+    // sites 4/5 compare binders by ORDINAL — not, as in slice a, because they
+    // never compared them at all.
+    [InlineData("A3-middleware-alpha", 1, 0)]
+    // The negative control for the same mechanism: same shape, impl row {e, cw}
+    // against interface row {e}. The ORDINARY fits relation rejects it.
+    [InlineData("A3-middleware-broadening", 1, 1)]
+    public void A3Fixtures_AreExactlyCalor0418PerInvocation(
+        string fixture, int expected0418, int expected0421)
+    {
+        var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+        Assert.True(File.Exists(path), $"A3 fixture missing: {path}");
+
+        var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        // Driven through Program.Compile, NOT through a hand-built
+        // Parser/Binder/EffectEnforcementPass chain. That distinction is
+        // load-bearing and was found the hard way: binding A3-map and A3-match
+        // directly reports Calor0202 ("'Double' is a function, not a variable")
+        // on their method-group arguments, which the real pipeline does not, so
+        // the hand-built chain SKIPS the effect pass on exactly the two fixtures
+        // that exercise rank-1 instantiation. `PpE1NegativeControl_*` above has
+        // that shape and is therefore vacuous for those two; this pin does not
+        // inherit it. UnsafeTranspileOnly stops at C# emission, which removes
+        // only Calor1002 relative to the pinned CLI invocation.
+        var result = Compiler.Program.Compile(
+            source,
+            fixture + ".calr",
+            new Compiler.CompilationOptions { UnsafeTranspileOnly = true });
+
+        var byCode = result.Diagnostics
+            .GroupBy(d => d.Code, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+
+        var expected = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (expected0418 > 0)
+            expected[Compiler.Diagnostics.DiagnosticCode.DelegateInvocation] = expected0418;
+        if (expected0421 > 0)
+            expected[Compiler.Diagnostics.DiagnosticCode.InterfaceEffectVariance] = expected0421;
+
+        Assert.Equal(
+            string.Join(", ", expected.OrderBy(e => e.Key, StringComparer.Ordinal)
+                .Select(e => $"{e.Key}x{e.Value}")),
+            string.Join(", ", byCode.OrderBy(e => e.Key, StringComparer.Ordinal)
+                .Select(e => $"{e.Key}x{e.Value}")));
+    }
+
+    /// <summary>
     /// The corrected PP-E1 leg-A negative-control baselines, from annex
     /// sub-entry <b>A-1.11.1</b> (2026-08-26), measured under the PINNED
     /// invocation (no flags) at <c>main</c> =

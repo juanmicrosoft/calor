@@ -942,4 +942,62 @@ public class EffectRowLatticeTests
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.ToString())));
         return new Calor.Compiler.Binding.Binder(diagnostics, "test.calr").Bind(ast);
     }
+
+    // ------------------------------------- §8.2, E3 slice b: the bound reader ---
+
+    [Fact]
+    public void CSharpDeclaredDelegateParameter_IsASite_ThroughTheBoundFunctionType()
+    {
+        // Design-doc §8.2. Slice a built a FunctionBoundType for this position
+        // and left `RowSiteChecker.IsFunctionTyped` on the STRING test, so the
+        // type existed and nothing read it — stated at the time as "exercised by
+        // tests rather than by a production reader". This is the change that
+        // makes it load-bearing: `Handler` is declared inside a §CSHARP block, so
+        // TypeIdentity.IsFunctionTypeName does not recognise it and the string
+        // test says "not function-typed", while the BINDER knows better.
+        //
+        // The A2 shape exactly: a delegate-typed parameter passed onward to a
+        // parameter whose row is narrower.
+        //
+        // Discriminating revert: drop the `_pass.BoundFunctionType(...)` arm from
+        // IsParameterFunctionTyped and the Calor0424 disappears — measured, not
+        // assumed: the same source on 9119397e produces zero Calor0424.
+        var result = TestHarness.Compile("""
+            §M{m001:A2Shape}
+              §F{f001:Apply:pub} (Handler:h §E{}) -> void
+                §E{}
+                §R
+              §F{f002:Wrap:pub} (Handler:g §E{cw}) -> void
+                §E{}
+                §C{Apply} §A g §/C
+              §CSHARP{public delegate void Handler(int x);}§/CSHARP
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMismatch
+              && d.Message.Contains("Argument 'g'")
+              && d.Message.Contains("parameter 'h' of 'Apply'")
+              && d.Message.Contains("Extra effect(s): cw"));
+    }
+
+    [Fact]
+    public void CSharpDeclaredDelegateParameter_WideEnough_Compiles()
+    {
+        // The `_Compiles` polarity, so the pin above cannot be satisfied by an
+        // unconditional emitter.
+        var result = TestHarness.Compile("""
+            §M{m001:A2Shape}
+              §F{f001:Apply:pub} (Handler:h §E{cw}) -> void
+                §E{cw}
+                §R
+              §F{f002:Wrap:pub} (Handler:g §E{cw}) -> void
+                §E{cw}
+                §C{Apply} §A g §/C
+              §CSHARP{public delegate void Handler(int x);}§/CSHARP
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMismatch
+              || d.Code == DiagnosticCode.EffectRowUnknown);
+    }
 }

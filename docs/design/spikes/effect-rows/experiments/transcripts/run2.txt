@@ -65,7 +65,6 @@ CASE Y3a-B-with-sameline-E  args: (none)  exit: 0
     §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
 ------------------------------------------------------------------------------
 Compilation successful: Y3a-B-with-sameline-E.g.cs
-Y3a-B-with-sameline-E.calr(4,25): warning Calor0425: Initializer of binding 'f' has effect row [unknown] and binding 'f' declares row cw, so it cannot be decided whether the row fits. State a row on both sides, or compile with --permissive-effects.
 
 ==============================================================================
 CASE Y3b-B-plain  args: (none)  exit: 0
@@ -87,7 +86,6 @@ CASE Y4a-O-sameline-E-decl-later  args: (none)  exit: 0
     §R §LAM{lam1} §R INT:1 §/LAM{lam1}
 ------------------------------------------------------------------------------
 Compilation successful: Y4a-O-sameline-E-decl-later.g.cs
-Y4a-O-sameline-E-decl-later.calr(5,8): warning Calor0425: Returned value lambda has effect row [unknown] and the return of 'Make' declares row cw, so it cannot be decided whether the row fits. State a row on both sides, or compile with --permissive-effects.
 
 ==============================================================================
 CASE Y5a-arrow-sameline-E  args: (none)  exit: 1

@@ -467,4 +467,35 @@ public class IncrementalCliEndToEndTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_tempDir, ".calor-build-state.json")),
             "plain compile must not write build state without --cache");
     }
+
+    /// <summary>
+    /// Design-doc pin <b>P23</b> — <c>BuildStateCache</c>'s three version
+    /// constants (<c>BuildStateCache.cs:121-123</c>), frozen with a value each.
+    ///
+    /// <para>The one that matters is
+    /// <c>CurrentCompilerSemanticsVersion</c>. <b>G-CODEGEN</b> (§12.2) is a
+    /// feature-wide BLOCKING gate: effect rows must not change a byte of emitted
+    /// C#. If they did, the semantics stamp would have to move, so a moved stamp
+    /// and an unchanged one cannot both be right — pinning it here means E3 cannot
+    /// quietly contradict G-CODEGEN by bumping it.</para>
+    ///
+    /// <para><c>CurrentFormatVersion</c> moves <c>"3.0"</c> → <c>"4.0"</c> at
+    /// <b>E5</b>, when <c>BuildFileEntry.EffectSummary</c>'s shape changes; it is
+    /// pinned at <c>"3.0"</c> here because E3 does not touch that shape, and E5's
+    /// PR must flip this line deliberately rather than discover it.</para>
+    ///
+    /// <para>Discriminating revert: bump the semantics stamp and this fails,
+    /// naming G-CODEGEN.</para>
+    /// </summary>
+    [Fact]
+    public void BuildStateCacheConstants_AreUnchangedByEffectRows()
+    {
+        Assert.Equal("3.0", Calor.Compiler.Incremental.BuildStateCache.CurrentFormatVersion);
+        Assert.Equal(
+            "calor-compile-semantics-v1",
+            Calor.Compiler.Incremental.BuildStateCache.CurrentCompilerSemanticsVersion);
+        Assert.Equal(
+            "compile-inputs-v3",
+            Calor.Compiler.Incremental.BuildStateCache.CurrentOptionsSerializerVersion);
+    }
 }
