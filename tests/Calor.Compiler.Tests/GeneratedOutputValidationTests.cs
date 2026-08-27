@@ -1,5 +1,6 @@
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
@@ -46,6 +47,142 @@ public class GeneratedOutputValidationTests
             result.Diagnostics,
             item => item.Code == DiagnosticCode.CodeGenCompilationError);
         Assert.Contains("int x = \"not an int\";", result.GeneratedCode);
+    }
+
+    /// <summary>
+    /// The driver's generated-output validation covers this run's clean outputs
+    /// plus every cached output, as one Roslyn compilation. When a file FAILED,
+    /// its output is absent from that set, and validating the rest reported
+    /// cascade Calor1002s ("name does not exist") on every caller of the failed
+    /// file — on a cold build only, because a warm build whose sole uncached
+    /// file was the failing one skipped validation (nothing pending). ES-08
+    /// (tests/TestData/EditScripts) found that disagreement; the rule now is
+    /// that validation is skipped whenever any file in the run failed, so cold
+    /// and warm agree and the only reported error is the real one.
+    /// </summary>
+    [Fact]
+    public void CompileAll_WhenAFileFails_ReportsNoCascadeCalor1002_ColdOrWarm()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            var callee = Path.Combine(workspace, "callee.calr");
+            var caller = Path.Combine(workspace, "caller.calr");
+            File.WriteAllText(callee, """
+                §M{m001:Lib}
+                  §F{f001:Ping:pub} () -> i32
+                    §E{}
+                    §R INT:1
+                """);
+            File.WriteAllText(caller, """
+                §M{m002:App}
+                  §F{f001:Main:pub} () -> i32
+                    §E{}
+                    §R §C{Ping} §/C
+                """);
+
+            // Warm the cache with a clean state: both files compile, no findings.
+            var clean = DriveAll(workspace, clearFirst: true);
+            Assert.Empty(clean.Codes);
+            Assert.False(clean.AnyErrors);
+
+            // The callee now fails effect enforcement; the caller is untouched.
+            File.WriteAllText(callee, """
+                §M{m001:Lib}
+                  §F{f001:Ping:pub} () -> i32
+                    §E{}
+                    §P "ping"
+                    §R INT:1
+                """);
+
+            var warm = DriveAll(workspace, clearFirst: false);
+            var cold = DriveAll(workspace, clearFirst: true);
+
+            Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, warm.Codes);
+            Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, cold.Codes);
+            Assert.True(warm.AnyErrors);
+            Assert.True(cold.AnyErrors);
+            Assert.Equal(1, warm.Skipped);
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The two-sided half of the rule above: skipping validation is tied to a
+    /// FAILED file, not to the presence of diagnostics or to the driver path.
+    /// With every Calor file compiling, a generated output that Roslyn rejects
+    /// still surfaces as Calor1002 through the driver.
+    /// </summary>
+    [Fact]
+    public void CompileAll_WhenNoFileFails_StillReportsCalor1002ForInvalidOutput()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(workspace, "ok.calr"), """
+                §M{m001:Ok}
+                  §F{f001:One:pub} () -> i32
+                    §E{}
+                    §R INT:1
+                """);
+            File.WriteAllText(Path.Combine(workspace, "bad.calr"), TypeInvalidSource);
+
+            var result = DriveAll(workspace, clearFirst: true, enableTypeChecking: false);
+
+            Assert.Contains(DiagnosticCode.CodeGenCompilationError, result.Codes);
+            Assert.True(result.AnyErrors);
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
+    private static string CreateWorkspace()
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(),
+            "calor-genvalidation-" + Guid.NewGuid().ToString("N")[..12]);
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static (string[] Codes, bool AnyErrors, int Skipped) DriveAll(
+        string workspace,
+        bool clearFirst,
+        bool enableTypeChecking = true)
+    {
+        var sources = Directory.GetFiles(workspace, "*.calr")
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Select(path => new FileInfo(path))
+            .ToList();
+        var sink = new DiagnosticBag();
+        var result = CompilationDriver.CompileAll(
+            sources,
+            _ => new CompilationOptions
+            {
+                EnforceEffects = true,
+                EnableTypeChecking = enableTypeChecking,
+            },
+            crossModuleEnforcement: true,
+            crossModulePolicy: UnknownCallPolicy.Strict,
+            onCompiled: (file, compileResult) => File.WriteAllText(
+                Path.ChangeExtension(file.FullName, ".g.cs"),
+                compileResult.GeneratedCode),
+            diagnosticSink: sink,
+            cache: new CompilationDriver.DriverCacheSettings(
+                workspace,
+                "effects-on",
+                clearFirst,
+                file => Path.ChangeExtension(file.FullName, ".g.cs")));
+
+        return (
+            sink.Select(d => d.Code).Distinct().OrderBy(c => c, StringComparer.Ordinal).ToArray(),
+            result.AnyErrors,
+            result.Skipped.Count);
     }
 
     [Fact]

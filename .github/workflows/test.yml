@@ -1047,6 +1047,51 @@ jobs:
           CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
+  cli-tool-consumer:
+    # Roadmap §2.5 gate 7 — clean-consumer install, CLI leg (#790). The Sdk leg
+    # is sdk-package-consumer above; this is the `calor` global tool, which was
+    # previously only ever checked by hand after a publish.
+    #
+    # The matrix is gate 7's frozen RID set (win-x64, linux-x64, osx-arm64). The
+    # dropped osx-x64 RID (#916) is not a runner here — its amended oracle, the
+    # documented degradation, is reproduced inside the script on every leg.
+    name: cli-tool-consumer (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rid: linux-x64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        if: runner.os != 'Windows'
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
+      - name: Bootstrap verified Z3 assets (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+
+      - name: Run gate 7 CLI consumer check (pack -> tool install -> solver verdict)
+        env:
+          CALOR_EXPECTED_RID: ${{ matrix.rid }}
+        run: bash .github/scripts/test-cli-tool-consumer.sh
+
   verify-phase1:
     # Tier 1 self-verification harness — v6 §3.1.
     # Goal: every PR finishes Tier 1 in < 60s.

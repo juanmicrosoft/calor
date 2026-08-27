@@ -136,6 +136,26 @@ public sealed class EditScriptIdentityTests : IDisposable
             lines.Add(
                 $"occ|{occurrence.File}|{occurrence.Line}|{occurrence.Column}|{occurrence.Kind}");
         }
+        // v0.15 E5's effects facet (ProjectIndex format 4.0). Gate 3 observes
+        // effects "as diagnostics and index bytes"; without these lines an
+        // effect-row edit (ES-08) that moved only the facet would be invisible
+        // to this leg.
+        //
+        // Symbol ids are not printed: they embed the canonicalised source
+        // identity (Binder: `source/<identity>/module/...`), which differs
+        // between the two temp workspaces the way the header hashes do. The
+        // row is identified by file, line, kind and name instead.
+        foreach (var row in index.EffectRows)
+        {
+            lines.Add(
+                $"effrow|{row.File}|{row.Line}|{row.Kind}|{row.Name}"
+                    + $"|declared={row.Declared}"
+                    + $"|{DescribeRow(row.DeclaredRow)}|{DescribeRow(row.InferredRow)}"
+                    + $"|{row.Verdict}|{row.DiagnosticCode}"
+                    + $"|forbidden={string.Join(",", row.Forbidden)}|bound={row.BoundRow}");
+        }
+        foreach (var unavailable in index.Residual.EffectRowsUnavailable)
+            lines.Add($"residual-effect-rows-unavailable|{unavailable}");
         foreach (var unreadable in index.Residual.UnreadableFiles)
             lines.Add($"residual-unreadable|{unreadable}");
         foreach (var unresolved in index.Residual.UnresolvedCalls)
@@ -144,6 +164,17 @@ public sealed class EditScriptIdentityTests : IDisposable
             lines.Add($"residual-ambiguous|{ambiguous}");
 
         return string.Join("\n", lines);
+    }
+
+    private static string DescribeRow(Indexing.IndexedRow? row)
+    {
+        if (row is null)
+            return "-";
+        var variables = string.Join(
+            ",",
+            row.Variables.Select(variable => $"{variable.Ordinal}:{variable.Name}"));
+        return $"{row.State}{{{string.Join(",", row.Effects)}}}<{variables}>"
+            + $"[{string.Join(",", row.Reasons)}]";
     }
 
     [Theory]
@@ -228,8 +259,118 @@ public sealed class EditScriptIdentityTests : IDisposable
                 "ES-05-options-flip",
                 "ES-06-touch-noop",
                 "ES-07-persistent-finding",
+                // v0.16 kickoff sweep: the effect-row script (roadmap-v0.13-v0.15
+                // §4.4 gate 3), registered under F-3′ §4 of
+                // docs/plans/v0.13-freeze-registrations.md with its breach
+                // disclosed (it was to land before E2 merged; E2 merged first).
+                "ES-08-effect-row-edit",
             },
             EnumerateScriptDirectories().Select(Path.GetFileName).ToArray());
+    }
+
+    // --- ES-08: the effect-row script ---------------------------------------
+
+    /// <summary>
+    /// ES-08's per-step diagnostic outcome, pinned by code and file so the
+    /// script's registered meaning (F-3′ §4) is a tested claim and not prose:
+    /// the row edits in <c>combinators.calr</c> move the UNEDITED caller's
+    /// Calor0410 (step 1) and the callee's own Calor0425 (step 2), and
+    /// <c>bystander.calr</c> never reports anything. Each entry is
+    /// <c>file|code</c>, ordinally sorted, over a from-scratch compile.
+    /// </summary>
+    private static readonly IReadOnlyList<string>[] Es08ExpectedCodesPerStep =
+    [
+        // step-00-clean: Map<eff e> is instantiated with a pure function by
+        // UsePure and with a printing one by UseImpure; every row fits.
+        [],
+        // step-01-callee-row-widens: Map's declared row gains `cw`. UsePure
+        // declares §E{alloc, mut} and was not edited — the cross-module charge
+        // now names an effect it does not declare. UseImpure declares `cw`
+        // and stays clean.
+        ["app.calr|Calor0410"],
+        // step-02-callee-row-erased: Map loses `<eff e>` and its parameter's
+        // §E{e}. Invoking the row-less `f` inside Map is "cannot tell"
+        // (Calor0425, a warning at the invocation) plus the fail-closed
+        // Unknown charge on Map itself (Calor0410, the shipped 0.15 rule:
+        // `--permissive-effects` is the only waiver); the callers no longer
+        // instantiate a row and Map's declared row covers what they declare.
+        // No Calor1002 on app.calr: the callee's failure excludes its output
+        // from generated-C# validation, and CompilationDriver now skips that
+        // validation when any file failed — on cold and warm builds alike.
+        ["combinators.calr|Calor0410", "combinators.calr|Calor0425"],
+    ];
+
+    [Fact]
+    public void Es08_EffectRowEdit_DiagnosticsMoveAsRegistered()
+    {
+        var script = LoadScript("ES-08-effect-row-edit");
+        Assert.Equal(Es08ExpectedCodesPerStep.Length, script.Steps.Count);
+
+        for (var index = 0; index < script.Steps.Count; index++)
+        {
+            var workspace = CreateTempDir();
+            SyncWorkspace(workspace, script.Steps[index].SourceDirectory);
+            var outcome = RunStep(workspace, script.Steps[index], clearFirst: true);
+
+            var codes = outcome.Diagnostics
+                .Select(line =>
+                {
+                    var parts = line.Split('|');
+                    return $"{parts[0]}|{parts[1]}";
+                })
+                .OrderBy(line => line, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.True(
+                Es08ExpectedCodesPerStep[index].SequenceEqual(codes, StringComparer.Ordinal),
+                $"ES-08 step {index}: expected [{string.Join(", ", Es08ExpectedCodesPerStep[index])}] "
+                    + $"but the compiler reported [{string.Join(", ", codes)}]. The script's "
+                    + "registered outcome (F-3′ §4) moved — re-register with disclosure; do "
+                    + "not edit the fixture to fit. Full diagnostics:\n  "
+                    + string.Join("\n  ", outcome.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void Es08_EffectRowEdit_DeltaIsConfinedToTheCalleeAndItsCallers()
+    {
+        // Gate 3's "confined to the affected declarations and their callers"
+        // clause, made observable: the bystander module is never edited and
+        // never calls Map, so neither its diagnostics nor its index lines
+        // (declarations, occurrences, effect rows) may move across the three
+        // steps — while the callee's own effect-row entry MUST move, or the
+        // EffectRows facet is not observing the edit at all.
+        var script = LoadScript("ES-08-effect-row-edit");
+
+        var bystanderIndexPerStep = new List<string>();
+        var calleeRowPerStep = new List<string>();
+        for (var index = 0; index < script.Steps.Count; index++)
+        {
+            var workspace = CreateTempDir();
+            SyncWorkspace(workspace, script.Steps[index].SourceDirectory);
+            var outcome = RunStep(workspace, script.Steps[index], clearFirst: true);
+
+            Assert.DoesNotContain(
+                outcome.Diagnostics,
+                line => line.StartsWith("bystander.calr|", StringComparison.Ordinal));
+
+            var lines = SerializeIndex(workspace, script.Steps[index]).Split('\n');
+            bystanderIndexPerStep.Add(string.Join(
+                "\n",
+                lines.Where(line => line.Contains("|bystander.calr|", StringComparison.Ordinal))));
+            calleeRowPerStep.Add(string.Join(
+                "\n",
+                lines.Where(line =>
+                    line.StartsWith("effrow|combinators.calr|", StringComparison.Ordinal))));
+        }
+
+        Assert.NotEmpty(bystanderIndexPerStep[0]);
+        for (var index = 1; index < script.Steps.Count; index++)
+            Assert.Equal(bystanderIndexPerStep[0], bystanderIndexPerStep[index]);
+
+        Assert.NotEmpty(calleeRowPerStep[0]);
+        Assert.NotEqual(calleeRowPerStep[0], calleeRowPerStep[1]);
+        Assert.NotEqual(calleeRowPerStep[0], calleeRowPerStep[2]);
     }
 
     [Theory]

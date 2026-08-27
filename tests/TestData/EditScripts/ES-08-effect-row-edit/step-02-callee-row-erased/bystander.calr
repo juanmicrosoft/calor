@@ -1,0 +1,4 @@
+§M{m003:Bystander}
+  §F{f001:Answer:pub} () -> i32
+    §E{}
+    §R INT:42

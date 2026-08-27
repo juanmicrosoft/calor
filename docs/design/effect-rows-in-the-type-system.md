@@ -2792,6 +2792,35 @@ untrimmed code in `Calor0403`.
 > under `bench/phase0-agent-native/*.json` moved for any reason but the 40 files, and `dA.total` /
 > `demandTotal` (route (b)'s 3123) did not move at all.
 
+> **EXECUTED, v0.16 kickoff sweep (ES-08 registration) — FOUR moved lines in ONE script, plus
+> `o53/baseline.json`'s `measuredCommit`; none of them a compiler-output change.** Counted from
+> `git diff -U0` of all six transcripts after `regenerate-transcripts.py`, against `origin/main`
+> (`867ededc`): `run.py`, `run2.py`, `run3.py`, `facts2.py` and `compile53.py` are **CLEAN**
+> (byte-identical). The one cause: **nine `.calr` snapshots entered the committed corpus** under
+> `tests/TestData/EditScripts/ES-08-effect-row-edit/` (the effect-row edit script,
+> `v0.13-freeze-registrations.md` F-3′ §6), three of them a `combinators.calr` carrying
+> `Map<eff e> (…, Func<i32,i32>:f §E{e})` — the same rank-1 shape as gate 7's golden — and
+> `facts.py` greps `tests/TestData` for function-typed shapes and enumerates `git ls-files '*.calr'`.
+>
+> | Case | Result |
+> |---|---|
+> | `facts.txt:37` "tests/TestData function-typed .calr" | `count: 1` → `4` (the three `combinators.calr`; step 2's has no row but still names `Func<i32,i32>`) |
+> | `facts.txt:40-` "whole-corpus function-typed positions" | `7` → `10`, the same three files added to the list |
+> | `o53/baseline.json` `measuredCommit` | re-stamped by the regeneration script; counts unchanged (no ES-08 file writes the two-line `§O`/`§E` form) |
+>
+> The corpus instruments regenerated for the same cause, old → new: D-A demand ledger `dA.fileCount`
+> 926 → 935 (`dA.total`, `demandTotal` 3123 and every class count unchanged; both legs re-stamped at
+> one commit with submodules initialised); resolver-key ledger `tests.filesMeasured` 485 → 494
+> (`keysFromBound` 22 / `keysFromString` 135 unchanged); binder-incomplete baseline `ParsedFiles`
+> 507 → 516, `ExpressionsBound` 4715 → 4787, `IncompleteCount` 0 unchanged;
+> `EffectRowCorpusShapeTests` 926 → 935 with the two row-bearing `combinators.calr` on its reasoned
+> allowlist (step 2's, row erased, deliberately not). Formatter corpus baseline `trackedFileCount` 926 → 935,
+> `successfulTransformationCount` 693 → 698, four ES-08 files registered as semantic-error
+> conservative fallbacks (the three `app.calr`, cross-module alone; step 2's `combinators.calr`,
+> Calor0410). No `src/**` file that any transcript probes
+> differs from `origin/main`; the sweep's one `src/` change (`CompilationDriver.cs`, the
+> generated-output validation guard) is probed by no script.
+
 ## 14. Open questions
 
 1. **Does §7.5's R2 have a usable spelling for a foreign interface?** — **ANSWERED IN PART BY

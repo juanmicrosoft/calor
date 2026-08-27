@@ -209,6 +209,17 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    must get the *documented degradation* (a loud "Z3 unavailable"/Calor0710 signal, no crash, no
    silent pass), which turns the drop decision itself into a tested claim. NuGet registries and
    GitHub release assets are verified **after** publishing (a workflow firing is not a publish).
+   **Status (2026-08-15).** Both legs are now instruments in CI rather than post-publish habits:
+   `sdk-package-consumer` (5 RIDs, Calor0712 canary in the MSBuild task context) and
+   `cli-tool-consumer` (the frozen 3 RIDs — win-x64, linux-x64, osx-arm64 — packing `calor`,
+   installing it from a local feed with a cold package cache, and requiring a *solver verdict*:
+   contracts Proven, none Skipped, no Calor0710). The VSIX leg is retired with the extension
+   itself (#952). The dropped osx-x64 RID has no runner, so its amended oracle is reproduced on
+   every leg by removing the runner's own Z3 native from the installed tool — the same state an
+   Intel-mac consumer is in — and asserting documented degradation. **Building that oracle found
+   the gate's own failure mode live in the shipped CLI**: `Calor0710` was `info` severity and the
+   text report prints only errors and warnings, so a solverless consumer saw 14 `Skipped`, exit 0,
+   and no stated reason outside `--format json`. Fixed in the same PR.
 8. **Performance envelope (project scale needs a number)**: index build ≤ 30s and warm `calor query`
    ≤ 500ms on the largest pinned conversion subject, measured in CI. Generous by design; the point
    is that "usable at project scale" is adjudicable at all. Frozen here, before the index exists.

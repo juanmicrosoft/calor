@@ -277,7 +277,20 @@ internal static class CompilationDriver
         }
 
         var generatedValidationFailed = false;
-        if (pending.Count > 0 && pending.Any(item => !item.Options.UnsafeTranspileOnly))
+        // Generated-output validation runs over the outputs of THIS run's clean
+        // files plus every cached output, so the set is validated as a whole.
+        // A file that failed above has no output in that set, and validating
+        // the rest against the hole reports cascade errors (Calor1002 "name does
+        // not exist" at every call into the failed file) that are not theirs.
+        // Skipping validation when any file failed keeps a cold build and a warm
+        // one identical — the warm path already skipped it whenever the only
+        // uncached file was the failing one (pending empty), so without this a
+        // cold build reported cascade Calor1002s a warm build never did. Found
+        // by ES-08 (tests/TestData/EditScripts), whose row-erased step makes the
+        // callee fail while its cached callers stay clean.
+        if (!anyErrors
+            && pending.Count > 0
+            && pending.Any(item => !item.Options.UnsafeTranspileOnly))
         {
             var generatedSources = pending
                 .Select(item => new GeneratedCSharpSource(
