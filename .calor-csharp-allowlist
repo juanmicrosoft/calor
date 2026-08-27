@@ -60,6 +60,17 @@ src/Calor.Compiler/Commands/IndexCommand.cs
 # the S1 entries above.
 src/Calor.Compiler/Commands/QueryCommand.cs
 
+# v0.16 E7 (docs/plans/roadmap-v0.16.md §3.1) — the MCP query surface over the
+# persisted index. `ProjectIndexQueryReader` is the reader extracted from
+# QueryCommand (callers | callees | impact [--effects --row] | effects) so the
+# CLI and the MCP `calor_query` tool answer from one code path over
+# `ProjectIndex` (format 4.0); `QueryTool` is the MCP registration. Compiler-
+# internal index machinery + MCP protocol plumbing, same class as the S1/S2
+# entries above and the MCP session tools. Pre-registered here per the guard's
+# rule; the E7 PR lands the files.
+src/Calor.Compiler/Commands/ProjectIndexQueryReader.cs
+src/Calor.Compiler/Mcp/Tools/QueryTool.cs
+
 # MCP memory admission policy (#897) — the type that carries the heavy-tool
 # admission rule out of McpMessageHandler so it can differ between the stdio
 # server (which owns its process) and an embedded host (which does not).
