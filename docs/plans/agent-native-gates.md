@@ -373,7 +373,7 @@ its freeze point — **none of the five `after/*.calr` fixtures parses** on the 
 and 2× `Calor0403`), ×4 (A3-callback), every one exit 1 — so A-1.11's A3 "exit 0, zero diagnostics"
 was as unreproducible at the pinned freeze commit as the A2 multiset was. (Measured by rebuilding
 `f7cd1c46`, `211bf356`, `d41765cc` and `4766c8fc` and running the pinned invocation on all five
-fixtures plus `before/A2.calr`; the same sweep is the source of the `d41765cc` attribution above.)
+fixtures plus `before/A2.calr`; the same sweep is the source of the `d41765cc` attribution below.)
 
 **Measured, results-in-hand, at `main` = `9119397e979dfcab3606ee382b16afbdec4b136a`** (E3a merged;
 `src/Calor.Compiler` built Debug; `LC_ALL=C`; the pinned invocation, and then the forbidden one, on
@@ -429,7 +429,9 @@ not a satisfying alternative: an A2 compile that still shows it at adjudication 
 MISS of (3), whether or not E4 has merged — E4 MUST merge before adjudication per §4.2, and this
 sentence is what makes that "must" bite. Anything outside the post-E4 multiset — a third
 `Calor0411`, a `Calor0410` at another declaration, a `Calor0418` anywhere, or any code from the
-barred set — fails the control.
+barred set — fails the control, with exactly one exception, inherited unchanged from A-1.11 and
+restated above: a `Calor0410`-'unknown' or `Calor0411` entry of that multiset may be **replaced**
+by `Calor0425`/`Calor0419` **at the same declaration**, and nothing else may.
 
 **(2) `A3-map`, `A3-match`, `A3-middleware`, `A3-callback` — A-1.11's "exit 0, zero diagnostics"
 (quoted verbatim from the frozen row; it says *zero diagnostics*, not zero effect-family
