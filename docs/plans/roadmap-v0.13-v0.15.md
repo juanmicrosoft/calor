@@ -836,6 +836,18 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   fixture's zero; no Calor0418 anywhere). Leg A's own-goal MISS no longer stands; the
   four-valued verdict is read at the release commit by `EffectRowsProbeLedgerTests`, as
   registered.
+  **Status, 2026-08-27 — instrument BUILT (PR #1109); leg A recomputed 10/10 at
+  `121c6681ecc861d90fc55d455b8a40eedf1fe463`; leg B not run; verdict NOT-ADJUDICATED pending the release-commit
+  epoch.** `bench/phase0-agent-native/effect-rows-probe-ledger.json` exists and is read by exact
+  equality in `EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation`: all ten cells detect
+  with the registered code at the registered declaration (L6-MAP/L6-MATCH name `cw`; L6-MID's
+  message names the instantiation on its `Effect row:` continuation line), **no drift**, the
+  post-E4 control multisets reproduce byte-for-byte, route (a) does not fire, route (b) reads
+  2 + 3121 = 3123 against the floor of 25. Leg B's adjudicator `ppe1-analyze.py` and its epoch
+  runner `run-ppe1-epoch.sh` (refuses without `--confirm-paid-epoch`) are registered but the
+  epoch `e1-rows-parity-001` has **not** run; its arithmetic is pinned by a dry run on
+  `w5-parity-002` (point 1.0016, lower bound 0.8270, realized CV 0.4392 — the derivation's
+  population figures reproduced). Notes: `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md`.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
   discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.
@@ -907,7 +919,12 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    caused by this workstream's own change is adjudicated MISS.
    *Freeze point:* A-1.11, before E2 merges. *Discriminating pin:* the annex append-only check
    rejects an edit to the frozen row; and dropping any one registered mutation from the ledger
-   fails the exact-equality test.
+   fails the exact-equality test. *Status (2026-08-27):* **instrument BUILT (PR #1109); leg A
+   recomputed 10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463` with a clean control and no drift; leg B not run;
+   verdict NOT-ADJUDICATED pending the release-commit epoch** — the release PR's author runs
+   `bench/phase0-agent-native/run-ppe1-epoch.sh --confirm-paid-epoch` (see
+   `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md` for the exact commands), then
+   regenerates the ledger, and the test derives the verdict from the frozen map.
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
    migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
    version (§4.0). *Denominator:* the committed `.calr` corpus at the 0.15 branch-cut commit, in

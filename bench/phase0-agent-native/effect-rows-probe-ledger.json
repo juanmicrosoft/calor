@@ -1,0 +1,654 @@
+{
+  "schemaVersion": 2,
+  "proofPoint": "PP-E1",
+  "registration": "docs/plans/agent-native-gates.md §A.2 row PP-E1 + §A.3 entry A-1.11 (2026-08-25); leg-A negative control re-frozen by sub-entry A-1.11.1 (2026-08-26)",
+  "measuredCommit": "121c6681ecc861d90fc55d455b8a40eedf1fe463",
+  "pinnedInvocation": "dotnet <calor.dll> -i <source> -o <scratch>; no flags (--permissive-effects and any manifest outside the built-in set are forbidden); diagnostics sorted by (line, column, code, severity, text) under LC_ALL=C",
+  "recomputedVsRecorded": "leg A recomputed by EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation (each frozen diff re-applied to the frozen fixture, compiled with the pinned invocation, codes and declarations compared); negative control, routes (a)/(b) and the ramp state recomputed; leg B recorded, with only its arithmetic recomputed by bench/phase0-agent-native/ppe1-analyze.py from the archived per-run result.json files, and its fails/underpowered booleans re-derived here from the recorded point/bound/CV; route (d) and the own-goal flag recorded, but bound to a cut citation / an artifact and to the recomputed mechanical evidence; verdict derived from the frozen outcome map",
+  "detectionRule": "a cell is detected iff the registered code appears at the registered declaration; L6-MAP/L6-MATCH must name the laundered effect 'cw' and L6-MID must name the instantiation; L7 requires Calor0425 specifically, rising above the unmutated fixture's count at that declaration; a different code at the registered declaration counts as detected-with-code-drift only if it is in the drift set, and is published by name",
+  "driftSet": [
+    "Calor0424",
+    "Calor0425",
+    "Calor0404",
+    "Calor0405"
+  ],
+  "neverDetection": [
+    "Calor0418",
+    "Calor0419",
+    "Calor0411"
+  ],
+  "negativeControl": {
+    "rule": "the plain compile of each unmutated fixture must reproduce exactly its frozen post-E4 multiset (A-1.11.1); any effect-family diagnostic beyond it — including a code enumerated nowhere in the row — fails the control; Calor0405/0420/0421/0424 anywhere fail it; the only pre-allowed move is A2's Calor0410-'unknown' replaced by Calor0425, or Calor0411 replaced by Calor0419, at the same declaration",
+    "barredAnywhere": [
+      "Calor0405",
+      "Calor0420",
+      "Calor0421",
+      "Calor0424"
+    ],
+    "perFixture": [
+      {
+        "fixture": {
+          "name": "A2",
+          "path": "docs/design/spikes/effect-rows/after/A2.calr",
+          "blobSha": "93ecdf1605c4e220313c1dd76b3291d3a79bb705"
+        },
+        "expectedExitCode": 1,
+        "baseline": [
+          {
+            "code": "Calor0410",
+            "count": 1,
+            "declaration": "m008",
+            "severity": "error",
+            "line": 23,
+            "column": 9,
+            "messageContains": "'unknown'"
+          },
+          {
+            "code": "Calor0411",
+            "count": 1,
+            "declaration": "_chainProcess010.ConfigureAwait",
+            "severity": "warning",
+            "line": 26,
+            "column": 24,
+            "messageContains": null
+          },
+          {
+            "code": "Calor0411",
+            "count": 1,
+            "declaration": "_chainNext011.ConfigureAwait",
+            "severity": "warning",
+            "line": 28,
+            "column": 19,
+            "messageContains": null
+          }
+        ],
+        "observedExitCode": 1,
+        "observed": [
+          {
+            "line": 23,
+            "column": 9,
+            "code": "Calor0410",
+            "severity": "error",
+            "message": "Function 'Handle' uses effect 'unknown' but does not declare it"
+          },
+          {
+            "line": 26,
+            "column": 24,
+            "code": "Calor0411",
+            "severity": "warning",
+            "message": "Unknown external call to '_chainProcess010.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest."
+          },
+          {
+            "line": 28,
+            "column": 19,
+            "code": "Calor0411",
+            "severity": "warning",
+            "message": "Unknown external call to '_chainNext011.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest."
+          }
+        ],
+        "preAllowedMigrationTaken": false,
+        "violations": [],
+        "clean": true
+      },
+      {
+        "fixture": {
+          "name": "A3-map",
+          "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+          "blobSha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+        },
+        "expectedExitCode": 0,
+        "baseline": [],
+        "observedExitCode": 0,
+        "observed": [],
+        "preAllowedMigrationTaken": false,
+        "violations": [],
+        "clean": true
+      },
+      {
+        "fixture": {
+          "name": "A3-match",
+          "path": "docs/design/spikes/effect-rows/after/A3-match.calr",
+          "blobSha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"
+        },
+        "expectedExitCode": 0,
+        "baseline": [],
+        "observedExitCode": 0,
+        "observed": [],
+        "preAllowedMigrationTaken": false,
+        "violations": [],
+        "clean": true
+      },
+      {
+        "fixture": {
+          "name": "A3-middleware",
+          "path": "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+          "blobSha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"
+        },
+        "expectedExitCode": 0,
+        "baseline": [],
+        "observedExitCode": 0,
+        "observed": [],
+        "preAllowedMigrationTaken": false,
+        "violations": [],
+        "clean": true
+      },
+      {
+        "fixture": {
+          "name": "A3-callback",
+          "path": "docs/design/spikes/effect-rows/after/A3-callback.calr",
+          "blobSha": "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4"
+        },
+        "expectedExitCode": 0,
+        "baseline": [],
+        "observedExitCode": 0,
+        "observed": [],
+        "preAllowedMigrationTaken": false,
+        "violations": [],
+        "clean": true
+      }
+    ],
+    "clean": true
+  },
+  "legA": {
+    "denominator": 10,
+    "rampFired": false,
+    "rampVerdict": "VALIDATED",
+    "rampNote": "design §7.5 / roadmap §4.1 ramp VALIDATED at the spike (spike-verdict.json ramp.verdict); rank-1 was NOT cut from E2, so the three L6 cells stay in the denominator (10, not 7)",
+    "detected": 10,
+    "detectedWithDrift": 0,
+    "cells": [
+      {
+        "id": "L5-A2",
+        "class": "L5 interface implementation",
+        "fixture": {
+          "name": "A2",
+          "path": "docs/design/spikes/effect-rows/after/A2.calr",
+          "blobSha": "93ecdf1605c4e220313c1dd76b3291d3a79bb705"
+        },
+        "mutation": {
+          "kind": "committed-mutant",
+          "anchor": null,
+          "replacement": null,
+          "anchorOccurrences": null,
+          "path": "docs/design/spikes/effect-rows/after/A2-broadening.calr",
+          "blobSha": "f975f2824464af2531d53e889ef79e1fe5a363e4"
+        },
+        "registeredCode": "Calor0421",
+        "registeredDeclaration": "m008",
+        "registeredLine": 23,
+        "registeredColumn": 9,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0421",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 23,
+            "column": 9,
+            "code": "Calor0410",
+            "severity": "error",
+            "message": "Function 'Handle' uses effect 'unknown' but does not declare it"
+          },
+          {
+            "line": 23,
+            "column": 9,
+            "code": "Calor0421",
+            "severity": "error",
+            "message": "Implementation 'RequestPreProcessorBehavior.Handle' of interface method 'IPipelineBehavior.Handle' on class 'RequestPreProcessorBehavior' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw, e does not fit the interface's row e. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L5-MID",
+        "class": "L5 interface implementation",
+        "fixture": {
+          "name": "A3-middleware",
+          "path": "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+          "blobSha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "§E{e}\n      §R §C{RunTwice} §A next §/C",
+          "replacement": "§E{e, cw}\n      §R §C{RunTwice} §A next §/C",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0421",
+        "registeredDeclaration": "mt002",
+        "registeredLine": 15,
+        "registeredColumn": null,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0421",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 15,
+            "column": 7,
+            "code": "Calor0421",
+            "severity": "error",
+            "message": "Implementation 'RetryBehavior.Handle' of interface method 'IPipelineBehavior.Handle' on class 'RetryBehavior' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw, e does not fit the interface's row e. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L6-MAP",
+        "class": "L6 rank-1 generic instantiation",
+        "fixture": {
+          "name": "A3-map",
+          "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+          "blobSha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "§R §C{Map} §A xs §A Double §/C",
+          "replacement": "§R §C{Map} §A xs §A Announce §/C",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0410",
+        "registeredDeclaration": "f004",
+        "registeredLine": 20,
+        "registeredColumn": null,
+        "messageRule": "names the laundered effect 'cw'",
+        "messageMustContain": [
+          "'cw'"
+        ],
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0410",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 20,
+            "column": 5,
+            "code": "Calor0410",
+            "severity": "error",
+            "message": "Function 'UsePure' uses effect 'cw' but does not declare it\n  Effect row: effect variable 'e' of 'Map' instantiated to cw at this call site"
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": true,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L6-MATCH",
+        "class": "L6 rank-1 generic instantiation",
+        "fixture": {
+          "name": "A3-match",
+          "path": "docs/design/spikes/effect-rows/after/A3-match.calr",
+          "blobSha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "§A Identity §A Zero §/C",
+          "replacement": "§A Shout §A Zero §/C",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0410",
+        "registeredDeclaration": "f005",
+        "registeredLine": 22,
+        "registeredColumn": null,
+        "messageRule": "names the laundered effect 'cw'",
+        "messageMustContain": [
+          "'cw'"
+        ],
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0410",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 22,
+            "column": 5,
+            "code": "Calor0410",
+            "severity": "error",
+            "message": "Function 'BothPure' uses effect 'cw' but does not declare it\n  Effect row: effect variable 'e' of 'MatchOption' instantiated to cw at this call site"
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": true,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L6-MID",
+        "class": "L6 rank-1 generic instantiation",
+        "fixture": {
+          "name": "A3-middleware",
+          "path": "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+          "blobSha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "§E{e}\n      §R §C{RunTwice} §A next §/C",
+          "replacement": "§E{}\n      §R §C{RunTwice} §A next §/C",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0410",
+        "registeredDeclaration": "mt002",
+        "registeredLine": 15,
+        "registeredColumn": null,
+        "messageRule": "names the instantiation: the message must say RunTwice's row instantiates at a call site in Handle",
+        "messageMustContain": [
+          "'s row instantiates to",
+          "at a call site in 'Handle'"
+        ],
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0410",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 15,
+            "column": 7,
+            "code": "Calor0410",
+            "severity": "error",
+            "message": "Function 'Handle' uses effect variable 'e' but does not declare it\n  Effect row: RunTwice's row instantiates to e at a call site in 'Handle'"
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": true,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L7-A2",
+        "class": "L7 row erasure",
+        "fixture": {
+          "name": "A2",
+          "path": "docs/design/spikes/effect-rows/after/A2.calr",
+          "blobSha": "93ecdf1605c4e220313c1dd76b3291d3a79bb705"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "next §E{e}, CancellationToken:cancellationToken) -> TResponse",
+          "replacement": "next, CancellationToken:cancellationToken) -> TResponse",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0425",
+        "registeredDeclaration": "m008 (§C{next})",
+        "registeredLine": 27,
+        "registeredColumn": null,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0425",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 27,
+            "column": 27,
+            "code": "Calor0425",
+            "severity": "warning",
+            "message": "Invocation of 'next' in 'Handle' cannot be charged: its effect row is Unknown (parameter 'next' of 'Handle' (type 'RequestHandlerDelegate<TResponse>') carries no effect row). Add §E{…} on the same line as the type to state what 'next' may do, or compile with --permissive-effects. 'Handle' is charged Unknown."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L7-MAP",
+        "class": "L7 row erasure",
+        "fixture": {
+          "name": "A3-map",
+          "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+          "blobSha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "Func<i32,i32>:f §E{e}",
+          "replacement": "Func<i32,i32>:f",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0425",
+        "registeredDeclaration": "f001 (§C{f})",
+        "registeredLine": 7,
+        "registeredColumn": null,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0425",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 7,
+            "column": 22,
+            "code": "Calor0425",
+            "severity": "warning",
+            "message": "Invocation of 'f' in 'Map' cannot be charged: its effect row is Unknown (parameter 'f' of 'Map' (type 'Func<i32,i32>') carries no effect row). Add §E{…} on the same line as the type to state what 'f' may do, or compile with --permissive-effects. 'Map' is charged Unknown."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L7-MATCH",
+        "class": "L7 row erasure",
+        "fixture": {
+          "name": "A3-match",
+          "path": "docs/design/spikes/effect-rows/after/A3-match.calr",
+          "blobSha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "Func<i32,i32>:onSome §E{e}",
+          "replacement": "Func<i32,i32>:onSome",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0425",
+        "registeredDeclaration": "f001 (§C{onSome})",
+        "registeredLine": 5,
+        "registeredColumn": null,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0425",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 5,
+            "column": 10,
+            "code": "Calor0425",
+            "severity": "warning",
+            "message": "Invocation of 'onSome' in 'MatchOption' cannot be charged: its effect row is Unknown (parameter 'onSome' of 'MatchOption' (type 'Func<i32,i32>') carries no effect row). Add §E{…} on the same line as the type to state what 'onSome' may do, or compile with --permissive-effects. 'MatchOption' is charged Unknown."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L7-MID",
+        "class": "L7 row erasure",
+        "fixture": {
+          "name": "A3-middleware",
+          "path": "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+          "blobSha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "(Func<i32>:g §E{e})",
+          "replacement": "(Func<i32>:g)",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0425",
+        "registeredDeclaration": "f001 (§C{g})",
+        "registeredLine": 4,
+        "registeredColumn": null,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0425",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 4,
+            "column": 19,
+            "code": "Calor0425",
+            "severity": "warning",
+            "message": "Invocation of 'g' in 'RunTwice' cannot be charged: its effect row is Unknown (parameter 'g' of 'RunTwice' (type 'Func<i32>') carries no effect row). Add §E{…} on the same line as the type to state what 'g' may do, or compile with --permissive-effects. 'RunTwice' is charged Unknown."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      },
+      {
+        "id": "L7-CB",
+        "class": "L7 row erasure",
+        "fixture": {
+          "name": "A3-callback",
+          "path": "docs/design/spikes/effect-rows/after/A3-callback.calr",
+          "blobSha": "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4"
+        },
+        "mutation": {
+          "kind": "textual",
+          "anchor": "§FLD{Action<i32>:onChange:pri} §E{cw}",
+          "replacement": "§FLD{Action<i32>:onChange:pri}",
+          "anchorOccurrences": 1,
+          "path": null,
+          "blobSha": null
+        },
+        "registeredCode": "Calor0425",
+        "registeredDeclaration": "mt001 (§C{onChange})",
+        "registeredLine": 6,
+        "registeredColumn": null,
+        "messageRule": null,
+        "messageMustContain": null,
+        "beforeCode": "Calor0100",
+        "inDenominator": true,
+        "observedExitCode": 1,
+        "observedCode": "Calor0425",
+        "observedAtRegisteredDeclaration": [
+          {
+            "line": 6,
+            "column": 7,
+            "code": "Calor0425",
+            "severity": "warning",
+            "message": "Invocation of 'onChange' in 'Bump' cannot be charged: its effect row is Unknown (field 'onChange' of 'Counter' (type 'Action<i32>') carries no effect row). Add §E{…} on the same line as the type to state what 'onChange' may do, or compile with --permissive-effects. 'Bump' is charged Unknown."
+          }
+        ],
+        "baselineCountAtRegisteredDeclaration": 0,
+        "registeredCodeCountAtRegisteredDeclaration": 1,
+        "messageRuleSatisfied": null,
+        "detected": true,
+        "drift": null,
+        "note": null
+      }
+    ],
+    "bar": "10/10 detected with the registered code at the registered declaration, with a clean negative control",
+    "meetsBar": true
+  },
+  "routes": {
+    "a": {
+      "fires": false,
+      "rule": "any of the five fixtures fails to compile on the release compiler, mutated or not — recomputed as: a lexer/parser/semantic-class code (Calor0001–Calor0299) or a codegen/interop-or-later code (Calor1000+) in any control or mutant compile, or a non-zero exit with no diagnostic at all (a crash)",
+      "evidence": []
+    },
+    "b": {
+      "fires": false,
+      "floor": 25,
+      "da": 2,
+      "db": 3121,
+      "total": 3123,
+      "source": "bench/phase0-agent-native/higher-order-demand-ledger.json (dA.total + dB.aggregate.total)"
+    },
+    "c": {
+      "fires": null,
+      "rule": "the PP-W5 validity floor (a cell with < 2 valid runs drops its pair, disclosed; fewer than 3 surviving pairs, or either arm below 12 valid runs), two arms without distinct repo roots and distinct Calor.Tasks hashes, or either arm above §2's 40 % censoring cap — recorded by ppe1-analyze.py as harnessValid; and an analysis whose harness is valid but whose point/bound/CV are not three finite JSON numbers",
+      "reason": null
+    },
+    "d": {
+      "fires": false,
+      "rule": "E2, E3 or E4 does not ship in 0.15.0, and only where roadmap §4.2's cut line was invoked in writing, the cut cited here; an unplanned E4 slip is a MISS — recorded, and bound: fires requires cutCitation to resolve to a roadmap section that names the cut line for the workstream, and cannot fire while mechanicalEvidenceAllShipped is true",
+      "cutCitation": null,
+      "mechanicalEvidenceAllShipped": true,
+      "evidence": [
+        "Calor0424 (E2's DoesNotFit) present in src/Calor.Compiler: True",
+        "L7 cells observing Calor0425 (E4's code): 5/5",
+        "L5 cells observing Calor0421 (E3's row text): 2/2"
+      ]
+    },
+    "ownGoal": false,
+    "ownGoalArtifact": null,
+    "ownGoalClause": "a not-adjudicated route caused by this workstream's own change is adjudicated MISS; the cause must be published with the artifact that shows it — recorded; ownGoal requires ownGoalArtifact, a repository path that exists"
+  },
+  "legB": {
+    "status": "not-run",
+    "epoch": "e1-rows-parity-001",
+    "analysisPath": "bench/phase0-agent-native/epochs/e1-rows-parity-001/ppe1-analysis.json",
+    "analyzer": "bench/phase0-agent-native/ppe1-analyze.py",
+    "rule": "fails iff BOTH the one-sided 95 % two-level cluster-bootstrap lower bound of the median paired per-pair output-tokens-to-green ratio (0.15.0 release build / v0.14.3) exceeds 1.0 AND the point estimate exceeds 1.35; UNDERPOWERED if the point exceeds 1.35 with the bound not firing, or the realized median within-cell CV exceeds 0.66; per-run figure = tokens.output as derived by token-usage.py (A-1.9.1), never usage.output_tokens; fails/underpowered are RE-DERIVED from the recorded numbers by the ledger test and must equal the analysis file's",
+    "pointEstimate": null,
+    "lowerBound95": null,
+    "realizedMedianWithinCellCv": null,
+    "harnessValid": null,
+    "invalidReason": null,
+    "fails": null,
+    "underpowered": null,
+    "recordedFails": null,
+    "recordedUnderpowered": null,
+    "booleansConsistent": null,
+    "controlArm": null,
+    "treatmentArm": null
+  },
+  "precedence": "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
+  "verdict": "NOT-ADJUDICATED",
+  "reason": "leg B epoch e1-rows-parity-001 not yet run; adjudication at the 0.15.0 release commit"
+}

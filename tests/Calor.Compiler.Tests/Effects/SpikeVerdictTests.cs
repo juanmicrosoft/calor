@@ -644,21 +644,7 @@ public sealed class SpikeVerdictTests
     /// frozen baseline is never adjudicated against a stale build of the other
     /// configuration. CI builds one configuration only.
     /// </summary>
-    private static string CompilerDll()
-    {
-        var root = RepositoryRoot();
-        var newest = new[] { "Debug", "Release" }
-            .Select(configuration => Path.Combine(
-                root, "src", "Calor.Compiler", "bin", configuration, "net10.0", "calor.dll"))
-            .Where(File.Exists)
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault();
-        if (newest is not null) return newest;
-
-        throw new InvalidOperationException(
-            "calor.dll not found under src/Calor.Compiler/bin/{Debug,Release}/net10.0/. "
-            + "Run: dotnet build src/Calor.Compiler");
-    }
+    private static string CompilerDll() => PpE1Probe.CompilerDll();
 
     /// <summary>
     /// The five fixtures annex entry A-1.11 froze as PP-E1's denominator, with
@@ -702,41 +688,11 @@ public sealed class SpikeVerdictTests
         }
     }
 
-    /// <summary>Git's object id for a file: SHA-1 over "blob {length}\0{bytes}".</summary>
-    private static string GitBlobSha1(string path)
-    {
-        var content = File.ReadAllBytes(path);
-        var header = System.Text.Encoding.ASCII.GetBytes(
-            $"blob {content.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}\0");
-        var payload = new byte[header.Length + content.Length];
-        header.CopyTo(payload, 0);
-        content.CopyTo(payload, header.Length);
-#pragma warning disable CA5350 // git object ids are SHA-1 by definition; not a security use
-        var digest = System.Security.Cryptography.SHA1.HashData(payload);
-#pragma warning restore CA5350
-        return Convert.ToHexStringLower(digest);
-    }
+    private static string GitBlobSha1(string path) => PpE1Probe.GitBlobSha1(path);
 
-    private static string SpikeDirectory()
-        => Path.Combine(RepositoryRoot(), "docs", "design", "spikes", "effect-rows");
+    private static string SpikeDirectory() => PpE1Probe.SpikeDirectory();
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))
-                || File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException(
-            $"Repository root not found above {AppContext.BaseDirectory}.");
-    }
+    private static string RepositoryRoot() => PpE1Probe.RepositoryRoot();
 
     private static string Normalize(string text)
         => text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
@@ -1011,15 +967,18 @@ public sealed class SpikeVerdictTests
     /// (`at §C{f} in f001`). This is leg A's detection for L7, not the ledger
     /// (`EffectRowsProbeLedgerTests`) that A-1.11 registers for adjudication.</para>
     /// </summary>
+    /// <summary>
+    /// The five L7 rows of the frozen catalogue, read from the ONE place it is
+    /// written (<see cref="PpE1Probe.Catalogue"/>), so this pin and the ledger
+    /// test can never disagree about which diff a cell applies.
+    /// </summary>
+    public static IEnumerable<object[]> L7Cells()
+        => PpE1Probe.Catalogue
+            .Where(m => m.Id.StartsWith("L7-", StringComparison.Ordinal))
+            .Select(m => new object[] { m.Id, m.Fixture, m.Anchor!, m.Replacement!, m.RegisteredLine });
+
     [Theory]
-    [InlineData("L7-A2", "A2",
-        "next §E{e}, CancellationToken:cancellationToken) -> TResponse",
-        "next, CancellationToken:cancellationToken) -> TResponse", 27)]
-    [InlineData("L7-MAP", "A3-map", "Func<i32,i32>:f §E{e}", "Func<i32,i32>:f", 7)]
-    [InlineData("L7-MATCH", "A3-match", "Func<i32,i32>:onSome §E{e}", "Func<i32,i32>:onSome", 5)]
-    [InlineData("L7-MID", "A3-middleware", "(Func<i32>:g §E{e})", "(Func<i32>:g)", 4)]
-    [InlineData("L7-CB", "A3-callback",
-        "§FLD{Action<i32>:onChange:pri} §E{cw}", "§FLD{Action<i32>:onChange:pri}", 6)]
+    [MemberData(nameof(L7Cells))]
     public void PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4(
         string cell, string fixture, string anchor, string replacement, int invocationLine)
     {
@@ -1053,17 +1012,7 @@ public sealed class SpikeVerdictTests
     }
 
     private static int CountOccurrences(string haystack, string needle)
-    {
-        var count = 0;
-        for (var at = haystack.IndexOf(needle, StringComparison.Ordinal);
-             at >= 0;
-             at = haystack.IndexOf(needle, at + needle.Length, StringComparison.Ordinal))
-        {
-            count++;
-        }
-
-        return count;
-    }
+        => PpE1Probe.CountOccurrences(haystack, needle);
 
     /// <summary>
     /// Compiles one control fixture with the PINNED invocation A-1.11 froze —
@@ -1078,7 +1027,9 @@ public sealed class SpikeVerdictTests
     /// purpose. The pinned invocation IS the CLI pipeline, and the in-process
     /// shortcut measures something else: it reports binder diagnostics the CLI
     /// filters and, where those are errors, skips the effect pass entirely, so
-    /// A3-map and A3-match come back with no Calor0418 at all.</para>
+    /// A3-map and A3-match come back with no Calor0418 at all. The shelling
+    /// itself lives in <see cref="PpE1Probe"/>, shared with the PP-E1 ledger
+    /// test so both read the same invocation.</para>
     /// </summary>
     private static (int ExitCode, string[] Diagnostics) CompileControlFixture(string fixture)
     {
@@ -1091,43 +1042,12 @@ public sealed class SpikeVerdictTests
     /// mutants are copies of a frozen fixture, compiled exactly as the control is.</summary>
     private static (int ExitCode, string[] Diagnostics) CompileControlSource(string source)
     {
-        var output = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{Guid.NewGuid():N}.g.cs");
-        try
-        {
-            var start = new ProcessStartInfo("dotnet")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                WorkingDirectory = RepositoryRoot(),
-            };
-            start.ArgumentList.Add(CompilerDll());
-            start.ArgumentList.Add("-i");
-            start.ArgumentList.Add(source);
-            start.ArgumentList.Add("-o");
-            start.ArgumentList.Add(output);
-
-            using var process = Process.Start(start);
-            Assert.NotNull(process);
-            var stdout = process!.StandardOutput.ReadToEnd();
-            var stderr = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-
-            string[] diagnostics = [.. DiagnosticLine.Matches(stdout + "\n" + stderr)
-                .Select(m => $"{m.Groups[2].Value} {m.Groups[3].Value}@{m.Groups[1].Value}")
-                .OrderBy(s => s, StringComparer.Ordinal)];
-            return (process.ExitCode, diagnostics);
-        }
-        finally
-        {
-            if (File.Exists(output)) File.Delete(output);
-        }
+        var (exitCode, diagnostics) = PpE1Probe.Compile(source);
+        string[] formatted = [.. diagnostics
+            .Select(d => $"{d.Severity} {d.Code}@{d.Line},{d.Column}")
+            .OrderBy(s => s, StringComparer.Ordinal)];
+        return (exitCode, formatted);
     }
-
-    /// <summary>`…/A2.calr(26,24): warning Calor0411: …` → `26,24`, `warning`, `Calor0411`.</summary>
-    private static readonly System.Text.RegularExpressions.Regex DiagnosticLine = new(
-        @"\((\d+,\d+)\): (error|warning|info) (Calor\d+):",
-        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     [Fact]
     public void PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2()
@@ -1152,5 +1072,306 @@ public sealed class SpikeVerdictTests
 
         Assert.DoesNotContain(diagnostics,
             d => d.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMisplaced);
+    }
+}
+
+/// <summary>One diagnostic of the pinned invocation, with its full message —
+/// continuation lines (the compiler's <c>Effect row:</c> clause) joined by
+/// <c>\n</c>, because PP-E1's L6 message-naming rule reads them.</summary>
+internal sealed record PpE1Diagnostic(int Line, int Column, string Code, string Severity, string Message);
+
+/// <summary>
+/// One cell of annex A-1.11's frozen mutation catalogue. <see cref="Anchor"/> is
+/// the exact text the registration verified to occur exactly once in the frozen
+/// fixture; <see cref="Replacement"/> is what the diff puts there. A cell whose
+/// mutant is itself a committed artifact (<c>L5-A2</c>) carries
+/// <see cref="CommittedMutant"/> instead and no anchor.
+/// </summary>
+internal sealed record PpE1Mutation(
+    string Id,
+    string Class,
+    string Fixture,
+    string? Anchor,
+    string? Replacement,
+    string? CommittedMutant,
+    string RegisteredCode,
+    string RegisteredDeclaration,
+    int RegisteredLine,
+    string BeforeCode,
+    string? MessageRule,
+    string[]? MessageMustContain = null,
+    int? RegisteredColumn = null);
+
+/// <summary>
+/// PP-E1's pinned compiler invocation and frozen mutation catalogue, shared by
+/// the negative-control / L7 pins in <see cref="SpikeVerdictTests"/> and the
+/// adjudicating ledger test <c>EffectRowsProbeLedgerTests</c>, so the two can
+/// never disagree about the invocation or about which diff a cell applies.
+///
+/// <para>Annex A-1.11 (docs/plans/agent-native-gates.md §A.2, PP-E1 row):
+/// <c>dotnet &lt;calor.dll&gt; -i &lt;source&gt; -o &lt;scratch&gt;</c> with
+/// <b>no flags</b>; <c>--permissive-effects</c> and any manifest outside the
+/// built-in set are forbidden; diagnostics sorted by (line, column, code,
+/// severity, text) under <c>LC_ALL=C</c>.</para>
+/// </summary>
+internal static class PpE1Probe
+{
+    /// <summary>
+    /// The ten cells, transcribed from the frozen row. Anchors are the diff's
+    /// exact text. BEFORE is the pre-E2 baseline the row measured at f7cd1c46
+    /// (Calor0100: the mutant did not parse).
+    ///
+    /// <para><b>On <c>RegisteredLine</c> / <c>RegisteredColumn</c>.</b> A-1.11
+    /// names declarations (<c>m008</c>, <c>mt002</c>, <c>f004</c>, "at §C{f} in
+    /// f001"), not positions — with ONE exception, <c>L5-A2</c>, whose position
+    /// it gives as (23,9). The line numbers here are the transcription of those
+    /// named declarations onto the frozen fixture bytes (blob-SHA pinned, so
+    /// they cannot drift): for L5/L6 the declaration's <c>§E</c> row line, the
+    /// line the compiler reports a declaration-level effect diagnostic on; for
+    /// L7 the registered invocation's line. They were confirmed against the
+    /// observed positions when the ledger was first generated, and that is
+    /// disclosed rather than hidden: they are where the row's named declaration
+    /// sits, not an independent registration of a position. L5-A2's column 9 is
+    /// asserted because the annex gives it.</para>
+    /// </summary>
+    public static readonly PpE1Mutation[] Catalogue =
+    [
+        // L5 — interface implementation broadens the interface's row.
+        new("L5-A2", "L5 interface implementation", "A2",
+            Anchor: null, Replacement: null, CommittedMutant: "A2-broadening",
+            RegisteredCode: "Calor0421", RegisteredDeclaration: "m008", RegisteredLine: 23,
+            BeforeCode: "Calor0100", MessageRule: null, RegisteredColumn: 9),
+        new("L5-MID", "L5 interface implementation", "A3-middleware",
+            Anchor: "§E{e}\n      §R §C{RunTwice} §A next §/C",
+            Replacement: "§E{e, cw}\n      §R §C{RunTwice} §A next §/C",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0421", RegisteredDeclaration: "mt002", RegisteredLine: 15,
+            BeforeCode: "Calor0100", MessageRule: null),
+        // L6 — rank-1 generic instantiation launders an effect through a variable.
+        new("L6-MAP", "L6 rank-1 generic instantiation", "A3-map",
+            Anchor: "§R §C{Map} §A xs §A Double §/C",
+            Replacement: "§R §C{Map} §A xs §A Announce §/C",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0410", RegisteredDeclaration: "f004", RegisteredLine: 20,
+            BeforeCode: "Calor0100", MessageRule: "names the laundered effect 'cw'",
+            MessageMustContain: ["'cw'"]),
+        new("L6-MATCH", "L6 rank-1 generic instantiation", "A3-match",
+            Anchor: "§A Identity §A Zero §/C",
+            Replacement: "§A Shout §A Zero §/C",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0410", RegisteredDeclaration: "f005", RegisteredLine: 22,
+            BeforeCode: "Calor0100", MessageRule: "names the laundered effect 'cw'",
+            MessageMustContain: ["'cw'"]),
+        new("L6-MID", "L6 rank-1 generic instantiation", "A3-middleware",
+            Anchor: "§E{e}\n      §R §C{RunTwice} §A next §/C",
+            Replacement: "§E{}\n      §R §C{RunTwice} §A next §/C",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0410", RegisteredDeclaration: "mt002", RegisteredLine: 15,
+            BeforeCode: "Calor0100",
+            MessageRule: "names the instantiation: the message must say RunTwice's row instantiates at a call site in Handle",
+            MessageMustContain: ["'s row instantiates to", "at a call site in 'Handle'"]),
+        // L7 — row erasure: invoke a row-less value (§3.5: no row ⇒ Unknown).
+        new("L7-A2", "L7 row erasure", "A2",
+            Anchor: "next §E{e}, CancellationToken:cancellationToken) -> TResponse",
+            Replacement: "next, CancellationToken:cancellationToken) -> TResponse",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0425", RegisteredDeclaration: "m008 (§C{next})", RegisteredLine: 27,
+            BeforeCode: "Calor0100", MessageRule: null),
+        new("L7-MAP", "L7 row erasure", "A3-map",
+            Anchor: "Func<i32,i32>:f §E{e}", Replacement: "Func<i32,i32>:f",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0425", RegisteredDeclaration: "f001 (§C{f})", RegisteredLine: 7,
+            BeforeCode: "Calor0100", MessageRule: null),
+        new("L7-MATCH", "L7 row erasure", "A3-match",
+            Anchor: "Func<i32,i32>:onSome §E{e}", Replacement: "Func<i32,i32>:onSome",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0425", RegisteredDeclaration: "f001 (§C{onSome})", RegisteredLine: 5,
+            BeforeCode: "Calor0100", MessageRule: null),
+        new("L7-MID", "L7 row erasure", "A3-middleware",
+            Anchor: "(Func<i32>:g §E{e})", Replacement: "(Func<i32>:g)",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0425", RegisteredDeclaration: "f001 (§C{g})", RegisteredLine: 4,
+            BeforeCode: "Calor0100", MessageRule: null),
+        new("L7-CB", "L7 row erasure", "A3-callback",
+            Anchor: "§FLD{Action<i32>:onChange:pri} §E{cw}", Replacement: "§FLD{Action<i32>:onChange:pri}",
+            CommittedMutant: null,
+            RegisteredCode: "Calor0425", RegisteredDeclaration: "mt001 (§C{onChange})", RegisteredLine: 6,
+            BeforeCode: "Calor0100", MessageRule: null),
+    ];
+
+    /// <summary>The five frozen fixtures by name, with the blob SHA the row pins.</summary>
+    public static readonly (string Fixture, string BlobSha)[] FrozenFixtures =
+    [
+        ("A2", "93ecdf1605c4e220313c1dd76b3291d3a79bb705"),
+        ("A3-map", "0885b3dd40fcff28c51de72860d47a32db60bf8c"),
+        ("A3-match", "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"),
+        ("A3-middleware", "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"),
+        ("A3-callback", "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4"),
+    ];
+
+    /// <summary>The committed L5-A2 mutant's pinned blob SHA.</summary>
+    public const string A2BroadeningBlobSha = "f975f2824464af2531d53e889ef79e1fe5a363e4";
+
+    public static string FixturePath(string fixture)
+        => Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+
+    /// <summary>Repository-relative path with forward slashes, as the ledger records it.</summary>
+    public static string FixtureRelativePath(string fixture)
+        => "docs/design/spikes/effect-rows/after/" + fixture + ".calr";
+
+    /// <summary>
+    /// Runs the pinned invocation over <paramref name="source"/> and returns the
+    /// exit code and the diagnostics sorted by (line, column, code, severity,
+    /// text) with ordinal comparison — the <c>LC_ALL=C</c> discipline.
+    /// </summary>
+    public static (int ExitCode, PpE1Diagnostic[] Diagnostics) Compile(string source)
+    {
+        var output = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{Guid.NewGuid():N}.g.cs");
+        try
+        {
+            var start = new ProcessStartInfo("dotnet")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                WorkingDirectory = RepositoryRoot(),
+            };
+            start.Environment["LC_ALL"] = "C";
+            start.ArgumentList.Add(CompilerDll());
+            start.ArgumentList.Add("-i");
+            start.ArgumentList.Add(source);
+            start.ArgumentList.Add("-o");
+            start.ArgumentList.Add(output);
+
+            using var process = Process.Start(start);
+            Assert.NotNull(process);
+            var stdout = process!.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            return (process.ExitCode, Parse(stdout + "\n" + stderr));
+        }
+        finally
+        {
+            if (File.Exists(output)) File.Delete(output);
+        }
+    }
+
+    /// <summary>
+    /// `…/A2.calr(26,24): warning Calor0411: message` → one diagnostic; an
+    /// indented line that follows one is that diagnostic's continuation.
+    /// </summary>
+    private static PpE1Diagnostic[] Parse(string text)
+    {
+        var result = new List<PpE1Diagnostic>();
+        PpE1Diagnostic? current = null;
+        foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            var match = DiagnosticLine.Match(raw);
+            if (match.Success)
+            {
+                current = new PpE1Diagnostic(
+                    int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+                    int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture),
+                    match.Groups[4].Value,
+                    match.Groups[3].Value,
+                    match.Groups[5].Value.TrimEnd());
+                result.Add(current);
+            }
+            else if (current is not null && raw.Length > 0 && char.IsWhiteSpace(raw[0])
+                     && !string.IsNullOrWhiteSpace(raw))
+            {
+                var joined = current with { Message = current.Message + "\n" + raw.TrimEnd() };
+                result[result.Count - 1] = joined;
+                current = joined;
+            }
+            else
+            {
+                current = null;
+            }
+        }
+
+        return [.. result
+            .OrderBy(d => d.Line)
+            .ThenBy(d => d.Column)
+            .ThenBy(d => d.Code, StringComparer.Ordinal)
+            .ThenBy(d => d.Severity, StringComparer.Ordinal)
+            .ThenBy(d => d.Message, StringComparer.Ordinal)];
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex DiagnosticLine = new(
+        @"\((\d+),(\d+)\): (error|warning|info) (Calor\d+): (.*)$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    public static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var at = haystack.IndexOf(needle, StringComparison.Ordinal);
+             at >= 0;
+             at = haystack.IndexOf(needle, at + needle.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// The compiler the pinned invocation runs. When both configurations are
+    /// built (a dev box), the most recently written <c>calor.dll</c> wins, so a
+    /// frozen baseline is never adjudicated against a stale build of the other
+    /// configuration. CI builds one configuration only.
+    /// </summary>
+    public static string CompilerDll()
+    {
+        var root = RepositoryRoot();
+        var newest = new[] { "Debug", "Release" }
+            .Select(configuration => Path.Combine(
+                root, "src", "Calor.Compiler", "bin", configuration, "net10.0", "calor.dll"))
+            .Where(File.Exists)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (newest is not null) return newest;
+
+        throw new InvalidOperationException(
+            "calor.dll not found under src/Calor.Compiler/bin/{Debug,Release}/net10.0/. "
+            + "Run: dotnet build src/Calor.Compiler");
+    }
+
+    /// <summary>Git's object id for a file: SHA-1 over "blob {length}\0{bytes}".</summary>
+    public static string GitBlobSha1(string path)
+    {
+        var content = File.ReadAllBytes(path);
+        var header = System.Text.Encoding.ASCII.GetBytes(
+            $"blob {content.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}\0");
+        var payload = new byte[header.Length + content.Length];
+        header.CopyTo(payload, 0);
+        content.CopyTo(payload, header.Length);
+#pragma warning disable CA5350 // git object ids are SHA-1 by definition; not a security use
+        var digest = System.Security.Cryptography.SHA1.HashData(payload);
+#pragma warning restore CA5350
+        return Convert.ToHexStringLower(digest);
+    }
+
+    public static string SpikeDirectory()
+        => Path.Combine(RepositoryRoot(), "docs", "design", "spikes", "effect-rows");
+
+    public static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))
+                || File.Exists(Path.Combine(directory.FullName, ".git"))
+                || File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException(
+            $"Repository root not found above {AppContext.BaseDirectory}.");
     }
 }
