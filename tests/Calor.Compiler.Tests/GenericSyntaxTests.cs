@@ -275,11 +275,12 @@ public class GenericSyntaxTests
     [Fact]
     public void E2E_GenericMethod_InClass_CompilesCorrectly()
     {
-        // WS-W2 (D-W2.1): invoking the Func-typed 'converter' parameter is a
-        // Calor0418 error under enforcement (enforced Calor is first-order by
-        // design). This test pins EMISSION shape for generic methods, so it
-        // compiles under the --permissive-effects waiver per the migration
-        // policy (the delegate error is demoted to a warning).
+        // v0.15 E4: invoking the row-less Func-typed 'converter' parameter charges
+        // an Unknown row — Calor0425 at the call plus the fail-closed Calor0410
+        // 'unknown' under the default policy (pre-E4: Calor0418). This test pins
+        // EMISSION shape for generic methods, so it compiles under the
+        // --permissive-effects waiver, which suppresses the Calor0425 and charges
+        // nothing for the Unknown row.
         var calor = """
             §M{m001:Test}
               §CL{c001:Container:pub}

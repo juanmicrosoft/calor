@@ -26,7 +26,7 @@ public class StrictnessBatchTests
     // ========================================================================
 
     [Fact]
-    public void DelegateInvocation_FunctionTypedParameter_IsError()
+    public void DelegateInvocation_FunctionTypedParameter_WithoutRow_IsUnknown()
     {
         var source = @"
 §M{m001:Test}
@@ -37,14 +37,15 @@ public class StrictnessBatchTests
       §R §C{transform} §A value §/C
 ";
         var result = TestHarness.Compile(source);
-
-        Assert.True(result.HasErrors, "Invoking a function-typed parameter must fail under enforcement");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("transform"));
+        // v0.15 E4 (§13.1): row-less ⇒ Unknown ⇒ Calor0425 at the invocation, and the
+        // Unknown charge fails closed as Calor0410 'unknown' on the pure declaration.
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+        Assert.Contains(result.Diagnostics.Warnings, d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("'transform'"));
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
     }
 
     [Fact]
-    public void DelegateInvocation_LambdaBoundLocal_IsError()
+    public void DelegateInvocation_LambdaBoundLocal_ChargesInferredRow()
     {
         var source = @"
 §M{m001:Test}
@@ -54,14 +55,13 @@ public class StrictnessBatchTests
       §R §C{f} §A INT:1 §/C
 ";
         var result = TestHarness.Compile(source);
-
-        Assert.True(result.HasErrors, "Invoking a lambda-bound local must fail under enforcement");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'f'"));
+        // v0.15 E4, baseline Y9a: a row-less §B takes its initializer's row (§3.5); ρ_body is pure, so {} is charged and it compiles.
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation || d.Code == DiagnosticCode.EffectRowUnknown);
     }
 
     [Fact]
-    public void DelegateInvocation_UnderPermissiveEffects_IsWaivedToWarning()
+    public void DelegateInvocation_UnderPermissiveEffects_Calor0425IsSuppressed()
     {
         var source = @"
 §M{m001:Test}
@@ -73,11 +73,11 @@ public class StrictnessBatchTests
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: UnknownCallPolicy.Permissive);
-
-        Assert.DoesNotContain(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.DelegateInvocation);
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("transform"));
+        // v0.15 E4 (§4.5): the flag's one job is to waive "cannot tell" — the Calor0425 is
+        // suppressed, nothing is charged, and the file compiles. Its sibling for "does not
+        // fit is never waived" is NeverWaived_DoesNotFit_AtEveryMonomorphicSite (P11).
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation || d.Code == DiagnosticCode.EffectRowUnknown);
     }
 
     [Fact]
@@ -469,11 +469,11 @@ var x = 1;
     // ========================================================================
 
     [Fact]
-    public void C2_DecoyNamedDelegateParameter_ShadowsFunction_IsError()
+    public void C2_DecoyNamedDelegateParameter_ShadowsFunction_RowGoverns()
     {
-        // Review C2: a Func parameter named like a pure module function must be
-        // resolved as the VALUE (matching C# scoping and emission), yielding
-        // Calor0418 — not silently charged as the shadowed pure function.
+        // Review C2 / v0.15 E4 (§13.1): a Func parameter named like a pure module
+        // function is resolved as the VALUE, so the DECOY'S row governs — row-less
+        // ⇒ Calor0425 + Calor0410 'unknown' — never the shadowed pure function's.
         var source = @"
 §M{m001:Shadow}
   §F{f001:Helper:pub}
@@ -497,11 +497,11 @@ var x = 1;
 ";
         var result = TestHarness.Compile(source);
 
-        Assert.True(result.HasErrors, "Decoy-named delegate invocation must fail");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'Helper'"));
-        // C4 companion: Main passes the impure method group 'Loud' — charged at
-        // the passing site, so §E{} on Main is a Calor0410.
+        Assert.True(result.HasErrors, "Decoy-named delegate invocation must fail closed");
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("'Helper'") && d.Message.Contains("'Go'"));
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'Go'") && d.Message.Contains("'unknown'"));
+        // C4 companion: Main passes the impure method group 'Loud' — charged at the passing site, so §E{} on Main is a Calor0410.
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("Main"));
     }
@@ -725,10 +725,10 @@ var x = 1;
     }
 
     [Fact]
-    public void M1_ExpressionCallSpelling_DelegateValue_IsError()
+    public void M1_ExpressionCallSpelling_DelegateValue_ChargesTheRow()
     {
-        // Review M1: `§C f §A x §/C` (expression-call spelling) is the same
-        // delegate invocation as `§C{f}` and gets the same Calor0418 error.
+        // Review M1 / v0.15 E4 (§13.1): `§C f §A x §/C` is the same invocation as
+        // `§C{f}` — the row of `f` is charged; row-less ⇒ Calor0425 + 0410 'unknown'.
         var source = @"
 §M{m001:Wrap}
   §F{f001:Apply:pub}
@@ -739,17 +739,17 @@ var x = 1;
       §R §C f §A x §/C
 ";
         var result = TestHarness.Compile(source);
-
-        Assert.True(result.HasErrors, "Expression-call delegate invocation must be an error");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'f'"));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+        Assert.True(result.HasErrors, "Expression-call invocation of an Unknown row must fail closed");
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("'f'"));
     }
 
     [Fact]
-    public void M1_ReturnedDelegateInvocation_IsError()
+    public void M1_ReturnedDelegateInvocation_ChargesTheReturnRow()
     {
-        // Review M1: invoking the RESULT of a call (`GetF()()`) invokes a
-        // delegate value — Calor0418.
+        // Review M1 / v0.15 E4 (§13.1): invoking the RESULT of a call (`GetF()()`)
+        // charges the callee's declared RETURN row; `§O` with no row ⇒ Calor0425.
         var source = @"
 §M{m001:E}
   §F{f001:GetF:pub}
@@ -762,10 +762,10 @@ var x = 1;
       §R §C §C{GetF} §/C §/C
 ";
         var result = TestHarness.Compile(source);
-
-        Assert.True(result.HasErrors, "Returned-delegate invocation must be an error");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("returned delegate"));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+        Assert.True(result.HasErrors, "Invoking a returned value whose return row is Unknown must fail closed");
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("returned by 'GetF'") && d.Message.Contains("'Go'"));
     }
 
     // ========================================================================
@@ -1378,7 +1378,7 @@ var x = 1;
         // to close.
         //
         // Asserted on the `Top` diagnostic SPECIFICALLY, not on the whole
-        // multiset: pre-E4 there is also a Calor0418 inside `Run`.
+        // multiset (post-E4 `Run`'s `§C{g}` charges `e`, which `Run` declares).
         //
         // Discriminating revert: delete the PropagateInstantiatedCharges call and
         // `Top` goes silent.
@@ -1688,4 +1688,239 @@ var x = 1;
     private static Calor.Compiler.CompilationResult Permissive(string source) =>
         TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: UnknownCallPolicy.Permissive);
+
+    // ======================================================================
+    // v0.15 E4 — Calor0418 replaced by fits-at-invocation (roadmap §4.2 E4,
+    // design-doc §10.1, §13.1). Everything below sits past every line
+    // facts.py probes, on purpose.
+    // ======================================================================
+
+    /// <summary>The A3-callback shape (§10.1's worked example, X13) with the
+    /// invoking method's own row as <paramref name="bumpRow"/>.</summary>
+    private static string CallbackField(string bumpRow) => $$"""
+        §M{m001:CallbackAfter}
+          §CL{c001:Counter:pub}
+            §FLD{Action<i32>:onChange:pri} §E{cw}
+            §MT{mt001:Bump:pub} (i32:n) -> void
+              {{bumpRow}}
+              §C{onChange} §A n §/C
+        """;
+
+    [Fact]
+    public void Invocation_RowedValue_FitsAndChargesTheRow_PositiveControl()
+    {
+        // The positive control every DelegateInvocation_* rewrite needs: a
+        // function-typed value WITH a row, invoked by a function that declares
+        // that row, compiles with zero effect-family diagnostics. Pre-E4 this was
+        // Calor0418 (A-1.11.1's A3-callback baseline: 1x at (6,7)).
+        var result = TestHarness.Compile(CallbackField("§E{cw}"));
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == DiagnosticCode.DelegateInvocation
+            || d.Code == DiagnosticCode.EffectRowUnknown
+            || d.Code == DiagnosticCode.EffectRowMismatch
+            || d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Fact]
+    public void MessageTexts_Calor0410_InvocationProvenance_IsTheDesignDocSample()
+    {
+        // P22, §10.1's string, by FULL equality. The doc's first draft wrote
+        // `(row: [cw])`; the emitter spells a concrete row bare (§8.3 / §6.4's F6
+        // correction), and the doc was corrected to the emitter, not the reverse.
+        // The row IS charged and the caller's under-declaration is Calor0410 —
+        // never Calor0424, which has no invocation cell in §6.2.
+        var result = TestHarness.Compile(CallbackField("§E{}"));
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors
+            .Where(d => d.Code == DiagnosticCode.ForbiddenEffect));
+        Assert.Equal(
+            "Function 'Bump' uses effect 'cw' but does not declare it\n"
+            + "  Effect row: charged by invoking 'onChange' (row: cw)",
+            diagnostic.Message);
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == DiagnosticCode.EffectRowMismatch
+            || d.Code == DiagnosticCode.EffectRowUnknown
+            || d.Code == DiagnosticCode.DelegateInvocation);
+    }
+
+    [Fact]
+    public void MessageTexts_Calor0425_AtInvocation_NamesTheValueTheCauseAndTheWaiver()
+    {
+        // E4's new string (recorded in design-doc §10.1 alongside the provenance
+        // clause), by FULL equality. X9c's shape with the row deleted — PP-E1's
+        // L7 class.
+        var result = TestHarness.Compile("""
+            §M{m001:X9}
+              §F{f001:Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
+                §E{cw}
+                §R §C{transform} §A value §/C
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Warnings
+            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        Assert.Equal(
+            "Invocation of 'transform' in 'Apply' cannot be charged: its effect row is Unknown "
+            + "(parameter 'transform' of 'Apply' (type 'Func<i32,i32>') carries no effect row). "
+            + "Add §E{…} on the same line as the type to state what 'transform' may do, or "
+            + "compile with --permissive-effects. 'Apply' is charged Unknown.",
+            diagnostic.Message);
+        // Fail-closed: the Unknown charge is the same one an unknown external
+        // call gets today, so the declaration draws Calor0410 'unknown'.
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("'unknown'"));
+    }
+
+    [Fact]
+    public void Invocation_LambdaBoundLocal_NarrowedDeclaration_IsCalor0410()
+    {
+        // §13.1's second half of the Y9a rewrite: the inferred row of a
+        // lambda-bound local is CHARGED, so a declaration narrower than it is
+        // Calor0410 — with §10.1's provenance naming the local.
+        var result = TestHarness.Compile("""
+            §M{m001:Y9}
+              §F{f001:Narrow:pub} () -> void
+                §E{}
+                §B{g} §LAM{lam2} §P "hi" §/LAM{lam2}
+                §C{g} §/C
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics.Errors
+            .Where(d => d.Code == DiagnosticCode.ForbiddenEffect));
+        Assert.Contains("uses effect 'cw'", diagnostic.Message);
+        Assert.Contains("charged by invoking 'g' (row: cw)", diagnostic.Message);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+    }
+
+    [Fact]
+    public void Invocation_AssumedRow_ChargesTheSetAndReportsTheAssumptionOnce()
+    {
+        // §4.3's Assumed cell read at an invocation: ρ_body of the lambda is
+        // Assumed (its body is raw interop), so the invocation charges the set
+        // and reports ONE Calor0425 carrying the reason.
+        var result = TestHarness.Compile("""
+            §M{m001:Asm}
+              §F{f001:Go:pub} () -> i32
+                §E{}
+                §B{h} §LAM{l1} §R §CS{Foo.Bar()} §/LAM{l1}
+                §R §C{h} §/C
+            """);
+
+        var reported = Assert.Single(result.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        Assert.Equal(
+            "Invocation of 'h' in 'Go' is charged [assumed: pure] under an assumption: contains a "
+            + "raw C# interop expression (§CS). The row is charged as an assumption, not a proof.",
+            reported.Message);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+    }
+
+    [Fact]
+    public void Invocation_PolymorphicRow_ChargesTheVariable_WhichTheDeclarationBinds()
+    {
+        // A3-middleware's `RunTwice`: `g §E{e}` invoked inside a declaration that
+        // binds `e`. The row's variable part is the caller's own binder, its
+        // concrete part is empty, and nothing is reported — this is what makes
+        // the four A3 fixtures exit 0 with zero diagnostics (A-1.11).
+        var result = TestHarness.Compile("""
+            §M{m001:MiddlewareAfter}
+              §F{f001:RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §B{first:i32} §C{g}
+                §B{second:i32} §C{g}
+                §R (+ first second)
+            """);
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == DiagnosticCode.DelegateInvocation
+            || d.Code == DiagnosticCode.EffectRowUnknown
+            || d.Code == DiagnosticCode.EffectRowMismatch);
+    }
+
+    [Fact]
+    public void Invocation_ProvablyNonFunctionValue_IsTheResidualCalor0418_NeverWaived()
+    {
+        // The ONE shape Calor0418 is kept for: the invoked value's type is
+        // provably not a function type, so there is no row to read. An error
+        // under the default policy AND under --permissive-effects — this is "we
+        // know it is wrong", not "we cannot tell" (§4.5), and the binder does
+        // not catch it (measured: `§C{x}` on an i32 parameter binds clean).
+        const string source = """
+            §M{m001:P1}
+              §F{f001:Go:pub} (i32:x) -> i32
+                §E{}
+                §R §C{x} §/C
+            """;
+
+        foreach (var result in new[] { TestHarness.Compile(source), Permissive(source) })
+        {
+            var diagnostic = Assert.Single(result.Diagnostics.Errors
+                .Where(d => d.Code == DiagnosticCode.DelegateInvocation));
+            Assert.Equal(
+                "'x' has type 'i32', which is not a function type, so invoking it cannot be "
+                + "charged to any effect row. Calor0418 is reported only for a value that is "
+                + "provably not a function; a function-typed value is charged through its "
+                + "effect row.",
+                diagnostic.Message);
+            Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+        }
+    }
+
+    [Fact]
+    public void Invocation_NotProvablyFunctionTyped_IsUnknown_NotTheResidual()
+    {
+        // The other side of the residual's boundary: an external nominal type
+        // the binder does not know is not provably EITHER way, so the value is
+        // Unknown (Calor0425, fails closed) rather than Calor0418. Pre-E4 this
+        // drew Calor0418 "value 'cb' (declared type 'MyExternalDelegate')".
+        var result = TestHarness.Compile("""
+            §M{m001:P2}
+              §F{f001:Go:pub} (MyExternalDelegate:cb) -> void
+                §E{}
+                §C{cb} §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("'cb'"));
+    }
+
+    [Fact]
+    public void AuthorMayAssertARowOverAnUnknown_OneCalor0425AtTheHop_TheDeclaredRowIsCharged()
+    {
+        // §4.5's residual (E3a review F15), answered by E4 in the design doc:
+        // YES — an author may assert a row over an Unknown source. The
+        // assertion costs exactly one Calor0425 at the hop; from there the
+        // DECLARED row is the value's row (§4.4), and invoking it charges that
+        // row, with provenance, and reports nothing further.
+        const string source = """
+            §M{m001:F15}
+              §F{f001:Main:pub} (Func<i32,i32>:opaque) -> i32
+                §E{}
+                §B{g:Func<i32,i32>} §E{cw} opaque
+                §R §C{g} §A INT:1 §/C
+            """;
+
+        var strict = TestHarness.Compile(source);
+        var hop = Assert.Single(strict.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        Assert.StartsWith("Initializer of binding 'g' has effect row [unknown]", hop.Message);
+        var charged = Assert.Single(strict.Diagnostics.Errors
+            .Where(d => d.Code == DiagnosticCode.ForbiddenEffect));
+        Assert.Equal(
+            "Function 'Main' uses effect 'cw' but does not declare it\n"
+            + "  Effect row: charged by invoking 'g' (row: cw)",
+            charged.Message);
+
+        // Under the waiver the single Calor0425 is silenced — §4.5's consequence
+        // 2, accepted with the answer — but the CHARGE is not a "cannot tell"
+        // and survives: Calor0410 still fires (demoted, as every 0410 is under
+        // the flag). The assertion is waivable; the row asserted is not.
+        var permissive = Permissive(source);
+        Assert.DoesNotContain(permissive.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+        Assert.Contains(permissive.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("charged by invoking 'g'"));
+    }
 }

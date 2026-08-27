@@ -1172,7 +1172,8 @@ public class EffectEnforcementTests
     /// SURVIVING FALLBACK — <c>function.Parameters[].TypeName</c>. A parameter
     /// used as a BARE call target is not a receiver, so the receiver side
     /// channel carries no entry for it and the AST parameter-type string is
-    /// what fills Calor0418's message.
+    /// what fills the diagnostic's message — v0.15 E4: Calor0425 (the row-less
+    /// parameter's row is Unknown), where pre-E4 it was Calor0418.
     ///
     /// <para>This is the shape that decided the slice's scope. An earlier
     /// revision recorded every bound name, not just receivers; that made the
@@ -1194,9 +1195,10 @@ public class EffectEnforcementTests
 ";
         var result = TestHarness.Compile(source);
 
-        var delegateInvocation = Assert.Single(
-            result.Diagnostics.Errors.Where(d => d.Code == DiagnosticCode.DelegateInvocation));
-        Assert.Contains("function-typed value 'make'", delegateInvocation.Message);
-        Assert.Contains("Func<", delegateInvocation.Message);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+        var rowUnknown = Assert.Single(
+            result.Diagnostics.Warnings.Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
+        Assert.Contains("parameter 'make' of 'Go'", rowUnknown.Message);
+        Assert.Contains("Func<", rowUnknown.Message);
     }
 }

@@ -475,11 +475,12 @@ public class CliMultiFileTests : IDisposable
                 §P x
             """);
 
-        // WS-W2 (D-W2.1): invoking the Func-typed 'Notify' parameter is now a
-        // Calor0418 error under default enforcement (the parameter shadows the
-        // cross-module name for effects exactly as it does for emission). This
-        // test pins EMISSION shape, so it compiles under the
-        // --permissive-effects waiver (Calor0418 demoted to a warning).
+        // v0.15 E4: invoking the row-less Func-typed 'Notify' parameter charges
+        // an Unknown row — Calor0425 plus the fail-closed Calor0410 'unknown'
+        // under default enforcement (pre-E4: Calor0418); the parameter shadows
+        // the cross-module name for effects exactly as it does for emission.
+        // This test pins EMISSION shape, so it compiles under the
+        // --permissive-effects waiver (the Calor0425 is suppressed, nothing charged).
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath, "--permissive-effects");
         Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
 

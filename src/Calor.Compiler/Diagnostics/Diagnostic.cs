@@ -427,12 +427,22 @@ public static class DiagnosticCode
     public const string UndeclaredPublicFunction = "Calor0417";
 
     /// <summary>
-    /// Error: Invocation of a delegate/function-typed value under effect enforcement.
-    /// Function-typed values carry no effect contract (effect-annotated function types
-    /// are a future design), so their invocation cannot be charged and is rejected.
-    /// Migration policy: wrap in §CSHARP interop (surfaced as an assumption via
-    /// Calor0419) or compile with --permissive-effects (an explicit waiver; demoted
-    /// to a warning).
+    /// Error: a value whose type is PROVABLY not a function type (<c>i32</c>,
+    /// <c>str</c>, an array …) is invoked as a call, so there is no effect row to
+    /// charge. Never demoted by any policy — this is "we know it is wrong", not
+    /// "we cannot tell" (design-doc §4.5).
+    ///
+    /// <para><b>v0.15 E4 — retained for that residual only.</b> Until E4 this code
+    /// rejected EVERY invocation of a function-typed value ("function-typed values
+    /// carry no effect contract"). They carry one now: the value's effect row
+    /// (<c>FunctionBoundType.Row</c>, §8.2) is charged to the invoking function
+    /// like a callee's declared <c>§E</c> — <c>Concrete</c> is charged silently,
+    /// <c>Assumed</c> is charged and reported once as Calor0425, and
+    /// <c>Unknown</c> is Calor0425 at the invocation plus the fail-closed Unknown
+    /// charge (§10.1, roadmap §4.2 E4). A function-typed value never reaches this
+    /// code again; <c>StrictnessBatchTests.Invocation_ProvablyNonFunctionValue_*</c>
+    /// and <c>DiagnosticCodeTests.Calor0418_IsRetainedForTheProvablyNonFunctionResidual</c>
+    /// pin the decision.</para>
     /// </summary>
     public const string DelegateInvocation = "Calor0418";
 
