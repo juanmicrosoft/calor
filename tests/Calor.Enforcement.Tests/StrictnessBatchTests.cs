@@ -1923,4 +1923,127 @@ var x = 1;
         Assert.Contains(permissive.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("charged by invoking 'g'"));
     }
+
+    // ---------------------------------------------------- E4 review round 1 ----
+
+    /// <summary>F1's two shapes: a mutable bound to a pure lambda and re-bound to
+    /// an impure value, invoked under <c>§E{}</c>. <paramref name="declaredType"/>
+    /// is empty for the UNTYPED mutable, which pre-fix was silently accepted
+    /// (site 1 never put it in scope, and the invocation charged the initializer's
+    /// row); site 1 now fires on it because a lambda initializer is function-valued
+    /// by construction, so the re-binding is Calor0424 exactly as on the typed one.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData(":Func<i32,i32>")]
+    public void Invocation_MutableReboundToImpure_IsCaughtAtSite1_TypedAndUntyped(string declaredType)
+    {
+        var result = TestHarness.Compile($$"""
+            §M{m001:F1}
+              §F{f001:Impure:pub} (i32:x) -> i32
+                §E{cw}
+                §P x
+                §R x
+              §F{f002:Go:pub} () -> i32
+                §E{}
+                §B{~f{{declaredType}}} §LAM{l1:x:i32} (+ x 1) §/LAM{l1}
+                §ASSIGN f Impure
+                §R §C{f} §A INT:1 §/C
+            """);
+
+        Assert.True(result.HasErrors, "re-binding a function-valued mutable to an impure value under §E{} must fail");
+        var mismatch = Assert.Single(result.Diagnostics.Errors
+            .Where(d => d.Code == DiagnosticCode.EffectRowMismatch));
+        Assert.Contains("Value assigned to 'f' has effect row cw", mismatch.Message);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
+    }
+
+    /// <summary>F2: two sibling branches each bind <c>f</c>; the invocation must
+    /// charge the row of the <c>§B</c> the binder resolved it to, not the first
+    /// of that name in lexical order. Both directions — the impure one invoked
+    /// (Calor0410, no false negative) and the pure one invoked (clean, no false
+    /// positive). The sources are PARAMETERS so that no lambda-creation charge
+    /// (the enclosing function is charged a lambda's body at creation, a
+    /// pre-existing rule) can mask the answer.</summary>
+    [Theory]
+    [InlineData("§E{} pure", "§E{cw} impure", true)]
+    [InlineData("§E{cw} impure", "§E{} pure", false)]
+    public void Invocation_SiblingBranchSameName_ChargesTheBoundDeclaration(
+        string firstBinding, string secondBinding, bool expectCalor0410)
+    {
+        var result = TestHarness.Compile($$"""
+            §M{m001:F2}
+              §F{f003:Go:pub} (bool:b, Func<i32,i32>:pure §E{}, Func<i32,i32>:impure §E{cw}) -> i32
+                §E{}
+                §IF{if1} b
+                  §B{f:Func<i32,i32>} {{firstBinding}}
+                  §R INT:0
+                §EL
+                  §B{f:Func<i32,i32>} {{secondBinding}}
+                  §R §C{f} §A INT:1 §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == DiagnosticCode.DelegateInvocation
+            || d.Code == DiagnosticCode.EffectRowUnknown
+            || d.Code == DiagnosticCode.EffectRowMismatch);
+        if (expectCalor0410)
+        {
+            var charged = Assert.Single(result.Diagnostics.Errors
+                .Where(d => d.Code == DiagnosticCode.ForbiddenEffect));
+            Assert.Contains("charged by invoking 'f' (row: cw)", charged.Message);
+        }
+        else
+        {
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
+        }
+    }
+
+    [Fact]
+    public void Invocation_ShadowingInANestedScope_IsRejectedByTheBinder()
+    {
+        // F2's third shape. A `§B{f}` shadowing a parameter `f` in a nested
+        // scope never reaches the effect pass: the binder rejects it (Calor0255)
+        // and Program.Compile stops on binder errors, which is fail-closed by
+        // construction. Pinned so the day the binder admits shadowing, this
+        // test says the invocation charge must be re-checked for it.
+        var result = TestHarness.Compile("""
+            §M{m001:F2c}
+              §F{f003:Go:pub} (Func<i32,i32>:f §E{}) -> i32
+                §E{}
+                §IF{if1} true
+                  §B{f:Func<i32,i32>} §E{cw} §LAM{l2:x:i32} §P x §R x §/LAM{l2}
+                  §R §C{f} §A INT:1 §/C
+                §R §C{f} §A INT:2 §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.BindShadowsEnclosingScope);
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == DiagnosticCode.ForbiddenEffect
+            || d.Code == DiagnosticCode.EffectRowUnknown
+            || d.Code == DiagnosticCode.DelegateInvocation);
+    }
+
+    [Fact]
+    public void PolymorphicSource_IntoRowlessDestination_IsCannotTell_NotDoesNotFit()
+    {
+        // F6 (pre-existing since E3b, made visible by PP-E1's L7-MID mutant):
+        // `next §E{e}` passed to a parameter with NO row. §4.3 says Unknown never
+        // yields DoesNotFit on either side, so this is Calor0425 (the row-less
+        // destination message) and never a Calor0424 reading "declared row:
+        // [unknown]" with a leaked "(binder #0)".
+        var result = TestHarness.Compile("""
+            §M{m001:F6}
+              §F{f001:RunTwice:pub} (Func<i32>:g) -> i32
+                §E{}
+                §R INT:0
+              §F{f002:Handle:pub}<eff e> (Func<i32>:next §E{e}) -> i32
+                §E{e}
+                §R §C{RunTwice} §A next §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowMismatch);
+        Assert.Contains(result.Diagnostics.Warnings, d =>
+            d.Code == DiagnosticCode.EffectRowUnknown
+            && d.Message.StartsWith("Parameter 'g' of 'RunTwice' is function-typed with no effect row", StringComparison.Ordinal));
+    }
 }

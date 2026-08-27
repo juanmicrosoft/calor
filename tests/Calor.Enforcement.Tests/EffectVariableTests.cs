@@ -356,7 +356,7 @@ public class EffectVariableTests
         // identify them. It can, because both are ordinal 0.
         //
         // The behavioural half of this pin is
-        // SpikeFixtureDiagnosticsTests.A3Fixtures_AreExactlyCalor0418PerInvocation,
+        // SpikeVerdictTests.A3Fixtures_AreExactlyZeroCalor0418_PostE4,
         // which compiles the frozen fixture and asserts zero Calor0421.
         var module = Parse("""
             §M{m001:MiddlewareAlpha}

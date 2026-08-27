@@ -694,7 +694,12 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   (renamed from `_PreE4`) pins it under the pinned CLI invocation, and
   `PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4` pins that all five
   L7 cells now discriminate. Adjudication stays at the 0.15.0 release commit.
-- **E5 — Effects facet in the index.** Effect rows per declaration recorded in `ProjectIndex`;
+- **E5 — Effects facet in the index.** **Carries one obligation from E4's review (PR #1107,
+  F3, 0.15.x):** the invocation row is keyed on the bound symbol end-to-end —
+  `FunctionBoundType.Row` (write-only in 0.15, because `Binder.BindRow` collapses a
+  variable-mentioning row to Unknown) gains a production reader, and
+  `EffectInferrer.ResolveInvokedValueRow`'s AST span-matching goes; design §13.5's E4 block
+  names the pins that must stay green. Effect rows per declaration recorded in `ProjectIndex`;
   `calor query effects`; effect-change blast radius via the existing `impact` closure.
   `EffectSummary` is derived from the index or migrated into it (design-doc decision) — and
   **a structural pin that no name-keyed second store remains** (`EffectSummaryBuilder`'s

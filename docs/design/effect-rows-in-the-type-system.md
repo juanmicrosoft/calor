@@ -2594,8 +2594,10 @@ and it needs its own justification in the E2 PR body.**
 > **EXECUTED, v0.15 E4 — TWELVE moved items across THREE scripts; obligations #2 and #3
 > DISCHARGED.** Counted from a full diff of all six transcripts (`git diff -U0`), not from P29's
 > first-difference message. `run3.py`, `facts2.py` and `compile53.py` are **CLEAN**, so
-> `o53/baseline.json` is untouched — not even re-stamped, because E4 changed nothing that
-> script measures.
+> `o53/baseline.json`'s 23 files / 54 occurrences / 1 green / 22 red are unchanged and only its
+> `measuredCommit` is re-stamped by the regeneration script, as every slice before this one
+> did — gate 5's line-adjacency leg re-run. (A first draft of this block said "not even
+> re-stamped"; the numstat said otherwise — review round 1, F4.)
 >
 > | Case | Obligation | Result |
 > |---|---|---|
@@ -2616,6 +2618,38 @@ and it needs its own justification in the E2 PR body.**
 > `:1691`, E3a's discipline kept. The seven Calor0418 transcript lines that existed before E4
 > (X9a, X9b, X9c, X10, X13, X14, Y9a) are the seven that moved; no line moved for any other
 > reason.
+>
+> **Review round 1 of the E4 PR (#1107) moved three things, recorded here.** (F1) An UNTYPED
+> mutable `§B{~f} §LAM …` re-bound to an impure value and invoked under `§E{}` was silently
+> accepted: site 1 never put it in scope (`DeclaredFunctionTypes` carried parameters only —
+> §8.2's "parameters and locals" was one word too generous), so the re-binding was never
+> checked and the invocation charged the initializer's row. Site 1 now treats a lambda
+> initializer as function-valued by construction and reads the binder's local
+> `FunctionBoundType` (`CallGraphAnalysis.DeclaredLocalFunctionType`); the re-binding is
+> Calor0424, typed and untyped alike. (F2) The invocation resolved a name to the FIRST `§B` of
+> that name in lexical order, so two sibling branches each binding `f` charged the wrong row in
+> one direction and nothing in the other. It now resolves to the BOUND declaration
+> (`CallGraphAnalysis.BoundValueDeclaration`: the reference span → the resolved
+> `VariableSymbol.DeclarationSpan`, from `BoundCallStatement.ReceiverSymbol` /
+> `BoundVariableExpression.Variable`), and where binding threw it uses the name only when
+> exactly one candidate is visible — two same-named `§B`s, or a `§B` beside a same-named
+> parameter, fail CLOSED as Unknown. Shadowing a parameter in a nested scope is rejected by the
+> binder (Calor0255) and never reaches the pass; pinned as such. (F6, E3b's, made visible by
+> the L7-MID mutant) `PolyRow.Fits` ran its ordinal-containment test before the lattice's
+> Unknown check, so a variable-mentioning source into a row-less destination was `DoesNotFit`
+> (Calor0424 "declared row: [unknown]", leaking "(binder #0)") where §4.3 says `CannotTell`.
+> Fixed: an Unknown on either side defers to `EffectRow.Fits` first; the mutant now draws only
+> Calor0425s (and the fail-closed Calor0410s).
+>
+> **`FunctionBoundType.Row` is WRITE-ONLY in 0.15, stated plainly.** E4's charge reads the
+> declaration's `§E` node, not the bound row, because `Binder.BindRow` (`Binder.cs:5453-5477`)
+> collapses a variable-mentioning row to Unknown, and the A3 fixtures need `e`. So §8.2's
+> "first production reader" is a reader of `FunctionBoundType` (function-typedness), never of
+> its `Row`. **Obligation, 0.15.x (registered on the roadmap's E5 row): key the invocation row
+> on the bound symbol end-to-end — `FunctionBoundType.Row` carrying the variable part (or the
+> binder recording the `EffectsNode` on the symbol) so it gains a production reader and the
+> AST span-matching in `ResolveInvokedValueRow` can go.** Pinned by the F2 tests, which are
+> what that refactor must keep green.
 
 `spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
 machine-readable form, and P27 asserts that the case list holds exactly seven rows.

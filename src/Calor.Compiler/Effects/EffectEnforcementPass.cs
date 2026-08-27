@@ -1221,6 +1221,14 @@ public sealed class EffectEnforcementPass
         /// </summary>
         public static Binding.BoundTypes.EffectFit Fits(PolyRow source, PolyRow destination)
         {
+            // v0.15 E4 (review round 1, F6): §4.3 — Unknown never yields Fits on
+            // EITHER side, and it never yields DoesNotFit either. The ordinal
+            // test below runs only between two rows that are both known; a
+            // variable-mentioning source into a row-less (Unknown) destination
+            // is CannotTell, not a Calor0424 reading "declared row: [unknown]".
+            if (source.Row.IsUnknown || destination.Row.IsUnknown)
+                return Binding.BoundTypes.EffectRow.Fits(source.Row, destination.Row);
+
             // Spelled as an explicit loop rather than the library containment
             // helper, whose NAME is the token P16's structural half counts under
             // `Effects/`. This is containment over ORDINALS, not the effect-set
@@ -1893,8 +1901,17 @@ public sealed class EffectEnforcementPass
             _pass.BoundFieldFunctionType(owner.Name, field.Name) != null
             || IsFunctionTyped(field.TypeName);
 
+        // v0.15 E4 (review round 1, F1): an UNTYPED `§B{~f} §LAM …` is
+        // function-valued by construction, and the binder gives it a
+        // FunctionBoundType (inherited from the initializer) that the
+        // parameter-only DeclaredFunctionTypes map never carried. Without this,
+        // site 1 never put the mutable in scope, so re-binding it to an impure
+        // value was silently accepted while the invocation charged the
+        // initializer's row.
         private bool IsBindingFunctionTyped(BindStatementNode bind) =>
             _pass.BoundFunctionType(_function.Id, bind.Name) != null
+            || _pass._callGraphAnalysis.DeclaredLocalFunctionType(_function.Id, bind.Name, bind.Span) != null
+            || bind.Initializer is LambdaExpressionNode
             || IsFunctionTyped(bind.TypeName);
 
         private bool IsReturnFunctionTyped(FunctionNode owner, OutputNode output) =>
@@ -2478,7 +2495,8 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromCallTarget(
             string target,
             TextSpan span,
-            IReadOnlyList<ExpressionNode>? arguments = null)
+            IReadOnlyList<ExpressionNode>? arguments = null,
+            TextSpan? referenceSpan = null)
         {
             var exactInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
@@ -2531,7 +2549,7 @@ public sealed class EffectEnforcementPass
                 // branches on it there; both arms of the old `if` called it
                 // unconditionally, so the test was dead. Collapsed in E1 slice 2b
                 // (review round 2, nit 5) — behaviour unchanged.
-                return InferFromBareNameTarget(target, span);
+                return InferFromBareNameTarget(target, span, referenceSpan ?? span);
             }
 
             // D-W2.2 (call-site leg): a call through a receiver whose static type is an
@@ -2656,7 +2674,7 @@ public sealed class EffectEnforcementPass
         /// </summary>
         private const string UnknownLocalTypeSentinel = "?";
 
-        private EffectSet InferFromBareNameTarget(string target, TextSpan span)
+        private EffectSet InferFromBareNameTarget(string target, TextSpan span, TextSpan referenceSpan)
         {
             var valueType = ResolveLocalValueType(target);
 
@@ -2688,13 +2706,19 @@ public sealed class EffectEnforcementPass
                 // Unknown) and charged to this function. Calor0418 survives for
                 // exactly one shape: a value whose type is PROVABLY not a
                 // function type, where there is no row to read.
-                var invoked = ResolveInvokedValueRow(target, valueType);
+                var invoked = ResolveInvokedValueRow(target, valueType, referenceSpan);
                 if (invoked == null)
                 {
+                    // F10: quote the SOURCE spelling of the type (`i32`), not the
+                    // binder's (`INT`), when the AST has one.
+                    var spelled = ResolveLocalValueTypeFromAst(target) is { } ast
+                                  && ast != UnknownLocalTypeSentinel
+                        ? ast
+                        : valueType;
                     _context.Invocations?.ReportNotAFunction(
                         _context.CurrentFunctionId,
                         span,
-                        $"'{target}' has type '{valueType}', which is not a function type, so "
+                        $"'{target}' has type '{spelled}', which is not a function type, so "
                         + "invoking it cannot be charged to any effect row. Calor0418 is reported "
                         + "only for a value that is provably not a function; a function-typed value "
                         + "is charged through its effect row.");
@@ -2772,18 +2796,74 @@ public sealed class EffectEnforcementPass
         /// does not know — is <c>Unknown</c> too: "cannot tell" is the honest
         /// answer, and fails closed through the same Calor0425.</para>
         /// </summary>
-        private (PolyRow Row, string Why)? ResolveInvokedValueRow(string name, string valueType)
+        private (PolyRow Row, string Why)? ResolveInvokedValueRow(string name, string valueType, TextSpan reference)
         {
             _context.Functions.TryGetValue(_context.CurrentFunctionId, out var function);
             var ownerName = function?.Name ?? _context.CurrentFunctionId;
 
             if (function != null)
             {
-                foreach (var parameter in function.Parameters)
-                {
-                    if (!parameter.Name.Equals(name, StringComparison.Ordinal))
-                        continue;
+                // v0.15 E4 (review round 1, F2): the reference is resolved to its
+                // BOUND declaration, not to the first `§B` of that name. Two
+                // sibling branches can each bind `f`; the binder knows which one
+                // this `§C{f}` names (`BoundCallStatement.ReceiverSymbol` /
+                // `BoundVariableExpression.Variable`, via `_scope.LookupAll`), and
+                // CallGraphAnalysis records that declaration's span per reference.
+                var declaration = _context.CallGraph.BoundValueDeclaration(_context.CurrentFunctionId, reference);
+                var bindings = CollectLocalBindings(name, function.Body);
+                var parameter = function.Parameters.FirstOrDefault(
+                    p => p.Name.Equals(name, StringComparison.Ordinal));
 
+                BindStatementNode? bind = null;
+                var ambiguous = false;
+                if (declaration is { } declared)
+                {
+                    bind = bindings.FirstOrDefault(b => b.Span.Start <= declared.Start && declared.Start <= b.Span.End)
+                        ?? bindings.FirstOrDefault(b => b.Span.Start == declared.Start);
+                    // A resolved declaration that is not any `§B` is the parameter
+                    // (its span is in the signature) or a field; fall through.
+                }
+                else
+                {
+                    // Binding threw, or the reference was not recorded: the
+                    // name-keyed answer is used only where it is UNAMBIGUOUS.
+                    // More than one candidate — two same-named `§B`s, or a `§B`
+                    // shadowing a parameter — fails CLOSED as Unknown.
+                    var candidates = bindings.Count + (parameter != null ? 1 : 0);
+                    if (candidates > 1)
+                        ambiguous = true;
+                    else if (bindings.Count == 1)
+                        bind = bindings[0];
+                }
+
+                if (ambiguous)
+                {
+                    return (PolyRow.Unknown,
+                        $"more than one declaration named '{name}' is visible in '{ownerName}' and the "
+                        + "binder did not resolve this reference to one of them");
+                }
+
+                if (bind != null)
+                {
+                    if (bind.Row != null)
+                        return (PolyRow.From(bind.Row), string.Empty);
+
+                    if (InitializerRow(bind, ownerName) is { } fromInitializer)
+                        return fromInitializer;
+
+                    var functionTyped =
+                        _context.CallGraph.DeclaredLocalFunctionType(_context.CurrentFunctionId, name, bind.Span) != null
+                        || IsFunctionTypeName(bind.TypeName ?? valueType);
+                    if (!functionTyped && TypeIdentity.IsProvablyNonFunctionType(bind.TypeName ?? valueType))
+                        return null;
+
+                    return (PolyRow.Unknown,
+                        $"binding '{name}' in '{ownerName}' carries no effect row and its "
+                        + "initializer's row cannot be determined");
+                }
+
+                if (parameter != null)
+                {
                     if (parameter.Row != null)
                         return (PolyRow.From(parameter.Row), string.Empty);
 
@@ -2797,27 +2877,6 @@ public sealed class EffectEnforcementPass
                     return (PolyRow.Unknown,
                         $"parameter '{name}' of '{ownerName}' (type '{parameter.TypeName}') carries "
                         + "no effect row");
-                }
-
-                var bind = FindLocalBinding(name, function.Body);
-                if (bind != null)
-                {
-                    if (bind.Row != null)
-                        return (PolyRow.From(bind.Row), string.Empty);
-
-                    if (InitializerRow(bind, ownerName) is { } fromInitializer)
-                        return fromInitializer;
-
-                    var functionTyped =
-                        _context.CallGraph.DeclaredFunctionTypes(_context.CurrentFunctionId)
-                            .GetValueOrDefault(name) != null
-                        || IsFunctionTypeName(bind.TypeName ?? valueType);
-                    if (!functionTyped && TypeIdentity.IsProvablyNonFunctionType(bind.TypeName ?? valueType))
-                        return null;
-
-                    return (PolyRow.Unknown,
-                        $"binding '{name}' in '{ownerName}' carries no effect row and its "
-                        + "initializer's row cannot be determined");
                 }
             }
 
@@ -2878,7 +2937,7 @@ public sealed class EffectEnforcementPass
                     var aliasType = ResolveLocalValueType(reference.Name);
                     if (aliasType != null && aliasType != UnknownLocalTypeSentinel)
                     {
-                        var aliased = ResolveInvokedValueRowDirect(reference.Name);
+                        var aliased = ResolveInvokedValueRowDirect(reference.Name, reference.Span);
                         if (aliased != null)
                             return aliased;
                     }
@@ -2907,20 +2966,28 @@ public sealed class EffectEnforcementPass
 
         /// <summary>One alias hop of <see cref="ResolveInvokedValueRow"/> — the
         /// same lookup, minus the alias arm, so `§B{g} f` cannot recurse.</summary>
-        private (PolyRow Row, string Why)? ResolveInvokedValueRowDirect(string name)
+        private (PolyRow Row, string Why)? ResolveInvokedValueRowDirect(string name, TextSpan reference)
         {
             _context.Functions.TryGetValue(_context.CurrentFunctionId, out var function);
             if (function != null)
             {
-                foreach (var parameter in function.Parameters)
+                var bindings = CollectLocalBindings(name, function.Body);
+                var declaration = _context.CallGraph.BoundValueDeclaration(_context.CurrentFunctionId, reference);
+                var bind = declaration is { } declared
+                    ? bindings.FirstOrDefault(b => b.Span.Start <= declared.Start && declared.Start <= b.Span.End)
+                    : bindings.Count == 1 ? bindings[0] : null;
+
+                if (bind == null)
                 {
-                    if (parameter.Name.Equals(name, StringComparison.Ordinal))
-                        return parameter.Row != null
-                            ? (PolyRow.From(parameter.Row), string.Empty)
-                            : null;
+                    foreach (var parameter in function.Parameters)
+                    {
+                        if (parameter.Name.Equals(name, StringComparison.Ordinal))
+                            return parameter.Row != null
+                                ? (PolyRow.From(parameter.Row), string.Empty)
+                                : null;
+                    }
                 }
 
-                var bind = FindLocalBinding(name, function.Body);
                 if (bind?.Row != null)
                     return (PolyRow.From(bind.Row), string.Empty);
                 if (bind?.Initializer is LambdaExpressionNode lambda)
@@ -2962,33 +3029,27 @@ public sealed class EffectEnforcementPass
             return (PolyRow.Unknown, $"{subject}returns a function type with no effect row");
         }
 
-        /// <summary>The first <c>§B</c> of that name in lexical order, not
-        /// descending into a <c>§LAM</c> (its bindings are the lambda's).</summary>
-        private static BindStatementNode? FindLocalBinding(string name, IEnumerable<StatementNode> statements)
+        /// <summary>EVERY <c>§B</c> of that name in lexical order, not descending
+        /// into a <c>§LAM</c> (its bindings are the lambda's). The caller picks
+        /// the one the binder resolved a reference to, or fails closed when it
+        /// cannot tell (F2).</summary>
+        private static List<BindStatementNode> CollectLocalBindings(string name, IEnumerable<StatementNode> statements)
         {
+            var found = new List<BindStatementNode>();
             foreach (var statement in statements)
-            {
-                if (FindLocalBinding(name, statement) is { } found)
-                    return found;
-            }
-
-            return null;
+                CollectLocalBindings(name, statement, found);
+            return found;
         }
 
-        private static BindStatementNode? FindLocalBinding(string name, AstNode node)
+        private static void CollectLocalBindings(string name, AstNode node, List<BindStatementNode> found)
         {
             if (node is LambdaExpressionNode)
-                return null;
+                return;
             if (node is BindStatementNode bind && bind.Name.Equals(name, StringComparison.Ordinal))
-                return bind;
+                found.Add(bind);
 
             foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-            {
-                if (FindLocalBinding(name, child) is { } found)
-                    return found;
-            }
-
-            return null;
+                CollectLocalBindings(name, child, found);
         }
 
         /// <summary>
@@ -4649,7 +4710,8 @@ public sealed class EffectEnforcementPass
                     // route through the full named-target resolution (value →
                     // its row is charged, E4; internal function → its effects;
                     // free name → unknown chain).
-                    return InferFromCallTarget(reference.Name, call.Span, call.Arguments).Union(argEffects);
+                    return InferFromCallTarget(reference.Name, call.Span, call.Arguments, reference.Span)
+                        .Union(argEffects);
 
                 case LambdaExpressionNode lambda:
                     // Immediately-invoked lambda literal: the body IS the callee,

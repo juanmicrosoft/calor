@@ -434,9 +434,11 @@ public static class DiagnosticCode
     ///
     /// <para><b>v0.15 E4 — retained for that residual only.</b> Until E4 this code
     /// rejected EVERY invocation of a function-typed value ("function-typed values
-    /// carry no effect contract"). They carry one now: the value's effect row
-    /// (<c>FunctionBoundType.Row</c>, §8.2) is charged to the invoking function
-    /// like a callee's declared <c>§E</c> — <c>Concrete</c> is charged silently,
+    /// carry no effect contract"). They carry one now: the value's effect row —
+    /// the <c>§E{…}</c> on the declaration that put it in scope, which is the node
+    /// <c>FunctionBoundType.Row</c> is built from (the bound projection itself has
+    /// no production reader in 0.15; design-doc §13.5 E4) — is charged to the
+    /// invoking function like a callee's declared <c>§E</c>: <c>Concrete</c> is charged silently,
     /// <c>Assumed</c> is charged and reported once as Calor0425, and
     /// <c>Unknown</c> is Calor0425 at the invocation plus the fail-closed Unknown
     /// charge (§10.1, roadmap §4.2 E4). A function-typed value never reaches this

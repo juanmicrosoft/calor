@@ -754,7 +754,7 @@ public sealed class SpikeVerdictTests
     //
     // What this test deliberately does NOT assert is the control's full
     // per-fixture multiset. That is asserted separately, by
-    // PpE1NegativeControls_MatchA1111Baselines_PreE4 below.
+    // PpE1NegativeControls_MatchA1111Baselines_PostE4 below.
     //
     // THE BASELINE A-1.11 FROZE IS SUPERSEDED. A-1.11's leg-A negative control
     // read "A2 = 1x Calor0410 at (23,9) + 3x Calor0411; the four A3 = exit 0

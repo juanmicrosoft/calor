@@ -1,7 +1,7 @@
 {
   "SchemaVersion": 2,
   "Scope": "Calor0425 (EffectRowUnknown) emitted by EffectEnforcementPass over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols, then enforced with UnknownCallPolicy.Strict and no --permissive-effects; modules that fail conversion or whose converted output fails to parse are excluded from the denominator and counted separately. Causes are the ones the FIVE MONOMORPHIC SITES of design-doc \u00A76.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of sites 4/5 and the three verdicts an INVOCATION of a function-typed value can draw \u2014 row-less declaration, undetermined source (a BCL-returned or row-less-returned value), and an Assumed row; \u00A713.4\u0027s unresolved-receiver cause is Calor0411\u0027s, not this ledger\u0027s",
-  "MeasuredCommit": "496edea8de4bfc314317a759d03c9a105dec083c",
+  "MeasuredCommit": "dd4d8f273ec2d01d8285e5532acb3738c29b0bee",
   "AggregateDiagnostics": 8,
   "AggregateModulesWithDiagnostics": 8,
   "AggregateModulesEnforced": 99,
