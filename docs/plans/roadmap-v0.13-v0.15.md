@@ -517,6 +517,17 @@ review record preserves that earlier wording as written.)* Still a shippable rel
 MUST items gate the release; SHOULD items ship if they fit and defer to 0.15.x without
 renegotiation; DEFERRED items are named so their absence is a decision.
 
+**0.15.0 shipped 2026-08-27** (release PR from `release/v0.15.0`; bump commit
+`72d060f400b5787ba4ec11cb4dd8860c95173da3` on the branch — **the squash-merge SHA on `main`
+will differ; the branch SHA is the adjudication commit**, the one PP-E1's ledger records as
+`measuredCommit`). The MUST tier (E1–E5, M1) is complete. **The SHOULD tier — E6, E7, E8, E9
+and M2 — is deferred to 0.15.x. This is a written decision, recorded here:** cut line (1) below
+was invoked by the user's decision to ship 0.15.0 now, **not by an E1 overrun** (E1 completed,
+all three exit pins met). Nothing in the SHOULD tier was started; the gate legs that move with
+them (gate 3's MCP leg, gate 7's E6/E7 legs) move to 0.15.x with them. Gate 3 also ships
+partial against its own instrument list — ES-08 was never registered, and the CLI-process and
+`Calor.Sdk` legs were not built — and the release notes say so (§4.4 gate 3 status).
+
 **MUST**
 
 - **E1 — Foundation (the never-merged metadata S6, plus the lambda type). — COMPLETE.**
@@ -727,6 +738,7 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   items are done, so E2 may merge, and its PR body cites A-1.11 (design §13.3's M1 row).
 
 **SHOULD** (0.13 §2.2 leftovers this bullet used to hide inside "the agent workflow completes")
+— **all five DEFERRED to 0.15.x on 2026-08-27 by the ship decision** (header above; cut line (1)).
 
 - **E6** `review-packet` reads the index (callers and effects) instead of its in-memory graph.
 - **E7** MCP query surface reading the index: callers / callees / impact / effects.
@@ -850,6 +862,15 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   margin. Notes: `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md` ("Leg B — run", "What a
   HIT means", "Corpus ledgers regenerated"). *Superseded status:* instrument BUILT (PR #1109), leg A
   10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463`, leg B not run, NOT-ADJUDICATED.
+  **ADJUDICATED, 2026-08-27, at the 0.15.0 release commit (0.15.0 shipped 2026-08-27).** The
+  ledger was regenerated (`CALOR_REGENERATE_PPE1_LEDGER=1`) at the release branch's bump commit
+  `72d060f400b5787ba4ec11cb4dd8860c95173da3` (`release/v0.15.0`): leg A recomputed on the release
+  product — 10/10, control clean, no drift; leg B's recorded figures re-derived unchanged. **The
+  only field that moved is `measuredCommit`** (`7ad1b1e0…` → `72d060f4…`); verdict **HIT**, point
+  1.1835, lower bound 0.9012, CV 0.2746 — identical. The 0.15.0 release notes carry the verdict,
+  the "no large tax detected" reading, and the **"TIER1A: not run"** row (§4.5). **The
+  squash-merge SHA on `main` will differ from the branch SHA; the branch SHA
+  `72d060f4…` is the adjudication commit** and is what the ledger records.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
   discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.
@@ -929,7 +950,12 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md`, "Leg B — run"). The instrument was
    BUILT in PR #1109 (leg A 10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463`; NOT-ADJUDICATED
    until the epoch ran); the release PR re-runs the ledger test at its own commit and publishes
-   the verdict in the release notes whatever it says.
+   the verdict in the release notes whatever it says. **ADJUDICATED at the 0.15.0 release
+   commit, 2026-08-27 (0.15.0 shipped 2026-08-27):** ledger regenerated at the release branch's
+   bump commit `72d060f400b5787ba4ec11cb4dd8860c95173da3` (`release/v0.15.0`); leg A recomputed
+   on the release product 10/10 with a clean control and no drift; only `measuredCommit` moved;
+   verdict **HIT** with identical numbers (point 1.1835, lower bound 0.9012, CV 0.2746).
+   **The squash-merge SHA on `main` will differ; the branch SHA is the adjudication commit.**
 5. **Compatibility, restated over the corpus that exists.** Draft v3's denominator — "the repo's
    migrated `.calr` corpus" — was never a distinct artifact: no committed `.calr` declares a
    version (§4.0). *Denominator:* the committed `.calr` corpus at the 0.15 branch-cut commit, in
