@@ -4,6 +4,85 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-27
+
+Calor 0.15 is the "Composable Effects" release. You can now write, on a callback's
+type, what that callback is allowed to do — the same `§E{…}` tag functions have
+always used, placed on the parameter, field, return type or lambda it describes. You
+can write one function that works for both pure and impure callbacks by giving it a
+placeholder effect (`<eff e>`), and the compiler works out what the placeholder means
+at each call site from the callback you actually passed. And the compiler checks all
+of it: a callback that does more than its destination allows is an error
+(`Calor0424`), one the compiler cannot vouch for is a warning (`Calor0425`), and
+calling a callback charges its effects to the caller — so nothing can sneak an effect
+through a callback. The project index knows about effects too (`calor query effects`).
+The proof point we registered in advance came out **HIT**, and here is what it cost:
+on ordinary tasks with no callbacks in them, an AI agent used roughly 18 % more output
+tokens to get the same programs green with the stricter compiler — a real cost, and
+inside the limit we set beforehand.
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension (StructuralClarity): 1.84x (Calor)
+  - ErrorDetection (DetectionCapability): 1.49x (Calor)
+  - TokenEconomics (CompositeTokenEconomics): 1.42x (Calor)
+  - RefactoringStability (OverallStability): 1.38x (Calor)
+  - EditPrecision (TargetingPrecision): 1.36x (Calor)
+  - Correctness (EstimatedCorrectness): 1.29x (Calor)
+  - GenerationAccuracy: 1.02x and InformationDensity: 0.98x — the two near-even categories
+- **Compilation Success**: Calor 217, C# 216
+- **Benchmarks Evaluated**: 217
+
+These numbers are unchanged from 0.14.3 because none of the 217 benchmark programs
+passes callbacks around, so this benchmark cannot see the effect-rows feature at all;
+the feature's own scorecard is PP-E1 below.
+
+### Proof point PP-E1 (registered in advance, annex A-1.11)
+
+| Leg | What it measures | Result | Bar |
+|---|---|---|---|
+| A — detection | Ten deliberate mistakes planted, one at a time, in five frozen example programs | **10/10** caught, with the registered error code at the registered place; negative control clean (the unmodified programs report exactly what was frozen for them) | 10/10 with a clean control |
+| B — cost | Output tokens an AI agent needs to get the same four small programs green, new compiler vs `v0.14.3` | point **1.1835**; one-sided 95 % lower bound **0.9012**; median within-cell CV **0.2746**; **40/40** valid runs | fails only if point > 1.35 **and** lower bound > 1.0; underpowered if CV > 0.66 |
+
+- Model `claude-opus-4-8`; control = `v0.14.3` (`63316987`); treatment = `b775acb4`;
+  epoch `e1-rows-parity-001`.
+- **Verdict: HIT.** A HIT means "no large loop tax detected" — never "proven equal". With
+  40 runs the test's power to see a true 25 % / 40 % / 60 % tax is only 0.22 / 0.48 / 0.77,
+  and the four tasks contain no callbacks, so the feature's benefit on callback-heavy code
+  is not measured here. One task (inventory) was 51 % more expensive on its own.
+- Adjudicated at this release's bump commit: `bench/phase0-agent-native/effect-rows-probe-ledger.json`
+  is regenerated there (`measuredCommit` = the release branch's bump commit), leg A is
+  recomputed on the release product, and the verdict and every number above are unchanged.
+- **TIER1A: not run.** `docs/experiments/registry.json` is empty; TIER1A is not a 0.15
+  gate (roadmap §4.5) and is re-adjudicated at the 0.15.0 retro.
+
+### Release gates (roadmap §4.4)
+
+All seven are executed by the test suite at this commit (`dotnet test
+tests/Calor.Compiler.Tests/` and `tests/Calor.Enforcement.Tests/`).
+
+| # | Gate | Instrument | Status |
+|---|---|---|---|
+| 1 | Effect laundering, closed classes | P15's six `_IsError` / `_Compiles` pairs in `tests/Calor.Enforcement.Tests/StrictnessBatchTests.cs` — assignment, argument, return, virtual override, interface implementation, rank-1 generic instantiation | green. Not closed, and named as such: reflection, `DynamicInvoke`, `dynamic` receivers, event-handler subscription, BCL-returned delegates |
+| 2 | Higher-order expressiveness | `HigherOrderDemandLedgerTests` re-executed against `bench/phase0-agent-native/higher-order-demand-ledger.json` | green. `Calor0418` on the registered classes is **0** (was 1 before E4); demand 2 + 3121 = 3123 sites, above the 25-site floor |
+| 3 | Surface agreement | `EditScriptIdentityTests` over ES-01…ES-07 (clean vs incremental, in-process; `RegisteredScriptIdsAreStable` pins the list); index and build-cache format `4.0` pinned in `IncrementalCliBuildTests`; entry-point defaults pinned in `CliEnforceEffectsDefaultTests` | green on what exists. **Partial against the roadmap's own list:** ES-08 (the effect-row edit script) was never registered, and the CLI-process and `Calor.Sdk` legs were not built |
+| 4 | The probe adjudicates | PP-E1 via `EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation` (exact equality on the ledger), cost leg via `bench/phase0-agent-native/ppe1-analyze.py` | **HIT** (see above), re-adjudicated at the bump commit |
+| 5 | Compatibility over the corpus | leg (a) `BulkBenchmarkCompilationTests` (226 benchmark files, ≥ 200 asserted), `samples/` via `scripts/verify_phase1.py` in CI, and every `.calr` a test project compiles; leg (b) the D-A half of `HigherOrderDemandLedgerTests`, which compiles all **926** committed `.calr` in its scope (941 tracked, minus the 15 design-spike artifacts it excludes by rule) and lists the 45 that do not reach the effect pass by name | green. The standalone `compile-all-committed-calr` CI job the roadmap named was not created; the D-A leg is the compile-all instrument that exists |
+| 6 | Resolution floor | `MetadataBinderCorpusMeasurementTests`, two-sided exact equality against `bench/phase0-agent-native/metadata-binding-corpus-ledger.json` | green at the v0.14.3 floor: 817/1248 (MediatR 129/226, Serilog 104/113, FluentValidation 584/909) — the floor did not move in either direction |
+| 7 | Index/query correctness, effects leg | `QueryGoldenTests` with the `effects` (8) and `impact-effects` (3) goldens over `tests/TestData/QueryCorpus/`, plus `TheEffectsGoldensExerciseEveryVerdict` | green |
+
+### Deferred to 0.15.x
+
+These were the SHOULD tier of roadmap §4.2. They move to 0.15.x by the ship decision, not
+because anything overran (cut line (1) invoked by the decision to ship now):
+- **E6** — `review-packet` reading callers and effects from the index instead of its own in-memory graph.
+- **E7** — the MCP query surface reading the index: callers, callees, impact, effects.
+- **E8** — contract outcomes recorded in the index, with an invalidated-proofs facet.
+- **E9** — an affected-tests mapping (a new facet; no design exists yet).
+- **M2** — a real Calor arm in the agent benchmark harness (`Calor0410` enforcement genuinely in the loop).
+
 ### Added
 - **We built the scorecard that will judge the new effect-rows feature.** Before any of the
   effect-rows work was written, we registered a test for it: ten small, deliberate mistakes
