@@ -50,6 +50,45 @@ public sealed class CallGraphAnalysis
         string,
         IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>> _boundValueTypes;
 
+    // v0.15 E3 slice b, design-doc §8.2 — the DECLARED function types of named
+    // positions, which is a different question from BoundValueTypes' "what did
+    // the binder make of this receiver". Populated once, right after the graph is
+    // built, because they come from the same Bind() call that resolves the call
+    // sites and re-binding to get them would double the binder's cost.
+    private static readonly IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>
+        NoFunctionTypes =
+            new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(StringComparer.Ordinal);
+
+    private IReadOnlyDictionary<
+        string,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>> _declaredFunctionTypes =
+            new Dictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>(
+                StringComparer.Ordinal);
+
+    private IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>
+        _declaredReturnFunctionTypes = NoFunctionTypes;
+
+    private IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>
+        _declaredFieldFunctionTypes = NoFunctionTypes;
+
+    /// <summary>
+    /// The declared <c>FunctionBoundType</c> of the named parameters and locals of
+    /// one function — <c>VariableSymbol.FunctionType</c>, keyed by name. Empty
+    /// when binding threw.
+    /// </summary>
+    public IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredFunctionTypes(
+        string functionId) =>
+        _declaredFunctionTypes.TryGetValue(functionId, out var map) ? map : NoFunctionTypes;
+
+    /// <summary>The declared <c>FunctionSymbol.ReturnFunctionType</c> of one function.</summary>
+    public Binding.BoundTypes.FunctionBoundType? DeclaredReturnFunctionType(string functionId) =>
+        _declaredReturnFunctionTypes.GetValueOrDefault(functionId);
+
+    /// <summary>The declared function type of a class FIELD, keyed <c>Class.field</c>.</summary>
+    public Binding.BoundTypes.FunctionBoundType? DeclaredFieldFunctionType(
+        string className, string fieldName) =>
+        _declaredFieldFunctionTypes.GetValueOrDefault($"{className}.{fieldName}");
+
     /// <summary>
     /// Builds an overload-precise graph from bound calls. External calls remain
     /// explicitly unresolved instead of being projected onto an internal name.
@@ -486,7 +525,8 @@ public sealed class CallGraphAnalysis
             }
         }
 
-        var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes) =
+        var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
+             declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes) =
             ResolveBoundCallSites(ast, functions);
 
         // Build call edges
@@ -530,7 +570,7 @@ public sealed class CallGraphAnalysis
             resolvedCallIds,
             boundCallSites);
 
-        return new CallGraphAnalysis(
+        var analysis = new CallGraphAnalysis(
             callerToCallees,
             calleeToCallers,
             functions,
@@ -542,6 +582,10 @@ public sealed class CallGraphAnalysis
             boundResolutionComplete,
             boundValueTypes,
             sccs);
+        analysis._declaredFunctionTypes = declaredFunctionTypes;
+        analysis._declaredReturnFunctionTypes = declaredReturnTypes;
+        analysis._declaredFieldFunctionTypes = declaredFieldTypes;
+        return analysis;
     }
 
     private static (
@@ -549,7 +593,11 @@ public sealed class CallGraphAnalysis
         HashSet<AstCallKey> BoundCallSites,
         bool Complete,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>>
-            BoundValueTypes)
+            BoundValueTypes,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>
+            DeclaredFunctionTypes,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredReturnTypes,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredFieldTypes)
         ResolveBoundCallSites(
             ModuleNode ast,
             IReadOnlyDictionary<string, FunctionNode> functions)
@@ -563,6 +611,18 @@ public sealed class CallGraphAnalysis
         var valueTypes =
             new Dictionary<string, Dictionary<string, Binding.BoundTypes.BoundType?>>(
                 StringComparer.Ordinal);
+
+        // v0.15 E3 slice b, §8.2 — the DECLARED function types, collected from the
+        // same bound module. Unlike `valueTypes` these are not receiver-derived and
+        // have no ambiguity rule: a parameter name is unique within its function,
+        // and a field name within its class.
+        var declaredTypes =
+            new Dictionary<string, Dictionary<string, Binding.BoundTypes.FunctionBoundType>>(
+                StringComparer.Ordinal);
+        var declaredReturns =
+            new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(StringComparer.Ordinal);
+        var declaredFields =
+            new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(StringComparer.Ordinal);
 
         void RecordValue(string callerId, string name, Binding.BoundTypes.BoundType type)
         {
@@ -619,10 +679,38 @@ public sealed class CallGraphAnalysis
                 .Where(item => item.LegacyId != null)
                 .ToDictionary(item => item.SymbolId, item => item.LegacyId!);
 
+            foreach (var symbol in boundModule.SymbolsById.Values)
+            {
+                if (symbol is not Binding.VariableSymbol
+                    {
+                        IsField: true,
+                        FunctionType: { } fieldType,
+                        DeclaringTypeName: { } owner,
+                    } field)
+                {
+                    continue;
+                }
+                declaredFields[$"{owner}.{field.Name}"] = fieldType;
+            }
+
             foreach (var function in boundModule.Functions)
             {
                 if (!legacyIds.TryGetValue(function.SymbolId, out var callerId))
                     continue;
+
+                if (function.Symbol.ReturnFunctionType is { } returnType)
+                    declaredReturns[callerId] = returnType;
+                foreach (var parameter in function.Symbol.Parameters)
+                {
+                    if (parameter.FunctionType is not { } parameterType) continue;
+                    if (!declaredTypes.TryGetValue(callerId, out var byName))
+                    {
+                        byName = new Dictionary<string, Binding.BoundTypes.FunctionBoundType>(
+                            StringComparer.Ordinal);
+                        declaredTypes[callerId] = byName;
+                    }
+                    byName[parameter.Name] = parameterType;
+                }
 
                 foreach (var node in DescendantsAndSelf(function))
                 {
@@ -700,10 +788,26 @@ public sealed class CallGraphAnalysis
                 boundCallSites,
                 false,
                 new Dictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>>(
-                    StringComparer.Ordinal));
+                    StringComparer.Ordinal),
+                new Dictionary<
+                    string,
+                    IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>(
+                    StringComparer.Ordinal),
+                NoFunctionTypes,
+                NoFunctionTypes);
         }
 
-        return (resolved, boundCallSites, true, FreezeValueTypes(valueTypes));
+        return (
+            resolved,
+            boundCallSites,
+            true,
+            FreezeValueTypes(valueTypes),
+            declaredTypes.ToDictionary(
+                entry => entry.Key,
+                entry => (IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>)entry.Value,
+                StringComparer.Ordinal),
+            declaredReturns,
+            declaredFields);
     }
 
     /// <summary>
@@ -859,7 +963,12 @@ public sealed class CallGraphAnalysis
             method.Preconditions,
             method.Postconditions,
             method.Body,
-            method.Attributes);
+            method.Attributes)
+        {
+            // v0.15 E3 slice b — the `eff` binders travel with the method, or
+            // site 6 cannot see that the callee is effect-polymorphic at all.
+            EffectParameters = method.EffectParameters,
+        };
     }
 
     private static FunctionNode ToCtorFunctionNode(ConstructorNode ctor, string className)

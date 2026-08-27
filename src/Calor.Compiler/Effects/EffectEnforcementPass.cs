@@ -431,7 +431,19 @@ public sealed class EffectEnforcementPass
                 var chain = FindCallChain(function.Id, kind, value);
                 var chainStr = chain.Count > 0 ? $"\n  Call chain: {string.Join(" → ", chain)}" : "";
 
-                var message = $"Function '{function.Name}' uses effect '{EffectSetExtensions.ToSurfaceCode(kind, value)}' but does not declare it{chainStr}";
+                // v0.15 E3 slice b, design-doc §10.3 — when the effect arrived
+                // through a rank-1 instantiation, say so. Today's Calor0410 can
+                // only report that a call happened; with rows it can report that
+                // the call was to something whose effect variable resolved to
+                // this effect, and which argument decided that.
+                var surface = EffectSetExtensions.ToSurfaceCode(kind, value);
+                var rowStr =
+                    _rank1Provenance.TryGetValue(function.Id, out var byCode)
+                    && byCode.TryGetValue(surface, out var why)
+                        ? $"\n  Effect row: {why}"
+                        : "";
+
+                var message = $"Function '{function.Name}' uses effect '{surface}' but does not declare it{rowStr}{chainStr}";
 
                 if (fix != null)
                 {
@@ -740,9 +752,231 @@ public sealed class EffectEnforcementPass
             : GetDeclaredEffects(row).ToRow();
 
     /// <summary>True when a row is effect-POLYMORPHIC — it mentions an
-    /// <c>eff</c> variable, so its verdict is site 6's and not this slice's.</summary>
+    /// <c>eff</c> variable. Slice a declined every such position; slice b
+    /// adjudicates it at site 6 (§7.4), so this survives only as a shape test.</summary>
     private static bool IsPolymorphicRow(EffectsNode? row) =>
         row is { EffectVariables.Count: > 0 };
+
+    /// <summary>
+    /// v0.15 E3 slice b, design-doc §5 — ρ_body per <c>§LAM</c>, recorded during
+    /// inference and read afterwards. Reference identity: two structurally
+    /// identical lambdas at different places are different lambdas.
+    /// </summary>
+    private readonly Dictionary<LambdaExpressionNode, LambdaBodyFact> _lambdaBodyRows =
+        new(ReferenceEqualityComparer.Instance as IEqualityComparer<LambdaExpressionNode>);
+
+    private readonly record struct LambdaBodyFact(
+        string FunctionId,
+        EffectSet Body,
+        IReadOnlyList<string> Reasons);
+
+    /// <summary>
+    /// Design-doc §10.3's provenance clause, per function and per SURFACE effect
+    /// code: why this function is charged that effect, when the answer is "a
+    /// rank-1 effect variable instantiated to it at a call site". Read by
+    /// <see cref="CheckEffects"/>, which is where Calor0410 names the effect.
+    /// </summary>
+    private readonly Dictionary<string, Dictionary<string, string>> _rank1Provenance =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// ρ_body for an un-annotated <c>§LAM</c> (§5). Unknown when the lambda was
+    /// never reached by inference — which is the honest answer, and the same one
+    /// slice a gave unconditionally.
+    /// </summary>
+    private PolyRow LambdaBodyRow(LambdaExpressionNode lambda)
+    {
+        if (!_lambdaBodyRows.TryGetValue(lambda, out var fact))
+            return PolyRow.Unknown;
+
+        var row = fact.Body.ToRow();
+        return PolyRow.Concrete(
+            fact.Reasons.Count > 0
+                ? Binding.BoundTypes.EffectRow.Assumed(row.Codes, fact.Reasons)
+                : row);
+    }
+
+    /// <summary>
+    /// Site 6's charge (§7.4): the caller is charged the INSTANTIATED own-row of
+    /// the callee, not its declared one. Applied to <c>_computedEffects</c> after
+    /// SCC processing, so a rank-1 charge reaches the caller's own Calor0410 but
+    /// does <b>not</b> propagate transitively to the caller's callers — that
+    /// needs the solve to run inside the fixpoint, which needs rows in the
+    /// inferrer, and it is E4's (which redesigns invocation charging anyway).
+    /// No committed <c>.calr</c> binds an <c>eff</c> variable, so the gap is
+    /// observable only in the spike fixtures and in tests.
+    /// </summary>
+    private void ChargeInstantiatedRow(
+        string functionId,
+        Binding.BoundTypes.EffectRow row,
+        IReadOnlyDictionary<string, string> provenance)
+    {
+        if (row.IsUnknown) return;
+
+        var charged = row.ToEffectSet();
+        _computedEffects[functionId] =
+            _computedEffects.GetValueOrDefault(functionId, EffectSet.Empty).Union(charged);
+
+        if (provenance.Count == 0) return;
+        if (!_rank1Provenance.TryGetValue(functionId, out var byCode))
+        {
+            byCode = new Dictionary<string, string>(StringComparer.Ordinal);
+            _rank1Provenance[functionId] = byCode;
+        }
+        foreach (var (code, reason) in provenance)
+            byCode.TryAdd(code, reason);
+    }
+
+    /// <summary>
+    /// v0.15 E3 slice b, design-doc §8.2 — the declared <c>FunctionBoundType</c>
+    /// of a named position, or <c>null</c>. This is the first PRODUCTION reader
+    /// of <c>VariableSymbol.FunctionType</c> and
+    /// <c>FunctionSymbol.ReturnFunctionType</c>: the row checker asks the BOUND
+    /// answer before the string test, so a position whose type the string test
+    /// cannot recognise — a <c>§CSHARP</c>-declared delegate, the A2 shape — is
+    /// still a site.
+    /// </summary>
+    private Binding.BoundTypes.FunctionBoundType? BoundFunctionType(string functionId, string name)
+        => _callGraphAnalysis.DeclaredFunctionTypes(functionId).GetValueOrDefault(name);
+
+    private Binding.BoundTypes.FunctionBoundType? BoundReturnFunctionType(string functionId)
+        => _callGraphAnalysis.DeclaredReturnFunctionType(functionId);
+
+    private Binding.BoundTypes.FunctionBoundType? BoundFieldFunctionType(string className, string field)
+        => _callGraphAnalysis.DeclaredFieldFunctionType(className, field);
+
+    /// <summary>
+    /// v0.15 E3 slice b, design-doc §7 — a row that may mention <c>eff</c>
+    /// VARIABLES as well as concrete codes: <c>§E{cw, e}</c> denotes
+    /// <c>Concrete({cw}) ⊔ e</c>.
+    ///
+    /// <para>The variables are carried as <b>ordinals</b> — the index of the
+    /// binder in its declaration's <c>eff</c> list — because that is the
+    /// identity two declarations' binders are compared on. An interface member's
+    /// <c>eff e</c> and its implementation's <c>eff f</c> are both ordinal 0, so
+    /// sites 4 and 5 identify them without a rank-1-specific branch, which is
+    /// §7.5's R2 (<c>A3-middleware-alpha</c>). <see cref="VariableNames"/> is
+    /// display only and deliberately takes no part in <see cref="Fits"/> — a
+    /// row's identity must not depend on what the author called the binder.</para>
+    ///
+    /// <para><b>Ordinals are only comparable within one declaration's
+    /// vocabulary.</b> A callee's row is in the CALLEE's vocabulary until
+    /// <see cref="RowSiteChecker"/> instantiates it; every row that reaches
+    /// <see cref="Fits"/> is in the caller's, because instantiation is what
+    /// converts one to the other.</para>
+    /// </summary>
+    private readonly record struct PolyRow(
+        Binding.BoundTypes.EffectRow Row,
+        System.Collections.Immutable.ImmutableSortedSet<int> Variables,
+        System.Collections.Immutable.ImmutableSortedSet<string> VariableNames)
+    {
+        private static readonly System.Collections.Immutable.ImmutableSortedSet<int> NoVariables =
+            System.Collections.Immutable.ImmutableSortedSet<int>.Empty;
+
+        private static readonly System.Collections.Immutable.ImmutableSortedSet<string> NoNames =
+            System.Collections.Immutable.ImmutableSortedSet<string>.Empty
+                .WithComparer(StringComparer.Ordinal);
+
+        public static readonly PolyRow Unknown =
+            new(Binding.BoundTypes.EffectRow.Unknown, NoVariables, NoNames);
+
+        public static readonly PolyRow Pure =
+            new(Binding.BoundTypes.EffectRow.Pure, NoVariables, NoNames);
+
+        public bool IsPolymorphic => Variables.Count > 0;
+
+        public static PolyRow Concrete(Binding.BoundTypes.EffectRow row) =>
+            new(row, NoVariables, NoNames);
+
+        /// <summary>The row a declared <c>§E{…}</c> denotes, variables included.</summary>
+        public static PolyRow From(EffectsNode? row)
+        {
+            if (row == null) return Unknown;
+
+            var variables = NoVariables;
+            var names = NoNames;
+            for (var index = 0; index < row.EffectVariables.Count; index++)
+            {
+                var ordinal = index < row.EffectVariableOrdinals.Count
+                    ? row.EffectVariableOrdinals[index]
+                    : -1;
+                variables = variables.Add(ordinal);
+                names = names.Add(row.EffectVariables[index]);
+            }
+
+            return new PolyRow(GetDeclaredEffects(row).ToRow(), variables, names);
+        }
+
+        /// <summary>
+        /// The row a DECLARATION denotes. Differs from <see cref="From"/> in
+        /// exactly one cell and the difference is §3.5's: an omitted row on a
+        /// declaration is <b>pure</b>, while an omitted row on a binding POSITION
+        /// is Unknown.
+        /// </summary>
+        public static PolyRow FromDeclaration(EffectsNode? row) =>
+            row == null ? Pure : From(row);
+
+        /// <summary>§4.2's join, lifted over the variable part.</summary>
+        public static PolyRow Join(PolyRow left, PolyRow right) =>
+            new(
+                Binding.BoundTypes.EffectRow.Join(left.Row, right.Row),
+                left.Variables.Union(right.Variables),
+                left.VariableNames.Union(right.VariableNames));
+
+        /// <summary>
+        /// §4.3's <c>fits</c>, lifted over the variable part: a source may
+        /// mention only variables the destination also mentions. A destination
+        /// with EXTRA variables is a widening and fits, exactly as a destination
+        /// with extra concrete codes does.
+        /// </summary>
+        public static Binding.BoundTypes.EffectFit Fits(PolyRow source, PolyRow destination)
+        {
+            // Spelled as an explicit loop rather than the library containment
+            // helper, whose NAME is the token P16's structural half counts under
+            // `Effects/`. This is containment over ORDINALS, not the effect-set
+            // relation that pin exists to keep out of the compatibility sites,
+            // and it should not read as one.
+            foreach (var variable in source.Variables)
+            {
+                if (!destination.Variables.Contains(variable))
+                    return Binding.BoundTypes.EffectFit.DoesNotFit;
+            }
+
+            return Binding.BoundTypes.EffectRow.Fits(source.Row, destination.Row);
+        }
+
+        /// <summary>
+        /// §7.4's <c>⊖</c> — difference over the CONCRETE part only. The variable
+        /// part is carried through untouched: a residual that still mentions a
+        /// caller variable is what makes <c>A3-middleware</c>'s
+        /// <c>§C{RunTwice} §A next §/C</c> instantiate to the caller's own
+        /// variable rather than to Unknown.
+        /// </summary>
+        public PolyRow Except(PolyRow declared)
+        {
+            if (Row.IsUnknown) return new PolyRow(Row, Variables, VariableNames);
+            if (declared.Row.IsUnknown) return this;
+
+            var remaining = EffectSet
+                .FromInternal(Row.ToEffectSet().Except(declared.Row.ToEffectSet()))
+                .ToRow();
+            var residual = Row.IsAssumed
+                ? Binding.BoundTypes.EffectRow.Assumed(remaining.Codes, Row.Reasons)
+                : remaining;
+            return new PolyRow(residual, Variables, VariableNames);
+        }
+
+        /// <summary>The compact spelling for diagnostics, variables included.</summary>
+        public string Display()
+        {
+            var concrete = Row.ToCompactDisplayString();
+            if (VariableNames.Count == 0) return concrete;
+            var variables = string.Join(", ", VariableNames);
+            return Row.IsUnknown || (Row.IsConcrete && Row.Codes.Count == 0)
+                ? variables
+                : $"{concrete}, {variables}";
+        }
+    }
 
     /// <summary>
     /// Walks ONE callable body and adjudicates sites 1-3 inside it. A fresh
@@ -759,7 +993,7 @@ public sealed class EffectEnforcementPass
         /// row they carry AT THIS POINT. Site 1 rewrites an entry through
         /// <c>EffectRow.AtDestination</c>, which is how §4.4's assumption
         /// survives to the next hop.</summary>
-        private readonly Dictionary<string, Binding.BoundTypes.EffectRow> _scope =
+        private readonly Dictionary<string, PolyRow> _scope =
             new(StringComparer.Ordinal);
 
         public RowSiteChecker(EffectEnforcementPass pass, FunctionNode function)
@@ -774,15 +1008,19 @@ public sealed class EffectEnforcementPass
             {
                 foreach (var field in owner.Fields)
                 {
-                    if (IsFunctionTyped(field.TypeName) && !IsPolymorphicRow(field.Row))
-                        _scope[field.Name] = PositionRow(field.Row);
+                    if (IsFieldFunctionTyped(owner, field))
+                        _scope[field.Name] = PolyRow.From(field.Row);
                 }
             }
 
+            // Slice b keeps effect-POLYMORPHIC parameters in scope rather than
+            // dropping them (slice a's `!IsPolymorphicRow` guard): `next §E{e}`
+            // is the source whose row makes A3-middleware's `§C{RunTwice} §A next`
+            // instantiate to the caller's own variable instead of to Unknown.
             foreach (var parameter in _function.Parameters)
             {
-                if (IsFunctionTyped(parameter.TypeName) && !IsPolymorphicRow(parameter.Row))
-                    _scope[parameter.Name] = PositionRow(parameter.Row);
+                if (IsParameterFunctionTyped(_function, parameter))
+                    _scope[parameter.Name] = PolyRow.From(parameter.Row);
             }
 
             foreach (var statement in _function.Body)
@@ -841,10 +1079,10 @@ public sealed class EffectEnforcementPass
                     CheckReturnSite(returned);
                     break;
                 case CallStatementNode call:
-                    CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames);
+                    CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames, call.Span);
                     break;
                 case CallExpressionNode call:
-                    CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames);
+                    CheckArgumentSite(call.Target, call.Arguments, call.ArgumentNames, call.Span);
                     break;
             }
 
@@ -857,8 +1095,8 @@ public sealed class EffectEnforcementPass
         private void CheckAssignmentSite(BindStatementNode bind)
         {
             var declaresRow = bind.Row != null;
-            var functionTyped = declaresRow || IsFunctionTyped(bind.TypeName);
-            if (!functionTyped || IsPolymorphicRow(bind.Row))
+            var functionTyped = declaresRow || IsBindingFunctionTyped(bind);
+            if (!functionTyped)
                 return;
 
             var source = SourceRow(bind.Initializer);
@@ -867,11 +1105,11 @@ public sealed class EffectEnforcementPass
                 // No nameable function value on the right. §3.5: a row-less §B
                 // takes its initializer's row, and there is nothing to check.
                 if (declaresRow)
-                    _scope[bind.Name] = PositionRow(bind.Row);
+                    _scope[bind.Name] = PolyRow.From(bind.Row);
                 return;
             }
 
-            var destination = PositionRow(bind.Row);
+            var destination = PolyRow.From(bind.Row);
 
             // §3.5 — a §B with NO row of its own INFERS one from its initializer.
             // That is not a site: there is no declared destination to disagree
@@ -896,18 +1134,14 @@ public sealed class EffectEnforcementPass
             // §4.4 — the row the value HAS at its destination. An Assumed source
             // that fits produces an Assumed destination, so the assumption is
             // reported again at the next hop instead of vanishing.
-            _scope[bind.Name] =
-                Binding.BoundTypes.EffectRow.Fits(source.Value.Row, destination)
-                    == Binding.BoundTypes.EffectFit.Fits
-                    ? Binding.BoundTypes.EffectRow.AtDestination(source.Value.Row, destination)
-                    : destination;
+            _scope[bind.Name] = AtDestination(source.Value.Row, destination);
         }
 
         /// <summary>
         /// Site 1's SECOND half (§6.2 — "`§B` init, <b>and re-assignment to a
         /// function-typed mutable</b>"), added by review round 1 (F10). The
         /// destination is the row the mutable already carries at this point in
-        /// the body, which after a `Fits` hop is <see cref="Binding.BoundTypes.EffectRow.AtDestination"/>'s
+        /// the body, which after a `Fits` hop is <see cref="AtDestination"/>'s
         /// answer — so re-assigning through a mutable cannot launder a row that
         /// the original binding reported on.
         ///
@@ -936,19 +1170,48 @@ public sealed class EffectEnforcementPass
                 owner: _function.Name);
 
             // The row the mutable carries AFTER the assignment (§4.4).
-            _scope[target.Name] =
-                Binding.BoundTypes.EffectRow.Fits(source.Value.Row, destination)
-                    == Binding.BoundTypes.EffectFit.Fits
-                    ? Binding.BoundTypes.EffectRow.AtDestination(source.Value.Row, destination)
-                    : destination;
+            _scope[target.Name] = AtDestination(source.Value.Row, destination);
         }
 
-        // ===== Site 2 — argument =====
+        /// <summary>§4.4's destination rule, lifted over the variable part: the
+        /// destination's variables are the ones the value has once it has
+        /// arrived, because the destination's declaration is the contract.</summary>
+        private static PolyRow AtDestination(PolyRow source, PolyRow destination)
+            => PolyRow.Fits(source, destination) == Binding.BoundTypes.EffectFit.Fits
+                ? new PolyRow(
+                    Binding.BoundTypes.EffectRow.AtDestination(source.Row, destination.Row),
+                    destination.Variables,
+                    destination.VariableNames)
+                : destination;
 
+        // ===== Site 2 — argument — and site 6 — rank-1 instantiation =====
+
+        /// <summary>
+        /// One pass over a call's arguments settles BOTH sites, because they are
+        /// the same traversal asking two questions of each parameter.
+        ///
+        /// <para>A parameter whose declared row is MONOMORPHIC is site 2: the
+        /// argument's row must fit it (Calor0424/0425), exactly as in slice a.</para>
+        ///
+        /// <para>A parameter whose declared row MENTIONS an <c>eff</c> variable is
+        /// site 6's binding site: it contributes
+        /// <c>ρ(argⱼ) ⊖ ρ_declⱼ</c> to that variable's solution (§7.4). There is
+        /// no second <c>fits</c> check at such a position, and that is a
+        /// consequence rather than an omission: the solution is DEFINED as the
+        /// join of the residuals, so the substituted parameter row contains the
+        /// argument's row by construction. What can still go wrong is that a
+        /// contributor is not determinable at all, and that is exactly the
+        /// Calor0425 <see cref="InstantiateAndCharge"/> reports.</para>
+        ///
+        /// <para><b>ONE solve, no fixpoint</b> — §7.5's R3. Every variable is
+        /// settled by a single left-to-right sweep of this argument list; nothing
+        /// is revisited, and no constraint set is built.</para>
+        /// </summary>
         private void CheckArgumentSite(
             string target,
             IReadOnlyList<ExpressionNode> arguments,
-            IReadOnlyList<string?>? argumentNames)
+            IReadOnlyList<string?>? argumentNames,
+            TextSpan callSpan)
         {
             if (arguments.Count == 0)
                 return;
@@ -962,20 +1225,53 @@ public sealed class EffectEnforcementPass
             if (callee == null)
                 return;
 
+            var binderCount = callee.EffectParameters.Count;
+            var solutions = new PolyRow?[binderCount];
+            var undetermined = new string?[binderCount];
+
             for (var index = 0; index < arguments.Count && index < callee.Parameters.Count; index++)
             {
                 var parameter = callee.Parameters[index];
-                if (!IsFunctionTyped(parameter.TypeName) || IsPolymorphicRow(parameter.Row))
+                if (!IsParameterFunctionTyped(callee, parameter))
                     continue;
 
+                var declared = PolyRow.From(parameter.Row);
                 var source = SourceRow(arguments[index]);
+
+                if (declared.IsPolymorphic)
+                {
+                    var reason = source == null
+                        ? $"argument {index + 1} of '{callee.Name}' is not a function value this "
+                          + "pass can name"
+                        : source.Value.Row.Row.IsUnknown
+                            ? $"the row of argument {source.Value.Description} could not be determined"
+                            : null;
+
+                    if (reason != null)
+                    {
+                        foreach (var ordinal in declared.Variables)
+                            MarkUndetermined(undetermined, ordinal, reason);
+                        continue;
+                    }
+
+                    var residual = source!.Value.Row.Except(declared);
+                    foreach (var ordinal in declared.Variables)
+                    {
+                        if (ordinal < 0 || ordinal >= binderCount) continue;
+                        solutions[ordinal] = solutions[ordinal] is { } existing
+                            ? PolyRow.Join(existing, residual)
+                            : residual;
+                    }
+                    continue;
+                }
+
                 if (source == null)
                     continue;
 
                 Adjudicate(
                     arguments[index].Span,
                     source.Value.Row,
-                    PositionRow(parameter.Row),
+                    declared,
                     sourceDescription: $"Argument {source.Value.Description}",
                     destinationDescription: $"parameter '{parameter.Name}' of '{callee.Name}'",
                     destinationName: $"'{parameter.Name}'",
@@ -983,16 +1279,107 @@ public sealed class EffectEnforcementPass
                     positionDescription: $"Parameter '{parameter.Name}' of '{callee.Name}'",
                     owner: callee.Name);
             }
+
+            if (binderCount > 0)
+                InstantiateAndCharge(callee, solutions, undetermined, callSpan);
         }
+
+        private static void MarkUndetermined(string?[] undetermined, int ordinal, string reason)
+        {
+            if (ordinal < 0 || ordinal >= undetermined.Length) return;
+            undetermined[ordinal] ??= reason;
+        }
+
+        /// <summary>
+        /// Site 6's second half (§7.4): substitute the solved variables into the
+        /// callee's OWN row and charge the caller with the result.
+        ///
+        /// <para>A variable the arguments could not determine makes the
+        /// instantiated row Unknown, which is Calor0425 at the CALL SITE — §10.3's
+        /// second message. Nothing is charged for such a variable: the slice that
+        /// charges an Unknown row is E4, which replaces Calor0418, and inventing
+        /// an <c>unknown</c> effect here would raise a Calor0410 the author cannot
+        /// declare away.</para>
+        /// </summary>
+        private void InstantiateAndCharge(
+            FunctionNode callee,
+            PolyRow?[] solutions,
+            string?[] undetermined,
+            TextSpan callSpan)
+        {
+            var ownRow = PolyRow.FromDeclaration(callee.Effects);
+            var instantiated = PolyRow.Concrete(ownRow.Row);
+            var provenance = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var ordinal in ownRow.Variables)
+            {
+                var name = BinderName(callee, ordinal);
+                if (ordinal < 0 || ordinal >= solutions.Length || solutions[ordinal] is not { } solved)
+                {
+                    var reason = ordinal >= 0 && ordinal < undetermined.Length
+                        ? undetermined[ordinal]
+                        : null;
+                    _pass.ReportRowUnknown(
+                        callSpan,
+                        $"Effect variable '{name}' of '{callee.Name}' instantiates to Unknown at this "
+                        + $"call site: {reason ?? $"no parameter of '{callee.Name}' binds it"}. The "
+                        + $"instantiated row of '{callee.Name}' is Unknown here, so nothing is charged "
+                        + $"to '{_function.Name}' for it. State a row on the argument's declaration, or "
+                        + "compile with --permissive-effects.");
+                    continue;
+                }
+
+                instantiated = PolyRow.Join(instantiated, solved);
+
+                // §10.3's provenance clause, attributed PER EFFECT: the Calor0410
+                // that follows names the effect, so the explanation has to be
+                // reachable from the effect and not merely from the call.
+                foreach (var effect in solved.Row.ToEffectSet().Effects)
+                {
+                    provenance.TryAdd(
+                        EffectSetExtensions.ToSurfaceCode(effect.Kind, effect.Value),
+                        $"effect variable '{name}' of '{callee.Name}' instantiated to "
+                        + $"{solved.Display()} at this call site");
+                }
+            }
+
+            // The concrete part is charged to the caller. The ordinary call-site
+            // charge already added the callee's DECLARED concrete codes, so this
+            // union adds exactly what instantiation contributed.
+            _pass.ChargeInstantiatedRow(_function.Id, instantiated.Row, provenance);
+
+            // A variable the instantiated row still mentions is one of the
+            // CALLER's own binders (it arrived through a caller parameter's row).
+            // The caller must declare it, exactly as it must declare a concrete
+            // effect it uses.
+            var callerOwn = PolyRow.FromDeclaration(_function.Effects);
+            foreach (var ordinal in instantiated.Variables)
+            {
+                if (callerOwn.Variables.Contains(ordinal)) continue;
+                var name = BinderName(_function, ordinal);
+                _pass._diagnostics.Report(
+                    _function.Effects?.Span ?? _function.Span,
+                    DiagnosticCode.ForbiddenEffect,
+                    $"Function '{_function.Name}' uses effect variable '{name}' but does not declare "
+                    + $"it{Environment.NewLine}  Effect row: {callee.Name}'s row instantiates to "
+                    + $"{instantiated.Display()} at a call site in '{_function.Name}'",
+                    DiagnosticSeverity.Error);
+            }
+        }
+
+        private static string BinderName(FunctionNode declaration, int ordinal) =>
+            ordinal >= 0 && ordinal < declaration.EffectParameters.Count
+                ? declaration.EffectParameters[ordinal].Name
+                : $"#{ordinal}";
 
         // ===== Site 3 — return =====
 
         private void CheckReturnSite(ExpressionNode returned)
         {
             var output = _function.Output;
-            if (output == null || IsPolymorphicRow(output.Row))
+            if (output == null)
                 return;
-            if (output.Row == null && !IsFunctionTyped(output.TypeName))
+            if (output.Row == null && !IsReturnFunctionTyped(_function, output))
                 return;
 
             var source = SourceRow(returned);
@@ -1002,7 +1389,7 @@ public sealed class EffectEnforcementPass
             Adjudicate(
                 returned.Span,
                 source.Value.Row,
-                PositionRow(output.Row),
+                PolyRow.From(output.Row),
                 sourceDescription: $"Returned value {source.Value.Description}",
                 destinationDescription: $"the return of '{_function.Name}'",
                 destinationName: "the return type",
@@ -1015,8 +1402,8 @@ public sealed class EffectEnforcementPass
 
         private void Adjudicate(
             TextSpan span,
-            Binding.BoundTypes.EffectRow source,
-            Binding.BoundTypes.EffectRow destination,
+            PolyRow source,
+            PolyRow destination,
             string sourceDescription,
             string destinationDescription,
             string destinationName,
@@ -1024,27 +1411,29 @@ public sealed class EffectEnforcementPass
             string positionDescription,
             string owner)
         {
-            switch (Binding.BoundTypes.EffectRow.Fits(source, destination))
+            switch (PolyRow.Fits(source, destination))
             {
                 case Binding.BoundTypes.EffectFit.DoesNotFit:
                 {
-                    var extra = string.Join(", ",
-                        source.ToEffectSet().Except(destination.ToEffectSet())
-                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
-                            .OrderBy(code => code, StringComparer.Ordinal));
+                    var extraCodes = source.Row.ToEffectSet().Except(destination.Row.ToEffectSet())
+                        .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
+                        .Concat(source.VariableNames.Where(
+                            name => !destination.VariableNames.Contains(name)))
+                        .OrderBy(code => code, StringComparer.Ordinal);
+                    var extra = string.Join(", ", extraCodes);
                     _pass._diagnostics.Report(
                         span,
                         DiagnosticCode.EffectRowMismatch,
-                        $"{sourceDescription} has effect row {source.ToCompactDisplayString()}, which does "
+                        $"{sourceDescription} has effect row {source.Display()}, which does "
                         + $"not fit {destinationDescription} (declared row: "
-                        + $"{destination.ToCompactDisplayString()}). Extra effect(s): {extra}. Widen "
+                        + $"{destination.Display()}). Extra effect(s): {extra}. Widen "
                         + $"{destinationName} to §E{{{extra}}}, or pass a function whose row fits. "
                         + "An effect row that does not fit is never waived.",
                         DiagnosticSeverity.Error);
                     break;
                 }
 
-                case Binding.BoundTypes.EffectFit.CannotTell when destinationIsPosition && destination.IsUnknown:
+                case Binding.BoundTypes.EffectFit.CannotTell when destinationIsPosition && destination.Row.IsUnknown:
                     // §6.4's second sample: the destination POSITION carries no row
                     // at all, so nothing is known about what may be passed.
                     _pass.ReportRowUnknown(
@@ -1058,8 +1447,8 @@ public sealed class EffectEnforcementPass
                 case Binding.BoundTypes.EffectFit.CannotTell:
                     _pass.ReportRowUnknown(
                         span,
-                        $"{sourceDescription} has effect row {source.ToCompactDisplayString()} and "
-                        + $"{destinationDescription} declares row {destination.ToCompactDisplayString()}, "
+                        $"{sourceDescription} has effect row {source.Display()} and "
+                        + $"{destinationDescription} declares row {destination.Display()}, "
                         + "so it cannot be decided whether the row fits. State a row on both sides, or "
                         + "compile with --permissive-effects.");
                     break;
@@ -1070,7 +1459,7 @@ public sealed class EffectEnforcementPass
                     // propagates a Calor0425, from whichever side the assumption
                     // came. Read through CarriedReasons, which is total; reading it
                     // off AtDestination would lose them on an Unknown destination.
-                    var reasons = Binding.BoundTypes.EffectRow.CarriedReasons(source, destination);
+                    var reasons = Binding.BoundTypes.EffectRow.CarriedReasons(source.Row, destination.Row);
                     if (reasons.IsEmpty)
                         break;
 
@@ -1089,7 +1478,7 @@ public sealed class EffectEnforcementPass
         // ===== Source rows =====
 
         private readonly record struct RowSource(
-            Binding.BoundTypes.EffectRow Row,
+            PolyRow Row,
             string Description);
 
         /// <summary>
@@ -1098,23 +1487,23 @@ public sealed class EffectEnforcementPass
         ///
         /// <para>P17, "no silent Unknown": an unresolved receiver, an
         /// unknown-typed name and a call result all yield
-        /// <see cref="Binding.BoundTypes.EffectRow.Unknown"/> or no site at all;
-        /// none of them ever yields a <c>Concrete</c> row. A <c>Concrete</c> row
-        /// here would mean the compiler claiming to know what a value does when it
-        /// does not.</para>
+        /// <see cref="PolyRow.Unknown"/> or no site at all; none of them ever
+        /// yields a <c>Concrete</c> row. A <c>Concrete</c> row here would mean the
+        /// compiler claiming to know what a value does when it does not.</para>
         /// </summary>
         private RowSource? SourceRow(ExpressionNode? expression)
         {
             switch (expression)
             {
                 case LambdaExpressionNode lambda:
-                    if (IsPolymorphicRow(lambda.Effects))
-                        return null;
-                    // §5 — the §LAM's §E IS the lambda's declared row. With no
-                    // annotation the row is ρ_body, which slice b computes; in
-                    // slice a it stays Unknown, which fits nothing and is fitted
-                    // by nothing, so nothing slips through.
-                    return new RowSource(PositionRow(lambda.Effects), "lambda");
+                    // §5 — the §LAM's §E IS the lambda's declared row, and the
+                    // DECLARATION BOUNDARY makes it Concrete. With no annotation
+                    // the row is ρ_body, which slice b computes during inference.
+                    return new RowSource(
+                        lambda.Effects != null
+                            ? PolyRow.From(lambda.Effects)
+                            : _pass.LambdaBodyRow(lambda),
+                        "lambda");
 
                 case ReferenceNode reference:
                 {
@@ -1129,12 +1518,20 @@ public sealed class EffectEnforcementPass
                     if (callee == null)
                         return null;
 
-                    var declared = GetDeclaredEffects(callee.Effects).ToRow();
+                    // A method group whose OWN declaration is effect-polymorphic
+                    // carries a row in ITS vocabulary, not the caller's, and
+                    // passing it as a value is rank-2 (§7.3, position 6). Unknown
+                    // is the honest answer; it fits nothing.
+                    var declaredRow = PolyRow.FromDeclaration(callee.Effects);
+                    if (callee.EffectParameters.Count > 0 || declaredRow.IsPolymorphic)
+                        return new RowSource(PolyRow.Unknown, $"'{callee.Name}'");
+
+                    var declared = declaredRow.Row;
                     var row =
                         _pass._assumedEffects.TryGetValue(callee.Id, out var reasons) && reasons.Count > 0
                             ? Binding.BoundTypes.EffectRow.Assumed(declared.Codes, reasons)
                             : declared;
-                    return new RowSource(row, $"'{callee.Name}'");
+                    return new RowSource(PolyRow.Concrete(row), $"'{callee.Name}'");
                 }
 
                 default:
@@ -1149,6 +1546,22 @@ public sealed class EffectEnforcementPass
                 ? callee
                 : null;
         }
+
+        private bool IsParameterFunctionTyped(FunctionNode owner, ParameterNode parameter) =>
+            _pass.BoundFunctionType(owner.Id, parameter.Name) != null
+            || IsFunctionTyped(parameter.TypeName);
+
+        private bool IsFieldFunctionTyped(ClassDefinitionNode owner, ClassFieldNode field) =>
+            _pass.BoundFieldFunctionType(owner.Name, field.Name) != null
+            || IsFunctionTyped(field.TypeName);
+
+        private bool IsBindingFunctionTyped(BindStatementNode bind) =>
+            _pass.BoundFunctionType(_function.Id, bind.Name) != null
+            || IsFunctionTyped(bind.TypeName);
+
+        private bool IsReturnFunctionTyped(FunctionNode owner, OutputNode output) =>
+            _pass.BoundReturnFunctionType(owner.Id) != null
+            || IsFunctionTyped(output.TypeName);
 
         private bool IsFunctionTyped(string? typeName) =>
             TypeIdentity.IsFunctionTypeName(typeName, _pass._delegateTypeNames.Contains);
