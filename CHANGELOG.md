@@ -25,6 +25,21 @@ All notable changes to this project will be documented in this file.
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code
   belongs to the API-strictness family; the loop that used to borrow it as a warning now
   reports `Calor0406` as an error instead. (v0.16 W5)
+### Corrected
+
+- **A number we published in 0.15 was wrong, and here is the right one.** The 0.15 notes
+  said the compiler's "callback effects are unknown here" warning (`Calor0425`) showed up
+  **8 times across 99** of the 364 real-world C# files we convert and check. That 99 was
+  not how many files the compiler actually checks — it was how many files our *measurement*
+  chose to check. The measurement threw away any file the name-resolution step complained
+  about at all, but the real compiler keeps going: most of those complaints are internal
+  notes it never shows you, so it checks the file anyway. Measured the way the compiler
+  really works, it checks **256** of those files, and the warning shows up **67 times
+  across 30** of them. Nothing about the compiler changed — only the yardstick did. Both
+  figures are published side by side so the correction is visible rather than quietly
+  swapped in. The measurement now uses the compiler's own rule, and each of our two
+  measurement records says on its face which rule produced it, so this cannot happen
+  silently again.
 
 ### Fixed
 
