@@ -258,6 +258,95 @@ public class EffectRowLatticeTests
             d => d.Code == DiagnosticCode.EffectRowMisplaced);
     }
 
+    // ============================================== review round 1, F2 =======
+
+    [Fact]
+    public void RowOnACSharpDeclaredDelegateTypedPosition_IsNotCalor0405()
+    {
+        // F2. A `delegate` declared inside a §CSHARP interop block is a real
+        // type, and a position of that type IS function-typed. Before this,
+        // §3.5's placement check called it "not a function type" and reported a
+        // HARD ERROR on a legal declaration — measured on the frozen PP-E1
+        // fixture A2.calr, whose RequestHandlerDelegate<TResponse> is declared
+        // exactly this way, and PP-E1's row bars Calor0405 anywhere in a control
+        // compile.
+        //
+        // Discriminating revert: drop the interop scan in
+        // CollectDelegateTypeNames and the Calor0405 comes back.
+        var compiled = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Apply:pub} (Handler:h §E{cw}) -> void
+                §E{cw}
+              §CSHARP{public delegate void Handler(int x);}§/CSHARP
+            """);
+
+        Assert.DoesNotContain(compiled.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMisplaced);
+    }
+
+    [Fact]
+    public void CSharpDeclaredDelegateParameter_GetsAFunctionBoundTypeCarryingItsRow()
+    {
+        // The other half of F2's pin: recognising the name is only useful if the
+        // position then gets a FunctionBoundType, so the row is available to the
+        // §6.2 sites rather than merely un-rejected.
+        var parameter = BindSingleParameter("""
+            §M{m001:M}
+              §F{f001:Apply:pub} (Handler:h §E{cw}) -> void
+                §E{cw}
+              §CSHARP{public delegate void Handler(int x);}§/CSHARP
+            """);
+
+        Assert.NotNull(parameter.FunctionType);
+        Assert.Equal(Concrete(Cw), parameter.FunctionType!.Row);
+    }
+
+    [Fact]
+    public void RowOnAnUnknownNominalType_IsNotCalor0405()
+    {
+        // F2's general rule, stated without interop: Calor0405 fires only where
+        // the position PROVABLY cannot carry a row. `!IsFunctionTypeName` was the
+        // wrong complement of a LIST predicate — everything the list had not
+        // heard of drew a hard error. An unknown nominal is "I do not know what
+        // this is", and §4.3's discipline is that an unknown is not a verdict.
+        //
+        // Discriminating revert: restore `!IsFunctionTypedSpelling` as the test
+        // and this reports again.
+        var compiled = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Apply:pub} (SomeAliasFromElsewhere:h §E{cw}) -> void
+                §E{cw}
+            """);
+
+        Assert.DoesNotContain(compiled.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMisplaced);
+    }
+
+    [Theory]
+    [InlineData("i32", true)]
+    [InlineData("str", true)]
+    [InlineData("void", true)]
+    [InlineData("bool", true)]
+    [InlineData("f64", true)]
+    [InlineData("[i32]", true)]
+    [InlineData("", true)]
+    [InlineData("Func<i32,i32>", false)]
+    [InlineData("Action", false)]
+    [InlineData("SomeUnknownNominal", false)]
+    [InlineData("Option<i32>", true)]
+    public void IsProvablyNonFunctionType_IsConservative(string typeName, bool expected)
+    {
+        // The predicate F2 introduced, table-driven. A `true` here is a licence
+        // to emit a HARD ERROR, so every `true` must be a type the compiler can
+        // point at and say "this is not, and cannot become, a function". The
+        // blank spelling is R2-A: a type position the author left empty.
+        Assert.Equal(expected,
+            Calor.Compiler.Binding.TypeIdentity.IsProvablyNonFunctionType(typeName));
+
+        // null is NOT the same as blank: nothing was written, so nothing is known.
+        Assert.False(Calor.Compiler.Binding.TypeIdentity.IsProvablyNonFunctionType(null));
+    }
+
     // ================================================================ P8 =====
     // `fits` is TOTAL over all nine source × destination cells (§4.3), including
     // the three Assumed-DESTINATION cells Draft v1 left undefined.

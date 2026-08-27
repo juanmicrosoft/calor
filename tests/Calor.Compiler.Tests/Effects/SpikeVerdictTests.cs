@@ -819,16 +819,18 @@ public sealed class SpikeVerdictTests
     }
 
     [Fact]
-    public void PpE1NegativeControl_A2StillDrawsTheCalor0405ThatSliceBIntroduced()
+    public void PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2()
     {
-        // The failure above is asserted as a FACT so it cannot be forgotten, and
-        // so the slice that fixes it has a test to flip. PP-E1's row bars
-        // Calor0405 "anywhere in a control compile"; A2 draws two, from E2 slice
-        // b's P6 check, on a delegate declared in a §CSHARP block.
+        // PP-E1's row bars Calor0405 "anywhere in a control compile". A2 drew
+        // TWO — from E2 slice b's P6 check, on `RequestHandlerDelegate<TResponse>`,
+        // a delegate declared inside a §CSHARP block that the binder's
+        // delegate-name collection never saw. Review round 1 (F2) fixed both
+        // halves: the collection now reads interop text, and Calor0405 fires only
+        // where the type is PROVABLY non-function.
         //
-        // When IsFunctionTypeName learns about §CSHARP-declared delegates this
-        // goes red, and the right response is to DELETE it — the control is
-        // clean again — not to weaken it.
+        // Kept as an explicit pin rather than folded into the sweep above,
+        // because it is the clause of PP-E1 this branch had to repair, and a
+        // regression in either half must name A2.
         var path = Path.Combine(SpikeDirectory(), "after", "A2.calr");
         var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
         var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
@@ -837,12 +839,7 @@ public sealed class SpikeVerdictTests
             diagnostics).Parse();
         new Compiler.Binding.Binder(diagnostics, "A2.calr").Bind(module);
 
-        var misplaced = diagnostics
-            .Where(d => d.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMisplaced)
-            .ToList();
-
-        Assert.Equal(2, misplaced.Count);
-        Assert.All(misplaced, d =>
-            Assert.Contains("RequestHandlerDelegate", d.Message, StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMisplaced);
     }
 }

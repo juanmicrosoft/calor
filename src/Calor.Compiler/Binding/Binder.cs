@@ -1538,6 +1538,11 @@ public sealed class Binder
             if (!IsFunctionTypedSpelling(subjectType)
                 && initializer?.Type is not BoundTypes.FunctionBoundType)
             {
+                // F2: same fail-open rule as CheckRowPosition. A §B of an unknown
+                // nominal type keeps its row rather than drawing a hard error.
+                if (!TypeIdentity.IsProvablyNonFunctionType(subjectType))
+                    return TryBuildFunctionType(subjectType, bind.Row, binders: null);
+
                 ReportRowOnNonFunctionType(bind.Row, subjectType, bind.Name, "binding");
                 return null;
             }
@@ -5147,6 +5152,51 @@ public sealed class Binder
             _delegateTypeNames.Add(@delegate.Name);
         foreach (var cls in module.Classes)
             CollectNestedDelegateTypeNames(cls);
+
+        // v0.15 E3 slice a, review round 1 (F2) — a `delegate` declared inside a
+        // §CSHARP interop block is a real type the rest of the module may use as
+        // a parameter, field or return spelling, and a position of that type IS
+        // function-typed. Before this, §3.5's placement check called it "not a
+        // function type" and reported Calor0405 — a hard error on a legal
+        // declaration. Measured on the frozen PP-E1 fixture A2.calr, whose
+        // RequestHandlerDelegate<TResponse> is declared exactly this way.
+        foreach (var block in module.InteropBlocks)
+            CollectInteropDelegateTypeNames(block);
+        foreach (var block in module.TypePreprocessorBlocks)
+            CollectTypePreprocessorDelegateTypeNames(block);
+        foreach (var cls in module.Classes)
+            CollectNestedInteropDelegateTypeNames(cls);
+    }
+
+    private void CollectInteropDelegateTypeNames(CSharpInteropBlockNode block)
+    {
+        foreach (var name in TypeIdentity.DelegateNamesDeclaredInInteropText(block.CSharpCode))
+            _delegateTypeNames.Add(name);
+    }
+
+    private void CollectTypePreprocessorDelegateTypeNames(TypePreprocessorBlockNode block)
+    {
+        foreach (var @delegate in block.Delegates)
+            _delegateTypeNames.Add(@delegate.Name);
+        foreach (var interop in block.InteropBlocks)
+            CollectInteropDelegateTypeNames(interop);
+        foreach (var cls in block.Classes)
+        {
+            CollectNestedDelegateTypeNames(cls);
+            CollectNestedInteropDelegateTypeNames(cls);
+        }
+        foreach (var nested in block.NestedBlocks)
+            CollectTypePreprocessorDelegateTypeNames(nested);
+        if (block.ElseBranch != null)
+            CollectTypePreprocessorDelegateTypeNames(block.ElseBranch);
+    }
+
+    private void CollectNestedInteropDelegateTypeNames(ClassDefinitionNode cls)
+    {
+        foreach (var interop in cls.InteropBlocks)
+            CollectInteropDelegateTypeNames(interop);
+        foreach (var nested in cls.NestedClasses)
+            CollectNestedInteropDelegateTypeNames(nested);
     }
 
     private void CollectNestedDelegateTypeNames(ClassDefinitionNode cls)
@@ -5302,6 +5352,14 @@ public sealed class Binder
     {
         if (row == null) return;
         if (IsFunctionTypedSpelling(typeName)) return;
+
+        // v0.15 E3 slice a, review round 1 (F2) — fail OPEN. Calor0405 fires only
+        // where the position PROVABLY cannot carry a row; an unknown nominal is
+        // "I do not know what this is", which is not a verdict. `!IsFunctionTypedSpelling`
+        // was the wrong complement of a LIST predicate and made a legal delegate
+        // a hard error.
+        if (!TypeIdentity.IsProvablyNonFunctionType(typeName)) return;
+
         ReportRowOnNonFunctionType(row, typeName, subject, subjectKind);
     }
 
