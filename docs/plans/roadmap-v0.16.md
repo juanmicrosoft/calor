@@ -348,10 +348,13 @@ below were measured for this draft on both arms (v0.14.3 `--permissive-effects` 
 | W-005 A2 | `d49d0017` / `93ecdf16` | a `§P` pre-processor step inside `Handle` | `warning Calor0410` (reviewer-measured) | error Calor0410; **arm B's starter does not build** (exit 1, PP-E1's frozen post-E4 multiset, A:338-450) | warning-vs-error, **leg A only** |
 | **W-006** A3-map | `9f108655` / `0885b3dd` | a **field-stored** stage `§FLD{Func<i32,i32>:stage:pri}` (row `§E{cw}` in B) passed to `Map` from a new `§MT{mt001:Twice} §E{alloc, mut}` | only the pre-existing Calor0418 warning on `f` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` | **blind** |
 
-The same field-stored shape on A3-match is **not registrable**: arm A draws `error Calor1002`
-(generated C# cannot resolve the module-level method group `Zero` from inside a class) beside its
-Calor0418 warnings, a codegen confound unrelated to effects; recorded here so it is not
-re-proposed. **W-005 stays as a warning-vs-error, leg-A-only cell** rather than being dropped,
+The same field-stored shape on A3-match is **not registrable with a module-level method group**:
+passing `Zero` for `onNone` from inside a class draws `error Calor1002` on arm A (generated C#
+cannot resolve it — a codegen confound unrelated to effects). With a second field
+`§FLD{Func<i32>:none:pri}` (row `§E{}` in B) for `onNone` the shape compiles on both arms and is
+**blind** (arm A: 2× Calor0418 only; arm B: `error Calor0410 'Twice'`) — measured in review round
+4; it is available as a fourth blind cell if S3 wants one, and is recorded here so the
+method-group variant is not re-proposed. **W-005 stays as a warning-vs-error, leg-A-only cell** rather than being dropped,
 because it is the only MediatR-shaped pipeline in the set and its arm-A signal is the one PP-E1's
 own control names; the agent must repair `Handle` on arm B before extending, so the pair's runs
 are **excluded from leg B** (its `tokens.output` is archived, never entered into the ratio) and
@@ -429,8 +432,9 @@ compiles, with the margin the other population would have given stated.
 At the archived **$1.005 per run** (N:S1.2): S1 pilot 2 runs + dry run 36 runs + a 6 × 8 × 2
 main epoch 96 runs ≈ $135; **ceiling $150**, and the pilot, every retry, the dry run and the
 epoch all count against it. **When the ceiling is reached the epoch stops**; the PP-W5 validity
-floor then decides route (c) on what was run; the overrun is disclosed in the ledger. If N > 8
-is needed, the six-pair epoch does not fit the ceiling and the PP registers its achievable power.
+floor then decides route (c) on what was run; the overrun is disclosed in the ledger. If N > 9
+is needed, the six-pair epoch does not fit the ceiling (N = 9 → 146 runs ≈ $147 with zero
+retries; N = 10 → $159) and the PP registers its achievable power.
 
 **Four-valued outcome, precedence NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT** (A:317):
 NOT-ADJUDICATED — (a) any unmutated starter fails to reproduce its frozen multiset on its arm;
@@ -712,7 +716,7 @@ Dispositions:
 **Declined:** none. **Narrowed:** item 2 — kept W-005 (leg A only) rather than dropping it, with
 the one-sentence reason in §4.1.
 
-### Round 4 (2026-08-27, on Draft v4 @ `417b4d55`) — plan/process APPROVE 92 %, engineering APPROVE 90 %, measurement pending (re-running the 3 000-sim margin)
+### Round 4 (2026-08-27, on Draft v4 @ `417b4d55`) — plan/process APPROVE 92 %, engineering APPROVE 90 %, measurement APPROVE 92 %
 
 One engineering minor, applied on the branch without re-review: W1/W2 *Touches* now name the
 harness mechanics the sixth pair and W-005's leg-B exclusion need — a `run-ppw-epoch.sh` (or `W)`
@@ -720,7 +724,12 @@ arm) for the six `W-00x` ids (`run-ppe1-epoch.sh:56/:169` hardcodes N1; `run-m5-
 resolves groups by `case` with an explicit-id fallback; no collision with the `W1-…W5C-` pair
 directories), `ppw-analyze.py` reading `legBPairs` from `pins.json` (named in A-1.12; `ppe1-analyze.py:66`
 hardcodes its list), and `run-pair.sh:289-290`'s config rejection cited by the derogation. The
-measurement lens's verdict, and any item it adds, are recorded below when relayed.
+measurement lens returned **APPROVE 92 %** with every registered number re-derived (W-006 blind on
+both arms; margin at `SIMS = 3 000` across three seeds: p95 1.1766–1.1864, half-width 0.005 →
+1.20; false-fail 0.012; power 0.514 / 0.837 / 0.973; leg-A conventions; `legBPairs` as a registered
+leg-B denominator of five) and two wording residuals, both applied: the A3-match field shape is
+registrable with a field for `onNone` (a fourth blind cell, §4.1), and the ceiling cut-over is
+N > 9, not N > 8 (§4.1).
 
 **Remaining open questions (none block registration):** (1) whether the 0.15.0 release PR's
 benchmark block moved; (2) whether the A3-match `Calor1002` confound is a converter/emitter
