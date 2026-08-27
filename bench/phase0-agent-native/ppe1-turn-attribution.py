@@ -338,6 +338,13 @@ def exact_pooled_p(cells):
         per_pair.append(sums)
         s_obs += sum(cells[p]["treatment"])
         relabellings *= math.comb(len(pool), n_t)
+    # `bisect_left` + suffix sum counts S >= s_obs EXACTLY only because every
+    # metric here is integer-valued (num_turns, output tokens, duration_ms), so
+    # the per-pair sums and s_obs are ints and equality is exact. A future
+    # float-valued metric would lose ties to representation error at the
+    # boundary; add a `- 1e-9` slack to the search key (deliberately counting
+    # near-ties as hits, the conservative direction for a one-sided p) if one
+    # is ever added.
     half = len(per_pair) // 2
     left = _convolve(per_pair[:half]) if half else Counter({0: 1})
     right = _convolve(per_pair[half:])

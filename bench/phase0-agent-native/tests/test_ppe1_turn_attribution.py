@@ -166,6 +166,14 @@ class ArchiveAttribution(unittest.TestCase):
             self.assertEqual(by[m]["pairs"], 4)
 
     def test_median_over_pairs_is_monte_carlo_within_three_se_of_exact(self):
+        """The 3-s.e. band checks the VALUE, not the shuffle scheme.
+
+        Other permutation schemes (e.g. permuting labels across pairs rather
+        than within) can land inside this band on some metrics, so the band
+        alone does not pin the mechanism. The scheme is pinned by the exact
+        relabelling triple asserted below, by
+        `test_roadmap_triple_is_this_scheme_at_20k`, and by the byte-equality
+        of the committed artifact."""
         mc = self.e1["permutation"]["medianOverPairsOfPairedMeanDelta"]
         self.assertEqual((mc["seed"], mc["draws"]), (4537, 100000))
         by = mc["byMetric"]
@@ -193,13 +201,18 @@ class ArchiveAttribution(unittest.TestCase):
         import itertools
         import statistics
         observed = self.mod.stat_pooled_mean_difference(cells)
+        pool_a, pool_b = [5, 7, 1, 2, 3], [10, 4, 6]
         hits = total = 0
-        for ta in itertools.combinations([5, 7, 1, 2, 3], 2):
-            ca = [v for v in [5, 7, 1, 2, 3] if v not in ta]
-            for tb in itertools.combinations([10, 4, 6], 1):
-                cb = [v for v in [10, 4, 6] if v not in tb]
+        # Split by INDEX, not by value: a value-membership split would drop
+        # relabellings whenever a pool holds duplicates.
+        for ia in itertools.combinations(range(len(pool_a)), 2):
+            ta = [pool_a[i] for i in ia]
+            ca = [pool_a[i] for i in range(len(pool_a)) if i not in ia]
+            for ib in itertools.combinations(range(len(pool_b)), 1):
+                tb = [pool_b[i] for i in ib]
+                cb = [pool_b[i] for i in range(len(pool_b)) if i not in ib]
                 total += 1
-                stat = statistics.mean(list(ta) + list(tb)) - statistics.mean(ca + cb)
+                stat = statistics.mean(ta + tb) - statistics.mean(ca + cb)
                 hits += stat >= observed
         exact = self.mod.exact_pooled_p(cells)
         self.assertEqual(exact["relabellings"], total)

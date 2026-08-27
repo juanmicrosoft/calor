@@ -120,6 +120,7 @@
   ],
   "allowedRuntimeSkipSites": [
     {
+      "_comment": "counts are per Skip.If/Skip.IfNot CALL SITE (check_test_quality.py regex-counts occurrences in test sources), not per test: EpochTurnAttributionTests routes four SkippableFacts through one Skip.If inside RunScript",
       "reason": "python3 not on PATH",
       "count": 1
     },
