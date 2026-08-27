@@ -245,11 +245,7 @@ public class StrictnessBatchTests
     public void OverrideOfExternalBase_RoutesToAssumedChannel()
     {
         // Base class is external C# (not in this module): variance cannot be
-        // checked, so site 4's verdict is CannotTell. §13.1's `:260` rewrite,
-        // discharged by E3 slice b: the assumption channel here IS Calor0425 now
-        // (§6.2 retires both external-base Calor0419s, together). The method name
-        // is kept so facts.py's `:245` probe does not move; "assumed channel" is
-        // still what this asserts, only spelled with the row code.
+        // checked, so the assumed channel is Calor0425 (§13.1's `:260` rewrite).
         var source = @"
 §M{m001:Test}
   §CL{c001:MyController:pub}
@@ -262,8 +258,6 @@ public class StrictnessBatchTests
 
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("external base"));
-        Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.AssumedEffects);
     }
 
     [Fact]
@@ -593,9 +587,7 @@ var x = 1;
     public void C3_ExternalInheritedImplementation_RoutesToAssumed()
     {
         // Review C3 (external arm): §IMPL satisfied only by a member inherited
-        // from an external base is surfaced as Calor0425 — §13.1's `:607`
-        // rewrite, discharged by E3 slice b with its override sibling (§6.2 says
-        // the two must move together). §6.4's THIRD message sample ships here.
+        // from an external base is surfaced as Calor0425 (§13.1's `:607`).
         var source = @"
 §M{m001:ExtImpl}
   §IFACE{i001:IQuiet}
@@ -614,8 +606,6 @@ var x = 1;
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown
                 && d.Message.Contains("SomeExternalBase") && d.Message.Contains("IQuiet.Run"));
-        Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.AssumedEffects);
     }
 
     [Fact]
@@ -1313,6 +1303,63 @@ var x = 1;
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
               && d.Message.Contains("uses effect variable 'a' but does not declare it"));
+    }
+
+    [Fact]
+    public void ExternalBaseAssumptions_AreCalor0425_AndNoCalor0419Remains()
+    {
+        // The half of §13.1's `:260`/`:607` rewrites that could not live IN those
+        // two tests without moving facts.py's line probes: both arms must have
+        // stopped emitting Calor0419, not merely started emitting Calor0425.
+        //
+        // §6.2 requires them to move TOGETHER, and slice a declined to move
+        // either for that reason: the override arm was an AddAssumption whose
+        // reasons propagate through PropagateAssumptions into every caller's
+        // Calor0419, while the interface arm was a direct report. Retiring one
+        // alone would make sites 4 and 5 disagree about what an unresolvable base
+        // means. Both are retired here, so this asserts BOTH polarities at once.
+        //
+        // Discriminating revert: restore either AddAssumption/Report and the
+        // matching DoesNotContain fails.
+        var overrideArm = TestHarness.Compile(@"
+§M{m001:Test}
+  §CL{c001:MyController:pub}
+      §EXT{SomeExternalBase}
+      §MT{mt001:Handle:pub:over}
+          §O{void}
+          §E{}
+");
+        Assert.DoesNotContain(overrideArm.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
+        Assert.Contains(overrideArm.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown);
+
+        var interfaceArm = TestHarness.Compile(@"
+§M{m001:ExtImpl}
+  §IFACE{i001:IQuiet}
+      §MT{m001:Run}
+          §O{void}
+          §E{}
+  §CL{c001:Bridge:pub}
+      §EXT{SomeExternalBase}
+      §IMPL{IQuiet}
+      §MT{mt001:Other:pub}
+          §O{void}
+          §E{}
+");
+        Assert.DoesNotContain(interfaceArm.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
+
+        // §6.4's THIRD message sample, by full equality — the string P22's own
+        // enumeration says ships with these two retirements. It RE-WORDS the old
+        // Calor0419 text rather than merely re-coding it: it names the row.
+        var reported = Assert.Single(interfaceArm.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown);
+        Assert.Equal(
+            "Class 'Bridge' implements 'IQuiet.Run' through a member not visible in this module "
+            + "(inherited from external base 'SomeExternalBase'), so its effect row is Unknown. "
+            + "The interface's declared row [pure] is assumed here, not verified.",
+            reported.Message);
     }
 
     // ================================================================ P11 ====

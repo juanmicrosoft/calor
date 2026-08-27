@@ -3,7 +3,7 @@ BindingNode hits: 0
 src/Calor.Compiler/Ast/ControlFlowNodes.cs:161:public sealed class BindStatementNode : StatementNode
 src/Calor.Compiler/Ast/ClassNodes.cs:564:public sealed class ClassFieldNode : AstNode
 src/Calor.Compiler/Ast/FunctionNode.cs:21:public sealed class OutputNode : AstNode
-src/Calor.Compiler/Ast/FunctionNode.cs:283:public sealed class ParameterNode : AstNode
+src/Calor.Compiler/Ast/FunctionNode.cs:315:public sealed class ParameterNode : AstNode
 
 ### ast-schema / ArchitectureTests
 eng/ast-schema.json exists: True
@@ -11,7 +11,7 @@ eng/ast-schema.json exists: True
 1
 
 ### cross-module IsSubsetOf site
-src/Calor.Compiler/Effects/EffectEnforcementPass.cs:384:        if (!computedEffects.IsSubsetOf(declaredEffects))
+src/Calor.Compiler/Effects/EffectEnforcementPass.cs:393:        if (!computedEffects.IsSubsetOf(declaredEffects))
 src/Calor.Compiler/Effects/EffectSet.cs:97:    public bool IsSubsetOf(EffectSet other)
 
 ### ProjectIndex references outside Commands/
@@ -86,13 +86,13 @@ StrictnessBatchTests.cs:152: d => d.Code == DiagnosticCode.OverrideEffectVarianc
 StrictnessBatchTests.cs:172: diagnostic.Code == DiagnosticCode.OverrideEffectVariance
 StrictnessBatchTests.cs:219: d => d.Code == DiagnosticCode.InterfaceEffectVariance && d.Message.Contains("Render"));
 StrictnessBatchTests.cs:245: public void OverrideOfExternalBase_RoutesToAssumedChannel()
-StrictnessBatchTests.cs:260: d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("external base"));
+StrictnessBatchTests.cs:260: d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("external base"));
 StrictnessBatchTests.cs:472: public void C2_DecoyNamedDelegateParameter_ShadowsFunction_IsError()
 StrictnessBatchTests.cs:502: d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'Helper'"));
 StrictnessBatchTests.cs:555: public void C3_InheritedImplementation_BroaderEffects_IsError()
 StrictnessBatchTests.cs:582: d => d.Code == DiagnosticCode.InterfaceEffectVariance
 StrictnessBatchTests.cs:587: public void C3_ExternalInheritedImplementation_RoutesToAssumed()
-StrictnessBatchTests.cs:607: d => d.Code == DiagnosticCode.AssumedEffects
+StrictnessBatchTests.cs:607: d => d.Code == DiagnosticCode.EffectRowUnknown
 StrictnessBatchTests.cs:640: public void C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption()
 StrictnessBatchTests.cs:656: Assert.Contains(result.Diagnostics.Warnings,
 StrictnessBatchTests.cs:728: public void M1_ExpressionCallSpelling_DelegateValue_IsError()
