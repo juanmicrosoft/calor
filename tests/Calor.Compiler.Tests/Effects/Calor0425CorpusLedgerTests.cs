@@ -286,15 +286,24 @@ public class Calor0425CorpusLedgerTests
                 continue;
             }
 
-            // The effect pass recurses over the AST, and a Lossy conversion of a
-            // 1,400-line corpus module nests far deeper than any hand-written
-            // Calor: measured, `serilog/src/Serilog/Core/Logger.cs` overflows the
-            // default 1 MB test-host stack and takes the whole run down with it.
-            // That is PRE-EXISTING — it reproduces with v0.15 E3's row checking
-            // disabled — and it is not slice a's to fix, but a ledger that cannot
-            // be produced is not an instrument. So the pass runs on a thread with
-            // a 64 MB stack, which is the standard remedy and is honest about
-            // what it is: more headroom, not a fix.
+            // The effect pass recurses without a depth bound, and a Lossy
+            // conversion of a large corpus module nests far deeper than any
+            // hand-written Calor: measured, `serilog/src/Serilog/Core/Logger.cs`
+            // and `Core/Sinks/Batching/BatchingSink.cs` take the whole test host
+            // down. That is PRE-EXISTING — it reproduces with v0.15 E3's row
+            // checking disabled — and is tracked as its own issue (see the E3a
+            // notes doc).
+            //
+            // THE CATCH BELOW CANNOT CATCH IT (review round 1, F8). A
+            // StackOverflowException in .NET is a fail-fast: the process dies and
+            // no catch block, on any thread, observes it. The 64 MB stack buys
+            // headroom and nothing more, and measuring proved headroom alone is
+            // not enough — the run still died with it in place. What actually
+            // makes this test runnable is the BIND-FIRST GUARD below, which never
+            // hands the pass a module the binder rejected. The thread and the
+            // catch are belt to that brace: they contain ORDINARY exceptions,
+            // which do occur, and they are documented here as NOT containing the
+            // crash so nobody reads them as the remedy.
             var effectDiagnostics = new DiagnosticBag();
             // BIND FIRST, and skip a module the binder rejects. This is not a
             // convenience: `Program.Compile` returns as soon as binding has
