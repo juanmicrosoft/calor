@@ -844,7 +844,7 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   fail and is not underpowered. Leg A recomputed 10/10 with a clean control and no drift; route
   (b) reads 2 + 3121 = 3123 over a corpus now 926 files (the epoch's own 40 `final-src` archives
   included — D-A's counts unmoved, only its denominator). Verdict **HIT** at ledger `measuredCommit`
-  `LEDGER_SHA_TBD`; adjudicated formally at the 0.15.0 release commit by re-running
+  `7ad1b1e0aad3560d954da083124cf9376fe1bd06`; adjudicated formally at the 0.15.0 release commit by re-running
   `EffectRowsProbeLedgerTests` there. A HIT means "no large tax detected" (power 0.22 / 0.48 / 0.77
   at 1.25× / 1.4× / 1.6×), never "proven equal"; N1-002's 1.51 is a real per-pair cost inside the
   margin. Notes: `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md` ("Leg B — run", "What a
@@ -924,7 +924,7 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    fails the exact-equality test. *Status (2026-08-27):* **leg B run 2026-08-27 (epoch `e1-rows-parity-001`,
    arm A v0.14.3 @ `63316987`, arm B `b775acb4`, model `claude-opus-4-8`, 40/40 valid); leg A
    recomputed 10/10 with a clean control and no drift; verdict HIT at ledger `measuredCommit`
-   `LEDGER_SHA_TBD` (point 1.1835, lower bound 0.9012, CV 0.2746); adjudicated formally at the
+   `7ad1b1e0aad3560d954da083124cf9376fe1bd06` (point 1.1835, lower bound 0.9012, CV 0.2746); adjudicated formally at the
    0.15.0 release commit by re-running `EffectRowsProbeLedgerTests`** (PR #1110;
    `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md`, "Leg B — run"). The instrument was
    BUILT in PR #1109 (leg A 10/10 at `121c6681ecc861d90fc55d455b8a40eedf1fe463`; NOT-ADJUDICATED
