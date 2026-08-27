@@ -96,6 +96,17 @@ public sealed class EffectRowCorpusShapeTests
         // longer measuring the corpus the design doc's argument is about.
         Assert.Equal(886, files.Count);
 
+        // The allowlist must not go stale: an entry earns its place by actually
+        // writing a same-line row, and it must still be a committed file.
+        foreach (var allowed in AuthoredUnderDecisionOne)
+        {
+            Assert.Contains(allowed, files);
+            var allowedLines = File.ReadAllLines(Path.Combine(root, allowed));
+            Assert.True(
+                allowedLines.Any(line => MeaningChangingForms.Any(form => Regex.IsMatch(line, form.Pattern))),
+                $"{allowed} is allowlisted but writes no same-line row — remove it from AuthoredUnderDecisionOne.");
+        }
+
         var offenders = new List<string>();
         foreach (var relative in files)
         {

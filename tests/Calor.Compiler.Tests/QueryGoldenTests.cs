@@ -229,6 +229,7 @@ public sealed class QueryGoldenTests : IDisposable
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("verdict=cannot-tell", StringComparison.Ordinal)));
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("code=Calor0410", StringComparison.Ordinal)));
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("written=false", StringComparison.Ordinal)));
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("written=true", StringComparison.Ordinal)));
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("position=parameter", StringComparison.Ordinal)));
         // The inferred row of a polymorphic body carries its variable part.
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains(";inferred=e;", StringComparison.Ordinal)));

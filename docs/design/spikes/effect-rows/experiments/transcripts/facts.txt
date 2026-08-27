@@ -37,7 +37,7 @@ src/Calor.Compiler/Effects/ExternalCallCollector.cs
 count: 1
 
 ### whole-corpus function-typed positions (IsFunctionTypeName shapes)
-6
+7
 tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr
 tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr
 tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr

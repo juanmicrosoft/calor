@@ -156,6 +156,40 @@ public sealed class QueryCommandTests : IDisposable
         Assert.Contains("impact: 1 of 3 affected declaration(s) would stop fitting a row of cw (its current declared row)", current.StdOut);
     }
 
+    /// <summary>
+    /// v0.15 E5 (review round 2) — a caller the index holds no row for (its file
+    /// has binder errors, so the effect pass did not run there) is reported as
+    /// "cannot tell" on its own summary line, never counted among the callers
+    /// that "would stop fitting".
+    /// </summary>
+    [Fact]
+    public void ImpactEffects_ReportsCallersWithoutARowAsCannotTell_NotAsBroken()
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(), "calor-qcmd-" + Guid.NewGuid().ToString("N")[..12]);
+        Directory.CreateDirectory(dir);
+        _dirs.Add(dir);
+        File.WriteAllText(Path.Combine(dir, "lib.calr"), """
+            §M{m001:Lib}
+              §F{f001:Double:pub} (i32:n) -> i32
+                §E{cw}
+                §P n
+                §R (* n INT:2)
+            """);
+        File.WriteAllText(Path.Combine(dir, "broken.calr"), """
+            §M{m002:Broken}
+              §F{f001:Uses:pub} () -> i32
+                §E{}
+                §R (+ §C{Double} §A undefinedName §/C INT:1)
+            """);
+
+        var run = CliTestHarness.RunCli(dir, "query", "impact", "Double", "--effects", "--row", "fs:w", "--project", dir);
+        Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
+        Assert.Contains("function Uses — declares (no row recorded): cannot-tell", run.StdOut);
+        Assert.Contains("impact: 0 of 1 affected declaration(s) would stop fitting a row of fs:w", run.StdOut);
+        Assert.Contains("impact: 1 of 1 cannot tell — no declared row the index could compare against", run.StdOut);
+    }
+
     [Fact]
     public void QueryingAnUnknownNameFindsNothing()
     {

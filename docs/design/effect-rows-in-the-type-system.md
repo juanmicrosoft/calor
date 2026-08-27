@@ -2274,7 +2274,7 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 > uses `Except()`, which is empty exactly when that subset test passes, so P16's structural pin
 > still reads 2. `o53/baseline.json` re-stamped by the regeneration script, as every prior slice
 > did. **The §9 "0 of 359 function-typed `.calr` goldens" moves to 1** (`facts.txt` `count: 0` →
-> `1`): review round 1 required a rank-1 function IN the golden corpus (`Map<eff e>`), because
+> `1`; whole-corpus function-typed positions 5 → 7): review round 1 required a rank-1 function IN the golden corpus (`Map<eff e>`, then `Twice<eff e>` in round 2), because
 > the in-process pin had hidden that the inferred row lost its variable part. §3.2's same-line
 > sweep (`EffectRowCorpusShapeTests`) carries `app.calr` on a reasoned allowlist — authored
 > under Decision 1, not a regression of it — and §9's row says so.
@@ -2733,6 +2733,23 @@ change on a path rows do not own; it was fixed rather than recorded. E2 should k
 untrimmed code in `Calor0403`.
 
 ---
+
+> **EXECUTED, v0.15 E5, PR #1108 — THREE moved items across ONE script, none of them a
+> compiler-output change.** Counted from `git diff -U0` of all six transcripts after
+> `regenerate-transcripts.py`: `run.py`, `run2.py`, `run3.py`, `facts2.py` and `compile53.py`
+> are **CLEAN**; `o53/baseline.json`'s 23 files / 54 occurrences / 1 green / 22 red are
+> unchanged and only its `measuredCommit` is re-stamped, as every slice before this one did.
+>
+> | Case | Result |
+> |---|---|
+> | `facts.py` `IsSubsetOf` sweep | `EffectEnforcementPass.cs:401` → `:600`, a LINE SHIFT only: phase 5's `DeclarationEffectFact` record, `DeclarationFacts`, and the `_chargedVariables` bookkeeping sit above `CheckEffects`. Still exactly two occurrences (`EffectSet.cs:97` + this one); phase 5 computes its forbidden set with `Except()`, so P16's structural count stays 2 |
+> | `facts.py` "tests/TestData function-typed .calr" + "whole-corpus function-typed positions" | `count: 0` → `1`, and the whole-corpus position count 5 → 7 with one file added to its list — `tests/TestData/QueryCorpus/project/app.calr`, gate 7's fixture, now carries `Map<eff e>` / `Twice<eff e>`, two same-line parameter rows (review round 1, #2 asked for the rank-1 golden IN the corpus). §9's row and §3.2's sweep note say so; `EffectRowCorpusShapeTests` carries the file on a reasoned, anti-staleness-checked allowlist |
+> | `o53/baseline.json` `measuredCommit` | re-stamped `dd4d8f27…` → `d2f7e4bb…` by the regeneration script; counts unchanged |
+>
+> **Every other probe line is byte-identical.** Nothing under `bench/phase0-agent-native/`
+> moved: the ground truth was appended to two EXISTING fixture files rather than committed as
+> an 887th `.calr`, after a first cut with a new file turned four count-pinned instruments red
+> on the count alone (§13.2's E5 block).
 
 ## 14. Open questions
 

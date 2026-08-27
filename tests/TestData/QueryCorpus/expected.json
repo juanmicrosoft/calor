@@ -270,6 +270,17 @@
         "app.calr:25:f:position=parameter;declared=e;bound=[unknown]"
       ],
       "partial": true
+    },
+    {
+      "why": "The OTHER way a body is charged a variable (review round 2, #1): Twice<eff e> never invokes g — it passes g to Map, and Map's `e` instantiates to Twice's `e` at the call (site 6, §7.4). That charge goes through InstantiateAndCharge, not ChargeInvokedRow, so the Map golden cannot see it: remove only the InstantiateAndCharge bookkeeping and Map still reads `inferred=e` while Twice reads `[pure]`. Not partial: the call to Map resolves, and g is an argument here, not an invocation.",
+      "facet": "effects",
+      "name": "Twice",
+      "inFile": "app.calr",
+      "expect": [
+        "app.calr:28:Twice:written=true;declared=e;inferred=e;verdict=fits;code=none;undeclared=",
+        "app.calr:28:g:position=parameter;declared=e;bound=[unknown]"
+      ],
+      "partial": false
     }
   ]
 }
