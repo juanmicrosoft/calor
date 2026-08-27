@@ -649,8 +649,12 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   because invoking a row-less value is still `Calor0418` until **E4 replaces it**. Under A-1.11's
   own-goal clause this is a **MISS if adjudicated now**, because the workstream that broke the
   control is this one. Adjudication is at the **0.15.0 release commit**, so before then: **E4 must
-  restore the A3 control**, and the **`A-1.11.x` sub-entry must re-freeze A2** under the pinned
-  invocation. Neither is optional and neither is E3a's to do.
+  restore the A3 control**, and A2 had to be re-frozen under the pinned invocation — **done:
+  annex sub-entry [A-1.11.1](agent-native-gates.md) (2026-08-26) re-freezes it**, registering the
+  measured no-flag multiset at `9119397e` (1× `Calor0410` (23,9) + 2× `Calor0411` (26,24)(28,19)
+  + 1× `Calor0418` (27,27)), the post-E4 multiset that drops the `Calor0418`, the pre-E4 A3
+  `Calor0418` counts, and the own-goal MISS that stands until E4 merges. **E4 remains
+  outstanding** and is not E3a's to do.
 
 - **E4 — Calor0418 replaced.** Accepted when the function value's row fits; Calor0424 on
   mismatch; Calor0425 when the row is Unknown/Assumed because metadata is incomplete. The
@@ -658,6 +662,14 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   `EffectEnforcementTests.cs:354,378`) are rewritten from "is an error" to "fits / does not
   fit"; the `--permissive-effects` waiver survives as the waiver for Calor0425 only (a row that
   *does not fit* is never waived — §4.5 row).
+  **E4 also owes PP-E1's negative control**, per annex sub-entry
+  [A-1.11.1](agent-native-gates.md): it must take A2 from the registered pre-E4 multiset to the
+  post-E4 one (the `Calor0418` at (27,27) gone, leaving 1× `Calor0410` (23,9) + 2× `Calor0411`)
+  and return the four A3 fixtures to exit 0 with zero effect-family diagnostics — the baseline
+  A-1.11 froze, which A-1.11.1 leaves standing. `PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4`
+  (`tests/Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs`) pins the **pre**-E4 state and is
+  named so that it goes red on E4's own change; **the E4 PR flips it to the post-E4 multisets**.
+  Until E4 lands, leg A is a **MISS** under A-1.11's own-goal clause if adjudicated.
 - **E5 — Effects facet in the index.** Effect rows per declaration recorded in `ProjectIndex`;
   `calor query effects`; effect-change blast radius via the existing `impact` closure.
   `EffectSummary` is derived from the index or migrated into it (design-doc decision) — and
@@ -730,8 +742,9 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   lower bound above 1.0; measured null false-fail 1.7 % (point test alone 3.7 %), power
   0.22 / 0.48 / 0.77 at 1.25× / 1.4× / 1.6×. Script and full output committed at
   `bench/phase0-agent-native/ppe1-margin-derivation.py` / `…-derivation.txt`.
-- **PP-E1's A2 control baseline is NOT reproducible under the pinned invocation, and must be
-  re-frozen (E3a review round 1, finding F1).** A-1.11 pins the invocation as
+- **PP-E1's A2 control baseline was NOT reproducible under the pinned invocation — RE-FROZEN at
+  annex sub-entry [A-1.11.1](agent-native-gates.md), 2026-08-26 (E3a review round 1, finding
+  F1).** A-1.11 pins the invocation as
   `dotnet <calor.dll> -i <source> -o <scratch>` with **no flags**, and states that
   `--permissive-effects` is **forbidden in this probe, control and mutant alike**. But the frozen
   A2 baseline it cites — exactly 1× `Calor0410` "uses effect 'unknown'" at (23,9) and 3×
@@ -755,11 +768,21 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   there is one **extra** `Calor0418` at (27,27). `Calor0405` is **zero** — that was E3a's F2 to
   fix and it is fixed. None of the residual divergence is an effect-row emission.
 
-  **Disposition: an `A-1.11.x` annex sub-entry, in a separate PR after E3a merges**, re-freezes
-  A2's control baseline under the pinned invocation. It is a sub-entry rather than an edit because
-  the annex is append-only and guarded by
-  `experiment-registry-tamper-check.yml`. It must land before the 0.15.0 release commit, which is
-  where PP-E1 is adjudicated.
+  **Disposition — LANDED: annex sub-entry [A-1.11.1](agent-native-gates.md) (2026-08-26), in its
+  own PR after E3a merged**, re-freezes A2's control baseline under the pinned invocation. A
+  sub-entry rather than an edit, because the annex is append-only and guarded by
+  `experiment-registry-tamper-check.yml`; the guard confirms +0 rows, +1 entry and an unchanged
+  A-1.11 pointer (a sub-version does not move the top-level counter). What it registers: A2's
+  baseline is the measured no-flag multiset at `9119397e` — 1× `Calor0410` (23,9), 2× `Calor0411`
+  (26,24)(28,19), 1× `Calor0418` (27,27) — with the rule that **the `Calor0418` is E4's**, so the
+  post-E4 expected multiset is 1× `Calor0410` (23,9) + 2× `Calor0411`, and **that post-E4 multiset
+  is the binding one at adjudication** since §4.2 makes E4 non-deferrable. The four A3 fixtures'
+  "exit 0, zero effect-family diagnostics" **stands** as the post-E4 expectation, with today's
+  pre-E4 `Calor0418` counts recorded (map 1, match 2, middleware 2, callback 1). Everything else in
+  A-1.11's control clause — the bar on any further effect-family code, and the one pre-allowed
+  Calor0410/0411 → Calor0425/0419 migration at the same declaration — is unchanged. Pinned by
+  `PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4`. It landed before the 0.15.0 release commit,
+  which is where PP-E1 is adjudicated.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
   discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.
