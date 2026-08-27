@@ -224,9 +224,9 @@ public sealed class EffectRowsProbeLedgerTests
         // false booleans (review round 2, M9/M10).
         if (ledger.Verdict == "HIT")
         {
-            Assert.True(IsFinite(ledger.LegB.PointEstimate) && IsFinite(ledger.LegB.LowerBound95)
-                        && IsFinite(ledger.LegB.RealizedMedianWithinCellCv),
-                "a HIT ledger must carry finite pointEstimate, lowerBound95 and realizedMedianWithinCellCv");
+            Assert.True(IsAdjudicable(ledger.LegB.PointEstimate) && IsAdjudicable(ledger.LegB.LowerBound95)
+                        && IsAdjudicable(ledger.LegB.RealizedMedianWithinCellCv),
+                "a HIT ledger must carry finite, non-negative pointEstimate, lowerBound95 and realizedMedianWithinCellCv");
             Assert.True(ledger.LegB.Fails == false && ledger.LegB.Underpowered == false,
                 "a HIT ledger must carry fails=false and underpowered=false as non-null booleans");
         }
@@ -396,6 +396,42 @@ public sealed class EffectRowsProbeLedgerTests
           "harnessValid": true, "legBFails": false, "underpowered": false
         }
         """, "lowerBound95")]
+    // Review round 3: negative numbers adjudicated HIT. A ratio of token means and a
+    // CV cannot be negative; "finite" becomes "finite AND >= 0".
+    [InlineData("negative-point", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "pointEstimate": -1.5, "lowerBound95": -2.0, "realizedMedianWithinCellCv": 0.1,
+          "harnessValid": true, "legBFails": false, "underpowered": false
+        }
+        """, "pointEstimate")]
+    [InlineData("negative-bound", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "pointEstimate": 1.0016, "lowerBound95": -2.0, "realizedMedianWithinCellCv": 0.4392,
+          "harnessValid": true, "legBFails": false, "underpowered": false
+        }
+        """, "lowerBound95")]
+    [InlineData("negative-cv", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "pointEstimate": 1.0016, "lowerBound95": 0.8270, "realizedMedianWithinCellCv": -0.1,
+          "harnessValid": true, "legBFails": false, "underpowered": false
+        }
+        """, "realizedMedianWithinCellCv")]
+    // A literal 1e400 parses to +Infinity; it must become a named route (c),
+    // never an exception from the JSON writer at regeneration.
+    [InlineData("infinite-point", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "pointEstimate": 1e400, "lowerBound95": 0.8270, "realizedMedianWithinCellCv": 0.4392,
+          "harnessValid": true, "legBFails": false, "underpowered": false
+        }
+        """, "pointEstimate")]
     public void PpE1LegB_PlantedAnalysisWithoutFiniteNumbers_IsNotAdjudicatedViaRouteC(
         string shape, string json, string missingField)
     {
@@ -410,6 +446,8 @@ public sealed class EffectRowsProbeLedgerTests
             Assert.Contains(missingField, legB.InvalidReason, StringComparison.Ordinal);
             Assert.Null(legB.Fails);
             Assert.Null(legB.Underpowered);
+            // The record must be serializable whatever was planted (+∞ is stored as null).
+            Assert.Contains("\"legB\"", JsonSerializer.Serialize(new { legB }, JsonOptions), StringComparison.Ordinal);
 
             var routes = RoutesFor(legB);
             Assert.True(routes.C.Fires);
@@ -493,6 +531,35 @@ public sealed class EffectRowsProbeLedgerTests
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// Review round 3: on the REAL roadmap, the ancestor headings of §4.2 —
+    /// <c>## 4. v0.15 — Composable Effects</c> and the document title — were
+    /// accepted as citations because the section walk reached §4.2's
+    /// "Cut lines." paragraph. Only the heading whose own body states the cut
+    /// lines is citable.
+    /// </summary>
+    [Theory]
+    [InlineData("# Roadmap — v0.13 / v0.14 / v0.15", false)]
+    [InlineData("## 4. v0.15 — Composable Effects", false)]
+    [InlineData("### 4.2 Ship — tiered, with the cut lines stated", true)]
+    [InlineData("### 4.3 Honest measurement", false)]
+    public void PpE1CutCitation_OnlyTheHeadingWhoseOwnBodyStatesTheCutLinesIsCitable(string heading, bool citable)
+    {
+        var routes = InertRoutes() with
+        {
+            D = InertRoutes().D with
+            {
+                Fires = true, MechanicalEvidenceAllShipped = false,
+                CutCitation = new PpE1CutCitation("docs/plans/roadmap-v0.13-v0.15.md", heading, "E4"),
+            },
+        };
+        var violations = ValidateRoutes(routes, RepoRoot());
+        if (citable)
+            Assert.Empty(violations);
+        else
+            Assert.Contains(violations, v => v.Contains("own body", StringComparison.Ordinal));
     }
 
     // ------------------------------------------------------------ measurement
@@ -886,9 +953,13 @@ public sealed class EffectRowsProbeLedgerTests
         var recordedFails = NullableBool(root, "legBFails");
         var recordedUnderpowered = NullableBool(root, "underpowered");
 
-        // A run with a valid harness MUST carry three finite JSON numbers.
-        // Anything else — absent, null, a string, NaN — makes the analysis
-        // INVALID (route (c)), naming the field. Never adjudicated on nulls.
+        // A run with a valid harness MUST carry three finite, NON-NEGATIVE
+        // JSON numbers (a ratio of token means and a CV cannot be negative).
+        // Anything else — absent, null, a string, NaN, ±∞, negative — makes
+        // the analysis INVALID (route (c)), naming the field. Never adjudicated
+        // on nulls. A non-finite value is stored as null (review round 3: a
+        // literal 1e400 parses to +∞, which the JSON writer refuses — the path
+        // must be a named route, not an exception).
         string? invalidReason = null;
         if (recordedHarnessValid)
         {
@@ -897,13 +968,18 @@ public sealed class EffectRowsProbeLedgerTests
                          ("pointEstimate", point), ("lowerBound95", lower), ("realizedMedianWithinCellCv", cv),
                      })
             {
-                if (!IsFinite(value))
+                if (!IsAdjudicable(value))
                 {
-                    invalidReason = $"{name} is missing or not a finite JSON number in {AnalysisRelativePath()}";
+                    invalidReason = $"{name} is missing, not a finite JSON number, or negative "
+                                    + $"({Describe(value)}) in {AnalysisRelativePath()}";
                     break;
                 }
             }
         }
+
+        point = IsFinite(point) ? point : null;
+        lower = IsFinite(lower) ? lower : null;
+        cv = IsFinite(cv) ? cv : null;
 
         var harnessValid = recordedHarnessValid && invalidReason is null;
         var (fails, underpowered) = DeriveBooleans(point, lower, cv, harnessValid);
@@ -917,11 +993,11 @@ public sealed class EffectRowsProbeLedgerTests
             root.GetProperty("armB").GetProperty("label").GetString());
     }
 
-    /// <summary>The frozen leg-B rule, applied to numbers only when all three are finite.</summary>
+    /// <summary>The frozen leg-B rule, applied only when all three numbers are finite and non-negative.</summary>
     internal static (bool? Fails, bool? Underpowered) DeriveBooleans(
         double? point, double? lower, double? cv, bool harnessValid)
     {
-        if (!harnessValid || !IsFinite(point) || !IsFinite(lower) || !IsFinite(cv))
+        if (!harnessValid || !IsAdjudicable(point) || !IsAdjudicable(lower) || !IsAdjudicable(cv))
             return (null, null);
         var pointExceeds = point!.Value > PointGate;
         var boundFires = lower!.Value > LowerBoundGate;
@@ -930,6 +1006,13 @@ public sealed class EffectRowsProbeLedgerTests
     }
 
     private static bool IsFinite(double? value) => value is not null && double.IsFinite(value.Value);
+
+    /// <summary>Finite AND ≥ 0: a ratio of token means and a coefficient of variation cannot be negative.</summary>
+    private static bool IsAdjudicable(double? value) => IsFinite(value) && value!.Value >= 0;
+
+    private static string Describe(double? value)
+        => value is null ? "absent, null, or not a JSON number"
+            : value.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
 
     private static double? Number(JsonElement root, string name)
         => root.TryGetProperty(name, out var e) && e.ValueKind == JsonValueKind.Number ? e.GetDouble() : null;
@@ -1056,19 +1139,20 @@ public sealed class EffectRowsProbeLedgerTests
             yield break;
         }
 
-        var level = headingMatch.Groups[1].Value.Length;
+        // The cited heading's OWN body — up to the next heading of ANY level —
+        // must carry the literal paragraph lead "Cut lines." (review round 3:
+        // walking to the next heading of <= level let `## 4. v0.15` and the
+        // document title cite §4.2's paragraph as their own). The deepest
+        // heading whose own body states the cut lines is the only citable one.
         var end = start + 1;
-        while (end < lines.Length
-               && !(MarkdownHeading.Match(lines[end]) is { Success: true } next && next.Groups[1].Value.Length <= level))
+        while (end < lines.Length && !MarkdownHeading.IsMatch(lines[end]))
             end++;
-        var section = string.Join("\n", lines[start..end]);
-        // The roadmap states its cut lines under the literal paragraph lead
-        // "Cut lines." — a section that only mentions one in passing is not
-        // where a cut was invoked in writing.
-        if (!section.Contains("Cut lines.", StringComparison.Ordinal))
-            yield return $"cited section '{citation.Heading}' does not carry the literal paragraph lead \"Cut lines.\"";
-        if (!section.Contains(citation.Workstream, StringComparison.Ordinal))
-            yield return $"cited section '{citation.Heading}' does not name {citation.Workstream}";
+        var body = string.Join("\n", lines[(start + 1)..end]);
+        if (!body.Contains("Cut lines.", StringComparison.Ordinal))
+            yield return $"the own body of '{citation.Heading}' (before any sub-heading) does not carry the "
+                         + "literal paragraph lead \"Cut lines.\" — cite the deepest heading that states them";
+        if (!body.Contains(citation.Workstream, StringComparison.Ordinal))
+            yield return $"the own body of '{citation.Heading}' does not name {citation.Workstream}";
     }
 
     private static readonly System.Text.RegularExpressions.Regex MarkdownHeading = new(
@@ -1124,7 +1208,8 @@ public sealed class EffectRowsProbeLedgerTests
         // booleans derived from three finite numbers. Null is not "does not
         // fail"; it is "no adjudicable figure" (review round 2, M9/M10).
         if (legB.Fails != false || legB.Underpowered != false
-            || !IsFinite(legB.PointEstimate) || !IsFinite(legB.LowerBound95) || !IsFinite(legB.RealizedMedianWithinCellCv))
+            || !IsAdjudicable(legB.PointEstimate) || !IsAdjudicable(legB.LowerBound95)
+            || !IsAdjudicable(legB.RealizedMedianWithinCellCv))
             return ("NOT-ADJUDICATED", $"leg B carries no adjudicable figures (fails {Fmt(legB.Fails)}, underpowered "
                                        + $"{Fmt(legB.Underpowered)}); {legASummary}; {legBSummary}");
 
