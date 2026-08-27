@@ -1,153 +1,101 @@
-# Roadmap — v0.16
+# Roadmap — v0.16 "Measured Effects"
 
 **Date:** 2026-08-27
-**Status:** Draft v1 — written against the source at `7d621c0d` (main after PR #1110, the PP-E1
-leg-B record), before the 0.15.0 release PR merges (`Directory.Build.props:3` still reads
-`0.14.3`). Every number below was re-measured from the tree or the archived epoch at that commit,
-with the file and line it came from; nothing is copied from a prior plan. §10 is empty on purpose —
-the adversarial reviews run next.
-**Governing inputs:** `roadmap-v0.13-v0.15.md` (§4.0–§4.5 for the 0.15 discipline this draft
-mirrors; §8–§10 for the mistakes reviewers made that plan fix), the effect-rows design doc
-(`docs/design/effect-rows-in-the-type-system.md`, hereafter *D*), the seven 0.15 slice notes
-(`docs/plans/2026-08-2*-v0.15-*.md`), the A-annex (`docs/plans/agent-native-gates.md`, hereafter
-*A*, read-only), the open issue list on 2026-08-27, `CHANGELOG.md` `[Unreleased]`, and the
-2026-08-18 test-suite audit.
-
-**Conventions.** *R:* = `roadmap-v0.13-v0.15.md`; *D:* = the design doc; *A:* = the annex;
-*e2a/e2b/e3a/e3b/e4/e5/ppe1:* = the slice notes by short name; bare paths are repo-relative.
-"Ledger" means a committed JSON under `bench/phase0-agent-native/` re-executed by an
-exact-equality test.
+**Status:** Draft v2 — Draft v1 (2026-08-27, §10 round 1: three adversarial lenses, all
+NEEDS-FIXES) revised with every finding applied or declined in §10. Written against the source at
+`7d621c0d` (main after PR #1110), before the 0.15.0 release PR merges (`Directory.Build.props:3`
+reads `0.14.3`). Every number is re-measured from the tree or the archived epoch, with its source;
+the S1/S2 measurement tables live in `2026-08-27-v0.16-s1-s2-measurement-notes.md` (*N:*).
+**Governing inputs:** `roadmap-v0.13-v0.15.md` (*R:*), `docs/design/effect-rows-in-the-type-system.md`
+(*D:*), the seven 0.15 slice notes (*e2a…ppe1:*), `docs/plans/agent-native-gates.md` (*A:*,
+read-only), `v0.13-freeze-registrations.md` (*F:*), the open issue list on 2026-08-27,
+`CHANGELOG.md` `[Unreleased]`, and the 2026-08-18 test-suite audit.
 
 ---
 
-## 0. Where 0.15 left us (measured at `7d621c0d`, 2026-08-27)
+## 0. Where 0.15 left us (measured at `7d621c0d`)
 
-### 0.1 What shipped
+### 0.1 Shipped, and two discipline breaches to record beside the #944 precedent
 
-- **E1–E5, M1 and PP-E1 all landed** (R:522-727). E1 has one `EffectResolver.Resolve(EffectResolverKey)`
-  entry point (R:524-529); E2 parses all eight row positions and gives `FunctionBoundType` a `Row`
-  (R:593-608); E3 checks the six D:§6.2 sites (D:903-910) with Calor0424/0425 and the rank-1 solve
-  (R:621-647); E4 replaces Calor0418 with row charging at invocations (R:672-696); E5 records rows
-  in `ProjectIndex.EffectRows` and adds `calor query effects` / `impact --effects` (R:697-720).
-  The `[Unreleased]` changelog at `CHANGELOG.md:5-387` is the user-facing record.
-- **Elision is default-on** (R:976; `CHANGELOG.md:326-354`); **`§SEMVER{1.x}` is refused with
-  Calor0701** (`CHANGELOG.md:303-325`; #1084 item 1 done, items 2–3 open).
+- **E1–E5, M1, PP-E1 landed** (R:522-727): one `EffectResolver.Resolve(EffectResolverKey)`
+  (R:524-529); eight row positions and `FunctionBoundType.Row` (R:593-608); Calor0424/0425 at the
+  six D:903-910 sites plus the rank-1 solve (R:621-647); Calor0418 replaced by row charging
+  (R:672-696); `ProjectIndex.EffectRows`, `calor query effects` / `impact --effects` (R:697-720).
+  Elision default-on (R:976); `§SEMVER{1.x}` refused with Calor0701 (`CHANGELOG.md:303-325`).
+- **Breach 1 — ES-08 never registered.** F:364-366 registers the effect-row edit script "before
+  roadmap §4.2 E2 merges"; `tests/TestData/EditScripts/` holds ES-01…ES-07 only and E2 merged
+  (PRs #1101/#1102). Gate 3 (R:889-905) was therefore not met as written. §6 carries it.
+- **Breach 2 — R:987 said PRs #982/#981/#976 would be "merged or closed in the 0.15 kickoff
+  sweep"; all three are open.** #982 is gate 3's CLI-process leg. §6 carries each.
+- **Never built:** gate 5 leg (b)'s `compile-all-committed-calr` job (R:938-940; no workflow
+  mentions it) and gate 3's `Calor.Sdk` leg (R:891-893).
 
-### 0.2 PP-E1 — verdict HIT, and what the archive actually shows
+### 0.2 PP-E1 — HIT, and what the archive can and cannot say
 
-- **Leg A** 10/10 detected, control clean, ramp not fired (denominator 10, not 7):
-  `bench/phase0-agent-native/effect-rows-probe-ledger.json` (`legA.detected = 10`,
-  `legA.rampFired = false`, `negativeControl.clean = true`, `verdict = HIT`,
-  `measuredCommit = 7ad1b1e0…`).
-- **Leg B** over epoch `e1-rows-parity-001` (`…/epochs/e1-rows-parity-001/ppe1-analysis.json`):
-  model `claude-opus-4-8`; arm A = v0.14.3 @ `63316987`, arm B = `b775acb4`; 40/40 valid, 0 %
-  censored; per-pair ratios N1-001 **1.1762**, N1-002 **1.5118**, N1-003 **1.1907**, N1-005
-  **0.8984**; point **1.1835**; one-sided 95 % lower bound **0.9012**; median within-cell CV
-  **0.2746** (max 0.4259); `iterationsToGreen` control `{1:19, 2:1}`, treatment `{1:18, 2:2}`.
-  Registered reading: "no large tax detected", never "proven equal"; power 0.22 / 0.48 / 0.77 at
-  1.25× / 1.4× / 1.6× (ppe1:262-274; A:317 "Power, so a pass cannot be overread").
-- **Sensitivity, on the record** (ppe1:225-230, :274-281): one control run (N1-001 run 3) spawned
-  a subagent; read naively (4 522 instead of 12 821 tokens) the point would be **1.3390**, 0.011
-  under the 1.35 gate. The corrected figure is the registered one.
-- **The N1 pairs contain no callbacks.** Measured over the 40 archived `final-src` files: no
-  `<eff …>` binder, no `§LAM` / `§DEL` / function-typed position, 257 `§E{…}` declarations all on
-  their own line (ppe1:294-298). Leg B "measures a stricter compiler's cost in the edit-compile
-  loop on ordinary code, **not** rows' cost on rows-using code, which no archived epoch measures"
-  (ppe1:271-274). **Rows' benefit on callback-heavy code is unmeasured.**
-
-**The 18 % is not the effect checker — re-measured for this draft, and this refutes the brief's
-working hypothesis.** Over every `journal.jsonl` in the epoch (49 harness-observed builds: 26
-treatment, 23 control — `journal.jsonl` `diagnostics[].code`):
-
-| Arm | Builds | Diagnostics any agent ever saw |
-|---|---|---|
-| `calor+0.15.0` (treatment) | 26 | Calor0100 ×2, Calor0101 ×2 (parse errors the agent introduced and fixed), Calor0830 ×1 |
-| `calor+v0.14.3` (control) | 23 | Calor0830 ×1 |
-
-**Zero Calor0410 / 0411 / 0419 / 0424 / 0425 on either arm.** The candidate causes the brief named
-— Calor0425 "cannot tell" noise, fail-closed Unknown charges on BCL-returned delegates — did not
-occur once. What differs is agent behaviour, not compiler output (`agent.json` `num_turns`,
-`duration_ms`; `result.json` `tokens.output`):
-
-| Pair | Median turns T / C | Median wall-clock T / C (s) | Output tokens T (sorted) | Output tokens C (sorted) |
-|---|---|---|---|---|
-| N1-001 | 19 / 16 | 136 / 127 | 4864, 8027, 8203, 12426, 13150 | 4221, 5817, 7387, 9431, 12821 |
-| N1-002 | 23 / 17 | 135 / 91 | 5642, 7437, 8048, 10298, 10621 | 3361, 4348, 4461, 5548, 10093 |
-| N1-003 | 23 / 19 | 255 / 187 | 5004, 11552, 16362, 18034, 23938 | 10597, 11788, 12196, 13585, 14732 |
-| N1-005 | 19 / 20 | 109 / 126 | 5736, 6045, 6882, 7284, 7900 | 6128, 7066, 7748, 8366, 8368 |
-
-More turns with the same number of builds and the same first-iteration green rate means the extra
-spend is reads, thinking and non-build tool calls — **and the archive cannot say which.**
-`run-pair.sh:853` / `:867` invoke `claude --print --output-format json`; `agent.json` holds usage
-plus the final message, no per-turn tool calls (keys: `usage`, `modelUsage`, `num_turns`,
-`result`, …). The prompt is arm-neutral (`run-pair.sh:792`), the only hook the harness installs
-blocks `.g.cs` edits (`run-pair.sh:502-516`), and the surfaces that differ between the two arm
-commits and that an agent *could* have read are enumerable from `git diff 63316987..b775acb4`:
-`Program.cs` (59 lines, 3 option-description lines), `Commands/QueryCommand.cs` (213),
-`Commands/EffectsCommand.cs` (77), `Commands/HookCommand.cs` (14 — `§SEMVER` reminder text; not
-installed by the harness), `Calor.Tasks/CompileCalor.cs` (12 — the elision default, inert on
-contract-free N1 code), `Sdk.targets` (3). **"Why more turns" is an open question** the entry
-spike must answer (§2.1) with a zero-spend replay first and a per-turn capture second — no further
-paid epoch runs before the capture exists (§5 gate 8).
+- Leg A 10/10, control clean, ramp not fired; leg B point **1.1835**, lower bound **0.9012**,
+  median CV **0.2746**, 40/40 valid; per-pair 1.1762 / 1.5118 / 1.1907 / 0.8984
+  (`effect-rows-probe-ledger.json`; `epochs/e1-rows-parity-001/ppe1-analysis.json`). Registered
+  reading: "no large tax detected", power 0.22 / 0.48 / 0.77 (ppe1:262-274; A:317).
+- **The N1 pairs contain no callbacks** (ppe1:294-298); leg B measured "a stricter compiler's cost
+  on ordinary code, not rows' cost on rows-using code" (ppe1:271-274). **Rows' benefit is
+  unmeasured.**
+- **The harness's strict CLI compile of every build-time source state emitted zero effect-family
+  diagnostics on either arm** (N:S1.1 — 49 builds, 26 treatment / 23 control, 4 vs 2 of them
+  unedited observation builds; only Calor0100 ×2, Calor0101 ×2, Calor0830 ×1 vs Calor0830 ×1). The
+  agent's own `dotnet build` stdout is not archived (W1). The brief's "Calor0425 noise / BCL
+  Unknown charge" hypothesis is refuted on this data.
+- **The gap is agent turns, and it is real:** per-pair median Δturns +3 / +6 / +4 / −1;
+  within-pair permutation p = **0.004** (turns), 0.025 (tokens), 0.449 (wall-clock) (N:S1.2).
+  Sensitivity: all-naive 1.3490, one-run-corrected 1.3390, registered 1.1835 (N:S1.2).
+- **S1 steps 1–2 are DONE and null** (N:S1.3): byte-identical C# and CLI text across the arms on
+  all 40 archived programs; the arm diff is enumerated. `run-pair.sh:853/867` run
+  `claude --print --output-format json`, so no per-turn tool calls exist. **"Why more turns" is
+  open and cannot be closed from the archive.**
 
 ### 0.3 The static benchmark cannot see rows
 
-`CHANGELOG.md:391-398` (0.14.3): 1.32× overall over 30 runs, 7 categories to 1, 217 benchmarks
-evaluated; the same block is byte-identical at 0.14.0–0.14.3 (`:392`, `:412`, `:450`, `:515`);
-`[Unreleased]` carries no benchmark block yet. D:1768: **0 of 359** `.calr` goldens under
-`tests/TestData` had a `Func<`/`Action<`/`§DEL`/`§LAM` shape at design-doc freeze; **1 of 359**
-now (`QueryCorpus/project/app.calr`, authored with a row on purpose by E5 — re-verified by grep
-at `7d621c0d`). D:1770: `Calor.Conversion.Tests` never runs the effect pass. The headline number
-remains a regression indicator (R:37-38), and it is structurally blind to 0.15's feature.
+`CHANGELOG.md:391-398`: 1.32× over 30 runs, 217 benchmarks, byte-identical at 0.14.0–0.14.3
+(`:392/:412/:450/:515`); `[Unreleased]` has no block yet. D:1768: 0 of 359 `tests/TestData` goldens
+had a function-typed shape at design freeze; **1 of 359** now (`QueryCorpus/project/app.calr`,
+E5's). `Calor.Conversion.Tests` never runs the effect pass (D:1770). Regression indicator only (R:37-38).
 
-### 0.4 Corpus and ledgers (exact, from the committed files)
+### 0.4 Corpus, ledgers, and the denominator (exact)
 
-| Instrument | Value at `7d621c0d` | Source |
+| Instrument | Value | Source |
 |---|---|---|
-| Committed `.calr` in ledger scope | **941** = 926 corpus + 15 spike artifacts under `docs/design/spikes/` (excluded by every ledger, D:2722-2729) | `find` at `7d621c0d`; ppe1:288-292 (886 → 926 with the 40 epoch archives) |
-| D-A higher-order demand (Calor-native) | **2** (`calor0418` 0, `calor0419FunctionTyped` 2) over 926 files, 45 not reaching the effect pass | `higher-order-demand-ledger.json` `dA.*` |
-| D-B backstop (Roslyn count, three subjects) | **3121** over 364 files: 2676 lambdas, 311 delegate-typed declarations, 132 delegate invocations, 2 delegate declarations | same file, `dB.aggregate.*` |
-| Route (b) floor | 3123 vs floor 25 — inert | same file, `floor`; probe ledger `routes.b` |
-| Calor0425 corpus ledger (P32) | **8** diagnostics over **99** enforced of 364 modules; **265 excluded** (59 parse-failed, 206 bind-failed); causes: `InvocationRowless` 4, `ExternalBase` 4, **`UnknownSource` 0, `InvocationUndetermined` 0, `InvocationAssumed` 0** | `calor0425-corpus-ledger.json` `PerSubject[*]` |
-| Calor0270 ledger | **193** diagnostics across 38 of **305** bound modules | `calor0270-corpus-ledger.json` |
-| Resolver-key ledger (E1 slice 2c baseline 202/751) | **259 bound / 812 string** — the +57/+61 is the 40 epoch archives, accounted construct by construct (ppe1:303); E2 did **not** move the split on the pre-existing 886 | `effect-resolver-key-ledger.json`; R:532-537 |
-| Metadata-binding gate 6 | **817 / 1248 = 65.46 %** (MediatR 129/226, Serilog 104/113, FluentValidation 584/909); MediatR's dominant class "No overload matches the supplied argument types" 86 | `metadata-binding-corpus-ledger.json` `perSubject` |
-| Converter → Calor validity | 59 of 364 outputs fail to parse (#903, 3 clusters); 72 `AnalysisICE` from a bare `?` lambda parameter type (#1097) | issue bodies |
+| Committed `.calr` in ledger scope | 941 = 926 + 15 spike artifacts (excluded, D:2722-2729) | `find`; ppe1:288-292 |
+| D-A (Calor-native higher-order demand) | **2**; D-B (Roslyn, three subjects) **3121** over 364 files; floor 25 inert | `higher-order-demand-ledger.json` |
+| Calor0425 corpus ledger (P32) | **8** over **99 enforced** of 364; 265 excluded (59 parse-failed, 206 bind-failed); causes `InvocationRowless` 4, `ExternalBase` 4, **`UnknownSource` 0, `InvocationUndetermined` 0** | `calor0425-corpus-ledger.json` |
+| Calor0270 ledger | 193 across 38 of **305** bound modules | `calor0270-corpus-ledger.json` |
+| Resolver-key ledger | 259 bound / 812 string (E1 2c baseline 202/751 + the 40 archives; E2 moved nothing on the 886) | `effect-resolver-key-ledger.json`; R:532-537 |
+| Metadata gate 6 | **817/1248 = 65.46 %** (129/226, 104/113, 584/909) | `metadata-binding-corpus-ledger.json` |
 
-Two readings of that table drive §1. First, **the Calor-native corpus has essentially no
-higher-order code** (D-A = 2) while the C# corpus has 3121 sites: rows meet real code only through
-conversion, and the converter emits no rows (D:1780-1783). Second, **the corpus every 0.15 effect
-claim stands on is 99 of 364 modules** — 265 are excluded before the effect pass by conversion
-parse failures, binder failures, and the #1104 crash workaround (e3a:252-270) — and the
-"BCL-returned delegate" cause the DEFERRED list names is **measured at zero** in the modules that
-do reach the pass.
+**The denominator is bind-first by design, and stays so (Draft v1 round 1, DECIDED).** The
+shipped compiler stops at binder errors (`Program.cs:830-834`), the ledger test refuses unbound
+modules (`Calor0425CorpusLedgerTests.cs:347-354`) and asserts `AggregateModulesExcluded > 0`
+(`:181-183`); e3a:266-268 calls bind-first the correct denominator. **S2's histogram** (N:S2):
+of the 206 bind-failed modules, **200 carry Calor0200** (member access on converted/external
+receivers; a C# `null` emitted as an identifier is the *first* error in 104), 88 Calor0273, 35
+Calor0208, 26 the #1097 ICE (Calor0932) — and **1** module is ICE-only. The 59 parse failures are
+Calor0099 36 / Calor0100 21 / Calor0117 2 (#903's three clusters). **#1104 unlocks zero modules.**
+Converter-side fixes provably reach **100** enforced; the expected reach is ≈ 119 (N:S2).
 
-### 0.5 Registered 0.15.x debts (the full table is §6; the ones that shape the theme)
+Two readings drive §1: rows meet real code only through conversion (D-A = 2; the converter emits
+no rows, D:1780-1783), **and even after W3 the enlarged denominator holds zero rows** — so no row
+meets real code in 0.16. The "BCL-returned delegate" cause is 0 in the bind-clean quartile, which
+is the least likely place to find it: FluentValidation's 236 delegate-typed declarations
+(`higher-order-demand-ledger.json` `dB.perSubject`) sit largely in its 142 bind-failed modules.
 
-- `FunctionBoundType.Row` still has no end-to-end production reader: `Binder.BindRow` collapses a
-  variable-mentioning row to Unknown, so `EffectInferrer.ResolveInvokedValueRow` reads the `§E`
-  node by AST span-matching (R:710-720; D:2700-2708; e5:150-164). Binder work that moves every
-  E2b/E3/E4 pin.
-- A `§LAM` inside a rank-1 function that invokes the polymorphic parameter under-approximates its
-  row **silently** if it escapes under a row-less `-> Func<…>` (e4:230-234).
-- Lambda parameters invoked inside the lambda → Calor0411, silently pure under
-  `--permissive-effects` (e4:255-259); untyped alias `§B{g} f` then `§C{g}` → Calor0411 + the
-  fail-closed 0410 (e4:252-254); Calor0410 itself still demoted under `--permissive-effects`
-  (e4:246-248).
-- Index vs `calor build` parity: the index folds cross-module charges for every file that binds,
-  the driver only for files whose own compile succeeded (e5:265-272); interface methods are not
-  indexed (e5:273-275); the per-file effect pass in the index build is unmeasured against gate 8's
-  30 s envelope (e5:259-261).
-- `PropagateInstantiatedCharges` stops silently at `maxIterations = 10_000`
-  (`src/Calor.Compiler/Effects/EffectEnforcementPass.cs:1129`; e3b:117-123 says the cap mirrors
-  `ProcessScc`'s and names no number). #1104: `EffectEnforcementPass.Enforce` recurses without a
-  bound on two Serilog modules (e3a:252-270).
-- DEFERRED at design-doc merge (R:738-742): async rows (D:§11, lines 1922-1945 — there is no D:§5.1;
-  the 0.16 re-entry test is D:1936-1942), `PreconditionSuggester` on the typed CFG, reflection /
-  `DynamicInvoke` / `dynamic`, event-handler `+=`, BCL-returned delegates (D:1660-1662).
-- SHOULD tier never started: E6 (`review-packet` reads the index), E7 (MCP query surface), E8
-  (contract outcomes facet), E9 (affected-tests facet — no design), M2 (a real Calor arm as
-  product) (R:729-736).
+### 0.5 Registered 0.15.x debts that shape the theme (full table §6)
+
+`FunctionBoundType.Row` has no end-to-end reader (R:710-720; D:2700-2708; e5:150-164); lambda
+parameters invoked in-lambda → Calor0411 (e4:255-259); index/`calor build` parity and interface
+members (e5:265-275); `PropagateInstantiatedCharges` stops silently at `maxIterations = 10_000`
+(`EffectEnforcementPass.cs:1129`) while `ProcessScc`'s cap of 100 already reports **Calor0600**
+(`:455`, `:484-487`); #1104 recursion in the nested `EffectInferrer`
+(`EffectEnforcementPass.cs:2547`; cycle `:4022 → :3942 → :3827`); DEFERRED at design merge
+(R:738-742): async rows (D:§11, 1922-1945), `PreconditionSuggester`, reflection/`dynamic`,
+`+=`, BCL-returned delegates; SHOULD never started: E6–E9, M2 (R:729-736).
 
 ---
 
@@ -155,486 +103,457 @@ do reach the pass.
 
 ### 1.1 What the ladder says comes after 0.15
 
-R:40-46 ends the staircase at 0.15; R:1068-1082 states what "better than C#" meant at its end:
-compositional effect safety **for the registered combinator set, instrumented at fixture scale**,
-plus "a standing, quantitative path back to real-scale measurement". R:989-1010 keeps the
-real-scale venue retired until "≥70 evaluable tasks" and "an arm that actually invokes Calor"
-both exist. 0.16 therefore starts with two measured holes: the benefit of rows on the code they
-were built for has never been observed, and every corpus-scale claim about effects rests on
-27 % of the conversion subjects.
+R:40-46 ends at 0.15; R:1068-1082 claims compositional effect safety "instrumented at fixture
+scale" plus "a standing, quantitative path back to real-scale measurement"; R:993-994 keeps the
+real-scale venue retired until ≥ 70 evaluable tasks and a real Calor arm exist. 0.16 starts with
+two measured holes — rows' benefit never observed; every corpus-scale effect claim resting on 99
+of 364 modules — and one product hole: nothing an agent uses reads the index but `calor query`.
 
-### 1.2 Three candidates, each tested against §0
+### 1.2 Three candidates against §0
 
-**Candidate A — "Effects that pay for themselves"** (the brief's framing): measure the benefit,
-remove the tax, extend rows to where Unknown comes from (IL-derived rows for BCL delegates).
+**A — "Effects that pay for themselves"** (measure the benefit; remove the tax; IL-derived rows).
+*Benefit leg:* supported — unmeasured by construction, fixtures exist. *Tax leg:* the named cause
+is refuted (§0.2); the open question needs an instrument, not product. *IL leg:* demand reads 0
+where it can be measured, and the place it would live is unmeasured (§0.4) — a demand trigger
+tied to the W3 denominator, not a slot. Building it now would be the designer-judgment gate that
+failed TIER1A (R:441).
 
-- *Benefit leg — supported.* Unmeasured by construction (§0.2); the five spike fixtures already
-  carry the callback shapes (A:317 leg A fixture set), so a benefit probe has fixtures.
-- *Tax leg — the hypothesis is refuted, the question is open.* Zero effect-family diagnostics on
-  either arm (§0.2). There is no diagnostic to remove. The residual question — why 3–6 more turns
-  per run — has no instrument in the archive and needs a harness change before any paid run.
-- *IL-rows leg — no measured demand.* The 0425 ledger's `UnknownSource` and
-  `InvocationUndetermined` buckets are **0** over the 99 enforced modules; the 8 sites present are
-  row-less declarations (4) and external bases (4). D-A's `calor0419FunctionTyped` is 2. Building
-  IL-derived rows in 0.16 would be building for a cause the instrument cannot find — the TIER1A
-  shape (R:1096, "designer-judgment gate"). It earns a **demand trigger**, not a MUST slot (§6).
+**B — "Index consumers"** (E6/E7/E8, R:729-734). *Supported:* E7 is fully specified (callers /
+callees / impact / effects over the index), already has gates (gate 3's MCP leg, gate 7's E7 leg,
+R:861-864), needs no annex registration, and is the only candidate that puts something new in an
+agent's hands — MCP `calor_navigate` neither reads the index nor exposes callers/impact
+(R:410-411). *Draft v1 dismissed B for "no measurement"; that was the draft's omission — the
+E7 gates exist and are stated in §5.* What B lacks is a proof point; what it does not need is a
+theme. **E7 is MUST (§3.1).**
 
-**Candidate B — "Index consumers"** (E6 / E7 / E8, R:729-734): make the project model the product.
+**C — "Trustworthy migration"** (#903, #1097, #901, #929, #943, #847). *Supported:* the §0.4
+denominator. *Against as the whole:* R:995 / R:294-306 decline a broad campaign; its measured
+subset is the converter-side reach S2 priced (100 provable, ≈ 119 expected) — MUST W3, not a theme.
 
-- *Supported by:* the SHOULD tier is fully specified and three of its four items have instruments
-  already (gate 3's MCP leg, gate 7's E6/E7 legs, R:861-864). E7 is what `calor_navigate` lacks
-  (R:410-411).
-- *Against as a theme:* no proof point exists for "agents use the index" and none is proposed;
-  R:1005 records zero external adopters; E9 has no design. B is product work whose absence is a
-  recorded decision already — it does not need a release's name to ship in 0.16.x. It stays
-  SHOULD (§3.2).
+### 1.3 Recommendation — **v0.16 "Measured Effects"**
 
-**Candidate C — "Trustworthy migration"** (#903, #1097, #901, #929, #943, #847): converter fidelity.
+**User-visible deliverable, one sentence:** an agent can ask the MCP server who calls a function,
+what it calls, what breaks if its effects change, and what its effect row is — read from the same
+index `calor build` writes — and the converter's output parses and binds for more of the real
+code it is pointed at.
 
-- *Supported by:* the denominator numbers in §0.4. 265 of 364 subject modules never reach the
-  effect pass; 59 converter outputs do not parse; 72 bind as `AnalysisICE`; `Calor.Conversion.Tests`
-  never runs the effect pass (D:1770); the converter emits no rows (D:1780-1783). The 0.15 gates
-  (R:933-970) are green over a denominator that excludes three quarters of the real code, and the
-  real-scale re-entry condition (≥70 evaluable tasks) is gated on the same converter (R:28-31).
-- *Against as the whole theme:* R:995 and R:294-306 declined "a broad converter campaign", and the
-  precedent is that demoted conversion issues got closed one at a time anyway (R:1019). A version
-  titled "migration" with no effect-system progress also abandons the ladder's spine after one
-  release of rows.
-
-### 1.3 Recommendation — **v0.16 "Rows on real code"**
-
-Take A's benefit leg and its (reframed) tax leg as the measurement spine, take C's *measured
-subset* — not a campaign — as the denominator repair those measurements need, and hold A's IL leg
-and B behind pre-registered triggers. Stated as three testable outcomes:
-
-1. **Rows' benefit is observed, not asserted.** A pre-registered proof point (PP-W-rows, §4.1)
-   runs agents on callback-heavy tasks with seeded laundering defects, rows on vs rows off, and
-   publishes a four-valued verdict at the 0.16.0 release commit.
-2. **The turn gap is attributed or bounded.** The harness captures per-turn tool calls before any
-   paid epoch (§2.1, §5 gate 8); the zero-spend replay over the 0.15 arms is published whatever it
-   finds.
-3. **The corpus denominator is at least doubled.** The 0425 and 0270 ledgers enforce a
-   pre-registered floor of modules reaching the effect pass — the trigger for every "on real
-   code" claim, and the instrument that decides whether IL-derived rows have demand.
-
-Why this and not A verbatim: A's tax leg as posed would have built product against a refuted
-cause; A's IL leg has a measured demand of zero. Why not C verbatim: the release would carry no
-effect-system claim and no proof point. Why not B: it has no measurement and needs no theme.
+Beneath that, the measurement spine: (1) **rows' benefit is observed** by a pre-registered proof
+point on callback-heavy tasks (PP-W-rows, §4.1) whose verdict decides whether 0.17 is a rows
+release; (2) **the turn gap is attributed or bounded** — per-turn capture in the harness before
+any further paid epoch, S1 published; (3) **the conversion denominator moves by a pre-registered,
+provable amount** (gate 9). The title claims what §0.4 allows: nothing in 0.16 puts a row on real
+code; 0.16 measures effects and makes the next measurement possible.
 
 ---
 
-## 2. Entry gate — three spikes, each with a pass/fail, before the MUST tier opens
+## 2. Entry gate — three spikes and one registration before any row-family `src/` change merges
 
-0.15's pattern (R:437-513): an adversarially reviewed design doc, a throwaway spike with a
-G-CODEGEN-style blocking gate (D:1988-1996), and the PP registered in the annex **before** any
-implementation merges (R:762-786, A:470). 0.16 has no new type-system decision to design, so the
-entry gate is three spikes with numeric exits, and one annex registration.
+0.15's pattern (R:437-513; D:1988-1996; R:762-786). No new type-system decision exists, so the
+gate is spikes with numeric exits plus annex entry **A-1.12**.
 
-### 2.1 Spike S1 — the zero-spend replay of `e1-rows-parity-001` (answers "why more turns" as far as the archive allows)
+**What A-1.12 blocks, exactly:** merges that change the row family under `src/` — W6, W7, and any
+Calor0424/0425/0404/0405 emission change — until the entry exists (the M1 rule, R:721-727,
+scoped). It does **not** block W1 (harness), W3 (converter / effect-pass robustness), E7, W5, or
+the S1/S2 artifacts.
 
-*Doable today, costs no API spend, and must be published before PP-W-rows registers.*
+### 2.1 Spike S1 — the zero-spend replay (steps 1–2 DONE and null, N:S1)
 
-1. Rebuild both arms (`63316987`, `b775acb4`) and, for each of the 40 archived
-   `final-src/*.calr`, compile under both and diff the emitted C# and the `dotnet build` text
-   byte-for-byte. Expected: identical (N1 has no contracts, so the elision flip is inert) — if not,
-   that diff is a candidate cause and is published.
-2. Diff `calor --help`, every subcommand's `--help`, and `Calor.Tasks` MSBuild messages between the
-   arms (the surfaces `git diff 63316987..b775acb4` names in §0.2).
-3. Re-derive the turn/duration/token table of §0.2 with a committed script
-   (`bench/phase0-agent-native/ppe1-turn-attribution.py`, exact-equality test in
-   `tests/Calor.Compiler.Tests/Effects/`), so §0.2 is reproducible rather than narrated.
-4. A **2-run pilot** (one pair, one run per arm) under `claude --print --output-format stream-json`
-   to prove per-turn capture round-trips through the harness — the only paid step, bounded to two
-   runs, and its purpose is to validate the instrument, not to measure.
+Remaining: (3) commit `bench/phase0-agent-native/ppe1-turn-attribution.py` reproducing N:S1.1–S1.2
+with an exact-equality test; (4) a **2-run pilot** (one pair, one run per arm) under
+`claude --print --verbose --output-format stream-json` (Claude Code 2.1.243 requires `--verbose`
+with `stream-json`), streamed as `tee transcript.jsonl | jq -c 'select(.type=="result")' >
+agent.json` so `detect_invalid_run` (`run-pair.sh:42-72`, which scans the whole of `agent.json`
+for "rate limit" / "api error" / "overloaded") keeps its input. The pilot **defines the turn
+count** (distinct assistant `message.id`; `stream-json` emits one event per content block, and
+subagent turns appear only with `--forward-subagent-text`) — not "equals `num_turns`".
+*Pass:* a per-turn transcript per run with a documented turn definition. *Fail:* the stream cannot
+be separated from `agent.json` without changing `detect_invalid_run` — then that change is W1's.
 
-*Pass:* steps 1–3 published as a note with the diff artifacts; step 4 archives a per-turn transcript
-per run. *Fail:* step 1 finds a byte difference — then the cause is measured, not the harness, and
-S1's note says which.
+### 2.2 Spike S2 — DONE: the first-error histogram (N:S2)
 
-### 2.2 Spike S2 — the conversion denominator (fixes #1104 on a throwaway; measures what it unlocks)
+Result: 100 provable / ≈ 119 expected / 0 from #1104. It sets gate 9's floor (§5) **now**, before
+any W3 fix merges. The residual question S2 leaves is binder-side (Calor0200 on Lossy receivers,
+200 modules) and is SHOULD by §9.
 
-Fix the `EffectInferrer` recursion behind #1104 with a depth bound *on a throwaway branch*, drop
-the P32 workaround that skips unbound modules (e3a:252-270, "costs 265 of 364 modules"), and
-regenerate the 0425 and 0270 ledgers. Publish the new `ModulesEnforced` / `ModulesBound` and,
-per excluded module, the first error code — the `notReachingEffectPass` pattern of the demand
-ledger.
+### 2.3 Spike S3 — PP-W-rows fixtures, arms and margin, blind as to agent behaviour
 
-*Pass:* the spike shows what floor is **reachable** by the #1104 fix alone versus what needs
-#903's clusters 1–2 (Calor0099 dedent, Calor0100 empty-`§IFACE`) and #1097. The floor §5 gate 9
-pre-registers is set from this measurement, **before** any of those fixes merge to `main`
-(freeze-before-measurement, R:1057-1058). *Fail:* the spike cannot bound the recursion without
-changing resolution answers (gate 6's ledger moves) — then #1104 is binder-adjacent work and
-falls under §9's abort clause.
-
-### 2.3 Spike S3 — PP-W-rows fixtures and margin, results-blind
-
-Author the four W-rows pair specs (§4.1) as arm-neutral behavioural specs in
-`bench/phase0-agent-native/pairs/W-*/spec.md` (the N1 `spec.md` shape, `pairs/N1-002-inventory/spec.md:1-4`),
-each with a held-out test that **observes the laundered effect** (stdout capture / a recording
-sink), and re-run the margin derivation (`ppe1-margin-derivation.py`, seed 4537) on the
-`e1-rows-parity-001` population — the closest archived variance (CV 0.2746) — producing the null
-p95, the 0.05-grid margin, the false-fail rate and power at 1.25× / 1.4× / 1.6×.
-
-*Pass:* the annex entry **A-1.12** registers PP-W-rows with fixtures by blob SHA, the two arms,
-the metric, the margin, power, the four-valued map and the freeze event, verified at registration
-by the absence of any 0.16 row-family change in `src/` (the A-1.11 `grep` discipline, R:767). The
-A-1.2 honest-timing disclosure applies: the fixtures are authored by this workstream.
-*Fail:* power at the registered effect is below the PP-W5 floor that A:§6.1 requires — then the
-design is widened (more runs per cell) or the PP registers as UNDERPOWERED-by-design and says so.
-
-**Ordering:** S1 → S3 (the margin needs S1's attribution script to be trusted); S2 in parallel. No
-MUST item merges before A-1.12 exists (the M1 rule, R:721-727).
+Author five pair specs (`bench/phase0-agent-native/pairs/W-*/spec.md`, the N1 shape) with per-arm
+starters and held-out tests that observe the laundered effect; compile every starter and every
+seeded variant on **both** arms and record the exact diagnostic multisets; run the margin
+derivation on the chosen population (§4.1, "Margin") with the grid extended to 1.15/1.20; compute
+leg A's minimum detectable difference under the two-level cluster bootstrap and set the cell
+count from A:81 (≥ 80 % power using the **upper confidence bound of the estimated variance**,
+dry run ≥ 3 runs/arm on ≥ 5 pairs). *Pass:* A-1.12 registers all of it with the arm-A derogation
+(§4.1) and the API-spend ceiling; verified at registration by `grep -rn "PP-W" src/` empty and no
+row-family `src/` diff since `7d621c0d`. *Fail:* the cell count for 80 % power exceeds the spend
+ceiling — the PP registers with its achievable power stated and the UNDERPOWERED branch armed.
 
 ---
 
-## 3. Ship — tiered, with the cut lines stated
-
-MUST gates the release; SHOULD ships if it fits and defers to 0.16.x without renegotiation;
-DEFERRED is named so its absence is a decision (R:517-519).
+## 3. Ship — tiered
 
 ### 3.1 MUST
 
-- **W1 — Per-turn capture in the harness.** `run-pair.sh` / `run-bundle.sh` archive the
-  `stream-json` transcript per run beside `agent.json`; `token-usage.py` (A:619-636) keeps deriving
-  `tokens.output` from `modelUsage`, unchanged; #1094's `.calor-build-state.json` archive lands in
-  the same change (compiler-attested arm provenance). *Touches:* `bench/phase0-agent-native/run-pair.sh`,
-  `run-bundle.sh`, `tests/test_token_usage.py` sibling. *Pin:* a harness test that a run directory
-  without a per-turn transcript is `invalid`, and that the transcript's turn count equals
-  `agent.json` `num_turns`. *Discriminating:* delete the archive step and the test fails.
-- **W2 — PP-W-rows run and adjudicated** (§4.1) at the 0.16.0 release commit, verdict in the
-  release notes whatever it says. *Touches:* `bench/phase0-agent-native/pairs/W-*`,
-  `ppw-analyze.py`, `effect-rows-benefit-ledger.json`, `tests/…/EffectRowsBenefitLedgerTests.cs`.
-  *Pin:* exact-equality ledger test (the `EffectRowsProbeLedgerTests` pattern, R:906-932).
-- **W3 — Conversion denominator floor** (the S2 measurement made permanent): #1104 fixed with a
-  bounded recursion and a regression pin on the two Serilog modules; #903 clusters 1–2 fixed;
-  #1097's bare `?` replaced by the fail-closed `UnresolvedBoundType` route the binder already has
-  (`CHANGELOG.md:284-297`). The P32 workaround is deleted. *Touches:*
-  `src/Calor.Compiler/Effects/EffectInferrer` (under `Effects/`), `Migration/CalorEmitter.cs`,
-  `Migration/RoslynSyntaxVisitor.cs:11774-11794`, the two ledger tests. *Pin:* §5 gate 9 — the
-  ledgers' `ModulesEnforced` / `ModulesBound` at or above the pre-registered floor, exact per
-  subject. *Discriminating:* restore the workaround and the floor test fails.
-- **W4 — The turn-gap attribution published.** S1's note plus, once W1 exists, the per-turn
-  breakdown of the first 0.16 epoch (PP-W-rows itself is the first epoch with capture). No product
-  change is promised here: the deliverable is a measurement with a cause or a bounded "unknown".
-  *Pin:* the attribution script's exact-equality test over the archived epochs.
-- **W5 — Silent stops made loud.** The `10_000` cap in `PropagateInstantiatedCharges`
-  (`EffectEnforcementPass.cs:1129`) raises a diagnostic (Calor04xx, allocated in the W5 PR) with the
-  function that hit it instead of returning quietly; the e4:230-234 escaping-lambda case draws
-  Calor0425 at the `§R` (the D:§6.2 site 3 span) instead of nothing. *Pin:* one `_IsReported` test
-  each, built from a fixture that reaches the cap / the escape. *Discriminating:* revert and the
-  test fails.
+- **E7 — MCP query surface over the index:** `calor_query` (or `calor_navigate` extended) exposing
+  `callers | callees | impact [--effects --row] | effects`, reading `ProjectIndex` (format 4.0)
+  and answering byte-for-byte what `calor query` answers. *Touches:* `Mcp/Tools/NavigateTool.cs`
+  or a sibling, `Commands/QueryCommand.cs` (shared reader), `docs/`. *Gates:* gate 3's MCP leg
+  (the edit-script corpus through the MCP surface), gate 7's E7 leg (the ten effects goldens
+  answered identically via MCP). *Discriminating:* answer from the in-memory graph instead of the
+  index and the gate-7 MCP golden for the cross-module fold (`Whisper`) fails.
+- **W1 — Per-turn capture.** `run-pair.sh` / `run-bundle.sh` archive `transcript.jsonl` per run
+  (S1's mechanics), the agent's `dotnet build` stdout, and #1094's `.calor-build-state.json`;
+  `pair.json` gains the arm-A derogation field §4.1 names. *Touches:* the two runners,
+  `templates/calor-arm/CalorArm.csproj.template:17`, `tests/test_token_usage.py` sibling.
+  *Pin:* a run directory without `transcript.jsonl` is `invalid`; the transcript's turn count (S1's
+  definition) is recorded in `result.json`. *Discriminating:* delete the archive step → the first
+  0.16 epoch run is invalid → PP-W-rows route (b).
+- **W2 — PP-W-rows** run and adjudicated at the 0.16.0 release commit (§4.1). *Touches:*
+  `pairs/W-*`, `ppw-analyze.py`, `effect-rows-benefit-ledger.json`, its exact-equality test.
+- **W3 — Converter reach + effect-pass robustness.** (a) #903 clusters 1–2 (Calor0099 dedent
+  emission in `Migration/CalorEmitter.cs`; empty-`§IFACE` Calor0100); (b) #1097:
+  `TryInferLambdaParameterType` (`RoslynSyntaxVisitor.cs:11774-11794`) returns `null` for
+  `TypeKind.Error` so no bare `?` is emitted; (c) #1104: a depth bound in the nested
+  `EffectInferrer` (`EffectEnforcementPass.cs:2547`, cycle `:4022 → :3942 → :3827`) with a
+  crash-repro pin — **in `tests/Calor.Enforcement.Tests/EffectInferrerRecursionTests.cs`, over a
+  committed fixture reduced from the Serilog module and enforced *without* binding**, because the
+  ledger test refuses unbound modules and must keep doing so. *Pin:* gate 9. *Discriminating:*
+  revert (a) → `ExcludedParseFailed` rises above 2 → red; revert (b) → MediatR `ModulesEnforced`
+  drops below 27 → red; revert (c) → the recursion test crashes the host.
+- **W4 — Turn-gap attribution published.** S1's script and note; after W1, the per-turn
+  tool-class table (Read / Grep / Bash-build / Edit / other) over PP-W-rows' runs. *Touches:*
+  `ppe1-turn-attribution.py`, `tests/…/EpochTurnAttributionTests.cs`, the 0.16.0 release notes.
+  *Gate:* 12. *Discriminating:* delete one archived run → the exact-equality test is red.
+- **W5 — Silent stop made loud.** `PropagateInstantiatedCharges` reports **Calor0600** at its cap
+  (the `ProcessScc` text, `:484-487`; no new code), with the cap injectable so the pin runs at
+  cap = 2 on a three-hop fixture. *Touches:* `EffectEnforcementPass.cs:1123-1140`,
+  `tests/Calor.Enforcement.Tests/`. *Discriminating:* revert the report → `_IsReported` fails.
 
-**Cut line 1.** If W3 overruns (converter and effect-pass fixes have a history of finding more
-behind them — #903 has been open since 2026-08-10), W2 still runs: the PP is fixture-scale and
-independent of the corpus floor. W3's floor then reads at its S2-measured "reachable by #1104
-alone" value and the release notes say which cluster did not land.
+**Cut line 1.** If W3(a) overruns, W2 still runs (fixture-scale, corpus-independent); gate 9
+reads its **(b)+(c) floor** (MediatR ≥ 27; aggregate ≥ 100) and the release notes name the
+cluster that did not land. If E7 overruns it defers to 0.16.x **with** its two gate legs — a MUST
+that slips is renamed in the release notes, not silently re-tiered.
 
 ### 3.2 SHOULD
 
-- **E6** `review-packet` reads the index (R:731) — gate 7's E6 leg already exists conditionally.
-- **E7** MCP query surface: callers / callees / impact / effects (R:732) — gate 3's MCP leg.
-- **W6 — `FunctionBoundType.Row` end-to-end** (the 0.15.x obligation, D:2700-2708): the bound row
-  carries the variable part; `ResolveInvokedValueRow`'s AST span-matching goes. Binder-adjacent,
-  so SHOULD by §9's rule; the pins that must stay green are named at D:2700-2708 and e5:150-164.
-- **W7 — Lambda-parameter rows** (position 2 of D:§3.3) so `§LAM{l1:h:Func<…>} §C{h}` is charged
-  rather than Calor0411 (e4:255-259) — the same slice fixes the untyped-alias hop (e4:252-254).
-- **W8 — Index parity with `calor build`** (e5:265-272) and interface members indexed
-  (e5:273-275); gate 8's 30 s envelope measured on the largest corpus subject (e5:259-261).
-- **E8** contract outcomes in the index (R:733).
-- **M2** the real Calor arm as product (R:735-736) — a SHOULD for the third release running, and
-  §5.1's re-entry condition; W2 is *not* M2: it invokes Calor on fixtures, not on a ≥70-task venue.
+- **W6 — Binder on Lossy receivers:** Calor0200 (200 modules) / Calor0273 (88) on
+  converted/external receivers; the C# `null`-as-identifier emission (104 first errors) may be
+  converter-side and is triaged first. Binder-adjacent → SHOULD by §9; if it ships, gate 9's ledger
+  regenerates in-PR with the delta disclosed.
+- **W7 — `FunctionBoundType.Row` end-to-end** (D:2700-2708; e5:150-164) and lambda-parameter rows
+  (e4:255-259; e4:252-254). Row-family; blocked by A-1.12.
+- **W8 — Index parity with `calor build`** (e5:265-272), interface members indexed (e5:273-275),
+  the index-build effect pass measured against gate 8's envelope (e5:259-261).
+- **E6** `review-packet` over the index; **E8** contract outcomes facet; **M2** the real Calor
+  arm (R:735-736) — a SHOULD for the third release; W2 is not M2.
 
-### 3.3 DEFERRED (named; frozen as the residual list at A-1.12 registration)
+### 3.3 DEFERRED (frozen as the residual list at A-1.12)
 
-- **IL-derived rows for BCL-returned delegates** — *demand trigger:* the 0425 ledger's
-  `UnknownSource + InvocationUndetermined` exceeds **10** over the W3 denominator at the 0.16 branch
-  cut; today 0 over 99. Venue if triggered: 0.17 entry spike.
-- **Async rows** — the D:1936-1942 three-clause re-entry test is adjudicated at the 0.15.0 retro,
-  as D:1926 says; absent that adjudication in writing, deferred again by decision.
-- `PreconditionSuggester` on the typed CFG (#786 residual); reflection / `DynamicInvoke` /
-  `dynamic`; event-handler `+=`; `§DEL` type parameters (D:1143); rank-2 (e3b:150-155) — all
-  unchanged from R:738-742.
-- **E9** affected-tests facet — still no design; not deferred *to* anything until one exists.
-- **Converter emits rows** — declined again on D:1780-1783's grounds (a Roslyn-side effect
-  inference over 3121 sites is the campaign R:995 refuses).
+IL-derived rows for BCL-returned delegates — *trigger:* `UnknownSource + InvocationUndetermined`
+> 10 over gate 9's enforced set at the 0.16 branch cut (today 0 / 99). Async rows — the
+D:1936-1942 three-clause test, **adjudicated by the maintainer in writing at the 0.16 branch cut**
+(the 0.15.0 retro has no date). `PreconditionSuggester` on the typed CFG; reflection /
+`DynamicInvoke` / `dynamic`; `+=`; `§DEL` type parameters (D:1143); rank-2 (e3b:150-155); E9
+(no design); converter-emitted rows (D:1780-1783); ρ_body under-approximation of an escaping
+lambda (e4:230-234 — **not silent**: 0.15.0 emits Calor0425 "return of 'Wrap' is function-typed
+with no effect row" at the `§R` span; the under-approximation is observable only through the
+private `_lambdaBodyRows`, so it is a §6 row with a trigger, not a MUST).
 
 ---
 
 ## 4. Honest measurement
 
-### 4.1 PP-W-rows — "rows catch laundered effects on callback-heavy code without a large loop tax"
+### 4.1 PP-W-rows — "with rows, fail-closed, agents launder fewer effects on callback-heavy code than under the pre-rows language as it was usable, at no large loop tax"
 
-**Pair set (four pairs, the PP-E1 fixture shapes, A:317 leg A):**
+**Pairs — five (A:81's floor), per-arm starters.** The spec is arm-neutral; **the starter is
+not**: the `after/*.calr` fixtures do not parse on v0.14.3 (Calor0100 at `<eff`), so arm A starts
+from the row-less `before/` programs and arm B from `after/`. Both are frozen by blob SHA
+(`git ls-tree` at `7d621c0d`):
 
-| Pair | Shape | Source fixture | Seeded laundering defect (one per task, frozen by diff anchor) |
-|---|---|---|---|
-| W-001 middleware | pipeline `Handle(request, next)` with `<eff e>` | `docs/design/spikes/effect-rows/after/A2.calr` (blob `93ecdf16`) | an interface member widened `§E{e}` → `§E{e, cw}` with a body that prints — the L5-A2 cell |
-| W-002 map | `Map<eff e>` over a list with a pure and an impure callback | `A3-map.calr` (`0885b3dd`) | a printing callback passed where the caller declares `§E{}` — L6-MAP |
-| W-003 match | `Match` combinator with two callbacks | `A3-match.calr` (`c1ce7517`) | as L6-MATCH |
-| W-004 callback field | `§FLD{Action<i32>:onChange}` invoked from a method | `A3-callback.calr` (`05ddc23d`) | the field's row deleted, the method left `§E{}` — L7-CB |
+| Pair | Shape | Arm A starter (`before/`) | Arm B starter (`after/`) | Laundering opportunity in the EXTENSION |
+|---|---|---|---|---|
+| W-001 | middleware `RunTwice<eff e>` + `Handle` | `A3-middleware.calr` `2d351d10` | `A3-middleware.calr` `e5ee81e2` | add a timing/logging stage; the pure caller's `§E{}` must stay honest |
+| W-002 | `Map<eff e>` over a list | `A3-map.calr` `9f108655` | `A3-map.calr` `0885b3dd` | add a `MapAndReport` that passes a **lambda** whose body prints |
+| W-003 | `Match` combinator | `A3-match.calr` `1f36ea6e` | `A3-match.calr` `c1ce7517` | add a fallback branch that logs, invoked through a **lambda** |
+| W-004 | `§FLD{Action<i32>:onChange}` | `A3-callback.calr` `f2dca4a6` | `A3-callback.calr` `05ddc23d` | add a subscriber that writes; `Bump` is declared `§E{}` |
+| W-005 | MediatR-shaped pipeline `Handle(request, next)` | `A2.calr` `d49d0017` | `A2.calr` `93ecdf16` | add a pre-processor step that prints |
 
-Each task asks the agent to **extend** the module (a new combinator use, a new subscriber) under an
-arm-neutral behavioural spec; the seeded defect is present in the starter and the held-out test
-**observes the effect** (captured stdout / a recording sink asserting the pure path printed
-nothing). A-1.2 honest-timing: the fixtures pre-exist, and 7 of 10 mutation cells have a
-pre-existing execution (A:317 "Honest timing"); the *tasks* are new and blind.
+`after/A2.calr` does **not** compile clean on 0.15.0 (exit 1: Calor0410 'unknown' + 2× Calor0411
+— the PP-E1 post-E4 multiset, A:338-450); its control is therefore that multiset, and route (a)
+below is worded as PP-E1's "matches the frozen multiset", not "compiles clean".
 
-**Arms — which contrast isolates the claim.** Three options, priced:
+**Design change from Draft v1 (round 1, C.6): the starter builds on both arms.** No defect is
+seeded in the starter. The task asks for an extension whose *natural shortcut* launders an effect
+(a printing lambda handed to a pure-declared combinator; a writing subscriber under a pure
+`Bump`); the held-out test asserts the pure path stays silent (captured stdout / a recording
+sink). The compiler on arm B catches what the agent writes; arm A's compiler cannot. Leg B then
+charges arm B for *reacting to a diagnostic*, which is the cost being measured — **pre-registered
+bias direction: leg B's ratio is expected > 1 on arm B; a ratio < 1 would be surprising and is
+disclosed as such.** The prompt's "the starter already builds" (`run-pair.sh:792`) stays true.
 
-- *(i) v0.15.0 vs 0.16 build.* Measures 0.16's delta over 0.15, not rows' benefit — rows exist in
-  both arms. Rejected for this PP; it is PP-E1's shape and belongs to a 0.16 *tax* re-run if W4
-  finds a cause worth removing.
-- *(ii) v0.15.0 strict vs v0.15.0 `--permissive-effects`.* Same compiler; the flag waives
-  Calor0425 only (R:985; `CHANGELOG.md:88-92`) and, pre-existing, demotes Calor0410 to a warning
-  (e4:246-248). The contrast isolates **fail-closed reporting** of the row family — but Calor0424
-  fires in both arms, so a laundering the checker *can* prove is caught in both. It measures the
-  waiver's cost, not rows' benefit.
-- *(iii) v0.14.3 with `--permissive-effects` vs v0.15.0 strict.* Under v0.14.3, invoking a
-  function value is Calor0418 rejection (R:358-360), so callback code compiles only under the
-  waiver — which is exactly how the spike's own BEFORE artifacts were produced
-  (`after/A2.diagnostics.txt` header, R:793-794). Arm A is therefore "the language before rows, as
-  an agent would actually have used it"; arm B is rows, fail-closed. This is the contrast that
-  isolates *having rows* from *not having them*. **Chosen.** Its confound is stated: arm A also
-  lacks 0.15's non-row changes (E1 re-keying, elision default); the fixtures carry no contracts,
-  and E1 moved zero corpus diagnostics (R:530-531), so both are inert on these programs — the S1
-  replay method (§2.1 step 1) verifies that on the W fixtures before registration.
+**What v0.14.3 already catches — disclosed per pair, measured at S3, not assumed.** Under
+`--permissive-effects` v0.14.3 emits `warning Calor0410 … uses effect 'cw'` on a *method-group*
+printing callback (Draft v1 review, C.4); W-002/W-003 therefore seed through **lambda bodies**,
+and W-004 through a field callback, which v0.14.3 cannot charge. S3 compiles every seeded
+extension on arm A and records the multiset; any pair where arm A draws a Calor0410 *naming the
+effect* is published as "warning-vs-error" and its leg-A contribution reported separately. Arm A
+also sees Calor0418/0419 **warnings** at every invocation under the waiver — an arm-visible
+signal, disclosed.
 
-**Metric.** Two legs, one verdict:
+**Arms — contrast (iii), with the derogation it needs.** v0.14.3 + `--permissive-effects` vs
+v0.15.0 strict. Rejected: (i) 0.15.0 vs 0.16 (rows in both arms — a tax re-run, not a benefit
+test); (ii) 0.15.0 strict vs permissive (Calor0424 fires in both — measures the waiver, not rows).
+Chosen (iii) is the only contrast that isolates *having rows*; its confounds are named: on v0.14.3
+the waiver also silences Calor0410/0411, so **leg A measures "effect checking with rows,
+fail-closed" against "the pre-rows language as an agent could actually use it" — not rows in
+isolation** — hence the title above, and arm A additionally lacks E1 re-keying and the elision
+default, both measured inert on contract-free code (N:S1.3; R:530-531).
+**Derogation (DECIDED, round 1 C.2):** a Calor arm under `--permissive-effects` is an invalid run
+under the frozen pin — `run-pair.sh:289` reads `arms.calor.config.permissiveEffects` against the
+annex §1 pin table, and `CalorArm.csproj.template:17` hardcodes `CalorEnforceEffects=true`.
+**A-1.12 registers, under §7's supersession rule, a "pre-rows control arm" derogation**: for
+PP-W-rows only, arm A's `pair.json` sets `permissiveEffects: true`, the pin named as relaxed is
+the §1 table's `permissiveEffects = false` row, the template gains a per-arm
+`<CalorPermissiveEffects>` property (W1), and every other pin (model, `raw` edits, distinct
+`Calor.Tasks` hashes, censoring caps) stands. Arm B runs no flags.
 
-- *Leg A — escapes.* Per run, `escapedBugs` from the held-out effect-observing test
-  (`result.json` already carries `escapedBugs`, `heldoutPassed`). Bar: the treatment arm's escape
-  rate is below the control's by the registered margin (set at A-1.12 from S3's derivation over the
-  4 × 5 design — a Fisher-exact one-sided test at α = 0.05 with the minimum detectable difference
-  published; if the minimum detectable difference at power 0.8 exceeds 0.5, the PP registers as
-  UNDERPOWERED-by-design and says so).
-- *Leg B — loop tax*, the PP-E1 rule verbatim: fails iff the one-sided 95 % two-level
-  cluster-bootstrap lower bound of the median paired per-pair `tokens.output` ratio (treatment /
-  control) exceeds 1.0 **and** the point exceeds the margin; iterations-to-green observational.
-  Margin: S3 re-derives on `e1-rows-parity-001` (null simulation → p95 → round up to the 0.05
-  grid, A:317 "Margin derivation"); the number is **not** written here because it must be produced
-  by the script, not the plan. The CV cap = 1.5 × the calibration population's median CV, the
-  A-1.11 rule.
+**Metric — two legs, nested design (A:§6.1), one verdict.**
 
-**Four-valued outcome, precedence NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT** (A:317; R:919-921):
+- *Leg A — escapes.* Per pair, the escape rate on each arm (`result.json` `escapedBugs` /
+  `heldoutPassed` from the effect-observing test); statistic = **median over pairs of the
+  per-pair escape-rate delta (A − B)**, with the same two-level cluster bootstrap as leg B; bar =
+  the one-sided 95 % lower bound of the delta exceeds **0** and the point exceeds the MDD S3
+  derives at 80 % power. Not Fisher over pooled runs — runs are nested in pairs.
+- *Leg B — loop tax*, PP-E1's rule verbatim on `tokens.output` (A-1.9.1): fails iff the lower
+  bound exceeds 1.0 **and** the point exceeds the margin; iterations observational.
 
-- **NOT-ADJUDICATED**, exhaustive: (a) any fixture fails to compile on either arm unmutated; (b)
-  W1's per-turn capture is missing for any run (the harness-invalid route, extended); (c) the
-  PP-W5 validity floor (a cell < 2 valid runs drops its pair; < 3 pairs; either arm < 12 valid;
-  > 40 % censored); (d) W2 does not ship in 0.16.0 **and only where §3.1's cut line was invoked
-  in writing**, cited in the ledger.
-- **Own-goal clause** (A:317; R:920-921): a not-adjudicated route caused by this workstream — a
-  fixture broken by a 0.16 edit, a ledger regenerated by it, a harness misconfigured by its
-  author — is **MISS**, with the artifact published.
-- **MISS**: leg A misses its bar on a valid harness, or leg B fails, or an own-goal.
-- **UNDERPOWERED**: leg A at its bar but leg B's point exceeds the margin with the bound not
-  firing, or the realized CV exceeds the cap.
-- **HIT**: leg A at its bar and leg B not failing. A HIT means "rows caught the registered
-  laundering classes at no large loop tax", never "rows are free".
+**Margin — derived, disclosed, one knife edge.** Re-running the committed
+`ppe1-margin-derivation.py` (seed 4537, 300 × 400) on `e1-rows-parity-001` with the grid extended
+to 1.15/1.20: within-cell CV median 0.2746, null point p95 **1.1800 → margin 1.20**; conjunction
+false-fail 0.7 % (point-only 2.7 %); power **0.53 / 0.81 / 0.97** at 1.25× / 1.4× / 1.6×. *Knife
+edge:* the population's own realized point is 1.1835 — the 0.15 tax sits *at* its null p95 —
+and pooling both arms of an epoch whose arms differ inflates the null spread, so an `e1`-only
+calibration biases the margin **toward leniency**. S3 pre-registers the population — `e1` alone,
+or `w5-parity-002 + e1` pooled — before any W run, and states the margin the other choice would
+have given. The CV cap = 1.5 × the chosen population's median CV.
 
-**Freeze event:** annex entry **A-1.12**, registered before any W-item merges, guarded by
-`scripts/check-annex-freeze.py` (A-1.10, `CHANGELOG.md:223-236`). **Who runs it:** the 0.16.0
-release PR's author before the tag, via `run-pair.sh` with W1's capture; `create-release` does not
-proceed without the analysis file (the A-1.11 rule).
+**Cells and spend.** Five pairs; runs per cell from A:81 (≥ 80 % power at the registered
+leg-A MDD, upper-bound variance); at the archived mean of **$1.005 per run** (N:S1.2) a 5 × 8 × 2
+design is ≈ $80 — the pre-registered **API-spend ceiling is $150** (≈ 150 runs); if 80 % power
+needs more, the PP registers its achievable power and arms UNDERPOWERED.
 
-### 4.2 The tax question — instrument first, diagnosis second
+**Four-valued outcome, precedence NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT** (A:317):
+NOT-ADJUDICATED — (a) any unmutated starter fails to reproduce its frozen multiset on its arm;
+(b) any run lacks W1's transcript; (c) the PP-W5 validity floor / distinct-hash / censoring
+routes; (d) W2 does not ship in 0.16.0 **and only where §9 cut line 2 was invoked in writing**,
+cited in the ledger. **Own-goal clause** (A:317): a route caused by this workstream is MISS, with
+the artifact. MISS — leg A below its bar on a valid harness, or leg B fails, or an own-goal.
+UNDERPOWERED — leg A at bar with leg B's point over the margin and the bound not firing, or CV
+over the cap, or registered achievable power < 80 %. HIT — leg A at bar and leg B not failing:
+"rows, fail-closed, caught the registered classes at no large loop tax", never "rows are free".
 
-The per-diagnostic attribution the brief asked for has been run for this draft and is in §0.2:
-it attributes **nothing** to diagnostics. Two instruments follow:
+**Blindness, stated correctly (round 1, C.8):** PP-E1 executed all ten mutation cells (10/10) and
+the S3 compiles execute every seeded extension on both arms; the registration is results-blind
+**only as to agent behaviour** — no agent has run any W task. **Freeze event:** A-1.12, guarded by
+`check-annex-freeze.py`. **Who runs it:** the 0.16.0 release PR's author before the tag.
 
-- *Zero-spend, now (S1):* the arm-surface replay and the committed turn-attribution script. Done
-  before A-1.12; its result is an input to the margin derivation (if a cause is found and removed
-  in 0.16, PP-W-rows' leg B measures against arm A unchanged — the cause is disclosed, not
-  corrected for).
-- *With W1:* per-turn tool-call classes (Read / Grep / Bash-build / Edit / other) per arm per run,
-  over PP-W-rows' own runs — the first epoch captured. Published as a table in the 0.16.0 release
-  notes. **No 0.16 product change is justified by the 18 % until that table exists.**
+### 4.2 The tax question — instrument first
 
-### 4.3 What stays true from 0.15
+S1 steps 1–2 are done and null; the per-diagnostic attribution attributes nothing to
+diagnostics; the per-turn table over PP-W-rows' own runs (the first captured epoch) is W4's
+deliverable. **No product change is justified by the 18 % until that table exists.**
 
-No real-scale epoch unless both re-entry conditions hold (R:856-857, R:993-994). M2 stays SHOULD.
-The benchmark's 1.32× stays a regression indicator (R:37-38). Register-then-merge is enforced by
-the annex guard, not discipline (A-1.10).
+### 4.3 Unchanged from 0.15
+
+No real-scale epoch until both re-entry conditions hold (R:856-857); M2 SHOULD; 1.32× a regression
+indicator; register-then-merge enforced by A-1.10.
 
 ---
 
 ## 5. Release gates — instrument, denominator, freeze point, discriminating pin
 
-**Carried live from 0.15** (R:859-970), restated only where 0.16 changes the reading:
+**Carried from 0.15, restated as what exists:**
 
-1. **Effect laundering, closed classes** — unchanged: six classes, one `_IsError`/`_Compiles`
-   pair each; W5 adds the escaping-lambda case as a *seventh* pin **without** widening the frozen
-   class list (it is a site-3 emission, not a new class).
-2. **Higher-order expressiveness** — the demand ledger re-executed at the release commit; floor
-   25; **new:** D-A's per-class counts are published beside the W3 denominator so a rise in
-   Calor-native higher-order code is visible.
-3. **Surface agreement** — as it exists (clean vs incremental); the MCP leg fires with E7.
-4. **PP-E1** — adjudicated at 0.15.0; its ledger test stays in CI as a *regression* pin: leg A
-   must remain 10/10 with a clean control on every 0.16 commit.
-5. **Corpus compatibility** — the committed `.calr` at the 0.16 branch cut, two legs as at
-   R:933-946; W3-attributable new diagnostics on the conversion subjects are separated and
-   published (the E1 clause, R:941-944).
-6. **Resolution floor** — 817/1248 exact, per subject, two-sided (R:947-958). W3 must not move it;
-   if #1097's fix changes what binds, the ledger regenerates in the same PR with the delta
-   disclosed.
-7. **Index/query correctness** — the ten E5 goldens plus W8's interface-member and parity goldens
-   when W8 ships.
+1. **Laundering, six closed classes** — unchanged (R:866-881).
+2. **Higher-order demand ledger** re-executed at the release commit; floor 25 (R:882-888).
+3. **Surface agreement — as it exists:** clean-vs-incremental in-process only
+   (`EditScriptIdentityTests`); the CLI-process leg is PR #982 (open), the `Calor.Sdk` leg is
+   unbuilt, ES-08 is unregistered (§0.1). **E7's MCP leg is built in 0.16** and joins the
+   instrument; the CLI/SDK legs and ES-08 are §6 rows with triggers, not gates.
+4. **PP-E1** — a regression pin: leg A stays 10/10 with a clean control on every 0.16 commit.
+5. **Corpus compatibility — leg (a) only, as it exists** (`tests/TestData/Benchmarks`,
+   `samples/`, test-compiled `.calr`); leg (b) is unbuilt (§6). W3-attributable new diagnostics are
+   separated and published (R:941-944).
+6. **Resolution floor** 817/1248 exact per subject, two-sided (R:947-958).
+7. **Index/query goldens** — the ten E5 goldens; **E7 leg unconditional** (E7 is MUST).
 
-**New in 0.16:**
+**New:**
 
-8. **Harness capture.** *Instrument:* the W1 harness test (a run without a per-turn transcript is
-   invalid; transcript turns = `num_turns`). *Denominator:* every run of every 0.16 epoch.
-   *Freeze point:* A-1.12 names the capture as a validity condition. *Discriminating pin:* remove
-   the archive step → the first epoch run is invalid → PP-W-rows reads NOT-ADJUDICATED by route (b).
-9. **Conversion denominator floor.** *Instrument:* `Calor0425CorpusLedgerMatchesRecomputation`
-   and the Calor0270 ledger test, exact per subject, plus a floor assertion. *Denominator:* 364
-   subject modules at the pinned submodule SHAs. *Freeze point:* the floor is written into the
-   ledgers' `floorRule` by the S2 PR **before** any W3 fix merges; today's values (99 enforced /
-   305 bound) are the baseline it must exceed. *Discriminating pin:* re-introduce the P32
-   bind-first workaround → `ModulesEnforced` drops below the floor → red. Two-sided as gate 6: a
-   rise regenerates in-PR with disclosure.
-10. **PP-W-rows.** *Instrument:* `effect-rows-benefit-ledger.json` + its exact-equality test +
-    `ppw-analyze.py`. *Denominator:* four pairs × 5 runs/arm, two legs. *Freeze point:* A-1.12.
-    *Discriminating pin:* the annex guard rejects an edit to the frozen row; dropping a pair from
-    the ledger fails the test.
-11. **Silent-stop coverage.** *Instrument:* W5's two `_IsReported` pins. *Denominator:* the two
-    named silent paths (`EffectEnforcementPass.cs:1129`; e4:230-234). *Freeze point:* this
-    document's §3.1 W5. *Discriminating pin:* revert either emission and its test fails.
-
-A gate missing any of the three is an aspiration (R:1055-1056); every gate above names its pin.
+8. **Harness capture.** *Instrument:* W1's validity test. *Denominator:* every run of every 0.16
+   epoch. *Freeze:* A-1.12 names it a validity condition. *Pin:* remove the archive step → route (b).
+9. **Conversion denominator floor.** *Instrument:* the Calor0425 and Calor0270 ledger tests,
+   schema 3 with `floorRule`, exact per subject. *Denominator:* 364 subject modules at the pinned
+   SHAs, bind-first. *Floor, pre-committed here from S2:* aggregate `ExcludedParseFailed ≤ 2`
+   (cluster 3 remains) **and** `ModulesEnforced ≥ 100` (MediatR ≥ 27, serilog ≥ 47,
+   FluentValidation ≥ 26); expectation ≈ 119, published, not gated. *Freeze:* the S2 PR writes
+   the floor before any W3 fix merges. *NOT-ADJUDICATED route:* the one ICE-only module draws a
+   second error after the #1097 fix — then the floor is unreachable by construction and is
+   re-registered at 99 with the artifact. *Pin:* revert the converter fix → per-subject
+   `ModulesEnforced` / `ExcludedParseFailed` move → red. Two-sided as gate 6.
+10. **PP-W-rows.** *Instrument:* `effect-rows-benefit-ledger.json` + exact-equality test +
+    `ppw-analyze.py`. *Denominator:* five pairs × the registered cells × two arms. *Freeze:*
+    A-1.12. *Pin:* the annex guard; dropping a pair fails the test.
+11. **Silent-stop coverage.** *Instrument:* W5's `_IsReported` pin at an injected cap.
+    *Denominator:* the one named path (`:1129`). *Freeze:* §3.1 W5. *Pin:* revert → red.
+12. **Turn attribution.** *Instrument:* `ppe1-turn-attribution.py` + exact-equality test.
+    *Denominator:* every archived epoch under `bench/phase0-agent-native/epochs/`. *Freeze:*
+    A-1.12 (the fields it reads). *Pin:* delete one run → red.
 
 ---
 
-## 6. Carried debt — every registered residual, with a trigger and a venue
-
-Sources: the brief's list, R:§4.2/§4.5, D:§13.5/§14, and the residual sections of the seven slice
-notes (72 items collected for this draft; the ones below are the registered, non-discharged ones —
-transcript-regeneration bookkeeping and items discharged in a later slice are omitted).
+## 6. Carried debt — trigger and venue for every registered residual
 
 | Item | Source | Trigger | Venue |
 |---|---|---|---|
-| `FunctionBoundType.Row` has no end-to-end reader; `ResolveInvokedValueRow` span-matches the AST; `Binder.BindRow` collapses variable rows | R:710-720; D:2700-2708; e5:150-164 | W7 needs it, or any second AST-keyed row store appears | **0.16 SHOULD W6**; 0.16.x if §9 abort |
-| Lambda parameters invoked in-lambda → Calor0411; silently pure under permissive | e4:255-259 | — | **0.16 SHOULD W7** |
-| Untyped alias / untyped non-lambda `§B` → Calor0411 + fail-closed 0410 | e4:252-254; R:538-540 | — | 0.16 SHOULD W7 (same slice) |
-| Escaping lambda under row-less `-> Func<…>` inside rank-1: SILENT | e4:230-234 | — | **0.16 MUST W5** (report), rank-2 semantics stay deferred |
-| `PropagateInstantiatedCharges` `10_000` cap stops silently | `EffectEnforcementPass.cs:1129`; e3b:117-123 | — | **0.16 MUST W5** |
-| Calor0421 ordinal-mismatch message ("matched BY POSITION") | e3b:144-148 | user report of confusion | not scheduled; message is pinned and correct |
-| #1104 EffectInferrer unbounded recursion (two Serilog modules) | e3a:252-270; R:652-657 | — | **0.16 MUST W3** |
-| P32 excludes 265/364 modules; no `ExternalBase` bucket until E4 | e3a:252-270; e3b:236-241 | — | 0.16 MUST W3 / gate 9 |
-| Index folds cross-module charges for every bindable file; `calor build` only for compiled ones | e5:265-272 | — | 0.16 SHOULD W8 |
-| Interface methods not indexed (`query effects ILogger.Write` → "no declaration") | e5:273-275 | — | 0.16 SHOULD W8 |
-| Index-build effect pass unmeasured against gate 8's 30 s | e5:259-261 | — | 0.16 SHOULD W8 (measure; nightly `performance.yml`) |
-| `§FLD`/`§B` rows not index positions; `§LAM` rows private; hover shows declared row only; `--json` on `effects` only | e5:168-175 | E7 ships | with E7, else 0.16.x |
-| `impact --effects` compares against the caller's DECLARED row only | e5:252-255 | user report | not scheduled; documented |
-| Solution-level manifests not consulted by the index | e5:256-258 | a solution with manifests in the corpus | 0.16.x |
-| D2: D:§6.2 row 6 spells `DoesNotFit` as Calor0424; unreachable under §7.4's solve | e3b:68-88 | design-doc owner adjudicates | D:§6.2 annotation stands; not code |
-| D5: effect-polymorphic method group answers Unknown (rank-2) | e3b:150-155 | — | DEFERRED (rank-2) |
-| Calor0410 demoted to a warning under `--permissive-effects` | e4:246-248 | — | not scheduled; R:985's inventory extended by this row |
-| Calor0419 "passes function-typed value" at BCL argument sites | e4:249-251; D-A = 2 | D-A `calor0419FunctionTyped` > 10 | 0.17 with IL rows, if triggered |
-| BCL-returned delegates → Unknown; no manifest row-on-return | D:1660-1664; R:741-742 | 0425 `UnknownSource + InvocationUndetermined` > 10 over the W3 denominator | **DEFERRED, demand-triggered** (§3.3) |
-| Key parameter component is inferred ARGUMENT types; IL keys built `FromStrings` | D:1360-1366; D:1677-1687; R:545-556 | gate 6 needs it to move, or IL rows trigger | 0.17 |
-| Bound types carry no interface set (hardcoded Linq receiver fallback) | D:1346-1353 | — | 0.17 |
-| Lambda `ParameterTypes` are surface spellings; one `FunctionBoundType` mixes vocabularies | D:1614-1620 | W6 | with W6 |
-| Async rows | D:1922-1945 | the three-clause test D:1936-1942, adjudicated in writing at the 0.15.0 retro | DEFERRED (§3.3) |
-| `PreconditionSuggester` on the typed CFG | R:739 | #909's double-report fix touches it | 0.16.x with #909, else 0.17 |
-| Reflection / `DynamicInvoke` / `dynamic`; event-handler `+=` | R:740-741 | corpus witness in the W3 denominator | DEFERRED |
-| Q1: a C#-declared interface has no row to check an implementation against | D:2810-2819 | manifest row-on-member schema | 0.17 with IL rows |
-| Q2: `eff` lookahead vs a type parameter named `eff` — pinned by `TypeParamNamedEff_StillWorks` | D:2820-2826 | — | closed by pin; no action |
-| Q3: `Subtypes` widening has no doc-drift guard in `self-check docs` | D:2827-2833 | — | 0.16.x: a `Calor13xx` drift code |
-| Q4: Calor0425 at the parameter span vs invocation | D:2834-2847 | never-invoked fraction dominates in the W3 denominator | re-read at the 0.16 branch cut |
-| PP-E1 negative-control pin skips the effect pass on `A3-map`/`A3-match` (weaker than it reads) | e3b:272-278 | — | 0.16.x: rewrite over the CLI invocation |
-| Route (b)'s denominator includes each epoch's own archives | ppe1:319-323 | — | A-1.12 states it; W2's archives enter the same way |
-| 0.14 §3.3 decisions 2–3 (migrator, golden regen) | R:977; #1084 | a user-reported 1.x file; else re-adjudicate at the 0.16 branch cut | this draft re-adjudicates: **remain demand-driven** (0 of 941 `.calr` declare 1.x) |
-| 3.5.1 null-state slice + adversarial null corpus | R:979 | 0.15.0 retro | not 0.16 MUST; 0.16.x if the retro says so |
-| #845 unsigned obligations; #859/#884 Z3 flake | R:981-983 | 0.15.0 retro with the flake rate attached | 0.16.x instrument debt |
-| #970 tri-state residual counts | R:984 | — | published per release, unchanged |
-| TIER1A "not run" | R:978 | — | release-notes row, unchanged |
+| ES-08 never registered while E2 merged (breach) | F:364-366; §0.1 | — | **0.16 kickoff sweep:** register ES-08 under F-3's supersession rule with the breach disclosed |
+| Gate 3 CLI-process leg (PR #982 open); `Calor.Sdk` leg unbuilt | R:891-893; §0.1 | E7 lands (the MCP leg needs the same driver) | #982 merged or closed in the kickoff sweep; SDK leg with E7 |
+| PRs #981 (unreleased-changes doc), #976 (perf-gate strategy, #965) open | R:987 | — | kickoff sweep: merge, close, or re-open as issues — never silent |
+| Gate 5 leg (b) `compile-all-committed-calr` never built | R:938-940 | — | 0.16.x; until then gate 5 claims leg (a) only (§5) |
+| PP-E1 negative-control pin skips the effect pass on `A3-map`/`A3-match` | e3b:272-278 | — | **kickoff sweep with #949** (cheap; gate 4 leans on it) |
+| `FunctionBoundType.Row` no end-to-end reader; AST span-matching | R:710-720; D:2700-2708 | A-1.12 registered | 0.16 SHOULD W7 |
+| Lambda params invoked in-lambda → Calor0411; untyped alias hop | e4:255-259; e4:252-254 | A-1.12 registered | 0.16 SHOULD W7 |
+| Calor0410 demoted to a warning under `--permissive-effects` | e4:246-248 | **PP-W-rows arm A depends on it** (the pre-rows waiver) — any change before the epoch is an own-goal | frozen through the 0.16.0 release commit; re-adjudicated after |
+| ρ_body under-approximation on an escaping lambda (reported as Calor0425, not silent) | e4:230-234 | a fixture measured silent | DEFERRED (§3.3) |
+| `PropagateInstantiatedCharges` `10_000` cap silent | `EffectEnforcementPass.cs:1129` | — | **0.16 MUST W5** (Calor0600) |
+| #1104 recursion | `EffectEnforcementPass.cs:2547`; e3a:252-270 | — | **0.16 MUST W3(c)** |
+| Calor0200/0273 on Lossy receivers (200 / 88 modules); `null` as identifier (104) | N:S2 | — | 0.16 SHOULD W6 |
+| Index folds cross-module charges for bindable files; `calor build` for compiled | e5:265-272 | — | 0.16 SHOULD W8 |
+| Interface methods not indexed; index-build cost unmeasured | e5:273-275; :259-261 | — | 0.16 SHOULD W8 |
+| `§FLD`/`§B` rows not index positions; hover declared-only; `--json` on `effects` only | e5:168-175 | E7 | with E7 |
+| Solution-level manifests not consulted by the index | e5:256-258 | a corpus solution with manifests | 0.16.x |
+| Calor0419 at BCL argument sites (D-A = 2) | e4:249-251 | D-A `calor0419FunctionTyped` > 10 | 0.17 with IL rows |
+| BCL-returned delegates → Unknown | D:1660-1664 | `UnknownSource + InvocationUndetermined` > 10 over gate 9's set | DEFERRED, demand-triggered |
+| Key parameter component = inferred argument types; IL keys `FromStrings` | D:1360-1366; :1677-1687 | gate 6 must move, or IL rows trigger | 0.17 |
+| Lambda `ParameterTypes` are surface spellings | D:1614-1620 | W7 | with W7 |
+| Async rows | D:1922-1945 | three-clause test, maintainer, **0.16 branch cut** | DEFERRED |
+| `PreconditionSuggester` on typed CFG; #909 double-report | R:739; #909 | — | 0.16.x together |
+| Q1 C#-declared interface rows; Q4 Calor0425 span placement | D:2810-2819; :2834-2847 | IL rows / gate 9's never-invoked fraction | 0.17 / 0.16 branch cut |
+| Q3 `Subtypes` widening has no doc-drift guard | D:2827-2833 | — | 0.16.x: a Calor13xx drift code in `self-check docs` |
+| D2 (§6.2 row 6 code), Q2 (`eff` lookahead, pinned) | e3b:68-88; D:2820-2826 | — | closed by annotation / pin; no action |
+| 0.14 §3.3 decisions 2–3 (migrator, golden regen) | R:977; #1084 | a user-reported 1.x file | demand-driven (0 of 941 declare 1.x) |
+| 3.5.1 null-state slice; #845; #859/#884 Z3 flake; #970 tri-state; TIER1A not-run | R:978-984 | **0.16 branch cut**, maintainer, with the 0.15-cycle flake rate | 0.16.x instrument debt / release-notes rows |
 
 ---
 
-## 7. Backlog disposition — every open issue on 2026-08-27 (29; none labelled P0/P1; #1082 is `p2`)
+## 7. Backlog disposition — all 30 open issues on 2026-08-27 (none P0/P1; #1082 `p2`)
 
 | Issue | Disposition |
 |---|---|
-| #1104 EffectEnforcementPass unbounded recursion | **0.16 MUST W3** — the S2 spike bounds it first |
-| #1097 converter bare `?` lambda parameter type (72 ICEs) | **0.16 MUST W3** |
-| #903 converter emits Calor its parser rejects (59/364; 3 clusters) | **0.16 MUST W3** clusters 1–2; cluster 3 (`§EI`, 2 files) with it if trivial, else 0.16.x |
-| #901 `benchmarks/*.calr` stale (7 files) | 0.16.x — 45 files already excluded from the demand ledger as "not reaching the effect pass"; repairing them moves D-A's denominator, so the PR regenerates the ledger with disclosure |
-| #929 module-level `§CT` breaks a later `§IF` dedent | 0.16.x — a parser fix with a named failing fixture; not theme work |
-| #943 no `ref`/`out` call-site syntax | 0.16.x — demand: the metadata spike's fifth call shape; re-read when W3's denominator shows how many subject sites need it |
-| #847 faithful local-function emission | demand-driven (R:1020 stands) |
-| #1094 archive `.calor-build-state.json` per run | **0.16 MUST W1** (same harness change) |
-| #1084 self-migration residue | item 1 done (Calor0701); items 2–3 re-adjudicated here: demand-driven (§6) |
-| #1082 nullability follow-ons (`p2`) | sequenced after W3 (gate 6 makes a mis-sequenced landing visible, R:980); no 0.16 gate |
-| #875 non-null `str` root cause | closes with #1082 items 1–3 (R:982's judgment stands) |
-| #845 unsigned obligations | 0.16.x (§6) |
-| #859, #884 Z3 CI flake | 0.16.x instrument debt with the 0.15-cycle flake rate attached (§6) |
-| #965 perf suite kills the CI runner on the release path | **release-blocking for 0.16.0 if it recurs**; the 0.15.0 release PR's outcome decides whether it is already closed in practice — recorded here so it is not silent |
-| #949 branch protection requires a check that no longer reports | 0.16 kickoff sweep (CI hygiene; a `--admin` merge habit hides real failures) |
-| #948 round-trip gate flake on a MediatR test | 0.16.x — `CHANGELOG.md:383-387` says the known-flake list now flows through; close if it does not recur in the 0.16 cycle |
-| #959 test host `std::system_error` flake | 0.16.x instrument debt, tracked with #859/#884 |
-| #922 LSP rename across partial types | not 0.16 — needs identity groups; re-read with E7 |
-| #906 `${}` interpolation invisible to the binder | 0.16.x — a converter/lexer fix; it widens the F-2 denominator and says so |
-| #909 DivisionByZeroChecker double-report; Calor0926 over-strong | 0.16.x, with the `PreconditionSuggester` residual (§6) |
-| #1011 test-suite audit epic (R1–R14) | continuous; R1/R2 (regression pins for #925, #774, #883) and R9 (round-trip incremental alarm) are the ones 0.16's gates lean on — R9 is what would have caught #948's shape; not release-gated |
-| #1030 round-trip baseline write-back; #1031 shared LSP client; #1032 watch sync-context; #1042 CNF property tests | audit follow-ups, continuous |
-| #851 task-gen filter precision | retired with the venue (R:1043); re-opens under §4.3's conditions |
-| #673 MCP scaffold spine; #709 Codex; #711 Gemini | adoption work, not release-gated (R:1006-1010) |
+| #1104 | 0.16 MUST W3(c) — robustness; unlocks no modules (N:S2) |
+| #1097 | 0.16 MUST W3(b) — converter-side `null` on `TypeKind.Error` |
+| #903 | 0.16 MUST W3(a) clusters 1–2; cluster 3 (2 files) with it if trivial, else 0.16.x |
+| #1094 | 0.16 MUST W1 |
+| #901 | 0.16.x; regenerates the demand ledger with disclosure (45 files not reaching the pass) |
+| #929 | 0.16.x parser fix with a named fixture |
+| #943 | 0.16.x; re-read against gate 9's enforced set for `ref`/`out` sites |
+| #847 | demand-driven (R:1020) |
+| #1084 | item 1 done; 2–3 demand-driven (§6) |
+| #1082 (`p2`), #875 | sequenced after W3; gate 6 makes mis-sequencing visible (R:980-982) |
+| #845 | 0.16.x (§6) |
+| #859, #884, #959 | 0.16.x instrument debt; flake rate attached at the 0.16 branch cut |
+| #965 | release-blocking for 0.16.0 if it recurs on the 0.15.0 release; #976's strategy PR is its venue |
+| #949 | kickoff sweep (with the PP-E1 pin rewrite, §6) |
+| #948 | 0.16.x; close if the `CHANGELOG.md:383-387` fix holds through the cycle |
+| #922 | not 0.16; re-read with E7's identity needs |
+| #906 | 0.16.x; widens the F-2 denominator and says so |
+| #909 | 0.16.x with the `PreconditionSuggester` residual |
+| #1011 (R1–R14) | continuous; R1/R2/R9 are the ones 0.16's gates lean on |
+| #1030, #1031, #1032, #1042 | audit follow-ups, continuous |
+| #851 | retired with the venue (R:1043) |
+| #673, #709, #711 | adoption work, not release-gated (R:1006-1010) |
 
 ---
 
-## 8. What "better than C#" means at the end of 0.16 — testable statements
+## 8. What "better than C#" means at the end of 0.16 — testable
 
-Each is a claim with an instrument; none is wider than what §3 commits to.
-
-1. **An agent writing callback-heavy code with a seeded effect laundering is caught by the
-   compiler** on the four registered shapes, at no large loop tax — PP-W-rows HIT at the 0.16.0
-   release commit, or the release notes carry the other verdict.
-2. **Every effect claim on real code names its denominator, and it is at least the gate-9
-   floor** — the 0425 and 0270 ledgers publish `ModulesEnforced`/`ModulesBound` per subject, and
-   the "BCL-returned delegate" residual is a measured count, not a named fear.
-3. **The compiler never stops checking silently** on the two paths that did in 0.15 (gate 11).
-4. **The cost of the toolchain in the agent loop is attributable per turn**, not per run — every
-   0.16 epoch archives per-turn tool calls (gate 8), and the 0.15 gap is either explained or
-   bounded in writing (W4).
-5. Unchanged from R:1068-1082: the queryable project model (now with an effects facet), null
-   safety for 0.14's closed classes, honest contracts with default-on elision, and no real-scale
-   claim until the re-entry conditions hold.
+1. **An agent can ask the MCP server** who calls a function, what breaks if its effects change,
+   and what its row is — answered from the index, byte-identical to `calor query` (gate 7 E7 leg).
+2. **On five callback-heavy tasks, rows fail-closed catch laundered effects that the pre-rows
+   language let through, at no large loop tax** — PP-W-rows HIT at the release commit, or the
+   verdict published as it reads.
+3. **The converter's output parses for all but two of 364 real modules and binds for at least
+   100** (gate 9), and every effect claim on real code names that denominator.
+4. **The compiler reports when it stops checking** (gate 11).
+5. **Every paid epoch is attributable per turn** (gates 8, 12); the 0.15 gap is explained or bounded.
+6. Unchanged from R:1068-1082: null safety for 0.14's closed classes; honest contracts with
+   default-on elision; no real-scale claim until the re-entry conditions hold.
 
 ---
 
 ## 9. Cut lines and schedule abort
 
-- **Binder-adjacent rule (the V3/V4 lesson, R:745-748).** Nothing binder-adjacent is MUST: W6
-  and W7 are SHOULD and defer to 0.16.x without renegotiation. W3's only binder-touching piece is
-  #1097, whose fix reuses the existing `UnresolvedBoundType` route; if S2 shows #1104 cannot be
-  bounded without moving gate 6, #1104 moves to SHOULD and gate 9's floor is set from what parse
-  fixes alone reach.
-- **Cut line 1** (§3.1): W3 overrun does not stop W2.
-- **Cut line 2:** if A-1.12 has not registered by the 0.16 branch cut — the entry gate itself
-  slipped — **no** W-item merges (the M1 rule), and 0.16.0 ships as W1 + W5 + whatever of W3
-  reached its floor, under the renamed theme **"Measured Effects"**; PP-W-rows moves to 0.17 with
-  its fixtures frozen where they are.
-- **Schedule abort:** if W1 (the capture) is not merged by the branch cut, no paid epoch runs in
-  0.16 at all — PP-W-rows reads NOT-ADJUDICATED by route (b), which under the own-goal clause is
-  a MISS if the cause is this workstream's, and the release notes say so.
-- **Not a cut line:** the 1.32× benchmark; PP-E1's regression pin (gate 4) — a red there is a
-  0.15 regression, fixed before release.
+- **Binder-adjacent rule (R:745-748).** W6 and W7 are SHOULD and defer to 0.16.x without
+  renegotiation. W3 touches the binder nowhere: (a) and (b) are converter-side, (c) is the effect
+  pass. If W3(c) cannot be bounded without changing a resolution answer (gate 6 moves), (c)
+  becomes SHOULD and gate 9 keeps its (a)+(b) floor.
+- **Cut line 1** (§3.1): W3(a) overrun does not stop W2; E7 overrun re-tiers in writing.
+- **Cut line 2:** if A-1.12 has not registered by the 0.16 branch cut, no row-family `src/`
+  change merges (W6/W7 stay out), and 0.16.0 ships **E7 + W1 + W3 + W4 (over the archived epochs
+  only) + W5** under the same title; PP-W-rows moves to 0.17 with its fixtures frozen where they
+  are and route (d) cites this line.
+- **Schedule abort:** if W1 is not merged by the branch cut, no paid epoch runs in 0.16;
+  PP-W-rows reads NOT-ADJUDICATED by route (b) — MISS under the own-goal clause if the cause is
+  this workstream's — and the release notes say so.
+- **Not cut lines:** the 1.32× benchmark; PP-E1's regression pin (a red there is a 0.15
+  regression, fixed before release).
 
 ---
 
-## 10. Review record — Draft v1
+## 10. Review record
 
-*(empty — adversarial reviews run next; findings and their dispositions are recorded here, with
-declined findings and their rationale.)*
+### Round 1 (2026-08-27, on Draft v1 @ `1af259a9`) — plan/process 85 %, measurement 88 %, engineering 85 %; all NEEDS-FIXES
 
-**Open questions this draft could not settle from the repository** (for the reviewers):
+§0's numbers reproduced under every lens; one reviewer re-executed S1 steps 1–2 (byte-identical C#
+and CLI text) and measured the bind-failed histogram this draft then re-ran (N:S2 — identical
+counts). Dispositions:
 
-1. Whether the 0.15.0 release PR's benchmark block moved from the 0.14.3 values — `[Unreleased]`
-   has none at `7d621c0d`.
-2. Whether `EffectInferrer`'s recursion (#1104) can be bounded without changing any resolution
-   answer — S2 decides; this draft assumed it can and priced the alternative in §9.
-3. The exact PP-W-rows margin, CV cap and leg-A minimum detectable difference — produced by S3's
-   scripts, deliberately not written here.
-4. Whether the two `duration` readings differ by field (`duration_ms` here; `duration_api_ms` is
-   also archived) matters for any claim — this draft uses wall-clock and makes no claim on it.
-5. Whether the 0.15.0 retro adjudicated async rows' re-entry test (D:1926) — no record exists yet.
+| # | Finding | Disposition |
+|---|---|---|
+| A.1 | Title claims rows on real code; none meet it in 0.16 | **Done** — "Measured Effects" (orchestrator DECIDED) |
+| A.2 | No user-visible deliverable sentence | **Done** — §1.3 |
+| A.3 | E7 dismissed as "no measurement"; it is specified, instrumented, needs no registration | **Done** — E7 MUST with gate 3 MCP leg + gate 7 E7 leg; §1.2 argues B fairly and records the draft's omission |
+| B.1 | Deleting the bind-first guard inflates the ledger; #1104 unlocks zero | **Done** — bind-first kept (DECIDED); §0.4, N:S2 |
+| B.2 | Run the first-error histogram now | **Done** — N:S2 (364 files; Calor0200 200, Calor0273 88, Calor0208 35, ICE 26, ICE-only 1, `null`-first 104) |
+| B.3 | W3 scope: converter-side #903 c1–2 + #1097 (`null` on `TypeKind.Error`); #1104 as robustness with a crash-repro pin whose home is named; drop the "UnresolvedBoundType route" claim | **Done** — §3.1 W3(a)(b)(c); pin in `Calor.Enforcement.Tests/EffectInferrerRecursionTests.cs` over a committed reduced fixture, unbound |
+| B.4 | Calor0200/0273 binder work is binder-adjacent → SHOULD | **Done** — W6 |
+| B.5 | Gate 9: pre-commit a numeric floor from the histogram; schema 3 `floorRule`; converter-fix pin; NOT-ADJUDICATED route; drop "doubled" and the vacuous "#1104 alone" line | **Done** — floor `ExcludedParseFailed ≤ 2 ∧ ModulesEnforced ≥ 100` (27/47/26); expectation ≈ 119 published; "doubled" removed from §1.3/§5/§8/cut line 1 |
+| C.1 | `after/` fixtures do not parse on v0.14.3; register per-arm starters | **Done** — five pairs with `before/`/`after/` blobs verified by `git ls-tree` |
+| C.2 | `--permissive-effects` on a Calor arm is an invalid run; derogation or contrast (ii) | **Done** — derogation text in §4.1 (DECIDED); contrast (ii) argued and rejected because Calor0424 fires in both arms; the waiver's 0410/0411 silencing is named and leg A retitled |
+| C.3 | `after/A2.calr` fails route (a) before the first run; use five pairs incl. A3-middleware | **Done** — A3-middleware is W-001, A2 is W-005 with its frozen multiset; route (a) reworded to "matches the frozen multiset" |
+| C.4 | Method-group seeds are already Calor0410 warnings on v0.14.3 permissive | **Done** — W-002/W-003 seed through lambda bodies, W-004 through a field; S3 measures every seed on arm A and publishes warning-vs-error pairs; e4:246-248 row given a trigger |
+| C.5 | Leg A metric must respect nesting; MDD/cells from A:81; spend ceiling; drop the unfirable UNDERPOWERED-by-design | **Done** — per-pair delta with two-level bootstrap; MDD from S3; ≥ 80 % power at upper-bound variance; $150 ceiling at $1.005/run |
+| C.6 | Seeded starter fails to build on arm B — legs in tension, prompt broken | **Done** — redesigned: starter builds on both arms; laundering arises in the extension; bias direction pre-registered |
+| C.7 | Margin on `e1`: p95 1.18 → 1.20; grid starts at 1.25; knife edge; pooled population | **Done** — re-derived (1.1800 → 1.20; false-fail 0.7 %; power 0.53/0.81/0.97); grid extension noted; population choice pre-registered at S3; bias direction (toward leniency) disclosed |
+| C.8 | "7 of 10 cells … tasks blind" is stale | **Done** — "results-blind only as to agent behaviour" |
+| D.1 | W4 MUST with no gate; missing Touches/Discriminating; cut line 2 must dispose of it | **Done** — gate 12; W4 lines; cut line 2 lists W4 |
+| D.2 | W5 half 1: reuse Calor0600, injectable cap | **Done** — W5 rewritten; the "reserve a code" question is moot |
+| D.3 | W5 half 2 is not silent on 0.15.0 | **Done** — dropped from MUST; §3.3/§6 row with a "measured silent" trigger |
+| D.4 | W1: `--verbose` required; stream must not feed `agent.json`; define turn count from the pilot | **Done** — §2.1 / §3.1 W1 |
+| D.5 | "M1 rule" over-generalised | **Done** — §2 states what A-1.12 blocks (W6/W7, row-family `src/`) and what it does not |
+| E.1–E.5 | Builds 26 vs 23 with 4 vs 2 unedited; permutation p; both naive sensitivities; "harness's strict CLI compile" wording with `run-pair.sh:677-701`; `ExecutionWorkspace.cs`; S1 1–2 done; table moved to a note | **Done** — §0.2 and N:S1 (my permutation 0.004/0.025/0.449 beside the reviewers' 0.012/0.08/0.44, statistic stated) |
+| F.1 | ES-08 breach; gate 3 CLI/SDK legs; gate 5 leg (b); PRs #982/#981/#976 open | **Done** — §0.1, §5 gates 3/5 restated as what exists, §6 rows |
+| F.2 | 0410-demoted row trigger; PP-E1 pin rewrite to kickoff sweep with #949 | **Done** — §6 |
+| F.3 | IL-rows trigger tied to the real floor; bind-failed quartile note | **Done** — §0.4, §3.3, §6 |
+| F.4 | 30 open issues; retro-venued items need owner + date | **Done** — §7; retro items moved to the 0.16 branch cut, maintainer |
+| F.5 | Cites: R:441; delete the "no D:§5.1" parenthetical; `EffectInferrer` nested at `:2547`; A:81; route (d) cites §9 cut line 2 | **Done** — all applied; `EffectInferrer` path corrected in §0.5/§3.1/§6 |
+| F.6 | Trim narration; §6 "—/not scheduled" rows are a list | **Done** — Draft v2 is 6 610 words by `wc -w` (v1 7 253 as reviewed) with the S1/S2 tables moved to N:; every §6 row has a trigger or a closing pin |
+
+**Declined:** none. **Narrowed:** C.2 — the reviewers allowed contrast (ii) as an alternative;
+this draft keeps (iii) with the derogation because (ii) cannot separate rows from the waiver
+(Calor0424 fires on both arms), and states leg A's claim at the width (iii) actually supports.
+
+**Open questions for round 2:** (1) whether the 0.15.0 release PR's benchmark block moved;
+(2) the S3 population choice (`e1` alone vs pooled) — pre-registered, not decided here; (3) whether
+E7 extends `calor_navigate` or adds `calor_query` (a product decision with no gate consequence);
+(4) whether the `null`-as-identifier emission (104 first errors) is converter-side — if so it
+moves from W6 to W3 and gate 9's expectation rises, with the floor unchanged.
