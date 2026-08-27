@@ -430,8 +430,11 @@ in advance is the point: it is what stops the baseline being quietly regenerated
 
 **Discriminating pin.** `PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4`
 (`tests/Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs`, `compiler` shard) asserts (1)'s pre-E4
-multiset on A2 and (2)'s pre-E4 `Calor0418` counts on the four A3 fixtures, on the current compiler,
-under the pinned enforcement configuration. **It is named so that E4 must update it**: E4 removes
+multiset on A2 and (2)'s pre-E4 `Calor0418` counts on the four A3 fixtures by **shelling out to the
+pinned invocation itself** — `dotnet <calor.dll> -i <source> -o <scratch>`, no flags — rather than
+driving the passes in process, because the in-process shortcut reports binder diagnostics the CLI
+filters and then skips the effect pass where those are errors. **It is named so that E4 must update
+it**: E4 removes
 the `Calor0418`s, the test goes red, and the E4 PR flips it to the post-E4 multisets registered
 above — which is the mechanical link between this correction and the restoration it demands.
 
