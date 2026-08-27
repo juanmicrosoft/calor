@@ -91,13 +91,29 @@ internal static class CliTestHarness
 
     private static string FindCalorDllCore()
     {
-        foreach (var config in new[] { "Release", "Debug" })
+        var candidates = new[] { "Release", "Debug" }
+            .Select(config => Path.Combine(FindRepoRoot(), "src", "Calor.Compiler", "bin", config, "net10.0", "calor.dll"))
+            .Where(File.Exists)
+            .ToArray();
+        if (candidates.Length == 0)
+            throw new InvalidOperationException("calor.dll not found — build the compiler first.");
+
+        // Prefer the build that IS the compiler this test process loaded. When
+        // both configurations exist on disk, a CLI child running the other one
+        // is a different compiler: its index headers and build-state hashes do
+        // not match ours, so a `--no-build` query refuses ("the compiler
+        // changed") for a reason that has nothing to do with the test.
+        var loaded = typeof(Program).Assembly.Location;
+        if (!string.IsNullOrEmpty(loaded) && File.Exists(loaded))
         {
-            var candidate = Path.Combine(FindRepoRoot(), "src", "Calor.Compiler", "bin", config, "net10.0", "calor.dll");
-            if (File.Exists(candidate)) return candidate;
+            var loadedHash = Incremental.BuildStateCache.ComputeCompilerHash([loaded]);
+            var matching = candidates.FirstOrDefault(candidate =>
+                Incremental.BuildStateCache.ComputeCompilerHash([candidate]) == loadedHash);
+            if (matching != null)
+                return matching;
         }
 
-        throw new InvalidOperationException("calor.dll not found — build the compiler first.");
+        return candidates[0];
     }
 
     /// <summary>

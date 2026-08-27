@@ -20,6 +20,21 @@ All notable changes to this project will be documented in this file.
 
 - New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
 
+- **AI agents can now ask the MCP server about your project's structure.** A new `calor_query`
+  tool answers four questions about any function or method: who calls it (`callers`), what it
+  calls (`callees`), what would be affected if it changed (`impact`, and with `effects: true`,
+  which callers would stop compiling if its effects changed), and what effects it declares
+  versus what it actually does (`effects`). The answers come from the same saved project index
+  `calor query` reads, and they match the command line word for word. If the index is out of
+  date the tool rebuilds it first (or refuses, with `noBuild: true`), and every answer says when
+  it might be incomplete and why.
+- `calor query callers`, `callees` and `impact` gained `--json`, so every query facet can
+  now be read by a program, not just `effects`.
+- `calor_compile` (MCP) can compile a folder as one project with `options.crossModule: true`,
+  checking effects across files the way `calor -i a.calr -i b.calr` does, and it now returns
+  every diagnostic (warnings included) for each file. `options.enforceEffects` and
+  `options.requireDocs` match the command line's `--no-enforce-effects` and `--require-docs`.
+
 ### Changed
 
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code

@@ -175,6 +175,7 @@ Classes:
 | `calor_migrate` | E | **Yes** | per-file envelope entries in all phases; `errorCategories` keyed by code |
 | `calor_navigate` | E | **Yes** | parse errors as envelope entries |
 | `calor_structure` | E | **Yes** | parse errors as envelope entries |
+| `calor_query` | D | **Yes** | v0.16 E7: `format=json` returns the exact `calor query … --json` envelope (`command: "query"`, answer record under `data`, `diagnostics[]` empty); `format=text` returns the CLI's text; refusals (missing/stale index, unknown or ambiguous symbol, unparsable row) are `isError` results carrying the CLI's own message |
 | `calor_format` | E | **Yes** | parser + `Calor0800`-band diagnostics as envelope entries with `declarationId` |
 | `calor_fix` | D | **Yes** (by audit) | applied-fix records only; verified no diagnostic-shaped data hides in the payload |
 | `calor_session_open` | E | **Yes** | per-file parse errors as envelope entries under `diagnostics[]`, with `declarationId` attributed via tolerant-parse partial ASTs (loop plan WS2 D2.1/D2.5) |
@@ -184,7 +185,7 @@ Classes:
 | `calor_self_test` | X | — | golden-diff scenarios |
 
 **M-E1 (envelope coverage)** = adopted E+D surfaces / all E+D surfaces =
-**31/31 = 100 %** (29 at the final D1.3 sweep, +`calor_session_open` and
+**32/32 = 100 %** (29 at the final D1.3 sweep, +`calor_session_open` and
 `calor_file_write` from loop plan M3/WS2) — the WS1 exit criterion is met.
 Any new command or MCP tool must be added to this table (with an envelope
 adoption or a reviewed exemption) before it ships; the conformance suite and

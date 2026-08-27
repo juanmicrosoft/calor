@@ -16,9 +16,11 @@ src/Calor.Compiler/Effects/EffectSet.cs:    public bool IsSubsetOf(EffectSet oth
 
 ### ProjectIndex references outside Commands/
 src/Calor.Compiler/Commands/IndexCommand.cs
+src/Calor.Compiler/Commands/ProjectIndexQueryReader.cs
 src/Calor.Compiler/Commands/QueryCommand.cs
 src/Calor.Compiler/Indexing/ProjectIndex.cs
 src/Calor.Compiler/Indexing/ProjectIndexBuilder.cs
+src/Calor.Compiler/Mcp/Tools/QueryTool.cs
 
 ### Effects/*.cs file count
 10
