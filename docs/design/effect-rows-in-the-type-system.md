@@ -2081,6 +2081,42 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 > **A fourth split — "declared but never invoked" vs "invoked"** — ships with the ledger, because
 > that is exactly the number §14 Q4 needs.
 
+> **EXECUTED — E3 slice a, PR #1103. The number is ZERO, and the denominator is 27% of the
+> corpus.** Both halves matter and the second was added by review round 1 (F7), because a zero
+> quoted without its denominator is the failure mode this ledger exists to prevent.
+>
+> | Subject | Calor0425 | enforced | excluded | excluded: convert / parse / **bind** | Calor0418 witness |
+> |---|---|---|---|---|---|
+> | MediatR | **0** | 26 | 10 | 0 / 3 / **7** | 2 |
+> | serilog | **0** | 47 | 65 | 0 / 8 / **57** | 1 |
+> | FluentValidation | **0** | 26 | 190 | 0 / 48 / **142** | 1 |
+> | **aggregate** | **0** | **99** | **265** | 0 / 59 / **206** | 4 |
+>
+> Per-cause split: `RowlessDestination` 0, `UnknownSource` 0, `Assumed` 0. Fourth split
+> (invoked / never invoked): 0 / 0.
+>
+> **265 of 364 modules — 73% — never reach the effect pass**, 206 of them because the Lossy
+> conversion does not BIND. Modules that fail binding are excluded on purpose: `Program.Compile`
+> returns as soon as binding has errors, so their Calor0425s could never be emitted and counting
+> them would inflate the ledger with diagnostics no user can see. But the consequence is that
+> **the zero is a zero over the 27% that binds**, not over the corpus, and FluentValidation
+> contributes 26 enforced modules against 190 excluded. The exclusion count and its
+> reason histogram are now ledger fields, pinned by exact equality, so the rate cannot drift
+> unobserved.
+>
+> **The anti-vacuity witness is weak, and is written down as weak.** Four Calor0418 across all
+> three subjects (2/1/1) establishes that the pass reached higher-order code *at all*. It does
+> **not** establish that the measured subset is representative. An earlier revision of the test's
+> own comment claimed "Calor0418 fires in the hundreds", which was false by two orders of
+> magnitude; corrected.
+>
+> **What the zero does and does not answer.** It answers §13.4's question for *slice a*:
+> the five binding sites cost converted code nothing, because converted code hands function values
+> to BCL callees — which have no destination row (§8.4) — rather than to in-module rowed
+> positions. It does **not** forecast E4, whose Calor0418 replacement puts a row check at every
+> invocation, and whose PR must both widen this ledger to §13.4's three-way cause split and
+> re-measure against a denominator this small.
+
 Draft v1 left this as "open question 1" with the instrument being a promise that the E2 PR would
 publish a count. That is the failure mode §13.3 gate 2 exists to prevent. The number matters
 because 431 of 1248 BCL call sites do not resolve (§2.2): if the 0425 count per subject is in the

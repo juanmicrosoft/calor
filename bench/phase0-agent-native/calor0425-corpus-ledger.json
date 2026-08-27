@@ -1,10 +1,11 @@
 {
   "SchemaVersion": 1,
   "Scope": "Calor0425 (EffectRowUnknown) emitted by EffectEnforcementPass over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols, then enforced with UnknownCallPolicy.Strict and no --permissive-effects; modules that fail conversion or whose converted output fails to parse are excluded from the denominator and counted separately. Causes are the ones the FIVE MONOMORPHIC SITES of design-doc \u00A76.2 can distinguish; \u00A713.4\u0027s unresolved-receiver / BCL-returned-delegate split is E4\u0027s, because both reach a site as the same Unknown",
-  "MeasuredCommit": "7cbd426cd6ec973457659efc850255d3b772acba",
+  "MeasuredCommit": "d68d9fb03f8155beddb88eb9d6be73152e5a091a",
   "AggregateDiagnostics": 0,
   "AggregateModulesWithDiagnostics": 0,
   "AggregateModulesEnforced": 99,
+  "AggregateModulesExcluded": 265,
   "PerSubject": [
     {
       "Subject": "MediatR",
@@ -17,7 +18,10 @@
       "Assumed": 0,
       "RowlessInvoked": 0,
       "RowlessNeverInvoked": 0,
-      "Calor0418Witness": 2
+      "Calor0418Witness": 2,
+      "ExcludedConversionFailed": 0,
+      "ExcludedParseFailed": 3,
+      "ExcludedBindFailed": 7
     },
     {
       "Subject": "serilog",
@@ -30,7 +34,10 @@
       "Assumed": 0,
       "RowlessInvoked": 0,
       "RowlessNeverInvoked": 0,
-      "Calor0418Witness": 1
+      "Calor0418Witness": 1,
+      "ExcludedConversionFailed": 0,
+      "ExcludedParseFailed": 8,
+      "ExcludedBindFailed": 57
     },
     {
       "Subject": "FluentValidation",
@@ -43,7 +50,10 @@
       "Assumed": 0,
       "RowlessInvoked": 0,
       "RowlessNeverInvoked": 0,
-      "Calor0418Witness": 1
+      "Calor0418Witness": 1,
+      "ExcludedConversionFailed": 0,
+      "ExcludedParseFailed": 48,
+      "ExcludedBindFailed": 142
     }
   ]
 }

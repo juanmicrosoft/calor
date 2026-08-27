@@ -104,7 +104,9 @@ public class Calor0425CorpusLedgerTests
                 + $"(rowless {subject.RowlessDestination}, unknown-source {subject.UnknownSource}, "
                 + $"assumed {subject.Assumed}; of the rowless, invoked {subject.RowlessInvoked} / "
                 + $"never invoked {subject.RowlessNeverInvoked}; Calor0418 witness "
-                + $"{subject.Calor0418Witness})");
+                + $"{subject.Calor0418Witness}; excluded {subject.ModulesNotMeasured} "
+                + $"= convert {subject.ExcludedConversionFailed} / parse {subject.ExcludedParseFailed} "
+                + $"/ bind {subject.ExcludedBindFailed})");
         }
 
         var measured = new Ledger(
@@ -114,6 +116,7 @@ public class Calor0425CorpusLedgerTests
             perSubject.Sum(s => s.Diagnostics),
             perSubject.Sum(s => s.ModulesWithDiagnostics),
             perSubject.Sum(s => s.ModulesEnforced),
+            perSubject.Sum(s => s.ModulesNotMeasured),
             perSubject);
 
         Console.WriteLine(
@@ -143,9 +146,25 @@ public class Calor0425CorpusLedgerTests
             $"Only {measured.AggregateModulesEnforced} modules were enforced — the corpus "
             + "denominator collapsed, so the equalities below would be vacuous.");
 
+        // THE EXCLUSION RATE IS PART OF THE MEASUREMENT, not a footnote to it.
+        // 265 of 364 modules (73%) never reach the effect pass, almost all of
+        // them because the Lossy conversion does not BIND — FluentValidation
+        // alone contributes 190 of them, leaving 26 enforced. A zero measured
+        // over the 27% that binds is a much weaker statement than a zero over
+        // the corpus, and pinning the rate is what stops the next reader (or the
+        // next regeneration) from forgetting that.
+        Assert.Equal(committed.AggregateModulesExcluded, measured.AggregateModulesExcluded);
+        Assert.True(measured.AggregateModulesExcluded > 0,
+            "Zero exclusions would mean the conversion+bind gate stopped filtering, which "
+            + "changes what the headline zero is a zero OVER.");
+
         // The zero this ledger records is only worth recording if the pass ran
-        // and SAW higher-order code. It did: Calor0418 fires in the hundreds over
-        // the same modules.
+        // and SAW higher-order code. It did — but only barely: the witness is
+        // FOUR Calor0418 across all three subjects (2/1/1), not "hundreds". That
+        // is a weak witness and it is written down as one: it establishes that
+        // the pass reached higher-order code at all, and it does NOT establish
+        // that the measured subset is representative of the corpus. Read the
+        // exclusion rate below before drawing any conclusion from the zero.
         Assert.True(measured.PerSubject.Sum(s => s.Calor0418Witness) > 0,
             "No Calor0418 anywhere in the measured corpus — the effect pass did not reach the "
             + "higher-order code it is supposed to be measuring, so a Calor0425 count of zero "
@@ -220,6 +239,8 @@ public class Calor0425CorpusLedgerTests
         int diagnostics = 0, modulesWith = 0, enforced = 0, notMeasured = 0;
         int rowless = 0, unknownSource = 0, assumed = 0, rowlessInvoked = 0, rowlessNever = 0;
         int delegateInvocationWitness = 0;
+        // F7 — WHY a module was excluded, not just how many were.
+        int excludedConversionFailed = 0, excludedParseFailed = 0, excludedBindFailed = 0;
 
         foreach (var file in files)
         {
@@ -242,12 +263,14 @@ public class Calor0425CorpusLedgerTests
             catch
             {
                 notMeasured++;
+                excludedConversionFailed++;
                 continue;
             }
 
             if (string.IsNullOrEmpty(conversion.CalorSource))
             {
                 notMeasured++;
+                excludedConversionFailed++;
                 continue;
             }
 
@@ -259,6 +282,7 @@ public class Calor0425CorpusLedgerTests
             if (parseDiagnostics.HasErrors)
             {
                 notMeasured++;
+                excludedParseFailed++;
                 continue;
             }
 
@@ -290,6 +314,7 @@ public class Calor0425CorpusLedgerTests
             if (bindDiagnostics.HasErrors)
             {
                 notMeasured++;
+                excludedBindFailed++;
                 continue;
             }
             var faulted = false;
@@ -310,6 +335,7 @@ public class Calor0425CorpusLedgerTests
             if (faulted)
             {
                 notMeasured++;
+                excludedBindFailed++;
                 continue;
             }
 
@@ -358,7 +384,8 @@ public class Calor0425CorpusLedgerTests
         return new SubjectVolume(
             name, diagnostics, modulesWith, enforced, notMeasured,
             rowless, unknownSource, assumed, rowlessInvoked, rowlessNever,
-            delegateInvocationWitness);
+            delegateInvocationWitness,
+            excludedConversionFailed, excludedParseFailed, excludedBindFailed);
     }
 
     /// <summary>
@@ -400,7 +427,12 @@ public class Calor0425CorpusLedgerTests
         int Assumed,
         int RowlessInvoked,
         int RowlessNeverInvoked,
-        int Calor0418Witness);
+        int Calor0418Witness,
+        /// <summary>F7 — the exclusion-reason histogram. These three sum to
+        /// <c>ModulesNotMeasured</c>.</summary>
+        int ExcludedConversionFailed,
+        int ExcludedParseFailed,
+        int ExcludedBindFailed);
 
     private sealed record Ledger(
         int SchemaVersion,
@@ -409,5 +441,10 @@ public class Calor0425CorpusLedgerTests
         int AggregateDiagnostics,
         int AggregateModulesWithDiagnostics,
         int AggregateModulesEnforced,
+        /// <summary>Review round 1 (F7). Modules that never reached the effect
+        /// pass — conversion threw, produced nothing, failed to parse, or (the
+        /// overwhelming majority) failed to BIND. 73% of the corpus at this
+        /// commit, so the headline zero is a zero over the remaining 27%.</summary>
+        int AggregateModulesExcluded,
         List<SubjectVolume> PerSubject);
 }
