@@ -82,6 +82,7 @@ For the motivation behind this design, see [Effects & Contracts Enforcement](/ca
 | Calor0411  | UnknownExternalCall| Call to unknown external method in strict mode       |
 | Calor0412  | MissingSpecificEffect | A specific effect is missing from declaration     |
 | Calor0413  | AmbiguousStub      | Multiple stubs match call signature                  |
+| Calor0406  | EffectInferenceDidNotConverge | The SCC fixpoint (cap 100 rounds) or the instantiated-charge worklist (cap 10 000 steps) stopped with effect sets still changing; always an error |
 
 ### SCC-Based Interprocedural Analysis
 
@@ -91,7 +92,7 @@ The effect enforcement pass uses Strongly Connected Component (SCC) analysis:
 2. **Compute SCCs** using Tarjan's algorithm
 3. **Process SCCs in reverse topological order**:
    - For each SCC, iterate functions until effects stabilize
-   - Recursion within SCC resolves via fixpoint
+   - Recursion within SCC resolves via fixpoint (capped at 100 rounds; reaching the cap with sets still changing is Calor0406, an error)
 4. **Check**: ComputedEffects ⊆ DeclaredEffects for each function
 
 ### Effect Inference Coverage

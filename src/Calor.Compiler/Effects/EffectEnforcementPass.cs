@@ -20,6 +20,54 @@ public sealed class EffectEnforcementPass
     private readonly bool _strictEffects;
     private readonly HashSet<string> _crossModuleFunctionNames;
 
+    /// <summary>
+    /// Default cap on the <see cref="ProcessScc"/> fixpoint: how many rounds over
+    /// a recursive SCC the pass will run before it stops and reports
+    /// Calor0406. Effect sets only grow and the effect universe is finite, so a
+    /// converging SCC needs at most (members × distinct effects) rounds and in
+    /// practice about its call-graph diameter; 100 has never been reached on the
+    /// corpus.
+    /// </summary>
+    public const int DefaultSccFixpointIterationCap = 100;
+
+    /// <summary>
+    /// Default cap on the <see cref="PropagateInstantiatedCharges"/> worklist:
+    /// how many dequeues the pass will perform before it stops and reports
+    /// Calor0406. Counts dequeues, not hops, so a fan-in of N callers on a chain
+    /// of depth D costs about N × D.
+    /// </summary>
+    public const int DefaultInstantiatedChargeIterationCap = 10_000;
+
+    /// <summary>
+    /// v0.16 W5 (gate 11) — the <see cref="ProcessScc"/> fixpoint cap, injectable
+    /// so a pin can drive a three-hop fixture into the cap at 2 rather than
+    /// building a hundred-function SCC. Defaults to
+    /// <see cref="DefaultSccFixpointIterationCap"/>; must be at least 1.
+    /// </summary>
+    internal int SccFixpointIterationCap
+    {
+        get => _sccFixpointIterationCap;
+        init => _sccFixpointIterationCap = value >= 1
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(SccFixpointIterationCap), value, "The cap must be at least 1.");
+    }
+
+    /// <summary>
+    /// v0.16 W5 (gate 11) — the <see cref="PropagateInstantiatedCharges"/> worklist
+    /// cap, injectable for the same reason. Defaults to
+    /// <see cref="DefaultInstantiatedChargeIterationCap"/>; must be at least 1.
+    /// </summary>
+    internal int InstantiatedChargeIterationCap
+    {
+        get => _instantiatedChargeIterationCap;
+        init => _instantiatedChargeIterationCap = value >= 1
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(InstantiatedChargeIterationCap), value, "The cap must be at least 1.");
+    }
+
+    private readonly int _sccFixpointIterationCap = DefaultSccFixpointIterationCap;
+    private readonly int _instantiatedChargeIterationCap = DefaultInstantiatedChargeIterationCap;
+
     // Delegated call graph analysis (populated by Enforce)
     private CallGraphAnalysis _callGraphAnalysis = null!;
 
@@ -452,7 +500,7 @@ public sealed class EffectEnforcementPass
         // For recursive SCCs — mutual, or a single function calling itself — iterate to fixpoint
         var changed = true;
         var iterations = 0;
-        const int maxIterations = 100;
+        var maxIterations = _sccFixpointIterationCap;
 
         // Initialize with empty effects
         foreach (var functionId in scc)
@@ -479,14 +527,54 @@ public sealed class EffectEnforcementPass
             }
         }
 
+        // v0.16 W5 (gate 11): the loop above exits either because a full round
+        // changed nothing (converged) or because the cap was reached with the
+        // last round still changing. The second case used to be reported as the
+        // API-strictness code Calor0600 (a warning); it is now Calor0406, an
+        // error, because an SCC whose sets were still growing may be missing
+        // effects and any Calor0410 not reported for its members is unsound.
         if (changed)
         {
-            _diagnostics.ReportWarning(
+            ReportDidNotConverge(
                 _callGraphAnalysis.Functions[scc[0]].Span,
-                "Calor0600",
-                $"Effect fixpoint iteration did not converge after {maxIterations} iterations for mutually recursive functions. Effects may be incomplete.");
+                "SCC fixpoint",
+                maxIterations,
+                "round(s)",
+                scc.Select(id => _callGraphAnalysis.Functions[id].Name),
+                "the effects computed for these mutually recursive functions may be incomplete");
         }
     }
+
+    /// <summary>
+    /// Calor0406 at one of the two capped sites. The message names the site, the
+    /// cap, and the functions involved so the reader can tell which of the two
+    /// loops stopped and what to split; the function list is truncated after
+    /// <see cref="MaxNamedFunctionsInNonConvergenceMessage"/> names.
+    /// </summary>
+    private void ReportDidNotConverge(
+        TextSpan span,
+        string site,
+        int cap,
+        string unit,
+        IEnumerable<string> functionNames,
+        string consequence)
+    {
+        var names = functionNames.ToList();
+        var shown = names.Take(MaxNamedFunctionsInNonConvergenceMessage)
+            .Select(n => $"'{n}'");
+        var list = string.Join(", ", shown);
+        if (names.Count > MaxNamedFunctionsInNonConvergenceMessage)
+            list += $", and {names.Count - MaxNamedFunctionsInNonConvergenceMessage} more";
+
+        _diagnostics.Report(
+            span,
+            DiagnosticCode.EffectInferenceDidNotConverge,
+            $"Effect inference did not converge: the {site} stopped at its cap of {cap} {unit} "
+            + $"with the effect sets still changing; {consequence}. Functions involved: {list}.",
+            DiagnosticSeverity.Error);
+    }
+
+    private const int MaxNamedFunctionsInNonConvergenceMessage = 8;
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
@@ -1115,7 +1203,10 @@ public sealed class EffectEnforcementPass
     /// two-level chain and leaves a three-level one broken. Effect sets only ever
     /// GROW here and the effect universe is finite, so the worklist terminates;
     /// the iteration cap mirrors <see cref="ProcessScc"/>'s and exists for the
-    /// same reason — a cycle in the call graph must not spin.</para>
+    /// same reason — a cycle in the call graph must not spin. Since v0.16 (W5,
+    /// gate 11) reaching the cap with work still queued is Calor0406, not a
+    /// silent stop: the functions still in the queue may have callers of their
+    /// own that were never charged.</para>
     ///
     /// <para>Recursion is handled by the growth test, not by an SCC walk: a member
     /// of a cycle re-enters the queue only while its set is still changing.</para>
@@ -1126,7 +1217,7 @@ public sealed class EffectEnforcementPass
 
         var queue = new Queue<string>(_rank1Charged);
         var iterations = 0;
-        const int maxIterations = 10_000;
+        var maxIterations = _instantiatedChargeIterationCap;
 
         while (queue.Count > 0 && iterations < maxIterations)
         {
@@ -1169,6 +1260,27 @@ public sealed class EffectEnforcementPass
 
                 queue.Enqueue(callerId);
             }
+        }
+
+        // v0.16 W5 (gate 11): work left in the queue means the cap stopped the
+        // propagation, not the growth test. Reported at the declaration of the
+        // first function still queued — the one whose callers were never
+        // charged — and the message names every function still waiting (a
+        // function can be queued more than once; it is named once).
+        if (queue.Count > 0)
+        {
+            var pending = queue.Distinct(StringComparer.Ordinal).ToList();
+            var first = pending[0];
+            var span = _callGraphAnalysis.Functions.TryGetValue(first, out var firstFunction)
+                ? firstFunction.Span
+                : default;
+            ReportDidNotConverge(
+                span,
+                "instantiated-charge propagation",
+                maxIterations,
+                "step(s)",
+                pending.Select(id => _callGraphAnalysis.Functions.TryGetValue(id, out var f) ? f.Name : id),
+                "the callers of these functions may not have been charged the effects instantiated in their callees");
         }
     }
 

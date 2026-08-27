@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **The compiler now tells you when effect checking gave up early — new error `Calor0406`.**
+  Effect checking runs in loops that have a safety limit, so a tangle of functions that
+  call each other cannot make the compiler spin forever. Before, hitting that limit was
+  either reported under the wrong code (`Calor0600`, which belongs to the API-strictness
+  family) or, in the loop that carries a placeholder effect up to the callers of callers,
+  not reported at all — the compiler just stopped and said the program was fine. Now both
+  loops report `Calor0406` as an error naming which loop stopped, the limit, and the
+  functions involved, so a result the compiler did not finish is never passed off as a
+  clean build. `Calor0600` is no longer emitted for this. No real program in our test
+  corpus comes anywhere near either limit. (v0.16 W5, gate 11)
+
 ## [0.15.0] - 2026-08-27
 
 Calor 0.15 is the "Composable Effects" release. You can now write, on a callback's type,
