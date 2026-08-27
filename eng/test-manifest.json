@@ -132,7 +132,7 @@
     },
     {
       "reason": "corpus submodules not initialized",
-      "count": 4
+      "count": 5
     },
     {
       "reason": "no committed .calr found under the repository root — partial checkout",
