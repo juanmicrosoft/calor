@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "proofPoint": "PP-E1",
   "registration": "docs/plans/agent-native-gates.md §A.2 row PP-E1 + §A.3 entry A-1.11 (2026-08-25); leg-A negative control re-frozen by sub-entry A-1.11.1 (2026-08-26)",
-  "measuredCommit": "7ad1b1e0aad3560d954da083124cf9376fe1bd06",
+  "measuredCommit": "72d060f400b5787ba4ec11cb4dd8860c95173da3",
   "pinnedInvocation": "dotnet <calor.dll> -i <source> -o <scratch>; no flags (--permissive-effects and any manifest outside the built-in set are forbidden); diagnostics sorted by (line, column, code, severity, text) under LC_ALL=C",
   "recomputedVsRecorded": "leg A recomputed by EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation (each frozen diff re-applied to the frozen fixture, compiled with the pinned invocation, codes and declarations compared); negative control, routes (a)/(b) and the ramp state recomputed; leg B recorded, with only its arithmetic recomputed by bench/phase0-agent-native/ppe1-analyze.py from the archived per-run result.json files, and its fails/underpowered booleans re-derived here from the recorded point/bound/CV; route (d) and the own-goal flag recorded, but bound to a cut citation / an artifact and to the recomputed mechanical evidence; verdict derived from the frozen outcome map",
   "detectionRule": "a cell is detected iff the registered code appears at the registered declaration; L6-MAP/L6-MATCH must name the laundered effect 'cw' and L6-MID must name the instantiation; L7 requires Calor0425 specifically, rising above the unmutated fixture's count at that declaration; a different code at the registered declaration counts as detected-with-code-drift only if it is in the drift set, and is published by name",
