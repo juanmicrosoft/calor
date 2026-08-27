@@ -478,8 +478,8 @@ Or in MSBuild:
 </PropertyGroup>
 ```
 
-A gentler step for converted code keeps enforcement on but reports violations as
-warnings — the CLI's `--permissive-effects`, or in MSBuild:
+A gentler step for converted code keeps enforcement on but relaxes what the compiler
+assumes about calls it cannot resolve — the CLI's `--permissive-effects`, or in MSBuild:
 
 ```xml
 <PropertyGroup>
@@ -488,7 +488,13 @@ warnings — the CLI's `--permissive-effects`, or in MSBuild:
 ```
 
 The default is `false` (strict). Under the permissive policy unknown calls are assumed
-pure and `Calor0410`-family violations, single-module and cross-module, are warnings.
+pure, so `Calor0425` is suppressed, and undeclared-effect violations — `Calor0410` and
+`Calor0411`, single-module and cross-module — are reported as warnings.
+
+It does **not** waive a row the code states and then contradicts: `Calor0424` (a row that
+does not fit), `Calor0420` / `Calor0421` (a broadened or narrowed row on an override or
+interface implementation) and `Calor0418` (a function-typed value with no row at a checked
+position) remain errors under every flag.
 
 ---
 
