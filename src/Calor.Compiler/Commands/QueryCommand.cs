@@ -1,7 +1,5 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using Calor.Compiler.Binding.BoundTypes;
-using Calor.Compiler.Effects;
 using Calor.Compiler.Indexing;
 
 namespace Calor.Compiler.Commands;
@@ -18,18 +16,22 @@ namespace Calor.Compiler.Commands;
 ///    so a cross-file call resolves only when exactly one declaration bears the
 ///    name — these are "the callers we can name", and saying so is the
 ///    difference between a limit and a lie.
+///
+/// v0.16 E7: the answers come from <see cref="ProjectIndexQueryReader"/>, which
+/// the MCP tool <c>calor_query</c> reads through as well; this command is the
+/// CLI's argument parsing plus the text and <c>--json</c> formatters, and the
+/// MCP tool renders through the same formatters so the two surfaces answer
+/// byte-identically.
 /// </summary>
 public static class QueryCommand
 {
-    private const string OptionsToken = "index-v1";
-
     public static Command Create()
     {
         var command = new Command("query", "Ask the project index about your code")
         {
             CreateFacetCommand("symbol", "Where a name is declared"),
-            CreateFacetCommand("callers", "What calls a declaration"),
-            CreateFacetCommand("callees", "What a declaration calls"),
+            CreateFacetCommand("callers", "What calls a declaration", withJson: true),
+            CreateFacetCommand("callees", "What a declaration calls", withJson: true),
             CreateImpactCommand(),
             CreateFacetCommand("contracts", "Contracts declared on a declaration"),
             CreateFacetCommand("assumptions", "Assumptions in force for a declaration"),
@@ -40,17 +42,6 @@ public static class QueryCommand
         };
         return command;
     }
-
-    /// <summary>
-    /// v0.15 E5 — the payload <c>calor query effects --json</c> carries under
-    /// the envelope's <c>data</c>. The rows are the index's own records, so
-    /// the JSON and the text answer cannot disagree.
-    /// </summary>
-    private sealed record EffectsAnswer(
-        string Subject,
-        string SymbolId,
-        IReadOnlyList<IndexedEffectRow> Rows,
-        bool Partial);
 
     private static Command CreateImpactCommand()
     {
@@ -79,11 +70,14 @@ public static class QueryCommand
             description: "With --effects: the row the subject would carry after the change, as "
                 + "comma-separated effect codes (e.g. \"cw,fs:w\"; \"\" for pure). "
                 + "Default: the subject's current declared row");
+        var jsonOption = new Option<bool>(
+            aliases: ["--json"],
+            description: "Emit the answer as an envelope document (schema v1.1) instead of text");
 
         var command = new Command("impact", "What a change could affect")
         {
             subjectArgument, pathOption, inFileOption, fileOption, noBuildOption,
-            effectsOption, rowOption,
+            effectsOption, rowOption, jsonOption,
         };
 
         command.SetHandler((InvocationContext context) =>
@@ -95,7 +89,8 @@ public static class QueryCommand
                 context.ParseResult.GetValueForOption(fileOption),
                 context.ParseResult.GetValueForOption(noBuildOption),
                 context.ParseResult.GetValueForOption(effectsOption),
-                context.ParseResult.GetValueForOption(rowOption));
+                context.ParseResult.GetValueForOption(rowOption),
+                context.ParseResult.GetValueForOption(jsonOption));
         });
 
         return command;
@@ -108,176 +103,73 @@ public static class QueryCommand
         bool wholeFile,
         bool noBuild,
         bool effects = false,
-        string? row = null)
+        string? row = null,
+        bool json = false)
     {
-        if (!Directory.Exists(projectDirectory))
-        {
-            Console.Error.WriteLine($"Error: directory not found: {projectDirectory}");
-            return 1;
-        }
-
-        var index = Resolve(projectDirectory, noBuild, out var error);
+        var index = ProjectIndexQueryReader.Resolve(projectDirectory, noBuild, out var error);
         if (index == null)
         {
             Console.Error.WriteLine(error);
             return 1;
         }
 
-        IReadOnlyList<IndexedDeclaration> affected;
-        string described;
         if (wholeFile)
         {
-            var normalized = subject.Replace('\\', '/');
-            if (!index.Files.ContainsKey(normalized))
+            var fileAnswer = ProjectIndexQueryReader.ImpactOfFile(index, subject, out error);
+            if (fileAnswer == null)
             {
-                Console.Error.WriteLine($"Error: '{subject}' is not an indexed source file.");
+                Console.Error.WriteLine(error);
                 return 1;
-            }
-            affected = index.FindImpactOfFile(normalized);
-            described = $"the whole file {normalized}";
-        }
-        else
-        {
-            var declarations = index.FindDeclarations(subject);
-            if (declarations.Count == 0)
-            {
-                Console.Error.WriteLine(
-                    $"Error: no declaration named '{subject}'. Use --file to ask about a file.");
-                return 1;
-            }
-
-            IndexedDeclaration target;
-            if (declarations.Count == 1)
-            {
-                target = declarations[0];
-            }
-            else
-            {
-                var matches = inFile == null
-                    ? declarations
-                    : declarations.Where(declaration => string.Equals(
-                        declaration.File, inFile, StringComparison.Ordinal)).ToArray();
-                if (matches.Count != 1)
-                {
-                    Console.Error.WriteLine(
-                        $"Error: '{subject}' is declared in {declarations.Count} places; "
-                            + "narrow it with --in-file:");
-                    foreach (var declaration in declarations)
-                        Console.Error.WriteLine($"  {Describe(declaration)}");
-                    return 1;
-                }
-                target = matches[0];
             }
 
             if (effects)
-                return ExecuteEffectImpact(index, target, row);
+            {
+                Console.Error.WriteLine("Error: --effects asks about one declaration's row; it cannot be combined with --file.");
+                return 1;
+            }
 
-            affected = index.FindImpactOfDeclarations([target.SymbolId]);
-            described = Describe(target);
+            if (json)
+                Console.WriteLine(ToJson(fileAnswer));
+            else
+                WriteImpact(Console.Out, fileAnswer);
+            return 0;
+        }
+
+        var lookup = ProjectIndexQueryReader.ResolveSubject(index, subject, inFile);
+        if (lookup.NotFound)
+        {
+            Console.Error.WriteLine(ImpactNotFoundText(subject));
+            return 1;
+        }
+
+        if (lookup.Subject == null)
+        {
+            foreach (var line in ProjectIndexQueryReader.AmbiguityLines(subject, lookup.Candidates))
+                Console.Error.WriteLine(line);
+            return 1;
         }
 
         if (effects)
         {
-            Console.Error.WriteLine("Error: --effects asks about one declaration's row; it cannot be combined with --file.");
-            return 1;
-        }
-
-        foreach (var declaration in affected.OrderBy(
-                     declaration => $"{declaration.File}:{declaration.Line}",
-                     StringComparer.Ordinal))
-        {
-            Console.WriteLine($"  {Describe(declaration)}");
-        }
-
-        var affectedFiles = affected
-            .Select(declaration => declaration.File)
-            .Distinct(StringComparer.Ordinal)
-            .Count();
-        Console.WriteLine(
-            affected.Count == 0
-                ? $"impact: nothing calls into {described}"
-                : $"impact: {affected.Count} declaration(s) in {affectedFiles} file(s) "
-                    + $"affected by a change to {described}");
-
-        if (wholeFile)
-        {
-            Console.WriteLine(
-                "impact: file-grained — a change to ANY declaration in this file "
-                    + "implicates all of these. Ask about a declaration for a precise answer.");
-        }
-
-        ReportResidual(index, index.ImpactAnswerIsPartial());
-        return 0;
-    }
-
-    /// <summary>
-    /// v0.15 E5 (design-doc §8.6) — effect-change blast radius. The closure is
-    /// <see cref="ProjectIndex.FindImpactOfDeclarations"/>'s, unchanged; the
-    /// effects dimension is the verdict of fitting the row the subject WOULD
-    /// carry into each affected caller's DECLARED row. A caller that stops
-    /// fitting is where a Calor0410 would land after the change.
-    /// </summary>
-    private static int ExecuteEffectImpact(ProjectIndex index, IndexedDeclaration target, string? row)
-    {
-        var own = index.FindEffectRow(target.SymbolId);
-        EffectRow hypothetical;
-        string rowDescribed;
-        if (row != null)
-        {
-            var codes = row.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            try
+            var effectAnswer = ProjectIndexQueryReader.EffectImpact(index, lookup.Subject, row, out error);
+            if (effectAnswer == null)
             {
-                hypothetical = EffectSet.From(codes).ToRow();
-            }
-            catch (ArgumentException exception)
-            {
-                Console.Error.WriteLine($"Error: --row '{row}' is not a row of effect codes: {exception.Message}");
+                Console.Error.WriteLine(error);
                 return 1;
             }
-            rowDescribed = hypothetical.ToCompactDisplayString();
+
+            if (json)
+                Console.WriteLine(ToJson(effectAnswer));
+            else
+                WriteEffectImpact(Console.Out, effectAnswer);
+            return 0;
         }
-        else if (own != null)
-        {
-            hypothetical = own.DeclaredRow.Row;
-            rowDescribed = own.DeclaredRow.Display + " (its current declared row)";
-        }
+
+        var answer = ProjectIndexQueryReader.Impact(index, lookup.Subject);
+        if (json)
+            Console.WriteLine(ToJson(answer));
         else
-        {
-            Console.Error.WriteLine(
-                $"Error: no effect row is recorded for {Describe(target)}; pass --row to ask about a hypothetical one.");
-            return 1;
-        }
-
-        var impacts = index.FindEffectImpact(target.SymbolId, hypothetical);
-        var stopFitting = 0;
-        var cannotTell = 0;
-        foreach (var impact in impacts.OrderBy(
-                     impact => $"{impact.Declaration.File}:{impact.Declaration.Line}",
-                     StringComparer.Ordinal))
-        {
-            var declared = impact.Row?.DeclaredRow.Display ?? "(no row recorded)";
-            var verdict = ProjectIndexBuilder.VerdictText(impact.Verdict);
-            if (impact.Verdict == EffectFit.DoesNotFit)
-                stopFitting++;
-            else if (impact.Verdict == EffectFit.CannotTell)
-                cannotTell++;
-            Console.WriteLine(
-                $"  {Describe(impact.Declaration)} — declares {declared}: {verdict}");
-        }
-
-        // "Would stop fitting" is DoesNotFit only; a caller whose row is Unknown
-        // or unrecorded is counted as what it is — undecided — never as broken.
-        Console.WriteLine(
-            impacts.Count == 0
-                ? $"impact: nothing calls into {Describe(target)}, so no declared row is affected by a row of {rowDescribed}"
-                : $"impact: {stopFitting} of {impacts.Count} affected declaration(s) would stop fitting "
-                    + $"a row of {rowDescribed} on {Describe(target)}");
-        if (cannotTell > 0)
-        {
-            Console.WriteLine(
-                $"impact: {cannotTell} of {impacts.Count} cannot tell — no declared row the index could compare against");
-        }
-        ReportResidual(index, index.ImpactAnswerIsPartial());
+            WriteImpact(Console.Out, answer);
         return 0;
     }
 
@@ -329,64 +221,40 @@ public static class QueryCommand
         bool noBuild,
         bool json = false)
     {
-        if (!Directory.Exists(projectDirectory))
-        {
-            Console.Error.WriteLine($"Error: directory not found: {projectDirectory}");
-            return 1;
-        }
-
-        var index = Resolve(projectDirectory, noBuild, out var error);
+        var index = ProjectIndexQueryReader.Resolve(projectDirectory, noBuild, out var error);
         if (index == null)
         {
             Console.Error.WriteLine(error);
             return 1;
         }
 
-        var declarations = index.FindDeclarations(name);
-        if (declarations.Count == 0)
+        var lookup = ProjectIndexQueryReader.ResolveSubject(index, name, inFile);
+        if (lookup.NotFound)
         {
-            Console.WriteLine($"query: no declaration named '{name}'");
-            ReportResidual(index, partial: index.DeclarationLookupIsPartial());
+            foreach (var line in NotFoundLines(index, name))
+                Console.WriteLine(line);
             return 1;
         }
 
         if (facet == "symbol")
         {
-            foreach (var declaration in declarations)
-                Console.WriteLine($"  {Describe(declaration)}");
+            foreach (var declaration in lookup.Candidates)
+                Console.WriteLine($"  {ProjectIndexQueryReader.Describe(declaration)}");
             Console.WriteLine(
-                $"query: {declarations.Count} declaration(s) named '{name}'");
-            ReportResidual(index, index.DeclarationLookupIsPartial());
+                $"query: {lookup.Candidates.Count} declaration(s) named '{name}'");
+            if (index.DeclarationLookupIsPartial())
+                WriteResidual(Console.Out, index.Residual);
             return 0;
         }
 
-        // Several declarations share the name: the caller must say which, rather
-        // than the tool picking one and presenting the result as if unambiguous.
-        IndexedDeclaration subject;
-        if (declarations.Count == 1)
+        if (lookup.Subject == null)
         {
-            subject = declarations[0];
-        }
-        else
-        {
-            var matches = inFile == null
-                ? declarations
-                : declarations
-                    .Where(declaration => string.Equals(
-                        declaration.File, inFile, StringComparison.Ordinal))
-                    .ToArray();
-            if (matches.Count != 1)
-            {
-                Console.Error.WriteLine(
-                    $"Error: '{name}' is declared in {declarations.Count} places; "
-                        + "narrow it with --in-file:");
-                foreach (var declaration in declarations)
-                    Console.Error.WriteLine($"  {Describe(declaration)}");
-                return 1;
-            }
-            subject = matches[0];
+            foreach (var line in ProjectIndexQueryReader.AmbiguityLines(name, lookup.Candidates))
+                Console.Error.WriteLine(line);
+            return 1;
         }
 
+        var subject = lookup.Subject;
         if (facet == "contracts")
         {
             var contracts = index.FindContracts(subject.SymbolId);
@@ -394,8 +262,8 @@ public static class QueryCommand
                 Console.WriteLine($"  {contract.File}:{contract.Line} {contract.Kind}: {contract.Text}");
             Console.WriteLine(
                 contracts.Count == 0
-                    ? $"query: no contracts declared on {Describe(subject)}"
-                    : $"query: {contracts.Count} contract(s) on {Describe(subject)}");
+                    ? $"query: no contracts declared on {ProjectIndexQueryReader.Describe(subject)}"
+                    : $"query: {contracts.Count} contract(s) on {ProjectIndexQueryReader.Describe(subject)}");
             // The index records what is DECLARED. A proof status would have to
             // come from the verifier, and a stale "Proven" is worse than none.
             Console.WriteLine(
@@ -404,7 +272,15 @@ public static class QueryCommand
         }
 
         if (facet == "effects")
-            return ExecuteEffects(index, subject, json);
+        {
+            var effects = ProjectIndexQueryReader.Effects(index, subject);
+            if (json)
+            {
+                Console.WriteLine(ToJson(effects));
+                return 0;
+            }
+            return WriteEffects(Console.Out, effects);
+        }
 
         if (facet == "assumptions")
         {
@@ -419,180 +295,161 @@ public static class QueryCommand
             }
             Console.WriteLine(
                 assumptions.Count == 0
-                    ? $"query: nothing is assumed for {Describe(subject)}"
-                    : $"query: {assumptions.Count} assumption(s) in force for {Describe(subject)}");
+                    ? $"query: nothing is assumed for {ProjectIndexQueryReader.Describe(subject)}"
+                    : $"query: {assumptions.Count} assumption(s) in force for {ProjectIndexQueryReader.Describe(subject)}");
             return 0;
         }
 
-        var (answer, partial) = facet switch
-        {
-            "callers" => (index.FindCallers(subject.SymbolId),
-                index.CallersAnswerIsPartial(subject.Name)),
-            "callees" => (index.FindCallees(subject.SymbolId),
-                index.CalleesAnswerIsPartial(subject.SymbolId)),
-            _ => (Array.Empty<IndexedDeclaration>(), false),
-        };
-
-        foreach (var declaration in answer.OrderBy(
-                     declaration => $"{declaration.File}:{declaration.Line}",
-                     StringComparer.Ordinal))
-        {
-            Console.WriteLine($"  {Describe(declaration)}");
-        }
-
-        var noun = facet == "callers" ? "caller" : "callee";
-        Console.WriteLine(
-            answer.Count == 0
-                ? $"query: no {noun}s found for {Describe(subject)}"
-                : $"query: {answer.Count} {noun}(s) of {Describe(subject)}");
-        ReportResidual(index, partial);
+        var answer = facet == "callers"
+            ? ProjectIndexQueryReader.Callers(index, subject)
+            : ProjectIndexQueryReader.Callees(index, subject);
+        if (json)
+            Console.WriteLine(ToJson(answer));
+        else
+            WriteDeclarations(Console.Out, answer);
         return 0;
     }
 
-    /// <summary>
-    /// v0.15 E5 (design-doc §8.6) — <c>calor query effects</c>: the declared
-    /// row, the inferred row, the verdict between them and the diagnostic code
-    /// that fires, plus the assumption reasons when the inferred row is only
-    /// assumed; then the rows of the function-typed positions the declaration
-    /// owns. Read off the index, which read it off the enforcement pass: no
-    /// inference runs here.
-    /// </summary>
-    private static int ExecuteEffects(ProjectIndex index, IndexedDeclaration subject, bool json)
-    {
-        var rows = index.FindEffectRows(subject.SymbolId);
-        var partial = index.EffectsAnswerIsPartial(subject.SymbolId, subject.File);
+    // --- formatters (shared with the MCP tool) -----------------------------
 
-        if (json)
+    /// <summary>
+    /// The envelope document <c>--json</c> prints (schema v1.1 envelope, the
+    /// answer record under <c>data</c>). The MCP tool returns this same text.
+    /// </summary>
+    internal static string ToJson(object answer) => EnvelopeWriter.Serialize("query", answer);
+
+    /// <summary>What a name-keyed facet prints when the name is unknown (stdout, exit 1).</summary>
+    internal static IReadOnlyList<string> NotFoundLines(ProjectIndex index, string name)
+    {
+        var lines = new List<string> { $"query: no declaration named '{name}'" };
+        if (index.DeclarationLookupIsPartial())
+            lines.AddRange(ProjectIndexQueryReader.ResidualLines(index.Residual));
+        return lines;
+    }
+
+    /// <summary>What <c>impact</c> prints when the name is unknown (stderr, exit 1).</summary>
+    internal static string ImpactNotFoundText(string name) =>
+        $"Error: no declaration named '{name}'. Use --file to ask about a file.";
+
+    internal static void WriteDeclarations(TextWriter writer, ProjectIndexQueryReader.DeclarationsAnswer answer)
+    {
+        foreach (var declaration in answer.Declarations)
+            writer.WriteLine($"  {ProjectIndexQueryReader.Describe(declaration)}");
+
+        var noun = answer.Facet == "callers" ? "caller" : "callee";
+        writer.WriteLine(
+            answer.Declarations.Count == 0
+                ? $"query: no {noun}s found for {answer.Subject}"
+                : $"query: {answer.Declarations.Count} {noun}(s) of {answer.Subject}");
+        WriteResidual(writer, answer.Residual);
+    }
+
+    internal static void WriteImpact(TextWriter writer, ProjectIndexQueryReader.ImpactAnswer answer)
+    {
+        foreach (var declaration in answer.Affected)
+            writer.WriteLine($"  {ProjectIndexQueryReader.Describe(declaration)}");
+
+        writer.WriteLine(
+            answer.Affected.Count == 0
+                ? $"impact: nothing calls into {answer.Subject}"
+                : $"impact: {answer.Affected.Count} declaration(s) in {answer.AffectedFiles} file(s) "
+                    + $"affected by a change to {answer.Subject}");
+
+        if (answer.File != null)
         {
-            Console.WriteLine(EnvelopeWriter.Serialize(
-                "query",
-                new EffectsAnswer(Describe(subject), subject.SymbolId, rows, partial)));
-            return 0;
+            writer.WriteLine(
+                "impact: file-grained — a change to ANY declaration in this file "
+                    + "implicates all of these. Ask about a declaration for a precise answer.");
         }
 
-        if (rows.Count == 0)
+        WriteResidual(writer, answer.Residual);
+    }
+
+    internal static void WriteEffectImpact(TextWriter writer, ProjectIndexQueryReader.EffectImpactAnswer answer)
+    {
+        foreach (var impact in answer.Impacts)
         {
-            var unavailable = index.Residual.EffectRowsUnavailable
-                .FirstOrDefault(entry => entry.StartsWith(subject.File + ":", StringComparison.Ordinal));
-            Console.WriteLine(
-                unavailable != null
-                    ? $"query: no effect row for {Describe(subject)} — {unavailable[(subject.File.Length + 2)..]}"
-                    : $"query: no effect row is recorded for {Describe(subject)} (only functions, methods, "
+            var declared = impact.DeclaredRow ?? "(no row recorded)";
+            writer.WriteLine(
+                $"  {ProjectIndexQueryReader.Describe(impact.Declaration)} — declares {declared}: {impact.Verdict}");
+        }
+
+        var rowDescribed = answer.RowIsCurrentDeclared
+            ? answer.Row + " (its current declared row)"
+            : answer.Row;
+
+        // "Would stop fitting" is DoesNotFit only; a caller whose row is Unknown
+        // or unrecorded is counted as what it is — undecided — never as broken.
+        writer.WriteLine(
+            answer.Impacts.Count == 0
+                ? $"impact: nothing calls into {answer.Subject}, so no declared row is affected by a row of {rowDescribed}"
+                : $"impact: {answer.StopFitting} of {answer.Impacts.Count} affected declaration(s) would stop fitting "
+                    + $"a row of {rowDescribed} on {answer.Subject}");
+        if (answer.CannotTell > 0)
+        {
+            writer.WriteLine(
+                $"impact: {answer.CannotTell} of {answer.Impacts.Count} cannot tell — no declared row the index could compare against");
+        }
+        WriteResidual(writer, answer.Residual);
+    }
+
+    /// <summary>
+    /// The text answer for <c>effects</c>. Returns the exit code: 1 when the
+    /// index holds no row for the subject, which the text says and the JSON
+    /// form reports as an empty <c>rows</c>.
+    /// </summary>
+    internal static int WriteEffects(TextWriter writer, ProjectIndexQueryReader.EffectsAnswer answer)
+    {
+        if (answer.Rows.Count == 0)
+        {
+            writer.WriteLine(
+                answer.Unavailable != null
+                    ? $"query: no effect row for {answer.Subject} — {answer.Unavailable}"
+                    : $"query: no effect row is recorded for {answer.Subject} (only functions, methods, "
                         + "constructors, accessors and rowed parameters/returns carry one)");
-            ReportResidual(index, partial);
+            WriteResidual(writer, answer.Residual);
             return 1;
         }
 
         IndexedEffectRow? own = null;
-        foreach (var row in rows)
+        foreach (var row in answer.Rows)
         {
-            if (row.OwnerSymbolId.Length == 0 && row.Kind is not ("parameter" or "return"))
+            if (ProjectIndexQueryReader.IsOwnRow(row))
             {
                 own = row;
-                Console.WriteLine($"  {Describe(subject)}");
-                Console.WriteLine($"    declared: {row.DeclaredRow.Display}"
+                writer.WriteLine($"  {answer.Subject}");
+                writer.WriteLine($"    declared: {row.DeclaredRow.Display}"
                     + (row.Declared ? "" : "  (no §E written — a declaration without one is pure)"));
-                Console.WriteLine($"    inferred: {row.InferredRow?.Display ?? "(not inferred)"}");
-                Console.WriteLine($"    verdict:  {DescribeVerdict(row)}");
+                writer.WriteLine($"    inferred: {row.InferredRow?.Display ?? "(not inferred)"}");
+                writer.WriteLine($"    verdict:  {ProjectIndexQueryReader.DescribeVerdict(row)}");
                 foreach (var reason in row.InferredRow?.Reasons ?? [])
-                    Console.WriteLine($"    assumed because: {reason}");
+                    writer.WriteLine($"    assumed because: {reason}");
                 continue;
             }
 
             var bound = row.BoundRow == null ? "" : $"; bound type carries {row.BoundRow}";
             var position = row.Kind == "return" ? "return" : $"parameter {row.Name}";
-            Console.WriteLine($"  {row.File}:{row.Line} {position} declares {row.DeclaredRow.Display}{bound}");
+            writer.WriteLine($"  {row.File}:{row.Line} {position} declares {row.DeclaredRow.Display}{bound}");
         }
 
-        Console.WriteLine(
+        writer.WriteLine(
             own == null
-                ? $"query: {rows.Count} position row(s) on {Describe(subject)}"
-                : $"query: effect row of {Describe(subject)} — declared {own.DeclaredRow.Display}, "
-                    + $"inferred {own.InferredRow?.Display ?? "(not inferred)"}, {DescribeVerdict(own)}");
-        ReportResidual(index, partial);
+                ? $"query: {answer.Rows.Count} position row(s) on {answer.Subject}"
+                : $"query: effect row of {answer.Subject} — declared {own.DeclaredRow.Display}, "
+                    + $"inferred {own.InferredRow?.Display ?? "(not inferred)"}, {ProjectIndexQueryReader.DescribeVerdict(own)}");
+        WriteResidual(writer, answer.Residual);
         return 0;
     }
-
-    private static string DescribeVerdict(IndexedEffectRow row)
-    {
-        var text = row.Verdict switch
-        {
-            "fits" => "fits",
-            "does-not-fit" => "does not fit",
-            "cannot-tell" => "cannot tell",
-            _ => row.Verdict,
-        };
-        if (row.DiagnosticCode != null)
-        {
-            text += $" — {row.DiagnosticCode} fires";
-            if (row.Forbidden.Count > 0)
-                text += $" (undeclared: {string.Join(", ", row.Forbidden)})";
-        }
-        return text;
-    }
-
-    private static ProjectIndex? Resolve(
-        string projectDirectory,
-        bool noBuild,
-        out string? error)
-    {
-        error = null;
-        var output = IndexCommand.DefaultOutputDirectory(projectDirectory);
-        var sources = ProjectIndexBuilder.DiscoverSources(projectDirectory);
-        if (sources.Count == 0)
-        {
-            error = $"Error: no .calr files under {projectDirectory}";
-            return null;
-        }
-
-        var options = new ProjectIndexBuilder.Options(
-            projectDirectory, OptionsToken, sources);
-        var inputs = ProjectIndexBuilder.CurrentInputs(options);
-
-        var (loaded, status) = ProjectIndex.Load(output);
-        var freshness = loaded == null
-            ? status
-            : loaded.CheckFreshness(
-                inputs.CompilerHash, inputs.OptionsHash, inputs.ManifestHash, inputs.Files);
-
-        if (freshness == ProjectIndex.Freshness.Fresh && loaded != null)
-            return loaded;
-
-        // A stale index is never answered from — that is the whole discipline.
-        if (noBuild)
-        {
-            error = $"Error: index unusable — {ProjectIndex.Explain(freshness)}. "
-                + "Run `calor index build` (or drop --no-build).";
-            return null;
-        }
-
-        var rebuilt = ProjectIndexBuilder.Build(options);
-        rebuilt.Save(output);
-        return rebuilt;
-    }
-
-    private static string Describe(IndexedDeclaration declaration) =>
-        $"{declaration.File}:{declaration.Line}:{declaration.Column} "
-            + $"{declaration.Kind} {declaration.Name}";
 
     /// <summary>
     /// Printed with every answer, never on request only. "3 callers" over a
     /// silently dropped fourth is the failure this project keeps paying for.
     /// </summary>
-    private static void ReportResidual(ProjectIndex index, bool partial)
+    internal static void WriteResidual(TextWriter writer, IndexResidual? residual)
     {
-        if (!partial)
+        if (residual == null)
             return;
-
-        Console.WriteLine(
-            "query: PARTIAL — this answer may be incomplete. Calor binds one file "
-                + "at a time, so a call resolves only when exactly one declaration "
-                + "bears the name:");
-        foreach (var file in index.Residual.UnreadableFiles)
-            Console.WriteLine($"  unreadable file: {file} (nothing in it is indexed)");
-        foreach (var call in index.Residual.UnresolvedCalls)
-            Console.WriteLine($"  unresolved call: {call.File}: {call.Target}");
-        foreach (var ambiguous in index.Residual.AmbiguousCallees)
-            Console.WriteLine($"  ambiguous name: {ambiguous} (several declarations share it)");
+        foreach (var line in ProjectIndexQueryReader.ResidualLines(residual))
+            writer.WriteLine(line);
     }
 }

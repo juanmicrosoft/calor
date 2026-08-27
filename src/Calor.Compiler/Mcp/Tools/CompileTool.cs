@@ -81,6 +81,21 @@ public sealed class CompileTool : McpToolBase
                             "type": "boolean",
                             "default": true,
                             "description": "Auto-fix high-confidence errors (parser, ID, effects). Set to false to skip auto-fix."
+                        },
+                        "enforceEffects": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enforce effect declarations (the CLI's --enforce-effects; false is --no-enforce-effects)"
+                        },
+                        "requireDocs": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Require documentation on public functions and types (the CLI's --require-docs)"
+                        },
+                        "crossModule": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Batch mode only: compile the file set as ONE project the way `calor -i a.calr -i b.calr` does — cross-module effect enforcement, contractMode/effectMode/enforceEffects/requireDocs honored, every diagnostic returned as an envelope entry under each file's diagnostics[]. Without it, batch mode compiles each file alone with contracts off and effects permissive (migration triage)."
                         }
                     }
                 },
@@ -167,22 +182,7 @@ public sealed class CompileTool : McpToolBase
         var keepProvenGuards = GetBool(options, "keepProvenGuards");
         var analyze = GetBool(options, "analyze");
         var autoFix = GetBool(options, "autoFix", defaultValue: true);
-        var contractModeStr = GetString(options, "contractMode") ?? "debug";
-        var effectModeStr = GetString(options, "effectMode") ?? "default";
-
-        var contractMode = contractModeStr.ToLowerInvariant() switch
-        {
-            "off" => ContractMode.Off,
-            "release" => ContractMode.Release,
-            _ => ContractMode.Debug
-        };
-
-        var (unknownCallPolicy, strictEffects) = effectModeStr.ToLowerInvariant() switch
-        {
-            "strict" => (UnknownCallPolicy.Strict, true),
-            "permissive" => (UnknownCallPolicy.Permissive, false),
-            _ => (UnknownCallPolicy.Strict, false)
-        };
+        var (contractMode, unknownCallPolicy, strictEffects) = ParseModes(options);
 
         try
         {
@@ -191,6 +191,8 @@ public sealed class CompileTool : McpToolBase
                 ContractMode = contractMode,
                 UnknownCallPolicy = unknownCallPolicy,
                 StrictEffects = strictEffects,
+                EnforceEffects = GetBool(options, "enforceEffects", defaultValue: true),
+                RequireDocs = GetBool(options, "requireDocs"),
                 VerifyContracts = verify,
                 ElideProvenGuards = !keepProvenGuards,
                 EnableVerificationAnalyses = analyze,
@@ -350,8 +352,33 @@ public sealed class CompileTool : McpToolBase
         };
     }
 
+    private static (ContractMode ContractMode, UnknownCallPolicy Policy, bool StrictEffects) ParseModes(JsonElement? options)
+    {
+        var contractModeStr = GetString(options, "contractMode") ?? "debug";
+        var effectModeStr = GetString(options, "effectMode") ?? "default";
+
+        var contractMode = contractModeStr.ToLowerInvariant() switch
+        {
+            "off" => ContractMode.Off,
+            "release" => ContractMode.Release,
+            _ => ContractMode.Debug
+        };
+
+        var (unknownCallPolicy, strictEffects) = effectModeStr.ToLowerInvariant() switch
+        {
+            "strict" => (UnknownCallPolicy.Strict, true),
+            "permissive" => (UnknownCallPolicy.Permissive, false),
+            _ => (UnknownCallPolicy.Strict, false)
+        };
+
+        return (contractMode, unknownCallPolicy, strictEffects);
+    }
+
     private static McpToolResult CompileBatch(List<string> filePaths, JsonElement? arguments, CancellationToken cancellationToken)
     {
+        if (GetBool(GetOptions(arguments), "crossModule"))
+            return CompileProject(filePaths, arguments, cancellationToken);
+
         var results = new List<BatchFileCompileResult>();
         var totalErrors = 0;
         var errorCategories = new Dictionary<string, int>();
@@ -403,7 +430,8 @@ public sealed class CompileTool : McpToolBase
                     Success = !result.HasErrors,
                     ErrorCount = errors.Count,
                     WarningCount = result.Diagnostics.Count(d => !d.IsError),
-                    Errors = errors.Count > 0 ? errors : null
+                    Errors = errors.Count > 0 ? errors : null,
+                    Diagnostics = DiagnosticEnvelope.Build(result.Diagnostics, null)
                 });
 
                 if (result.HasErrors) totalErrors++;
@@ -433,6 +461,131 @@ public sealed class CompileTool : McpToolBase
         };
 
         return McpToolResult.Json(output, isError: totalErrors > 0);
+    }
+
+    /// <summary>
+    /// v0.16 E7 (roadmap gate 3, MCP leg) — batch mode with
+    /// <c>options.crossModule</c>: the file set compiled as ONE project through
+    /// the same driver <c>calor -i a.calr -i b.calr</c> uses, with cross-module
+    /// effect enforcement and the CLI's option semantics, so the diagnostics an
+    /// agent gets here are the diagnostics the CLI prints. Nothing is written to
+    /// disk; every diagnostic is returned as an envelope entry on the file it
+    /// belongs to (<c>projectDiagnostics</c> holds the few with no file).
+    /// </summary>
+    private static McpToolResult CompileProject(List<string> filePaths, JsonElement? arguments, CancellationToken cancellationToken)
+    {
+        var options = GetOptions(arguments);
+        var (contractMode, policy, strictEffects) = ParseModes(options);
+        var enforceEffects = GetBool(options, "enforceEffects", defaultValue: true);
+        var requireDocs = GetBool(options, "requireDocs");
+        var verify = GetBool(options, "verify");
+        var keepProvenGuards = GetBool(options, "keepProvenGuards");
+        var analyze = GetBool(options, "analyze");
+
+        var missing = filePaths.Where(path => !File.Exists(path)).ToList();
+        if (missing.Count > 0)
+            return McpToolResult.Error("File not found: " + string.Join(", ", missing));
+
+        var sources = filePaths
+            .Select(path => new FileInfo(Path.GetFullPath(path)))
+            .ToList();
+        var sink = new DiagnosticBag();
+        var declarationIds = new DeclarationIdResolver();
+        CompilationDriver.DriverResult driverResult;
+        try
+        {
+            driverResult = CompilationDriver.CompileAll(
+                sources,
+                file => new CompilationOptions
+                {
+                    ContractMode = contractMode,
+                    UnknownCallPolicy = policy,
+                    StrictEffects = strictEffects,
+                    EnforceEffects = enforceEffects,
+                    RequireDocs = requireDocs,
+                    VerifyContracts = verify,
+                    ElideProvenGuards = !keepProvenGuards,
+                    EnableVerificationAnalyses = analyze,
+                    ProjectDirectory = Path.GetDirectoryName(file.FullName),
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                    CancellationToken = cancellationToken
+                },
+                crossModuleEnforcement: true,
+                crossModulePolicy: policy,
+                diagnosticSink: sink,
+                onAst: (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return McpToolResult.Error($"Compilation failed: {ex.Message}");
+        }
+
+        var comparer = Incremental.BuildStateCache.GetPathComparer();
+        var byFile = new Dictionary<string, List<Diagnostic>>(comparer);
+        var unattributed = new List<Diagnostic>();
+        foreach (var source in sources)
+            byFile[source.FullName] = [];
+        foreach (var diagnostic in sink)
+        {
+            if (diagnostic.FilePath is { Length: > 0 } path
+                && byFile.TryGetValue(Path.GetFullPath(path), out var bucket))
+            {
+                bucket.Add(diagnostic);
+            }
+            else
+            {
+                unattributed.Add(diagnostic);
+            }
+        }
+
+        var results = new List<BatchFileCompileResult>();
+        var errorCategories = new Dictionary<string, int>();
+        var failedFiles = 0;
+        foreach (var source in sources)
+        {
+            var diagnostics = byFile[source.FullName];
+            var errors = diagnostics
+                .Where(d => d.IsError)
+                .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
+                .ToList();
+            foreach (var d in diagnostics.Where(d => d.IsError))
+                IncrementCategory(errorCategories, d.Code.ToString());
+            if (errors.Count > 0)
+                failedFiles++;
+            results.Add(new BatchFileCompileResult
+            {
+                FilePath = source.FullName,
+                Success = errors.Count == 0,
+                ErrorCount = errors.Count,
+                WarningCount = diagnostics.Count(d => !d.IsError),
+                Errors = errors.Count > 0 ? errors : null,
+                Diagnostics = diagnostics.Select(d => DiagnosticEnvelope.Build(d, declarationIds)).ToList()
+            });
+        }
+
+        foreach (var d in unattributed.Where(d => d.IsError))
+            IncrementCategory(errorCategories, d.Code.ToString());
+        var anyErrors = driverResult.AnyErrors || sink.Any(d => d.IsError);
+
+        var output = new BatchCompileOutput
+        {
+            Success = !anyErrors,
+            TotalFiles = sources.Count,
+            SuccessfulFiles = sources.Count - failedFiles,
+            FailedFiles = failedFiles,
+            ErrorCategories = errorCategories.Count > 0 ? errorCategories : null,
+            Files = results,
+            CrossModule = true,
+            ProjectDiagnostics = unattributed.Count > 0
+                ? unattributed.Select(d => DiagnosticEnvelope.Build(d, declarationIds)).ToList()
+                : null
+        };
+
+        return McpToolResult.Json(output, isError: anyErrors);
     }
 
     private static void IncrementCategory(Dictionary<string, int> categories, string key)
@@ -572,6 +725,16 @@ public sealed class CompileTool : McpToolBase
 
         [JsonPropertyName("files")]
         public required List<BatchFileCompileResult> Files { get; init; }
+
+        /// <summary>v0.16 E7: true when the set was compiled as one project (<c>options.crossModule</c>).</summary>
+        [JsonPropertyName("crossModule")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool CrossModule { get; init; }
+
+        /// <summary>v0.16 E7: diagnostics the driver attributed to no file (crossModule only).</summary>
+        [JsonPropertyName("projectDiagnostics")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<EnvelopeDiagnostic>? ProjectDiagnostics { get; init; }
     }
 
     private sealed class BatchFileCompileResult
@@ -591,6 +754,14 @@ public sealed class CompileTool : McpToolBase
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? Errors { get; init; }
+
+        /// <summary>
+        /// Every diagnostic on this file as an envelope entry (schema 2.0) —
+        /// warnings and infos included, which the <c>errors</c> strings drop.
+        /// </summary>
+        [JsonPropertyName("diagnostics")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<EnvelopeDiagnostic>? Diagnostics { get; init; }
     }
 
     private sealed class CompatCheckOutput

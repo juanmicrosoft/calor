@@ -60,6 +60,9 @@ public sealed class McpMessageHandler
         // ── Code navigation ─────────────────────────────────
         RegisterTool(new NavigateTool());
         RegisterTool(new StructureTool());
+        // v0.16 E7: the project index (callers / callees / impact / effects),
+        // read the way `calor query` reads it.
+        RegisterTool(new QueryTool());
 
         // ── Edit support & formatting ───────────────────────
         RegisterTool(new EditPreviewTool());
