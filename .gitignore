@@ -127,4 +127,3 @@ tools/calor-allowlist-audit/bin/
 # machine-specific hashes. scripts/check-dogfood-utility.sh fails if one is
 # committed.
 .calor-index.json
-bench/phase0-agent-native/epochs/**/heldout/

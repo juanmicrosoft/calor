@@ -314,14 +314,18 @@ public class EffectResolverKeyLedgerTests
         // Filter on REPO-RELATIVE paths, for the reason HigherOrderDemandLedgerTests
         // records: the checkout may itself live under a directory named like an
         // excluded segment (a worktree under `.claude/worktrees/`), and an
-        // absolute-path filter would then match every file.
+        // absolute-path filter would then match every file. Every dot-directory is
+        // skipped, for the reason recorded there too: this is a filesystem walk, and
+        // the harness's gitignored `epochs/**/.prev-src/` / `.envelope-src/` copies
+        // would otherwise enter the denominator (1006 vs 926 on a clean tree, PR #1110).
+        // No committed .calr lives under a dot-directory, so the counts are unchanged.
         return Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
             .Where(rel =>
             {
                 var segments = rel.Split('/');
                 var directories = segments.Take(segments.Length - 1).ToList();
-                return !directories.Any(d => d is "bin" or "obj" or ".git" or ".claude" or "node_modules")
+                return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
             })

@@ -21,8 +21,8 @@ All notable changes to this project will be documented in this file.
 - **We ran the cost test for the new effect-rows feature, and the scorecard reads HIT.** The
   paid half of the scorecard above has now run: an AI agent solved the same four small
   programming tasks five times each against the previous compiler (v0.14.3) and five times each
-  against the new one — 40 runs, every one finishing green. Agents needed about 18 % more output
-  tokens on average to finish the same small tasks with the new compiler. That is a real cost,
+  against the new one — 40 runs, every one finishing green. Agents typically needed about 18 % more
+  output tokens to finish the same small tasks with the new compiler. That is a real cost,
   but it is within the limit we set beforehand (the test only fails when the average is more than
   35 % higher *and* the statistics say the increase is clearly above zero; here the lower bound is
   below zero). One task (the inventory one) was 51 % more expensive on its own; another was
