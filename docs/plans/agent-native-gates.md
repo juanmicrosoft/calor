@@ -335,6 +335,106 @@ disclosures in the A-1.5 entry below.
 
 <!-- annex-freeze (A-1.10): each entry starting with **A-1.N is byte-frozen against main by scripts/check-annex-freeze.py, keyed by its first line; newest first. Add a new entry for every annex change and update the Annex version pointer; never edit or remove an existing entry. -->
 
+**A-1.11.1 — PP-E1 leg A's negative control re-frozen under the pinned invocation (2026-08-26).**
+Additive amendment under the §7 supersession rule to the A-1.11 registration; **no threshold
+changes, no frozen row or entry touched.** A-1.11's PP-E1 §A.2 row and its §A.3 entry stand
+byte-for-byte as written; this sub-entry supersedes **one cell of them, by reference** — leg A's
+per-fixture negative-control baselines — and nothing else. The mutation catalogue, the
+denominator (10 cells, 7 if the ramp fires), the detection rule and its bounded drift set, the
+four-valued outcome map with its precedence and own-goal clause, and leg B's 1.35 ∧ bound-above-1.0
+margin are all UNCHANGED. This entry registers no new proof point, so the annex version pointer
+stays at **A-1.11** (`scripts/check-annex-freeze.py` rule 5 reads the highest *top-level* counter;
+verified by running the guard).
+
+**The defect, stated plainly.** A-1.11's PP-E1 row pins the probe's compiler invocation, control
+and mutant alike, as `dotnet <calor.dll> -i <source> -o <scratch>` with **no flags**, and rules
+`--permissive-effects` **forbidden** in this probe ("it waives Calor0425 and would silently satisfy
+all five `L7` cells"). The A2 baseline it then freezes is quoted here verbatim, so the correction
+is checkable against the frozen text rather than against a paraphrase of it:
+
+> **`A2` → exit 1 with exactly 1× `Calor0410` "uses effect 'unknown' but does not declare it" at
+> (23,9) = `m008` and 3× `Calor0411` on `processor.Process`, `_chainProcess010.ConfigureAwait` and
+> `_chainNext011.ConfigureAwait`**
+
+That multiset was transcribed from `docs/design/spikes/effect-rows/after/A2.diagnostics.txt`, whose
+own fourth header line reads `# emit args: --permissive-effects`. It is therefore the output of the
+**forbidden** invocation, produced by the spike's **throwaway, unmerged** prototype (branch
+`spike/effect-rows-emitter`, PR #1096) — not the pinned invocation's output, on that compiler or on
+any other. **The negative control A-1.11 defined for A2 was never reproducible and could never have
+passed.** The flag is one of two independent faults in the same cell: the second is provenance —
+the numbers describe a prototype that is not the shipping compiler. Found by the E3a adversarial
+review (PR #1103, review round 1, findings F1 and F3); written up at roadmap §4.3 and
+`docs/plans/2026-08-26-v0.15-e3a-notes.md`. The four A3 fixtures' `.diagnostics.txt` headers read
+`# emit args: (none)`, so the **flag** fault is A2's alone; the **prototype-provenance** fault is
+shared by all five, and it is why the A3 baselines do not reproduce either.
+
+**Measured, results-in-hand, at `main` = `9119397e979dfcab3606ee382b16afbdec4b136a`** (E3a merged;
+`src/Calor.Compiler` built Debug; `LC_ALL=C`; the pinned invocation, and then the forbidden one, on
+each of the five frozen fixtures). Blob SHAs re-verified with `git hash-object` at this commit and
+**all five still match** the frozen row: `A2` `93ecdf16`, `A3-map` `0885b3dd`, `A3-match`
+`c1ce7517`, `A3-middleware` `e5ee81e2`, `A3-callback` `05ddc23d` — so the divergence below is the
+compiler's, never an edited fixture.
+
+| Fixture | Pinned invocation — **no flags** (this is the control) | Same source with the **forbidden** `--permissive-effects` |
+|---|---|---|
+| `A2.calr` | **exit 1** — 1× `Calor0410` (23,9) `Handle` uses effect 'unknown'; 1× `Calor0411` (26,24) `_chainProcess010.ConfigureAwait`; 1× `Calor0411` (28,19) `_chainNext011.ConfigureAwait`; 1× `Calor0418` (27,27) invocation of `next` | **exit 0** — 1× `Calor0418` (27,27), demoted to a warning. **Zero** `Calor0410`, **zero** `Calor0411` |
+| `A3-map.calr` | **exit 1** — 1× `Calor0418` (7,22) invocation of `f` | **exit 0** — the same one diagnostic, demoted to a warning |
+| `A3-match.calr` | **exit 1** — 2× `Calor0418`, (5,10) `onSome` and (6,8) `onNone` | **exit 0** — the same two, demoted |
+| `A3-middleware.calr` | **exit 1** — 2× `Calor0418`, (4,19) and (5,20), both `g` | **exit 0** — the same two, demoted |
+| `A3-callback.calr` | **exit 1** — 1× `Calor0418` (6,7) invocation of `onChange` | **exit 0** — the same one, demoted |
+
+**That contrast is the defect made visible.** Under the forbidden flag the shipping compiler emits
+*neither* `Calor0410` *nor* `Calor0411` on A2 — so the frozen multiset is not even what the flag
+produces today; it is what a prototype produced under it in August 2026. Two further facts about
+A2, attributed rather than smoothed: `Calor0411` is **2, not 3**, because `processor.Process` now
+resolves as an in-module call and is no longer an unknown external one (a resolution improvement
+from the E1/E2a line, not from E3a); and `Calor0405` is **zero**, E3a having fixed the E2b P6 defect
+that briefly put two there (PR #1103 finding F2). **E3a's own emissions — `Calor0424`, `Calor0425`,
+`Calor0420`, `Calor0421` — are zero on all five control compiles**, which is the clause of the
+control the rows implementation could put at risk, and it holds.
+
+**THE CORRECTED CONTROL, frozen here, superseding A-1.11's leg-A negative-control cell.** Everything
+else in that row's control clause survives unchanged — in particular "**any** effect-family
+diagnostic beyond it (including a code enumerated nowhere in this row) fails the control", the bar
+on `Calor0405`/`Calor0420`/`Calor0421`/`Calor0424` anywhere in a control compile, and the one
+bounded A2 migration A-1.11 pre-allowed (a frozen `Calor0410`-'unknown'/`Calor0411` entry may be
+**replaced** by `Calor0425`/`Calor0419` **at the same declaration**).
+
+**(1) `A2` — baseline = the measured no-flag multiset at `9119397e979dfcab3606ee382b16afbdec4b136a`,
+namely exit 1 with 1× `Calor0410` at (23,9), 2× `Calor0411` at (26,24) and (28,19), and 1×
+`Calor0418` at (27,27).** The release compiler's unmutated A2, compiled with the pinned invocation
+and no flags, must reproduce that baseline EXCEPT for the `Calor0418`, which is E4's to remove.
+Stated precisely, and this sentence is the rule: **1× `Calor0418` at (27,27) is E4's; after E4 the
+expected multiset is 1× `Calor0410` at (23,9) + 2× `Calor0411` (26,24)(28,19); either multiset, and
+no other code, satisfies the control at adjudication depending on whether E4 has merged — E4 MUST
+merge before adjudication per §4.2, so the post-E4 multiset is the binding one.** Anything outside
+those two multisets — a third `Calor0411`, a `Calor0410` at another declaration, a surviving
+`Calor0418` after E4, or any code from the barred set — fails the control.
+
+**(2) `A3-map`, `A3-match`, `A3-middleware`, `A3-callback` — A-1.11's "exit 0, zero effect-family
+diagnostics" STANDS as the post-E4 expectation**, and is not re-frozen: it was recorded under the
+correct (flagless) invocation and states the property E4 exists to deliver. What is registered here
+is the **pre-E4 state**, so the gap is a measured number rather than a surprise at adjudication:
+`A3-map` **1×** `Calor0418` (7,22); `A3-match` **2×** (5,10) and (6,8); `A3-middleware` **2×**
+(4,19) and (5,20); `A3-callback` **1×** (6,7) — exit 1 in every case. `Calor0418` on a row-less
+invocation is exactly what E4 replaces; A-1.11 already ruled `Calor0418` out of detection, and this
+entry does not let it back in through the control.
+
+**(3) The own-goal consequence, registered rather than discovered later.** Until E4 merges, **leg A
+is a MISS if adjudicated** — all five control compiles exit 1 with a `Calor0418` that the post-E4
+baseline does not permit, and the workstream that put the fixtures and the control in this state is
+this one, so A-1.11's own-goal clause adjudicates it MISS rather than not-adjudicated. Adjudication
+is at the **0.15.0 release commit**, not now; roadmap §4.2's cut line already makes E4 non-deferrable
+(E1–E4 do not defer), and §4.3 now carries this entry as the landed correction. Registering the MISS
+in advance is the point: it is what stops the baseline being quietly regenerated at release time.
+
+**Discriminating pin.** `PpE1NegativeControl_A2_MatchesA1111Baseline_PreE4`
+(`tests/Calor.Compiler.Tests/Effects/SpikeVerdictTests.cs`, `compiler` shard) asserts (1)'s pre-E4
+multiset on A2 and (2)'s pre-E4 `Calor0418` counts on the four A3 fixtures, on the current compiler,
+under the pinned enforcement configuration. **It is named so that E4 must update it**: E4 removes
+the `Calor0418`s, the test goes red, and the E4 PR flips it to the post-E4 multisets registered
+above — which is the mechanical link between this correction and the restoration it demands.
+
 **A-1.11 — the 0.15 effect-rows proof point registers (2026-08-25); second half of the 0.15
 amendment, and M1 is now complete.** Additive: adds the **PP-E1** row to §A.2 and alters no
 frozen row or entry. **(i) This entry is the freeze event.** A-1.10 said so in advance ("this
