@@ -753,18 +753,21 @@ public sealed class SpikeVerdictTests
     //   * the four A3 fixtures draw Calor0418 at each invocation, because
     //     invoking a row-less value is still Calor0418 until E4 — the gate row
     //     says so itself ("Calor0425 … is E4's and owns all five L7 cells");
-    //   * A2 draws 2× Calor0405, because E2 slice b's P6 check reads
-    //     `RequestHandlerDelegate<TResponse>` — a §CSHARP-declared delegate, not
-    //     a §DEL — as not function-typed and reports the row on `next` as
-    //     misplaced.
+    //   * A2 drew 2x Calor0405 before this PR, because E2 slice b's P6 check read
+    //     `RequestHandlerDelegate<TResponse>` -- a §CSHARP-declared delegate, not a
+    //     §DEL -- as not function-typed. FIXED HERE (review round 1, F2): delegate
+    //     declarations inside interop text are collected, and Calor0405 fails OPEN
+    //     via TypeIdentity.IsProvablyNonFunctionType. See
+    //     PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2 below.
     //
-    // The second of those IS a live negative-control failure, created by
-    // PR #1102 and inherited here. PP-E1 is adjudicated at the 0.15.0 release
-    // commit and its leg-A instrument (EffectRowsProbeLedgerTests) is
-    // registered-not-built, so this is reported rather than repaired in a slice
-    // that did not cause it. Fixing it means teaching
-    // TypeIdentity.IsFunctionTypeName about §CSHARP-declared delegates, which is
-    // a change with its own blast radius.
+    // A2's frozen multiset itself carries a second defect (F1): the
+    //   after/A2.diagnostics.txt it was read from was recorded with
+    //   --permissive-effects, which the gate row forbids, so it was never
+    //   reproducible under the pinned invocation. The measured no-flag output
+    //   after F2 is 1x Calor0410 at (23,9), 2x Calor0411, 1x Calor0418 at (27,27);
+    //   an A-1.11.x annex sub-entry re-freezes it (separate PR). Until E4
+    //   replaces Calor0418, PP-E1 leg A is a MISS under the own-goal clause
+    //   if adjudicated now; adjudication is at the 0.15.0 release commit.
     // ========================================================================
 
     /// <summary>The five §12.1 fixtures PP-E1 leg A freezes, by path.</summary>

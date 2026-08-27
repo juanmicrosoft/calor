@@ -139,18 +139,21 @@ lambda), or named after a real effect code.
 
 ### What is checked today
 
-**Writing a row is not yet checked against anything.** The compiler reads it, remembers
-it, and re-prints it faithfully — `calor fmt` keeps it — but it does not yet compare the
-row on a callback against what the function you passed actually does. That comparison is
-the next release. Writing a row today is documentation the compiler has agreed to carry.
+**A row is now checked where a function value moves.** When a function value is bound,
+re-assigned, passed as an argument, returned, or used to override/implement a member, the
+compiler compares the value's row with the row of the place it is going: a row that is too
+wide is **Calor0424** (always an error), a row the compiler cannot determine is **Calor0425**
+(a warning; `--permissive-effects` waives only this one). A row on something that is provably
+not a function (`i32`, `str`, an array) is **Calor0405**; a row on a type the compiler does not
+know is accepted, not refused.
 
-**So the thing you most want to do still does not work yet.** Calling a callback is
-refused, row or no row:
+**Still to come:** calling a callback through its row. Invoking a function value is refused
+today whatever row it carries, and a lambda's body is not yet compared with its declared row:
 
 ```
 §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
   §E{cw}
-  §R §C{transform} §A value §/C     // Calor0418, even with the row above
+  §R §C{transform} §A value §/C     // Calor0418 until the next slice replaces it
 ```
 
 The row is what will *make* that call legal — the compiler has to compare it against the
