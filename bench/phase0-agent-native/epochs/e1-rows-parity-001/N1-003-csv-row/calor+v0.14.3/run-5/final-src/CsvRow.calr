@@ -1,0 +1,61 @@
+§M{m001:CsvRow}
+  §F{f001:NeedsQuoting:pub} (str:field) -> bool
+    §E{}
+    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+
+  §F{f002:EscapeField:pub} (str:field) -> str
+    §E{}
+    §IF{i1} §C{NeedsQuoting} §A field §/C
+      §B{doubled} (replace field "\"" "\"\"")
+      §R (concat "\"" (concat doubled "\""))
+    §EL
+      §R field
+
+  §F{f003:JoinRow:pub} (List<str>:fields) -> str
+    §E{mut,alloc}
+    §B{~sb} (sb-new)
+    §B{~first} true
+    §EACH{e1:field} fields
+      §IF{i2} first
+        §ASSIGN first false
+      §EL
+        §ASSIGN sb (sb-append sb ",")
+      §ASSIGN sb (sb-append sb §C{EscapeField} §A field §/C)
+    §R (sb-tostring sb)
+
+  §F{f004:SplitRow:pub} (str:line) -> List<str>
+    §E{mut,alloc}
+    §B{result} §NEW{List<str>} §/NEW
+    §B{~i} 0
+    §B{~n} (len line)
+    §B{~more} true
+    §B{~sb} (sb-new)
+    §B{~inField} true
+    §WH{w1} more
+      §ASSIGN sb (sb-new)
+      §IF{i3} (&& (< i n) (== (char-code (char-at line i)) 34))
+        §ASSIGN i (+ i 1)
+        §ASSIGN inField true
+        §WH{w2} inField
+          §IF{i4} (>= i n)
+            §ASSIGN inField false
+          §EI (== (char-code (char-at line i)) 34)
+            §IF{i5} (&& (< (+ i 1) n) (== (char-code (char-at line (+ i 1))) 34))
+              §ASSIGN sb (sb-append sb "\"")
+              §ASSIGN i (+ i 2)
+            §EL
+              §ASSIGN i (+ i 1)
+              §ASSIGN inField false
+          §EL
+            §ASSIGN sb (sb-append sb (str (char-at line i)))
+            §ASSIGN i (+ i 1)
+      §EL
+        §WH{w3} (&& (< i n) (!= (char-code (char-at line i)) 44))
+          §ASSIGN sb (sb-append sb (str (char-at line i)))
+          §ASSIGN i (+ i 1)
+      §PUSH{result} (sb-tostring sb)
+      §IF{i6} (&& (< i n) (== (char-code (char-at line i)) 44))
+        §ASSIGN i (+ i 1)
+      §EL
+        §ASSIGN more false
+    §R result
