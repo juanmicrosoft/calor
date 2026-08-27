@@ -15,8 +15,8 @@ All notable changes to this project will be documented in this file.
   result the compiler did not finish is never passed off as a clean build. The limit for
   a group of functions that call each other now grows with the size of the group, so a
   big but ordinary group never trips it. The project index (`calor query effects`) says
-  "did not converge" for such a file instead of recording half-finished rows. Every
-  committed `.calr` in the repository compiles with zero `Calor0406`. (v0.16 W5, gate 11)
+  "did not converge" for such a file instead of recording half-finished rows. (v0.16 W5,
+  gate 11)
 
 ### Changed
 
