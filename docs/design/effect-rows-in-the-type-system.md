@@ -200,8 +200,11 @@ three source files — `Commands/IndexCommand.cs`, `Commands/QueryCommand.cs`,
 > **STATUS — LANDED IN FULL, PR #1106, v0.15 E3 slice b.** Site 6 is implemented:
 > at a call to a declaration carrying `eff` binders each variable is solved ONCE
 > from the argument rows (§7.4's one-line solve, no fixpoint — **R3**), the
-> instantiated own-row is charged to the CALLER, and a variable the arguments
-> cannot determine yields Calor0425 at the call site. Rows carry variable
+> instantiated own-row is charged to the CALLER — and, since review round 1
+> finding 1, to the caller's own callers, to a fixpoint: the solve runs after the
+> SCC pass, so without that propagation a three-level chain could launder an
+> effect (under `--permissive-effects` the laundering program compiled clean).
+> A variable the arguments cannot determine yields Calor0425 at the call site. Rows carry variable
 > **ordinals** (`EffectsNode.EffectVariableOrdinals`), so an interface member's
 > `eff e` and its implementation's `eff f` unify under the ORDINARY `fits`
 > relation with no rank-1-specific branch — **R2**, and `A3-middleware-alpha`
@@ -902,8 +905,10 @@ Draft v1 used Calor0424 for rank-1 scope violations, conflating a *declaration* 
 > **P32 moves 0 → 4 and this is the whole cause** — 1 in serilog, 3 in FluentValidation, attributed
 > by disabling each candidate change in turn rather than by inference. The ledger's cause taxonomy
 > has no bucket for it, so all four land in its `UnknownSource` ELSE arm; §13.4's taxonomy is E4's
-> to revisit. Per §4.4, a `Fits`-carrying-reasons
-verdict makes the destination row `Assumed`, so the assumption survives the hop.
+> to revisit.
+
+Per §4.4, a `Fits`-carrying-reasons verdict makes the destination row `Assumed`, so the assumption
+survives the hop.
 
 **Cross-module is the Calor0410 rule, not a seventh site.**
 `Effects/CrossModuleEffectEnforcementPass.cs:162`
@@ -2389,6 +2394,34 @@ and it needs its own justification in the E2 PR body.**
 > instead of a cascade, but neither reaches `exit 0`: both end at **Calor0418**, because what they
 > need is acceptance of an *invocation*, and that is E4's — not site 2's. The design's own note on
 > them ("the acceptance half is E3's") was one slice too optimistic and is corrected here.
+
+> **EXECUTED, E3 slice b, PR #1106 — SIX moved lines across TWO scripts.** Counted from a full
+> diff of all six, not from P29's first-difference message. `run.py`, `run3.py`, `facts2.py` and
+> `compile53.py` are **CLEAN**, so `o53/baseline.json`'s 23 files / 54 occurrences / 1 green /
+> 22 red are unchanged and only its `measuredCommit` is re-stamped — gate 5's line-adjacency leg
+> re-run.
+>
+> | Case | Obligation | Result |
+> |---|---|---|
+> | `facts.py` `ParameterNode` probe | — | `Ast/FunctionNode.cs:283` → `:315`. **Unavoidable**, and the same mechanism as obligation **#6**: `EffectsNode` gains `EffectVariableOrdinals` (§7.4's binder positions) and is declared above `ParameterNode` in that file |
+> | `facts.py` `IsSubsetOf` sweep | **#7** | `EffectEnforcementPass.cs:384` → `:398` — a LINE SHIFT only. The sweep still lists exactly **two** occurrences, neither a compatibility site, so obligation #7 stays discharged exactly as slice a left it. (`PolyRow.Fits` deliberately spells its ordinal containment as an explicit loop rather than calling the library helper, whose NAME this sweep counts.) |
+> | `facts.py` `StrictnessBatchTests.cs:260` | — | `AssumedEffects` → `EffectRowUnknown`. **§13.1's `:260` rewrite, discharged** |
+> | `facts.py` `StrictnessBatchTests.cs:607` | — | `AssumedEffects` → `EffectRowUnknown`. **§13.1's `:607` rewrite, discharged** |
+> | `run2.py` **Y3a-B-with-sameline-E** | — | loses one Calor0425. **ρ_body (§5).** A row-less `§LAM` into a `§E{cw}` binding was `CannotTell` while the lambda's row was slice a's Unknown placeholder; ρ_body makes it a decided `Fits` |
+> | `run2.py` **Y4a-O-sameline-E-decl-later** | — | loses one Calor0425, same cause, at site 3 |
+>
+> The two `run2.py` cases are the answer to "how many Calor0425 does ρ_body resolve?": **two
+> transcript sites, ZERO corpus sites**. The corpus's single Calor0425
+> (`13-03.approved.calr`) correctly SURVIVES — it is a row-less `§LAM` returned into a
+> **row-less return**, so ρ_body fixes the source while the destination stays Unknown.
+>
+> **Every other line in all six transcripts is byte-identical**, including the
+> `StrictnessBatchTests.cs` probes at `:472/:502/:555/:582/:587/:612/:640/:656/:728/:745`: the two
+> in-place re-pins were written to preserve the file's line COUNT, and everything new is appended
+> past line 745 — slice a's discipline kept. A first draft broke it and moved ten probe lines onto
+> unrelated source text; caught by diffing every script in full, and fixed rather than regenerated
+> over. Obligations **#2 (X9b)** and **#3 (X9c)** remain undischarged: both still end at Calor0418,
+> which is E4's.
 
 `spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
 machine-readable form, and P27 asserts that the case list holds exactly seven rows.

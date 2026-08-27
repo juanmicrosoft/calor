@@ -629,7 +629,9 @@ renegotiation; DEFERRED items are named so their absence is a decision.
     production caller yet and says so. Corpus delta: **one file of 886**, gaining one Calor0425 at a
     real site 3. P32's ledger reads **zero Calor0425** across all three converted subjects.
   - **slice b — LANDED (PR #1106).** **Site 6** (§7.4's rank-1 instantiation): one solve per call,
-    no fixpoint (**R3**); rows carry effect-variable **ordinals**, so an interface's `eff e` and an
+    no fixpoint in the SOLVE (**R3**), with a separate worklist carrying the resulting charges to
+    **transitive callers** so a multi-hop chain cannot launder an effect (review round 1, finding 1);
+    rows carry effect-variable **ordinals**, so an interface's `eff e` and an
     implementation's `eff f` unify under the ORDINARY `fits` relation (**R2**), and the four
     combinators type-check with zero Calor0424/0425/0404 (**R1**) — the §7.5 ramp does **not**
     fire. **§5's ρ_body** (P14) with Calor0410 on a lambda whose body exceeds its declared row, and
