@@ -557,21 +557,29 @@ public sealed class EffectEnforcementPass
                     // EffectRow.Fits that answers Calor0424 at sites 1-3 answers
                     // here, and Calor0420 is the site-specific spelling of its
                     // DoesNotFit (§6.3). P16 pins that they move together.
-                    var overrideRow = overrideDeclared.ToRow();
-                    var baseRow = baseDeclared.ToRow();
-                    var verdict = Binding.BoundTypes.EffectRow.Fits(overrideRow, baseRow);
+                    // v0.15 E3 slice b — the rows carry their `eff` VARIABLES
+                    // here, by ORDINAL, so an override's `eff f` is identified
+                    // with its base's `eff e` (§7.5's R2) by the ORDINARY fits
+                    // relation and not by a rank-1-specific branch. Slice a
+                    // computed from EffectSet, where a variable contributes
+                    // nothing, and therefore never compared them at all.
+                    var overrideRow = PolyRow.FromDeclaration(method.Effects);
+                    var baseRow = PolyRow.FromDeclaration(baseMethod.Effects);
+                    var verdict = PolyRow.Fits(overrideRow, baseRow);
                     if (verdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                     {
                         var extra = overrideDeclared.Except(baseDeclared)
-                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
+                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
+                            .Concat(overrideRow.VariableNames.Where(
+                                name => !baseRow.VariableNames.Contains(name)));
                         _diagnostics.Report(
                             method.Effects?.Span ?? method.Span,
                             DiagnosticCode.OverrideEffectVariance,
                             $"Override '{cls.Name}.{method.Name}' declares effect(s) [{string.Join(", ", extra)}] " +
                             $"not declared by base method '{baseClassName}.{method.Name}' " +
                             $"(base declares: {baseDeclared.ToDisplayString()}). " +
-                            $"Effect row {overrideRow.ToCompactDisplayString()} does not fit the base method's " +
-                            $"row {baseRow.ToCompactDisplayString()}. " +
+                            $"Effect row {overrideRow.Display()} does not fit the base method's " +
+                            $"row {baseRow.Display()}. " +
                             "An override may not broaden its base method's effect set — broader effects " +
                             "would launder through dynamic dispatch.",
                             varianceSeverity);
@@ -581,9 +589,9 @@ public sealed class EffectEnforcementPass
                         ReportRowUnknown(
                             method.Effects?.Span ?? method.Span,
                             $"Override '{cls.Name}.{method.Name}' has effect row "
-                            + $"{overrideRow.ToCompactDisplayString()} and base method "
+                            + $"{overrideRow.Display()} and base method "
                             + $"'{baseClassName}.{method.Name}' has row "
-                            + $"{baseRow.ToCompactDisplayString()}, so effect variance cannot be decided. "
+                            + $"{baseRow.Display()}, so effect variance cannot be decided. "
                             + "State a row on both, or compile with --permissive-effects.");
                     }
                 }
@@ -611,23 +619,28 @@ public sealed class EffectEnforcementPass
                         var implDeclared = GetDeclaredEffects(impl.Effects);
                         var ifaceDeclared = GetDeclaredEffects(sig.Effects);
                         // Site 5 (§6.2) — same relation, site-specific code.
-                        var implRow = implDeclared.ToRow();
-                        var ifaceRow = ifaceDeclared.ToRow();
-                        var implVerdict = Binding.BoundTypes.EffectRow.Fits(implRow, ifaceRow);
+                        // Site 5, alpha-equivalently (§7.5 R2): the ordinal is
+                        // the variable's identity, so `eff e` on the interface
+                        // member and `eff f` on the implementation unify.
+                        var implRow = PolyRow.FromDeclaration(impl.Effects);
+                        var ifaceRow = PolyRow.FromDeclaration(sig.Effects);
+                        var implVerdict = PolyRow.Fits(implRow, ifaceRow);
                         if (implVerdict == Binding.BoundTypes.EffectFit.CannotTell)
                         {
                             ReportRowUnknown(
                                 impl.Effects?.Span ?? impl.Span,
                                 $"Implementation '{implOwnerName ?? cls.Name}.{impl.Name}' of interface method "
                                 + $"'{iface.Name}.{sig.Name}' has effect row "
-                                + $"{implRow.ToCompactDisplayString()} and the interface declares row "
-                                + $"{ifaceRow.ToCompactDisplayString()}, so effect variance cannot be decided. "
+                                + $"{implRow.Display()} and the interface declares row "
+                                + $"{ifaceRow.Display()}, so effect variance cannot be decided. "
                                 + "State a row on both, or compile with --permissive-effects.");
                         }
                         else if (implVerdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                         {
                             var extra = implDeclared.Except(ifaceDeclared)
-                                .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
+                                .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
+                                .Concat(implRow.VariableNames.Where(
+                                    name => !ifaceRow.VariableNames.Contains(name)));
                             var inheritedNote = implOwnerName != null
                                 && !implOwnerName.Equals(cls.Name, StringComparison.Ordinal)
                                 ? $" (implementation inherited from base class '{implOwnerName}')"
@@ -644,8 +657,8 @@ public sealed class EffectEnforcementPass
                                 $"'{iface.Name}.{sig.Name}' on class '{cls.Name}'{inheritedNote} declares effect(s) " +
                                 $"[{string.Join(", ", extra)}] not declared by the interface " +
                                 $"(interface declares: {ifaceDeclared.ToDisplayString()}). " +
-                                $"Effect row {implRow.ToCompactDisplayString()} does not fit the interface's " +
-                                $"row {ifaceRow.ToCompactDisplayString()}. " +
+                                $"Effect row {implRow.Display()} does not fit the interface's " +
+                                $"row {ifaceRow.Display()}. " +
                                 "An implementation may not broaden the interface's declared effect set — interface " +
                                 "dispatch launders effects identically to overrides.",
                                 varianceSeverity);
