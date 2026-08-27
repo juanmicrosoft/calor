@@ -1,9 +1,9 @@
 # Roadmap — v0.16 "Measured Effects"
 
 **Date:** 2026-08-27
-**Status:** Draft v3 — Draft v1 (§10 round 1) and Draft v2 (§10 round 2: plan/process 88 %,
-measurement 90 %, engineering 80 %, all NEEDS-FIXES) with every finding applied or declined in
-§10. Written against the source at `7d621c0d` (main after PR #1110), before the 0.15.0 release PR
+**Status:** Draft v4 (intended final) — three adversarial rounds (§10: round 1 on v1, round 2 on
+v2, round 3 on v3 — engineering APPROVE-with-fixes, measurement and plan/process NEEDS-FIXES with
+one Major) with every finding applied or declined in §10. Written against the source at `7d621c0d` (main after PR #1110), before the 0.15.0 release PR
 merges (`Directory.Build.props:3` reads `0.14.3`). Every number is re-measured from the tree or
 the archived epoch with its source; the S1/S2 measurement tables live in
 `2026-08-27-v0.16-s1-s2-measurement-notes.md` (*N:*).
@@ -29,13 +29,16 @@ read-only), `v0.13-freeze-registrations.md` (*F:*), the open issue list on 2026-
 - **Breach 2 — R:987 said PRs #982/#981/#976 would be "merged or closed in the 0.15 kickoff
   sweep"; all three are open.** #982 is gate 3's CLI-process leg. §6 carries each.
 - **Correction to a published 0.15 number.** The P32 ledger's "8 Calor0425 sites over 99 of 364
-  modules" (`calor0425-corpus-ledger.json`; the `[Unreleased]` changelog) counts modules that pass
-  the **raw** binder bag, but the shipping compiler applies `BindingDiagnosticPolicy.
+  modules" (`calor0425-corpus-ledger.json`; cited at R:654-656) counts modules that pass the
+  **raw** binder bag, but the shipping compiler applies `BindingDiagnosticPolicy.
   PropagateCompilationErrors` (`Program.cs:820`; allowlist `Binding/Scope.cs:53-78`) before it
   stops (`:829-833`). Under the production rule **256** of 305 parsed modules reach the effect
-  pass and Calor0425 appears in **30** (N:S2). The number was a ledger artifact, not a compiler
-  fact; the annex's frozen P32 row stays as written and is superseded by **K1** (§3.1), cited.
-  Found by the round-2 engineering review; re-measured for this draft (N:S2.1, S2.2).
+  pass and Calor0425 appears in **30** of them (67 sites) (N:S2). The number was a ledger
+  artifact, not a compiler fact. The committed ledger and R:654-656 stand as written (P32 is not
+  an annex row); the corrected 30/256 figure is published in the next release's notes beside the
+  8/99 one, and **K1** (§3.1) regenerates the ledger under the shipping rule. Found by the round-2
+  engineering review; re-measured for this draft (N:S2.1, S2.2) and reproduced cell-for-cell by
+  all three round-3 lenses.
 - **Never built:** gate 5 leg (b)'s `compile-all-committed-calr` job (R:938-940) and gate 3's
   `Calor.Sdk` leg (R:891-893).
 
@@ -60,7 +63,7 @@ read-only), `v0.13-freeze-registrations.md` (*F:*), the open issue list on 2026-
 - **S1 steps 1–2 are DONE and null** (N:S1.3): byte-identical C# and CLI text across the arms on
   all 40 archived programs; the arm diff is enumerated; the harness hook is identical across the
   two Calor arms (`run-pair.sh:502-516`, including the `${calr_block}${smoke_block}` clauses at
-  `:511`). `run-pair.sh:853/867` run `claude --print --output-format json`, so no per-turn tool
+  `:510`). `run-pair.sh:853/867` run `claude --print --output-format json`, so no per-turn tool
   calls exist. **"Why more turns" is open and cannot be closed from the archive.**
 
 ### 0.3 The static benchmark cannot see rows
@@ -195,19 +198,21 @@ plan's own S2 record; the in-process and CLI rows must agree per subject as they
 In order: (a) **A-1.12 fixes the margin population and the CV cap first** — `e1-rows-parity-001`
 alone or pooled with `w5-parity-002`, decided in writing before any seeded-extension compile
 (compiler outputs do not unblind agent behaviour, but the population choice must not follow the
-seeds); (b) the margin is re-derived by the **committed** `ppe1-margin-derivation.py` with the
-population added as a flag and the grid extended to 1.15/1.20 (a bench-script change, S3
-*Touches*), **using the committed script's redraw convention verbatim** — the convention matters:
-resample-with-replacement gives a null p95 of 1.190, the script's permutation redraw 1.203, and
-the two round to different grid lines (1.20 vs 1.25); the registered margin is the committed
-script's; (c) author five pair specs (`bench/phase0-agent-native/pairs/W-*/spec.md`) with per-arm
-starters and held-out tests that observe the laundered effect; compile every seeded extension on
-**both** arms and record the multisets (§4.1 table); (d) **after W1 merges, a paid dry run per
-A:81 — ≥ 3 runs/arm on the five pairs, 30 runs ≈ $30** — from which leg A's MDD and the cell
-count for ≥ 80 % power (upper confidence bound of the variance) are set; (e) A-1.12 registers
-all of it, verified at registration by `grep -rn "PP-W" src/` empty and no row-family `src/` diff
-since `7d621c0d`. *Fail:* the cell count for 80 % power exceeds the spend ceiling — the PP
-registers its achievable power and arms UNDERPOWERED.
+seeds); (b) the margin is derived by the **committed** `ppe1-margin-derivation.py` with the
+population added as a flag, `SIMS` raised to **≥ 3 000**, and the grid extended to 1.15/1.20 (a
+bench-script change, S3 *Touches*), under the committed script's own null-redraw convention
+**named in A-1.12: resample-with-replacement** (`simulate()`, `:111-140`, `random.choice(pooled[pair])`
+— not a permutation); seed and `SIMS` are recorded in A-1.12; the registered rule is §4.1's
+"Margin"; (c) author the six pair specs (`bench/phase0-agent-native/pairs/W-*/spec.md`) with
+per-arm starters and held-out tests that observe the laundered effect; compile every seeded
+extension on **both** arms and record the multisets (§4.1 table — five of six already measured
+for this draft); (d) **after W1 merges, a paid dry run per A:81 — ≥ 3 runs/arm on the six pairs,
+36 runs ≈ $36** — which sets **N** (runs per cell) to reach ≥ 80 % power at the **pre-registered
+effect size Δ = 0.5** (§4.1 leg A), using the upper confidence bound of the dry-run variance;
+the dry run sizes N and never moves the bar; (e) A-1.12 registers all of it, verified at
+registration by `grep -rn "PP-W" src/` empty and no row-family `src/` diff since `7d621c0d`.
+*Fail:* N for 80 % power at Δ = 0.5 exceeds the spend ceiling — the PP registers its achievable
+power and arms UNDERPOWERED.
 
 ---
 
@@ -226,11 +231,21 @@ registers its achievable power and arms UNDERPOWERED.
   and gate 7's E7 leg (the ten effects goldens answered byte-for-byte via `calor_query`) — two
   legs, stated separately in §5. *Discriminating:* answer from an in-memory graph instead of the
   index and the gate-7 golden for the cross-module fold (`Whisper`) fails.
-- **K1 — the P32 / Calor0270 ledgers mirror the shipping rule (kickoff sweep, DECIDED).** The
-  ledger tests' guard becomes `PropagateCompilationErrors` into a fresh bag, then `HasErrors`
-  (`Calor0425CorpusLedgerTests.cs:347-354` and the 0270 sibling); both ledgers regenerate with
-  the cause named in the PR and in `CHANGELOG.md`; schema 3 carries `bindRule:
-  "propagated"` and gate 9's `floorRule`. **Sequenced after W3(c)** — see there.
+- **K1 — the P32 ledger mirrors the shipping rule (kickoff sweep, DECIDED; scoped to P32).**
+  `Calor0425CorpusLedgerTests.cs:347-354`'s guard becomes `PropagateCompilationErrors` into a
+  fresh bag, then `HasErrors`; the ledger regenerates with the cause named; schema 3 carries
+  `bindRule: "propagated"` and gate 9's `floorRule`. The Calor0270 ledger is **not** touched:
+  `Calor0270CorpusVolumeTests.cs:188-208` has no bind guard (it counts Infos from the raw bag over
+  every parsed module — 305 — and asserts `AggregateModulesBound > 250` at `:118`); its schema
+  gains `bindRule: "parsed"` so the two rules are named side by side. K1 also pins the
+  **scratch-cwd rule** — the in-process measurement, like N:S2.2's CLI pass, runs with no
+  `.calor-effects.json` beside the input. *Touches:* `Calor0425CorpusLedgerTests.cs`,
+  `Calor0270CorpusVolumeTests.cs` (schema field only), both ledger JSONs, `CHANGELOG.md`.
+  *Sequencing pin:* K1's PR asserts that `tests/Calor.Enforcement.Tests/
+  EffectInferrerRecursionTests.cs` exists — W3(c) first — because K1 runs the **in-process**
+  effect pass over ~157 modules the ledger has never enforced; the CLI shows **zero crashes over
+  the 256 today** (N:S2.2), so the risk is confined to a test host that cannot catch a stack
+  overflow. *Discriminating:* restore the raw-bag guard → `ModulesEnforced` 256 → 99 → red.
 - **W1 — Per-turn capture.** `run-pair.sh` / `run-bundle.sh` archive `transcript.jsonl` per run
   (S1's mechanics), the agent's `dotnet build` stdout, and #1094's `.calor-build-state.json`;
   `pair.json` gains the additive "pre-rows control arm" definition (§4.1) and the template gains
@@ -250,10 +265,9 @@ registers its achievable power and arms UNDERPOWERED.
   robustness; (c) #1104: a depth bound in the nested `EffectInferrer` (`EffectEnforcementPass.cs:
   2547`, cycle `:4022 → :3942 → :3827`) with a crash-repro pin in
   `tests/Calor.Enforcement.Tests/EffectInferrerRecursionTests.cs` over a committed fixture reduced
-  from the Serilog module and enforced *without* binding. **(c) lands before K1** because K1 runs
-  the in-process effect pass over ~157 modules the ledger has never enforced: the two known
-  crashers stop at a propagated Calor0250 today, and the others are unmeasured crash risk in a
-  test host that cannot catch a stack overflow. *Discriminating:* revert (a) →
+  from the Serilog module and enforced *without* binding. **(c) lands before K1**, pinned by K1's
+  existence assertion on this test: the CLI pass shows zero crashes over the 256 (N:S2.2) and
+  the two known crashers stop at a propagated Calor0250, so the residual risk is in-process only. *Discriminating:* revert (a) →
   `ExcludedParseFailed` rises above 2 → red; revert (b) → the ICE fixture test is red; revert
   (c) → the recursion test crashes the host.
 - **W4 — Turn-gap attribution published.** S1's script and note; after W1, the per-turn
@@ -264,8 +278,11 @@ registers its achievable power and arms UNDERPOWERED.
   `EffectInferenceDidNotConverge`** (0406–0409 free at `7d621c0d`) and emit it at **both** caps —
   `PropagateInstantiatedCharges` (`:1129`, today silent) and `ProcessScc` (`:455`, today the
   mis-banded `Calor0600` string, retired at that site) — with the caps injectable so the pins
-  run at cap = 2 on three-hop fixtures. *Touches:* `Diagnostics/Diagnostic.cs`,
-  `EffectEnforcementPass.cs:455-487, 1123-1140`, `tests/Calor.Enforcement.Tests/`.
+  run at cap = 2 on three-hop fixtures. Retiring `Calor0600` at `ProcessScc` changes an emitted
+  code and gets a `CHANGELOG.md` line; **no test asserts the `Calor0600` string at that site**
+  (`grep -rn Calor0600 tests/` hits only the code-prefix list in `TelemetryPrivacyTests.cs:95`).
+  *Touches:* `Diagnostics/Diagnostic.cs`, `EffectEnforcementPass.cs:455-487, 1123-1140`,
+  `tests/Calor.Enforcement.Tests/`, `CHANGELOG.md`.
   *Discriminating:* revert either emission → its `_IsReported` pin fails.
 
 **Cut line 1.** If W3(a) overruns, W2 still runs (fixture-scale, corpus-independent); **gate 9
@@ -304,32 +321,50 @@ with a "measured silent" trigger).
 
 ### 4.1 PP-W-rows — "with rows, fail-closed, agents launder fewer effects on callback-heavy code than under the pre-rows language as it was usable (warnings included), at no large loop tax"
 
-**Pairs — five (A:81's floor), per-arm starters, per-arm emissions measured per cell.** The spec
-is arm-neutral; **the starter is not** (`after/*.calr` does not parse on v0.14.3 — Calor0100 at
-`<eff`), so arm A starts from the row-less `before/` programs and arm B from `after/`, both
-frozen by blob SHA (`git ls-tree` at `7d621c0d`). The starter **builds on both arms**; no defect
-is seeded in it. The task asks for an extension whose natural shortcut launders an effect; the
-held-out test asserts the pure path stays silent (captured stdout / a recording sink).
+**Pairs — six, three of them blind (floor two), per-arm starters, per-arm emissions measured per
+cell.** The spec is arm-neutral; **the starter is not** (`after/*.calr` does not parse on v0.14.3
+— Calor0100 at `<eff`), so arm A starts from the row-less `before/` programs and arm B from
+`after/`, both frozen by blob SHA (`git ls-tree` at `7d621c0d`). No defect is seeded in the
+starter; the task asks for an extension whose natural shortcut launders an effect, and the
+held-out test asserts the pure path stays silent (captured stdout / a recording sink). Emissions
+below were measured for this draft on both arms (v0.14.3 `--permissive-effects` at `63316987`;
+0.15 strict at `7d621c0d`) unless marked as the round-3 measurement reviewer's.
 
-| Pair | Starter A (`before/`) / B (`after/`) | Extension the task asks for | Arm A emission on the shortcut (v0.14.3 permissive, measured round 2) | Arm B emission (0.15.0 strict) | Leg-A cell class |
+| Pair | Starter A (`before/`) / B (`after/`) | Extension the task asks for | Arm A emission on the shortcut | Arm B emission | Class |
 |---|---|---|---|---|---|
-| W-001 A3-middleware | `2d351d10` / `e5ee81e2` | a logging stage under `RunTwice<eff e>` with a pure caller | S3 measures; expected Calor0418/0419 **warnings** | error Calor0410 (rank-1 charge, D:§7.4) | to be classified at S3 |
-| W-002 A3-map | `9f108655` / `0885b3dd` | `MapAndReport`: a printing `§LAM` bound by `§B` and passed to `Map` | **warning Calor0410** (an inline `§LAM` as `§A` draws Calor0208 on both arms; the `§B`-bound form compiles) | error Calor0410 | **warning-vs-error** |
-| W-003 A3-match | `1f36ea6e` / `c1ce7517` | a logging fallback branch via a `§B`-bound `§LAM` | **warning Calor0410** | error Calor0410 | **warning-vs-error** |
-| W-004 A3-callback | `f2dca4a6` / `05ddc23d` | a **new pure-declared method** invoking the field: `§MT{mt002:Peek} §E{} … §C{onChange}` (both frozen blobs already declare `Bump` `§E{cw}` and the field row `§E{cw}`) | Calor0418 **warnings only, no Calor0410** | **error Calor0410** | **blind on arm A** |
-| W-005 A2 | `d49d0017` / `93ecdf16` | a pre-processor step that prints inside `Handle` | S3 measures | error Calor0410 (control = PP-E1's frozen post-E4 multiset, A:338-450) | to be classified at S3 |
+| **W-001** A3-middleware | `2d351d10` / `e5ee81e2` | a **field-stored** stage `§FLD{Func<i32>:stage:pri}` (row `§E{cw}` in B) passed to `RunTwice` from a new pure `§MT{mt003:Twice} §E{}` | only the pre-existing Calor0418 warnings on `g` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` (rank-1 charge) | **blind** |
+| W-001s (published sibling, not adjudicated) | same | a printing `§LAM` bound by `§B` and passed to `RunTwice` | `warning Calor0410` (reviewer-measured) | error Calor0410 | warning-vs-error |
+| W-002 A3-map | `9f108655` / `0885b3dd` | `MapAndReport`: a printing `§LAM` bound by `§B` and passed to `Map` | `warning Calor0410` (an inline `§LAM` as `§A` draws Calor0208 on both arms; the `§B`-bound form compiles) | error Calor0410 | warning-vs-error |
+| W-003 A3-match | `1f36ea6e` / `c1ce7517` | a logging fallback via a `§B`-bound `§LAM` | `warning Calor0410` | error Calor0410 | warning-vs-error |
+| **W-004** A3-callback | `f2dca4a6` / `05ddc23d` | a new pure `§MT{mt002:Peek} §E{}` invoking `onChange` (`Bump` is `§E{cw}` in both blobs; the field row `§E{cw}` exists in B only — A's field has no row) | two Calor0418 warnings on `onChange`, **no Calor0410** | `error Calor0410: 'Peek' uses 'cw'` | **blind** |
+| W-005 A2 | `d49d0017` / `93ecdf16` | a `§P` pre-processor step inside `Handle` | `warning Calor0410` (reviewer-measured) | error Calor0410; **arm B's starter does not build** (exit 1, PP-E1's frozen post-E4 multiset, A:338-450) | warning-vs-error, **leg A only** |
+| **W-006** A3-map | `9f108655` / `0885b3dd` | a **field-stored** stage `§FLD{Func<i32,i32>:stage:pri}` (row `§E{cw}` in B) passed to `Map` from a new `§MT{mt001:Twice} §E{alloc, mut}` | only the pre-existing Calor0418 warning on `f` — **no Calor0410** | `error Calor0410: 'Twice' uses 'cw'` | **blind** |
 
-**Two cell classes, reported separately in leg A (DECIDED, round 2):** *warning-vs-error* cells
-(W-002, W-003 — v0.14.3 permissive already names the effect as a warning; leg A there measures
-"agents act on an error they would not act on as a warning") and *blind* cells (W-004 — v0.14.3
-cannot charge the invocation). W-001/W-005 are classified by S3's compile before registration.
-Arm A's disclosed signals: Calor0418/0419 warnings at every invocation under the waiver **and
-Calor0410 warnings on lambda-body launderings**. Route (a) below is worded as PP-E1's "matches
-the frozen multiset", not "compiles clean".
+The same field-stored shape on A3-match is **not registrable**: arm A draws `error Calor1002`
+(generated C# cannot resolve the module-level method group `Zero` from inside a class) beside its
+Calor0418 warnings, a codegen confound unrelated to effects; recorded here so it is not
+re-proposed. **W-005 stays as a warning-vs-error, leg-A-only cell** rather than being dropped,
+because it is the only MediatR-shaped pipeline in the set and its arm-A signal is the one PP-E1's
+own control names; the agent must repair `Handle` on arm B before extending, so the pair's runs
+are **excluded from leg B** (its `tokens.output` is archived, never entered into the ratio) and
+the repair is disclosed in the spec. A2 is not re-frozen.
+
+**Cell classes and the leg-A verdict (DECIDED, rounds 2–3):** *blind* cells — {**W-001, W-004,
+W-006**}, three registered, floor **two** (any blind cell that fails route (a) drops, and below two
+the PP reads NOT-ADJUDICATED); *warning-vs-error* cells — {W-002, W-003, W-005, W-001s} — where
+v0.14.3 permissive already names the effect as a warning and leg A measures "agents act on an
+error they would not act on as a warning". The verdict is read on the blind cells; the other
+class is published beside it. **Median convention:** the leg-A statistic is the median over blind
+pairs of the per-pair escape-rate delta; with an odd count it is the middle value, with an even
+count the mean of the two middle values — so k = 3 is no more powerful than k = 2 (the middle
+value of three), and the floor is what carries the power. Arm A's disclosed signals: Calor0418/
+0419 warnings at every invocation under the waiver, and Calor0410 warnings on lambda-body
+launderings. Route (a) below is worded as PP-E1's "matches the frozen multiset", not "compiles
+clean".
 
 **Bias direction, pre-registered:** leg B's ratio is expected > 1 on arm B — the agent reacts to
 an error — which is the cost being measured; < 1 is disclosed as surprising. The prompt's "the
-starter already builds" (`run-pair.sh:792`) stays true.
+starter already builds" (`run-pair.sh:792`) is true for every leg-B pair.
 
 **Arms — contrast (iii), with an additive arm definition, not a supersession.** v0.14.3 +
 `--permissive-effects` vs v0.15.0 strict. Rejected: (i) 0.15.0 vs 0.16 (rows in both arms);
@@ -349,47 +384,60 @@ sets `permissiveEffects: true` and `controlArmKind: "pre-rows"`, the template's
 **Metric — two legs, nested design (A:§6.1), one verdict.**
 
 - *Leg A — escapes.* Per pair, the escape rate on each arm (`result.json` `escapedBugs` /
-  `heldoutPassed` from the effect-observing test); statistic = **median over pairs of the
-  per-pair escape-rate delta (A − B)**, two-level cluster bootstrap; reported for the blind cells
-  and the warning-vs-error cells **separately**, the verdict read on the blind cells with the
-  other class published beside it; bar = the one-sided 95 % lower bound of the delta exceeds 0 and
-  the point exceeds the MDD the S3 dry run derives at 80 % power.
-- *Leg B — loop tax*, PP-E1's rule verbatim on `tokens.output` (A-1.9.1): fails iff the lower
-  bound exceeds 1.0 **and** the point exceeds the margin; iterations observational.
+  `heldoutPassed` from the effect-observing test); statistic = **median over blind pairs of the
+  per-pair escape-rate delta (A − B)** (convention above), two-level cluster bootstrap. **Bar:
+  the one-sided 95 % lower bound of that delta exceeds 0.** The bar is **not** a function of the
+  dry-run variance: the **pre-registered effect size is Δ = 0.5** (the round-3 simulation of this
+  rule at k = 2 blind pairs and 8 runs/cell gives MDD ≈ 0.45 with power 0.87 at Δ = 0.5; k = 1
+  gives MDD ≈ 0.6 and a single-fixture test), and the A:81 dry run sets **N** to reach ≥ 80 %
+  power at Δ = 0.5 under the upper confidence bound of its variance. Warning-vs-error cells are
+  published beside the verdict with the same statistic.
+- *Leg B — loop tax*, PP-E1's rule verbatim on `tokens.output` (A-1.9.1) over the leg-B pairs
+  (W-001–W-004, W-006): fails iff the lower bound exceeds 1.0 **and** the point exceeds the
+  margin; iterations observational.
 
-**Margin — derived by the committed script, disclosed, one knife edge.** On `e1-rows-parity-001`
-with the grid extended (seed 4537, 300 × 400, the script's permutation-redraw convention):
-within-cell CV median 0.2746, null point p95 **1.1800 → margin 1.20**; conjunction false-fail
-0.7 % (point-only 2.7 %); power **0.53 / 0.81 / 0.97** at 1.25× / 1.4× / 1.6×. *Knife edge:* the
-population's own realized point is 1.1835, and pooling an epoch whose arms differ inflates the
-null spread — an `e1`-only calibration biases the margin **toward leniency**; the redraw
-convention alone moves the grid line (1.190 vs 1.203). The population and the CV cap (1.5 × the
-chosen population's median CV) are fixed at A-1.12 **before** S3's compiles (§2.3(a)), with the
-margin the other choice would have given stated.
+**Margin — one derivation, one number, population named; registered as a rule.** Population
+`e1-rows-parity-001` (corrected tokens, 40 valid runs, within-cell CV median 0.2746); the
+committed `ppe1-margin-derivation.py`'s null redraw, **resample-with-replacement** from each
+pair's pooled runs (`simulate()`, `:111-140`); `SIMS = 3 000`, `BOOT = 400`, seed **4537**: null
+point median 0.9986, **p95 1.1766**; across seeds {4537, 1, 2} at 3 000 sims p95 1.1766–1.1864,
+Monte-Carlo half-width **0.005**. **Registered rule: the margin is the 0.05 grid line above
+(p95 + its Monte-Carlo half-width)** — 1.1766 + 0.005 = 1.182 → **1.20**. At that margin:
+conjunction false-fail 1.2 % (point-only 3.5 %); power **0.51 / 0.84 / 0.97** at 1.25× / 1.4× /
+1.6×. *Knife edge, disclosed with the across-seed range:* at 300 sims the same convention ranges
+1.171–1.213 across seeds (round-3 measurement review), which under the rule would round to 1.25;
+a shuffle-and-split permutation (not the script's convention) gives 1.200 at 3 000 sims, also
+1.25 under the rule. Draft v3 had the two conventions' labels swapped; A-1.12 records the
+convention by name, the seed, `SIMS`, and the number the committed script prints. The
+population's own realized point (1.1835) sits at its null p95, and pooling an epoch whose arms
+differ inflates the null spread — an `e1`-only calibration biases **toward leniency**; §2.3(a)
+fixes the population and the CV cap (1.5 × the chosen population's median CV) before S3's
+compiles, with the margin the other population would have given stated.
 
-**Cells and spend — with the mid-epoch rule (DECIDED).** Five pairs; runs per cell from the S3
-dry run (≥ 80 % power at the registered MDD, upper-bound variance). At the archived **$1.005 per
-run** (N:S1.2): S1 pilot 2 runs + dry run 30 runs + a 5 × 8 × 2 main epoch 80 runs ≈ $112;
-**ceiling $150**, and the pilot, every retry, the dry run and the epoch all count against it.
-**When the ceiling is reached the epoch stops**; the PP-W5 validity floor then decides route (c)
-on what was run; the overrun is disclosed in the ledger.
+**Cells and spend — with the mid-epoch rule (DECIDED).** Six pairs; N per cell from the dry run.
+At the archived **$1.005 per run** (N:S1.2): S1 pilot 2 runs + dry run 36 runs + a 6 × 8 × 2
+main epoch 96 runs ≈ $135; **ceiling $150**, and the pilot, every retry, the dry run and the
+epoch all count against it. **When the ceiling is reached the epoch stops**; the PP-W5 validity
+floor then decides route (c) on what was run; the overrun is disclosed in the ledger. If N > 8
+is needed, the six-pair epoch does not fit the ceiling and the PP registers its achievable power.
 
 **Four-valued outcome, precedence NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT** (A:317):
 NOT-ADJUDICATED — (a) any unmutated starter fails to reproduce its frozen multiset on its arm;
-(b) any run lacks W1's transcript; (c) the PP-W5 validity floor / distinct-hash / censoring
-routes (including a ceiling stop that leaves a cell below 2 valid runs); (d) W2 does not ship in
-0.16.0 **and only where §9 cut line 2 was invoked in writing**, cited in the ledger. **Own-goal
-clause** (A:317): a route caused by this workstream is MISS, with the artifact. MISS — leg A
-below its bar on a valid harness, or leg B fails, or an own-goal. UNDERPOWERED — leg A at bar
-with leg B's point over the margin and the bound not firing, or CV over the cap, or registered
-achievable power < 80 %. HIT — leg A at bar and leg B not failing: "rows, fail-closed, caught the
-registered classes at no large loop tax", never "rows are free".
+(a′) fewer than two blind cells survive (a); (b) any run lacks W1's transcript; (c) the PP-W5
+validity floor / distinct-hash / censoring routes (including a ceiling stop that leaves a cell
+below 2 valid runs); (d) W2 does not ship in 0.16.0 **and only where §9 cut line 2 was invoked in
+writing**, cited in the ledger. **Own-goal clause** (A:317): a route caused by this workstream is
+MISS, with the artifact. MISS — leg A below its bar on a valid harness, or leg B fails, or an
+own-goal. UNDERPOWERED — leg A at bar with leg B's point over the margin and the bound not
+firing, or CV over the cap, or registered achievable power < 80 % at Δ = 0.5. HIT — leg A at bar
+and leg B not failing: "rows, fail-closed, caught the registered classes at no large loop tax",
+never "rows are free".
 
 **Blindness, stated correctly:** PP-E1 executed all ten mutation cells (10/10) and S3 compiles
-every seeded extension on both arms; the registration is results-blind **only as to agent
-behaviour**, and the dry run's 30 runs are the first agent runs, used to size cells, never to
-adjudicate. **Freeze event:** A-1.12, guarded by `check-annex-freeze.py`. **Who runs it:** the
-0.16.0 release PR's author before the tag.
+every seeded extension on both arms (five of six are compiled in this draft); the registration is
+results-blind **only as to agent behaviour**, and the dry run's 36 runs are the first agent runs,
+used to size N, never to adjudicate. **Freeze event:** A-1.12, guarded by
+`check-annex-freeze.py`. **Who runs it:** the 0.16.0 release PR's author before the tag.
 
 ### 4.2 The tax question — instrument first
 
@@ -426,21 +474,25 @@ indicator; register-then-merge enforced by A-1.10.
 
 8. **Harness capture.** *Instrument:* W1's validity test. *Denominator:* every run of every 0.16
    epoch. *Freeze:* A-1.12 names it a validity condition. *Pin:* remove the archive step → route (b).
-9. **Conversion denominator — re-set on the production rule.** *Instrument:* the Calor0425 and
-   Calor0270 ledger tests after K1 (schema 3, `bindRule: "propagated"`, `floorRule`), exact per
-   subject. *Denominator:* 364 subject modules at the pinned SHAs. *Floor, pre-committed here from
-   N:S2:* **`ExcludedParseFailed ≤ 2`** (the user-visible bar; 57 recovered) **and
-   `ModulesEnforced ≥ 250`** under the propagated rule (256 measured; MediatR ≥ 29, serilog ≥ 84,
-   FluentValidation ≥ 137 — per-subject floors two below today's in-process count except MediatR,
-   whose count is exact). Expectation after W3(a): ≈ 256 + 48, published, not gated. *Freeze:*
-   this document; K1's PR writes `floorRule` before any W3 fix merges. *NOT-ADJUDICATED route:*
-   K1's regeneration lands below 250 for a cause that is a documented in-process/CLI difference
+9. **Conversion denominator — re-set on the production rule.** *Instrument:* the Calor0425
+   ledger test after K1 (schema 3, `bindRule: "propagated"`, `floorRule`, scratch cwd), exact per
+   subject; the Calor0270 ledger unchanged (`bindRule: "parsed"`). *Denominator:* 364 subject
+   modules at the pinned SHAs. *Floor, pre-committed here from N:S2:* **`ExcludedParseFailed ≤ 2`**
+   (the user-visible bar; 57 recovered) **and `ModulesEnforced ≥ 250`** under the propagated rule
+   — a **regression floor, six below the observed aggregate of 256**; per subject MediatR ≥ 29 and
+   serilog ≥ 84 (both **equal** to today's count — exact floors) and FluentValidation ≥ 137 (six
+   below 143, where the slack sits). Expectation after W3(a): ≈ 256 + 48, published, not gated.
+   *Freeze:* this document; K1's PR writes `floorRule` before any W3 fix merges.
+   *NOT-ADJUDICATED route:* K1's in-process regeneration lands below 250 for a cause that is one of
+   the **documented CLI-only passes** — `TypeChecker`, `PatternChecker`, `BindValidationPass`
+   (Calor0250), `ReturnValidationPass` (Calor0205) at `Program.cs:760-808`, or the
+   `--enforce-effects` default (`:1230`); the effect-pass construction is otherwise identical
+   (`Program.cs:856-866` vs `new EffectEnforcementPass(bag)`, `EffectEnforcementPass.cs:161-162`)
    — then the floor is re-registered from K1's number with the artifact. *Pin:* revert the
    converter fix → `ExcludedParseFailed` rises → red; restore the raw-bag guard →
    `ModulesEnforced` drops to 99 → red. Two-sided as gate 6.
 10. **PP-W-rows.** *Instrument:* `effect-rows-benefit-ledger.json` + exact-equality test +
-    `ppw-analyze.py`. *Denominator:* five pairs × the registered cells × two arms, two cell
-    classes. *Freeze:* A-1.12. *Pin:* the annex guard; dropping a pair fails the test.
+    `ppw-analyze.py`. *Denominator:* six pairs × N cells × two arms, two cell classes; blind floor two. *Freeze:* A-1.12. *Pin:* the annex guard; dropping a pair fails the test.
 11. **Non-convergence coverage.** *Instrument:* W5's two `_IsReported` pins at injected caps,
     both emitting Calor0406. *Denominator:* the two caps (`:455`, `:1129`). *Freeze:* §3.1 W5.
     *Pin:* revert either → red.
@@ -454,7 +506,8 @@ indicator; register-then-merge enforced by A-1.10.
 
 | Item | Source | Trigger | Venue |
 |---|---|---|---|
-| P32 / 0270 ledgers gate on the raw binder bag; the published "8 over 99" | §0.1; N:S2 | — | **kickoff K1**, after W3(c) |
+| P32 ledger gates on the raw binder bag; the published "8 over 99" | §0.1; N:S2 | — | **kickoff K1** (P32 only), after W3(c) |
+| Calor0270 ledger counts Infos over every parsed module (no bind guard) | `Calor0270CorpusVolumeTests.cs:118,188-208` | — | K1 records `bindRule: "parsed"`; no regeneration |
 | ES-08 never registered while E2 merged | F:364-366; §0.1 | — | kickoff sweep: register under F-3's supersession rule with the breach disclosed |
 | Gate 3 CLI-process leg (PR #982 open); `Calor.Sdk` leg unbuilt | R:891-893 | E7 lands | #982 merged or closed in the kickoff sweep; SDK leg with E7 |
 | PRs #981, #976 open | R:987 | — | kickoff sweep: merge, close, or re-open as issues |
@@ -521,7 +574,7 @@ indicator; register-then-merge enforced by A-1.10.
 1. **An agent can ask the MCP server** who calls a function, what breaks if its effects change,
    and what its row is — from the index, byte-identical to `calor query` (gate 7 E7 leg; gate 3
    MCP leg).
-2. **On five callback-heavy tasks, rows fail-closed catch laundered effects the pre-rows language
+2. **On six callback-heavy tasks (three blind), rows fail-closed catch laundered effects the pre-rows language
    (warnings included) let through, at no large loop tax** — PP-W-rows HIT at the release commit,
    or the verdict published as it reads, blind and warning-vs-error cells separately.
 3. **The converter's output parses for all but two of 364 real modules (57 recovered) and does
@@ -628,9 +681,27 @@ Dispositions:
 
 **Declined:** none. **Narrowed:** none.
 
-**Open questions for round 3:** (1) whether the 0.15.0 release PR's benchmark block moved;
-(2) whether W-001 and W-005 classify as blind or warning-vs-error — S3's compile decides, and the
-verdict is read on blind cells, so a five-pair set with only one blind cell would make leg A
-rest on W-004 alone (the reviewers may want a second blind shape registered); (3) whether K1's
-in-process regeneration reproduces the CLI's 256 exactly or the per-subject floors absorb a
-documented difference.
+**Open questions for round 3** were answered by round 3 (below).
+
+### Round 3 (2026-08-27, on Draft v3 @ `8c838430`) — engineering APPROVE-with-fixes 85 %, measurement NEEDS-FIXES 90 %, plan/process NEEDS-FIXES 90 % (one Major); all three reproduced the two-rule denominator cell-for-cell (256 / 59 / 49; Calor0425 in 30 modules / 67 sites; zero crashes)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (Major, all lenses) | Only one of five cells is blind (W-001's lambda extension and W-005's `§P` both warn Calor0410 on arm A); k = 1 → MDD ≈ 0.6; k = 2 → MDD ≈ 0.45 (power 0.87 at Δ = 0.5); k = 3 no better (median convention) | **Done** — W-001 re-registered as the field-stored-callback-to-`RunTwice` shape (measured blind for this draft on both arms; the lambda extension kept as the published sibling W-001s); the field shape measured on A3-map (**blind** → W-006) and A3-match (not registrable: arm A draws `error Calor1002` on the module-level method group `Zero` from inside a class); blind = {W-001, W-004, W-006}, floor two; median convention (odd/even) stated; Δ = 0.5 pre-registered, the dry run sizes N |
+| 2 | W-005's arm-B starter does not build; the repair confounds leg B | **Done** — W-005 kept as a warning-vs-error, leg-A-only cell (the only MediatR-shaped pipeline, and its arm-A signal is PP-E1's own control); its runs are excluded from leg B and the repair is disclosed; A2 not re-frozen |
+| 3 | Margin labels inverted (the script is with-replacement); seed-fragile; 1.1800 stale | **Done** — convention named (with-replacement, `simulate()` `:111-140`); re-run at `SIMS = 3 000` for three seeds (p95 1.1766–1.1864, half-width 0.005); rule registered as "the 0.05 grid line above p95 + Monte-Carlo half-width" → 1.20; knife edge disclosed with the 300-sim across-seed range and the permutation alternative; S3 raises `SIMS` in the committed script |
+| 4 | K1 scope: the 0270 test has no bind guard; Touches/Discriminating; sequencing pin; scratch-cwd rule; NOT-ADJUDICATED route names the CLI-only passes | **Done** — K1 scoped to P32; 0270 gets `bindRule: "parsed"`; Touches/Discriminating lines; K1's PR asserts `EffectInferrerRecursionTests` exists; scratch-cwd pin; gate 9's route names `TypeChecker` / `PatternChecker` / `BindValidationPass` / `ReturnValidationPass` (`Program.cs:760-808`) and the `--enforce-effects` default (`:1230`), construction otherwise identical (`:856-866`; `EffectEnforcementPass.cs:161-162`) |
+| 5a | Gate 9 per-subject sentence wrong (serilog 84 equals today; FV six below) | **Done** — "regression floor, six below the observed aggregate"; per-subject exact/slack stated |
+| 5b | P32 is not an annex row; the 0.15.0 notes never printed 99 | **Done** — §0.1 reworded: ledger and R:654-656 stand; 30/256 published beside 8/99 in the next release's notes |
+| 5c | W5's Calor0600 → 0406 is user-visible; no test asserts the string | **Done** — CHANGELOG line; `grep` result stated (`TelemetryPrivacyTests.cs:95` only) |
+| 5d | `run-pair.sh:510` not `:511` | **Done** |
+| 5e | W-004 row: A's field has no row | **Done** |
+| NEW-4 | Leg A's bar must not depend on dry-run variance | **Done** — bar = lower bound > 0; Δ = 0.5 fixed; N from the dry run |
+
+**Declined:** none. **Narrowed:** item 2 — kept W-005 (leg A only) rather than dropping it, with
+the one-sentence reason in §4.1.
+
+**Remaining open questions (none block registration):** (1) whether the 0.15.0 release PR's
+benchmark block moved; (2) whether the A3-match `Calor1002` confound is a converter/emitter
+defect worth an issue (a module-level method group referenced from a class body) — filed at S3
+if it reproduces on `after/` with the row declared.
