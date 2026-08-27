@@ -699,6 +699,24 @@ than a promise.
 > is left open rather than fixed, because closing it means deciding whether an author may assert a
 > row over an Unknown at all, which is a design question and not an implementation one. E4 owns
 > the answer, since E4 is where an Unknown row starts costing something at every invocation.
+>
+> **ANSWERED — v0.15 E4. YES: an author may assert a row over an Unknown, and the assertion
+> costs exactly one Calor0425, at the hop.** Rationale, in three parts. (1) A declared row on a
+> binding is the author's contract for that name, with the same standing as a `§F`'s own `§E{…}`
+> — and §5 already lets a declaration convert `Assumed` to `Concrete` at its boundary, reporting
+> the provenance there rather than carrying it onward. Refusing the assertion would make a
+> row-less BCL-returned delegate un-annotatable in Calor: the only remaining moves would be
+> `§CSHARP` interop or the flag, which is the ergonomics §13.4 exists to avoid. (2) The one
+> Calor0425 at the hop is the honest place: it names the source as `[unknown]` and the
+> declaration as the row assumed, and §4.4's rule then gives the value its DECLARED row, which
+> is what every later hop and the invocation read. The invocation therefore charges the declared
+> row (`Effect row: charged by invoking 'g' (row: cw)`) and reports nothing further — one
+> report per hop, P10(b), and the invocation is not a hop. (3) Consequence 2 is accepted with
+> the answer, and narrowed: under `--permissive-effects` the single Calor0425 is silenced, which
+> is the flag's specified meaning (waive *we cannot tell*), but the **charge is not a "cannot
+> tell" and is not waived** — the declared `cw` still reaches Calor0410. So the flag hides the
+> assumption, never the effect asserted. Pinned, both policies, by
+> `StrictnessBatchTests.AuthorMayAssertARowOverAnUnknown_OneCalor0425AtTheHop_TheDeclaredRowIsCharged`.
 
 **Is Calor0424 defeatable by deleting the source's `§E`?** No, and the reason is the composition.
 Deleting `§E{cw}` from an in-module source makes its declared row pure, so it would fit — but its
@@ -909,6 +927,41 @@ Draft v1 used Calor0424 for rank-1 scope violations, conflating a *declaration* 
 
 Per §4.4, a `Fits`-carrying-reasons verdict makes the destination row `Assumed`, so the assumption
 survives the hop.
+
+> **STATUS — v0.15 E4: Calor0418 replaced by fits-at-invocation, and INVOCATION IS NOT A
+> SEVENTH SITE.** This table has no invocation row, and E4 confirms that is right rather than
+> an omission: at `§C{f}` there is no destination row for `f`'s row to fit into — the invoked
+> value's row IS what the caller performs. So the three verdicts of §4.3 collapse to what a
+> row contributes when charged: `Concrete(S)` charges `S` (silently; §10.1's provenance clause
+> rides into Calor0410 if the caller under-declares); `Assumed(S, R)` charges `S` and reports
+> one Calor0425 carrying `R`; `Unknown` reports Calor0425 at the invocation and charges the
+> fail-closed `EffectSet.Unknown` (nothing under `--permissive-effects`). **Calor0424 is never
+> reported at an invocation** — there is no `DoesNotFit` cell to report it from — and
+> `StrictnessBatchTests.MessageTexts_Calor0410_InvocationProvenance_IsTheDesignDocSample` pins
+> that the under-declared caller draws Calor0410, not 0424. The charge lives INSIDE inference
+> (`EffectInferrer.ChargeInvokedRow`), not in `RowSiteChecker`, for one reason: a `§LAM` that
+> invokes a captured function value must carry that row in its ρ_body, and ρ_body is computed
+> by inference; a phase-3d charge would have arrived after the lambda had already been
+> adjudicated as a source. The row is read from the declaration's own `EffectsNode` — the node
+> `FunctionBoundType.Row` was built from — because the bound projection collapses a
+> variable-mentioning row to Unknown (`Binder.BindRow`) and `f §E{e}` invoked inside `Map` must
+> charge `e`, not Unknown. **Calor0418 is retained for exactly one residual**: invoking a value
+> whose type is PROVABLY not a function type (`TypeIdentity.IsProvablyNonFunctionType` —
+> `i32`, `str`, an array), where there is no row to read; measured, the binder does not reject
+> `§C{x}` on an `i32` parameter, so the code is the only guard. It is an error under every
+> policy. A value whose type is not provable either way (an external nominal the binder does
+> not know) is Unknown, not the residual. Pinned: `DiagnosticCodeTests.Calor0418_IsRetainedForTheProvablyNonFunctionResidual`
+> reads the catalogue; `StrictnessBatchTests.Invocation_ProvablyNonFunctionValue_*` and
+> `Invocation_NotProvablyFunctionTyped_IsUnknown_NotTheResidual` pin both sides of the line.
+>
+> **Corpus differential: ONE file of 886 moves** — `bench/phase0-agent-native/fixtures/d-s1.5/conditional-declaration/expected.calr`
+> loses its single Calor0418 (a typed `§B` bound to a pure `§LAM`, then invoked: the inferred
+> row is `{}`, charged silently) and gains nothing. Every other per-code total is identical
+> (0410 464, 0411 633, 0419 3, 0425 1, green 653). Calor0418 over the CLI harness was already
+> **1**, agreeing with E3b's harness and not with E3a's 619; the 619 remains the open number
+> E3b's notes named. The two instruments differ in exactly one respect — the CLI stops at
+> binder errors, an in-process count does not — which is a plausible cause and is stated as
+> that, not as a measurement.
 
 **Cross-module is the Calor0410 rule, not a seventh site.**
 `Effects/CrossModuleEffectEnforcementPass.cs:162`
@@ -1742,6 +1795,44 @@ The second line is **new** (today's Calor0410 carries only an optional `Call cha
 **X12b**) and is the payload of the design: today the compiler can say *you invoked something*;
 after rows it says *you invoked something that prints*. §13.2 pins that text.
 
+> **LANDED — v0.15 E4.** The shipped string, pinned by FULL equality (P22,
+> `StrictnessBatchTests.MessageTexts_Calor0410_InvocationProvenance_IsTheDesignDocSample`):
+>
+> ```
+> Function 'Bump' uses effect 'cw' but does not declare it
+>   Effect row: charged by invoking 'onChange' (row: cw)
+> ```
+>
+> Two corrections to the sample above, both to the emitter and not the reverse. (1) `(row: cw)`,
+> not `(row: [cw])` — §8.3 froze the compact spelling as `EffectSet.ToDisplayString()`'s, where a
+> concrete non-empty row is bare and brackets mark the three shapes; §6.4's F6 correction already
+> moved the 0424/0425 samples to it. (2) `Function 'Bump'`, not `Method 'Counter.Bump'` — the
+> Calor0410 head is the X12b text this section itself calls the real one, and it names the
+> callable by its own name. X9b's `.calr` now compiles to `exit 0` (obligation #2, §13.5).
+>
+> **The string E4 adds that this section did not spell — Calor0425 at an invocation whose row
+> is Unknown**, pinned by full equality (`MessageTexts_Calor0425_AtInvocation_NamesTheValueTheCauseAndTheWaiver`):
+>
+> ```
+> Calor0425: Invocation of 'transform' in 'Apply' cannot be charged: its effect row is
+> Unknown (parameter 'transform' of 'Apply' (type 'Func<i32,i32>') carries no effect
+> row). Add §E{…} on the same line as the type to state what 'transform' may do, or
+> compile with --permissive-effects. 'Apply' is charged Unknown.
+> ```
+>
+> The parenthetical names the DECLARATION whose row is missing (parameter / field / binding, or
+> "returns a function type with no effect row" / "is not visible to the effect pass" for a
+> value produced by a call), which is what §13.4's schema-2 ledger buckets on. The last
+> sentence is literal: under the default policy the Unknown row is **charged** — the same
+> fail-closed `EffectSet.Unknown` an unknown external call contributes, so the declaration draws
+> Calor0410 `'unknown'` exactly as §13.1's first row and §6.4's second sample say. It is what
+> keeps PR #968's hole closed at the one place a row-less value finally costs something
+> (§3.5: "defaulting to pure re-opens the hole"). Under `--permissive-effects` the Calor0425 is
+> suppressed and nothing is charged — the flag waiving *we cannot tell*, §4.5. An `Assumed` row is
+> charged and reported once: `Invocation of 'h' in 'Go' is charged [assumed: pure] under an
+> assumption: contains a raw C# interop expression (§CS). The row is charged as an assumption,
+> not a proof.` — also pinned by full equality.
+
 ### 10.2 Cross-module
 
 `§M{m001:Registry}` exposes `§F{f001:Register:pub} (str:name, Func<str,bool>:handler §E{fs:r})`;
@@ -2047,6 +2138,27 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | `EditScriptIdentityTests.cs:217-231` (`RegisteredScriptIdsAreStable`) | 7 ids, ES-01…07 | **+ ES-08**, the effect-row script. The F-3 supersession that had to precede it **already merged** — `b5d61e18` (PR #1085) |
 | `QueryGoldenTests.cs:134` (unknown facet throws) + `:152-172` (`EveryGoldenStatesWhyItExists`) | as today | **unchanged**; E5 adds the `effects` arm and its golden |
 
+> **EXECUTED — v0.15 E4.** Every Calor0418 row above is discharged, in place and at the same
+> line numbers so `facts.py`'s probes keep their meaning (the file's line count is unchanged;
+> exactly the four probe lines the table names — `:472`, `:502`, `:728`, `:745` — move):
+>
+> | Pin | Shipped as | Note |
+> |---|---|---|
+> | `:29` → `DelegateInvocation_FunctionTypedParameter_WithoutRow_IsUnknown` | Calor0425 at the invocation + Calor0410 `'unknown'` | span is the **invocation**, not the parameter (A-1.11's L7 cells say "at `§C{f}`"); the 0410 is the fail-closed charge the row promised |
+> | `:47` → `_LambdaBoundLocal_ChargesInferredRow` | compiles; `{}` charged | baseline Y9a. The "Calor0410 when `§E` is narrowed" half is `Invocation_LambdaBoundLocal_NarrowedDeclaration_IsCalor0410`, appended |
+> | `:64` → `_UnderPermissiveEffects_Calor0425IsSuppressed` | no 0425, nothing charged, compiles | the "0424 is not" sibling is P11's `NeverWaived_DoesNotFit_AtEveryMonomorphicSite`, already landed |
+> | `:728` → `M1_ExpressionCallSpelling_DelegateValue_ChargesTheRow` | Calor0425 (row-less) | same program |
+> | `:749` → `M1_ReturnedDelegateInvocation_ChargesTheReturnRow` | Calor0425 naming `returned by 'GetF'` | the `§O` carries no row; a rowed `§O{Func<i32>} §E{cw}` charges `cw` (measured, not pinned — the enclosing function's own Calor0410 on the lambda body pre-empts a clean positive control there) |
+> | `:472` → `C2_DecoyNamedDelegateParameter_ShadowsFunction_RowGoverns` | Calor0425 on `'Helper'` in `'Go'` + 0410 `'unknown'` on `Go` | the decoy's (absent) row governs; the shadowed pure function is never charged |
+> | `EffectEnforcementTests.cs:354`, `:378` | Calor0411 | **unchanged**, as the table said |
+> | `EffectEnforcementTests.cs:1175` (`E1Slice2b_FunctionTypedParameterAsBareTarget_UsesTheAstParameterType`) | Calor0425 quoting `parameter 'make' of 'Go'` and `Func<` | not in the table; the AST type string still fills the message, under the new code |
+> | `GenericSyntaxTests.cs:279`, `CliMultiFileTests.cs:479` | comments only | both compile under `--permissive-effects` as before; the comments now say why (0425 suppressed, nothing charged) |
+>
+> Positive controls added (the rewrite's other half): `Invocation_RowedValue_FitsAndChargesTheRow_PositiveControl`
+> (A3-callback's shape: rowed field invoked by a method declaring the row — zero effect-family
+> diagnostics), `Invocation_PolymorphicRow_ChargesTheVariable_WhichTheDeclarationBinds`
+> (A3-middleware's `RunTwice`).
+
 ### 13.2 New pins — home and freeze
 
 > **P1 and P6 contradict each other, and slice b re-specifies P1.** Recorded in review round 1 of
@@ -2136,6 +2248,22 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 >
 > A seventh pin lands that §13.2 did not name, because §8.2's bound reader had no pin at all:
 > `CSharpDeclaredDelegateParameter_IsASite_ThroughTheBoundFunctionType`, both polarities.
+
+> **EXECUTED — v0.15 E4.** Status of every pin this slice owed or touched:
+>
+> | Pin | Status | Home |
+> |---|---|---|
+> | **P22** | **LANDED for §10.1's string**, by FULL equality, with two corrections to the doc's sample recorded in §10.1 (`(row: cw)` bare; `Function 'Bump'`). Plus the invocation-Unknown and invocation-Assumed strings E4 adds, both by full equality | `StrictnessBatchTests.cs` (appended past `:1691`) |
+> | **P27** | unchanged; `transcriptDivergences.e2Obligation` still holds seven rows | `SpikeVerdictTests.cs` |
+> | **P29** | **REGENERATED** — obligations **#2 (X9b)** and **#3 (X9c)** discharged, and every other moved line accounted for in §13.5's E4 block | `EffectRowExperimentHarnessTests.cs` |
+> | **P32** | **REGENERATED, 4 → 8**, schema 1 → 2 with §13.4's widened taxonomy; every moved module named in §13.4's E4 block and three spot-checked by hand | `Calor0425CorpusLedgerTests.cs` |
+> | gate 2's ledger | **REGENERATED** — `dA.calor0418` 1 → 0, `dA.total` 3 → 2, `demandTotal` 3124 → 3123 (floor 25 untouched); the one file is the corpus differential's one file | `HigherOrderDemandLedgerTests.cs` |
+> | **M1 / A-1.11.1** | **PP-E1's negative control RESTORED**: `PpE1NegativeControls_MatchA1111Baselines_PreE4` flipped to `_PostE4` on the registered post-E4 multisets; `A3Fixtures_AreExactlyCalor0418PerInvocation` → `A3Fixtures_AreExactlyZeroCalor0418_PostE4`; **new** `PpE1_L7RowErasureMutants_DrawCalor0425AtTheRegisteredInvocation_PostE4` applies each of A-1.11's five L7 diffs textually and asserts the Calor0425 at the registered invocation rises above the unmutated fixture's zero | `SpikeVerdictTests.cs` |
+> | new, unnumbered | the residual Calor0418 read off the catalogue; §4.5's design question, both policies | `DiagnosticCodeTests.cs`, `StrictnessBatchTests.cs` |
+>
+> Not a pin, recorded: `Calor0425CorpusLedgerTests` now prints every site it counts
+> (`Calor0425-corpus site <subject>/<file>(line,col): <message>` under the detailed logger), so
+> the next regeneration can be spot-checked the way this one was.
 
 > **P17 and P32's freeze column was impossible, and is corrected to "with E3"** (E2 slice b,
 > review round 1 MINOR 12). Both were frozen "before E2", and **neither can exist until E3**:
@@ -2249,6 +2377,46 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 > positions. It does **not** forecast E4, whose Calor0418 replacement puts a row check at every
 > invocation, and whose PR must both widen this ledger to §13.4's three-way cause split and
 > re-measure against a denominator this small.
+
+> **EXECUTED — v0.15 E4. The number is EIGHT, over the same 27%, and the taxonomy is widened
+> (schema 2).** Re-measured with the same denominator (99 enforced of 364; exclusion histogram
+> unchanged at 0 / 59 / 206):
+>
+> | Subject | Calor0425 | rowless dst | unknown src | assumed | **external base** | **invocation: rowless / undetermined / assumed** | invocation witness |
+> |---|---|---|---|---|---|---|---|
+> | MediatR | **2** | 0 | 0 | 0 | 0 | **2** / 0 / 0 | 2 |
+> | serilog | **2** | 0 | 0 | 0 | 1 | **1** / 0 / 0 | 1 |
+> | FluentValidation | **4** | 0 | 0 | 0 | 3 | **1** / 0 / 0 | 1 |
+> | **aggregate** | **8** | 0 | 0 | 0 | **4** | **4** / 0 / 0 | 4 |
+>
+> **The taxonomy revisit E3b asked for, done.** Two new buckets and one re-labelling. (a)
+> `ExternalBase` — E3b's four sites, which the ELSE arm had filed as `UnknownSource` although
+> they are not a source row at a binding site at all (§6.4's third sample; the override arm
+> reads "overrides a member of external base class …, which is not visible in this module").
+> `UnknownSource` now reads **0**, honestly. (b) `InvocationRowless` / `InvocationUndetermined`
+> / `InvocationAssumed` — the three verdicts an invocation can draw, bucketed on the clause the
+> message quotes. This IS §13.4's "row-less function-typed declaration" and "BCL-returned
+> delegate", seen from the invoking side where E4 makes them cost something. §13.4's third
+> cause, "unresolved receiver", is deliberately **not** a bucket: an invoked value whose type
+> came from an unresolved receiver never reaches Calor0425 — the bare-target guard routes it to
+> Calor0411 (E1 slice 2c), the older fail-closed path, and this ledger counts Calor0425 only.
+>
+> **The four invocation sites are exactly the four pre-E4 Calor0418 witnesses (2/1/1)**, under
+> their new code, and three were checked by hand against the C# source: MediatR
+> `Pipeline/RequestPostProcessorBehavior.cs:22` `await next()` on a row-less
+> `RequestHandlerDelegate<TResponse> next`; serilog `Core/Filters/DelegateFilter.cs:29`
+> `_isEnabled(logEvent)` on a row-less `Func<LogEvent,bool>` field; FluentValidation
+> `InlineValidator.cs:47` `ruleCreator(this)` on a row-less `Func<…>` parameter. In each, nothing
+> in the module states what the value does, so *cannot tell* is the honest code. The witness is
+> renamed `InvocationWitness` (= the sum of the three invocation buckets) and asserted `> 0`, and
+> is exactly as weak as `Calor0418Witness` was — it says the pass reached higher-order code, not
+> that 27% is representative.
+>
+> **What the eight say about §13.4's worry.** Still not "hundreds": converted code invokes
+> function values rarely in the modules that bind, and each such invocation is one warning plus
+> one fail-closed Calor0410 under the default policy — the same cost as one unknown BCL call.
+> §14 Q4's fourth split is unchanged at 0 / 0 because no `RowlessDestination` exists in the
+> measured set.
 
 Draft v1 left this as "open question 1" with the instrument being a promise that the E2 PR would
 publish a count. That is the failure mode §13.3 gate 2 exists to prevent. The number matters
@@ -2422,6 +2590,32 @@ and it needs its own justification in the E2 PR body.**
 > unrelated source text; caught by diffing every script in full, and fixed rather than regenerated
 > over. Obligations **#2 (X9b)** and **#3 (X9c)** remain undischarged: both still end at Calor0418,
 > which is E4's.
+
+> **EXECUTED, v0.15 E4 — TWELVE moved items across THREE scripts; obligations #2 and #3
+> DISCHARGED.** Counted from a full diff of all six transcripts (`git diff -U0`), not from P29's
+> first-difference message. `run3.py`, `facts2.py` and `compile53.py` are **CLEAN**, so
+> `o53/baseline.json` is untouched — not even re-stamped, because E4 changed nothing that
+> script measures.
+>
+> | Case | Obligation | Result |
+> |---|---|---|
+> | `run.py` **X9b** | **#2** | **DISCHARGED, exactly as the spike predicted**: `exit 1` + Calor0418 → `exit 0`, `Compilation successful`. Position 8's row is read at the invocation of `onChange` and charged to `Bump`, which declares it |
+> | `run.py` **X9c** | **#3** | **DISCHARGED, as predicted**: `exit 1` + Calor0418 → `exit 0`. Position 5, same mechanism |
+> | `run.py` **X9a** | — | same flip, the `§I` spelling (position 4) |
+> | `run.py` **X14** | — | `exit 1` + Calor0418 on `'f' (type 'Func<>')` → `exit 0`. A lambda-bound local's ρ_body is pure and is charged; **§13.1's Y9a rewrite, in the strict transcript** |
+> | `run2.py` **Y9a** | — | the same program under `--permissive-effects` **loses its demoted Calor0418 warning**; nothing replaces it. The only `run2.py` line that moves |
+> | `run.py` **X10** | — | Calor0418 (error) → **Calor0425 at the invocation + Calor0410 `'unknown'`** on `Apply`. This is the BEFORE case of §10's worked example becoming §10.1's own after-state for a row-less parameter: fail-closed under a new code, `exit 1` both before and after |
+> | `run.py` **X13** | — | same, on a row-less FIELD (`Counter.onChange`): Calor0425 naming `field 'onChange' of 'Counter'` + Calor0410 `'unknown'` on `Bump` |
+> | `facts.py` `IsSubsetOf` sweep | #7 | `EffectEnforcementPass.cs:398` → `:401`, a LINE SHIFT only (the pass gains a field initialiser above it); still exactly two occurrences, neither a compatibility site |
+> | `facts.py` `StrictnessBatchTests.cs:472`, `:502` | — | §13.1's `C2` rewrite: `_IsError` → `_RowGoverns`, the assertion now `EffectRowUnknown … 'Helper' … 'Go'` |
+> | `facts.py` `StrictnessBatchTests.cs:728`, `:745` | — | §13.1's `M1` rewrite: `_IsError` → `_ChargesTheRow`, the assertion now `EffectRowUnknown … 'f'` |
+>
+> **Every other probe line is byte-identical** — `:152/:172/:219/:245/:260/:555/:582/:587/:607/:612/:640/:656/:106/:133`
+> and the `HigherOrderDemandLedgerTests.cs:186-200` block — because the six rewritten tests
+> were rewritten in place at their original line counts and everything new was appended past
+> `:1691`, E3a's discipline kept. The seven Calor0418 transcript lines that existed before E4
+> (X9a, X9b, X9c, X10, X13, X14, Y9a) are the seven that moved; no line moved for any other
+> reason.
 
 `spike-verdict.json`'s `transcriptDivergences.e2Obligation` carries the same sentence in
 machine-readable form, and P27 asserts that the case list holds exactly seven rows.
