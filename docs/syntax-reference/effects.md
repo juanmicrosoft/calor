@@ -478,6 +478,18 @@ Or in MSBuild:
 </PropertyGroup>
 ```
 
+A gentler step for converted code keeps enforcement on but reports violations as
+warnings — the CLI's `--permissive-effects`, or in MSBuild:
+
+```xml
+<PropertyGroup>
+  <CalorPermissiveEffects>true</CalorPermissiveEffects>
+</PropertyGroup>
+```
+
+The default is `false` (strict). Under the permissive policy unknown calls are assumed
+pure and `Calor0410`-family violations, single-module and cross-module, are warnings.
+
 ---
 
 ## Next

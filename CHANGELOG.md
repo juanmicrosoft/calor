@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
   "did not converge" for such a file instead of recording half-finished rows. (v0.16 W5,
   gate 11)
 
+- New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: effect mistakes show up as warnings instead of errors, which helps while converting old code. It is off by default, so nothing changes unless you turn it on.
+
 ### Changed
 
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code
