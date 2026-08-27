@@ -45,6 +45,10 @@ HELPERS="$SCRIPT_DIR/bundle-helpers.py"
 # #881: the ONE derivation of the cost-leg token figure (shared with run-pair.sh).
 # shellcheck source=token-usage.sh
 source "$SCRIPT_DIR/token-usage.sh"
+# W1 (roadmap v0.16 §3.1): the ONE reader of transcript.jsonl and
+# .calor-build-state.json (shared with run-pair.sh). See run-pair.sh's header
+# for the stream-json capture shape this runner mirrors.
+HARNESS_CAPTURE="$SCRIPT_DIR/harness-capture.py"
 
 MAX_INVALID_RETRIES=2
 INVALID_MARKERS=("hit your session limit" "rate limit" "overloaded" "api error")
@@ -68,6 +72,10 @@ detect_invalid_run() {
     # real runs (retried on a fresh workspace, then recorded invalid).
     if [[ "$agent_rc" -ne 0 ]]; then
         echo "agent exit code $agent_rc (nonzero -> invalid)"; return 0
+    fi
+    # W1 pin (gate 8): a run without its per-turn transcript is invalid.
+    if [[ ! -s "$ws_out/transcript.jsonl" ]]; then
+        echo "transcript.jsonl missing or empty (W1: a run without a per-turn transcript is invalid)"; return 0
     fi
     return 1
 }
@@ -378,6 +386,7 @@ run_agent() {
         if [[ $NULL_AGENT_NOOP -eq 1 ]]; then
             # NEGATIVE CONTROL: leave the defect in place -> expect ESCAPED.
             echo '{"null_agent":true,"noop":true}' > "$ws_out/agent.json"
+            echo '{"type":"result","subtype":"null_agent","null_agent":true,"noop":true}' > "$ws_out/transcript.jsonl"
             return 0
         fi
         # Apply the derived reference (the un-mutated source = the fix), then one
@@ -385,6 +394,7 @@ run_agent() {
         if ! python3 "$HELPERS" apply-fix "$BUNDLE_DIR" "$ARM" "$ws/src" "$CORPUS_ROOT" "$REPO_ROOT" > "$ws_out/.applyfix.txt" 2>&1; then
             echo "null-agent: reference underivable (bundle=$BUNDLE_ID arm=$ARM) -> SKIP: $(cat "$ws_out/.applyfix.txt")" >&2
             echo '{"null_agent":true,"skipped":true}' > "$ws_out/agent.json"
+            echo '{"type":"result","subtype":"null_agent","null_agent":true,"skipped":true}' > "$ws_out/transcript.jsonl"
             # SKIP marker (not a verdict) — extract_metrics emits outcome:skipped.
             printf 'null-agent reference underivable: %s' "$(cat "$ws_out/.applyfix.txt")" > "$ws_out/.skip"
             return 0
@@ -392,10 +402,14 @@ run_agent() {
         cat "$ws_out/.applyfix.txt" >&2
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" dotnet build "$REGNET" ${TFM:+--framework $TFM} $EXTRA --nologo -v q >/dev/null 2>&1 ) || true
         echo '{"null_agent":true}' > "$ws_out/agent.json"
+        echo '{"type":"result","subtype":"null_agent","null_agent":true}' > "$ws_out/transcript.jsonl"
         return 0
     fi
 
     # ---- Real agent (spend). Copied from run-pair.sh: timeout + watchdog. ----
+    # W1: stream-json tee'd to transcript.jsonl, result event filtered into
+    # agent.json (same content as --output-format json); see run-pair.sh.
+    local claude_args=(--print --verbose --output-format stream-json --forward-subagent-text --dangerously-skip-permissions)
     local timeout_bin=""
     if command -v timeout >/dev/null 2>&1; then timeout_bin="timeout"
     elif command -v gtimeout >/dev/null 2>&1; then timeout_bin="gtimeout"; fi
@@ -405,13 +419,15 @@ run_agent() {
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" \
-            "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
+            claude "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} \
+            "$prompt" 2> "$ws_out/agent.err" \
+            | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) || rc=$?
     else
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" \
-            "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
+            claude "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} \
+            "$prompt" 2> "$ws_out/agent.err" \
+            | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) &
         local agent_pid=$!
         local deadline=$(( SECONDS + TIMEOUT_SECS ))
         while kill -0 "$agent_pid" 2>/dev/null; do
@@ -498,9 +514,32 @@ extract_metrics() {
     token_usage_collect "$ws_out/agent.json" "$BUNDLE_ID/$ARM_LABEL/run-$run_idx"
     tin=$TOKENS_IN; tout=$TOKENS_OUT; token_usage=$TOKEN_USAGE_JSON
 
+    # W1: turns (distinct assistant message.id), the agent's own build calls,
+    # and #1094's compilerHash — same derivation as run-pair.sh. A bundle's
+    # calor arm is round-tripped C# (no Calor.Tasks build), so the build
+    # state is null there unless the project itself compiles .calr.
+    local turns num_turns agent_builds build_state compiler_hash
+    turns="$(python3 "$HARNESS_CAPTURE" turns "$ws_out/transcript.jsonl" 2>/dev/null)" \
+        || turns='{"assistantMessages":null,"assistantMessagesTopLevel":null,"assistantMessagesSubagent":null,"source":"helper-error"}'
+    num_turns="$(jq -c '.num_turns // null' "$ws_out/agent.json" 2>/dev/null || echo null)"
+    [[ -n "$num_turns" ]] || num_turns=null
+    turns="$(jq -c --argjson nt "$num_turns" '. + {numTurns: $nt, transcript: "transcript.jsonl"}' <<<"$turns")"
+    python3 "$HARNESS_CAPTURE" builds "$ws_out/transcript.jsonl" > "$ws_out/agent-builds.jsonl" 2>/dev/null \
+        || : > "$ws_out/agent-builds.jsonl"
+    agent_builds="$(jq -n --argjson n "$(grep -c . "$ws_out/agent-builds.jsonl" || true)" '{count: $n, file: "agent-builds.jsonl"}')"
+    local state_file
+    state_file="$(find "$ws/src" -path '*/obj/calor/.calor-build-state.json' -type f 2>/dev/null | head -1 || true)"
+    if [[ -n "$state_file" ]]; then cp "$state_file" "$ws_out/calor-build-state.json"; fi
+    build_state="$(python3 "$HARNESS_CAPTURE" build-state "$ws_out/calor-build-state.json" 2>/dev/null || echo '{"compilerHash":null,"source":"helper-error"}')"
+    build_state="$(jq -c --arg from "$([[ -n "$state_file" ]] && echo agent-workspace || echo none)" \
+        '. + {archivedFrom: $from, file: (if $from == "none" then null else "calor-build-state.json" end)}' <<<"$build_state")"
+    compiler_hash="$(jq -c '.compilerHash' <<<"$build_state")"
+
     jq -n \
         --arg bundle "$BUNDLE_ID" --arg project "$PROJECT" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
         --arg outcome "$outcome" \
+        --argjson turns "$turns" --argjson agent_builds "$agent_builds" \
+        --argjson compiler_hash "$compiler_hash" --argjson build_state "$build_state" \
         --argjson fbuild "$([[ "$fbuild" == "true" ]] && echo true || echo false)" \
         --argjson hp "$fhp" --argjson hf "$fhf" --argjson vp "$fvp" --argjson vf "$fvf" \
         --argjson basevf "$base_vf" --argjson escaped "$fhf" \
@@ -516,6 +555,8 @@ extract_metrics() {
           escapedBugs:$escaped, iterations:$iterations, iterationsToDeclaredDone:$iterations,
           costUsd:$cost, tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
           wallClockSeconds:$wall,
+          turns:$turns, agentBuilds:$agent_builds,
+          compilerHash:$compiler_hash, buildState:$build_state,
           invalid:false, nullAgent:($null_agent==1), nullAgentNoop:($noop==1),
           mutatedFile:$mutfile,
           presentationAsymmetry:"Calor arm = machine-converted round-tripped C#; C# arm = idiomatic original. Bias is against Calor."}' \
@@ -533,6 +574,10 @@ write_invalid_result() {
           iterations:0, iterationsToDeclaredDone:0,
           costUsd:0, tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
           wallClockSeconds:0,
+          turns:{assistantMessages:null, assistantMessagesTopLevel:null, assistantMessagesSubagent:null,
+                 numTurns:null, source:"invalid", transcript:null},
+          agentBuilds:{count:0, file:null},
+          compilerHash:null, buildState:{compilerHash:null, source:"invalid", archivedFrom:"none", file:null},
           invalid:true, nullAgent:($null_agent==1), nullAgentNoop:($noop==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"

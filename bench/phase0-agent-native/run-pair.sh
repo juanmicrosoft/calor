@@ -20,12 +20,27 @@
 # that journals invocations, hashes the src tree to detect edits, and silently
 # runs the held-out suite after each build/test.
 #
+# Per-turn capture (roadmap v0.16 §3.1 W1; §2.1 S1 mechanics): the agent runs
+# under `claude --print --verbose --output-format stream-json
+# --forward-subagent-text`, streamed as
+#     tee transcript.jsonl | jq -c 'select(.type=="result")' > agent.json
+# so agent.json keeps exactly the result envelope it always held (token-usage.py
+# and detect_invalid_run keep their input) and transcript.jsonl archives every
+# event. A run without transcript.jsonl is INVALID (gate 8). result.json gains
+# `turns.assistantMessages` (distinct assistant message.id — harness-capture.py),
+# `agent-builds.jsonl` (the agent's own dotnet build/test + calor calls with
+# their output) and `compilerHash` from the workspace's obj/calor/
+# .calor-build-state.json (#1094), archived as calor-build-state.json.
+#
 # ============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# W1: the ONE reader of transcript.jsonl / .calor-build-state.json / the arm
+# config pin (shared with run-bundle.sh and the python tests).
+HARNESS_CAPTURE="$SCRIPT_DIR/harness-capture.py"
 
 # ---------------------------------------------------------------------------
 # Invalid-run detection (gates doc §0.2): invalid, crashed, or API-errored
@@ -66,6 +81,15 @@ detect_invalid_run() {
         echo "agent exit code $agent_rc with empty journal.jsonl"
         return 0
     fi
+    # W1 pin (roadmap v0.16 §3.1 W1, gate 8): a run without its per-turn
+    # transcript is invalid — the turn-attribution instrument (gate 12) has no
+    # input, and "why more turns" would again be unanswerable from the archive.
+    # Checked AFTER the marker scan so a rate-limited run still reports the
+    # marker as its reason.
+    if [[ ! -s "$ws_out/transcript.jsonl" ]]; then
+        echo "transcript.jsonl missing or empty (W1: a run without a per-turn transcript is invalid)"
+        return 0
+    fi
     return 1
 }
 
@@ -96,6 +120,23 @@ archive_final_src() {
     return 1
 }
 
+# #1094 (W1): archive the compiler's own attestation of which product built
+# the agent's code — obj/calor/.calor-build-state.json, carrying
+# compilerHash — before the workspace is deleted. This turns arm provenance
+# from "the operator passed a flag" into "the compiler said so" (the
+# distinction between the void w5-parity-001 and the valid w5-parity-002).
+# Not run-invalidating: the C# arm has none, and a calor-arm agent may never
+# have built (a censored run); extract_metrics then falls back to the
+# harness's own final build state, labelled harness-final-build.
+archive_build_state() {
+    local ws="$1" ws_out="$2" source="${3:-agent-workspace}"
+    local state="$ws/src/obj/calor/.calor-build-state.json"
+    [[ -s "$state" ]] || return 0
+    cp "$state" "$ws_out/calor-build-state.json"
+    echo "$source" > "$ws_out/.build-state-source"
+    return 0
+}
+
 # Test entrypoint: ./run-pair.sh --detect-invalid <ws_out> [agent_exit_code]
 # Exits 0 (and prints the reason) if the run directory is invalid, 1 if valid.
 if [[ "${1:-}" == "--detect-invalid" ]]; then
@@ -106,6 +147,20 @@ if [[ "${1:-}" == "--detect-invalid" ]]; then
     fi
     echo "VALID"
     exit 1
+fi
+
+# Test entrypoint: ./run-pair.sh --check-pair-config <pair.json> <arm-config-key> [calor|csharp]
+# Runs the same admission check_pins applies (via harness-capture.py) and
+# exits 0 (admitted, JSON on stdout) or 3 (rejected, reason in the JSON) —
+# the exit code check_pins uses for a pin violation.
+if [[ "${1:-}" == "--check-pair-config" ]]; then
+    [[ -n "${2:-}" && -n "${3:-}" ]] || { echo "Usage: --check-pair-config <pair.json> <arm-config-key> [calor|csharp]" >&2; exit 2; }
+    arm_arg=()
+    [[ -n "${4:-}" ]] && arm_arg=(--arm "$4")
+    if python3 "$HARNESS_CAPTURE" pair-config "$2" "$3" ${arm_arg[@]+"${arm_arg[@]}"}; then
+        exit 0
+    fi
+    exit 3
 fi
 
 PAIR_DIR=""
@@ -124,11 +179,19 @@ EDIT_MECHANISM="raw"
 CALOR_DLL_OVERRIDE=""
 ARM_REPO_ROOT=""
 ARM_LABEL_OVERRIDE=""
+# W1 / roadmap §4.1: which `arms.<key>` entry of pair.json this invocation
+# runs under. Defaults to the arm language (`calor` / `csharp`), which is every
+# pre-0.16 pair. PP-W-rows runs two CALOR arms from one pair — the pre-rows
+# control arm (`calor-pre-rows`: permissive, controlArmKind "pre-rows", its
+# own `before/` starter) and the strict arm (`calor`) — so the key is a
+# parameter. The entry's `fixture` names the starter directory under the pair.
+ARM_CONFIG_KEY=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --pair) PAIR_DIR="$2"; shift 2 ;;
         --arm) ARM="$2"; shift 2 ;;
+        --arm-config) ARM_CONFIG_KEY="$2"; shift 2 ;;
         --runs) RUNS="$2"; shift 2 ;;
         --out) OUT_DIR="$2"; shift 2 ;;
         --null-agent) NULL_AGENT=1; shift ;;
@@ -142,7 +205,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
 # only the CLI/MCP/envelope build; the workspace's own `dotnet build` binds
@@ -160,6 +223,7 @@ else
     ARM_REPO_ROOT="$REPO_ROOT"
 fi
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
+[[ -n "$ARM_CONFIG_KEY" ]] || ARM_CONFIG_KEY="$ARM"
 case "$EDIT_MECHANISM" in
     raw) ;;
     mcp-file)
@@ -210,6 +274,16 @@ if [[ -n "$ARM_LABEL_OVERRIDE" ]]; then
 fi
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
+# Arm config resolution (W1): the admission verdict is applied by check_pins
+# below (exit 3 on rejection, the pre-0.16 behaviour for a pin violation);
+# the fixture / controlArmKind / permissive fields are needed by materialize
+# and result.json, so they are resolved once here.
+ARM_CONFIG_JSON="$(python3 "$HARNESS_CAPTURE" pair-config "$PAIR_DIR/pair.json" "$ARM_CONFIG_KEY" --arm "$ARM" || true)"
+[[ -n "$ARM_CONFIG_JSON" ]] || { echo "ERROR: harness-capture.py pair-config produced no output" >&2; exit 2; }
+FIXTURE_DIR="$(jq -r '.fixture // empty' <<<"$ARM_CONFIG_JSON")"
+[[ -n "$FIXTURE_DIR" ]] || FIXTURE_DIR="$ARM"
+CONTROL_ARM_KIND="$(jq -r '.controlArmKind // empty' <<<"$ARM_CONFIG_JSON")"
+PERMISSIVE_EFFECTS="$(jq -r 'if .permissiveEffects == true then "true" else "false" end' <<<"$ARM_CONFIG_JSON")"
 TIMEOUT_SECS="$(jq -r '.timeoutSeconds // 600' "$PAIR_DIR/pair.json")"
 # Test hook: lets watchdog behavior be exercised without a 10+ minute wait.
 [[ -n "${CALOR_P0_TIMEOUT_OVERRIDE:-}" ]] && TIMEOUT_SECS="$CALOR_P0_TIMEOUT_OVERRIDE"
@@ -280,14 +354,68 @@ if [[ "$EDIT_MECHANISM" == "mcp-file" && $NULL_AGENT -eq 0 && -z "$CALOR_CLI_DLL
 fi
 
 # ---------------------------------------------------------------------------
+# Template resolution (A-1.3 per-arm-native, amended by W1). The template comes
+# from the arm's own product checkout — EXCEPT for the pre-rows control arm
+# (roadmap §4.1), whose registered checkout (the v0.14.3 tag) predates the
+# <CalorPermissiveEffects> property: its template is the HARNESS checkout's,
+# with __REPO_ROOT__ still bound to the arm's product. result.json records
+# templateSource so the provenance is auditable.
+# ---------------------------------------------------------------------------
+TEMPLATE_SOURCE="arm-repo-root"
+TEMPLATE_PATH="$ARM_REPO_ROOT/bench/phase0-agent-native/templates/calor-arm/CalorArm.csproj.template"
+if [[ "$CONTROL_ARM_KIND" == "pre-rows" ]]; then
+    TEMPLATE_SOURCE="harness"
+    TEMPLATE_PATH="$SCRIPT_DIR/templates/calor-arm/CalorArm.csproj.template"
+fi
+render_template() {  # <dest csproj path>
+    sed -e "s|__REPO_ROOT__|$ARM_REPO_ROOT|g" \
+        -e "s|__CALOR_PERMISSIVE_EFFECTS__|$PERMISSIVE_EFFECTS|g" \
+        "$TEMPLATE_PATH" > "$1"
+}
+
+# ---------------------------------------------------------------------------
+# Pre-rows canary (roadmap §4.1; the #826 C3 lesson — config proves intent,
+# not effect). The arm's own Calor.Tasks build must actually HONOR
+# <CalorPermissiveEffects>: compile a canary whose strict compile is an
+# `error Calor0410` and whose permissive compile is the same code as a
+# WARNING, through the exact template + product root this arm's workspace
+# will use. Without this the "pre-rows" arm could silently run STRICT and
+# the epoch would measure nothing — the w5-parity-001 shape again.
+# Prints the reason and returns 1 when the arm cannot honor the property.
+# ---------------------------------------------------------------------------
+PERMISSIVE_CANARY="$SCRIPT_DIR/templates/calor-arm/permissive-canary.calr"
+permissive_canary() {
+    local dir out rc=0
+    dir="$(mktemp -d "${TMPDIR:-/tmp}/p0-prerows-canary-XXXXXX")"
+    mkdir -p "$dir/src"
+    render_template "$dir/src/Src.csproj"
+    cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
+    out="$(cd "$dir/src" && CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet build --nologo -v q 2>&1)" || rc=$?
+    rm -rf "$dir"
+    if [[ $rc -ne 0 ]] || grep -q 'error Calor0410' <<<"$out" || ! grep -q 'warning Calor0410' <<<"$out"; then
+        echo "INVALID: pre-rows control arm — the arm's Calor.Tasks build does not honor <CalorPermissiveEffects> (canary build exit $rc; expected a successful build carrying 'warning Calor0410', got: $(grep -o 'error Calor[0-9]*\|warning Calor[0-9]*' <<<"$out" | sort | uniq -c | tr -s ' \n' ' ' || true)). The arm would run STRICT; refusing before spend (roadmap §4.1)." >&2
+        return 1
+    fi
+    echo "pre-rows canary OK: Calor0410 is a warning under the arm's Calor.Tasks build ($ARM_REPO_ROOT)" >&2
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Config pin check (gates doc §0.2): calor arm must run enforced, strict,
-# contract-debug, Z3 present. Violations are invalid runs, detected up front.
+# contract-debug, Z3 present — OR the additive pre-rows control arm (roadmap
+# §4.1: permissive true ONLY together with controlArmKind "pre-rows"; every
+# other config still exits 3). Admission is harness-capture.py pair-config,
+# so the rule has one home and the python tests observe it.
 # ---------------------------------------------------------------------------
 check_pins() {
     if [[ "$ARM" == "calor" ]]; then
-        local cfg
-        cfg="$(jq -r '.arms.calor.config | "\(.enforceEffects) \(.permissiveEffects) \(.contractMode) \(.z3Required)"' "$PAIR_DIR/pair.json")"
-        [[ "$cfg" == "true false debug true" ]] || { echo "INVALID: pair.json calor config violates gates-doc pin: $cfg" >&2; exit 3; }
+        if [[ "$(jq -r '.admitted' <<<"$ARM_CONFIG_JSON")" != "true" ]]; then
+            echo "INVALID: pair.json arms.$ARM_CONFIG_KEY config violates gates-doc pin: $(jq -r '.reason' <<<"$ARM_CONFIG_JSON")" >&2
+            exit 3
+        fi
+        if [[ "$CONTROL_ARM_KIND" == "pre-rows" ]]; then
+            permissive_canary || exit 3
+        fi
     fi
     # Annex A-1.3 instrumentation item 3: when the epoch declares the verify
     # gate for this arm (CALOR_P0_VERIFY_EXPECTED=1), a run without the gate
@@ -345,15 +473,18 @@ materialize() {
     local ws="$1" ws_out="$2"
     mkdir -p "$ws/src" "$ws_out/heldout"
 
-    cp -R "$PAIR_DIR/$ARM/." "$ws/src/"
+    # The starter comes from the arm entry's fixture directory (W1 / §4.1:
+    # PP-W-rows' two calor arms start from different programs).
+    [[ -d "$PAIR_DIR/$FIXTURE_DIR" ]] || { echo "ERROR: fixture directory missing: $PAIR_DIR/$FIXTURE_DIR (arms.$ARM_CONFIG_KEY.fixture)" >&2; exit 2; }
+    cp -R "$PAIR_DIR/$FIXTURE_DIR/." "$ws/src/"
     cp "$PAIR_DIR/spec.md" "$ws/spec.md"
 
     if [[ "$ARM" == "calor" ]]; then
         # Per-arm-native (A-1.3): the TEMPLATE comes from the arm's own product
         # checkout — the control arm's registered configuration includes its
-        # template exactly as archived (pre-verify-gate), not main's.
-        sed "s|__REPO_ROOT__|$ARM_REPO_ROOT|g" \
-            "$ARM_REPO_ROOT/bench/phase0-agent-native/templates/calor-arm/CalorArm.csproj.template" > "$ws/src/Src.csproj"
+        # template exactly as archived (pre-verify-gate), not main's. The
+        # pre-rows exception is documented at render_template.
+        render_template "$ws/src/Src.csproj"
     else
         cat > "$ws/src/Src.csproj" <<'EOF'
 <Project Sdk="Microsoft.NET.Sdk">
@@ -807,9 +938,14 @@ run_agent() {
         }
         # Then apply the reference solution and do one observed build (validates
         # shim + held-out wiring end to end with zero API spend)
-        cp -R "$PAIR_DIR/reference/$ARM/." "$ws/src/"
+        [[ -d "$PAIR_DIR/reference/$FIXTURE_DIR" ]] || { echo "null-agent: reference solution missing: $PAIR_DIR/reference/$FIXTURE_DIR" >&2; }
+        cp -R "$PAIR_DIR/reference/$FIXTURE_DIR/." "$ws/src/"
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" dotnet build --nologo -v q >/dev/null 2>&1 ) || true
         echo '{"null_agent":true}' > "$ws_out/agent.json"
+        # W1: the transcript pin holds for every run. A null-agent run has no
+        # agent, so its transcript is the one synthetic result event; turns
+        # count 0 assistant messages.
+        echo '{"type":"result","subtype":"null_agent","null_agent":true}' > "$ws_out/transcript.jsonl"
         return 0
     fi
 
@@ -846,12 +982,23 @@ run_agent() {
     # taking the other branch. Both branches are guarded here — the timeout branch has
     # the identical expansion and fails the same way when it is the live one.
 
+    # W1 (roadmap §2.1 S1 mechanics): stream-json (Claude Code 2.1.243+
+    # requires --verbose with it) tee'd to transcript.jsonl; the result event
+    # alone is filtered into agent.json so its content is exactly what
+    # `--output-format json` produced — detect_invalid_run and token-usage.py
+    # keep their input. --forward-subagent-text makes subagent turns visible
+    # in the transcript (parent_tool_use_id set); harness-capture.py counts
+    # them separately and in the total, matching the corrected-token rule
+    # (A-1.9.1) which already includes subagent tokens. pipefail (set at the
+    # top) makes rc claude's exit when it fails, not tee's or jq's.
+    local claude_args=(--print --verbose --output-format stream-json --forward-subagent-text --dangerously-skip-permissions)
     local rc=0
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude --print --output-format json --dangerously-skip-permissions ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
-            "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
+            claude "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
+            "$prompt" 2> "$ws_out/agent.err" \
+            | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) || rc=$?
     else
         # Bash-watchdog fallback, hardened after ws2-exit-e2e-001 run 1: the
         # previous one-shot `sleep && kill -9 -- -pgid 2>/dev/null` provably
@@ -864,8 +1011,9 @@ run_agent() {
         # pattern kill — logging every step to stderr.
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude --print --output-format json --dangerously-skip-permissions ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
-            "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
+            claude "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
+            "$prompt" 2> "$ws_out/agent.err" \
+            | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) &
         local agent_pid=$!
         local deadline=$(( SECONDS + TIMEOUT_SECS ))
         while kill -0 "$agent_pid" 2>/dev/null; do
@@ -926,6 +1074,33 @@ extract_metrics() {
     local tokens_in tokens_out token_usage
     token_usage_collect "$ws_out/agent.json" "$PAIR_ID/$ARM_LABEL/run-$run_idx"
     tokens_in=$TOKENS_IN; tokens_out=$TOKENS_OUT; token_usage=$TOKEN_USAGE_JSON
+
+    # W1: per-turn fields from transcript.jsonl. turns.assistantMessages =
+    # distinct assistant message.id (the field A-1.12 registers — stream-json
+    # emits one event per content block, so events are not turns); num_turns
+    # from the result envelope stays archived beside it as turns.numTurns.
+    local turns num_turns agent_builds
+    turns="$(python3 "$HARNESS_CAPTURE" turns "$ws_out/transcript.jsonl" 2>/dev/null)" \
+        || turns='{"assistantMessages":null,"assistantMessagesTopLevel":null,"assistantMessagesSubagent":null,"source":"helper-error"}'
+    num_turns="$(jq -c '.num_turns // null' "$ws_out/agent.json" 2>/dev/null || echo null)"
+    [[ -n "$num_turns" ]] || num_turns=null
+    turns="$(jq -c --argjson nt "$num_turns" '. + {numTurns: $nt, transcript: "transcript.jsonl"}' <<<"$turns")"
+    # The agent's own `dotnet build` / `dotnet test` / `calor` calls with
+    # their tool_result output (§0.2: never archived before) -> agent-builds.jsonl
+    python3 "$HARNESS_CAPTURE" builds "$ws_out/transcript.jsonl" > "$ws_out/agent-builds.jsonl" 2>/dev/null \
+        || : > "$ws_out/agent-builds.jsonl"
+    agent_builds="$(jq -n --argjson n "$(grep -c . "$ws_out/agent-builds.jsonl" || true)" \
+        '{count: $n, file: "agent-builds.jsonl"}')"
+
+    # #1094: compilerHash. The agent-workspace copy was archived by the main
+    # loop right after the agent stopped; if the agent never built, the
+    # harness's final build above has just produced one — take it, labelled.
+    local build_state compiler_hash build_state_from
+    [[ -f "$ws_out/calor-build-state.json" ]] || archive_build_state "$ws" "$ws_out" "harness-final-build"
+    build_state="$(python3 "$HARNESS_CAPTURE" build-state "$ws_out/calor-build-state.json" 2>/dev/null || echo '{"compilerHash":null,"source":"helper-error"}')"
+    build_state_from="$(cat "$ws_out/.build-state-source" 2>/dev/null || echo none)"
+    build_state="$(jq -c --arg from "$build_state_from" '. + {archivedFrom: $from, file: (if $from == "none" then null else "calor-build-state.json" end)}' <<<"$build_state")"
+    compiler_hash="$(jq -c '.compilerHash' <<<"$build_state")"
 
     # WS5 defect probe (loop plan D5.1, Annex A-1.2 M-W1): pass/fail of the
     # per-defect held-out probe test at declared-done. caught=true iff the
@@ -1019,6 +1194,11 @@ extract_metrics() {
         --argjson defect "$defect" \
         --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
         --arg arm_repo_root "$ARM_REPO_ROOT" \
+        --argjson turns "$turns" --argjson agent_builds "$agent_builds" \
+        --argjson compiler_hash "$compiler_hash" --argjson build_state "$build_state" \
+        --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
+        --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
+        --arg template_source "$TEMPLATE_SOURCE" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
@@ -1026,6 +1206,11 @@ extract_metrics() {
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
           mcpWrites:$mcp_writes, defect:$defect,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
+          compilerHash:$compiler_hash, buildState:$build_state,
+          armConfigKey:$arm_config_key,
+          controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
+          permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
+          turns:$turns, agentBuilds:$agent_builds,
           tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
           nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
@@ -1045,11 +1230,22 @@ write_invalid_result() {
         --argjson null_agent "$NULL_AGENT" \
         --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
         --arg arm_repo_root "$ARM_REPO_ROOT" \
+        --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
+        --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
+        --arg template_source "$TEMPLATE_SOURCE" \
+        --argjson has_transcript "$([[ -s "$ws_out/transcript.jsonl" ]] && echo true || echo false)" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
           iterations:0, iterationsToGreen:$itg, censored:true,
           invalid:true, defect:null,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
+          compilerHash:null, buildState:{compilerHash:null, source:"invalid", archivedFrom:"none", file:null},
+          armConfigKey:$arm_config_key,
+          controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
+          permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
+          turns:{assistantMessages:null, assistantMessagesTopLevel:null, assistantMessagesSubagent:null,
+                 numTurns:null, source:"invalid", transcript:(if $has_transcript then "transcript.jsonl" else null end)},
+          agentBuilds:{count:0, file:null},
           tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
           nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
@@ -1087,6 +1283,10 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         materialize "$WS" "$WS_OUT"
         write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
+
+        # #1094: the agent's declared-done build state, before anything
+        # below rebuilds the workspace.
+        archive_build_state "$WS" "$WS_OUT" "agent-workspace"
 
         # Declared-done archival runs immediately after the agent stops —
         # before the final build below can rewrite anything — and its failure
