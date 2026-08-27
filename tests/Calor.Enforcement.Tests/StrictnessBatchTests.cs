@@ -902,6 +902,69 @@ var x = 1;
             d => d.Code == DiagnosticCode.EffectRowMismatch);
     }
 
+    [Fact]
+    public void RowMismatch_AtReassignment_IsError()
+    {
+        // §6.2 site 1's SECOND half — "§B init, AND re-assignment to a
+        // function-typed mutable" — which review round 1 (F10) found
+        // unimplemented. Without it a mutable is a laundering hole: the binding
+        // reports once and every later §ASSIGN through the same name is free.
+        //
+        // Two Calor0424s here, and both are wanted: one for the initializer
+        // (site 1's first half) and one for the re-assignment.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+                §E{cw}
+                §B{~f:Func<i32,i32>} §E{} src
+                §ASSIGN f src
+                §R INT:1
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.EffectRowMismatch
+              && d.Message.Contains("Value assigned to 'f'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RowMismatch_AtReassignment_Compiles()
+    {
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
+                §E{cw}
+                §B{~f:Func<i32,i32>} §E{cw} src
+                §ASSIGN f src
+                §R INT:1
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowMismatch
+              || d.Code == DiagnosticCode.EffectRowUnknown);
+    }
+
+    [Fact]
+    public void Reassignment_ToAFunctionTypedField_IsAdjudicated()
+    {
+        // A field of the owning class is in scope by bare name, so §ASSIGN
+        // through it is a site. What is NOT a site is a target that needs the
+        // RECEIVER typed (`this.cb`, `xs[i]`); RowSiteChecker declines those,
+        // and that limit is recorded in the method's doc comment rather than
+        // silently relied on.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §CL{c001:Holder:pub}
+                §FLD{Func<i32,i32>:cb:pri} §E{}
+                §MT{mt001:Set:pub} (Func<i32,i32>:src §E{cw}) -> void
+                  §E{}
+                  §ASSIGN cb src
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.EffectRowMismatch
+              && d.Message.Contains("Value assigned to 'cb'", StringComparison.Ordinal));
+    }
+
     // --------------------------------------------------- P15 site 2: argument
 
     [Fact]

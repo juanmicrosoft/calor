@@ -834,6 +834,9 @@ public sealed class EffectEnforcementPass
                 case BindStatementNode bind:
                     CheckAssignmentSite(bind);
                     break;
+                case AssignmentStatementNode assignment:
+                    CheckReassignmentSite(assignment);
+                    break;
                 case ReturnStatementNode { Expression: { } returned }:
                     CheckReturnSite(returned);
                     break;
@@ -894,6 +897,46 @@ public sealed class EffectEnforcementPass
             // that fits produces an Assumed destination, so the assumption is
             // reported again at the next hop instead of vanishing.
             _scope[bind.Name] =
+                Binding.BoundTypes.EffectRow.Fits(source.Value.Row, destination)
+                    == Binding.BoundTypes.EffectFit.Fits
+                    ? Binding.BoundTypes.EffectRow.AtDestination(source.Value.Row, destination)
+                    : destination;
+        }
+
+        /// <summary>
+        /// Site 1's SECOND half (§6.2 — "`§B` init, <b>and re-assignment to a
+        /// function-typed mutable</b>"), added by review round 1 (F10). The
+        /// destination is the row the mutable already carries at this point in
+        /// the body, which after a `Fits` hop is <see cref="Binding.BoundTypes.EffectRow.AtDestination"/>'s
+        /// answer — so re-assigning through a mutable cannot launder a row that
+        /// the original binding reported on.
+        ///
+        /// <para>Only a bare name is a site. A field or element target
+        /// (<c>this.cb</c>, <c>xs[i]</c>) needs the receiver typed, which this AST
+        /// walk does not do; declining is the honest answer and leaves it to the
+        /// slice that types receivers.</para>
+        /// </summary>
+        private void CheckReassignmentSite(AssignmentStatementNode assignment)
+        {
+            if (assignment.Target is not ReferenceNode target) return;
+            if (!_scope.TryGetValue(target.Name, out var destination)) return;
+
+            var source = SourceRow(assignment.Value);
+            if (source == null) return;
+
+            Adjudicate(
+                assignment.Value.Span,
+                source.Value.Row,
+                destination,
+                sourceDescription: $"Value assigned to '{target.Name}'",
+                destinationDescription: $"'{target.Name}'",
+                destinationName: $"'{target.Name}'",
+                destinationIsPosition: true,
+                positionDescription: $"'{target.Name}'",
+                owner: _function.Name);
+
+            // The row the mutable carries AFTER the assignment (§4.4).
+            _scope[target.Name] =
                 Binding.BoundTypes.EffectRow.Fits(source.Value.Row, destination)
                     == Binding.BoundTypes.EffectFit.Fits
                     ? Binding.BoundTypes.EffectRow.AtDestination(source.Value.Row, destination)
