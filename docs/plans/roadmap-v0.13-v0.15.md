@@ -209,12 +209,23 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    must get the *documented degradation* (a loud "Z3 unavailable"/Calor0710 signal, no crash, no
    silent pass), which turns the drop decision itself into a tested claim. NuGet registries and
    GitHub release assets are verified **after** publishing (a workflow firing is not a publish).
-   **Status (2026-08-15).** Both legs are now instruments in CI rather than post-publish habits:
+   **Gate amended again in the v0.16 kickoff sweep (2026-08-27), following the #916-review-F3
+   precedent above — two changes to the frozen matrix, stated as amendments rather than as
+   status.** *(i)* **The VSIX artifact leg is retired**, because the extension it verified was
+   itself retired (#952); the artifact matrix is CLI + Sdk on the three frozen RIDs, and the gate
+   claims nothing about a VSIX. *(ii)* **Both consumer legs are advisory, not merge-blocking.**
+   `main`'s required contexts on 2026-08-27 are `test`, `calor-first-guard`, `d-s1.5-fixtures`,
+   `tests (compiler)`, `tests (enforcement)` — neither `sdk-package-consumer (…)` (true since
+   v0.11) nor `cli-tool-consumer (…)` is among them, so a red leg is visible in the check list but
+   cannot block a merge. Making them required is a maintainer decision (#949 is the record of what
+   context/job-name drift costs) and was deliberately not taken here. The measurement below stands;
+   its enforcement is what is qualified.
+   **Instruments, as built (originally written 2026-08-15 for PR #982; carried into the tree
+   2026-08-27).** Both legs are instruments in CI rather than post-publish habits:
    `sdk-package-consumer` (5 RIDs, Calor0712 canary in the MSBuild task context) and
    `cli-tool-consumer` (the frozen 3 RIDs — win-x64, linux-x64, osx-arm64 — packing `calor`,
    installing it from a local feed with a cold package cache, and requiring a *solver verdict*:
-   contracts Proven, none Skipped, no Calor0710). The VSIX leg is retired with the extension
-   itself (#952). The dropped osx-x64 RID has no runner, so its amended oracle is reproduced on
+   contracts Proven, none Skipped, no Calor0710). The dropped osx-x64 RID has no runner, so its amended oracle is reproduced on
    every leg by removing the runner's own Z3 native from the installed tool — the same state an
    Intel-mac consumer is in — and asserting documented degradation. **Building that oracle found
    the gate's own failure mode live in the shipped CLI**: `Calor0710` was `info` severity and the

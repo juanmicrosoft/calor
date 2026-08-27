@@ -29,7 +29,9 @@ All notable changes to this project will be documented in this file.
 - **CI now installs the `calor` command-line tool from a freshly built package** on
   Windows, Linux and macOS and checks that it can actually prove contracts — and that
   when the Z3 solver is missing it says so out loud instead of quietly skipping
-  everything. Carried over from PR #982.
+  everything. Carried over from PR #982. Note this check is **advisory for now**: like
+  the matching check for the SDK package, it is not on the list of checks that must pass
+  before a change can be merged, so a failure is visible but does not block anything.
 
 - New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
 

@@ -538,6 +538,14 @@ public class HigherOrderDemandLedgerTests
         Assert.Equal(RegisteredAt, ledger.RegisteredAt);
         Assert.Equal(Floor, ledger.Floor);
         Assert.Equal(FloorRule, ledger.FloorRule);
+        // CONVENTION (recorded in review round 1 of the v0.16 kickoff sweep, M3;
+        // the check stays shape-only because a test cannot know its own future
+        // commit). `measuredCommit` names the commit whose TREE the counts were
+        // measured against. When a PR changes the corpus, the regeneration must
+        // therefore run with the corpus change already committed, so the stamp
+        // names a commit in which the counted files EXIST — the PR's own branch
+        // commit, as PR #1110 stamped its own. Stamping the branch BASE records
+        // a count that is not reproducible at the commit named.
         Assert.True(IsSha(ledger.MeasuredCommit),
             $"measuredCommit must be a 40-hex commit SHA, was '{ledger.MeasuredCommit}'");
         Assert.Equal(ScopeText, ledger.Scope);

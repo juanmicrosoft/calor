@@ -712,7 +712,12 @@ public sealed class SpikeVerdictTests
     // per-fixture multiset under the pinned invocation, the same table
     // PpE1NegativeControls_MatchA1111Baselines_PostE4 below asserts; the two
     // differ in what they name on failure (a barred code vs. a moved
-    // multiset), not in what they compile.
+    // multiset), not in what they compile — and since review round 1 (m3) they
+    // literally SHARE the compile: CompileControlFixture is memoised, so the
+    // redundancy costs no process spawns. Both are kept rather than collapsed
+    // because the gate row's "no barred code anywhere in a control compile" and
+    // A-1.11.1's per-fixture multiset are two distinct registered claims, and a
+    // failure should say which one moved.
     //
     // THE BASELINE A-1.11 FROZE IS SUPERSEDED. A-1.11's leg-A negative control
     // read "A2 = 1x Calor0410 at (23,9) + 3x Calor0411; the four A3 = exit 0
@@ -1059,11 +1064,25 @@ public sealed class SpikeVerdictTests
     /// itself lives in <see cref="PpE1Probe"/>, shared with the PP-E1 ledger
     /// test so both read the same invocation.</para>
     /// </summary>
+    /// <summary>
+    /// Memoised across the whole assembly (review round 1, m3): three pins now
+    /// compile the same five unmutated fixtures with the same pinned, flagless
+    /// invocation — the barred-code control, the A-1.11.1 multiset control, and
+    /// each L7 cell's baseline. The invocation is deterministic and the fixtures
+    /// are blob-SHA frozen, so one process per fixture answers all of them; this
+    /// removes five process spawns per run without weakening any assertion.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string, (int ExitCode, string[] Diagnostics)> PpE1ControlCompiles = new(StringComparer.Ordinal);
+
     private static (int ExitCode, string[] Diagnostics) CompileControlFixture(string fixture)
     {
-        var source = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
-        Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
-        return CompileControlSource(source);
+        return PpE1ControlCompiles.GetOrAdd(fixture, static key =>
+        {
+            var source = Path.Combine(SpikeDirectory(), "after", key + ".calr");
+            Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
+            return CompileControlSource(source);
+        });
     }
 
     /// <summary>The pinned invocation over an arbitrary source path — the L7

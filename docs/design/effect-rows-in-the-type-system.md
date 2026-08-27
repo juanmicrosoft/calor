@@ -2814,12 +2814,13 @@ untrimmed code in `Calor0403`.
 > (`keysFromBound` 22 / `keysFromString` 135 unchanged); binder-incomplete baseline `ParsedFiles`
 > 507 → 516, `ExpressionsBound` 4715 → 4787, `IncompleteCount` 0 unchanged;
 > `EffectRowCorpusShapeTests` 926 → 935 with the two row-bearing `combinators.calr` on its reasoned
-> allowlist (step 2's, row erased, deliberately not). Formatter corpus baseline `trackedFileCount` 926 → 935,
+> allowlist (step 2's, row erased, deliberately not); the sweep's two `src/` changes
+> (`CompilationDriver.cs`'s generated-output validation guard and `VerifyCommand.cs`'s
+> Z3-unavailable notice, the latter carried from PR #982) are probed by no script. Formatter corpus baseline `trackedFileCount` 926 → 935,
 > `successfulTransformationCount` 693 → 698, four ES-08 files registered as semantic-error
 > conservative fallbacks (the three `app.calr`, cross-module alone; step 2's `combinators.calr`,
 > Calor0410). No `src/**` file that any transcript probes
-> differs from `origin/main`; the sweep's one `src/` change (`CompilationDriver.cs`, the
-> generated-output validation guard) is probed by no script.
+> differs from `origin/main`.
 
 ## 14. Open questions
 

@@ -10,7 +10,7 @@
 > including `test (performance)` (2m35s) and `release-quality` (29m); the 0.14.1–0.14.3 release
 > runs on 2026-08-24 were green too. Roadmap-v0.16 §7 makes #965 release-blocking for 0.16.0
 > only if it recurs. **Phases 3–4 are open** (substrate repairs; deterministic counters) and are
-> tracked as an issue filed by the sweep. #976's other two files were not carried: the baseline
+> tracked as **issue #1115**. #976's other two files were not carried: the baseline
 > edit is already on main via #978, and the `run_performance_gate.py` change (the
 > compute-subtracted alternative in §6 Phase 1) was the road not taken.
 
