@@ -1166,19 +1166,25 @@ var x = 1;
     // ------------------------------- P15 site 6: rank-1 generic instantiation
 
     [Fact]
-    public void RowMismatch_AtGenericInstantiation_IsSliceBs_AndTheGapIsObserved()
+    public void RowMismatch_AtGenericInstantiation_IsError()
     {
-        // Gate 1's SIXTH class is NOT closed by this slice, and the honest thing
-        // is a test that observes the gap rather than an absent one that hides
-        // it. `Announce` prints; `Map`'s callback row is the effect variable `e`;
-        // `UsePure` declares no `cw`. §7.4 says the instantiation must charge
-        // `cw` to `UsePure` and reject it. Today `Binder.BindRow` makes any row
-        // mentioning a variable Unknown, and CheckRowCompatibility DECLINES a
-        // polymorphic position outright (it is site 6, not one of the five), so
-        // no Calor0424 fires.
+        // Gate 1's SIXTH class, CLOSED by E3 slice b. This test was
+        // `..._IsSliceBs_AndTheGapIsObserved` and asserted that NOTHING fired;
+        // it is flipped here, which is what §13.2 said slice b would do.
         //
-        // When slice b lands, this test flips: it must assert the mismatch, and
-        // its `_Compiles` half is `Double` in place of `Announce`.
+        // **The code is Calor0410, not Calor0424, and that is a divergence from
+        // §6.2's table this PR reports rather than hides.** §6.2 row 6 writes
+        // Calor0424 for site 6's DoesNotFit; §7.4's solve makes that cell
+        // UNREACHABLE, because `e := ⊔ (ρ(argⱼ) ⊖ ρ_declⱼ)` defines the solution
+        // as the join of the residuals — so the substituted parameter row
+        // contains every argument row BY CONSTRUCTION and no argument can fail
+        // `fits` at a variable-mentioning position. What site 6 can catch is the
+        // CALLER under-declaring the instantiated row, and §10.3's own worked
+        // example spells exactly that as Calor0410 with a new provenance clause.
+        // The class is closed; the code that closes it is 0410.
+        //
+        // Discriminating revert: delete the InstantiateAndCharge call in
+        // CheckArgumentSite and `UsePure` is silently charged nothing.
         var result = TestHarness.Compile("""
             §M{m001:M}
               §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
@@ -1193,9 +1199,120 @@ var x = 1;
                 §R §C{Map} §A INT:1 §A Announce §/C
             """);
 
+        var reported = Assert.Single(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+        // P22 — §10.3's FIRST string, by full equality.
+        Assert.Equal(
+            "Function 'UsePure' uses effect 'cw' but does not declare it\n"
+            + "  Effect row: effect variable 'e' of 'Map' instantiated to cw at this call site",
+            reported.Message);
+    }
+
+    [Fact]
+    public void RowMismatch_AtGenericInstantiation_Compiles()
+    {
+        // The `_Compiles` half the gap pin promised: `Double` in place of
+        // `Announce`, so `e := Concrete(∅)` and `Map`'s instantiated row is pure.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+                §E{e}
+                §R x
+              §F{f002:Double:pub} (i32:x) -> i32
+                §E{}
+                §R (* x INT:2)
+              §F{f003:UsePure:pub} () -> i32
+                §E{}
+                §R §C{Map} §A INT:1 §A Double §/C
+            """);
+
         Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.EffectRowMismatch
-              || d.Code == DiagnosticCode.EffectRowUnknown);
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              || d.Code == DiagnosticCode.EffectRowMismatch
+              || d.Code == DiagnosticCode.EffectRowUnknown
+              || d.Code == DiagnosticCode.EffectVariableScope);
+    }
+
+    [Fact]
+    public void RowMismatch_AtGenericInstantiation_CannotTell_IsCalor0425()
+    {
+        // §7.4 — "Any Unknown contributor makes e := Unknown and the site reports
+        // Calor0425." Here `cb` is a function-typed parameter with NO row, so its
+        // row is Unknown (§3.5) and the variable cannot be solved.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
+                §E{e}
+                §R x
+              §F{f003:Use:pub} (Func<i32,i32>:cb) -> i32
+                §E{}
+                §R §C{Map} §A INT:1 §A cb §/C
+            """);
+
+        // P22 — §10.3's SECOND string. The doc's sample ends "'UseImpure' is
+        // charged Unknown effects"; the shipped tail says what actually happens
+        // instead, because charging an `unknown` effect would raise a Calor0410
+        // the author cannot declare away. The divergence is recorded in the PR
+        // body and in docs/plans/2026-08-26-v0.15-e3b-notes.md.
+        var reported = Assert.Single(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.StartsWith("Effect variable", StringComparison.Ordinal));
+        Assert.Equal(
+            "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: the row of "
+            + "argument 'cb' could not be determined. The instantiated row of 'Map' is Unknown "
+            + "here, so nothing is charged to 'Use' for it. State a row on the argument's "
+            + "declaration, or compile with --permissive-effects.",
+            reported.Message);
+    }
+
+    [Fact]
+    public void GenericInstantiation_AlphaEquivalentBinders_Unify()
+    {
+        // §7.5's R2 at the level a caller can see: `Outer` binds `eff a` and
+        // passes its own rowed parameter into `Inner`, which binds `eff b`. The
+        // two are identified by ORDINAL, so the instantiated row is `a` again and
+        // `Outer`'s own declaration covers it. Under slice a the polymorphic
+        // position was declined outright and nothing was compared at all.
+        //
+        // Discriminating revert: compare binders by NAME and this reports that
+        // 'Outer' uses effect variable 'b'.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
+                §E{b}
+                §R INT:0
+              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
+                §E{a}
+                §R §C{Inner} §A h §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              || d.Code == DiagnosticCode.EffectRowMismatch
+              || d.Code == DiagnosticCode.EffectRowUnknown
+              || d.Code == DiagnosticCode.EffectVariableScope);
+    }
+
+    [Fact]
+    public void GenericInstantiation_CallerMustDeclareTheVariableItPassesOn()
+    {
+        // The other polarity of the same rule: `Outer` does NOT declare its own
+        // variable in its row, so the instantiated row mentions a variable the
+        // caller has not promised. That is an undeclared effect, spelled in
+        // today's Calor0410 shape.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
+                §E{b}
+                §R INT:0
+              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
+                §E{}
+                §R §C{Inner} §A h §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("uses effect variable 'a' but does not declare it"));
     }
 
     // ================================================================ P11 ====
