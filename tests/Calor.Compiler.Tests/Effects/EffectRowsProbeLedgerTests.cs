@@ -150,6 +150,11 @@ public sealed class EffectRowsProbeLedgerTests
             recorded.Routes.OwnGoal, recorded.Routes.OwnGoalArtifact);
         var expectedText = Serialize(recomputed);
 
+        // The named cause first (review round 2, minor e): a leg-B boolean the
+        // numbers do not imply, or a free route (d), is what the adjudicator
+        // must read — not the generic first-differing-line diff.
+        AssertRecordedFieldsAreNotFree(recomputed);
+
         var moved = DescribeWhatMoved(recorded, recomputed);
         if (expectedText != actualText)
         {
@@ -165,8 +170,6 @@ public sealed class EffectRowsProbeLedgerTests
             + "control that drew a new diagnostic, or a verdict that changed is a finding to be "
             + "published with the change that caused it. Regenerate only in a PR that names what "
             + $"moved and why ({RegenerateEnvVar}=1 dotnet test --filter EffectRowsProbeLedger).");
-
-        AssertRecordedFieldsAreNotFree(recomputed);
     }
 
     /// <summary>
@@ -185,13 +188,24 @@ public sealed class EffectRowsProbeLedgerTests
         var ledger = JsonSerializer.Deserialize<PpE1Ledger>(File.ReadAllText(LedgerPath()), JsonOptions);
         Assert.NotNull(ledger);
 
-        var violations = ValidateLegB(ledger!.LegB);
+        // Re-derive leg B's booleans from the ledger's RECORDED NUMBERS (not
+        // from its recorded booleans), so the file-only leg does what its name
+        // says (review round 2, minor a).
+        var (fails, underpowered) = DeriveBooleans(ledger!.LegB.PointEstimate, ledger.LegB.LowerBound95,
+            ledger.LegB.RealizedMedianWithinCellCv, ledger.LegB.HarnessValid == true);
+        Assert.True(fails == ledger.LegB.Fails && underpowered == ledger.LegB.Underpowered,
+            $"Ledger legB.fails={Fmt(ledger.LegB.Fails)} / underpowered={Fmt(ledger.LegB.Underpowered)} are not "
+            + $"what its recorded numbers imply ({Fmt(fails)} / {Fmt(underpowered)}).");
+        var legB = ledger.LegB with { Fails = fails, Underpowered = underpowered };
+
+        var violations = ValidateLegB(legB);
         violations.AddRange(ValidateRoutes(ledger.Routes, RepoRoot()));
+        violations.AddRange(ValidateOwnGoalNamedInReason(ledger.Routes, ledger.Reason));
         Assert.True(violations.Count == 0,
             "The ledger's recorded fields are not free:\n  " + string.Join("\n  ", violations));
 
         var (verdict, reason) = ComputeVerdict(ledger.NegativeControl.Clean, ledger.LegA,
-            ledger.Routes, ledger.LegB);
+            ledger.Routes, legB);
 
         Assert.True(verdict == ledger.Verdict && reason == ledger.Reason,
             $"Ledger verdict '{ledger.Verdict}' / reason '{ledger.Reason}' is not what its recorded "
@@ -204,6 +218,17 @@ public sealed class EffectRowsProbeLedgerTests
             Assert.Null(ledger.LegB.PointEstimate);
             Assert.Null(ledger.LegB.LowerBound95);
             Assert.Null(ledger.LegB.RealizedMedianWithinCellCv);
+        }
+
+        // A HIT ledger always carries three finite numbers and two non-null
+        // false booleans (review round 2, M9/M10).
+        if (ledger.Verdict == "HIT")
+        {
+            Assert.True(IsFinite(ledger.LegB.PointEstimate) && IsFinite(ledger.LegB.LowerBound95)
+                        && IsFinite(ledger.LegB.RealizedMedianWithinCellCv),
+                "a HIT ledger must carry finite pointEstimate, lowerBound95 and realizedMedianWithinCellCv");
+            Assert.True(ledger.LegB.Fails == false && ledger.LegB.Underpowered == false,
+                "a HIT ledger must carry fails=false and underpowered=false as non-null booleans");
         }
     }
 
@@ -321,13 +346,153 @@ public sealed class EffectRowsProbeLedgerTests
         var contradicted = cited with { D = cited.D with { MechanicalEvidenceAllShipped = true } };
         Assert.Contains(ValidateRoutes(contradicted, RepoRoot()), v => v.Contains("all shipped", StringComparison.Ordinal));
 
-        // Own-goal needs an artifact that exists.
-        var ownGoal = inert with { OwnGoal = true };
+        // Own-goal needs a firing route and an artifact that exists under
+        // bench/phase0-agent-native/ or docs/ (README.md is not evidence).
+        var ownGoal = cited with { OwnGoal = true };
         Assert.Contains(ValidateRoutes(ownGoal, RepoRoot()), v => v.Contains("ownGoalArtifact", StringComparison.Ordinal));
+        var ownGoalNoRoute = inert with { OwnGoal = true, OwnGoalArtifact = "docs/plans/agent-native-gates.md" };
+        Assert.Contains(ValidateRoutes(ownGoalNoRoute, RepoRoot()), v => v.Contains("no not-adjudicated route", StringComparison.Ordinal));
         var ownGoalMissing = ownGoal with { OwnGoalArtifact = "docs/plans/no-such-artifact.md" };
         Assert.Contains(ValidateRoutes(ownGoalMissing, RepoRoot()), v => v.Contains("does not exist", StringComparison.Ordinal));
+        var ownGoalReadme = ownGoal with { OwnGoalArtifact = "README.md" };
+        Assert.Contains(ValidateRoutes(ownGoalReadme, RepoRoot()), v => v.Contains("must live under", StringComparison.Ordinal));
         var ownGoalShown = ownGoal with { OwnGoalArtifact = "docs/plans/agent-native-gates.md" };
         Assert.Empty(ValidateRoutes(ownGoalShown, RepoRoot()));
+        Assert.Contains(ValidateOwnGoalNamedInReason(ownGoalShown, "route (d) …; no artifact named"),
+            v => v.Contains("does not name", StringComparison.Ordinal));
+        Assert.Empty(ValidateOwnGoalNamedInReason(ownGoalShown, "own-goal: … (docs/plans/agent-native-gates.md); …"));
+    }
+
+    /// <summary>
+    /// Review round 2 (M9/M10): an analysis with <c>harnessValid: true</c> and
+    /// NO numbers (or numbers as JSON strings) left <c>fails</c>/<c>underpowered</c>
+    /// null, <c>ValidateLegB</c> saw null == null, and <c>ComputeVerdict</c>
+    /// reached HIT because <c>fails == true</c> was false. Now a run with a
+    /// valid harness MUST carry three finite JSON numbers; otherwise the
+    /// analysis is INVALID and the verdict is NOT-ADJUDICATED via route (c),
+    /// naming the missing field — never HIT with null booleans.
+    /// </summary>
+    [Theory]
+    [InlineData("empty-numbers", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "harnessValid": true
+        }
+        """, "pointEstimate")]
+    [InlineData("string-numbers", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "pointEstimate": "1.0016", "lowerBound95": "0.8270", "realizedMedianWithinCellCv": "0.4392",
+          "harnessValid": true, "legBFails": null, "underpowered": null
+        }
+        """, "pointEstimate")]
+    [InlineData("nan-bound", """
+        {
+          "epoch": "e1-rows-parity-001", "dryRun": false,
+          "armA": {"label": "calor+v0.14.3"}, "armB": {"label": "calor+0.15.0"},
+          "pointEstimate": 1.0016, "lowerBound95": "NaN", "realizedMedianWithinCellCv": 0.4392,
+          "harnessValid": true, "legBFails": false, "underpowered": false
+        }
+        """, "lowerBound95")]
+    public void PpE1LegB_PlantedAnalysisWithoutFiniteNumbers_IsNotAdjudicatedViaRouteC(
+        string shape, string json, string missingField)
+    {
+        var planted = Path.Combine(Path.GetTempPath(), $"calor-ppe1-{shape}-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(planted, json);
+            var legB = ReadLegB(planted);
+            Assert.Equal("run", legB.Status);
+            Assert.False(legB.HarnessValid, "an analysis without finite numbers is INVALID, not adjudicable");
+            Assert.NotNull(legB.InvalidReason);
+            Assert.Contains(missingField, legB.InvalidReason, StringComparison.Ordinal);
+            Assert.Null(legB.Fails);
+            Assert.Null(legB.Underpowered);
+
+            var routes = RoutesFor(legB);
+            Assert.True(routes.C.Fires);
+            Assert.Empty(ValidateLegB(legB));
+
+            var (verdict, reason) = ComputeVerdict(true, PerfectLegA(), routes, legB);
+            Assert.Equal("NOT-ADJUDICATED", verdict);
+            Assert.Contains("(c) the harness is invalid", reason, StringComparison.Ordinal);
+            Assert.Contains(missingField, reason, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (File.Exists(planted)) File.Delete(planted);
+        }
+    }
+
+    /// <summary>
+    /// HIT is never reached with null booleans, whatever the routes say: a
+    /// leg B that is "run" and "valid" but carries no derived booleans is
+    /// NOT-ADJUDICATED, not HIT.
+    /// </summary>
+    [Fact]
+    public void PpE1Verdict_NullBooleansNeverHit()
+    {
+        var hollow = ReadLegB(Path.Combine(Path.GetTempPath(), "does-not-exist.json")) with
+        {
+            Status = "run", HarnessValid = true, Fails = null, Underpowered = null,
+        };
+        var (verdict, reason) = ComputeVerdict(true, PerfectLegA(), InertRoutes(), hollow);
+        Assert.Equal("NOT-ADJUDICATED", verdict);
+        Assert.Contains("no adjudicable", reason, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Review round 2, minor (c): the cut-citation check must not accept a prose
+    /// line that merely starts with <c>#</c> (an issue reference like
+    /// <c>#847) — …</c>) as a heading, nor a section that only mentions "cut
+    /// line" in passing: the heading must be a Markdown heading and the section
+    /// must carry the roadmap's literal paragraph lead "Cut lines.".
+    /// </summary>
+    [Fact]
+    public void PpE1CutCitation_NonHeadingMatchIsRejected()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"calor-ppe1-cite-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "docs", "plans"));
+            File.WriteAllText(Path.Combine(root, "docs", "plans", "fake.md"), string.Join("\n",
+            [
+                "# A fake roadmap",
+                "",
+                "#847) — the cut line was invoked for E4 here, in prose",
+                "",
+                "## 4.2 Ship — with cut lines mentioned but not stated",
+                "",
+                "A section that says cut line and E4 without the paragraph lead.",
+                "",
+                "## 4.9 The real thing",
+                "",
+                "**Cut lines.** (1) If E1 overruns, E4 defers.",
+                "",
+            ]));
+
+            string[] Check(string heading) =>
+                [.. ValidateRoutes(InertRoutes() with
+                {
+                    D = InertRoutes().D with
+                    {
+                        Fires = true, MechanicalEvidenceAllShipped = false,
+                        CutCitation = new PpE1CutCitation("docs/plans/fake.md", heading, "E4"),
+                    },
+                }, root)];
+
+            Assert.Contains(Check("#847) — the cut line was invoked for E4 here, in prose"),
+                v => v.Contains("heading", StringComparison.Ordinal));
+            Assert.Contains(Check("## 4.2 Ship — with cut lines mentioned but not stated"),
+                v => v.Contains("\"Cut lines.\"", StringComparison.Ordinal));
+            Assert.Empty(Check("## 4.9 The real thing"));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 
     // ------------------------------------------------------------ measurement
@@ -650,11 +815,7 @@ public sealed class EffectRowsProbeLedgerTests
                 routeAEvidence.ToArray()),
             new PpE1RouteB(dA + dB < floor, floor, dA, dB, dA + dB,
                 "bench/phase0-agent-native/higher-order-demand-ledger.json (dA.total + dB.aggregate.total)"),
-            new PpE1RouteC(legB.Status == "run" ? legB.HarnessValid == false : null,
-                "the PP-W5 validity floor (a cell with < 2 valid runs drops its pair, disclosed; fewer than "
-                + "3 surviving pairs, or either arm below 12 valid runs), two arms without distinct repo "
-                + "roots and distinct Calor.Tasks hashes, or either arm above §2's 40 % censoring cap — "
-                + "recorded by ppe1-analyze.py as harnessValid"),
+            RouteCFor(legB),
             new PpE1RouteD(recordedRouteDFires,
                 "E2, E3 or E4 does not ship in 0.15.0, and only where roadmap §4.2's cut line was invoked "
                 + "in writing, the cut cited here; an unplanned E4 slip is a MISS — recorded, and bound: "
@@ -708,7 +869,7 @@ public sealed class EffectRowsProbeLedgerTests
         {
             return new PpE1LegB("not-run", LegBEpoch, AnalysisRelativePath(),
                 "bench/phase0-agent-native/ppe1-analyze.py", rule,
-                null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         using var document = JsonDocument.Parse(File.ReadAllText(analysisPath));
@@ -721,27 +882,54 @@ public sealed class EffectRowsProbeLedgerTests
         var point = Number(root, "pointEstimate");
         var lower = Number(root, "lowerBound95");
         var cv = Number(root, "realizedMedianWithinCellCv");
-        var harnessValid = root.GetProperty("harnessValid").GetBoolean();
+        var recordedHarnessValid = root.GetProperty("harnessValid").GetBoolean();
         var recordedFails = NullableBool(root, "legBFails");
         var recordedUnderpowered = NullableBool(root, "underpowered");
 
-        bool? fails = null, underpowered = null;
-        if (harnessValid && point is not null && lower is not null && cv is not null)
+        // A run with a valid harness MUST carry three finite JSON numbers.
+        // Anything else — absent, null, a string, NaN — makes the analysis
+        // INVALID (route (c)), naming the field. Never adjudicated on nulls.
+        string? invalidReason = null;
+        if (recordedHarnessValid)
         {
-            var pointExceeds = point > PointGate;
-            var boundFires = lower > LowerBoundGate;
-            fails = pointExceeds && boundFires;
-            underpowered = !fails.Value && (pointExceeds || cv > CvCap);
+            foreach (var (name, value) in new[]
+                     {
+                         ("pointEstimate", point), ("lowerBound95", lower), ("realizedMedianWithinCellCv", cv),
+                     })
+            {
+                if (!IsFinite(value))
+                {
+                    invalidReason = $"{name} is missing or not a finite JSON number in {AnalysisRelativePath()}";
+                    break;
+                }
+            }
         }
+
+        var harnessValid = recordedHarnessValid && invalidReason is null;
+        var (fails, underpowered) = DeriveBooleans(point, lower, cv, harnessValid);
 
         return new PpE1LegB("run", LegBEpoch, AnalysisRelativePath(),
             "bench/phase0-agent-native/ppe1-analyze.py", rule,
-            point, lower, cv, harnessValid,
+            point, lower, cv, harnessValid, invalidReason,
             fails, underpowered, recordedFails, recordedUnderpowered,
-            fails == recordedFails && underpowered == recordedUnderpowered,
+            harnessValid ? fails == recordedFails && underpowered == recordedUnderpowered : null,
             root.GetProperty("armA").GetProperty("label").GetString(),
             root.GetProperty("armB").GetProperty("label").GetString());
     }
+
+    /// <summary>The frozen leg-B rule, applied to numbers only when all three are finite.</summary>
+    internal static (bool? Fails, bool? Underpowered) DeriveBooleans(
+        double? point, double? lower, double? cv, bool harnessValid)
+    {
+        if (!harnessValid || !IsFinite(point) || !IsFinite(lower) || !IsFinite(cv))
+            return (null, null);
+        var pointExceeds = point!.Value > PointGate;
+        var boundFires = lower!.Value > LowerBoundGate;
+        var fails = pointExceeds && boundFires;
+        return (fails, !fails && (pointExceeds || cv!.Value > CvCap));
+    }
+
+    private static bool IsFinite(double? value) => value is not null && double.IsFinite(value.Value);
 
     private static double? Number(JsonElement root, string name)
         => root.TryGetProperty(name, out var e) && e.ValueKind == JsonValueKind.Number ? e.GetDouble() : null;
@@ -757,6 +945,17 @@ public sealed class EffectRowsProbeLedgerTests
     {
         var violations = new List<string>();
         if (legB.Status != "run") return violations;
+        if (legB.HarnessValid != true)
+        {
+            // An invalid harness is route (c); its booleans are not adjudicated
+            // and must not exist, and the invalidity must be named.
+            if (legB.Fails is not null || legB.Underpowered is not null)
+                violations.Add("an invalid harness cannot carry derived booleans");
+            if (legB.InvalidReason is null && legB.HarnessValid is null)
+                violations.Add("a recorded leg B must say whether its harness is valid");
+            return violations;
+        }
+
         if (legB.Fails != legB.RecordedFails)
             violations.Add($"legBFails: {legB.AnalysisPath} recorded {Fmt(legB.RecordedFails)}, re-derived "
                            + $"{Fmt(legB.Fails)} from point {Fmt(legB.PointEstimate)} / bound "
@@ -767,6 +966,23 @@ public sealed class EffectRowsProbeLedgerTests
                            + $"{Fmt(legB.RealizedMedianWithinCellCv)} under the frozen rule");
         if (legB.BooleansConsistent != true)
             violations.Add("booleansConsistent must be true for a recorded leg B");
+        if (legB.Fails is null || legB.Underpowered is null)
+            violations.Add("a recorded leg B with a valid harness must carry derived fails/underpowered booleans");
+        return violations;
+    }
+
+    /// <summary>
+    /// Own-goal (review round 2, minor b): the artifact must live under
+    /// bench/phase0-agent-native/ or docs/, and the ledger's reason must name it.
+    /// "Caused by this workstream" itself is NOT derivable by a test — that
+    /// attribution is the adjudicator's, and is the instrument's stated limit.
+    /// </summary>
+    internal static List<string> ValidateOwnGoalNamedInReason(PpE1Routes routes, string reason)
+    {
+        var violations = new List<string>();
+        if (routes.OwnGoal && !string.IsNullOrWhiteSpace(routes.OwnGoalArtifact)
+            && !reason.Contains(routes.OwnGoalArtifact, StringComparison.Ordinal))
+            violations.Add($"routes.ownGoal is true but the reason does not name ownGoalArtifact '{routes.OwnGoalArtifact}'");
         return violations;
     }
 
@@ -793,9 +1009,17 @@ public sealed class EffectRowsProbeLedgerTests
 
         if (routes.OwnGoal)
         {
+            if (!(routes.A.Fires || routes.B.Fires || routes.C.Fires == true || routes.D.Fires))
+                violations.Add("routes.ownGoal is true but no not-adjudicated route fires — the own-goal clause "
+                               + "governs routes (a)–(d) only; there is nothing to attribute");
             if (string.IsNullOrWhiteSpace(routes.OwnGoalArtifact))
                 violations.Add("routes.ownGoal is true without an ownGoalArtifact — the cause must be published "
                                + "with the artifact that shows it, never asserted in prose");
+            else if (!(routes.OwnGoalArtifact.StartsWith("bench/phase0-agent-native/", StringComparison.Ordinal)
+                       || routes.OwnGoalArtifact.StartsWith("docs/", StringComparison.Ordinal)))
+                violations.Add($"routes.ownGoalArtifact '{routes.OwnGoalArtifact}' must live under "
+                               + "bench/phase0-agent-native/ or docs/ (the failing compile, the regenerated ledger, "
+                               + "the epoch's pins.json)");
             else if (!File.Exists(Path.Combine(repoRoot, routes.OwnGoalArtifact.Replace('/', Path.DirectorySeparatorChar))))
                 violations.Add($"routes.ownGoalArtifact '{routes.OwnGoalArtifact}' does not exist");
         }
@@ -818,30 +1042,43 @@ public sealed class EffectRowsProbeLedgerTests
             yield break;
         }
 
+        // A heading is `^#{1,6} ` followed by text — never a prose line that
+        // merely starts with '#' (an issue reference like `#847) — …`).
+        var headingMatch = MarkdownHeading.Match(citation.Heading);
         var lines = File.ReadAllLines(path);
-        var start = Array.FindIndex(lines, l => l.TrimEnd() == citation.Heading);
+        var start = headingMatch.Success
+            ? Array.FindIndex(lines, l => MarkdownHeading.IsMatch(l) && l.TrimEnd() == citation.Heading)
+            : -1;
         if (start < 0)
         {
-            yield return $"cutCitation heading '{citation.Heading}' not found in {citation.Path}";
+            yield return $"cutCitation heading '{citation.Heading}' is not a Markdown heading (^#{{1,6}} text) "
+                         + $"found in {citation.Path}";
             yield break;
         }
 
-        var level = citation.Heading.TakeWhile(c => c == '#').Count();
+        var level = headingMatch.Groups[1].Value.Length;
         var end = start + 1;
         while (end < lines.Length
-               && !(lines[end].StartsWith('#') && lines[end].TakeWhile(c => c == '#').Count() <= level))
+               && !(MarkdownHeading.Match(lines[end]) is { Success: true } next && next.Groups[1].Value.Length <= level))
             end++;
         var section = string.Join("\n", lines[start..end]);
-        if (!section.Contains("cut line", StringComparison.OrdinalIgnoreCase))
-            yield return $"cited section '{citation.Heading}' does not mention a cut line";
+        // The roadmap states its cut lines under the literal paragraph lead
+        // "Cut lines." — a section that only mentions one in passing is not
+        // where a cut was invoked in writing.
+        if (!section.Contains("Cut lines.", StringComparison.Ordinal))
+            yield return $"cited section '{citation.Heading}' does not carry the literal paragraph lead \"Cut lines.\"";
         if (!section.Contains(citation.Workstream, StringComparison.Ordinal))
             yield return $"cited section '{citation.Heading}' does not name {citation.Workstream}";
     }
+
+    private static readonly System.Text.RegularExpressions.Regex MarkdownHeading = new(
+        @"^(#{1,6}) \S", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     private static void AssertRecordedFieldsAreNotFree(PpE1Ledger ledger)
     {
         var violations = ValidateLegB(ledger.LegB);
         violations.AddRange(ValidateRoutes(ledger.Routes, RepoRoot()));
+        violations.AddRange(ValidateOwnGoalNamedInReason(ledger.Routes, ledger.Reason));
         Assert.True(violations.Count == 0,
             "The ledger's recorded fields are not free:\n  " + string.Join("\n  ", violations)
             + "\nA leg-B boolean the numbers do not imply, a route (d) with no resolving cut citation or "
@@ -866,7 +1103,8 @@ public sealed class EffectRowsProbeLedgerTests
         var notAdjudicatedRoutes = new List<string>();
         if (routes.A.Fires) notAdjudicatedRoutes.Add("(a) a fixture does not reach the effect pass");
         if (routes.B.Fires) notAdjudicatedRoutes.Add($"(b) demand ledger {routes.B.Total} below the floor of {routes.B.Floor}");
-        if (routes.C.Fires == true) notAdjudicatedRoutes.Add("(c) the harness is invalid");
+        if (routes.C.Fires == true)
+            notAdjudicatedRoutes.Add("(c) the harness is invalid" + (routes.C.Reason is null ? "" : ": " + routes.C.Reason));
         if (routes.D.Fires) notAdjudicatedRoutes.Add($"(d) {routes.D.CutCitation?.Workstream ?? "E2/E3/E4"} cut in writing ({routes.D.CutCitation?.Heading ?? "no citation"})");
         if (notAdjudicatedRoutes.Count > 0)
         {
@@ -882,6 +1120,14 @@ public sealed class EffectRowsProbeLedgerTests
         if (legB.Underpowered == true)
             return ("UNDERPOWERED", $"{legASummary}; {legBSummary}");
 
+        // HIT requires fails == false AND underpowered == false as NON-NULL
+        // booleans derived from three finite numbers. Null is not "does not
+        // fail"; it is "no adjudicable figure" (review round 2, M9/M10).
+        if (legB.Fails != false || legB.Underpowered != false
+            || !IsFinite(legB.PointEstimate) || !IsFinite(legB.LowerBound95) || !IsFinite(legB.RealizedMedianWithinCellCv))
+            return ("NOT-ADJUDICATED", $"leg B carries no adjudicable figures (fails {Fmt(legB.Fails)}, underpowered "
+                                       + $"{Fmt(legB.Underpowered)}); {legASummary}; {legBSummary}");
+
         return ("HIT", $"{legASummary}; {legBSummary}; leg B does not fail");
     }
 
@@ -893,6 +1139,17 @@ public sealed class EffectRowsProbeLedgerTests
 
     // ---------------------------------------------------------------- helpers
 
+    private static PpE1RouteC RouteCFor(PpE1LegB legB)
+        => new(legB.Status == "run" ? legB.HarnessValid == false : null,
+            "the PP-W5 validity floor (a cell with < 2 valid runs drops its pair, disclosed; fewer than "
+            + "3 surviving pairs, or either arm below 12 valid runs), two arms without distinct repo "
+            + "roots and distinct Calor.Tasks hashes, or either arm above §2's 40 % censoring cap — "
+            + "recorded by ppe1-analyze.py as harnessValid; and an analysis whose harness is valid but "
+            + "whose point/bound/CV are not three finite JSON numbers",
+            legB.InvalidReason);
+
+    private static PpE1Routes RoutesFor(PpE1LegB legB) => InertRoutes() with { C = RouteCFor(legB) };
+
     private static PpE1LegA PerfectLegA()
         => new(10, false, "VALIDATED", "test double", 10, 0, [], "10/10", true);
 
@@ -900,7 +1157,7 @@ public sealed class EffectRowsProbeLedgerTests
         => new(
             new PpE1RouteA(false, "test double", []),
             new PpE1RouteB(false, 25, 2, 3121, 3123, "test double"),
-            new PpE1RouteC(false, "test double"),
+            new PpE1RouteC(false, "test double", null),
             new PpE1RouteD(false, "test double", null, true, []),
             false, null, "test double");
 
@@ -1088,7 +1345,7 @@ internal sealed record PpE1RouteA(bool Fires, string Rule, string[] Evidence);
 
 internal sealed record PpE1RouteB(bool Fires, int Floor, int DA, int DB, int Total, string Source);
 
-internal sealed record PpE1RouteC(bool? Fires, string Rule);
+internal sealed record PpE1RouteC(bool? Fires, string Rule, string? Reason);
 
 /// <summary>Where roadmap §4.2's cut line was invoked in writing, for which workstream.</summary>
 internal sealed record PpE1CutCitation(string Path, string Heading, string Workstream);
@@ -1119,6 +1376,7 @@ internal sealed record PpE1LegB(
     double? LowerBound95,
     double? RealizedMedianWithinCellCv,
     bool? HarnessValid,
+    string? InvalidReason,
     bool? Fails,
     bool? Underpowered,
     bool? RecordedFails,

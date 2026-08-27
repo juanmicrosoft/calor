@@ -156,10 +156,13 @@ def analyze(epoch_dir, dry_run=False):
                         "compiler is identical on both arms")
     if arm_a.get("editMechanism", "raw") != "raw" or arm_b.get("editMechanism", "raw") != "raw":
         blockers.append("edit mechanism must be `raw` on both arms")
+    if not dry_run and pins.get("mode", "live") != "live":
+        blockers.append(f"pins.json records mode={pins.get('mode')!r}; only a live epoch can be leg B")
 
     # ---- collect runs, keyed on the PRODUCT root the run built against ------
     runs = {}
     unattributed = 0
+    null_agent_runs = 0
     token_sources = Counter()
     for path in sorted(glob.glob(os.path.join(epoch_dir, "*", "*", "run-*", "result.json"))):
         with open(path, encoding="utf-8") as fh:
@@ -175,6 +178,8 @@ def analyze(epoch_dir, dry_run=False):
         else:
             unattributed += 1
             continue
+        if record.get("nullAgent"):
+            null_agent_runs += 1
         invalid = bool(record.get("invalid", False))
         censored = bool(record.get("censored", False)) or invalid
         tokens, source = (None, "invalid") if invalid else corrected_output_tokens(os.path.dirname(path))
@@ -197,6 +202,9 @@ def analyze(epoch_dir, dry_run=False):
         })
     if unattributed:
         blockers.append(f"{unattributed} run(s) carry no armRepoRoot matching either pinned arm")
+    if null_agent_runs and not dry_run:
+        blockers.append(f"{null_agent_runs} null-agent run(s) in the epoch — a plumbing check is not "
+                        "a measurement and cannot be leg B (run it under another epoch id)")
 
     def valid_tokens(pair, role):
         return [r["tokens"] for r in runs.get(pair, {}).get(role, [])

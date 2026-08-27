@@ -68,6 +68,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# A null-agent run never lands in the registered directory: it is a plumbing
+# check, and ppe1-analyze.py refuses to adjudicate an epoch that holds one.
+if [[ -n "$NULL_FLAG" && "$EPOCH" == "e1-rows-parity-001" ]]; then
+    EPOCH="e1-rows-parity-001-null"
+    echo "NOTE: --null-agent forces the epoch id to '$EPOCH' (the registered id is for the live epoch only)"
+fi
+
 [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {
     echo "ERROR: --arm-a-repo-root (v0.14.3 product build) and --arm-b-repo-root (0.15.0 product build) are required." >&2
     echo "       Both arms MUST be per-arm checkouts; the harness checkout is neither arm." >&2

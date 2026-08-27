@@ -120,6 +120,32 @@ class PpE1AnalyzeDryRunOnW5Parity002(unittest.TestCase):
             self.assertEqual(analysis["censored"], {"control": 0.4, "treatment": 0.0})
             self.assertEqual(analysis["blockers"], ["only 2 pair(s) survived (need >= 3)"])
 
+    def test_null_agent_runs_invalidate_a_non_dry_run(self):
+        """Review round 2 (d): a plumbing check under the registered id is not leg B."""
+        with tempfile.TemporaryDirectory() as tmp:
+            import shutil
+            copy = os.path.join(tmp, "e1-rows-parity-001")
+            shutil.copytree(EPOCH, copy)
+            pins_path = os.path.join(copy, "pins.json")
+            pins = json.load(open(pins_path))
+            pins["epochId"], pins["kind"] = "e1-rows-parity-001", "pp-e1-rows-parity"
+            json.dump(pins, open(pins_path, "w"))
+            path = os.path.join(copy, "N1-003-csv-row", "calor+treatment", "run-2", "result.json")
+            record = json.load(open(path))
+            record["nullAgent"] = True
+            json.dump(record, open(path, "w"))
+            analysis, _ = self.mod.analyze(copy, dry_run=False)
+            self.assertFalse(analysis["harnessValid"])
+            self.assertTrue(any("null-agent run" in b for b in analysis["blockers"]), analysis["blockers"])
+            self.assertEqual(analysis["legBInput"], "INVALID")
+            # ...and a dry run of the same directory does not refuse on that ground.
+            dry, _ = self.mod.analyze(copy, dry_run=True)
+            self.assertFalse(any("null-agent" in b for b in dry["blockers"]), dry["blockers"])
+            pins["mode"] = "--null-agent"
+            json.dump(pins, open(pins_path, "w"))
+            analysis, _ = self.mod.analyze(copy, dry_run=False)
+            self.assertTrue(any("mode=" in b for b in analysis["blockers"]), analysis["blockers"])
+
     def test_fail_rule_is_the_conjunction(self):
         """Scale the treatment arm's envelopes 2x: point > 1.35 AND lower bound > 1.0 -> FAIL."""
         with tempfile.TemporaryDirectory() as tmp:
