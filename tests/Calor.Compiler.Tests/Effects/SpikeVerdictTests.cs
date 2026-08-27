@@ -1099,7 +1099,8 @@ internal sealed record PpE1Mutation(
     int RegisteredLine,
     string BeforeCode,
     string? MessageRule,
-    string[]? MessageMustContain = null);
+    string[]? MessageMustContain = null,
+    int? RegisteredColumn = null);
 
 /// <summary>
 /// PP-E1's pinned compiler invocation and frozen mutation catalogue, shared by
@@ -1117,10 +1118,21 @@ internal static class PpE1Probe
 {
     /// <summary>
     /// The ten cells, transcribed from the frozen row. Anchors are the diff's
-    /// exact text; registered lines are where the registered code must appear
-    /// (the declaration's row line for L5/L6, the invocation for L7 — "at
-    /// §C{f} in f001" is how the row names them). BEFORE is the pre-E2 baseline
-    /// the row measured at f7cd1c46 (Calor0100: the mutant did not parse).
+    /// exact text. BEFORE is the pre-E2 baseline the row measured at f7cd1c46
+    /// (Calor0100: the mutant did not parse).
+    ///
+    /// <para><b>On <c>RegisteredLine</c> / <c>RegisteredColumn</c>.</b> A-1.11
+    /// names declarations (<c>m008</c>, <c>mt002</c>, <c>f004</c>, "at §C{f} in
+    /// f001"), not positions — with ONE exception, <c>L5-A2</c>, whose position
+    /// it gives as (23,9). The line numbers here are the transcription of those
+    /// named declarations onto the frozen fixture bytes (blob-SHA pinned, so
+    /// they cannot drift): for L5/L6 the declaration's <c>§E</c> row line, the
+    /// line the compiler reports a declaration-level effect diagnostic on; for
+    /// L7 the registered invocation's line. They were confirmed against the
+    /// observed positions when the ledger was first generated, and that is
+    /// disclosed rather than hidden: they are where the row's named declaration
+    /// sits, not an independent registration of a position. L5-A2's column 9 is
+    /// asserted because the annex gives it.</para>
     /// </summary>
     public static readonly PpE1Mutation[] Catalogue =
     [
@@ -1128,7 +1140,7 @@ internal static class PpE1Probe
         new("L5-A2", "L5 interface implementation", "A2",
             Anchor: null, Replacement: null, CommittedMutant: "A2-broadening",
             RegisteredCode: "Calor0421", RegisteredDeclaration: "m008", RegisteredLine: 23,
-            BeforeCode: "Calor0100", MessageRule: null),
+            BeforeCode: "Calor0100", MessageRule: null, RegisteredColumn: 9),
         new("L5-MID", "L5 interface implementation", "A3-middleware",
             Anchor: "§E{e}\n      §R §C{RunTwice} §A next §/C",
             Replacement: "§E{e, cw}\n      §R §C{RunTwice} §A next §/C",
@@ -1157,7 +1169,7 @@ internal static class PpE1Probe
             RegisteredCode: "Calor0410", RegisteredDeclaration: "mt002", RegisteredLine: 15,
             BeforeCode: "Calor0100",
             MessageRule: "names the instantiation: the message must say RunTwice's row instantiates at a call site in Handle",
-            MessageMustContain: ["RunTwice", "instantiates"]),
+            MessageMustContain: ["'s row instantiates to", "at a call site in 'Handle'"]),
         // L7 — row erasure: invoke a row-less value (§3.5: no row ⇒ Unknown).
         new("L7-A2", "L7 row erasure", "A2",
             Anchor: "next §E{e}, CancellationToken:cancellationToken) -> TResponse",

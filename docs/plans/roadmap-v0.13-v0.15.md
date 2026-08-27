@@ -837,7 +837,7 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   four-valued verdict is read at the release commit by `EffectRowsProbeLedgerTests`, as
   registered.
   **Status, 2026-08-27 — instrument BUILT (PR #1109); leg A recomputed 10/10 at
-  `5ab6ffb5628097c1ff35ac1df45734ecd77952f3`; leg B not run; verdict NOT-ADJUDICATED pending the release-commit
+  `PPE1_MEASURED_COMMIT`; leg B not run; verdict NOT-ADJUDICATED pending the release-commit
   epoch.** `bench/phase0-agent-native/effect-rows-probe-ledger.json` exists and is read by exact
   equality in `EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation`: all ten cells detect
   with the registered code at the registered declaration (L6-MAP/L6-MATCH name `cw`; L6-MID's
@@ -920,7 +920,7 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    *Freeze point:* A-1.11, before E2 merges. *Discriminating pin:* the annex append-only check
    rejects an edit to the frozen row; and dropping any one registered mutation from the ledger
    fails the exact-equality test. *Status (2026-08-27):* **instrument BUILT (PR #1109); leg A
-   recomputed 10/10 at `5ab6ffb5628097c1ff35ac1df45734ecd77952f3` with a clean control and no drift; leg B not run;
+   recomputed 10/10 at `PPE1_MEASURED_COMMIT` with a clean control and no drift; leg B not run;
    verdict NOT-ADJUDICATED pending the release-commit epoch** — the release PR's author runs
    `bench/phase0-agent-native/run-ppe1-epoch.sh --confirm-paid-epoch` (see
    `docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md` for the exact commands), then

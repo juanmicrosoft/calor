@@ -165,5 +165,14 @@ stamp_pins
 trap - EXIT
 
 echo "--- collection complete; adjudicating leg B ---"
-python3 "$SCRIPT_DIR/ppe1-analyze.py" "$OUT"
+# ppe1-analyze.py refuses any epoch that is not the registered e1-rows-parity-001
+# (kind pp-e1-rows-parity) unless told it is a dry run. A --null-agent plumbing
+# check, or an epoch under another id, is exactly that: exercise the arithmetic,
+# label the output, never record it as leg B.
+ANALYZE_FLAGS=()
+if [[ -n "$NULL_FLAG" || "$EPOCH" != "e1-rows-parity-001" ]]; then
+    ANALYZE_FLAGS=(--dry-run)
+    echo "(dry run: ${NULL_FLAG:+null-agent }epoch '$EPOCH' is not the registered leg-B epoch; output is labelled dryRun and cannot be recorded)"
+fi
+python3 "$SCRIPT_DIR/ppe1-analyze.py" "$OUT" ${ANALYZE_FLAGS[@]+"${ANALYZE_FLAGS[@]}"}
 echo "--- now regenerate the ledger in the release PR: CALOR_REGENERATE_PPE1_LEDGER=1 dotnet test tests/Calor.Compiler.Tests --filter EffectRowsProbeLedger ---"

@@ -143,5 +143,29 @@ class PpE1AnalyzeDryRunOnW5Parity002(unittest.TestCase):
             self.assertEqual(analysis["legBInput"], "FAIL")
 
 
+class PpE1AnalyzeRecomputesTheRegisteredEpoch(unittest.TestCase):
+    """Once `epochs/e1-rows-parity-001/` exists, "leg B's arithmetic is recomputed" is a
+    CI-observed claim, not a release-author-observed one: analyze() is re-run on the
+    archived result.json files and compared to the committed ppe1-analysis.json. Skips
+    (and says so) until the epoch has run."""
+
+    REGISTERED = os.path.join(BENCH, "epochs", "e1-rows-parity-001")
+
+    def test_committed_analysis_matches_recomputation(self):
+        committed_path = os.path.join(self.REGISTERED, "ppe1-analysis.json")
+        if not os.path.isdir(self.REGISTERED):
+            self.skipTest("epochs/e1-rows-parity-001 has not run (PP-E1 leg B not adjudicated)")
+        self.assertTrue(os.path.exists(committed_path),
+                        "the registered epoch directory exists but ppe1-analysis.json was not committed "
+                        "with it — run bench/phase0-agent-native/ppe1-analyze.py on it")
+        with open(committed_path, encoding="utf-8") as fh:
+            committed = json.load(fh)
+        recomputed, _ = _load().analyze(self.REGISTERED, dry_run=False)
+        self.assertFalse(committed.get("dryRun"), "a dry run cannot be the recorded leg B")
+        self.assertEqual(recomputed, committed,
+                         "ppe1-analysis.json no longer matches its recomputation from the archived "
+                         "result.json files — regenerate in a PR that names what moved")
+
+
 if __name__ == "__main__":
     unittest.main()
