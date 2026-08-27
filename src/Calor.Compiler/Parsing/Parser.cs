@@ -1895,18 +1895,30 @@ public sealed class Parser
     /// enclosing declaration. Effect variables are ordinary identifiers, so the
     /// comparison is case-sensitive — unlike the effect taxonomy's lookup.
     /// </summary>
-    private bool IsEffectVariableInScope(string name)
+    private bool IsEffectVariableInScope(string name) => ResolveEffectVariable(name) >= 0;
+
+    /// <summary>
+    /// v0.15 E3 slice b, design-doc §7.4 — the INDEX of <paramref name="name"/>
+    /// within the innermost enclosing declaration's <c>eff</c> list, or
+    /// <c>-1</c> when nothing binds it. Slice a asked only "is it bound?" and
+    /// threw the position away; site 6 needs the position, because that is the
+    /// identity two declarations' binders are compared on
+    /// (<c>eff e</c> on an interface member ≡ <c>eff f</c> on its
+    /// implementation — both index 0).
+    /// </summary>
+    private int ResolveEffectVariable(string name)
     {
         for (var i = _effectVariableScopes.Count - 1; i >= 0; i--)
         {
-            foreach (var binder in _effectVariableScopes[i])
+            var binders = _effectVariableScopes[i];
+            for (var index = 0; index < binders.Count; index++)
             {
-                if (string.Equals(binder.Name, name, StringComparison.Ordinal))
-                    return true;
+                if (string.Equals(binders[index].Name, name, StringComparison.Ordinal))
+                    return index;
             }
         }
 
-        return false;
+        return -1;
     }
 
     private EffectsNode ParseEffects(EffectRowPosition position = EffectRowPosition.Declaration)
@@ -1942,7 +1954,14 @@ public sealed class Parser
             variables.Clear();
         }
 
-        return new EffectsNode(startToken.Span, effects, variables);
+        // §7.4 — persist the binder POSITION, not just the name. Resolved here
+        // rather than inside InterpretEffectsAttributes so the attribute helper
+        // keeps its boolean predicate and gains no knowledge of scopes.
+        var ordinals = new List<int>(variables.Count);
+        foreach (var variable in variables)
+            ordinals.Add(ResolveEffectVariable(variable));
+
+        return new EffectsNode(startToken.Span, effects, variables, ordinals);
     }
 
     /// <summary>
