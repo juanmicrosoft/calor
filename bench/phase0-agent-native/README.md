@@ -96,6 +96,16 @@ semantics are v0.14.3's — nothing under `src/Calor.Compiler/` is touched.* `ru
 any other arm-A commit and re-verifies the diff confinement against the tag before spend; the canary
 against that build emits `warning Calor0410` (permissive) / `error Calor0410` (strict).
 
+**What the pre-rows arm's waiver covers, so nobody later blames the policy.** Permissive
+suppresses `Calor0425` and demotes `Calor0410` / `Calor0411` (single-module and cross-module) to
+warnings. It does **not** waive `Calor0424`, `Calor0420` / `Calor0421` or `Calor0418` — those stay
+errors under every flag, by design. Two harness-relevant asymmetries between the MSBuild path the
+agent builds through and the CLI, both inert for PP-W-rows and recorded here rather than
+rediscovered mid-epoch: the `CompileCalor` task has no `StrictEffects` parameter (the CLI's
+`--strict-effects` has no MSBuild form), and the task gates its cross-module pass on
+`EnforceEffects` while the CLI runs cross-module enforcement unconditionally. Both arms build with
+`CalorEnforceEffects=true`, so neither difference is exercised.
+
 `run-ppw-epoch.sh` drives the six `W-001 … W-006` pairs (exact-id directory match; the `W1-`/`W2-`/`W3-`/`W5A-` directories cannot collide), interleaved, arm A = `v0.14.3` under `arms["calor-pre-rows"]`, arm B = `v0.15.0` under `arms.calor`, with the same rails as `run-ppe1-epoch.sh` (`--confirm-paid-epoch`, distinct `Calor.Tasks` hashes, run-once epoch ids, null-agent ids suffixed `-null`). It fails before any spend listing every missing or malformed pair. Its `pins.json` `ppW` block carries the registered leg-B denominator `legBPairs` (default `W-001 W-002 W-003 W-004 W-006`; W-005 is leg A only) and `blindPairs` (`W-001 W-004 W-006`); `ppw-analyze.py` (W2) reads them from there, never from a script default.
 
 `ppe1-margin-derivation.py` gained `--population {w5-parity-002,e1-rows-parity-001,pooled}`, `--sims`, `--boot`, `--seed`, `--grid {frozen,extended}` (adds 1.15/1.20) and `--half-width`; the defaults reproduce the committed `ppe1-margin-derivation.txt` byte for byte, and `ppw-margin-derivation.txt` is the PP-W-rows run (`--population e1-rows-parity-001 --sims 3000 --seed 4537 --grid extended`).
