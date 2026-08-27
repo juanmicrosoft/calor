@@ -1362,6 +1362,179 @@ var x = 1;
             reported.Message);
     }
 
+    [Fact]
+    public void GenericInstantiation_ChargePropagatesToTransitiveCallers()
+    {
+        // Review round 1, finding 1 — the soundness hole, closed. `Run` is
+        // rank-1; `Outer` instantiates its variable to {cw} by passing a printing
+        // callback; `Top` calls `Outer` and declares NOTHING.
+        //
+        // The site-6 solve runs in phase 3d, AFTER the SCC fixpoint, and an
+        // in-module call charges its caller the callee's COMPUTED set — so before
+        // PropagateInstantiatedCharges, `Outer` gained `cw` and `Top` saw the
+        // pre-instantiation ∅ and compiled clean. Calor0418 masked it in the
+        // default mode; under --permissive-effects the whole program printed
+        // "Compilation successful", which is precisely the laundering rows exist
+        // to close.
+        //
+        // Asserted on the `Top` diagnostic SPECIFICALLY, not on the whole
+        // multiset: pre-E4 there is also a Calor0418 inside `Run`.
+        //
+        // Discriminating revert: delete the PropagateInstantiatedCharges call and
+        // `Top` goes silent.
+        const string source = """
+            §M{m001:M}
+              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §R §C{g}
+              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+                §E{cw}
+                §R §C{Run} §A h §/C
+              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+                §E{}
+                §R §C{Outer} §A q §/C
+            """;
+
+        var strict = TestHarness.Compile(source);
+        Assert.Contains(strict.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("Function 'Top' uses effect 'cw' but does not declare it"));
+
+        // And under the flag, where the hole was loudest: --permissive-effects
+        // demotes Calor0410 to a warning (that is 0410's own long-standing
+        // policy), but the diagnostic must still FIRE. Before the fix this
+        // compiled clean.
+        var permissive = TestHarness.CompileWithEffects(
+            source, policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
+        Assert.Contains(permissive.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("Function 'Top' uses effect 'cw' but does not declare it"));
+    }
+
+    [Fact]
+    public void GenericInstantiation_ChargePropagatesThroughThreeHops()
+    {
+        // The same hole one level deeper, so what is pinned is the FIXPOINT and
+        // not merely one extra propagation pass: Run → Outer → Top → Top2. A
+        // single-pass fix reaches `Top` and leaves `Top2` silent.
+        //
+        // Discriminating revert: replace the worklist in
+        // PropagateInstantiatedCharges with one sweep over the seed set and this
+        // fails while the two-hop pin above still passes.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §R §C{g}
+              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+                §E{cw}
+                §R §C{Run} §A h §/C
+              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+                §E{cw}
+                §R §C{Outer} §A q §/C
+              §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
+                §E{}
+                §R §C{Top} §A r §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("Function 'Top2' uses effect 'cw' but does not declare it"));
+    }
+
+    [Fact]
+    public void GenericInstantiation_AssumedRow_ReportsOnceAtTheHop()
+    {
+        // Review round 1, finding 2. §4.4: an Assumed source produces an Assumed
+        // destination and every hop that carries an assumption reports it ONCE.
+        // Site 6 was silent — a callee whose own effects could only be ASSUMED
+        // (§CS interop) flowed through the solve and the reasons were charged but
+        // never surfaced, so the caller inherited an assumption with no Calor0425
+        // naming it. The Calor0419 on `Wrapped` is a different statement: it says
+        // *that function* is assumed, not that this HOP carries the assumption.
+        //
+        // Discriminating revert: drop the IsAssumed arm in InstantiateAndCharge
+        // and only the Calor0419 remains.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+                §E{e}
+                §R INT:0
+              §F{f002:Wrapped:pub} () -> i32
+                §E{}
+                §R §CS{ 1 + 1 }
+              §F{f003:Caller:pub} () -> i32
+                §E{}
+                §R §C{Run} §A Wrapped §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.Contains("instantiated effect row of 'Run' at this call site rests on an assumption")
+              && d.Message.Contains("raw C# interop expression"));
+    }
+
+    [Fact]
+    public void GenericInstantiation_BinderNoParameterMentions_IsCalor0425_EvenWithZeroArguments()
+    {
+        // Review round 1, finding 3. `CheckArgumentSite` returned early on an
+        // empty argument list, which made InstantiateAndCharge's "no parameter of
+        // 'X' binds it" arm unreachable from source: the ONE shape that reaches it
+        // is a declaration binding a variable no parameter mentions, and such a
+        // declaration is typically called with no arguments at all.
+        //
+        // Discriminating revert: move `if (arguments.Count == 0) return;` back
+        // above the binder-count check and this goes silent.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §F{f001:NoBinder:pub}<eff e> () -> i32
+                §E{e}
+                §R INT:0
+              §F{f002:Use:pub} () -> i32
+                §E{}
+                §R §C{NoBinder} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.Contains("Effect variable 'e' of 'NoBinder' instantiates to Unknown")
+              && d.Message.Contains("no parameter of 'NoBinder' binds it"));
+    }
+
+    [Fact]
+    public void InterfaceVariance_OrdinalMismatch_NamesTheBinderByPosition()
+    {
+        // Review round 1, finding 4. The interface binds <eff e, eff f> and uses
+        // `f` (ordinal 1); the implementation binds <eff f, eff e> and uses `f`
+        // (ordinal 0). `fits` correctly rejects it — position is the identity —
+        // but the message was computed by NAME, so the extras list came out EMPTY
+        // and the text read "row f does not fit ... row f", which tells the author
+        // nothing. The position must appear.
+        //
+        // Discriminating revert: compute the extras from the names again and both
+        // assertions below fail.
+        var result = TestHarness.Compile("""
+            §M{m001:M}
+              §IFACE{i001:IThing}
+                §MT{mt001:Handle}<eff e, eff f> (Func<i32>:next §E{f}) -> i32
+                  §E{f}
+
+              §CL{c001:Impl:pub}
+                §IMPL{IThing}
+                §MT{mt002:Handle:pub}<eff f, eff e> (Func<i32>:next §E{f}) -> i32
+                  §E{f}
+                  §R INT:0
+            """);
+
+        var reported = Assert.Single(result.Diagnostics,
+            d => d.Code == DiagnosticCode.InterfaceEffectVariance);
+        Assert.Contains("[f (binder #0)]", reported.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "Effect variables are matched BY POSITION in the declaration's 'eff' list, not by name.",
+            reported.Message,
+            StringComparison.Ordinal);
+    }
+
     // ================================================================ P11 ====
 
     [Fact]

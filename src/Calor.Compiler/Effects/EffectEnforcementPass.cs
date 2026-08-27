@@ -166,6 +166,11 @@ public sealed class EffectEnforcementPass
         // propagated through the call graph.
         CheckRowCompatibility();
 
+        // Phase 3d' (v0.15 E3 slice b, review round 1 finding 1): site-6 charges
+        // reach TRANSITIVE callers. Must run before phase 4, which is where
+        // Calor0410 reads _computedEffects.
+        PropagateInstantiatedCharges();
+
         // Phase 3e (v0.15 E3 slice b): design-doc §5 / P14 — every §LAM's
         // DECLARED row against its BODY's row. After inference, so ρ_body is the
         // converged answer and not an SCC iteration's.
@@ -577,10 +582,14 @@ public sealed class EffectEnforcementPass
                     var verdict = PolyRow.Fits(overrideRow, baseRow);
                     if (verdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                     {
+                        var extraVariables = overrideRow.ExtraVariables(baseRow).ToList();
                         var extra = overrideDeclared.Except(baseDeclared)
                             .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
-                            .Concat(overrideRow.VariableNames.Where(
-                                name => !baseRow.VariableNames.Contains(name)));
+                            .Concat(extraVariables);
+                        var positionNote = extraVariables.Count == 0
+                            ? ""
+                            : " Effect variables are matched BY POSITION in the declaration's "
+                              + "'eff' list, not by name.";
                         _diagnostics.Report(
                             method.Effects?.Span ?? method.Span,
                             DiagnosticCode.OverrideEffectVariance,
@@ -590,7 +599,7 @@ public sealed class EffectEnforcementPass
                             $"Effect row {overrideRow.Display()} does not fit the base method's " +
                             $"row {baseRow.Display()}. " +
                             "An override may not broaden its base method's effect set — broader effects " +
-                            "would launder through dynamic dispatch.",
+                            "would launder through dynamic dispatch." + positionNote,
                             varianceSeverity);
                     }
                     else if (verdict == Binding.BoundTypes.EffectFit.CannotTell)
@@ -661,10 +670,14 @@ public sealed class EffectEnforcementPass
                         }
                         else if (implVerdict == Binding.BoundTypes.EffectFit.DoesNotFit)
                         {
+                            var extraVariables = implRow.ExtraVariables(ifaceRow).ToList();
                             var extra = implDeclared.Except(ifaceDeclared)
                                 .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
-                                .Concat(implRow.VariableNames.Where(
-                                    name => !ifaceRow.VariableNames.Contains(name)));
+                                .Concat(extraVariables);
+                            var positionNote = extraVariables.Count == 0
+                                ? ""
+                                : " Effect variables are matched BY POSITION in the declaration's "
+                                  + "'eff' list, not by name.";
                             var inheritedNote = implOwnerName != null
                                 && !implOwnerName.Equals(cls.Name, StringComparison.Ordinal)
                                 ? $" (implementation inherited from base class '{implOwnerName}')"
@@ -684,7 +697,7 @@ public sealed class EffectEnforcementPass
                                 $"Effect row {implRow.Display()} does not fit the interface's " +
                                 $"row {ifaceRow.Display()}. " +
                                 "An implementation may not broaden the interface's declared effect set — interface " +
-                                "dispatch launders effects identically to overrides.",
+                                "dispatch launders effects identically to overrides." + positionNote,
                                 varianceSeverity);
                         }
                     }
@@ -871,6 +884,93 @@ public sealed class EffectEnforcementPass
         new(StringComparer.Ordinal);
 
     /// <summary>
+    /// Functions whose computed effect set GREW because of a rank-1 instantiation
+    /// (§7.4). Seeds <see cref="PropagateInstantiatedCharges"/>; empty for every
+    /// program that binds no <c>eff</c> variable, which is every committed
+    /// <c>.calr</c>, so the propagation below is a no-op on the corpus by
+    /// construction rather than by measurement.
+    /// </summary>
+    private readonly HashSet<string> _rank1Charged = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// v0.15 E3 slice b, review round 1 finding 1 — carry site-6 charges to
+    /// TRANSITIVE callers, to a fixpoint.
+    ///
+    /// <para><b>The hole this closes.</b> The solve runs in phase 3d, after the
+    /// SCC fixpoint has already computed everyone's effects. An in-module call
+    /// charges its caller the callee's COMPUTED set
+    /// (<c>EffectInferrer.InferFromInternalFunctions</c> and its sibling both read
+    /// <c>ComputedEffects</c>), so a caller processed during phase 2+3 saw the
+    /// callee's PRE-instantiation set. With a three-level chain — <c>Top</c> calls
+    /// <c>Outer</c> calls a rank-1 <c>Run</c> — <c>Outer</c> gained the instantiated
+    /// effect and <c>Top</c> did not, so <c>Top</c> could declare <c>§E{}</c> and
+    /// compile. Calor0418 masked it in the default mode; under
+    /// <c>--permissive-effects</c> the program printed "Compilation successful".
+    /// That is exactly the laundering rows exist to close, so it is closed here
+    /// rather than deferred to E4.</para>
+    ///
+    /// <para><b>Why a worklist and not one extra pass.</b> One pass fixes a
+    /// two-level chain and leaves a three-level one broken. Effect sets only ever
+    /// GROW here and the effect universe is finite, so the worklist terminates;
+    /// the iteration cap mirrors <see cref="ProcessScc"/>'s and exists for the
+    /// same reason — a cycle in the call graph must not spin.</para>
+    ///
+    /// <para>Recursion is handled by the growth test, not by an SCC walk: a member
+    /// of a cycle re-enters the queue only while its set is still changing.</para>
+    /// </summary>
+    private void PropagateInstantiatedCharges()
+    {
+        if (_rank1Charged.Count == 0) return;
+
+        var queue = new Queue<string>(_rank1Charged);
+        var iterations = 0;
+        const int maxIterations = 10_000;
+
+        while (queue.Count > 0 && iterations < maxIterations)
+        {
+            iterations++;
+            var calleeId = queue.Dequeue();
+            var calleeEffects = _computedEffects.GetValueOrDefault(calleeId, EffectSet.Empty);
+            if (calleeEffects.IsEmpty) continue;
+
+            var calleeName = _callGraphAnalysis.Functions.TryGetValue(calleeId, out var callee)
+                ? callee.Name
+                : calleeId;
+
+            foreach (var callerId in _callGraphAnalysis.GetCallers(calleeId))
+            {
+                if (callerId.Equals(calleeId, StringComparison.Ordinal))
+                    continue;
+
+                var before = _computedEffects.GetValueOrDefault(callerId, EffectSet.Empty);
+                var after = before.Union(calleeEffects);
+                if (after.Equals(before))
+                    continue;
+
+                _computedEffects[callerId] = after;
+
+                // §10.3's provenance, one hop on. The caller did not itself
+                // instantiate anything; it inherited the charge, and the message
+                // says which call brought it.
+                if (!_rank1Provenance.TryGetValue(callerId, out var byCode))
+                {
+                    byCode = new Dictionary<string, string>(StringComparer.Ordinal);
+                    _rank1Provenance[callerId] = byCode;
+                }
+                foreach (var (kind, value) in after.Except(before))
+                {
+                    byCode.TryAdd(
+                        EffectSetExtensions.ToSurfaceCode(kind, value),
+                        $"charged by calling '{calleeName}', whose effect row is instantiated at a "
+                        + "rank-1 call site inside it");
+                }
+
+                queue.Enqueue(callerId);
+            }
+        }
+    }
+
+    /// <summary>
     /// ρ_body for an un-annotated <c>§LAM</c> (§5). Unknown when the lambda was
     /// never reached by inference — which is the honest answer, and the same one
     /// slice a gave unconditionally.
@@ -890,12 +990,10 @@ public sealed class EffectEnforcementPass
     /// <summary>
     /// Site 6's charge (§7.4): the caller is charged the INSTANTIATED own-row of
     /// the callee, not its declared one. Applied to <c>_computedEffects</c> after
-    /// SCC processing, so a rank-1 charge reaches the caller's own Calor0410 but
-    /// does <b>not</b> propagate transitively to the caller's callers — that
-    /// needs the solve to run inside the fixpoint, which needs rows in the
-    /// inferrer, and it is E4's (which redesigns invocation charging anyway).
-    /// No committed <c>.calr</c> binds an <c>eff</c> variable, so the gap is
-    /// observable only in the spike fixtures and in tests.
+    /// SCC processing, and then carried to the caller's own callers by
+    /// <see cref="PropagateInstantiatedCharges"/> — <b>without</b> which the charge
+    /// would stop one level up and a two-hop program could launder an effect
+    /// (review round 1, finding 1).
     /// </summary>
     private void ChargeInstantiatedRow(
         string functionId,
@@ -905,8 +1003,11 @@ public sealed class EffectEnforcementPass
         if (row.IsUnknown) return;
 
         var charged = row.ToEffectSet();
-        _computedEffects[functionId] =
-            _computedEffects.GetValueOrDefault(functionId, EffectSet.Empty).Union(charged);
+        var before = _computedEffects.GetValueOrDefault(functionId, EffectSet.Empty);
+        var after = before.Union(charged);
+        _computedEffects[functionId] = after;
+        if (!after.Equals(before))
+            _rank1Charged.Add(functionId);
 
         if (provenance.Count == 0) return;
         if (!_rank1Provenance.TryGetValue(functionId, out var byCode))
@@ -946,9 +1047,12 @@ public sealed class EffectEnforcementPass
     /// identity two declarations' binders are compared on. An interface member's
     /// <c>eff e</c> and its implementation's <c>eff f</c> are both ordinal 0, so
     /// sites 4 and 5 identify them without a rank-1-specific branch, which is
-    /// §7.5's R2 (<c>A3-middleware-alpha</c>). <see cref="VariableNames"/> is
-    /// display only and deliberately takes no part in <see cref="Fits"/> — a
-    /// row's identity must not depend on what the author called the binder.</para>
+    /// §7.5's R2 (<c>A3-middleware-alpha</c>). The map's VALUES are the author's
+    /// spellings and are display only — they take no part in <see cref="Fits"/>,
+    /// because a row's identity must not depend on what the author called the
+    /// binder. Keeping them keyed BY ordinal rather than in a separate set is
+    /// what lets a diagnostic say <c>f (binder #0)</c> when two rows disagree
+    /// about position while agreeing about spelling (review round 1, finding 4).</para>
     ///
     /// <para><b>Ordinals are only comparable within one declaration's
     /// vocabulary.</b> A callee's row is in the CALLEE's vocabulary until
@@ -958,26 +1062,21 @@ public sealed class EffectEnforcementPass
     /// </summary>
     private readonly record struct PolyRow(
         Binding.BoundTypes.EffectRow Row,
-        System.Collections.Immutable.ImmutableSortedSet<int> Variables,
-        System.Collections.Immutable.ImmutableSortedSet<string> VariableNames)
+        System.Collections.Immutable.ImmutableSortedDictionary<int, string> Variables)
     {
-        private static readonly System.Collections.Immutable.ImmutableSortedSet<int> NoVariables =
-            System.Collections.Immutable.ImmutableSortedSet<int>.Empty;
-
-        private static readonly System.Collections.Immutable.ImmutableSortedSet<string> NoNames =
-            System.Collections.Immutable.ImmutableSortedSet<string>.Empty
-                .WithComparer(StringComparer.Ordinal);
+        private static readonly System.Collections.Immutable.ImmutableSortedDictionary<int, string>
+            NoVariables = System.Collections.Immutable.ImmutableSortedDictionary<int, string>.Empty;
 
         public static readonly PolyRow Unknown =
-            new(Binding.BoundTypes.EffectRow.Unknown, NoVariables, NoNames);
+            new(Binding.BoundTypes.EffectRow.Unknown, NoVariables);
 
         public static readonly PolyRow Pure =
-            new(Binding.BoundTypes.EffectRow.Pure, NoVariables, NoNames);
+            new(Binding.BoundTypes.EffectRow.Pure, NoVariables);
 
         public bool IsPolymorphic => Variables.Count > 0;
 
         public static PolyRow Concrete(Binding.BoundTypes.EffectRow row) =>
-            new(row, NoVariables, NoNames);
+            new(row, NoVariables);
 
         /// <summary>The row a declared <c>§E{…}</c> denotes, variables included.</summary>
         public static PolyRow From(EffectsNode? row)
@@ -985,17 +1084,15 @@ public sealed class EffectEnforcementPass
             if (row == null) return Unknown;
 
             var variables = NoVariables;
-            var names = NoNames;
             for (var index = 0; index < row.EffectVariables.Count; index++)
             {
                 var ordinal = index < row.EffectVariableOrdinals.Count
                     ? row.EffectVariableOrdinals[index]
                     : -1;
-                variables = variables.Add(ordinal);
-                names = names.Add(row.EffectVariables[index]);
+                variables = variables.SetItem(ordinal, row.EffectVariables[index]);
             }
 
-            return new PolyRow(GetDeclaredEffects(row).ToRow(), variables, names);
+            return new PolyRow(GetDeclaredEffects(row).ToRow(), variables);
         }
 
         /// <summary>
@@ -1008,11 +1105,19 @@ public sealed class EffectEnforcementPass
             row == null ? Pure : From(row);
 
         /// <summary>§4.2's join, lifted over the variable part.</summary>
-        public static PolyRow Join(PolyRow left, PolyRow right) =>
-            new(
+        public static PolyRow Join(PolyRow left, PolyRow right)
+        {
+            var variables = left.Variables;
+            foreach (var (ordinal, name) in right.Variables)
+            {
+                if (!variables.ContainsKey(ordinal))
+                    variables = variables.SetItem(ordinal, name);
+            }
+
+            return new PolyRow(
                 Binding.BoundTypes.EffectRow.Join(left.Row, right.Row),
-                left.Variables.Union(right.Variables),
-                left.VariableNames.Union(right.VariableNames));
+                variables);
+        }
 
         /// <summary>
         /// §4.3's <c>fits</c>, lifted over the variable part: a source may
@@ -1027,9 +1132,9 @@ public sealed class EffectEnforcementPass
             // `Effects/`. This is containment over ORDINALS, not the effect-set
             // relation that pin exists to keep out of the compatibility sites,
             // and it should not read as one.
-            foreach (var variable in source.Variables)
+            foreach (var (ordinal, _) in source.Variables)
             {
-                if (!destination.Variables.Contains(variable))
+                if (!destination.Variables.ContainsKey(ordinal))
                     return Binding.BoundTypes.EffectFit.DoesNotFit;
             }
 
@@ -1045,7 +1150,7 @@ public sealed class EffectEnforcementPass
         /// </summary>
         public PolyRow Except(PolyRow declared)
         {
-            if (Row.IsUnknown) return new PolyRow(Row, Variables, VariableNames);
+            if (Row.IsUnknown) return new PolyRow(Row, Variables);
             if (declared.Row.IsUnknown) return this;
 
             var remaining = EffectSet
@@ -1054,15 +1159,37 @@ public sealed class EffectEnforcementPass
             var residual = Row.IsAssumed
                 ? Binding.BoundTypes.EffectRow.Assumed(remaining.Codes, Row.Reasons)
                 : remaining;
-            return new PolyRow(residual, Variables, VariableNames);
+            return new PolyRow(residual, Variables);
+        }
+
+        /// <summary>
+        /// The binders this row mentions that <paramref name="destination"/> does
+        /// NOT, spelled <c>name (binder #k)</c>.
+        ///
+        /// <para>The ordinal is in the spelling deliberately (review round 1,
+        /// finding 4). Two rows can disagree about POSITION while agreeing about
+        /// SPELLING — an interface's <c>&lt;eff e, eff f&gt; §E{f}</c> against an
+        /// implementation's <c>&lt;eff f, eff e&gt; §E{f}</c> — and a message that
+        /// named only the spelling read as <i>"f does not fit f"</i>, or, when the
+        /// extras were computed by name, as an empty list. Naming the position
+        /// says what actually differs, because position is what <see cref="Fits"/>
+        /// compares.</para>
+        /// </summary>
+        public IEnumerable<string> ExtraVariables(PolyRow destination)
+        {
+            foreach (var (ordinal, name) in Variables)
+            {
+                if (!destination.Variables.ContainsKey(ordinal))
+                    yield return $"{name} (binder #{ordinal})";
+            }
         }
 
         /// <summary>The compact spelling for diagnostics, variables included.</summary>
         public string Display()
         {
             var concrete = Row.ToCompactDisplayString();
-            if (VariableNames.Count == 0) return concrete;
-            var variables = string.Join(", ", VariableNames);
+            if (Variables.Count == 0) return concrete;
+            var variables = string.Join(", ", Variables.Values);
             return Row.IsUnknown || (Row.IsConcrete && Row.Codes.Count == 0)
                 ? variables
                 : $"{concrete}, {variables}";
@@ -1271,8 +1398,7 @@ public sealed class EffectEnforcementPass
             => PolyRow.Fits(source, destination) == Binding.BoundTypes.EffectFit.Fits
                 ? new PolyRow(
                     Binding.BoundTypes.EffectRow.AtDestination(source.Row, destination.Row),
-                    destination.Variables,
-                    destination.VariableNames)
+                    destination.Variables)
                 : destination;
 
         // ===== Site 2 — argument — and site 6 — rank-1 instantiation =====
@@ -1304,9 +1430,6 @@ public sealed class EffectEnforcementPass
             IReadOnlyList<string?>? argumentNames,
             TextSpan callSpan)
         {
-            if (arguments.Count == 0)
-                return;
-
             // Named arguments would need overload-accurate positional mapping,
             // which this AST walk does not have. Declining is the honest answer.
             if (argumentNames != null && argumentNames.Any(name => name != null))
@@ -1317,6 +1440,16 @@ public sealed class EffectEnforcementPass
                 return;
 
             var binderCount = callee.EffectParameters.Count;
+
+            // The zero-argument early-out is AFTER the binder count, not before it
+            // (review round 1, finding 3). A declaration can bind an `eff` variable
+            // that no parameter mentions — §F{NoBinder:pub}<eff e> () -> i32 §E{e} —
+            // and returning first made InstantiateAndCharge's "no parameter of 'X'
+            // binds it" arm unreachable from source, so the variable silently
+            // contributed nothing instead of reporting Calor0425.
+            if (arguments.Count == 0 && binderCount == 0)
+                return;
+
             var solutions = new PolyRow?[binderCount];
             var undetermined = new string?[binderCount];
 
@@ -1340,13 +1473,13 @@ public sealed class EffectEnforcementPass
 
                     if (reason != null)
                     {
-                        foreach (var ordinal in declared.Variables)
+                        foreach (var ordinal in declared.Variables.Keys)
                             MarkUndetermined(undetermined, ordinal, reason);
                         continue;
                     }
 
                     var residual = source!.Value.Row.Except(declared);
-                    foreach (var ordinal in declared.Variables)
+                    foreach (var ordinal in declared.Variables.Keys)
                     {
                         if (ordinal < 0 || ordinal >= binderCount) continue;
                         solutions[ordinal] = solutions[ordinal] is { } existing
@@ -1402,7 +1535,7 @@ public sealed class EffectEnforcementPass
             var instantiated = PolyRow.Concrete(ownRow.Row);
             var provenance = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            foreach (var ordinal in ownRow.Variables)
+            foreach (var ordinal in ownRow.Variables.Keys)
             {
                 var name = BinderName(callee, ordinal);
                 if (ordinal < 0 || ordinal >= solutions.Length || solutions[ordinal] is not { } solved)
@@ -1434,6 +1567,26 @@ public sealed class EffectEnforcementPass
                 }
             }
 
+            // §4.4 — an Assumed source produces an Assumed destination, and every
+            // hop that carries an assumption reports it ONCE. Site 6 was silent
+            // here (review round 1, finding 2): a callback whose own effects this
+            // pass could only assume flowed through the solve and the instantiated
+            // row's reasons were charged but never surfaced, so the caller inherited
+            // an assumption with no Calor0425 naming it. This mirrors Adjudicate's
+            // Fits-carrying-reasons arm, deliberately in the same shape.
+            if (instantiated.Row.IsAssumed && !instantiated.Row.Reasons.IsEmpty)
+            {
+                var reasons = instantiated.Row.Reasons;
+                var shown = string.Join("; ", reasons.Take(3));
+                if (reasons.Count > 3)
+                    shown += $"; and {reasons.Count - 3} more";
+                _pass.ReportRowUnknown(
+                    callSpan,
+                    $"The instantiated effect row of '{callee.Name}' at this call site rests on an "
+                    + $"assumption: {shown}. '{_function.Name}' is charged "
+                    + $"{instantiated.Display()} as an assumption, not a proof.");
+            }
+
             // The concrete part is charged to the caller. The ordinary call-site
             // charge already added the callee's DECLARED concrete codes, so this
             // union adds exactly what instantiation contributed.
@@ -1444,9 +1597,9 @@ public sealed class EffectEnforcementPass
             // The caller must declare it, exactly as it must declare a concrete
             // effect it uses.
             var callerOwn = PolyRow.FromDeclaration(_function.Effects);
-            foreach (var ordinal in instantiated.Variables)
+            foreach (var ordinal in instantiated.Variables.Keys)
             {
-                if (callerOwn.Variables.Contains(ordinal)) continue;
+                if (callerOwn.Variables.ContainsKey(ordinal)) continue;
                 var name = BinderName(_function, ordinal);
                 _pass._diagnostics.Report(
                     _function.Effects?.Span ?? _function.Span,
@@ -1508,8 +1661,7 @@ public sealed class EffectEnforcementPass
                 {
                     var extraCodes = source.Row.ToEffectSet().Except(destination.Row.ToEffectSet())
                         .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value))
-                        .Concat(source.VariableNames.Where(
-                            name => !destination.VariableNames.Contains(name)))
+                        .Concat(source.ExtraVariables(destination))
                         .OrderBy(code => code, StringComparer.Ordinal);
                     var extra = string.Join(", ", extraCodes);
                     _pass._diagnostics.Report(
