@@ -558,7 +558,7 @@ public sealed class Binder
                 nullableAnnotation: TryReadDeclaredStringAnnotation(field.TypeName),
                 // v0.15 E2 slice b — position 8's row (§3.3). A §FLD has no
                 // type-parameter list, so no `eff` binders are in scope.
-                functionType: TryBuildRowedFunctionType(
+                functionType: TryBuildFunctionType(
                     field.TypeName, field.Row, binders: null));
             if (!classScope.TryDeclare(symbol))
             {
@@ -852,7 +852,7 @@ public sealed class Binder
                 nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName),
                 // v0.15 E2 slice b — position 4/5's row (§3.3). Null unless the
                 // parameter both carries a §E and spells a function type.
-                functionType: TryBuildRowedFunctionType(
+                functionType: TryBuildFunctionType(
                     parameter.TypeName, parameter.Row, effectParameters)))
             .ToArray();
         var symbol = new FunctionSymbol(
@@ -868,7 +868,7 @@ public sealed class Binder
             conditionalAlternative)
         {
             // v0.15 E2 slice b — position 6's row (§3.3).
-            ReturnFunctionType = TryBuildRowedFunctionType(
+            ReturnFunctionType = TryBuildFunctionType(
                 output?.TypeName, output?.Row, effectParameters),
         };
         TrackSymbol(symbol);
@@ -1130,7 +1130,7 @@ public sealed class Binder
                 // bind their parameters here rather than at registration
                 // (operators, indexers). No `eff` binders: neither production
                 // has a type-parameter list.
-                functionType: TryBuildRowedFunctionType(
+                functionType: TryBuildFunctionType(
                     parameter.TypeName, parameter.Row, binders: null));
             if (!_scope.TryDeclare(symbol))
             {
@@ -1538,6 +1538,11 @@ public sealed class Binder
             if (!IsFunctionTypedSpelling(subjectType)
                 && initializer?.Type is not BoundTypes.FunctionBoundType)
             {
+                // F2: same fail-open rule as CheckRowPosition. A §B of an unknown
+                // nominal type keeps its row rather than drawing a hard error.
+                if (!TypeIdentity.IsProvablyNonFunctionType(subjectType))
+                    return TryBuildFunctionType(subjectType, bind.Row, binders: null);
+
                 ReportRowOnNonFunctionType(bind.Row, subjectType, bind.Name, "binding");
                 return null;
             }
@@ -1555,7 +1560,13 @@ public sealed class Binder
 
         // Omitted row, function-typed initializer: inherit the initializer's
         // row verbatim — including its Unknown, when that is what it is.
-        return initializer?.Type as BoundTypes.FunctionBoundType;
+        if (initializer?.Type is BoundTypes.FunctionBoundType inherited)
+            return inherited;
+
+        // v0.15 E3 slice a, §8.2 — a function-typed §B with neither a row of its
+        // own nor a function-typed initializer still HAS a function type; its row
+        // is simply Unknown. Slice b left this null.
+        return TryBuildFunctionType(bind.TypeName ?? typeName, row: null, binders: null);
     }
 
     private static bool TryBuildStringTarget(string bindTypeName, out BoundTypes.BoundType? target)
@@ -5141,6 +5152,51 @@ public sealed class Binder
             _delegateTypeNames.Add(@delegate.Name);
         foreach (var cls in module.Classes)
             CollectNestedDelegateTypeNames(cls);
+
+        // v0.15 E3 slice a, review round 1 (F2) — a `delegate` declared inside a
+        // §CSHARP interop block is a real type the rest of the module may use as
+        // a parameter, field or return spelling, and a position of that type IS
+        // function-typed. Before this, §3.5's placement check called it "not a
+        // function type" and reported Calor0405 — a hard error on a legal
+        // declaration. Measured on the frozen PP-E1 fixture A2.calr, whose
+        // RequestHandlerDelegate<TResponse> is declared exactly this way.
+        foreach (var block in module.InteropBlocks)
+            CollectInteropDelegateTypeNames(block);
+        foreach (var block in module.TypePreprocessorBlocks)
+            CollectTypePreprocessorDelegateTypeNames(block);
+        foreach (var cls in module.Classes)
+            CollectNestedInteropDelegateTypeNames(cls);
+    }
+
+    private void CollectInteropDelegateTypeNames(CSharpInteropBlockNode block)
+    {
+        foreach (var name in TypeIdentity.DelegateNamesDeclaredInInteropText(block.CSharpCode))
+            _delegateTypeNames.Add(name);
+    }
+
+    private void CollectTypePreprocessorDelegateTypeNames(TypePreprocessorBlockNode block)
+    {
+        foreach (var @delegate in block.Delegates)
+            _delegateTypeNames.Add(@delegate.Name);
+        foreach (var interop in block.InteropBlocks)
+            CollectInteropDelegateTypeNames(interop);
+        foreach (var cls in block.Classes)
+        {
+            CollectNestedDelegateTypeNames(cls);
+            CollectNestedInteropDelegateTypeNames(cls);
+        }
+        foreach (var nested in block.NestedBlocks)
+            CollectTypePreprocessorDelegateTypeNames(nested);
+        if (block.ElseBranch != null)
+            CollectTypePreprocessorDelegateTypeNames(block.ElseBranch);
+    }
+
+    private void CollectNestedInteropDelegateTypeNames(ClassDefinitionNode cls)
+    {
+        foreach (var interop in cls.InteropBlocks)
+            CollectInteropDelegateTypeNames(interop);
+        foreach (var nested in cls.NestedClasses)
+            CollectNestedInteropDelegateTypeNames(nested);
     }
 
     private void CollectNestedDelegateTypeNames(ClassDefinitionNode cls)
@@ -5184,12 +5240,27 @@ public sealed class Binder
     /// row (E2 slice a, deviation 4) — so there is no source that could supply
     /// one.</para>
     /// </summary>
-    private BoundTypes.FunctionBoundType? TryBuildRowedFunctionType(
+    ///
+    /// <para><b>v0.15 E3 slice a widens this to EVERY function-typed position,
+    /// rowed or not</b> (§8.2). Slice b built one only where a row was written,
+    /// because an unconditional one would make
+    /// <c>EffectEnforcementPass.IsFunctionBoundType</c> answer true where it
+    /// answered false and could move Calor0418 on row-free programs. E3 measured
+    /// the fear rather than inheriting it: <c>VariableSymbol.FunctionType</c> and
+    /// <c>FunctionSymbol.ReturnFunctionType</c> have <b>no reader anywhere in
+    /// <c>src/</c></b> (<c>grep -rn '\.FunctionType\b' src/</c> → the declarations
+    /// only), and <c>IsFunctionBoundType</c> reads
+    /// <c>CallGraphAnalysis.BoundValueTypes</c>, which is built from bound call
+    /// RECEIVER expressions and not from these two properties. So widening is
+    /// behaviourally inert today, and the committed-corpus differential is the
+    /// proof rather than the claim. A row-free position gets
+    /// <see cref="BoundTypes.EffectRow.Unknown"/> — never pure.</para>
+    private BoundTypes.FunctionBoundType? TryBuildFunctionType(
         string? typeName,
         EffectsNode? row,
         IReadOnlyList<EffectParameterInfo>? binders)
     {
-        if (row == null || typeName == null) return null;
+        if (typeName == null) return null;
         if (!IsFunctionTypedSpelling(typeName)) return null;
         return BuildFunctionType(typeName, BindRow(row, binders));
     }
@@ -5281,6 +5352,14 @@ public sealed class Binder
     {
         if (row == null) return;
         if (IsFunctionTypedSpelling(typeName)) return;
+
+        // v0.15 E3 slice a, review round 1 (F2) — fail OPEN. Calor0405 fires only
+        // where the position PROVABLY cannot carry a row; an unknown nominal is
+        // "I do not know what this is", which is not a verdict. `!IsFunctionTypedSpelling`
+        // was the wrong complement of a LIST predicate and made a legal delegate
+        // a hard error.
+        if (!TypeIdentity.IsProvablyNonFunctionType(typeName)) return;
+
         ReportRowOnNonFunctionType(row, typeName, subject, subjectKind);
     }
 

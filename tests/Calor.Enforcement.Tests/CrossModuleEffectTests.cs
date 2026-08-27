@@ -784,4 +784,105 @@ public class CrossModuleEffectTests
         Assert.Contains(fb, d => d.Message.Contains("db:w"));
         Assert.Contains(fb, d => d.Message.Contains("net:w"));
     }
+
+    // ================================================================ P16 ====
+    // v0.15 E3 slice a — "three codes express ONE relation" (§6.3), and the
+    // cross-module site is the fourth caller of it (§6.2's note).
+
+    [Fact]
+    public void AllMismatchCodesShareOneRelation()
+    {
+        // The structural half: every compatibility site in the tree now routes
+        // through EffectRow.Fits, and NONE of them calls EffectSet.IsSubsetOf.
+        // The one surviving IsSubsetOf under Effects/ is the body-vs-declaration
+        // rule (Calor0410 at EffectEnforcementPass.CheckEffects) plus its own
+        // definition — which is exactly what facts.py's sweep now records.
+        //
+        // Discriminating revert: give CheckEffectVariance its own subset test
+        // back and this reads 3 rather than 2.
+        var effectsDirectory = Path.Combine(RepositoryRoot(), "src", "Calor.Compiler", "Effects");
+        var callSites = Directory
+            .EnumerateFiles(effectsDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .SelectMany(path => File.ReadAllLines(path)
+                .Select((line, index) => (File: Path.GetFileName(path), Line: index + 1, Text: line)))
+            .Where(entry => entry.Text.Contains("IsSubsetOf", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Equal(2, callSites.Count);
+        Assert.Contains(callSites, e => e.File == "EffectSet.cs");
+        Assert.Contains(callSites,
+            e => e.File == "EffectEnforcementPass.cs"
+              && e.Text.Contains("computedEffects", StringComparison.Ordinal));
+        Assert.DoesNotContain(callSites, e => e.File == "CrossModuleEffectEnforcementPass.cs");
+    }
+
+    [Fact]
+    public void CrossModuleSite_RoutesThroughFits_AndKeepsCalor0410OnDoesNotFit()
+    {
+        // The behavioural half. A cross-module callee whose declared row does
+        // not fit the caller's is still Calor0410 — §6.2: this site is the
+        // cross-module leg of the body-vs-declaration rule, so it keeps
+        // Calor0410 semantics even though the relation underneath it changed.
+        var callee = @"§M{m1:Worker}
+  §F{f001:Process:pub}
+      §O{void}
+      §E{cw}
+";
+        var caller = @"§M{m2:App}
+  §F{f001:Run:pub}
+      §O{void}
+      §E{}
+      §C{Process}
+      §/C
+";
+
+        var diagnostics = RunFull(("a.calr", callee), ("b.calr", caller));
+
+        Assert.Contains(diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("cross-module call", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+    }
+
+    [Fact]
+    public void CrossModuleSite_FamilyWideningIsShared()
+    {
+        // One relation means one answer: §4.1's family/narrow widening — a bare
+        // `db` encompassing `db:w` — reaches the cross-module site because it
+        // reaches EffectRow.Fits, without that site knowing anything about it.
+        var callee = @"§M{m1:Worker}
+  §F{f001:Process:pub}
+      §O{void}
+      §E{db:w}
+";
+        var caller = @"§M{m2:App}
+  §F{f001:Run:pub}
+      §O{void}
+      §E{db}
+      §C{Process}
+      §/C
+";
+
+        var diagnostics = RunFull(("a.calr", callee), ("b.calr", caller));
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+    }
+
+    private static string RepositoryRoot()
+    {
+        // Anchored on the directory this test reads, not on `.git`: a git
+        // WORKTREE carries a .git FILE rather than a directory, so the usual
+        // probe walks past the root and returns null.
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null
+            && !Directory.Exists(Path.Combine(directory.FullName, "src", "Calor.Compiler", "Effects")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory!.FullName;
+    }
 }

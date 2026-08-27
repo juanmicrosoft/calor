@@ -204,6 +204,7 @@ CASE X11-E3-before-silent-laundering  args: (none)  exit: 0
     §R §C{Apply} §A Shout §A INT:1 §/C
 ------------------------------------------------------------------------------
 Compilation successful: X11-E3-before-silent-laundering.g.cs
+X11-E3-before-silent-laundering.calr(13,21): warning Calor0425: Parameter 'transform' of 'Apply' is function-typed with no effect row, so its effects are Unknown. Add §E{…} on the same line as the type to state what callers may pass, or compile with --permissive-effects. Invoking a value whose row is Unknown charges Unknown to 'Apply'.
 
 ==============================================================================
 CASE X12-calor0410-real-message  args: (none)  exit: 1

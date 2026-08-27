@@ -733,4 +733,116 @@ public sealed class SpikeVerdictTests
 
     private static string Normalize(string text)
         => text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
+
+    // ========================================================================
+    // v0.15 E3 slice a — PP-E1 leg A's NEGATIVE CONTROL, the half this slice can
+    // honestly assert.
+    //
+    // The gate row (docs/plans/agent-native-gates.md, A-1.11) freezes five
+    // fixtures and bars "any of {Calor0405, Calor0420, Calor0421, Calor0424}
+    // anywhere in a control compile". Calor0424 and Calor0425 are E3's ONLY new
+    // emissions, so this asserts they are absent from all five — which is the
+    // clause of the control that E3 can put at risk and therefore the clause E3
+    // owes.
+    //
+    // What this test deliberately does NOT assert is the control's FULL frozen
+    // multiset (A2 = 1× Calor0410 at (23,9) + 3× Calor0411; the four A3 = exit 0
+    // with zero diagnostics). That baseline does not reproduce on today's
+    // compiler and did not before this branch either:
+    //
+    //   * the four A3 fixtures draw Calor0418 at each invocation, because
+    //     invoking a row-less value is still Calor0418 until E4 — the gate row
+    //     says so itself ("Calor0425 … is E4's and owns all five L7 cells");
+    //   * A2 drew 2x Calor0405 before this PR, because E2 slice b's P6 check read
+    //     `RequestHandlerDelegate<TResponse>` -- a §CSHARP-declared delegate, not a
+    //     §DEL -- as not function-typed. FIXED HERE (review round 1, F2): delegate
+    //     declarations inside interop text are collected, and Calor0405 fails OPEN
+    //     via TypeIdentity.IsProvablyNonFunctionType. See
+    //     PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2 below.
+    //
+    // A2's frozen multiset itself carries a second defect (F1): the
+    //   after/A2.diagnostics.txt it was read from was recorded with
+    //   --permissive-effects, which the gate row forbids, so it was never
+    //   reproducible under the pinned invocation. The measured no-flag output
+    //   after F2 is 1x Calor0410 at (23,9), 2x Calor0411, 1x Calor0418 at (27,27);
+    //   an A-1.11.x annex sub-entry re-freezes it (separate PR). Until E4
+    //   replaces Calor0418, PP-E1 leg A is a MISS under the own-goal clause
+    //   if adjudicated now; adjudication is at the 0.15.0 release commit.
+    // ========================================================================
+
+    /// <summary>The five §12.1 fixtures PP-E1 leg A freezes, by path.</summary>
+    private static readonly string[] PpE1ControlFixtures =
+    [
+        "A2", "A3-map", "A3-match", "A3-middleware", "A3-callback",
+    ];
+
+    [Fact]
+    public void PpE1NegativeControl_NoEffectRowDiagnosticOnAnyUnmutatedFixture()
+    {
+        var failures = new List<string>();
+
+        foreach (var fixture in PpE1ControlFixtures)
+        {
+            var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
+            Assert.True(File.Exists(path), $"PP-E1 control fixture missing: {path}");
+
+            var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
+            var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+            var module = new Compiler.Parsing.Parser(
+                new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(),
+                diagnostics).Parse();
+            new Compiler.Binding.Binder(diagnostics, fixture + ".calr").Bind(module);
+            if (!diagnostics.HasErrors)
+            {
+                // The pinned invocation is the CLI default: enforcement on,
+                // UnknownCallPolicy.Strict, NO --permissive-effects. The gate row
+                // forbids the flag here, because it waives Calor0425 and would
+                // satisfy every L7 cell for free.
+                new Compiler.Effects.EffectEnforcementPass(diagnostics).Enforce(module);
+            }
+
+            foreach (var diagnostic in diagnostics)
+            {
+                if (diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMismatch
+                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowUnknown
+                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.OverrideEffectVariance
+                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InterfaceEffectVariance)
+                {
+                    failures.Add($"{fixture}: {diagnostic.Code} — {diagnostic.Message}");
+                }
+            }
+        }
+
+        Assert.True(failures.Count == 0,
+            "PP-E1 leg A's negative control is FROZEN: an unmutated fixture must draw no "
+            + "row-family diagnostic. E3's emission put one there, which means the L5/L7 "
+            + "detection cells can no longer discriminate the feature under test. STOP and "
+            + "report before pushing — do not regenerate the baseline.\n  "
+            + string.Join("\n  ", failures));
+    }
+
+    [Fact]
+    public void PpE1NegativeControl_A2DrawsNoCalor0405_AfterF2()
+    {
+        // PP-E1's row bars Calor0405 "anywhere in a control compile". A2 drew
+        // TWO — from E2 slice b's P6 check, on `RequestHandlerDelegate<TResponse>`,
+        // a delegate declared inside a §CSHARP block that the binder's
+        // delegate-name collection never saw. Review round 1 (F2) fixed both
+        // halves: the collection now reads interop text, and Calor0405 fires only
+        // where the type is PROVABLY non-function.
+        //
+        // Kept as an explicit pin rather than folded into the sweep above,
+        // because it is the clause of PP-E1 this branch had to repair, and a
+        // regression in either half must name A2.
+        var path = Path.Combine(SpikeDirectory(), "after", "A2.calr");
+        var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(),
+            diagnostics).Parse();
+        new Compiler.Binding.Binder(diagnostics, "A2.calr").Bind(module);
+
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMisplaced);
+    }
 }

@@ -618,6 +618,40 @@ renegotiation; DEFERRED items are named so their absence is a decision.
   interface-implementation sites, as one row-subtyping rule — plus rank-1 generic-instantiation
   sites **unless the §4.1 ramp fires**. Calor0420/0421 either fold into it or are re-pinned
   against it (design-doc decision; pins retained either way).
+  - **slice a — LANDED (PR #1103).** The **five monomorphic** sites. Calor0424 `EffectRowMismatch`
+    (Error, never waived by any flag) and Calor0425 `EffectRowUnknown` (Warning; Error under
+    `--strict-effects`; suppressed by `--permissive-effects`) are allocated and emitted; sites 1–3
+    live in `EffectEnforcementPass.CheckRowCompatibility`; sites 4/5 keep Calor0420/0421 and are
+    re-implemented on `EffectRow.Fits`, **losing their `--permissive-effects` demotion** (§4.5);
+    `CrossModuleEffectEnforcementPass.cs:162` routes through the same relation; `FunctionBoundType`
+    is now built at **every** function-typed position (§8.2), measured inert (Calor0418 unchanged at
+    619 over the 886). `EffectRow.FitsFunction` lands §4.6's whole-function variance rule with no
+    production caller yet and says so. Corpus delta: **one file of 886**, gaining one Calor0425 at a
+    real site 3. P32's ledger reads **zero Calor0425** across all three converted subjects.
+  - **slice b owes:** §7.4's rank-1 instantiation (site 6 — slice a DECLINES any position whose row
+    mentions an `eff` variable, which is what keeps E3a's own emissions off the four A3
+    fixtures; it does **not** restore their frozen zero, see the PP-E1 note below),
+    §5's ρ_body and its Calor0410 on a lambda whose body exceeds its declared row,
+    **alpha-equivalence** of `eff` binders (slice a never compares two variable rows, so
+    `A3-middleware-alpha` passes without it), and §6.2's two external-base Calor0419 → Calor0425
+    retirements, which must move together because the override arm is an `AddAssumption` whose
+    propagation feeds every caller's computed effect set.
+- **Issue #1104 — `EffectEnforcementPass.Enforce` crashes the process on Lossy-converted, unbound
+  corpus modules** (found by E3a's P32 ledger work; reproduces on `main` at `b6530fac` with row
+  checking disabled). Unbounded recursion in `EffectInferrer`'s local-type resolution, so it is an
+  uncatchable fail-fast that no thread stack size avoids. It bounds what the Calor0425 corpus
+  ledger can measure — 99 of 364 modules — and it will bound E4's re-measurement the same way
+  unless it is fixed first. Not E3a's to fix; filed rather than absorbed.
+
+- **PP-E1 leg A's negative control does not reproduce today** (E3a review round 1, F3). A2 fails
+  for two reasons — its frozen baseline was recorded under `--permissive-effects`, which the probe
+  forbids (F1), and E2b's Calor0405 defect, **fixed in E3a** (F2) — and the four A3 fixtures fail
+  because invoking a row-less value is still `Calor0418` until **E4 replaces it**. Under A-1.11's
+  own-goal clause this is a **MISS if adjudicated now**, because the workstream that broke the
+  control is this one. Adjudication is at the **0.15.0 release commit**, so before then: **E4 must
+  restore the A3 control**, and the **`A-1.11.x` sub-entry must re-freeze A2** under the pinned
+  invocation. Neither is optional and neither is E3a's to do.
+
 - **E4 — Calor0418 replaced.** Accepted when the function value's row fits; Calor0424 on
   mismatch; Calor0425 when the row is Unknown/Assumed because metadata is incomplete. The
   `DelegateInvocation_*` pins (`StrictnessBatchTests.cs:29,47,64,749`;
@@ -696,6 +730,36 @@ this repo underestimates binder-adjacent work, and E1 is binder-adjacent.
   lower bound above 1.0; measured null false-fail 1.7 % (point test alone 3.7 %), power
   0.22 / 0.48 / 0.77 at 1.25× / 1.4× / 1.6×. Script and full output committed at
   `bench/phase0-agent-native/ppe1-margin-derivation.py` / `…-derivation.txt`.
+- **PP-E1's A2 control baseline is NOT reproducible under the pinned invocation, and must be
+  re-frozen (E3a review round 1, finding F1).** A-1.11 pins the invocation as
+  `dotnet <calor.dll> -i <source> -o <scratch>` with **no flags**, and states that
+  `--permissive-effects` is **forbidden in this probe, control and mutant alike**. But the frozen
+  A2 baseline it cites — exactly 1× `Calor0410` "uses effect 'unknown'" at (23,9) and 3×
+  `Calor0411` — was transcribed from `docs/design/spikes/effect-rows/after/A2.diagnostics.txt`,
+  whose own header records `# emit args: --permissive-effects`. So that multiset was **never**
+  the pinned invocation's output, and the negative control it defines could not have passed on
+  any compiler.
+
+  **Measured no-flag output at the E3a branch head, after finding F2's fix** (`exit 1`, paths
+  trimmed):
+
+  ```
+  A2.calr(26,24): warning Calor0411: Unknown external call to '_chainProcess010.ConfigureAwait'.
+  A2.calr(27,27): error   Calor0418: Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') …
+  A2.calr(28,19): warning Calor0411: Unknown external call to '_chainNext011.ConfigureAwait'.
+  A2.calr(23,9):  error   Calor0410: Function 'Handle' uses effect 'unknown' but does not declare it
+  ```
+
+  Against the frozen multiset: the `Calor0410` at (23,9) matches; `Calor0411` is **2, not 3**
+  (`processor.Process` now resolves in-module, so it is no longer an unknown external call); and
+  there is one **extra** `Calor0418` at (27,27). `Calor0405` is **zero** — that was E3a's F2 to
+  fix and it is fixed. None of the residual divergence is an effect-row emission.
+
+  **Disposition: an `A-1.11.x` annex sub-entry, in a separate PR after E3a merges**, re-freezes
+  A2's control baseline under the pinned invocation. It is a sub-entry rather than an edit because
+  the annex is append-only and guarded by
+  `experiment-registry-tamper-check.yml`. It must land before the 0.15.0 release commit, which is
+  where PP-E1 is adjudicated.
 - **Register-then-merge had a precedent to repair first (M1) — done:** PR #944 (the §3.1
   pre-registration) was still open while its spike shipped; it is now **closed with the
   discrepancy noted**, before the 0.15 PP registered, so the discipline is not aspirational.

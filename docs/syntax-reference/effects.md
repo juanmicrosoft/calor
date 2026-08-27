@@ -139,18 +139,21 @@ lambda), or named after a real effect code.
 
 ### What is checked today
 
-**Writing a row is not yet checked against anything.** The compiler reads it, remembers
-it, and re-prints it faithfully — `calor fmt` keeps it — but it does not yet compare the
-row on a callback against what the function you passed actually does. That comparison is
-the next release. Writing a row today is documentation the compiler has agreed to carry.
+**A row is now checked where a function value moves.** When a function value is bound,
+re-assigned, passed as an argument, returned, or used to override/implement a member, the
+compiler compares the value's row with the row of the place it is going: a row that is too
+wide is **Calor0424** (always an error), a row the compiler cannot determine is **Calor0425**
+(a warning; `--permissive-effects` waives only this one). A row on something that is provably
+not a function (`i32`, `str`, an array) is **Calor0405**; a row on a type the compiler does not
+know is accepted, not refused.
 
-**So the thing you most want to do still does not work yet.** Calling a callback is
-refused, row or no row:
+**Still to come:** calling a callback through its row. Invoking a function value is refused
+today whatever row it carries, and a lambda's body is not yet compared with its declared row:
 
 ```
 §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
   §E{cw}
-  §R §C{transform} §A value §/C     // Calor0418, even with the row above
+  §R §C{transform} §A value §/C     // Calor0418 until the next slice replaces it
 ```
 
 The row is what will *make* that call legal — the compiler has to compare it against the
@@ -403,6 +406,10 @@ Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
 - **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.
 - **Calor0422** — a constructor body performs effects beyond intrinsic initialization mutation/allocation (`mut`, `alloc`). Constructor syntax currently has no `§E` surface, so other effects fail closed; move effectful work to a declared method.
 - **Calor0423** — a custom property or event accessor body performs effects beyond intrinsic accessor mutation. Accessors currently have no `§E` surface, so such bodies fail closed.
+- **Calor0424** — an effect **row** does not fit where the value is going: a function value with a wider row is assigned to a binding, passed as an argument, or returned into a position whose row is narrower. **Always an error, and no flag waives it** — not even `--permissive-effects`. The message names both rows and the extra effect(s), so the fix is either to widen the destination's `§E{…}` or to pass a function whose row fits.
+- **Calor0425** — an effect **row** cannot be decided at one of those same places, because one side (or both) carries no row and so is Unknown, or because it fits only under an assumption. Warning by default; error under `--strict-effects`; **suppressed** by `--permissive-effects`. Add `§E{…}` on the same line as the type to say what may be passed.
+
+The two are the same question asked twice: Calor0424 is *we know it does not fit*, Calor0425 is *we cannot tell*. `--permissive-effects` waives only the second — a waiver for "we do not know" is honest, a waiver for "we know it is wrong" is not. That is also why **`--permissive-effects` no longer softens Calor0420 or Calor0421**: an override or implementation that broadens its base's effect set is an error under every flag as of v0.15.
 
 Calls through a receiver whose static type is an in-module interface or class charge the static type's *declared* `§E` — sound because Calor0420/Calor0421 pin every override and implementation to a subset of that declared set, **including implementations inherited from in-module base classes**. Overrides of **external C# base classes**, and interface implementations satisfied by members inherited from external bases, cannot be variance-checked and are surfaced through the Calor0419 assumption channel instead.
 

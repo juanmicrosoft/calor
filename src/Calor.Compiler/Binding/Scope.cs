@@ -361,6 +361,108 @@ public static class TypeIdentity
         };
     }
 
+    /// <summary>
+    /// The canonical spellings <see cref="Canonicalize(string)"/> produces for
+    /// the built-in types — the ones that provably cannot be a function type.
+    /// </summary>
+    private static readonly HashSet<string> ProvablyNonFunctionCanonicalNames = new(StringComparer.Ordinal)
+    {
+        "INT", "UINT", "LONG", "ULONG", "DECIMAL", "STRING", "BOOL", "OBJECT", "VOID", "NEVER",
+        "FLOAT", "FLOAT[bits=32]",
+        "INT[bits=8][signed=true]", "INT[bits=8][signed=false]",
+        "INT[bits=16][signed=true]", "INT[bits=16][signed=false]",
+        "INT[bits=32][signed=true]", "INT[bits=32][signed=false]",
+        "INT[bits=64][signed=true]", "INT[bits=64][signed=false]",
+    };
+
+    /// <summary>
+    /// v0.15 E3 slice a, review round 1 (F2) — "is this type PROVABLY not a
+    /// function type?", the conservative complement of
+    /// <see cref="IsFunctionTypeName"/>.
+    ///
+    /// <para>Calor0405 (§3.5) says a row on a non-function-typed position is
+    /// misplaced. It was implemented as <c>!IsFunctionTypeName(…)</c>, which is
+    /// the wrong complement: that predicate is a LIST of known function-type
+    /// spellings, so everything it has not heard of — an aliased delegate, a
+    /// delegate declared in a <c>§CSHARP</c> block, a type parameter that
+    /// resolves to a delegate — answered "not a function type" and drew a HARD
+    /// ERROR on a legally-declared delegate. Measured on the frozen PP-E1 fixture
+    /// <c>docs/design/spikes/effect-rows/after/A2.calr</c>, whose
+    /// <c>RequestHandlerDelegate&lt;TResponse&gt;</c> is declared inside a
+    /// <c>§CSHARP</c> block: 2× Calor0405, and PP-E1's row bars that code
+    /// anywhere in a control compile.</para>
+    ///
+    /// <para>So the rule is inverted to fail OPEN. A row is misplaced only when
+    /// the compiler can PROVE the position cannot carry one — a built-in scalar,
+    /// <c>void</c>, an array, a tuple, a pointer, or an <c>Option</c>. An unknown
+    /// NOMINAL is never Calor0405: the honest answer there is "I do not know what
+    /// this is", and §4.3's whole discipline is that an unknown is not a
+    /// verdict.</para>
+    ///
+    /// <para>Every case P6 pins — <c>i32</c>, <c>str</c>, <c>void</c> at all four
+    /// positions — is a built-in and still reports.</para>
+    /// </summary>
+    public static bool IsProvablyNonFunctionType(string? typeName)
+    {
+        // No type at all is "nothing is known" and must stay silent.
+        if (typeName is null) return false;
+
+        // A type position the author left BLANK (`§FLD{:c:pri}`) is different:
+        // there is no type for a row to attach to, so the row is provably
+        // misplaced. This is the R2-A case PR #1102's review round 2 added, and
+        // it must keep reporting rather than fall through the fail-open rule.
+        if (typeName.Trim().Length == 0) return true;
+
+        var trimmed = typeName.Trim().TrimEnd('?');
+        if (trimmed.Length == 0) return false;
+
+        // Arrays, pointers and tuples: shapes, not names, and none of them is a
+        // delegate however the element type is spelled.
+        if (trimmed.EndsWith("]", StringComparison.Ordinal)
+            || trimmed.EndsWith("*", StringComparison.Ordinal)
+            || trimmed.StartsWith("(", StringComparison.Ordinal))
+        {
+            return !trimmed.StartsWith("(", StringComparison.Ordinal) || trimmed.Contains(',');
+        }
+
+        var canonical = Canonicalize(trimmed);
+        return ProvablyNonFunctionCanonicalNames.Contains(canonical)
+            || canonical.StartsWith("OPTION<", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// v0.15 E3 slice a, review round 1 (F2) — the delegate names declared inside
+    /// <c>§CSHARP</c> interop text. A <c>§CSHARP</c> block is opaque C#, but a
+    /// <c>delegate</c> declaration in it introduces a real type that the rest of
+    /// the module may then use as a parameter, field or return spelling — and
+    /// once it does, that position IS function-typed and may carry a row.
+    ///
+    /// <para>Deliberately a textual scan and not a Roslyn parse: the block is
+    /// preserved verbatim precisely because the compiler does not model it, and
+    /// pulling Roslyn into the binder to read one identifier would be a far
+    /// larger dependency than the problem. A missed name degrades to "unknown
+    /// nominal", which after <see cref="IsProvablyNonFunctionType"/> is silent
+    /// rather than wrong.</para>
+    /// </summary>
+    public static IEnumerable<string> DelegateNamesDeclaredInInteropText(string? csharpCode)
+    {
+        if (string.IsNullOrWhiteSpace(csharpCode)) yield break;
+
+        foreach (System.Text.RegularExpressions.Match match in InteropDelegateDeclaration.Matches(csharpCode))
+        {
+            var name = match.Groups["name"].Value;
+            if (name.Length > 0)
+                yield return name;
+        }
+    }
+
+    // `delegate <return type> <Name>[<type args>](` — the return type may itself
+    // be generic (`Task<TResponse>`), so it is matched lazily and the NAME is the
+    // last identifier before the parameter list.
+    private static readonly System.Text.RegularExpressions.Regex InteropDelegateDeclaration =
+        new(@"\bdelegate\s+[^;{}()]+?\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^<>()]*>)?\s*\(",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     public static string CanonicalizeSignature(
         string typeName,
         IReadOnlyList<string> typeParameters)

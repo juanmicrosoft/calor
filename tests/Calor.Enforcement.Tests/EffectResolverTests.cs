@@ -1,3 +1,5 @@
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Effects.Manifests;
 using Xunit;
@@ -944,5 +946,58 @@ public class EffectResolverTests
 
         Assert.Contains("System.Collections.Generic.IEnumerable`1", arrayKey.ReceiverInterfaces);
         Assert.Equal(EffectResolutionStatus.Resolved, resolver.Resolve(arrayKey).Status);
+    }
+
+    // ================================================================ P21 ====
+    // v0.15 E3 slice a — design-doc §8.4's mapping, at the level the RESOLVER
+    // owns it. Slice b pinned the EffectSet → EffectRow bridge in
+    // EffectRowLatticeTests; this pins the three EffectResolutionStatus values
+    // that feed it, so the two halves cannot drift apart.
+
+    [Fact]
+    public void ManifestResolutionMapsToRow()
+    {
+        // §8.4: Resolved → Concrete(S), PureExplicit → Concrete(∅), Unknown →
+        // EffectRow.Unknown. Discriminating revert: map Unknown to Concrete(∅)
+        // and P17's fixture goes silent, because a provably-pure row fits every
+        // destination.
+        var resolved = new EffectResolution(
+            EffectResolutionStatus.Resolved, EffectSet.From("cw"), "manifest");
+        var pure = new EffectResolution(
+            EffectResolutionStatus.PureExplicit, EffectSet.Empty, "manifest");
+        var unknown = new EffectResolution(
+            EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+
+        Assert.Equal(EffectRow.Concrete(new[] { "io:console_write" }), resolved.Effects.ToRow());
+
+        Assert.Equal(EffectRow.Pure, pure.Effects.ToRow());
+        Assert.True(pure.Effects.ToRow().IsConcrete);
+
+        Assert.True(unknown.Effects.ToRow().IsUnknown);
+        Assert.NotEqual(EffectRow.Pure, unknown.Effects.ToRow());
+
+        // …and an Unknown row fits NOTHING and is fitted BY nothing, which is
+        // what makes the mapping load-bearing rather than cosmetic.
+        Assert.Equal(EffectFit.CannotTell,
+            EffectRow.Fits(unknown.Effects.ToRow(), EffectRow.Pure));
+        Assert.Equal(EffectFit.CannotTell,
+            EffectRow.Fits(EffectRow.Pure, unknown.Effects.ToRow()));
+    }
+
+    [Fact]
+    public void EffectRowDiagnosticCodesAreTheOnesSection61Froze()
+    {
+        // §6.1's allocation, asserted as literals so a renumbering has to be
+        // deliberate. Both were verified free at the design doc's merge and at
+        // PP-E1's registration; they are now taken.
+        Assert.Equal("Calor0424", DiagnosticCode.EffectRowMismatch);
+        Assert.Equal("Calor0425", DiagnosticCode.EffectRowUnknown);
+
+        // The neighbours they must not collide with.
+        Assert.Equal("Calor0404", DiagnosticCode.EffectVariableScope);
+        Assert.Equal("Calor0405", DiagnosticCode.EffectRowMisplaced);
+        Assert.Equal("Calor0420", DiagnosticCode.OverrideEffectVariance);
+        Assert.Equal("Calor0421", DiagnosticCode.InterfaceEffectVariance);
+        Assert.Equal("Calor0423", DiagnosticCode.AccessorEffectContractUnavailable);
     }
 }

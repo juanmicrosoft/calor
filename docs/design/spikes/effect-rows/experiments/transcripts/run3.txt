@@ -210,7 +210,7 @@ CASE W1c-IFACE-impl-member-typeparams-renamed  args: (none)  exit: 1
       §P r
       §R r
 ------------------------------------------------------------------------------
-W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementation 'Logging.Handle' of interface method 'IP.Handle' on class 'Logging' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementation 'Logging.Handle' of interface method 'IP.Handle' on class 'Logging' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw does not fit the interface's row [pure]. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
 
 ==============================================================================
 CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 1

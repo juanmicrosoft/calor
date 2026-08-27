@@ -466,6 +466,36 @@ public static class DiagnosticCode
     public const string ConstructorEffectContractUnavailable = "Calor0422";
 
     /// <summary>
+    /// v0.15 E3 slice a — Error: an effect ROW does not fit its destination at one
+    /// of the compatibility sites of
+    /// docs/design/effect-rows-in-the-type-system.md §6.2 (assignment, argument,
+    /// return, rank-1 instantiation). <c>EffectRow.Fits</c> answered
+    /// <c>DoesNotFit</c>.
+    ///
+    /// <para><b>Never waived, at any site, by any flag</b> (§4.5).
+    /// <c>--permissive-effects</c> waives "we cannot tell" (Calor0425), not "we
+    /// know it is wrong". Sites 4 and 5 — override and interface implementation —
+    /// keep their own codes (Calor0420/0421) on top of the same relation, so gate
+    /// 1 can observe each laundering class independently (§6.3).</para>
+    /// </summary>
+    public const string EffectRowMismatch = "Calor0424";
+
+    /// <summary>
+    /// v0.15 E3 slice a — Warning (Error under <c>--strict-effects</c>, suppressed
+    /// under <c>--permissive-effects</c>): an effect row at a compatibility site is
+    /// Unknown on one or both sides, or fits only under an assumption, so
+    /// compatibility cannot be decided. <c>EffectRow.Fits</c> answered
+    /// <c>CannotTell</c>, or answered <c>Fits</c> while carrying assumption
+    /// reasons (§4.3/§4.4 — one Calor0425 per hop, so an assumption cannot be
+    /// laundered away by one more assignment).
+    ///
+    /// <para>This is the one job <c>--permissive-effects</c> keeps in 0.15: a
+    /// waiver for <i>we do not know</i> is honest; a waiver for <i>we know it is
+    /// wrong</i> is not.</para>
+    /// </summary>
+    public const string EffectRowUnknown = "Calor0425";
+
+    /// <summary>
     /// Error: a custom property or event accessor body has effects other than
     /// intrinsic accessor mutation, but the accessor has no §E surface.
     /// </summary>
