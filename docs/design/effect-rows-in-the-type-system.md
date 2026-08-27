@@ -197,7 +197,7 @@ three source files — `Commands/IndexCommand.cs`, `Commands/QueryCommand.cs`,
 >
 > **Eight positions** (§3.3). No new token, no new AST node type, no new `IAstVisitor` method.
 
-> **STATUS — LANDED IN FULL, PR #1110, v0.15 E3 slice b.** Site 6 is implemented:
+> **STATUS — LANDED IN FULL, PR #1106, v0.15 E3 slice b.** Site 6 is implemented:
 > at a call to a declaration carrying `eff` binders each variable is solved ONCE
 > from the argument rows (§7.4's one-line solve, no fixpoint — **R3**), the
 > instantiated own-row is charged to the CALLER, and a variable the arguments
@@ -737,7 +737,7 @@ Formally the *destination's* parameter row must fit into the *source's*.
 > **Decision.** It **becomes the lambda's declared row**, checked against the body exactly as a
 > function's `§E` is (Calor0410). Omitted → inferred from the body, no diagnostic. Not removed.
 
-> **STATUS — LANDED, PR #1110, v0.15 E3 slice b (P14).** The effect pass records ρ_body for
+> **STATUS — LANDED, PR #1106, v0.15 E3 slice b (P14).** The effect pass records ρ_body for
 > every `§LAM` it walks (`InferenceContext.RecordLambdaBody`, written from `InferFromLambda`,
 > last-write-wins so an SCC's fixpoint leaves the CONVERGED row) and checks it against ρ_decl in
 > a new phase 3e: `DoesNotFit` → Calor0410 at the `§E` span, per effect, in today's shape;
@@ -889,7 +889,7 @@ Draft v1 used Calor0424 for rank-1 scope violations, conflating a *declaration* 
 (`EEP:548-553`, `:596-611`). Those two Calor0419 emissions are retired in favour of Calor0425;
 §13.1 disposes of the three existing pins that observe them.
 
-> **STATUS — BOTH ARMS RETIRED, PR #1110, v0.15 E3 slice b.** Slice a took neither, on the
+> **STATUS — BOTH ARMS RETIRED, PR #1106, v0.15 E3 slice b.** Slice a took neither, on the
 > ground that they must move together (§6.2's third scope decision). Both move here. The override
 > arm's `AddAssumption` is gone: measured rather than feared, the assumption channel carries
 > **reasons, not effects** (`AddAssumption` appends to `_assumedEffects`, which drives Calor0419
@@ -1473,7 +1473,7 @@ that rank-1 rows *type-check* and *erase at codegen*, not that the representatio
 
 ### 8.2 `FunctionBoundType`
 
-> **THE BOUND TYPE HAS A PRODUCTION READER — E3 slice b, PR #1110.**
+> **THE BOUND TYPE HAS A PRODUCTION READER — E3 slice b, PR #1106.**
 > `RowSiteChecker.IsFunctionTyped` now asks the BOUND answer before the string test:
 > `CallGraphAnalysis` exposes `DeclaredFunctionTypes` / `DeclaredReturnFunctionType` /
 > `DeclaredFieldFunctionType`, collected from the same `Bind()` call that already resolves the
@@ -2104,7 +2104,7 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P31 | **`SpikeArtifactManifestIsComplete`** — for every artifact in `spike-verdict.json`, the `before/`/`after/` `.calr`, `.g.cs` and diagnostic list exist, are non-empty, and the diagnostic list parses. Replaces v2's unsound decline of the presence check (P27 would pass with every artifact missing) | `SpikeVerdictTests.cs` | **spike PR** | delete one `.g.cs` → red |
 | P32 | **`Calor0425CorpusLedgerMatchesRecomputation`** — §13.4's ledger, exact-equality per subject and per cause, `measuredCommit` shape-checked. The only instrument v2 left without a P-number | `tests/Calor.Compiler.Tests/Effects/Calor0425CorpusLedgerTests.cs` (`compiler` shard, `Skip.IfNot` on submodules, registered in `eng/test-manifest.json`) | ~~before E2~~ → **with E3** (see the note below) | change one per-subject count → red |
 
-> **EXECUTED — E3 slice b, PR #1110.** Status of every pin this slice owed:
+> **EXECUTED — E3 slice b, PR #1106.** Status of every pin this slice owed:
 >
 > | Pin | Status | Home |
 > |---|---|---|

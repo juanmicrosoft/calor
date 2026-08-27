@@ -628,7 +628,7 @@ renegotiation; DEFERRED items are named so their absence is a decision.
     619 over the 886). `EffectRow.FitsFunction` lands §4.6's whole-function variance rule with no
     production caller yet and says so. Corpus delta: **one file of 886**, gaining one Calor0425 at a
     real site 3. P32's ledger reads **zero Calor0425** across all three converted subjects.
-  - **slice b — LANDED (PR #1110).** **Site 6** (§7.4's rank-1 instantiation): one solve per call,
+  - **slice b — LANDED (PR #1106).** **Site 6** (§7.4's rank-1 instantiation): one solve per call,
     no fixpoint (**R3**); rows carry effect-variable **ordinals**, so an interface's `eff e` and an
     implementation's `eff f` unify under the ORDINARY `fits` relation (**R2**), and the four
     combinators type-check with zero Calor0424/0425/0404 (**R1**) — the §7.5 ramp does **not**
