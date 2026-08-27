@@ -628,6 +628,7 @@ public sealed class EffectEnforcementPass
                 _lambdaBodyRows[lambda] = new LambdaBodyFact(functionId, body, reasons),
             LambdaBodyRow = LambdaBodyRow,
             Invocations = _invocations,
+            AstResolution = AstResolution,
         };
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromStatements(function.Body);
@@ -2586,6 +2587,91 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
+    /// #1104 (v0.16 W3(c)) — the bound on the nested <see cref="EffectInferrer"/>'s
+    /// AST-side local-type resolution, and the counters that make it observable.
+    ///
+    /// <para><see cref="EffectInferrer.ResolveLocalValueTypeFromAst"/> answers
+    /// "what is the declared type of the value called <c>name</c>" by reading
+    /// the name's <c>§B</c> initializer, and a call initializer is typed by
+    /// resolving its receiver and its arguments — each of which is again a
+    /// name. A converted module whose initializers refer back to the name being
+    /// resolved (Serilog's <c>out var</c> hoisting produces
+    /// <c>§B{~x} §C{f.M} §A x §/C</c>) therefore recursed without limit, and a
+    /// StackOverflowException is a fail-fast: the host dies, nothing catches it.</para>
+    ///
+    /// <para>Two guards, the way <see cref="RowSiteChecker"/> bounds its
+    /// structural walk. (1) A VISITED SET keyed on the name in progress: asking
+    /// for a name whose resolution is already on the stack is, by construction,
+    /// a cycle — the search is deterministic and context-free within one
+    /// function, so the inner ask could only repeat the outer one — and it
+    /// answers <see cref="EffectInferrer.UnknownLocalTypeSentinel"/> ("known
+    /// value, unknown type"). This guard alone guarantees termination: depth is
+    /// bounded by the number of distinct names in the function. It cannot fire
+    /// on acyclic code, so no resolution answer there changes (gate 6 / §9).
+    /// (2) A DEPTH CAP as a backstop for a very long ACYCLIC chain of distinct
+    /// temporaries, which terminates but could still exhaust a 1 MB thread; it
+    /// also answers the sentinel. <see cref="DefaultDepthCap"/> is an order of
+    /// magnitude past what the corpus reaches — measured over the 364 corpus
+    /// modules enforced without binding: deepest acyclic nesting 6, and the
+    /// only cycles are the two Serilog modules from the issue — and well inside
+    /// the frame budget (each nested ask costs roughly 2.5 KB of stack in
+    /// Debug; the CLI's main thread is 1 MB on Windows).</para>
+    ///
+    /// <para>Injectable so the boundary can be pinned at a small cap; the
+    /// counters distinguish a cycle stop from a cap stop so a test can say
+    /// which guard fired, and <see cref="MaxObservedDepth"/> lets a test pin
+    /// that an acyclic chain resolved all the way down rather than stopping.</para>
+    /// </summary>
+    internal sealed class AstResolutionBound
+    {
+        /// <summary>
+        /// Nested AST-side resolutions allowed on the stack at once. The
+        /// (cap + 1)-th nested ask stops with the sentinel.
+        /// </summary>
+        public const int DefaultDepthCap = 64;
+
+        public int DepthCap { get; init; } = DefaultDepthCap;
+
+        /// <summary>Asks refused because the name was already being resolved.</summary>
+        public int CycleStops { get; private set; }
+
+        /// <summary>Asks refused because <see cref="DepthCap"/> was reached.</summary>
+        public int DepthCapStops { get; private set; }
+
+        /// <summary>Deepest nesting any resolution reached (0 = never asked).</summary>
+        public int MaxObservedDepth { get; private set; }
+
+        private readonly List<string> _stoppedNames = new();
+
+        /// <summary>The names whose asks were refused, in order, by either guard.</summary>
+        public IReadOnlyList<string> StoppedNames => _stoppedNames;
+
+        internal void RecordCycleStop(string name)
+        {
+            CycleStops++;
+            _stoppedNames.Add(name);
+        }
+
+        internal void RecordDepthCapStop(string name)
+        {
+            DepthCapStops++;
+            _stoppedNames.Add(name);
+        }
+
+        internal void RecordDepth(int depth)
+        {
+            if (depth > MaxObservedDepth)
+                MaxObservedDepth = depth;
+        }
+    }
+
+    /// <summary>
+    /// #1104 — the AST-resolution bound this pass runs under. Shared by every
+    /// per-function inferrer the pass creates, so the counters are per Enforce.
+    /// </summary>
+    internal AstResolutionBound AstResolution { get; init; } = new();
+
+    /// <summary>
     /// Context for effect inference.
     /// </summary>
     private sealed class InferenceContext
@@ -2639,6 +2725,13 @@ public sealed class EffectEnforcementPass
         /// on-demand re-inference cannot emit the same one twice.
         /// </summary>
         public InvocationSink? Invocations { get; init; }
+
+        /// <summary>
+        /// #1104 — the bound on AST-side local-type resolution (cap and
+        /// counters). Defaults to a fresh bound so a context built without one
+        /// is still guarded.
+        /// </summary>
+        public AstResolutionBound AstResolution { get; init; } = new();
 
         public InferenceContext(
             EffectResolver resolver,
@@ -3962,11 +4055,61 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
+        /// #1104 — the names whose AST-side resolution is on the stack right
+        /// now. Every cycle through the local-type search re-enters
+        /// <see cref="ResolveLocalValueTypeFromAst"/> with a name (a call
+        /// initializer is typed by resolving its receiver and its arguments,
+        /// and <c>FindLocalDeclarationType</c> / <c>FindForeachVariableType</c>
+        /// are reached only from here), so this ONE choke point sees every
+        /// cycle. Per inferrer, i.e. per function: names are function-scoped
+        /// and an on-demand inference of another function gets its own.
+        /// </summary>
+        private readonly HashSet<string> _astResolutionInProgress = new(StringComparer.Ordinal);
+
+        /// <summary>#1104 — nesting depth of the AST-side resolution (backstop cap).</summary>
+        private int _astResolutionDepth;
+
+        /// <summary>
         /// The pre-slice-2b AST search, extracted so the resolver order above
         /// reads as "bound first, then this" and so the fallback can be probed
         /// on its own.
+        ///
+        /// <para>#1104 — bounded (see <see cref="AstResolutionBound"/>): a name
+        /// already being resolved is a cycle and answers
+        /// <see cref="UnknownLocalTypeSentinel"/>; past the depth cap every
+        /// ask answers the sentinel. Neither guard can fire on an acyclic chain
+        /// shorter than the cap, so nothing else changes.</para>
         /// </summary>
         private string? ResolveLocalValueTypeFromAst(string name)
+        {
+            var bound = _context.AstResolution;
+            if (!_astResolutionInProgress.Add(name))
+            {
+                bound.RecordCycleStop(name);
+                return UnknownLocalTypeSentinel;
+            }
+
+            if (_astResolutionDepth >= bound.DepthCap)
+            {
+                _astResolutionInProgress.Remove(name);
+                bound.RecordDepthCapStop(name);
+                return UnknownLocalTypeSentinel;
+            }
+
+            _astResolutionDepth++;
+            bound.RecordDepth(_astResolutionDepth);
+            try
+            {
+                return ResolveLocalValueTypeFromAstUnbounded(name);
+            }
+            finally
+            {
+                _astResolutionDepth--;
+                _astResolutionInProgress.Remove(name);
+            }
+        }
+
+        private string? ResolveLocalValueTypeFromAstUnbounded(string name)
         {
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
                 return null;

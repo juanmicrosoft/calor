@@ -1,5 +1,5 @@
 {
-  "trackedFileCount": 926,
+  "trackedFileCount": 927,
   "successfulTransformationCount": 693,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
@@ -174,7 +174,8 @@
       "tests/TestData/QueryCorpus/project/app.calr",
       "tests/TestData/QueryCorpus/project/asks-across.calr",
       "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr",
-      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
+      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr",
+      "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"
     ],
     "generatedCSharpErrors": [
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m01.calr",

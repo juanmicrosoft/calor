@@ -1,0 +1,26 @@
+// #1104 crash-repro fixture (v0.16 W3(c)), reduced from the Lossy conversion of
+// bench/corpus/serilog/src/Serilog/Core/Sinks/Batching/BatchingSink.cs at the
+// pinned submodule SHA 0597ddfb (converter options as in Calor0425CorpusLedgerTests).
+//
+// The C# line `_batchScheduler.MarkFailure(out var shouldDropBatch, out var shouldDropQueue);`
+// converts to a hoisted `§B{~shouldDropQueue}` with NO initializer on its own line,
+// followed by the call. The parser reads the next expression start as the binding's
+// initializer, so the binding's value is a call whose ARGUMENT is the binding itself.
+// Resolving the type of `shouldDropQueue` then types that call's arguments, which
+// resolves `shouldDropQueue` again — unbounded before the fix; the host died.
+//
+// Reduction (each step re-crashed the unfixed tree before the next was taken):
+//   1. full converted module (176 lines) → crash
+//   2. keep only the enclosing class, the receiver field, and LoopAsync's
+//      `§B{~shouldDropBatch}` / `§B{~shouldDropQueue}` / `§C{_batchScheduler.MarkFailure}` → crash
+//   3. drop the §NS wrapper and `§B{~shouldDropBatch}` (its initializer is null,
+//      it resolves in one step and is not on the cycle) → crash — this file.
+// The receiver field is load-bearing: a receiver that does not resolve to a type
+// returns before the arguments are typed and the cycle is never entered.
+§M{m001:Calor0425Leg}
+  §CL{c002:BatchingSink:int:seal}
+    §FLD{FailureAwareBatchScheduler:_batchScheduler:priv:readonly}
+
+    §AMT{m018:LoopAsync:priv}
+      §B{~shouldDropQueue}
+      §C{_batchScheduler.MarkFailure} §A shouldDropBatch §A shouldDropQueue §/C

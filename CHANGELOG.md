@@ -24,6 +24,15 @@ All notable changes to this project will be documented in this file.
   belongs to the API-strictness family; the loop that used to borrow it as a warning now
   reports `Calor0406` as an error instead. (v0.16 W5)
 
+### Fixed
+
+- The compiler no longer crashes on converted code whose local bindings form a cycle
+  (for example, a value whose type depends on itself, which the C# → Calor converter
+  can produce from `out var` arguments). The effect checker now notices when it is
+  asking about a name it is already working out, treats that value's type as unknown,
+  and moves on. A safety limit on how deep it will follow a chain of bindings backs
+  this up. Ordinary code is checked exactly as before. (#1104)
+
 ## [0.15.0] - 2026-08-27
 
 Calor 0.15 is the "Composable Effects" release. You can now write, on a callback's type,
