@@ -19,3 +19,9 @@
     §C{Relay} §/C
   §F{f007:Quiet:pub} () -> i32
     §R INT:1
+  §F{f008:Whisper:pub} () -> void
+    §E{}
+    §C{Shout} §A STR:"z" §/C
+  §F{f009:Map:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:value) -> i32
+    §E{e}
+    §R §C{f} §A value §/C

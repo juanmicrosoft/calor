@@ -104,7 +104,7 @@ public sealed class QueryGoldenTests : IDisposable
 
             var rendered = index.FindEffectRows(owner.SymbolId)
                 .Select(row => row.OwnerSymbolId.Length == 0 && row.Kind is not ("parameter" or "return")
-                    ? $"{row.File}:{row.Line}:{row.Name}:declared={row.DeclaredRow.Display};"
+                    ? $"{row.File}:{row.Line}:{row.Name}:written={(row.Declared ? "true" : "false")};declared={row.DeclaredRow.Display};"
                         + $"inferred={row.InferredRow?.Display ?? "none"};verdict={row.Verdict};"
                         + $"code={row.DiagnosticCode ?? "none"};undeclared={string.Join(",", row.Forbidden)}"
                     : $"{row.File}:{row.Line}:{row.Name}:position={row.Kind};"
@@ -228,6 +228,10 @@ public sealed class QueryGoldenTests : IDisposable
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("verdict=does-not-fit", StringComparison.Ordinal)));
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("verdict=cannot-tell", StringComparison.Ordinal)));
         Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("code=Calor0410", StringComparison.Ordinal)));
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("written=false", StringComparison.Ordinal)));
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains("position=parameter", StringComparison.Ordinal)));
+        // The inferred row of a polymorphic body carries its variable part.
+        Assert.Contains(effects, golden => golden.Expect.Any(entry => entry.Contains(";inferred=e;", StringComparison.Ordinal)));
 
         var blast = LoadGoldens().Where(golden => golden.Facet == "impact-effects").ToArray();
         Assert.Contains(blast, golden => golden.Expect.Any(entry => entry.EndsWith(":does-not-fit", StringComparison.Ordinal)));

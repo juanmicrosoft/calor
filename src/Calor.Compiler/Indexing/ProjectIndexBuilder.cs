@@ -402,7 +402,7 @@ public static class ProjectIndexBuilder
             Kind = fact.Kind,
             Declared = fact.HasDeclaration,
             DeclaredRow = ToIndexedRow(fact.DeclaredRow, fact.DeclaredVariables),
-            InferredRow = ToIndexedRow(inferred, []),
+            InferredRow = ToIndexedRow(inferred, fact.InferredVariables),
             Verdict = VerdictText(verdict),
             DiagnosticCode = code,
             Forbidden = forbidden.Distinct(StringComparer.Ordinal).ToList(),
@@ -518,12 +518,17 @@ public static class ProjectIndexBuilder
         };
 
         // EffectRowDisplay's spelling, with the row's `eff` binders appended —
-        // a polymorphic declared row is written `e` or `cw, e`, never `[pure]`.
+        // a polymorphic row is written `e` or `cw, e`, never `[pure]`, and an
+        // assumed one `[assumed: cw, e]`. Unknown absorbs everything (§4.2).
         var display = row.ToCompactDisplayString();
-        if (indexed.Variables.Count > 0 && !row.IsUnknown && !row.IsAssumed)
+        if (indexed.Variables.Count > 0 && !row.IsUnknown)
         {
             var names = string.Join(", ", indexed.Variables.Select(variable => variable.Name));
-            display = display == "[pure]" ? names : $"{display}, {names}";
+            display = row.IsAssumed
+                ? display.EndsWith(": pure]", StringComparison.Ordinal)
+                    ? $"[assumed: {names}]"
+                    : display[..^1] + $", {names}]"
+                : display == "[pure]" ? names : $"{display}, {names}";
         }
         indexed.Display = display;
         return indexed;

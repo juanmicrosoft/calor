@@ -940,10 +940,12 @@ else, including gate 7's E5 leg (E5 is MUST and cannot ship ungated).
    the `effects` arm or the golden cannot land. *Denominator:* `tests/TestData/QueryCorpus/`,
    extended with effects ground truth. *Freeze point:* the E5 PR. E5 leg unconditional; E6/E7
    legs conditional. *Discriminating pin:* alter one expected effects answer and the golden
-   fails. **E5 leg FROZEN (E5 PR):** `effects` and `impact-effects` arms added; eight goldens
-   over `QueryCorpus/project/app.calr` (all three verdicts, a firing Calor0410, a
-   cross-module fold, and the blast radius at three hypothetical rows), plus
-   `TheEffectsGoldensExerciseEveryVerdict` as the anti-vacuity guard.
+   fails. **E5 leg FROZEN (E5 PR):** `effects` and `impact-effects` arms added; ten goldens
+   over `QueryCorpus/project/app.calr` + `contracts.calr` (all three verdicts, a firing
+   Calor0410, the cross-module fold observed on an EFFECTFUL cross-file callee — `Whisper` —
+   a rank-1 body whose inferred row keeps its variable part — `Map<eff e>` — and the blast
+   radius at three hypothetical rows), plus `TheEffectsGoldensExerciseEveryVerdict` as the
+   anti-vacuity guard.
 
 ### 4.5 Carried 0.14 debt — dispositioned with a trigger and a venue
 

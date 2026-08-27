@@ -40,6 +40,25 @@ public sealed class EffectEnforcementPass
     private readonly Dictionary<string, DeclarationEffectFact> _declarationFacts =
         new(StringComparer.Ordinal);
 
+    // v0.15 E5 (review round 1, #2) — the VARIABLE part of what a body was
+    // charged: the caller's own `eff` binders that reached it through an
+    // invoked value's row (ChargeInvokedRow) or through a rank-1 instantiation's
+    // residual (InstantiateAndCharge). `_computedEffects` is an EffectSet and
+    // cannot carry `e`; without this record the inferred row of `Map<eff e>`
+    // printed as [pure]. Bookkeeping only — no charge or diagnostic changes.
+    private readonly Dictionary<string, SortedDictionary<int, string>> _chargedVariables =
+        new(StringComparer.Ordinal);
+
+    private void RecordVariableCharge(string functionId, int ordinal, string name)
+    {
+        if (!_chargedVariables.TryGetValue(functionId, out var variables))
+        {
+            variables = new SortedDictionary<int, string>();
+            _chargedVariables[functionId] = variables;
+        }
+        variables.TryAdd(ordinal, name);
+    }
+
     /// <summary>
     /// v0.15 E5, design-doc §8.5 ("one producer, two consumers") — what this pass
     /// concluded about ONE declaration: the row it declared, the row inference
@@ -69,6 +88,9 @@ public sealed class EffectEnforcementPass
     /// mentions, by ordinal within the declaration's own <c>eff</c> list (§7).</param>
     /// <param name="InferredRow">The body's computed effects as a row: Concrete,
     /// Assumed with the D-W2.3 reasons, or Unknown.</param>
+    /// <param name="InferredVariables">The declaration's own <c>eff</c> binders the
+    /// body was charged — through an invoked value's polymorphic row or a rank-1
+    /// instantiation's residual — by ordinal and name. Empty for a monomorphic body.</param>
     /// <param name="Verdict">See the summary.</param>
     /// <param name="DiagnosticCode">The code phase 4 reports for this declaration, or null.</param>
     /// <param name="Forbidden">Surface codes the body uses and the declaration does not cover.</param>
@@ -82,6 +104,7 @@ public sealed class EffectEnforcementPass
         Binding.BoundTypes.EffectRow DeclaredRow,
         IReadOnlyList<KeyValuePair<int, string>> DeclaredVariables,
         Binding.BoundTypes.EffectRow InferredRow,
+        IReadOnlyList<KeyValuePair<int, string>> InferredVariables,
         Binding.BoundTypes.EffectFit Verdict,
         string? DiagnosticCode,
         IReadOnlyList<string> Forbidden,
@@ -145,6 +168,8 @@ public sealed class EffectEnforcementPass
     /// </summary>
     public void Enforce(ModuleNode module)
     {
+        _chargedVariables.Clear();
+
         // Phase 1: Build function map and call graph (includes functions and methods)
         _callGraphAnalysis = CallGraphAnalysis.Build(module);
 
@@ -353,6 +378,10 @@ public sealed class EffectEnforcementPass
                 }
             }
 
+            var inferredVariables = _chargedVariables.TryGetValue(function.Id, out var charged)
+                ? charged.Select(pair => new KeyValuePair<int, string>(pair.Key, pair.Value)).ToList()
+                : new List<KeyValuePair<int, string>>();
+
             _declarationFacts[function.Id] = new DeclarationEffectFact(
                 function.Id,
                 function.Name,
@@ -361,6 +390,7 @@ public sealed class EffectEnforcementPass
                 declaredSet.ToRow(),
                 variables,
                 inferredRow,
+                inferredVariables,
                 verdict,
                 code,
                 forbidden,
@@ -1267,6 +1297,11 @@ public sealed class EffectEnforcementPass
                     DiagnosticSeverity.Error);
         }
 
+        /// <summary>v0.15 E5 — the variable part of an invoked row's charge, for
+        /// <see cref="DeclarationFacts"/>. Bookkeeping, not a diagnostic.</summary>
+        public void RecordVariableCharge(string functionId, int ordinal, string name)
+            => _pass.RecordVariableCharge(functionId, ordinal, name);
+
         /// <summary>§10.1's provenance clause, keyed by function and surface code —
         /// the same table site 6 writes, read by <see cref="CheckEffects"/>.</summary>
         public void RecordProvenance(string functionId, string code, string why)
@@ -1871,7 +1906,11 @@ public sealed class EffectEnforcementPass
             var callerOwn = PolyRow.FromDeclaration(_function.Effects);
             foreach (var ordinal in instantiated.Variables.Keys)
             {
-                if (callerOwn.Variables.ContainsKey(ordinal)) continue;
+                if (callerOwn.Variables.ContainsKey(ordinal))
+                {
+                    _pass.RecordVariableCharge(_function.Id, ordinal, BinderName(_function, ordinal));
+                    continue;
+                }
                 var name = BinderName(_function, ordinal);
                 _pass._diagnostics.Report(
                     _function.Effects?.Span ?? _function.Span,
@@ -3244,7 +3283,10 @@ public sealed class EffectEnforcementPass
                 foreach (var (ordinal, variable) in row.Variables)
                 {
                     if (ordinal >= 0 && ordinal < function.EffectParameters.Count)
+                    {
+                        _context.Invocations?.RecordVariableCharge(functionId, ordinal, variable);
                         continue;
+                    }
                     _context.Invocations?.ReportUndeclaredEffectVariable(
                         functionId,
                         function.Effects?.Span ?? function.Span,

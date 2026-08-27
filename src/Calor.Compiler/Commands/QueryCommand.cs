@@ -250,23 +250,33 @@ public static class QueryCommand
 
         var impacts = index.FindEffectImpact(target.SymbolId, hypothetical);
         var stopFitting = 0;
+        var cannotTell = 0;
         foreach (var impact in impacts.OrderBy(
                      impact => $"{impact.Declaration.File}:{impact.Declaration.Line}",
                      StringComparer.Ordinal))
         {
             var declared = impact.Row?.DeclaredRow.Display ?? "(no row recorded)";
             var verdict = ProjectIndexBuilder.VerdictText(impact.Verdict);
-            if (impact.Verdict != EffectFit.Fits)
+            if (impact.Verdict == EffectFit.DoesNotFit)
                 stopFitting++;
+            else if (impact.Verdict == EffectFit.CannotTell)
+                cannotTell++;
             Console.WriteLine(
                 $"  {Describe(impact.Declaration)} — declares {declared}: {verdict}");
         }
 
+        // "Would stop fitting" is DoesNotFit only; a caller whose row is Unknown
+        // or unrecorded is counted as what it is — undecided — never as broken.
         Console.WriteLine(
             impacts.Count == 0
                 ? $"impact: nothing calls into {Describe(target)}, so no declared row is affected by a row of {rowDescribed}"
                 : $"impact: {stopFitting} of {impacts.Count} affected declaration(s) would stop fitting "
                     + $"a row of {rowDescribed} on {Describe(target)}");
+        if (cannotTell > 0)
+        {
+            Console.WriteLine(
+                $"impact: {cannotTell} of {impacts.Count} cannot tell — no declared row the index could compare against");
+        }
         ReportResidual(index, index.ImpactAnswerIsPartial());
         return 0;
     }

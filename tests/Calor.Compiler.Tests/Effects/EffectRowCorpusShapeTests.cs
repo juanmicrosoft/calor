@@ -67,6 +67,25 @@ public sealed class EffectRowCorpusShapeTests
         }
     }
 
+    /// <summary>
+    /// Committed <c>.calr</c> written AFTER Decision 1 landed, in the new syntax, on
+    /// purpose. The sweep below guards §3.2's "zero regressions" claim — that no
+    /// file written BEFORE the line rule changes meaning under it — and a file
+    /// authored under the rule is not a regression of it. Each entry names why it
+    /// exists; adding one is a review event (the sweep's own message says so), not
+    /// a silent widening.
+    ///
+    /// <list type="bullet">
+    /// <item><c>tests/TestData/QueryCorpus/project/app.calr</c> — v0.15 E5 (review
+    /// round 1, #2): gate 7's polymorphic golden, <c>Map&lt;eff e&gt; (Func&lt;i32,i32&gt;:f §E{e}, …)</c>,
+    /// pins that the inferred row of a rank-1 body keeps its variable part.</item>
+    /// </list>
+    /// </summary>
+    private static readonly HashSet<string> AuthoredUnderDecisionOne = new(StringComparer.Ordinal)
+    {
+        "tests/TestData/QueryCorpus/project/app.calr",
+    };
+
     [Fact]
     public void NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges()
     {
@@ -80,6 +99,9 @@ public sealed class EffectRowCorpusShapeTests
         var offenders = new List<string>();
         foreach (var relative in files)
         {
+            if (AuthoredUnderDecisionOne.Contains(relative))
+                continue;
+
             var lines = File.ReadAllLines(Path.Combine(root, relative));
             for (var i = 0; i < lines.Length; i++)
             {

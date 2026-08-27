@@ -106,7 +106,13 @@ public sealed class IndexedRow
     /// <summary>Compact surface codes, ordinal-sorted. Empty for a pure or an Unknown row.</summary>
     public List<string> Effects { get; set; } = [];
 
-    /// <summary>The <c>eff</c> binders the row mentions, by ordinal in the declaration's own <c>eff</c> list (§7).</summary>
+    /// <summary>
+    /// The <c>eff</c> binders the row mentions, by ordinal in the declaration's own
+    /// <c>eff</c> list (§7). On a DECLARED row: what the author wrote. On an INFERRED
+    /// row: the binders the body was charged through an invoked value's polymorphic
+    /// row or a rank-1 instantiation's residual — the part <c>EffectSet</c> cannot
+    /// carry, recorded by the pass beside its computed set.
+    /// </summary>
     public List<IndexedEffectVariable> Variables { get; set; } = [];
 
     /// <summary>Why the row is only assumed — empty unless <see cref="State"/> is <c>assumed</c>.</summary>
