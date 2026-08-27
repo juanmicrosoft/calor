@@ -181,6 +181,9 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
+            // PP-W-rows pair fixtures (roadmap v0.16 §4.1): the same spike blobs as
+            // per-arm starters plus their seeded mutants, deliberately full of rows.
+            .Where(line => !line.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

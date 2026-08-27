@@ -946,6 +946,10 @@ public sealed class LosslessFormattingTests : IDisposable
             // and this line does not change it, because those files were never
             // among the 886.
             .Where(path => !path.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
+            // The PP-W-rows pairs (roadmap v0.16 §4.1) are those spike fixtures again,
+            // byte-identical per-arm starters plus their seeded mutants — measurement
+            // fixtures, not corpus. Same rule, same reason; the count is unchanged.
+            .Where(path => !path.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToArray();
     }

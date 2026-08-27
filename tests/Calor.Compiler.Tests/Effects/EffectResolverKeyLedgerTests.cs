@@ -327,7 +327,10 @@ public class EffectResolverKeyLedgerTests
                 var directories = segments.Take(segments.Length - 1).ToList();
                 return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
-                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
+                    // PP-W-rows pair fixtures (roadmap v0.16 §4.1): the spike blobs again as
+                    // per-arm starters plus seeded mutants — not corpus; counts unchanged.
+                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

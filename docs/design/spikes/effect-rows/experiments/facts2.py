@@ -25,6 +25,10 @@ print(sh("sed -n '/1. \\*\\*Effect laundering, closed classes/,/^2\\. \\*\\*High
 
 print("\n### files with two-line §O then §E (23 files)")
 files = subprocess.run(["git","ls-files","*.calr"],capture_output=True,text=True).stdout.split()
+# bench/phase0-agent-native/pairs/W-00*: the PP-W-rows pair fixtures (roadmap v0.16 §4.1) —
+# the spike blobs again as per-arm starters plus their seeded mutants (which carry §LAM);
+# excluded for the same reason facts.py excludes the spike artifacts.
+files = [f for f in files if not f.startswith("bench/phase0-agent-native/pairs/W-00")]
 hits=[]
 for f in files:
     L=open(f,encoding="utf-8",errors="replace").read().split("\n")

@@ -69,7 +69,10 @@ print("\n### whole-corpus function-typed positions (IsFunctionTypeName shapes)")
 # shapes in 5 files, all conversion snapshots" (§1) false by self-reference.
 # HigherOrderDemandLedgerTests and LosslessFormattingTests exclude the same path
 # for the same reason. This line does not change the count.
-CORPUS = "git ls-files '*.calr' | grep -v '^docs/design/spikes/'"
+# bench/phase0-agent-native/pairs/W-00*: the PP-W-rows pair fixtures (roadmap v0.16 §4.1) —
+# the spike blobs again as per-arm starters plus their seeded mutants; excluded for the
+# same reason the spike artifacts are.
+CORPUS = "git ls-files '*.calr' | grep -v '^docs/design/spikes/' | grep -v '^bench/phase0-agent-native/pairs/W-00'"
 print(sh(f"{CORPUS} | xargs grep -hoE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null | wc -l"))
 print(sh_sorted(f"{CORPUS} | xargs grep -lE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))
 
