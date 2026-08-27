@@ -45,6 +45,42 @@ All notable changes to this project will be documented in this file.
   silencing Calor0425 — the "I can't tell" warnings. Waiving *we don't know* is
   honest; waiving *we know it's wrong* isn't.
 
+- **Write one function that works for pure *and* impure callbacks.** Say you write a
+  `Map` that takes a list and a callback. If the callback is pure, `Map` should be
+  pure. If the callback prints, `Map` prints. Before, you had to pick one and be
+  wrong half the time. Now you can write `<eff e>` on the function and use `e` as
+  the callback's permission, and the compiler works out what `e` means **at each
+  call site, from the callback you actually passed**. Pass a pure callback and `Map`
+  is pure; pass a printing one and `Map` prints — and if the calling function didn't
+  say it prints, you get told, with a line explaining exactly where the permission
+  came from.
+
+  The name you give the placeholder doesn't matter. An interface can call it `e` and
+  the class implementing it can call it `f`; the compiler matches them by position,
+  the way it already matches ordinary type parameters. And if the compiler can't work
+  out what the placeholder should be — because the callback you passed carries no
+  annotation — it says so (Calor0425) instead of guessing.
+
+- **The `§E{…}` on a lambda is now a promise the compiler checks.** You could always
+  write one; the compiler read it and threw it away. Now it compares it against what
+  the lambda body actually does, and tells you if the body does more than the lambda
+  promised. If you *don't* write one, the compiler works the permission out from the
+  body — which means a lambda you hand to something with an annotation is now
+  properly checked instead of coming back "I can't tell".
+
+- **Two more "I can't tell" cases now say so out loud.** When a method overrides
+  something from a C# base class the compiler can't see, or a class satisfies an
+  interface through a member inherited from one, the permissions can't be verified.
+  That used to be filed as an assumption (Calor0419); it is now a Calor0425 warning
+  that names the row it is assuming and says plainly that it is assumed, not
+  verified. Nothing else changes: no Calor file in this repository compiles
+  differently.
+
+- **Callbacks whose type came from a `§CSHARP` block are checked now too.** If you
+  declared a delegate inside an interop block and used it as a parameter type, the
+  compiler previously didn't recognise it as a callback at all and skipped the
+  check. It asks the type checker now instead of guessing from the name.
+
 - **Calling a callback is still Calor0418 for one more release.** Annotating one and
   passing it around is fully checked now. *Invoking* it still isn't allowed under
   effect enforcement, because charging the call to the caller needs the last piece of

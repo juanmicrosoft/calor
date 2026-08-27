@@ -197,6 +197,30 @@ three source files — `Commands/IndexCommand.cs`, `Commands/QueryCommand.cs`,
 >
 > **Eight positions** (§3.3). No new token, no new AST node type, no new `IAstVisitor` method.
 
+> **STATUS — LANDED IN FULL, PR #1110, v0.15 E3 slice b.** Site 6 is implemented:
+> at a call to a declaration carrying `eff` binders each variable is solved ONCE
+> from the argument rows (§7.4's one-line solve, no fixpoint — **R3**), the
+> instantiated own-row is charged to the CALLER, and a variable the arguments
+> cannot determine yields Calor0425 at the call site. Rows carry variable
+> **ordinals** (`EffectsNode.EffectVariableOrdinals`), so an interface member's
+> `eff e` and its implementation's `eff f` unify under the ORDINARY `fits`
+> relation with no rank-1-specific branch — **R2**, and `A3-middleware-alpha`
+> passes for that reason rather than, as in slice a, because the two were never
+> compared. **R1** holds: all four combinators compile with zero Calor0424, zero
+> Calor0425 and zero Calor0404, the only residue being the Calor0418 at each
+> invocation of a row-less value, which is E4's. The §7.5 ramp does **not** fire.
+>
+> **One divergence from §6.2, reported not absorbed.** §6.2's row 6 writes
+> Calor0424 for site 6's `DoesNotFit`. Under §7.4's own solve that cell is
+> **unreachable**: the solution is defined as the join of the residuals
+> `ρ(argⱼ) ⊖ ρ_declⱼ`, so the substituted parameter row contains every argument's
+> row by construction and no argument at a variable-mentioning position can fail
+> `fits`. What site 6 catches is the CALLER under-declaring the instantiated
+> row — which is exactly what §10.3's own worked example spells, as **Calor0410
+> plus the new provenance clause**. Gate 1's sixth class is closed; the code in
+> that cell is 0410, not 0424. Adjudication of §6.2's table belongs to this
+> document's owner.
+>
 > **STATUS — LANDED (syntax only), PR #1101, v0.15 E2 slice a.** All eight positions parse,
 > `CalorEmitter` round-trips every one, and **Calor0405** replaces the cascade at the positions
 > with no `§E` arm. What landed is the *writing* of a row; **nothing compares two rows yet**.
@@ -713,6 +737,23 @@ Formally the *destination's* parameter row must fit into the *source's*.
 > **Decision.** It **becomes the lambda's declared row**, checked against the body exactly as a
 > function's `§E` is (Calor0410). Omitted → inferred from the body, no diagnostic. Not removed.
 
+> **STATUS — LANDED, PR #1110, v0.15 E3 slice b (P14).** The effect pass records ρ_body for
+> every `§LAM` it walks (`InferenceContext.RecordLambdaBody`, written from `InferFromLambda`,
+> last-write-wins so an SCC's fixpoint leaves the CONVERGED row) and checks it against ρ_decl in
+> a new phase 3e: `DoesNotFit` → Calor0410 at the `§E` span, per effect, in today's shape;
+> `CannotTell` → Calor0425. An un-annotated lambda's TYPE row is now ρ_body rather than E2b/E3a's
+> `Unknown` placeholder, and an annotated one's is `Concrete(declared)` — the declaration
+> boundary of the paragraph below, observed by `LambdaTypeCarriesDeclaredNotInferred`.
+>
+> **Measured effect of replacing the Unknown placeholder: two harness sites, zero corpus sites.**
+> `run2.py`'s **Y3a-B-with-sameline-E** (site 1) and **Y4a-O-sameline-E-decl-later** (site 3) each
+> lose the Calor0425 slice a gave them, because a decided `Fits` replaces `CannotTell`. The
+> committed corpus does not move at all, and its one Calor0425
+> (`13-03.approved.calr`) correctly SURVIVES: that site is a row-less `§LAM` returned into a
+> **row-less return**, so ρ_body fixes the source while the destination stays Unknown — and
+> `fits(anything, Unknown)` is `CannotTell` by §4.3. The expectation that ρ_body would clear it
+> was wrong about which side was unknown.
+
 Today it is parsed (`Parser.cs:11392-11397`), carried into the bound tree
 (`Binding/BoundNodes.cs:2128-2129`, AST field `Ast/LambdaNodes.cs:41`) and **discarded** —
 `InferFromLambda` (`EEP:2942-2954`) charges the body and never reads `lambda.Effects`. Executed:
@@ -846,7 +887,22 @@ Draft v1 used Calor0424 for rank-1 scope violations, conflating a *declaration* 
 `CannotTell` at **any** site reports **Calor0425** at the same span, whatever that site's
 `DoesNotFit` code is — including sites 4 and 5, which today emit Calor0419 for external bases
 (`EEP:548-553`, `:596-611`). Those two Calor0419 emissions are retired in favour of Calor0425;
-§13.1 disposes of the three existing pins that observe them. Per §4.4, a `Fits`-carrying-reasons
+§13.1 disposes of the three existing pins that observe them.
+
+> **STATUS — BOTH ARMS RETIRED, PR #1110, v0.15 E3 slice b.** Slice a took neither, on the
+> ground that they must move together (§6.2's third scope decision). Both move here. The override
+> arm's `AddAssumption` is gone: measured rather than feared, the assumption channel carries
+> **reasons, not effects** (`AddAssumption` appends to `_assumedEffects`, which drives Calor0419
+> and nothing else), so retiring it cannot move a computed effect set or a Calor0410 — and the
+> committed corpus confirms it, with Calor0410 unchanged at 464 and the three surviving Calor0419s
+> all the `§CS`-interop kind. §6.4's **third** message sample ships with them, pinned by full
+> equality. `StrictnessBatchTests.cs:260` and `:607` are re-pinned in place, preserving the file's
+> line numbering so `facts.py`'s probes keep their meaning.
+>
+> **P32 moves 0 → 4 and this is the whole cause** — 1 in serilog, 3 in FluentValidation, attributed
+> by disabling each candidate change in turn rather than by inference. The ledger's cause taxonomy
+> has no bucket for it, so all four land in its `UnknownSource` ELSE arm; §13.4's taxonomy is E4's
+> to revisit. Per §4.4, a `Fits`-carrying-reasons
 verdict makes the destination row `Assumed`, so the assumption survives the hop.
 
 **Cross-module is the Calor0410 rule, not a seventh site.**
@@ -1417,6 +1473,17 @@ that rank-1 rows *type-check* and *erase at codegen*, not that the representatio
 
 ### 8.2 `FunctionBoundType`
 
+> **THE BOUND TYPE HAS A PRODUCTION READER — E3 slice b, PR #1110.**
+> `RowSiteChecker.IsFunctionTyped` now asks the BOUND answer before the string test:
+> `CallGraphAnalysis` exposes `DeclaredFunctionTypes` / `DeclaredReturnFunctionType` /
+> `DeclaredFieldFunctionType`, collected from the same `Bind()` call that already resolves the
+> call sites, and `VariableSymbol.FunctionType` and `FunctionSymbol.ReturnFunctionType` gain
+> their first readers in `src/`. It is load-bearing rather than decorative: a `§CSHARP`-declared
+> delegate parameter — **the A2 shape** — is not recognised by
+> `TypeIdentity.IsFunctionTypeName`, so slice a MISSED that site entirely. Measured, not claimed:
+> the same source draws zero Calor0424 at `9119397e` and one here. The string test remains as the
+> documented fallback for positions the binder has no symbol for.
+>
 > **LANDED — E2 slice b, PR #1102.** `Row` and `ParameterRows` exist, default to
 > `EffectRow.Unknown`, are part of `Equals`/`GetHashCode`, and are absent from `DisplayString`.
 > `ParameterRows` is length-aligned to `ParameterTypes` by construction. Producers today:
@@ -2036,6 +2103,24 @@ was the test lens's cross-cutting defect. "Design-doc merge" means this document
 | P30 | **`O53Baseline_HasLedgerShape_AndTheCountsTheDocQuotes`** — `o53/baseline.json` gains `schemaVersion` + `measuredCommit` (40-hex, shape-checked not compared to HEAD, per `HigherOrderDemandLedgerTests.cs:480-498`) and the test asserts 23 files / 54 occurrences / 1 green / 22 red **and the 18+3+1 breakdown** §3.2 quotes | same — **landed in this PR** | **before E2** (already frozen) | change any count → red |
 | P31 | **`SpikeArtifactManifestIsComplete`** — for every artifact in `spike-verdict.json`, the `before/`/`after/` `.calr`, `.g.cs` and diagnostic list exist, are non-empty, and the diagnostic list parses. Replaces v2's unsound decline of the presence check (P27 would pass with every artifact missing) | `SpikeVerdictTests.cs` | **spike PR** | delete one `.g.cs` → red |
 | P32 | **`Calor0425CorpusLedgerMatchesRecomputation`** — §13.4's ledger, exact-equality per subject and per cause, `measuredCommit` shape-checked. The only instrument v2 left without a P-number | `tests/Calor.Compiler.Tests/Effects/Calor0425CorpusLedgerTests.cs` (`compiler` shard, `Skip.IfNot` on submodules, registered in `eng/test-manifest.json`) | ~~before E2~~ → **with E3** (see the note below) | change one per-subject count → red |
+
+> **EXECUTED — E3 slice b, PR #1110.** Status of every pin this slice owed:
+>
+> | Pin | Status | Home |
+> |---|---|---|
+> | **P14** | **LANDED.** Four cases plus two the pin did not name: an omitted row is not merely inferred but CHECKED at the binding site, and an annotated lambda's TYPE carries ρ_decl not ρ_body | `Calor.Enforcement.Tests/EffectRowLambdaTests.cs` (new) |
+> | **P15** | **LANDED for all six.** The site-6 gap pin is flipped from `..._IsSliceBs_AndTheGapIsObserved` to `RowMismatch_AtGenericInstantiation_IsError`, with `_Compiles` and `_CannotTell` halves. **Its code is Calor0410, not Calor0424** — see §7's status block; the class is closed, the cell's code moves | `StrictnessBatchTests.cs` |
+> | **P18** | **LANDED**, ordinal cases: `EffVariableOrdinal_AlphaEquivalent`, `..._UnifiesAcrossInterfaceAndImpl`, and a discriminator proving the ordinal is relative to the `eff` list and NOT to `EffectParameterInfo.Ordinal`'s combined position | `EffectVariableTests.cs` |
+> | **P22** | **LANDED** for §10.3's two strings and §6.4's third sample, all by FULL equality. §10.3's second string ships with a **different tail** from the doc's sample: the doc says the caller "is charged Unknown effects", and charging `unknown` would raise a Calor0410 no author can declare away, so the shipped text says what actually happens — nothing is charged. §10.1's string remains E4's | `StrictnessBatchTests.cs` |
+> | **P23** | **LANDED**, with `CurrentCompilerSemanticsVersion` frozen explicitly against G-CODEGEN | `Calor.Compiler.Tests/IncrementalCliBuildTests.cs` |
+> | **P32** | **REGENERATED**, 0 → 4 (serilog 1, FluentValidation 3), cause bisected to the external-base Calor0419 retirement and to nothing else | `Calor0425CorpusLedgerTests.cs` |
+>
+> **Gate 1's denominator is now six closed classes**, with the sixth spelled Calor0410 + §10.3's
+> provenance clause rather than Calor0424. The §7.5 ramp did not fire, so P18 and P15's site-6 pair
+> both ship.
+>
+> A seventh pin lands that §13.2 did not name, because §8.2's bound reader had no pin at all:
+> `CSharpDeclaredDelegateParameter_IsASite_ThroughTheBoundFunctionType`, both polarities.
 
 > **P17 and P32's freeze column was impossible, and is corrected to "with E3"** (E2 slice b,
 > review round 1 MINOR 12). Both were frozen "before E2", and **neither can exist until E3**:
