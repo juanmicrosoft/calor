@@ -1,0 +1,36 @@
+§M{m001:MiddlewareAfter}
+  §F{f001:RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+    §E{e}
+    §B{first:i32} §C{g}
+    §B{second:i32} §C{g}
+    §R (+ first second)
+
+  §F{f002:Beat:pub} () -> i32
+    §E{cw}
+    §P "beat"
+    §R INT:1
+
+  §F{f003:Tick:pub} () -> i32
+    §E{}
+    §R INT:1
+
+  §IFACE{i001:IPipelineBehavior}
+    §MT{mt001:Handle}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e}
+
+  §CL{c001:RetryBehavior:pub}
+    §IMPL{IPipelineBehavior}
+    §FLD{Func<i32>:loud:pri} §E{cw}
+    §FLD{Func<i32>:quiet:pri} §E{}
+    §CTOR{ctor001:pub} ()
+      §ASSIGN loud MiddlewareAfterModule.Beat
+      §ASSIGN quiet MiddlewareAfterModule.Tick
+    §MT{mt002:Handle:pub}<eff e> (i32:request, Func<i32>:next §E{e}) -> i32
+      §E{e}
+      §R §C{RunTwice} §A next §/C
+    §MT{mt003:Twice:pub} () -> i32
+      §E{}
+      §R §C{RunTwice} §A quiet §/C
+    §MT{mt004:Probe:pub} () -> i32
+      §E{cw}
+      §R §C{RunTwice} §A loud §/C

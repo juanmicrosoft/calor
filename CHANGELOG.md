@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Benchmark: added the six "PP-W-rows" task pairs (`bench/phase0-agent-native/pairs/W-00x-*`) that the v0.16 plan will use to check whether the effect rows from 0.15 stop AI agents from hiding a console print inside a function that claims to be silent. Each pair ships the frozen starting program for both compilers (0.14.3 and 0.15.0), a plain-language task, held-out tests that catch the hidden print at run time, and a worked example of both the shortcut and the honest solution, with every compile result recorded in `pairs/ppw-seeded-compiles.json`. No agent runs yet.
+
 ## [0.15.0] - 2026-08-27
 
 Calor 0.15 is the "Composable Effects" release. You can now write, on a callback's type,

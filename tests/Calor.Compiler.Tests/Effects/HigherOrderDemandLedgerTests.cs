@@ -305,7 +305,14 @@ public class HigherOrderDemandLedgerTests
                     // committed on purpose, so they cannot be moved and must be
                     // excluded by path instead. The ledger's counts are unchanged
                     // by this line — these files were never part of the 886.
-                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
+                    // The PP-W-rows pairs (roadmap v0.16 §4.1) are those same spike
+                    // fixtures again — byte-identical copies of before/*.calr and
+                    // after/*.calr frozen at 7d621c0d as per-arm starters — plus their
+                    // seeded shortcut/clean mutants. They are measurement fixtures for
+                    // an agent epoch, not corpus, and the ledger's counts are unchanged
+                    // by this line (S3 (c), bench/phase0-agent-native/pairs/W-00x-*).
+                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

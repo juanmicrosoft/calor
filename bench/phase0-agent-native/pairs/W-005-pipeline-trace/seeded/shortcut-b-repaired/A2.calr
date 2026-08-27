@@ -1,0 +1,38 @@
+§M{m001:MediatR.Pipeline}
+  §NS{ns001:MediatR.Pipeline:file}
+    §U{System.Collections.Generic}
+    §U{System.Threading}
+    §U{System.Threading.Tasks}
+
+    §IFACE{i002:IRequestPreProcessor<in TRequest>}
+      §MT{m003:Process} (TRequest:request, CancellationToken:cancellationToken) -> Task
+
+    §IFACE{i004:IPipelineBehavior<TRequest,TResponse>}
+      §MT{m005:Handle}<eff e> (TRequest:request, RequestHandlerDelegate<TResponse>:next §E{e}, CancellationToken:cancellationToken) -> Task<TResponse>
+        §E{e}
+
+    §CL{c006:RequestPreProcessorBehavior<TRequest,TResponse>:pub}
+      §IMPL{IPipelineBehavior<TRequest, TResponse>}
+
+      §FLD{Seq<IRequestPreProcessor<TRequest>>:_preProcessors:priv:readonly}
+
+      §CTOR{ctor007:pub} (Seq<IRequestPreProcessor<TRequest>>:preProcessors)
+        §ASSIGN _preProcessors preProcessors
+
+      §AMT{m008:Handle:pub}<eff e> (TRequest:request, RequestHandlerDelegate<TResponse>:next §E{e}, CancellationToken:cancellationToken) -> TResponse
+        §E{e}
+        §P (+ "pre:" request)
+        §EACH{each009:processor:var} _preProcessors
+          §B{_} §AWAIT §C{processor.Process} §A request §A cancellationToken §/C
+        §R §AWAIT §C{next}
+
+    §CL{c010:TracePreProcessor<TRequest>:pub}
+      §IMPL{IRequestPreProcessor<TRequest>}
+      §MT{m011:Process:pub} (TRequest:request, CancellationToken:cancellationToken) -> Task
+        §E{}
+        §R Task.CompletedTask
+
+
+    §CSHARP{public delegate Task<TResponse> RequestHandlerDelegate<TResponse>();}§/CSHARP
+
+

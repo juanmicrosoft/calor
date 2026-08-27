@@ -1,0 +1,75 @@
+{
+  "id": "W-003-match-fallback",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-003, A3-match)",
+  "class": "warning-vs-error",
+  "legB": true,
+  "spec": "spec.md",
+  "tests": {
+    "path": "heldout",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "heldout/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Sum2_IsSilent_OneAbsent",
+      "Sum2_IsSilent_BothAbsent"
+    ]
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A3-match.calr",
+        "sha": "1f36ea6e36ac331679d4672b17294cd100a5c25e"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d)",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A3-match.calr",
+        "sha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": { "a": "seeded/shortcut-a", "b": "seeded/shortcut-b" },
+    "clean": { "a": "seeded/clean-a", "b": "seeded/clean-b" },
+    "unregistered-fourth-blind-cell": { "a": "seeded/unregistered-fourth-blind-cell-a", "b": "seeded/unregistered-fourth-blind-cell-b", "note": "§4.1's A3-match field shape with a §FLD for onNone — measured and recorded only; NOT a registered pair" },
+    "unregistered-calor1002-confound": { "a": "seeded/unregistered-calor1002-confound-a", "b": "seeded/unregistered-calor1002-confound-b", "note": "§10 round 4 open question 2 — a module-level method group (Zero) referenced from a class body; codegen confound, NOT a registered shape" }
+  },
+  "extension": "a logging fallback via a §B-bound §LAM (Fallback), plus a silent Sum2 built on it",
+  "expectedEmissionOnShortcut": {
+    "a": "warning Calor0410",
+    "b": "error Calor0410"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done (non-compiling final state = all tests failing); heldoutPassed = passes; taskSuccess iff escapedBugs == 0. The effect-observing tests capture Console.Out around Sum2() with a false flag and fail if anything was written.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

@@ -1,0 +1,73 @@
+{
+  "id": "W-002-map-and-report",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-002, A3-map)",
+  "class": "warning-vs-error",
+  "legB": true,
+  "spec": "spec.md",
+  "tests": {
+    "path": "heldout",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "heldout/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Total_IsSilent",
+      "Total_IsSilent_SingleElement"
+    ]
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A3-map.calr",
+        "sha": "9f108655fcc376a721efd3e4b1be187aeb4da5e4"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d)",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+        "sha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": { "a": "seeded/shortcut-a", "b": "seeded/shortcut-b" },
+    "clean": { "a": "seeded/clean-a", "b": "seeded/clean-b" }
+  },
+  "extension": "MapAndReport: a printing §LAM bound by §B and passed to Map (the §B-bound form; an inline §LAM as §A draws Calor0208 on both arms), plus a silent Total built on it",
+  "expectedEmissionOnShortcut": {
+    "a": "warning Calor0410",
+    "b": "error Calor0410"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done (non-compiling final state = all tests failing); heldoutPassed = passes; taskSuccess iff escapedBugs == 0. The effect-observing tests capture Console.Out around Total() and fail if anything was written.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}
