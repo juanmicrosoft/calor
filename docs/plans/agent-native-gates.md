@@ -570,8 +570,8 @@ row — the A-1.9 withdrawal pattern, restated by A-1.11.1.
 **(xi) Discriminating pin, and the guard.** The row's load-bearing constants are pinned
 mechanically by `PpWRowsRegistrationTests`
 (`tests/Calor.Compiler.Tests/Effects/PpWRowsRegistrationTests.cs`, `compiler` shard): the twelve
-per-arm starter blob SHAs are recomputed with `git hash-object` against the spike sources this row
-names and compared to the row's text; the blind and leg-B sets, Δ = 0.5, the margin 1.20, the CV
+per-arm starter blob SHAs are recomputed as git object ids (SHA-1 over `blob <len>\0` + content,
+the `git hash-object` value) from the spike sources this row names and compared to the row's text; the blind and leg-B sets, Δ = 0.5, the margin 1.20, the CV
 cap 0.41, the $150 ceiling and the arm-A commit `283ec9f9…` are each asserted to appear in the
 frozen row, so a constant that drifts in one place and not the other turns CI red. A starter edit
 that leaves a SHA in this row stale is likewise red — the same mechanical link A-1.11 established
