@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -73,7 +74,7 @@ public sealed class PpWRowsRegistrationTests
         ("W-006", "W-006-map-doubler", "A3-map.calr"),
     ];
 
-    private static readonly string[] BlindPairs = ["W-001", "W-004", "W-006"];
+    private static readonly string[] BlindPairs = ["W-001", "W-004", "W-006"];   // ordinal order
 
     private static readonly string[] WarningVsErrorPairs = ["W-002", "W-003", "W-005"];
 
@@ -103,7 +104,7 @@ public sealed class PpWRowsRegistrationTests
         ("null p95", "p95 1.1766"),
         ("across-seed range", "range **1.1766–1.1864**"),
         ("Monte-Carlo half-width", "half-width of **0.005**"),
-        ("margin rule", "the 0.05 grid line above (p95 + its Monte-Carlo half-width)"),
+        ("margin rule", "the smallest 0.05 grid line at or above (p95 + its Monte-Carlo half-width)"),
         ("CV cap arithmetic", "1.5 × 0.2746 = 0.4119 → cap 0.41"),
         // Spend.
         ("archived per-run cost", "$1.0048 per run"),
@@ -191,6 +192,169 @@ public sealed class PpWRowsRegistrationTests
             PairDirectories.Select(p => p.Pair).OrderBy(p => p, StringComparer.Ordinal),
             BlindPairs.Concat(WarningVsErrorPairs).OrderBy(p => p, StringComparer.Ordinal));
         Assert.Equal(["W-005"], PairDirectories.Select(p => p.Pair).Except(LegBPairs, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// M7 (review round 1): the cell classes are <b>parsed out of the frozen row</b> and compared
+    /// to the pinned sets, in both directions. The earlier version only cross-checked the two
+    /// pinned arrays against each other, so swapping W-002 and W-006 between them stayed green
+    /// while inverting which pairs the verdict is read on — the single most consequential silent
+    /// mutation available on this row.
+    /// </summary>
+    [Fact]
+    public void TheRowsOwnCellClassesEqualThePinnedSets()
+    {
+        var row = FrozenRow();
+
+        Assert.Equal(BlindPairs, ParseBraceSet(row, "*blind* = {"));
+        Assert.Equal(WarningVsErrorPairs, ParseBraceSet(row, "*warning-vs-error* = {"));
+        Assert.Equal(LegBPairs, ParseBraceSet(row, "`legBPairs` = {"));
+        Assert.Equal(BlindPairs, ParseBraceSet(row, "`blindPairs` = {"));
+    }
+
+    /// <summary>
+    /// The scar left by review round 1's CRITICAL: the frozen row asserted that
+    /// <c>Calor0418</c> "stays an error under every flag" while its own six arm-A cells recorded
+    /// <c>warning Calor0418</c> at exit 0. The row cannot be corrected after merge, so the
+    /// contradiction is pinned out of any future row instead.
+    /// </summary>
+    [Fact]
+    public void TheRowNeverClaimsCalor0418IsAlwaysAnErrorWhileRecordingItAsAWarning()
+    {
+        var row = FrozenRow();
+        var recordsWarning = row.Contains("warning Calor0418", StringComparison.Ordinal)
+            || row.Contains("`warning Calor0418`", StringComparison.Ordinal)
+            || row.Contains("w 0418", StringComparison.Ordinal);
+        Assert.True(recordsWarning, "the row is expected to record arm A's demoted Calor0418");
+
+        foreach (var claim in new[]
+        {
+            "or `Calor0418`, which stay errors under every flag",
+            "`Calor0418`, which stay errors under every flag",
+            "`Calor0418` stays an error under every flag",
+        })
+        {
+            Assert.False(
+                row.Contains(claim, StringComparison.Ordinal),
+                "the frozen row records `warning Calor0418` on arm A, so it may not also claim "
+                + $"\"{claim}\" — that is review round 1's C1, and it cannot be fixed after merge.");
+        }
+
+        // The verified per-arm facts must be the ones the row states.
+        Assert.Contains("suppresses `Calor0411`", row, StringComparison.Ordinal);
+        Assert.Contains("demotes `Calor0418` to a warning", row, StringComparison.Ordinal);
+        Assert.Contains("`Calor0424` and `Calor0425` DO NOT EXIST at `63316987`", row, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// M6 (review round 1): nothing linked the 43 frozen per-arm compile multisets, or the
+    /// per-pair escape counts, to the row — flipping W-004's arm-A cell from blind to
+    /// warning-vs-error, or halving an escape count, both left the suite green. This asserts each
+    /// registered cell's <c>(exitCode, code, severity, line, column)</c> against the row's own
+    /// text. Skips until #1123 lands, mirroring
+    /// <see cref="PairStarterCopiesMatchTheFrozenBlobShas"/>.
+    /// </summary>
+    [SkippableFact]
+    public void FrozenSeededCompilesAgreeWithTheRowsEnumeratedCells()
+    {
+        var manifest = Path.Combine(
+            RepositoryRoot(), "bench", "phase0-agent-native", "pairs", "ppw-seeded-compiles.json");
+        Skip.IfNot(
+            File.Exists(manifest),
+            "ppw-seeded-compiles.json is not in the tree yet (branch bench/s3-ppw-rows-pairs, "
+            + "PR #1123, unmerged at A-1.12's registration)");
+
+        var row = FrozenRow();
+        using var document = JsonDocument.Parse(File.ReadAllText(manifest));
+        var compiles = document.RootElement.GetProperty("compiles");
+
+        var seen = 0;
+        foreach (var compile in compiles.EnumerateArray())
+        {
+            if (!string.Equals(compile.GetProperty("role").GetString(), "shortcut", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var pair = compile.GetProperty("pair").GetString()!;
+            var shortId = pair[..5];
+            var arm = compile.GetProperty("arm").GetString()!;
+            var exit = compile.GetProperty("exitCode").GetInt32();
+            seen++;
+
+            // The class the row registers must match what the shortcut actually emitted:
+            // blind  => arm A carries no Calor0410 and builds; otherwise arm A warns Calor0410.
+            var armAHasForbidden = string.Equals(arm, "A", StringComparison.Ordinal)
+                && compile.GetProperty("diagnostics").EnumerateArray()
+                    .Any(x => x.GetProperty("code").GetString() == "Calor0410");
+
+            if (string.Equals(arm, "A", StringComparison.Ordinal))
+            {
+                Assert.Equal(0, exit);
+                Assert.Equal(!BlindPairs.Contains(shortId, StringComparer.Ordinal), armAHasForbidden);
+            }
+            else
+            {
+                Assert.Equal(1, exit);
+            }
+
+            foreach (var diagnostic in compile.GetProperty("diagnostics").EnumerateArray())
+            {
+                var code = diagnostic.GetProperty("code").GetString()!;
+                var line = diagnostic.GetProperty("line").GetInt32();
+                var column = diagnostic.GetProperty("column").GetInt32();
+
+                // The row enumerates these cells in prose, so the pin is on the
+                // FACTS (code and position), not on a particular spelling: a cell
+                // whose position or code moves leaves the frozen row stale, and the
+                // row cannot be edited after merge.
+                Assert.True(
+                    row.Contains(code, StringComparison.Ordinal),
+                    $"{pair} arm {arm} emits {code}, which the frozen A-1.12 row never names.");
+                Assert.True(
+                    row.Contains($"({line},{column})", StringComparison.Ordinal),
+                    $"{pair} arm {arm} emits {code} at ({line},{column}), a position the frozen "
+                    + "A-1.12 row does not record. The row cannot be edited after merge: register "
+                    + "the corrected measurement in a NEW annex entry.");
+            }
+        }
+
+        Assert.True(seen >= 12, $"expected at least the six pairs' two shortcut cells, saw {seen}");
+
+        // The escape count the row publishes as pre-measured: every pair names
+        // exactly two effect-observing tests, which is what "leaks exactly 2" means.
+        Assert.Contains("leaks **2 escaped** effect-observing tests in every one of the six pairs", row, StringComparison.Ordinal);
+        foreach (var (_, directory, _) in PairDirectories)
+        {
+            var manifestPath = Path.Combine(
+                RepositoryRoot(), "bench", "phase0-agent-native", "pairs", directory, "pair.json");
+            Assert.True(File.Exists(manifestPath), $"pair manifest missing: {manifestPath}");
+            using var pairJson = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var observing = pairJson.RootElement
+                .GetProperty("tests").GetProperty("effectObservingTests").EnumerateArray().Count();
+            Assert.True(
+                observing == 2,
+                $"{directory} names {observing} effect-observing tests; the frozen A-1.12 row "
+                + "publishes the pre-measured escape as exactly 2 per pair.");
+        }
+    }
+
+    /// <summary>
+    /// The set literal the row writes for a named class, e.g. <c>{**W-001, W-004, W-006**}</c>.
+    /// Parsing the row rather than trusting a duplicate constant is the whole point of M7.
+    /// </summary>
+    private static string[] ParseBraceSet(string row, string marker)
+    {
+        var start = row.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"the frozen A-1.12 row does not contain the marker \"{marker}\"");
+        start += marker.Length;
+        var end = row.IndexOf('}', start);
+        Assert.True(end > start, $"unterminated set literal after \"{marker}\"");
+        return row[start..end]
+            .Replace("*", string.Empty, StringComparison.Ordinal)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToArray();
     }
 
     /// <summary>
