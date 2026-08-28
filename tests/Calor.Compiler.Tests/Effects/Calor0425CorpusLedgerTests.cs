@@ -96,14 +96,25 @@ namespace Calor.Compiler.Tests;
 /// red. See <c>docs/plans/roadmap-v0.16.md</c> §0.1, §0.4, §3.1 K1, §5 gate 9
 /// and <c>docs/plans/2026-08-27-v0.16-s1-s2-measurement-notes.md</c> §S2.</para>
 ///
-/// <para><b>Manifest rule (K1's scratch-cwd pin).</b> N:S2.2's CLI pass ran in a
-/// scratch cwd so that no <c>.calor-effects.json</c> sat beside the input. The
-/// in-process pass matches it: it is constructed with no project directory (so
-/// no project-local manifest is ever loaded, whatever the test host's cwd is)
-/// and with a hermetic <see cref="Calor.Compiler.Effects.Manifests.ManifestLoader"/>
-/// (so <c>~/.calor/manifests/</c> cannot make the number depend on the machine).
-/// <c>K1_ScratchCwdRule_ProjectLocalManifestBesideTheInputIsNotConsulted</c>
-/// observes both halves.</para>
+/// <para><b>Manifest rule.</b> The pass is constructed with no project directory,
+/// so the only channel for a project-local <c>.calor-effects.json</c> — the
+/// INPUT FILE's own directory (<c>Program.cs:488</c>/<c>:509</c>, not the cwd) —
+/// is closed, and with a hermetic
+/// <see cref="Calor.Compiler.Effects.Manifests.ManifestLoader"/> so
+/// <c>~/.calor/manifests/</c> cannot make the number depend on the machine. That
+/// is deliberately STRICTER than the CLI leg, which does read the user-level
+/// directory. <c>K1_ManifestRule_TheLedgerReadsBuiltInManifestsOnly</c> observes
+/// all three legs, and
+/// <c>K1_CrossCheckInvariant_NoProjectLocalManifestBesideAnyMeasuredModule</c>
+/// pins the repository-side invariant the CLI leg depends on.</para>
+///
+/// <para><b>The CLI cross-check travels with the numbers.</b> §S2 requires the
+/// in-process and pinned-CLI measurements to agree per subject on every row.
+/// That result is recorded in the ledger's <c>CliCrossCheck</c> block and
+/// asserted against the in-process cells by
+/// <c>Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement</c>, so a
+/// regeneration that moves the in-process numbers without re-running the CLI leg
+/// fails loudly instead of silently dropping the second measurement.</para>
 /// </summary>
 public class Calor0425CorpusLedgerTests
 {
@@ -132,11 +143,17 @@ public class Calor0425CorpusLedgerTests
         + "exactly as Program.cs:820/829-833 does (v0.16 K1, schema 3), NOT gated on the raw "
         + "binder bag as schema 2 was; modules that fail conversion, whose converted output fails "
         + "to parse, that stop at a propagated binding error, or whose effect pass throws are "
-        + "excluded from the denominator and counted separately. Manifests are built-in only: the "
-        + "pass is constructed with no project directory, so no .calor-effects.json beside the "
-        + "input is consulted whatever the cwd is, and the loader is hermetic, so "
-        + "~/.calor/manifests cannot move the number — the same manifest state as the pinned CLI "
-        + "pass's scratch cwd (N:S2.2). Causes are the ones the FIVE MONOMORPHIC SITES of "
+        + "excluded from the denominator and counted separately. Manifests are BUILT-IN ONLY — "
+        + "deliberately hermetic, and therefore STRICTER than the CLI leg, which still reads "
+        + "~/.calor/manifests: the pass is constructed with no project directory (so no "
+        + ".calor-effects.json beside the input can be read, which is the channel the CLI leg "
+        + "closes by keeping its converted-module directory manifest-free) and the loader is "
+        + "built with loadUserLevelManifests:false (so the machine cannot move the number). The "
+        + "invoked / never-invoked split of the row-less destinations is a TEXTUAL probe over the "
+        + "converted module covering §C{name} calls and the (?. name \"Invoke\") interop form; a "
+        + "delegate reached through a field chain or an alias is invisible to it, so "
+        + "RowlessNeverInvoked is an UPPER bound and RowlessInvoked a lower one. Causes are the "
+        + "ones the FIVE MONOMORPHIC SITES of "
         + "design-doc §6.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of "
         + "sites 4/5 and the three verdicts an INVOCATION of a function-typed value can draw — "
         + "row-less declaration, undetermined source (a BCL-returned or row-less-returned value), "
@@ -175,6 +192,7 @@ public class Calor0425CorpusLedgerTests
         2,
         59,
         "W3(a)",
+        99,
         "ModulesEnforced >= 250 is a live regression floor (six below the 256 observed at "
         + "registration; the per-subject MediatR/serilog floors are EXACT and the slack sits in "
         + "FluentValidation). ExcludedParseFailed <= 2 is the registered user-visible bar and is "
@@ -184,6 +202,39 @@ public class Calor0425CorpusLedgerTests
         + "rather than silently satisfying a weakened one. When the observed value drops to "
         + "<= ExcludedParseFailedMax, ExcludedParseFailedPendingUntil must be cleared to the "
         + "empty string in the same PR — the test asserts that consistency.");
+
+    /// <summary>
+    /// v0.16 K1, §S2's registration-time cross-check, recorded so it cannot go
+    /// missing. The in-process measurement above and the pinned CLI pass must
+    /// agree per subject on every row; §2.2 requires the CLI leg to be re-run
+    /// whenever the ledger is regenerated. Those CLI counts are a MEASUREMENT,
+    /// not a recomputation — no test can re-derive them without spawning 364
+    /// processes — so they are registered here and
+    /// <see cref="Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement"/> holds
+    /// them against the in-process cells. A regeneration that moves an
+    /// in-process number without re-running the CLI leg therefore FAILS instead
+    /// of quietly dropping the second measurement.
+    ///
+    /// <para>Note the one place the two rules differ in DETAIL while agreeing on
+    /// the outcome: the in-process propagated bag's first-code histogram is
+    /// Calor0208 32 / Calor0250 9 / Calor0201 8, the CLI's is 29 / 13 / 7,
+    /// because <c>BindValidationPass</c> (<c>Program.cs:790</c>) reports
+    /// Calor0250 ahead of the binder in the CLI. The SETS coincide — 0 of 364
+    /// modules land in a different bucket — which is why the per-subject
+    /// equalities below hold and why the histogram is recorded here in prose
+    /// rather than pinned as a number.</para>
+    /// </summary>
+    private static CliCrossCheck RegisteredCliCrossCheck() => new(
+        "dotnet calor.dll -i <converted-module>.calr -o <scratch>/<name>.g.cs — no flags, "
+        + "LC_ALL=C, one process per module, inputs dumped into a scratch directory holding no "
+        + ".calor-effects.json (Program.cs:509 would otherwise read it)",
+        "v0.16 K1 registration, re-run on this branch's tree after rebasing onto W3(c); "
+        + "364 modules, zero crashes, exit codes {0: 82, 1: 282}",
+        [
+            new CliCrossCheckSubject("MediatR", 36, 3, 4, 29, 7, 1, 12, 9, 3, 3),
+            new CliCrossCheckSubject("serilog", 112, 8, 20, 84, 44, 3, 26, 11, 11, 22),
+            new CliCrossCheckSubject("FluentValidation", 216, 48, 25, 143, 64, 3, 14, 62, 16, 42),
+        ]);
 
     private static string RepoRoot()
     {
@@ -232,6 +283,7 @@ public class Calor0425CorpusLedgerTests
             ScopeText,
             BindRuleText,
             RegisteredFloorRule(),
+            RegisteredCliCrossCheck(),
             MeasuredCommit(root),
             perSubject.Sum(s => s.Diagnostics),
             perSubject.Sum(s => s.ModulesWithDiagnostics),
@@ -316,6 +368,7 @@ public class Calor0425CorpusLedgerTests
         // exactly the failure K1 exists to correct.
         Assert.Equal(BindRuleText, committed.BindRule);
         AssertFloorRuleEqual(RegisteredFloorRule(), committed.FloorRule);
+        AssertCliCrossCheckEqual(RegisteredCliCrossCheck(), committed.CliCrossCheck);
 
         // measuredCommit is SHAPE-checked, never compared to HEAD — the
         // convention the two existing ledgers use
@@ -435,11 +488,14 @@ public class Calor0425CorpusLedgerTests
     }
 
     /// <summary>
-    /// §3.1 K1's <b>discriminating pin</b>, made permanent instead of run by
-    /// hand: the ledger carries BOTH denominators, and restoring schema 2's
-    /// raw-bag guard would make the production one collapse onto the raw-bag one.
-    /// If that ever happened, this test and
-    /// <see cref="Gate9_ModulesEnforcedFloor_Holds"/> both go red.
+    /// The <b>backstop</b> for §3.1 K1's discriminating pin. The pin itself lives
+    /// in <see cref="Calor0425CorpusLedgerMatchesRecomputation"/>: restoring
+    /// schema 2's raw-bag guard makes the live measurement report 99 and that
+    /// test reds (measured — the failure message names the 99). This test reads
+    /// only the COMMITTED JSON, so a mutated guard alone does not red it; what it
+    /// catches is the ledger being regenerated WRONG — a committed file whose
+    /// production denominator has collapsed onto the raw-bag one, which is what a
+    /// mutation plus a regeneration would leave behind.
     /// </summary>
     [Fact]
     public void Gate9_BothBindRules_AreRecorded_AndTheProductionOneIsWider()
@@ -449,11 +505,23 @@ public class Calor0425CorpusLedgerTests
         var rawBag = committed.PerSubject.Sum(s => s.ModulesEnforcedRawBagRule);
 
         Assert.True(rawBag > 0, "the raw-bag denominator is not recorded");
-        Assert.True(production > rawBag,
+
+        // >= is the structural fact (the propagated filter only ever REMOVES
+        // diagnostics, so it accepts every module the raw bag accepts). The
+        // discriminating statement is the second one: a converter fix could
+        // legitimately make the two denominators converge, but it cannot make the
+        // production rule land back on the raw-bag denominator REGISTERED at K1 —
+        // that is what restoring the guard produces.
+        Assert.True(production >= rawBag,
             $"The production rule enforces {production} modules and the raw-bag rule "
             + $"{rawBag}. The production rule can only be WIDER — every module the raw bag "
-            + "accepts, the propagated filter accepts too. Equality means the raw-bag guard is "
-            + "back (roadmap §3.1 K1's discriminating pin: ModulesEnforced 256 → 99 → red).");
+            + "accepts, the propagated filter accepts too, so this is impossible without a "
+            + "hand-edited ledger.");
+        Assert.True(production != committed.FloorRule.RawBagDenominatorAtRegistration,
+            $"The production denominator is {production}, exactly the raw-bag denominator "
+            + $"registered at K1 ({committed.FloorRule.RawBagDenominatorAtRegistration}). That is "
+            + "what restoring schema 2's raw-bag guard produces (roadmap §3.1 K1's "
+            + "discriminating pin: ModulesEnforced 256 → 99 → red).");
 
         // The four exclusion reasons account for every excluded module, and the
         // raw-bag rule's own exclusion count is recorded beside them.
@@ -468,6 +536,63 @@ public class Calor0425CorpusLedgerTests
                 + $"the propagated rule {subject.ExcludedBindFailed}; the propagated set is a "
                 + "SUBSET of the raw one by construction (the filter only removes diagnostics).");
         }
+    }
+
+    /// <summary>
+    /// §S2's requirement, as a standing test: the in-process measurement and the
+    /// pinned CLI pass agree per subject on <b>every</b> row. The CLI numbers are
+    /// a registered measurement (364 processes — nothing here can re-derive
+    /// them), so this holds them against the in-process cells the ledger
+    /// recomputes. A regeneration that moves an in-process number without
+    /// re-running the CLI leg goes RED, which is the whole point: the second
+    /// measurement cannot be silently dropped.
+    /// </summary>
+    [Fact]
+    public void Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement()
+    {
+        var committed = CommittedLedger();
+        var cli = committed.CliCrossCheck;
+
+        Assert.Equal(
+            committed.PerSubject.Select(s => s.Subject),
+            cli.PerSubject.Select(s => s.Subject));
+
+        foreach (var (inProcess, cliRow) in committed.PerSubject.Zip(cli.PerSubject))
+        {
+            var why = $"S2 cross-check disagreement for {inProcess.Subject} — the in-process "
+                + "measurement moved and the CLI leg was not re-run. Re-run the pinned CLI pass "
+                + "over the converted modules and update CliCrossCheck in the same PR "
+                + "(roadmap-v0.16.md §2.2: \"the in-process and CLI rows must agree per subject "
+                + "as they do today\"). ";
+
+            Assert.True(cliRow.ReachEffectPass == inProcess.ModulesEnforced,
+                why + $"reach {cliRow.ReachEffectPass} vs enforced {inProcess.ModulesEnforced}");
+            Assert.True(cliRow.ParseFailed == inProcess.ExcludedParseFailed,
+                why + $"parse {cliRow.ParseFailed} vs {inProcess.ExcludedParseFailed}");
+            Assert.True(cliRow.BindStopped == inProcess.ExcludedBindFailed,
+                why + $"bind {cliRow.BindStopped} vs {inProcess.ExcludedBindFailed}");
+            Assert.True(cliRow.Calor0425Modules == inProcess.ModulesWithDiagnostics,
+                why + $"0425 modules {cliRow.Calor0425Modules} vs "
+                + $"{inProcess.ModulesWithDiagnostics}");
+            Assert.True(cliRow.Calor0425Sites == inProcess.Diagnostics,
+                why + $"0425 sites {cliRow.Calor0425Sites} vs {inProcess.Diagnostics}");
+            Assert.True(cliRow.Files == inProcess.ModulesEnforced + inProcess.ModulesNotMeasured,
+                why + $"files {cliRow.Files} vs "
+                + $"{inProcess.ModulesEnforced + inProcess.ModulesNotMeasured}");
+
+            // The CLI row's own arithmetic: every module that reaches the pass
+            // lands in exactly one outcome bucket.
+            Assert.Equal(
+                cliRow.ReachEffectPass,
+                cliRow.StopCalor0410 + cliRow.StopCalor0422Or0423 + cliRow.StopCalor1002
+                    + cliRow.CompileClean);
+            Assert.Equal(
+                cliRow.Files,
+                cliRow.ParseFailed + cliRow.BindStopped + cliRow.ReachEffectPass);
+        }
+
+        Assert.Equal(364, cli.PerSubject.Sum(s => s.Files));
+        Assert.Equal(256, cli.PerSubject.Sum(s => s.ReachEffectPass));
     }
 
     /// <summary>
@@ -519,22 +644,33 @@ public class Calor0425CorpusLedgerTests
     }
 
     /// <summary>
-    /// <b>K1's scratch-cwd pin.</b> N:S2.2's CLI pass ran one process per module
-    /// in a scratch cwd precisely so no <c>.calor-effects.json</c> sat beside the
-    /// input; the in-process measurement has to match, or the two halves of the
-    /// S2 cross-check are not measuring the same compiler.
+    /// <b>K1's manifest rule</b> — what actually keeps the in-process leg and
+    /// N:S2.2's CLI leg reading the same manifests.
     ///
-    /// <para>Three assertions, in the order that makes the pin non-vacuous:
-    /// (1) the manifest is LOAD-BEARING — hand the pass that same directory as
-    /// its project directory and the module's unknown-call diagnostic goes away;
-    /// (2) the ledger's own construction, with the process cwd set to the
-    /// directory holding that manifest, does NOT pick it up; (3) the hermetic
-    /// loader the ledger uses reports no project-local or user-level source at
-    /// all. Without (1) the test would pass against a manifest that never did
-    /// anything.</para>
+    /// <para><b>The cwd is not the channel, so this pin does not guard it.</b>
+    /// An earlier draft of this test set the process cwd to a directory holding a
+    /// <c>.calor-effects.json</c> and asserted the ledger ignored it. That leg
+    /// could not fail: <c>ManifestLoader.LoadAll</c> only reaches
+    /// <c>LoadProjectLocalManifest</c> when a project directory is passed, and the
+    /// CLI derives that directory from the INPUT FILE
+    /// (<c>Program.cs:488</c>/<c>:509</c>, <c>Path.GetDirectoryName(file.FullName)</c>),
+    /// never from the cwd. The real channel is the directory the module being
+    /// compiled sits in, and that is what the legs below pin.</para>
+    ///
+    /// <para>(1) <b>Non-vacuity</b> — the manifest is load-bearing: hand its
+    /// directory in as the project directory and the module's Calor0411
+    /// disappears. (2) <b>The channel, spelled as the CLI spells it</b> — the
+    /// directory <c>Path.GetDirectoryName(inputPath)</c> yields IS read, while the
+    /// ledger's own construction (<c>projectDirectory: null</c>) is not.
+    /// (3) <b>The loader</b> the ledger uses carries built-in manifests only.</para>
+    ///
+    /// <para>Hermetic is deliberately STRICTER than the CLI leg, which still
+    /// reads <c>~/.calor/manifests/</c>: the in-process number cannot depend on
+    /// the machine, and the CLI leg's agreement with it is an empirical result
+    /// recorded in <c>CliCrossCheck</c>, not an assumption.</para>
     /// </summary>
     [Fact]
-    public void K1_ScratchCwdRule_ProjectLocalManifestBesideTheInputIsNotConsulted()
+    public void K1_ManifestRule_TheLedgerReadsBuiltInManifestsOnly()
     {
         // A call to a type no built-in manifest covers. Unresolved, the strict
         // policy fails closed with Calor0411; the manifest below resolves it to
@@ -547,34 +683,38 @@ public class Calor0425CorpusLedgerTests
                 §C{K1ScratchWidget.Ping} §/C
             """;
 
-        var scratch = Path.Combine(Path.GetTempPath(), "calor-k1-cwd-" + Guid.NewGuid().ToString("N"));
+        var scratch = Path.Combine(Path.GetTempPath(), "calor-k1-manifest-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(scratch);
-        var originalCwd = Directory.GetCurrentDirectory();
         try
         {
             File.WriteAllText(Path.Combine(scratch, ".calor-effects.json"), """
                 {
                   "version": "1.0",
-                  "description": "K1 scratch-cwd pin — must never be consulted by the ledger",
+                  "description": "K1 manifest-rule pin — must never be consulted by the ledger",
                   "mappings": [
                     { "type": "K1ScratchWidget", "methods": { "Ping": ["cw"] } }
                   ]
                 }
                 """);
 
-            // (1) The manifest is load-bearing: passed as the project directory,
-            //     it resolves the call and the unknown-call diagnostic disappears.
+            // (1) Load-bearing.
             var withManifest = EnforceOnce(source, projectDirectory: scratch, hermetic: false);
             Assert.DoesNotContain(withManifest, d => d.Code == DiagnosticCode.UnknownExternalCall);
 
-            // (2) The ledger's construction ignores it even from the same cwd.
-            Directory.SetCurrentDirectory(scratch);
+            // (2) The channel is the INPUT FILE's directory, derived here exactly
+            //     as Program.cs:509 derives it — and the ledger's construction,
+            //     which passes no project directory, does not open it.
+            var inputPath = Path.Combine(scratch, "module.calr");
+            File.WriteAllText(inputPath, source);
+            var asTheCliDerivesIt = EnforceOnce(
+                source, projectDirectory: Path.GetDirectoryName(inputPath), hermetic: false);
+            Assert.DoesNotContain(asTheCliDerivesIt, d => d.Code == DiagnosticCode.UnknownExternalCall);
+
             var asTheLedgerRunsIt = EnforceOnce(source, projectDirectory: null, hermetic: true);
             Assert.Contains(asTheLedgerRunsIt, d => d.Code == DiagnosticCode.UnknownExternalCall);
         }
         finally
         {
-            Directory.SetCurrentDirectory(originalCwd);
             try { Directory.Delete(scratch, recursive: true); } catch { /* best effort */ }
         }
 
@@ -584,6 +724,49 @@ public class Calor0425CorpusLedgerTests
         Assert.NotEmpty(loader.LoadedManifests);
         Assert.All(loader.LoadedManifests, entry => Assert.Equal(
             Compiler.Effects.Manifests.ManifestPriority.BuiltIn, entry.Source.Priority));
+    }
+
+    /// <summary>
+    /// The invariant the CLI leg of the S2 cross-check depends on, which nothing
+    /// pinned before: a converted module handed to the CLI must not have a
+    /// <c>.calor-effects.json</c> as a SIBLING, because <c>Program.cs:509</c>
+    /// makes that file's directory the project directory and the manifest would
+    /// silently resolve calls the in-process leg leaves Unknown. The cross-check
+    /// dumps into a scratch directory, so the durable half of the invariant is
+    /// the repository side: the three corpus subject <c>src/</c> trees the
+    /// modules are converted FROM, and <c>bench/phase0-agent-native/</c>, where
+    /// the ledgers live and where any in-repo dump would land.
+    ///
+    /// <para><b>Deliberately NOT the whole of <c>bench/</c>.</b>
+    /// <c>bench/corpus/manifests/</c> holds six package manifests
+    /// (<c>MediatR.Contracts</c>, <c>System.Threading.Channels</c>, …) on purpose;
+    /// they are not siblings of any converted module, so no compilation derives a
+    /// project directory that reaches them, and the CLI leg never loaded one. A
+    /// sweep over all of <c>bench/</c> flags those and says nothing true — the
+    /// scope below is the set of directories where such a file would actually
+    /// change a measurement.</para>
+    /// </summary>
+    [Fact]
+    public void K1_CrossCheckInvariant_NoProjectLocalManifestBesideAnyMeasuredModule()
+    {
+        var root = RepoRoot();
+        var roots = new List<string> { Path.Combine(root, "bench", "phase0-agent-native") };
+        roots.AddRange(Subjects.Select(s => Path.Combine(root, "bench", "corpus", s, "src")));
+
+        foreach (var directory in roots.Where(Directory.Exists))
+        {
+            var manifests = Directory
+                .EnumerateFiles(directory, "*.calor-effects.json", SearchOption.AllDirectories)
+                .ToList();
+            Assert.True(manifests.Count == 0,
+                $"A project-local effect manifest sits under {directory}: "
+                + string.Join(", ", manifests)
+                + ". Program.cs:509 makes an input file's own directory the project directory, so "
+                + "such a file would be read for any module beside it — the CLI leg of the S2 "
+                + "cross-check would then resolve calls the in-process leg (which passes no "
+                + "project directory) leaves Unknown, and the two legs would stop measuring the "
+                + "same compiler.");
+        }
     }
 
     private static IReadOnlyList<Diagnostic> EnforceOnce(
@@ -627,7 +810,17 @@ public class Calor0425CorpusLedgerTests
             expected.ExcludedParseFailedRegisteredAt, actual.ExcludedParseFailedRegisteredAt);
         Assert.Equal(
             expected.ExcludedParseFailedPendingUntil, actual.ExcludedParseFailedPendingUntil);
+        Assert.Equal(
+            expected.RawBagDenominatorAtRegistration, actual.RawBagDenominatorAtRegistration);
         Assert.Equal(expected.Note, actual.Note);
+    }
+
+    private static void AssertCliCrossCheckEqual(CliCrossCheck expected, CliCrossCheck actual)
+    {
+        Assert.NotNull(actual);
+        Assert.Equal(expected.Invocation, actual.Invocation);
+        Assert.Equal(expected.MeasuredAt, actual.MeasuredAt);
+        Assert.Equal(expected.PerSubject, actual.PerSubject);
     }
 
     private static string MeasuredCommit(string root)
@@ -918,11 +1111,33 @@ public class Calor0425CorpusLedgerTests
     /// crude one — the alternative is a second AST walk that would answer the
     /// same question with more machinery and the same caveat, since a delegate
     /// reached through a field chain is invisible to both.
+    ///
+    /// <para><b>v0.16 K1 widened it, because the narrow version published a
+    /// wrong cell.</b> Schema 2 matched only <c>§C{name}</c> / <c>§C{name.</c>
+    /// and reported <c>RowlessNeverInvoked = 0</c> everywhere — vacuously, since
+    /// it had no row-less destinations at all. Under the production rule the
+    /// split becomes load-bearing (roadmap §6 registers "K1's never-invoked
+    /// fraction" as the input to design-doc Q4), and the first non-zero value it
+    /// produced was an artifact: <c>_errorMessageFactory</c> in
+    /// <c>FluentValidation/Internal/RuleComponent.cs</c> is invoked twice, but
+    /// through C# <c>?.Invoke(…)</c>, which the converter emits as the interop
+    /// member-access form <c>(?. _errorMessageFactory "Invoke(context, value)")</c>
+    /// — no <c>§C{…}</c> anywhere. Both interop forms are matched now.</para>
+    ///
+    /// <para><b>Still an under-approximation, and the ledger's Scope says so.</b>
+    /// A delegate reached through a field chain, through an alias, or invoked
+    /// under a name this probe cannot spell is invisible to it, so
+    /// <c>RowlessNeverInvoked</c> is an UPPER bound on "never invoked" and
+    /// <c>RowlessInvoked</c> a lower bound. Q4 must read it that way.</para>
     /// </summary>
     private static bool IsInvokedInModule(string source, string name) =>
         name.Length > 0
         && (source.Contains($"§C{{{name}}}", StringComparison.Ordinal)
-            || source.Contains($"§C{{{name}.", StringComparison.Ordinal));
+            || source.Contains($"§C{{{name}.", StringComparison.Ordinal)
+            // C# `f?.Invoke(…)` / `f.Invoke(…)` on a function-typed position
+            // become interop member-access expressions, not §C calls.
+            || source.Contains($"(?. {name} \"Invoke", StringComparison.Ordinal)
+            || source.Contains($"(. {name} \"Invoke", StringComparison.Ordinal));
 
     private sealed record SubjectVolume(
         string Subject,
@@ -969,6 +1184,28 @@ public class Calor0425CorpusLedgerTests
     /// floor.</summary>
     private sealed record SubjectFloor(string Subject, int ModulesEnforcedMin);
 
+    /// <summary>v0.16 K1 — one subject's row of N:S2.2's CLI outcome table,
+    /// recorded beside the in-process numbers it must agree with.</summary>
+    private sealed record CliCrossCheckSubject(
+        string Subject,
+        int Files,
+        int ParseFailed,
+        int BindStopped,
+        int ReachEffectPass,
+        int StopCalor0410,
+        int StopCalor0422Or0423,
+        int StopCalor1002,
+        int CompileClean,
+        int Calor0425Modules,
+        int Calor0425Sites);
+
+    /// <summary>v0.16 K1 — the whole CLI cross-check, with the invocation it was
+    /// measured under.</summary>
+    private sealed record CliCrossCheck(
+        string Invocation,
+        string MeasuredAt,
+        List<CliCrossCheckSubject> PerSubject);
+
     /// <summary>
     /// v0.16 §5 gate 9's floor rule, written into the ledger by K1's PR. See
     /// <see cref="RegisteredFloorRule"/> for why the two legs are at different
@@ -987,6 +1224,10 @@ public class Calor0425CorpusLedgerTests
         /// <summary>The roadmap item that must merge before
         /// <c>ExcludedParseFailedMax</c> can be met; empty once it is met.</summary>
         string ExcludedParseFailedPendingUntil,
+        /// <summary>v0.16 K1 — the number schema 2's raw-bag guard produced (99).
+        /// Registered so the discriminating pin's backstop can name the value the
+        /// production denominator must NOT land on.</summary>
+        int RawBagDenominatorAtRegistration,
         string Note);
 
     private sealed record Ledger(
@@ -1000,6 +1241,10 @@ public class Calor0425CorpusLedgerTests
         /// <summary>v0.16 §5 gate 9's floor, registered with the numbers it
         /// gates.</summary>
         Gate9FloorRule FloorRule,
+        /// <summary>v0.16 K1 — §S2's second measurement (the pinned CLI pass),
+        /// recorded so the two legs' agreement is auditable from the JSON and so
+        /// a regeneration cannot silently drop it.</summary>
+        CliCrossCheck CliCrossCheck,
         string MeasuredCommit,
         int AggregateDiagnostics,
         int AggregateModulesWithDiagnostics,

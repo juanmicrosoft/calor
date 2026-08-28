@@ -27,9 +27,13 @@ All notable changes to this project will be documented in this file.
   reports `Calor0406` as an error instead. (v0.16 W5)
 ### Corrected
 
-- **A number we published in 0.15 was wrong, and here is the right one.** The 0.15 notes
-  said the compiler's "callback effects are unknown here" warning (`Calor0425`) showed up
-  **8 times across 99** of the 364 real-world C# files we convert and check. That 99 was
+- **A number we published in 0.15 was wrong, and here is the right one.** We keep a
+  measurement record in this repository — `bench/phase0-agent-native/calor0425-corpus-ledger.json`,
+  also quoted in our 0.15 planning document — and during 0.15 it said the compiler's
+  "callback effects are unknown here" warning (`Calor0425`) showed up
+  **8 times across 99** of the 364 real-world C# files we convert and check. (The figure
+  was never in these release notes or on the website; it is being corrected here because
+  it is a published number either way.) That 99 was
   not how many files the compiler actually checks — it was how many files our *measurement*
   chose to check. The measurement threw away any file the name-resolution step complained
   about at all, but the real compiler keeps going: most of those complaints are internal
