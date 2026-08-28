@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "measuredCommit": "a051ed71db54333d9bf88e30b023064258767dba",
+  "measuredCommit": "fdff11de6c824b33208f978c0e6654811feda76b",
   "scope": "Every committed .calr containing a line matching \u00a7O{...} at end-of-line immediately followed by a line matching \u00a7E{, compiled one file at a time via the CLI default (EnforceEffects on, UnknownCallPolicy.Strict, no --permissive-effects). twoLineOE is the occurrence count in that file; exit and codes are the compiler's verdict at measuredCommit. Design-doc Decision 1 must not disturb any of these.",
   "fileCount": 24,
   "occurrenceCount": 57,
