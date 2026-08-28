@@ -275,10 +275,52 @@ public sealed class ProjectIndexTests : IDisposable
     }
 
     /// <summary>
+    /// The contract of <see cref="CliTestHarness.StampForChildCli"/>, pinned
+    /// directly: the hash it stamps is the one a child <c>calor</c> computes for
+    /// itself. Built by the child (<c>calor index build</c>) and read back, so a
+    /// helper that hashed the wrong file is red here rather than showing up as a
+    /// puzzling "index unusable" in whichever test used it next.
+    ///
+    /// <para>What each lane catches, measured: hashing the wrong assembly
+    /// (<c>Calor.Runtime.dll</c>) is red in both lanes; hashing the test host's
+    /// own copy (<c>ComputeCliCompilerHash</c>) is caught by the coverage lane
+    /// specifically, since outside it that file is byte-identical to the child's
+    /// — an information-theoretic limit rather than a gap, and CI runs both
+    /// lanes.</para>
+    /// </summary>
+    [Fact]
+    public void StampForChildCli_UsesTheHashTheChildComputesForItself()
+    {
+        var dir = NewProject(("lib.calr", Library));
+
+        var built = CliTestHarness.RunCli(dir, "index", "build", dir);
+        Assert.True(built.ExitCode == 0, built.StdOut + built.StdErr);
+
+        var (fromChild, status) = ProjectIndex.Load(Commands.IndexCommand.DefaultOutputDirectory(dir));
+        Assert.Equal(ProjectIndex.Freshness.Fresh, status);
+        Assert.NotNull(fromChild);
+        Assert.NotEqual("", fromChild!.CompilerHash);
+        Assert.Equal(fromChild.CompilerHash, CliTestHarness.ChildCompilerHash());
+    }
+
+    /// <summary>
     /// …and <c>calor query effects</c> on a symbol in that file answers with the
     /// residual, not a row. The index is built with the injected cap and saved
     /// where the CLI looks; the CLI finds it fresh (the cap is not an input) and
     /// answers from it.
+    ///
+    /// <para>The index is stamped with the child's compiler hash before it is
+    /// saved (<see cref="CliTestHarness.StampForChildCli"/>, whose comment states
+    /// what that suppresses): an index built in-process is otherwise refused by
+    /// the child with <c>index unusable — the compiler changed</c> whenever the
+    /// two load different <c>calor.dll</c> files — under
+    /// <c>--collect:"XPlat Code Coverage"</c>, which instruments the host's copy,
+    /// and equally in a tree where both build configurations exist, since a Debug
+    /// test host is handed the Release binary for the child.
+    /// <c>--no-build</c> is kept deliberately: it makes any remaining mismatch a
+    /// hard error rather than a silent rebuild that would erase the residual, so
+    /// the pin cannot pass by accident — and the assertions below check the
+    /// residual line itself, not merely the exit code.</para>
     /// </summary>
     [Fact]
     public void QueryEffects_OnAFileWhoseInferenceDidNotConverge_ReportsTheResidual()
@@ -286,18 +328,25 @@ public sealed class ProjectIndexTests : IDisposable
         var dir = NewProject(("lib.calr", Library), ("capped.calr", ThreeHopMutualRecursion));
         var options = new ProjectIndexBuilder.Options(
             dir, "index-v1", ProjectIndexBuilder.DiscoverSources(dir)) { SccFixpointIterationCap = 1 };
-        ProjectIndexBuilder.Build(options).Save(Commands.IndexCommand.DefaultOutputDirectory(dir));
+        var index = ProjectIndexBuilder.Build(options);
+        CliTestHarness.StampForChildCli(index);
+        index.Save(Commands.IndexCommand.DefaultOutputDirectory(dir));
 
         var text = CliTestHarness.RunCli(dir, "query", "effects", "A", "--project", dir, "--no-build");
+        Assert.True(
+            text.StdErr.Length == 0,
+            $"the child must accept the index; it said: {text.StdErr}");
         Assert.Equal(1, text.ExitCode);
         Assert.Contains(
             "function A — effect inference did not converge (Calor0406), facts not recorded",
             text.StdOut);
+        Assert.DoesNotContain("declared:", text.StdOut);
 
         // The control: the un-capped file answers with a row through the same path.
         var control = CliTestHarness.RunCli(dir, "query", "effects", "Double", "--project", dir, "--no-build");
         Assert.True(control.ExitCode == 0, control.StdOut + control.StdErr);
         Assert.Contains("declared: [pure]", control.StdOut);
+        Assert.DoesNotContain("did not converge", control.StdOut);
     }
 
     /// <summary>
