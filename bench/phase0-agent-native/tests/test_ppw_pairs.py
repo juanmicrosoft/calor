@@ -249,7 +249,7 @@ class FrozenCompiles(unittest.TestCase):
         got = {(c["pair"], c["role"], c["arm"], c["path"]) for c in self.doc["compiles"]}
         self.assertEqual(expected, got, "ppw-seeded-compiles.json does not cover exactly the "
                                         "sources ppw-compile.py enumerates — regenerate it")
-        self.assertEqual(51, len(self.doc["compiles"]))
+        self.assertEqual(52, len(self.doc["compiles"]))
         self.assertEqual(len(expected), len(self.doc["compiles"]), "duplicate rows")
 
     def test_every_source_is_recorded_once_per_arm_and_blob_matches_disk(self):
@@ -333,49 +333,54 @@ class FrozenCompiles(unittest.TestCase):
         self.assertEqual(0, a["exitCode"])
         self.assertIn(("error", "Calor0410"), sev_codes(b))
 
-    def test_receiver_read_escapes_are_recorded_on_the_treatment_arm(self):
-        # Issue #1136, recorded before any agent run. The rule is operational, and it is NOT
-        # about resolvability: a field or property read through an EXPLICIT RECEIVER escapes
-        # (`this.stage`, a local aliased to `this`, `other.stage` on another object of the same
-        # class, an unqualified `§PROP`), while a SIMPLE NAME or a METHOD GROUP is charged
-        # (`stage`, a static rowed field, `inner.Beat`). `other.stage` is a rowed declaration in
-        # the enclosing class and still escapes, which is why the earlier "cannot resolve to a
-        # rowed declaration" wording was withdrawn. Two of the three blind cells have this route
-        # through the TREATMENT arm; A-1.12 registers it as a confound on leg A's direction.
-        for pid in ("W-001-middleware-stage", "W-006-map-doubler"):
-            for role in ("unregistered-this-qualified-escape", "unregistered-property-backed-escape"):
-                row = rows(self.doc, pid, role, "B")[0]
-                self.assertEqual(0, row["exitCode"], f"{pid}/{role}: the escape must BUILD on arm B")
-                self.assertTrue(row["emitted"])
-                self.assertNotIn("Calor0410", codes(row), f"{pid}/{role}: nothing is charged — that is the defect")
-                self.assertTrue(codes(row) and all(c == "Calor0425" for c in codes(row)),
-                                f"{pid}/{role}: expected Calor0425 warnings only")
-                self.assertTrue(all(d["severity"] == "warning" for d in row["diagnostics"]))
-                self.assertTrue(any("nothing is charged" in d["text"] for d in row["diagnostics"]), f"{pid}/{role}")
-        # The property spelling carries no `this.` at the call site: what escapes is a read
-        # through a receiver, not the qualifier.
-        prop = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "unregistered-property-backed-escape-b")
-        body = "".join(open(os.path.join(prop, f), encoding="utf-8").read()
-                       for f in sorted(os.listdir(prop)) if f.endswith(".calr"))
-        self.assertIn("§PROP{", body)
-        self.assertIn("§A Stage §/C", body)
-        self.assertNotIn("§A this.", body)
+    def test_the_registered_escape_shapes_are_recorded_on_the_treatment_arm(self):
+        # Issue #1136, recorded before any agent run. There is NO one-line rule: three glosses
+        # have been withdrawn ("specific to this."; "cannot resolve to a rowed declaration in the
+        # enclosing class"; "read through an explicit receiver" — a §PROP and an inherited field
+        # escape by simple name with no receiver, while a module-qualified module function is
+        # charged). What is registered is the measurement table, and these are its ESCAPES rows
+        # that have a committed artifact: warning Calor0425, exit 0, nothing charged. Two of the
+        # three blind cells have this route through the TREATMENT arm, so A-1.12 registers it as
+        # a confound on leg A's direction.
+        escapes = [
+            ("W-001-middleware-stage", "unregistered-this-qualified-escape"),      # own §FLD via this.
+            ("W-001-middleware-stage", "unregistered-property-backed-escape"),     # §PROP by simple name
+            ("W-001-middleware-stage", "unregistered-other-receiver-escape"),      # §FLD on another instance
+            ("W-001-middleware-stage", "unregistered-method-group-receiver-escape"),  # method group, parameter receiver
+            ("W-006-map-doubler", "unregistered-this-qualified-escape"),
+            ("W-006-map-doubler", "unregistered-property-backed-escape"),
+        ]
+        for pid, role in escapes:
+            row = rows(self.doc, pid, role, "B")[0]
+            self.assertEqual(0, row["exitCode"], f"{pid}/{role}: the escape must BUILD on arm B")
+            self.assertTrue(row["emitted"])
+            self.assertNotIn("Calor0410", codes(row), f"{pid}/{role}: nothing is charged — that is the defect")
+            self.assertTrue(codes(row) and all(c == "Calor0425" for c in codes(row)),
+                            f"{pid}/{role}: expected Calor0425 warnings only")
+            self.assertTrue(all(d["severity"] == "warning" for d in row["diagnostics"]))
+            self.assertTrue(any("nothing is charged" in d["text"] for d in row["diagnostics"]), f"{pid}/{role}")
 
-        # The counter-example that killed the "cannot resolve to a rowed declaration in the
-        # enclosing class" wording: `other.stage` IS that declaration, reached through a
-        # parameter receiver, and it escapes — while the same field passed by simple name in
-        # the same file is charged (its method is declared honestly so the file builds).
-        other = rows(self.doc, "W-001-middleware-stage", "unregistered-other-receiver-escape", "B")[0]
-        self.assertEqual(0, other["exitCode"], "the other-receiver escape must BUILD on arm B")
-        self.assertTrue(other["emitted"])
-        self.assertEqual(["Calor0425"], codes(other))
-        self.assertEqual("warning", other["diagnostics"][0]["severity"])
-        self.assertIn("nothing is charged to 'TwiceOf'", other["diagnostics"][0]["text"])
-        other_src = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "unregistered-other-receiver-escape-b")
-        other_body = "".join(open(os.path.join(other_src, f), encoding="utf-8").read()
-                             for f in sorted(os.listdir(other_src)) if f.endswith(".calr"))
-        self.assertIn("§A other.stage", other_body)
-        self.assertIn("§FLD{Func<i32>:stage:pri} §E{cw}", other_body)  # a rowed field of THIS class
+        def read(pid, rel):
+            d = os.path.join(PAIRS, pid, rel)
+            return "".join(open(os.path.join(d, f), encoding="utf-8").read()
+                           for f in sorted(os.listdir(d)) if f.endswith(".calr"))
+
+        # The two shapes that killed the "receiver" and "unresolvable" glosses, pinned by source
+        # so a later edit cannot quietly turn them back into something else.
+        prop = read("W-001-middleware-stage", "seeded/unregistered-property-backed-escape-b")
+        self.assertIn("§PROP{", prop)
+        self.assertIn("§A Stage §/C", prop)          # simple name: no receiver at all
+        self.assertNotIn("§A this.", prop)
+
+        other = read("W-001-middleware-stage", "seeded/unregistered-other-receiver-escape-b")
+        self.assertIn("§A other.stage", other)                       # another instance…
+        self.assertIn("§FLD{Func<i32>:stage:pri} §E{cw}", other)     # …of a rowed field of THIS class
+        self.assertNotIn("§NEW", other)  # an allocation would add `alloc` and confound the cell
+
+        mg = read("W-001-middleware-stage", "seeded/unregistered-method-group-receiver-escape-b")
+        self.assertIn("§A ticker.Beat", mg)
+        self.assertIn("(Ticker:ticker)", mg)  # a PARAMETER receiver, not a §NEW-allocated field
+        self.assertNotIn("§NEW", mg)
 
     def test_the_registered_negative_controls_fail_closed(self):
         # Three shapes the pass CAN resolve, so #1136 is bounded rather than "any indirection":

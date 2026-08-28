@@ -280,6 +280,25 @@
       ]
     },
     {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-method-group-receiver-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-method-group-receiver-escape-b/A3-middleware.calr",
+      "blobSha": "ced90553aa38ad95e0d06274240c1225b687cf87",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 30,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'TwiceOf' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
       "pair": "W-002-map-and-report",
       "role": "starter",
       "arm": "A",
