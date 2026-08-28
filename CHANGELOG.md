@@ -25,6 +25,25 @@ All notable changes to this project will be documented in this file.
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code
   belongs to the API-strictness family; the loop that used to borrow it as a warning now
   reports `Calor0406` as an error instead. (v0.16 W5)
+### Corrected
+
+- **A number we published in 0.15 was wrong, and here is the right one.** We keep a
+  measurement record in this repository — `bench/phase0-agent-native/calor0425-corpus-ledger.json`,
+  also quoted in our 0.15 planning document — and during 0.15 it said the compiler's
+  "callback effects are unknown here" warning (`Calor0425`) showed up
+  **8 times across 99** of the 364 real-world C# files we convert and check. (The figure
+  was never in these release notes or on the website; it is being corrected here because
+  it is a published number either way.) That 99 was
+  not how many files the compiler actually checks — it was how many files our *measurement*
+  chose to check. The measurement threw away any file the name-resolution step complained
+  about at all, but the real compiler keeps going: most of those complaints are internal
+  notes it never shows you, so it checks the file anyway. Measured the way the compiler
+  really works, it checks **256** of those files, and the warning shows up **67 times
+  across 30** of them. Nothing about the compiler changed — only the yardstick did. Both
+  figures are published side by side so the correction is visible rather than quietly
+  swapped in. The measurement now uses the compiler's own rule, and each of our two
+  measurement records says on its face which rule produced it, so this cannot happen
+  silently again.
 
 - Internal benchmark tooling: every agent-harness run now saves the full turn-by-turn transcript, the agent's own build output, and the compiler's build fingerprint next to its result; a run without a transcript no longer counts. The harness also accepts a registered "pre-rows" control arm for the v0.16 rows experiment.
 
