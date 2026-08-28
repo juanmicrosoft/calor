@@ -78,6 +78,7 @@ For the motivation behind this design, see [Effects & Contracts Enforcement](/ca
 
 | Code       | Name               | Description                                          |
 |------------|--------------------|------------------------------------------------------|
+| Calor0406  | EffectInferenceDidNotConverge | The SCC fixpoint (cap 100 rounds, floored at group size + 1) or the instantiated-charge worklist (cap 10 000 steps) stopped with effect sets still changing; always an error |
 | Calor0410  | ForbiddenEffect    | Function uses effect not declared in §E              |
 | Calor0411  | UnknownExternalCall| Call to unknown external method in strict mode       |
 | Calor0412  | MissingSpecificEffect | A specific effect is missing from declaration     |
@@ -91,7 +92,7 @@ The effect enforcement pass uses Strongly Connected Component (SCC) analysis:
 2. **Compute SCCs** using Tarjan's algorithm
 3. **Process SCCs in reverse topological order**:
    - For each SCC, iterate functions until effects stabilize
-   - Recursion within SCC resolves via fixpoint
+   - Recursion within SCC resolves via fixpoint (capped at 100 rounds or the group's size + 1, whichever is larger; reaching the cap with sets still changing is Calor0406, an error)
 4. **Check**: ComputedEffects ⊆ DeclaredEffects for each function
 
 ### Effect Inference Coverage
@@ -218,11 +219,33 @@ Add these properties to your project file or `Directory.Build.props`:
 
 ```xml
 <PropertyGroup>
-  <CalorContractMode Condition="'$(CalorContractMode)' == ''">debug</CalorContractMode>
   <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
-  <CalorUnknownCallPolicy Condition="'$(CalorUnknownCallPolicy)' == ''">strict</CalorUnknownCallPolicy>
+  <CalorPermissiveEffects Condition="'$(CalorPermissiveEffects)' == ''">false</CalorPermissiveEffects>
 </PropertyGroup>
 ```
+
+| Property | Default | CLI equivalent | Meaning |
+|---|---|---|---|
+| `CalorEnforceEffects` | `true` | `--enforce-effects` / `--no-enforce-effects` | Run the effect checker at all. |
+| `CalorPermissiveEffects` | `false` | `--permissive-effects` | Permissive policy, for converted code. `Calor0410` ("uses effect X but does not declare it") is reported as a **warning** instead of an error, in the per-file pass and in the cross-module pass alike. `Calor0411` (unknown external call) and `Calor0425` ("cannot be decided whether the effects fit") are **suppressed** — not reported at all. |
+
+Both properties are strict MSBuild booleans: only `true` / `false` (any casing) are accepted,
+and a value such as `1` or `banana` fails the build with `MSB4030`, not silently.
+
+`Calor0411` is a **warning** under MSBuild even at the strict default, because it is an error
+only under `--strict-effects` and the MSBuild task exposes no equivalent property; permissive
+turns it off rather than demoting it.
+
+**What permissive does not waive.** The waiver is bounded, and the bound is the part worth
+knowing: an effect row that does not fit its destination (`Calor0424`) and an override or
+interface implementation that **broadens** the effects it inherited (`Calor0420` /
+`Calor0421`) stay **errors under every flag**. (Narrowing is legal — an override may promise
+less than its base method, never more.) `--permissive-effects` relaxes what the compiler
+assumes about calls it cannot resolve; it never relaxes a row the code states and then
+contradicts.
+
+The value is part of the build cache's options fingerprint, so switching it recompiles every
+file once (the first build after the switch is a full one).
 
 ## Example Usage
 

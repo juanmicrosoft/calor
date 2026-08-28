@@ -22,6 +22,7 @@ This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP
 | **Navigate** | `calor_navigate` (action: definition/references/find/info/scope) |
 | **Code Quality** | `calor_check` (action: diagnose/lint/typecheck/validate), `calor_format` (action: format/ids) |
 | **Structure** | `calor_structure` (action: outline/callgraph/impact) |
+| **Project index** | `calor_query` (facet: callers/callees/impact/effects) |
 | **Syntax & Help** | `calor_help` (action: syntax/features/error/example) |
 | **Edit Support** | `calor_edit_preview` |
 | **Refinement** | `calor_refine` (action: obligations/bounds/diagnose/guards/fixes/types) |

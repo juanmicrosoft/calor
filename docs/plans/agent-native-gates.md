@@ -500,11 +500,16 @@ forwarded subagent messages counted separately and never folded into it**
 `a3e23e4c`). The refinement is load-bearing, not cosmetic: `--forward-subagent-text` adds subagent
 events to the stream, so the looser definition would make the turn count depend on a runner flag,
 and two epochs run with different flags would not be comparable. The roadmap's wording is
-superseded by this entry on that point. **A conflict to reconcile before the epoch, disclosed
-rather than left to be found:** at registration `bench/phase0-agent-native/harness-capture.py`
-(#1119 @ `a9fee7e4`) writes `assistantMessages` as **top-level + subagent**, with
-`assistantMessagesTopLevel` / `assistantMessagesSubagent` beside it — the same field name carrying
-the total, not the registered quantity. Both PRs are unmerged. **Whichever runner writes
+superseded by this entry on that point. **A conflict was disclosed here and has since been
+RESOLVED IN FAVOUR OF THIS REGISTRATION — recorded rather than quietly dropped:** when this entry
+was written, `bench/phase0-agent-native/harness-capture.py` (#1119, then unmerged) wrote
+`assistantMessages` as **top-level + subagent**, with `assistantMessagesTopLevel` /
+`assistantMessagesSubagent` beside it — the same field name carrying the total, not the registered
+quantity. **#1119 has since merged, and on `main` that helper computes
+`"assistantMessages": len(top)` — top-level only — with its own self-test asserting exactly that.**
+The registered definition and the shipped instrument now agree. The disclosure stays because the
+registration is what settled the disagreement, and any future divergence is to be read against
+this rule, not against the implementation of the day. **Whichever runner writes
 `result.json`, the field named `turns.assistantMessages` must carry the TOP-LEVEL count registered
 here**; a run whose `turns.assistantMessages` is the total is recording a different metric under a
 registered name, and the epoch's `pins.json` must record which definition produced it. The

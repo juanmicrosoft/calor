@@ -67,6 +67,7 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 **Navigation:**
 - `calor_navigate` - Go to definition, find references, search symbols (action: "definition", "references", "find", "symbol", "scope")
 - `calor_structure` - Document outline, call graph, or change impact analysis
+- `calor_query` - Ask the project index about a declaration (facet: "callers", "callees", "impact", "effects"; `effects`/`row` with impact for the effect-row blast radius) — same answers as `calor query`
 
 **Syntax & Documentation:**
 - `calor_help` - Syntax reference, feature support, error explanations, working examples

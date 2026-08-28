@@ -78,6 +78,7 @@ calor_check         - Diagnose, lint, type check, or validate
 calor_verify        - Verify function contracts
 calor_navigate      - Definitions, references, symbols, and scope
 calor_structure     - Outlines, call graphs, and impact
+calor_query         - Project index: callers, callees, impact, effect rows
 ```
 
 ### Example: Contract Verification
@@ -108,9 +109,10 @@ It is assumed while verifying the body; the runtime precondition check remains.
 | `calor_verify` | Seven-status Z3 contract verification |
 | `calor_navigate` | Definition, reference, symbol, type, and scope actions |
 | `calor_structure` | Outline, call graph, and impact actions |
+| `calor_query` | Project index: who calls a declaration, what it calls, what a change could break, its effect row |
 | `calor_analyze` | Advanced bug detection |
 
-See [calor mcp](/docs/cli/mcp/) for the complete 18-tool surface.
+See [calor mcp](/docs/cli/mcp/) for the complete 19-tool surface.
 
 ---
 

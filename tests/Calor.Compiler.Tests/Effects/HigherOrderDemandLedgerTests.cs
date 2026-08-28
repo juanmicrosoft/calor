@@ -277,6 +277,17 @@ public class HigherOrderDemandLedgerTests
             PerFile: perFile);
     }
 
+
+    /// <summary>
+    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
+    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
+    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
+    /// The per-arm starters beside them are NOT matched and stay counted.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
+        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static List<string> EnumerateCalorFiles(string root)
     {
         // Filter on REPO-RELATIVE paths: the checkout itself may live under a
@@ -287,7 +298,8 @@ public class HigherOrderDemandLedgerTests
         // FILESYSTEM walk, not `git ls-files`, and the agent-native harness leaves
         // gitignored `.prev-src/` and `.envelope-src/` copies of every run's source
         // under `bench/phase0-agent-native/epochs/**/` (PP-E1 leg B, PR #1110: a tree
-        // with them present counted 1006 files where a clean checkout counts 926).
+        // with them present counted 1006 files where a clean checkout counts 926 —
+        // 927 since #1104's crash-repro fixture).
         // No committed .calr lives under a dot-directory, so the rule changes nothing
         // on a clean tree; it only stops a local regeneration from freezing a
         // denominator CI can never reproduce.
@@ -305,7 +317,30 @@ public class HigherOrderDemandLedgerTests
                     // committed on purpose, so they cannot be moved and must be
                     // excluded by path instead. The ledger's counts are unchanged
                     // by this line — these files were never part of the 886.
-                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
+                    // Harness scratch that is not product corpus, the same case: templates/
+                    // holds the arm csproj template and the permissive canary run-pair.sh
+                    // compiles before a pre-rows epoch (v0.16 W1) — a program written to
+                    // draw Calor0410, never product code — and pairs/W-00x-*/seeded/ holds
+                    // the PP-W-rows seeded mutants (§4.1, S3 (c)). The per-arm STARTERS are
+                    // not excluded: they are ordinary programs, so the corpus bar applies to
+                    // them as it does to every other pair fixture. The archived epoch outputs under
+                    // epochs/ and the authored N1/W1..W5 pairs stay counted, as today; the
+                    // ledger's counts are unchanged by these two lines.
+                    // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
+                    // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
+                    // starters enter the census and the seeded mutants do not. What is NOT yet
+                    // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
+                    // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
+                    // `§FLD ... §E{...}`, and
+                    // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
+                    // asserts that ZERO committed .calr write those forms. So when #1123 lands that
+                    // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
+                    // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
+                    // the narrow one either way: widening it to the whole pair family would silently
+                    // exempt ordinary programs from the corpus bar.
+                    && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
+                    && !PpwSeededFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

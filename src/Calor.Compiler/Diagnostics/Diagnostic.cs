@@ -412,6 +412,25 @@ public static class DiagnosticCode
     /// </summary>
     public const string EffectRowMisplaced = "Calor0405";
 
+    /// <summary>
+    /// Error: effect inference stopped at an iteration cap before the computed
+    /// effect sets had stopped changing, so the effects it reports for the named
+    /// function(s) may be incomplete and any Calor0410 it did NOT report cannot be
+    /// trusted. Emitted at both capped sites of <c>EffectEnforcementPass</c> — the
+    /// SCC fixpoint (<c>ProcessScc</c>, default cap
+    /// <see cref="Effects.EffectEnforcementPass.DefaultSccFixpointIterationCap"/>)
+    /// and the instantiated-charge worklist
+    /// (<c>PropagateInstantiatedCharges</c>, default cap
+    /// <see cref="Effects.EffectEnforcementPass.DefaultInstantiatedChargeIterationCap"/>)
+    /// — at the declaration span of the function being processed when the cap
+    /// fired. The message names the site, the cap, and the functions involved.
+    /// An error under every policy: a stopped inference is not "we cannot tell"
+    /// about one value (Calor0425), it is a claim the compiler cannot stand
+    /// behind, so no flag waives it. v0.16 W5 (gate 11); until 0.16 the SCC site
+    /// reported the mis-banded Calor0600 and the worklist site was silent.
+    /// </summary>
+    public const string EffectInferenceDidNotConverge = "Calor0406";
+
     // Effect enforcement (Calor0410-0429)
     public const string ForbiddenEffect = "Calor0410";
     public const string UnknownExternalCall = "Calor0411";

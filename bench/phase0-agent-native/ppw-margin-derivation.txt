@@ -1,0 +1,40 @@
+PP-E1 margin derivation — 3000 null simulations x 400-resample two-level cluster bootstrap, seed 4537
+population e1-rows-parity-001; grid extended (1.15, 1.20, 1.25, 1.30, 1.35, 1.40, 1.45, 1.50); null redraw: resample-with-replacement from each pair's pooled runs; A-1.12 rule half-width 0.005
+
+=== e1-rows-parity-001 — PP-W-rows leg-B derivation population (realized PP-E1 epoch, corrected tokens) ===
+  N1-001   control    n=5 mean_corrected=    7935 cv_corrected=0.3768 mean_naive=    6276 cv_naive=0.3082
+  N1-001   treatment  n=5 mean_corrected=    9334 cv_corrected=0.3288 mean_naive=    9334 cv_naive=0.3288
+  N1-002   control    n=5 mean_corrected=    5562 cv_corrected=0.4259 mean_naive=    5562 cv_naive=0.4259
+  N1-002   treatment  n=5 mean_corrected=    8409 cv_corrected=0.2205 mean_naive=    8409 cv_naive=0.2205
+  N1-003   control    n=5 mean_corrected=   12580 cv_corrected=0.1144 mean_naive=   12372 cv_naive=0.1092
+  N1-003   treatment  n=5 mean_corrected=   14978 cv_corrected=0.4252 mean_naive=   14978 cv_naive=0.4252
+  N1-005   control    n=5 mean_corrected=    7535 cv_corrected=0.1131 mean_naive=    7535 cv_naive=0.1131
+  N1-005   treatment  n=5 mean_corrected=    6769 cv_corrected=0.1172 mean_naive=    6769 cv_naive=0.1172
+  within-cell CV (naive): median 0.2643  max 0.4259  cells 8
+  [naive] null point: median 0.9994  p95 1.1864  -> margin on the 0.05 grid: 1.20
+  [naive] A-1.12 rule: grid line above (p95 1.1864 + half-width 0.005 = 1.1914) -> margin 1.20
+      margin 1.15: null false-fail — point-only 0.088, conjunction 0.021
+      margin 1.20: null false-fail — point-only 0.041, conjunction 0.014
+      margin 1.25: null false-fail — point-only 0.018, conjunction 0.007
+      margin 1.30: null false-fail — point-only 0.009, conjunction 0.004
+      margin 1.35: null false-fail — point-only 0.003, conjunction 0.002
+      margin 1.40: null false-fail — point-only 0.001, conjunction 0.001
+      margin 1.45: null false-fail — point-only 0.001, conjunction 0.000
+      margin 1.50: null false-fail — point-only 0.000, conjunction 0.000
+      power @ 1.25x (conjunction): m=1.15 0.549  m=1.20 0.510  m=1.25 0.424  m=1.30 0.321  m=1.35 0.219  m=1.40 0.135  m=1.45 0.076  m=1.50 0.039
+      power @ 1.4x (conjunction): m=1.15 0.838  m=1.20 0.832  m=1.25 0.803  m=1.30 0.725  m=1.35 0.614  m=1.40 0.475  m=1.45 0.345  m=1.50 0.237
+      power @ 1.6x (conjunction): m=1.15 0.972  m=1.20 0.971  m=1.25 0.968  m=1.30 0.960  m=1.35 0.940  m=1.40 0.902  m=1.45 0.832  m=1.50 0.740
+  within-cell CV (corrected): median 0.2746  max 0.4259  cells 8
+  [corrected] null point: median 0.9986  p95 1.1766  -> margin on the 0.05 grid: 1.20
+  [corrected] A-1.12 rule: grid line above (p95 1.1766 + half-width 0.005 = 1.1816) -> margin 1.20
+      margin 1.15: null false-fail — point-only 0.084, conjunction 0.019
+      margin 1.20: null false-fail — point-only 0.035, conjunction 0.012
+      margin 1.25: null false-fail — point-only 0.015, conjunction 0.005
+      margin 1.30: null false-fail — point-only 0.006, conjunction 0.002
+      margin 1.35: null false-fail — point-only 0.002, conjunction 0.001
+      margin 1.40: null false-fail — point-only 0.000, conjunction 0.000
+      margin 1.45: null false-fail — point-only 0.000, conjunction 0.000
+      margin 1.50: null false-fail — point-only 0.000, conjunction 0.000
+      power @ 1.25x (conjunction): m=1.15 0.555  m=1.20 0.514  m=1.25 0.421  m=1.30 0.309  m=1.35 0.206  m=1.40 0.126  m=1.45 0.071  m=1.50 0.037
+      power @ 1.4x (conjunction): m=1.15 0.845  m=1.20 0.837  m=1.25 0.808  m=1.30 0.740  m=1.35 0.621  m=1.40 0.487  m=1.45 0.349  m=1.50 0.236
+      power @ 1.6x (conjunction): m=1.15 0.973  m=1.20 0.973  m=1.25 0.969  m=1.30 0.959  m=1.35 0.941  m=1.40 0.902  m=1.45 0.833  m=1.50 0.748

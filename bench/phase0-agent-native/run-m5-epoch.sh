@@ -51,6 +51,9 @@ KIND="m5-comparison"
 # claimed a contrast. The agent never invokes the `calor` CLI at all; it is told to run
 # `dotnet build`, so the CLI pin alone cannot reach it.
 ARM_A_ROOT=""; ARM_B_ROOT=""
+# Per-arm pair.json `arms.<key>` entry (W1 / roadmap §4.1). Empty = run-pair's default
+# (the arm language, `calor`). PP-W-rows' control arm runs under `calor-pre-rows`.
+ARM_A_CONFIG=""; ARM_B_CONFIG=""
 RUNS=5; NULL_FLAG=""; PAIR_FILTER=""
 # Frozen M5 sets (loop-m5-comparison.md §3): warm = PP-L5, neutral N1 = PP-L6(b).
 WARM_PAIRS=(W2-001 W2-002 W2-003 W2-004 W2-005 W3-001 W3-002 W3-003 W3-004)
@@ -63,6 +66,8 @@ while [[ $# -gt 0 ]]; do
         --arm-b-repo-root) ARM_B_ROOT="$2"; shift 2 ;;
         --arm-a-mech) ARM_A_MECH="$2"; shift 2 ;;
         --arm-b-mech) ARM_B_MECH="$2"; shift 2 ;;
+        --arm-a-config) ARM_A_CONFIG="$2"; shift 2 ;;
+        --arm-b-config) ARM_B_CONFIG="$2"; shift 2 ;;
         --arm-a-label) ARM_A_LABEL="$2"; shift 2 ;;
         --arm-b-label) ARM_B_LABEL="$2"; shift 2 ;;
         --arm-a-role) ARM_A_ROLE="$2"; shift 2 ;;
@@ -188,10 +193,11 @@ jq -n \
     --arg a_role "$ARM_A_ROLE" --arg b_role "$ARM_B_ROLE" \
     --arg a_root "$ARM_A_ROOT" --arg b_root "$ARM_B_ROOT" \
     --arg a_tasks "${a_tasks:-}" --arg b_tasks "${b_tasks:-}" \
+    --arg a_cfg "${ARM_A_CONFIG:-calor}" --arg b_cfg "${ARM_B_CONFIG:-calor}" \
     '{epochId:$epoch, kind:$kind, modelPin:$model, agentVersion:$agent_version,
       startedAt:$date, mode:$mode, runsPerArm:$runs, suiteDirtyFiles:($suite_dirty|tonumber),
-      armA:{label:$a_label, role:$a_role, commit:$a_commit, calorDll:$a_dll, editMechanism:$a_mech, repoRoot:$a_root, calorTasksSha:$a_tasks},
-      armB:{label:$b_label, role:$b_role, commit:$b_commit, calorDll:$b_dll, editMechanism:$b_mech, repoRoot:$b_root, calorTasksSha:$b_tasks},
+      armA:{label:$a_label, role:$a_role, commit:$a_commit, calorDll:$a_dll, editMechanism:$a_mech, repoRoot:$a_root, calorTasksSha:$a_tasks, armConfig:$a_cfg},
+      armB:{label:$b_label, role:$b_role, commit:$b_commit, calorDll:$b_dll, editMechanism:$b_mech, repoRoot:$b_root, calorTasksSha:$b_tasks, armConfig:$b_cfg},
       ppL5:{metric:"tokens-to-green", threshold:0.85, note:">=15% median paired-ratio reduction, one-sided cluster bootstrap a=0.05 (gates Annex A)", pairs:$warm},
       ppL6:{check:"neutral iterations-to-green parity + config invariance", pairs:$neutral},
       ppW5:(if $kind == "pp-w5-parity" then
@@ -206,12 +212,14 @@ echo "arm B: $ARM_B_COMMIT ($ARM_B_MECH)  $ARM_B_DLL"
 echo "pairs (${#PAIRS[@]}): ${PAIRS[*]}"
 echo "runs/arm: $RUNS   mode: ${NULL_FLAG:-live}   model: ${CLAUDE_MODEL:-default}"
 
-run_arm() {  # <pair_dir> <mechanism> <dll> <label> [repo-root] [runs] [run-offset]
-    local pair_dir="$1" mech="$2" dll="$3" label="$4" root="${5:-}" nruns="${6:-$RUNS}" roff="${7:-0}"
+run_arm() {  # <pair_dir> <mechanism> <dll> <label> [repo-root] [runs] [run-offset] [arm-config]
+    local pair_dir="$1" mech="$2" dll="$3" label="$4" root="${5:-}" nruns="${6:-$RUNS}" roff="${7:-0}" cfg="${8:-}"
     # The PRODUCT binding. Without it the arm template's __REPO_ROOT__ resolves to the
     # harness checkout and both arms share the compiler that actually builds the agent's
     # code — the defect that voided w5-parity-001.
     local root_args=(); [[ -n "$root" ]] && root_args=(--arm-repo-root "$root")
+    # W1 / §4.1: the pair.json arm entry (fixture + config pin) this arm runs under.
+    [[ -n "$cfg" ]] && root_args+=(--arm-config "$cfg")
     # --arm-label is REQUIRED, not cosmetic: run-pair writes to
     # $OUT/$PAIR/$ARM_LABEL/run-N, so two arms sharing a label overwrite each other.
     # M5 got away without it only because its arms differ in edit mechanism, which
@@ -231,9 +239,9 @@ for pid in "${PAIRS[@]}"; do
     [[ -d "$pair_dir" ]] || { echo "WARNING: pair not found, skipping: $pid" >&2; continue; }
     if [[ "$KIND" == "m5-comparison" ]]; then
         echo "=== $pid / arm A ($ARM_A_ROLE, $ARM_A_MECH) ==="
-        run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL" "$ARM_A_ROOT"
+        run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL" "$ARM_A_ROOT" "$RUNS" 0 "$ARM_A_CONFIG"
         echo "=== $pid / arm B ($ARM_B_ROLE, $ARM_B_MECH) ==="
-        run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL" "$ARM_B_ROOT"
+        run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL" "$ARM_B_ROOT" "$RUNS" 0 "$ARM_B_CONFIG"
     else
         # INTERLEAVED, one run per arm at a time. Running all of arm A and then all of
         # arm B confounds every time-varying factor — API state, machine load, model
@@ -242,9 +250,9 @@ for pid in "${PAIRS[@]}"; do
         # restarting the numbering.
         for ((k = 1; k <= RUNS; k++)); do
             echo "=== $pid / run $k / arm A ($ARM_A_ROLE) ==="
-            run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL" "$ARM_A_ROOT" 1 "$((k-1))"
+            run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL" "$ARM_A_ROOT" 1 "$((k-1))" "$ARM_A_CONFIG"
             echo "=== $pid / run $k / arm B ($ARM_B_ROLE) ==="
-            run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL" "$ARM_B_ROOT" 1 "$((k-1))"
+            run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL" "$ARM_B_ROOT" 1 "$((k-1))" "$ARM_B_CONFIG"
         done
     fi
 done

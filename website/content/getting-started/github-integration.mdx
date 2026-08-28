@@ -85,6 +85,7 @@ calor_check            - Diagnose, type check, lint, or validate snippets
 calor_verify           - Verify function contracts
 calor_navigate         - Definitions, references, symbols, and scope
 calor_structure        - Outlines, call graphs, and impact
+calor_query            - Project index: callers, callees, impact, effect rows
 ```
 
 ### Available Tools
@@ -98,8 +99,9 @@ calor_structure        - Outlines, call graphs, and impact
 | `calor_convert` | Convert between C# and Calor |
 | `calor_navigate` | Definition, reference, symbol, type, and scope queries |
 | `calor_structure` | Outline, call graph, and impact analysis |
+| `calor_query` | Project index: who calls a declaration, what it calls, what a change could break, its effect row |
 
-See [calor mcp](/docs/cli/mcp/) for the complete 18-tool surface.
+See [calor mcp](/docs/cli/mcp/) for the complete 19-tool surface.
 
 ### Using MCP Tools in Prompts
 
@@ -184,7 +186,7 @@ calor assess ./src --top 10
 
 - [Syntax Reference](/docs/syntax-reference/) - Complete language reference
 - [calor init](/docs/cli/init/) - Full init command documentation
-- [calor mcp](/docs/cli/mcp/) - Complete MCP tools reference (18 tools)
+- [calor mcp](/docs/cli/mcp/) - Complete MCP tools reference (19 tools)
 - [Claude Integration](/docs/getting-started/claude-integration/) - Alternative with enforced Calor-first
 - [Gemini Integration](/docs/getting-started/gemini-integration/) - Alternative with enforced Calor-first
 - [Codex Integration](/docs/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI

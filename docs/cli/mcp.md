@@ -46,7 +46,13 @@ The server communicates over stdio using the [Model Context Protocol](https://mo
 
 ## Available Tools
 
-The MCP server exposes 34 tools organized by category:
+The MCP server exposes **19 tools**. The names catalogued below predate the
+action-based consolidation (several one-purpose tools were folded into
+`calor_check`, `calor_analyze`, `calor_navigate`, `calor_structure` and
+`calor_convert`); the live surface, including the v0.16 `calor_query` tool over
+the project index, is the table in
+[the MCP reference](/calor/cli/mcp/). Clients should discover the tool list
+rather than assume names from this page.
 
 ### Compilation & Verification
 
@@ -825,7 +831,7 @@ When you run `calor init --ai claude`, the MCP server is automatically configure
 
 This configures two servers:
 - **calor-lsp**: Language server for IDE features (diagnostics, hover, go-to-definition)
-- **calor**: MCP server with all 34 tools
+- **calor**: MCP server with all 19 tools
 
 ### Gemini CLI (via calor init)
 

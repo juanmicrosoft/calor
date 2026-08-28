@@ -229,6 +229,169 @@ public sealed class ProjectIndexTests : IDisposable
         Assert.Empty(index.FindEffectRows(uses.SymbolId));
     }
 
+    /// <summary>
+    /// v0.16 W5 (review #2 M1) — a file whose effect inference stopped at a cap
+    /// (Calor0406) gets NO rows and a residual entry, exactly like a file the
+    /// binder rejected: <c>calor build</c> fails on it, and the pass's facts are
+    /// partial by its own account, so the index must not present them as rows.
+    /// Driven with an injected cap on three-hop fixtures (the SCC ring at cap 1,
+    /// the E3b rank-1 chain at worklist cap 2); the other file's rows are
+    /// unaffected, and the residual survives the JSON round-trip.
+    /// </summary>
+    [Theory]
+    [InlineData("scc")]
+    [InlineData("worklist")]
+    public void EffectsFacet_SkipsAFileWhoseInferenceDidNotConverge_AndSaysSo(string site)
+    {
+        var (source, subject) = site == "scc"
+            ? (ThreeHopMutualRecursion, "A")
+            : (ThreeHopRank1Chain, "Top2");
+        var dir = NewProject(("lib.calr", Library), ("capped.calr", source));
+        var options = site == "scc"
+            ? OptionsFor(dir) with { SccFixpointIterationCap = 1 }
+            : OptionsFor(dir) with { InstantiatedChargeIterationCap = 2 };
+
+        var index = ProjectIndexBuilder.Build(options);
+
+        Assert.DoesNotContain(index.EffectRows, row => row.File == "capped.calr");
+        Assert.Contains(index.EffectRows, row => row.File == "lib.calr" && row.Name == "Double");
+        var entry = Assert.Single(index.Residual.EffectRowsUnavailable);
+        Assert.Equal("capped.calr: effect inference did not converge (Calor0406), facts not recorded", entry);
+        var declaration = Assert.Single(index.FindDeclarations(subject));
+        Assert.True(index.EffectsAnswerIsPartial(declaration.SymbolId, declaration.File));
+        Assert.Empty(index.FindEffectRows(declaration.SymbolId));
+
+        // Round-trip: the residual is data, not a transient.
+        var output = Path.Combine(dir, "index-out");
+        index.Save(output);
+        var (loaded, status) = ProjectIndex.Load(output);
+        Assert.Equal(ProjectIndex.Freshness.Fresh, status);
+        Assert.Equal(entry, Assert.Single(loaded!.Residual.EffectRowsUnavailable));
+
+        // Negative: at the default caps the same file converges and is indexed.
+        var converged = ProjectIndexBuilder.Build(OptionsFor(dir));
+        Assert.Empty(converged.Residual.EffectRowsUnavailable);
+        Assert.Contains(converged.EffectRows, row => row.File == "capped.calr" && row.Name == subject);
+    }
+
+    /// <summary>
+    /// The contract of <see cref="CliTestHarness.StampForChildCli"/>, pinned
+    /// directly: the hash it stamps is the one a child <c>calor</c> computes for
+    /// itself. Built by the child (<c>calor index build</c>) and read back, so a
+    /// helper that hashed the wrong file is red here rather than showing up as a
+    /// puzzling "index unusable" in whichever test used it next.
+    ///
+    /// <para>What each lane catches, measured: hashing the wrong assembly
+    /// (<c>Calor.Runtime.dll</c>) is red in both lanes; hashing the test host's
+    /// own copy (<c>ComputeCliCompilerHash</c>) is caught by the coverage lane
+    /// specifically, since outside it that file is byte-identical to the child's
+    /// — an information-theoretic limit rather than a gap, and CI runs both
+    /// lanes.</para>
+    /// </summary>
+    [Fact]
+    public void StampForChildCli_UsesTheHashTheChildComputesForItself()
+    {
+        var dir = NewProject(("lib.calr", Library));
+
+        var built = CliTestHarness.RunCli(dir, "index", "build", dir);
+        Assert.True(built.ExitCode == 0, built.StdOut + built.StdErr);
+
+        var (fromChild, status) = ProjectIndex.Load(Commands.IndexCommand.DefaultOutputDirectory(dir));
+        Assert.Equal(ProjectIndex.Freshness.Fresh, status);
+        Assert.NotNull(fromChild);
+        Assert.NotEqual("", fromChild!.CompilerHash);
+        Assert.Equal(fromChild.CompilerHash, CliTestHarness.ChildCompilerHash());
+    }
+
+    /// <summary>
+    /// …and <c>calor query effects</c> on a symbol in that file answers with the
+    /// residual, not a row. The index is built with the injected cap and saved
+    /// where the CLI looks; the CLI finds it fresh (the cap is not an input) and
+    /// answers from it.
+    ///
+    /// <para>The index is stamped with the child's compiler hash before it is
+    /// saved (<see cref="CliTestHarness.StampForChildCli"/>, whose comment states
+    /// what that suppresses): an index built in-process is otherwise refused by
+    /// the child with <c>index unusable — the compiler changed</c> whenever the
+    /// two load different <c>calor.dll</c> files — under
+    /// <c>--collect:"XPlat Code Coverage"</c>, which instruments the host's copy,
+    /// and equally in a tree where both build configurations exist, since a Debug
+    /// test host is handed the Release binary for the child.
+    /// <c>--no-build</c> is kept deliberately: it makes any remaining mismatch a
+    /// hard error rather than a silent rebuild that would erase the residual, so
+    /// the pin cannot pass by accident — and the assertions below check the
+    /// residual line itself, not merely the exit code.</para>
+    /// </summary>
+    [Fact]
+    public void QueryEffects_OnAFileWhoseInferenceDidNotConverge_ReportsTheResidual()
+    {
+        var dir = NewProject(("lib.calr", Library), ("capped.calr", ThreeHopMutualRecursion));
+        var options = new ProjectIndexBuilder.Options(
+            dir, "index-v1", ProjectIndexBuilder.DiscoverSources(dir)) { SccFixpointIterationCap = 1 };
+        var index = ProjectIndexBuilder.Build(options);
+        CliTestHarness.StampForChildCli(index);
+        index.Save(Commands.IndexCommand.DefaultOutputDirectory(dir));
+
+        var text = CliTestHarness.RunCli(dir, "query", "effects", "A", "--project", dir, "--no-build");
+        Assert.True(
+            text.StdErr.Length == 0,
+            $"the child must accept the index; it said: {text.StdErr}");
+        Assert.Equal(1, text.ExitCode);
+        Assert.Contains(
+            "function A — effect inference did not converge (Calor0406), facts not recorded",
+            text.StdOut);
+        Assert.DoesNotContain("declared:", text.StdOut);
+
+        // The control: the un-capped file answers with a row through the same path.
+        var control = CliTestHarness.RunCli(dir, "query", "effects", "Double", "--project", dir, "--no-build");
+        Assert.True(control.ExitCode == 0, control.StdOut + control.StdErr);
+        Assert.Contains("declared: [pure]", control.StdOut);
+        Assert.DoesNotContain("did not converge", control.StdOut);
+    }
+
+    /// <summary>
+    /// A → B → C → A, all printing (the index's binder has no BCL references, so
+    /// the fixture stays on core statements). One effect shared by the ring
+    /// means round 1 changes every member, so a cap of 1 fires.
+    /// </summary>
+    private const string ThreeHopMutualRecursion = """
+        §M{m003:Ring}
+          §F{f001:A:pub} (i32:n) -> i32
+            §E{cw}
+            §P "a"
+            §IF{if1} (> n 0)
+              §R §C{B} §A (- n 1) §/C
+            §R n
+          §F{f002:B:pub} (i32:n) -> i32
+            §E{cw}
+            §P "b"
+            §IF{if2} (> n 0)
+              §R §C{C} §A (- n 1) §/C
+            §R n
+          §F{f003:C:pub} (i32:n) -> i32
+            §E{cw}
+            §P "c"
+            §IF{if3} (> n 0)
+              §R §C{A} §A (- n 1) §/C
+            §R n
+        """;
+
+    private const string ThreeHopRank1Chain = """
+        §M{m004:Chain}
+          §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+            §E{e}
+            §R §C{g}
+          §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
+            §E{cw}
+            §R §C{Run} §A h §/C
+          §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
+            §E{cw}
+            §R §C{Outer} §A q §/C
+          §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
+            §E{cw}
+            §R §C{Top} §A r §/C
+        """;
+
     [Fact]
     public void AddingOrRemovingAFileIsStale()
     {

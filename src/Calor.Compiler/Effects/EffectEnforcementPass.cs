@@ -20,6 +20,87 @@ public sealed class EffectEnforcementPass
     private readonly bool _strictEffects;
     private readonly HashSet<string> _crossModuleFunctionNames;
 
+    /// <summary>
+    /// Default cap on the <see cref="ProcessScc"/> fixpoint: how many rounds over
+    /// a recursive SCC the pass will run before it stops and reports
+    /// Calor0406. Effect sets only grow and the effect universe is finite, so a
+    /// converging SCC needs a bounded number of rounds — but the bound is set by
+    /// the SCC's SIZE, not its effect count: a round processes members in
+    /// Tarjan's order, so an effect travelling along a forward edge arrives in
+    /// the same round while one travelling along a back edge costs a round per
+    /// hop, and a doubly-linked chain of n functions sharing ONE effect needs
+    /// about n rounds (review of #1114 measured n = 101 hitting a flat cap of
+    /// 100). That is why the effective cap, when none is injected, is
+    /// <c>max(this, scc.Count + 1)</c> — see <see cref="SccFixpointIterationCap"/>.
+    /// </summary>
+    public const int DefaultSccFixpointIterationCap = 100;
+
+    /// <summary>
+    /// Default cap on the <see cref="PropagateInstantiatedCharges"/> worklist:
+    /// how many dequeues the pass will perform before it stops and reports
+    /// Calor0406. Counts dequeues, not hops, so a fan-in of N callers on a chain
+    /// of depth D costs about N × D.
+    /// </summary>
+    public const int DefaultInstantiatedChargeIterationCap = 10_000;
+
+    /// <summary>
+    /// How many function names a Calor0406 message lists before it says
+    /// "and N more".
+    /// </summary>
+    private const int MaxNamedFunctionsInNonConvergenceMessage = 8;
+
+    /// <summary>
+    /// v0.16 W5 (gate 11) — the <see cref="ProcessScc"/> fixpoint cap, injectable
+    /// so a pin can drive a three-hop fixture into the cap at 2 rather than
+    /// building a hundred-function SCC. Must be at least 1.
+    ///
+    /// <para>An injected value is used <b>verbatim</b>, so the pins see exactly the
+    /// cap they set. When nothing is injected the cap applied to an SCC is
+    /// <c>max(DefaultSccFixpointIterationCap, scc.Count + 1)</c>: monotone growth
+    /// over an SCC of n members needs at most n − 1 rounds of back-edge travel
+    /// plus one confirming round, so with that floor Calor0406 at this site can
+    /// only fire for an inference that is not monotone — a bug — never for a
+    /// large but well-behaved recursive group.</para>
+    /// </summary>
+    internal int SccFixpointIterationCap
+    {
+        get => _sccFixpointIterationCap;
+        init
+        {
+            _sccFixpointIterationCap = value >= 1
+                ? value
+                : throw new ArgumentOutOfRangeException(nameof(SccFixpointIterationCap), value, "The cap must be at least 1.");
+            _sccCapInjected = true;
+        }
+    }
+
+    /// <summary>
+    /// v0.16 W5 (gate 11) — the <see cref="PropagateInstantiatedCharges"/> worklist
+    /// cap, injectable for the same reason. Defaults to
+    /// <see cref="DefaultInstantiatedChargeIterationCap"/>; must be at least 1.
+    /// </summary>
+    internal int InstantiatedChargeIterationCap
+    {
+        get => _instantiatedChargeIterationCap;
+        init => _instantiatedChargeIterationCap = value >= 1
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(InstantiatedChargeIterationCap), value, "The cap must be at least 1.");
+    }
+
+    private readonly int _sccFixpointIterationCap = DefaultSccFixpointIterationCap;
+    private readonly bool _sccCapInjected;
+    private readonly int _instantiatedChargeIterationCap = DefaultInstantiatedChargeIterationCap;
+
+    /// <summary>
+    /// The cap <see cref="ProcessScc"/> applies to an SCC of <paramref name="sccSize"/>
+    /// members: the injected value verbatim, else the default floored at
+    /// <c>sccSize + 1</c> (see <see cref="SccFixpointIterationCap"/>).
+    /// </summary>
+    internal int EffectiveSccFixpointIterationCap(int sccSize) =>
+        _sccCapInjected
+            ? _sccFixpointIterationCap
+            : Math.Max(DefaultSccFixpointIterationCap, sccSize + 1);
+
     // Delegated call graph analysis (populated by Enforce)
     private CallGraphAnalysis _callGraphAnalysis = null!;
 
@@ -452,7 +533,7 @@ public sealed class EffectEnforcementPass
         // For recursive SCCs — mutual, or a single function calling itself — iterate to fixpoint
         var changed = true;
         var iterations = 0;
-        const int maxIterations = 100;
+        var maxIterations = EffectiveSccFixpointIterationCap(scc.Count);
 
         // Initialize with empty effects
         foreach (var functionId in scc)
@@ -479,13 +560,51 @@ public sealed class EffectEnforcementPass
             }
         }
 
+        // v0.16 W5 (gate 11): the loop above exits either because a full round
+        // changed nothing (converged) or because the cap was reached with the
+        // last round still changing. The second case used to be reported as the
+        // API-strictness code Calor0600 (a warning); it is now Calor0406, an
+        // error, because an SCC whose sets were still growing may be missing
+        // effects and any Calor0410 not reported for its members is unsound.
         if (changed)
         {
-            _diagnostics.ReportWarning(
+            ReportDidNotConverge(
                 _callGraphAnalysis.Functions[scc[0]].Span,
-                "Calor0600",
-                $"Effect fixpoint iteration did not converge after {maxIterations} iterations for mutually recursive functions. Effects may be incomplete.");
+                "SCC fixpoint",
+                maxIterations,
+                "rounds",
+                scc.Select(id => _callGraphAnalysis.Functions[id].Name),
+                "the effects computed for this recursive group may be incomplete");
         }
+    }
+
+    /// <summary>
+    /// Calor0406 at one of the two capped sites. The message names the site, the
+    /// cap, and the functions involved so the reader can tell which of the two
+    /// loops stopped and what to split; the function list is truncated after
+    /// <see cref="MaxNamedFunctionsInNonConvergenceMessage"/> names.
+    /// </summary>
+    private void ReportDidNotConverge(
+        TextSpan span,
+        string site,
+        int cap,
+        string unit,
+        IEnumerable<string> functionNames,
+        string consequence)
+    {
+        var names = functionNames.ToList();
+        var shown = names.Take(MaxNamedFunctionsInNonConvergenceMessage)
+            .Select(n => $"'{n}'");
+        var list = string.Join(", ", shown);
+        if (names.Count > MaxNamedFunctionsInNonConvergenceMessage)
+            list += $", and {names.Count - MaxNamedFunctionsInNonConvergenceMessage} more";
+
+        _diagnostics.Report(
+            span,
+            DiagnosticCode.EffectInferenceDidNotConverge,
+            $"Effect inference did not converge: the {site} stopped at its cap of {cap} {unit} "
+            + $"with the effect sets still changing; {consequence}. Functions involved: {list}.",
+            DiagnosticSeverity.Error);
     }
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
@@ -509,6 +628,7 @@ public sealed class EffectEnforcementPass
                 _lambdaBodyRows[lambda] = new LambdaBodyFact(functionId, body, reasons),
             LambdaBodyRow = LambdaBodyRow,
             Invocations = _invocations,
+            AstResolution = AstResolution,
         };
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromStatements(function.Body);
@@ -1115,7 +1235,10 @@ public sealed class EffectEnforcementPass
     /// two-level chain and leaves a three-level one broken. Effect sets only ever
     /// GROW here and the effect universe is finite, so the worklist terminates;
     /// the iteration cap mirrors <see cref="ProcessScc"/>'s and exists for the
-    /// same reason — a cycle in the call graph must not spin.</para>
+    /// same reason — a cycle in the call graph must not spin. Since v0.16 (W5,
+    /// gate 11) reaching the cap with work still queued is Calor0406, not a
+    /// silent stop: the functions still in the queue may have callers of their
+    /// own that were never charged.</para>
     ///
     /// <para>Recursion is handled by the growth test, not by an SCC walk: a member
     /// of a cycle re-enters the queue only while its set is still changing.</para>
@@ -1126,7 +1249,7 @@ public sealed class EffectEnforcementPass
 
         var queue = new Queue<string>(_rank1Charged);
         var iterations = 0;
-        const int maxIterations = 10_000;
+        var maxIterations = _instantiatedChargeIterationCap;
 
         while (queue.Count > 0 && iterations < maxIterations)
         {
@@ -1169,6 +1292,26 @@ public sealed class EffectEnforcementPass
 
                 queue.Enqueue(callerId);
             }
+        }
+
+        // v0.16 W5 (gate 11): work left in the queue means the cap stopped the
+        // propagation, not the growth test. Reported at the declaration of the
+        // first function still queued — the one whose callers were never
+        // charged — and the message names every function still waiting (a
+        // function can be queued more than once; it is named once). Every id
+        // in the queue is a key of `Functions`: the seeds are the ids inference
+        // charged (ChargeInstantiatedRow) and the rest come from `GetCallers`,
+        // whose reverse graph is built from the same function map.
+        if (queue.Count > 0)
+        {
+            var pending = queue.Distinct(StringComparer.Ordinal).ToList();
+            ReportDidNotConverge(
+                _callGraphAnalysis.Functions[pending[0]].Span,
+                "instantiated-charge propagation",
+                maxIterations,
+                "steps",
+                pending.Select(id => _callGraphAnalysis.Functions[id].Name),
+                "the callers of these functions may not have been charged the effects instantiated in their callees");
         }
     }
 
@@ -2444,6 +2587,121 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
+    /// #1104 (v0.16 W3(c)) — the bound on the nested <see cref="EffectInferrer"/>'s
+    /// AST-side local-type resolution, and the counters that make it observable.
+    ///
+    /// <para><see cref="EffectInferrer.ResolveLocalValueTypeFromAst"/> answers
+    /// "what is the declared type of the value called <c>name</c>" by reading
+    /// the name's <c>§B</c> initializer, and a call initializer is typed by
+    /// resolving its receiver and its arguments — each of which is again a
+    /// name. A converted module whose initializers refer back to the name being
+    /// resolved (Serilog's <c>out var</c> hoisting produces
+    /// <c>§B{~x} §C{f.M} §A x §/C</c>) therefore recursed without limit, and a
+    /// StackOverflowException is a fail-fast: the host dies, nothing catches it.</para>
+    ///
+    /// <para><b>Who reaches this unbound.</b> Not only the in-process ledgers:
+    /// <c>EditPreviewTool.CheckEffects</c> runs this pass on a lex/parse-only
+    /// <c>ParseResult</c> with no binder anywhere on the path, and TWO MCP
+    /// tools call it — <c>edit_preview</c> (<c>EditPreviewTool</c>) and
+    /// <c>file_write</c> (<c>FileWriteTool</c>, which calls the same helper
+    /// for its effect check). <c>calor mcp</c> therefore died on any parsed
+    /// <c>.calr</c> of this shape, through either tool. Those are shipping
+    /// surfaces, and they are why a cycle stop stays SILENT here: the
+    /// author of the edited file cannot act on a converter artifact, the call
+    /// the cycle sits on is already reported (Calor0411), and edit_preview
+    /// would otherwise grow a diagnostic about the compiler's own search.
+    /// The CLI binds first and returns on binding errors, which is why it
+    /// never saw any of this.</para>
+    ///
+    /// <para>Two guards, the way <see cref="RowSiteChecker"/> bounds its
+    /// structural walk. (1) A VISITED SET keyed on the name in progress: asking
+    /// for a name whose resolution is already on the stack is, by construction,
+    /// a cycle — the search is deterministic and context-free within one
+    /// function, so the inner ask could only repeat the outer one — and it
+    /// answers <see cref="EffectInferrer.UnknownLocalTypeSentinel"/> ("known
+    /// value, unknown type"). This guard alone guarantees termination: depth is
+    /// bounded by the number of distinct names in the function. It cannot fire
+    /// on acyclic code, so no resolution answer there changes (gate 6 / §9).
+    /// (2) A DEPTH CAP as a backstop for a very long ACYCLIC chain of distinct
+    /// temporaries, which terminates but could still exhaust a 1 MB thread; it
+    /// also answers the sentinel. <see cref="DefaultDepthCap"/> is an order of
+    /// magnitude past what the corpus reaches — measured over the 364 corpus
+    /// modules enforced without binding: deepest acyclic nesting 6, and the
+    /// only cycles are the two Serilog modules from the issue — and well inside
+    /// the frame budget (each nested ask costs roughly 2.5 KB of stack in
+    /// Debug; the CLI's main thread is 1 MB on Windows).</para>
+    ///
+    /// <para>Injectable so the boundary can be pinned at a small cap; the
+    /// counters distinguish a cycle stop from a cap stop so a test can say
+    /// which guard fired, and <see cref="MaxObservedDepth"/> lets a test pin
+    /// that an acyclic chain resolved all the way down rather than stopping.</para>
+    /// </summary>
+    internal sealed class AstResolutionBound
+    {
+        /// <summary>
+        /// Frames of the AST-side search allowed on the stack at once — name
+        /// asks and the structural walk's levels alike (review round 1, C1).
+        /// The (cap + 1)-th frame stops with the sentinel.
+        ///
+        /// <para><b>Chosen empirically, not by taste.</b> With frame-accurate
+        /// counting the worst shape is a chain whose links nest one <c>§IF</c>
+        /// deeper each time, which costs frames quadratically: 30 such links
+        /// reach 525 frames, 50 reach 1375. Driving the 200-link version on a
+        /// <b>1 MB</b> thread (what a test host gives a test, and the CLI's
+        /// main thread on Windows) at rising caps: 448 completes, 480
+        /// overflows. The default is half the largest surviving cap, so the
+        /// budget is doubled against a deeper stack above this pass or a
+        /// costlier frame in a future build. The corpus needs 13 frames at its
+        /// worst — measured over all 364 corpus modules enforced without
+        /// binding, with zero cap stops (pinned by
+        /// <c>EffectInferrerCorpusDepthTests</c>; several modules reach 13, so
+        /// no one file is "the deepest") — so ordinary code sits an order of
+        /// magnitude below the cap and never reaches it.</para>
+        /// </summary>
+        public const int DefaultDepthCap = 224;
+
+        public int DepthCap { get; init; } = DefaultDepthCap;
+
+        /// <summary>Asks refused because the name was already being resolved.</summary>
+        public int CycleStops { get; private set; }
+
+        /// <summary>Asks refused because <see cref="DepthCap"/> was reached.</summary>
+        public int DepthCapStops { get; private set; }
+
+        /// <summary>Deepest nesting any resolution reached (0 = never asked).</summary>
+        public int MaxObservedDepth { get; private set; }
+
+        private readonly List<string> _stoppedNames = new();
+
+        /// <summary>The names whose asks were refused, in order, by either guard.</summary>
+        public IReadOnlyList<string> StoppedNames => _stoppedNames;
+
+        internal void RecordCycleStop(string name)
+        {
+            CycleStops++;
+            _stoppedNames.Add(name);
+        }
+
+        internal void RecordDepthCapStop(string name)
+        {
+            DepthCapStops++;
+            _stoppedNames.Add(name);
+        }
+
+        internal void RecordDepth(int depth)
+        {
+            if (depth > MaxObservedDepth)
+                MaxObservedDepth = depth;
+        }
+    }
+
+    /// <summary>
+    /// #1104 — the AST-resolution bound this pass runs under. Shared by every
+    /// per-function inferrer the pass creates, so the counters are per Enforce.
+    /// </summary>
+    internal AstResolutionBound AstResolution { get; init; } = new();
+
+    /// <summary>
     /// Context for effect inference.
     /// </summary>
     private sealed class InferenceContext
@@ -2497,6 +2755,13 @@ public sealed class EffectEnforcementPass
         /// on-demand re-inference cannot emit the same one twice.
         /// </summary>
         public InvocationSink? Invocations { get; init; }
+
+        /// <summary>
+        /// #1104 — the bound on AST-side local-type resolution (cap and
+        /// counters). Defaults to a fresh bound so a context built without one
+        /// is still guarded.
+        /// </summary>
+        public AstResolutionBound AstResolution { get; init; } = new();
 
         public InferenceContext(
             EffectResolver resolver,
@@ -3820,11 +4085,109 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
+        /// #1104 — the names whose AST-side resolution is on the stack right
+        /// now. Every cycle through the local-type search re-enters
+        /// <see cref="ResolveLocalValueTypeFromAst"/> with a name (a call
+        /// initializer is typed by resolving its receiver and its arguments,
+        /// and <c>FindLocalDeclarationType</c> / <c>FindForeachVariableType</c>
+        /// are reached only from here), so this ONE choke point sees every
+        /// cycle. Per inferrer, i.e. per function: names are function-scoped
+        /// and an on-demand inference of another function gets its own.
+        ///
+        /// <para>Review round 1 (m3) — <see cref="FindForeachVariableType"/>
+        /// also calls <see cref="FindLocalDeclarationType"/> for a DIFFERENT
+        /// name (a §FE collection's), without going back through the ask. That
+        /// hop cannot make a cycle invisible: it reaches no ask, so it cannot
+        /// re-enter this set, and every frame it costs is still charged to the
+        /// shared depth counter. It is named here so the "one choke point"
+        /// claim is read as being about ASKS, not about frames — frames are
+        /// bounded separately by <see cref="TryEnterAstFrame"/>.</para>
+        /// </summary>
+        private readonly HashSet<string> _astResolutionInProgress = new(StringComparer.Ordinal);
+
+        /// <summary>#1104 — nesting depth of the AST-side resolution (backstop cap).</summary>
+        private int _astResolutionDepth;
+
+        /// <summary>
         /// The pre-slice-2b AST search, extracted so the resolver order above
         /// reads as "bound first, then this" and so the fallback can be probed
         /// on its own.
+        ///
+        /// <para>#1104 — bounded (see <see cref="AstResolutionBound"/>): a name
+        /// already being resolved is a cycle and answers
+        /// <see cref="UnknownLocalTypeSentinel"/>; past the depth cap every
+        /// ask answers the sentinel. Neither guard can fire on an acyclic chain
+        /// shorter than the cap, so nothing else changes.</para>
         /// </summary>
         private string? ResolveLocalValueTypeFromAst(string name)
+        {
+            var bound = _context.AstResolution;
+            if (!_astResolutionInProgress.Add(name))
+            {
+                bound.RecordCycleStop(name);
+                return UnknownLocalTypeSentinel;
+            }
+
+            // The cap check below is TryEnterAstFrame's, inlined: this one has
+            // to leave the visited set on the way out and answer the sentinel
+            // rather than a bool, which the shared helper cannot do. The two
+            // are equivalent today (same comparison, same counters) and must be
+            // changed together — if this method ever stops needing the sentinel
+            // return, delete the copy and call TryEnterAstFrame.
+            if (_astResolutionDepth >= bound.DepthCap)
+            {
+                _astResolutionInProgress.Remove(name);
+                bound.RecordDepthCapStop(name);
+                return UnknownLocalTypeSentinel;
+            }
+
+            _astResolutionDepth++;
+            bound.RecordDepth(_astResolutionDepth);
+            try
+            {
+                return ResolveLocalValueTypeFromAstUnbounded(name);
+            }
+            finally
+            {
+                _astResolutionDepth--;
+                _astResolutionInProgress.Remove(name);
+            }
+        }
+
+        /// <summary>
+        /// #1104, review round 1 (CRITICAL C1) — enters one FRAME of the
+        /// AST-side search and reports whether the cap admits it.
+        ///
+        /// <para>The first cut of this guard counted <i>name asks</i> only, and
+        /// that does not bound the stack: <see cref="FindLocalDeclarationType"/>
+        /// and <see cref="FindForeachVariableType"/> recurse STRUCTURALLY into
+        /// every nested statement body, and that walk runs inside each ask. A
+        /// chain whose links sit progressively deeper inside <c>§IF</c> blocks
+        /// therefore costs frames in proportion to links × nesting while an
+        /// ask-counter saw only <c>links</c>. Measured on the ask-counting
+        /// version at cap 64: 40 such links, no cycle, all names distinct,
+        /// <c>DepthCapStops == 0</c> — and the stack overflowed on a 1 MB
+        /// thread (the size a test host actually gives a test). Every recursion
+        /// inside the search now shares this one counter, so the cap bounds the
+        /// real frame cost rather than a proxy for it.</para>
+        /// </summary>
+        private bool TryEnterAstFrame(string name)
+        {
+            var bound = _context.AstResolution;
+            if (_astResolutionDepth >= bound.DepthCap)
+            {
+                bound.RecordDepthCapStop(name);
+                return false;
+            }
+
+            _astResolutionDepth++;
+            bound.RecordDepth(_astResolutionDepth);
+            return true;
+        }
+
+        private void ExitAstFrame() => _astResolutionDepth--;
+
+        private string? ResolveLocalValueTypeFromAstUnbounded(string name)
         {
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
                 return null;
@@ -3858,7 +4221,24 @@ public sealed class EffectEnforcementPass
             string name,
             IReadOnlyList<StatementNode> rootStatements)
         {
+            // #1104 C1 — one frame per structural level, sharing the ask
+            // counter (see TryEnterAstFrame). Declining at the cap loses a
+            // §FE variable's type, never invents one.
             string? Search(IEnumerable<StatementNode> statements)
+            {
+                if (!TryEnterAstFrame(name))
+                    return null;
+                try
+                {
+                    return SearchCore(statements);
+                }
+                finally
+                {
+                    ExitAstFrame();
+                }
+            }
+
+            string? SearchCore(IEnumerable<StatementNode> statements)
             {
                 foreach (var statement in statements)
                 {
@@ -3939,7 +4319,33 @@ public sealed class EffectEnforcementPass
                 : null;
         }
 
+        /// <summary>
+        /// #1104 C1 — the structural half of the search, and the half that
+        /// actually multiplies frames: it recurses into every nested statement
+        /// body, once per level, INSIDE each name ask. It therefore takes a
+        /// frame from the same counter the ask does
+        /// (<see cref="TryEnterAstFrame"/>). Declining at the cap returns "not
+        /// declared in this body", which is what an unsearched body honestly
+        /// says; the ask above it then falls through to its remaining
+        /// fallbacks. It never invents a declaration.
+        /// </summary>
         private string? FindLocalDeclarationType(string name, IEnumerable<StatementNode> statements)
+        {
+            if (!TryEnterAstFrame(name))
+                return null;
+            try
+            {
+                return FindLocalDeclarationTypeCore(name, statements);
+            }
+            finally
+            {
+                ExitAstFrame();
+            }
+        }
+
+        private string? FindLocalDeclarationTypeCore(
+            string name,
+            IEnumerable<StatementNode> statements)
         {
             foreach (var statement in statements)
             {

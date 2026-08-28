@@ -309,6 +309,17 @@ public class EffectResolverKeyLedgerTests
             .ToList();
     }
 
+
+    /// <summary>
+    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
+    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
+    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
+    /// The per-arm starters beside them are NOT matched and stay counted.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
+        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static List<string> EnumerateCalorFiles(string root)
     {
         // Filter on REPO-RELATIVE paths, for the reason HigherOrderDemandLedgerTests
@@ -317,7 +328,8 @@ public class EffectResolverKeyLedgerTests
         // absolute-path filter would then match every file. Every dot-directory is
         // skipped, for the reason recorded there too: this is a filesystem walk, and
         // the harness's gitignored `epochs/**/.prev-src/` / `.envelope-src/` copies
-        // would otherwise enter the denominator (1006 vs 926 on a clean tree, PR #1110).
+        // would otherwise enter the denominator (1006 vs 926 on a clean tree, PR #1110;
+        // the clean-tree count is 927 since #1104's crash-repro fixture).
         // No committed .calr lives under a dot-directory, so the counts are unchanged.
         return Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))
@@ -327,7 +339,26 @@ public class EffectResolverKeyLedgerTests
                 var directories = segments.Take(segments.Length - 1).ToList();
                 return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
-                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal);
+                    && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
+                    // Harness scratch that is not product corpus, excluded like the spike
+                    // artifacts above: templates/ = the arm csproj template and the
+                    // permissive canary (v0.16 W1), and the PP-W-rows SEEDED mutants
+                    // (pairs/W-00x-*/seeded/, S3 (c)). The per-arm starters stay counted: they
+                    // are ordinary programs, and §4.1 route (a) rests on them.
+                    // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
+                    // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
+                    // starters enter the census and the seeded mutants do not. What is NOT yet
+                    // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
+                    // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
+                    // `§FLD ... §E{...}`, and
+                    // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
+                    // asserts that ZERO committed .calr write those forms. So when #1123 lands that
+                    // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
+                    // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
+                    // the narrow one either way: widening it to the whole pair family would silently
+                    // exempt ordinary programs from the corpus bar.
+                    && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
+                    && !PpwSeededFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

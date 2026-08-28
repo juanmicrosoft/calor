@@ -22,7 +22,8 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
 /// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
-/// <c>final-src/*.calr</c>) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
+/// <c>final-src/*.calr</c> solutions; 927 since #1104's crash-repro fixture, see
+/// the count pin below) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
 /// the 23-file two-line <c>§O</c>/<c>§E</c> subset is already pinned by
 /// <c>o53/baseline.json</c> through P30.</para>
 /// </summary>
@@ -96,9 +97,11 @@ public sealed class EffectRowCorpusShapeTests
         // §3.2 and §9 both quote 886 — the corpus the design doc's argument was
         // measured on. PP-E1 leg B (epoch e1-rows-parity-001) archived its 40 declared-done
         // solutions as final-src/*.calr, exactly as w5-parity-002 does, so the committed
-        // corpus is 926 = 886 + 40 since then; the sweep below still covers every file. A
-        // drift from 926 means the sweep is no longer measuring the corpus it claims to.
-        Assert.Equal(926, files.Count);
+        // corpus is 926 = 886 + 40 since then, and 927 since #1104's crash-repro fixture
+        // (tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr,
+        // v0.16 W3(c)); the sweep below still covers every file. A drift from 927 means the
+        // sweep is no longer measuring the corpus it claims to.
+        Assert.Equal(927, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.
@@ -164,6 +167,17 @@ public sealed class EffectRowCorpusShapeTests
     /// <c>facts.py</c> exclude it (§13.5(b)): the emitter spike commits before/after
     /// .calr fixtures as EVIDENCE, and they are deliberately full of rows.
     /// </summary>
+
+    /// <summary>
+    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
+    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
+    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
+    /// The per-arm starters beside them are NOT matched and stay counted.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
+        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static IReadOnlyList<string> CommittedCalrFiles(string root)
     {
         var process = Process.Start(new ProcessStartInfo("git", "ls-files *.calr")
@@ -181,6 +195,29 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
+            // Harness scratch that is not product corpus, excluded exactly the way
+            // docs/design/spikes/ is: (1) templates/ — the arm csproj template and the
+            // permissive canary run-pair.sh compiles before a pre-rows epoch (v0.16 W1), a
+            // program written to draw Calor0410; (2) the PP-W-rows SEEDED mutants
+            // (pairs/W-00x-*/seeded/, S3 (c)) — the spike blobs plus deliberate laundering
+            // shortcuts. The per-arm STARTERS are deliberately NOT excluded: they are
+            // ordinary programs, the same bar applies to them as to every other pair
+            // fixture, and §4.1 route (a) depends on them, so they keep the automatic
+            // round-trip and effect-row-shape check. `W-\d{3}` rather than `W-00` so W-010+ is covered.
+            // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
+            // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
+            // starters enter the census and the seeded mutants do not. What is NOT yet
+            // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
+            // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
+            // `§FLD ... §E{...}`, and
+            // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
+            // asserts that ZERO committed .calr write those forms. So when #1123 lands that
+            // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
+            // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
+            // the narrow one either way: widening it to the whole pair family would silently
+            // exempt ordinary programs from the corpus bar.
+            .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
+            .Where(line => !PpwSeededFixture.IsMatch(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

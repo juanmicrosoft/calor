@@ -446,6 +446,7 @@ Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
 - **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.
 - **Calor0422** — a constructor body performs effects beyond intrinsic initialization mutation/allocation (`mut`, `alloc`). Constructor syntax currently has no `§E` surface, so other effects fail closed; move effectful work to a declared method.
 - **Calor0423** — a custom property or event accessor body performs effects beyond intrinsic accessor mutation. Accessors currently have no `§E` surface, so such bodies fail closed.
+- **Calor0406** — effect inference **stopped before it finished**. Two loops in the pass have a safety cap: the fixpoint over a group of mutually recursive functions (100 rounds, or one more than the group's size if that is larger — it is the group's size that sets how many rounds a well-behaved group can need, so at the default cap this only fires for an inference that misbehaves) and the worklist that carries a placeholder's instantiated effects up through a chain of callers (10 000 steps). If either cap is reached while the effect sets are still changing, the effects computed for the functions named in the message may be incomplete, so any Calor0410 the compiler did *not* report for them cannot be trusted. **Always an error, and no flag waives it** — this is not "we cannot tell" about one value, it is the compiler refusing to vouch for a result it did not finish. The message names which loop stopped, the cap, and the functions involved; for the first loop, splitting the recursive group is the usual fix. Neither cap has ever been reached on the corpus. Since v0.16; before that the first loop reported the API-strictness code Calor0600 and the second stopped silently.
 - **Calor0424** — an effect **row** does not fit where the value is going: a function value with a wider row is assigned to a binding, passed as an argument, or returned into a position whose row is narrower. **Always an error, and no flag waives it** — not even `--permissive-effects`. The message names both rows and the extra effect(s), so the fix is either to widen the destination's `§E{…}` or to pass a function whose row fits.
 - **Calor0425** — an effect **row** cannot be decided at one of those same places, because one side (or both) carries no row and so is Unknown, or because it fits only under an assumption. Warning by default; error under `--strict-effects`; **suppressed** by `--permissive-effects`. Add `§E{…}` on the same line as the type to say what may be passed.
 
@@ -476,6 +477,24 @@ Or in MSBuild:
   <CalorEnforceEffects>false</CalorEnforceEffects>
 </PropertyGroup>
 ```
+
+A gentler step for converted code keeps enforcement on but relaxes what the compiler
+assumes about calls it cannot resolve — the CLI's `--permissive-effects`, or in MSBuild:
+
+```xml
+<PropertyGroup>
+  <CalorPermissiveEffects>true</CalorPermissiveEffects>
+</PropertyGroup>
+```
+
+The default is `false` (strict). Under the permissive policy unknown calls are assumed pure,
+so `Calor0411` (unknown external call) and `Calor0425` ("cannot be decided") are suppressed,
+and `Calor0410` — "uses effect X but does not declare it" — is reported as a warning, in the
+per-file pass and in the cross-module pass alike.
+
+It does **not** waive a row the code states and then contradicts: `Calor0424` (a row that
+does not fit) and `Calor0420` / `Calor0421` (an override or interface implementation that
+**broadens** the effects it inherited; narrowing is legal) remain errors under every flag.
 
 ---
 

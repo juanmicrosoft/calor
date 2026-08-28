@@ -77,11 +77,11 @@ shape at design freeze; **1 of 359** now (E5's `QueryCorpus/project/app.calr`).
 
 | Instrument | Value | Source |
 |---|---|---|
-| Committed `.calr` in ledger scope | 941 = 926 + 15 spike artifacts (excluded, D:2722-2729) | `find`; ppe1:288-292 |
+| Committed `.calr` in ledger scope | 941 = 926 + 15 spike artifacts (excluded, D:2722-2729) — *#1120 (W3(c)) adds one crash-repro fixture: 942* | `find`; ppe1:288-292 |
 | D-A (Calor-native higher-order demand) | **2**; D-B (Roslyn, three subjects) **3121** over 364 files; floor 25 inert | `higher-order-demand-ledger.json` |
 | Calor0425 ledger (P32), **raw-bag rule** | 8 over 99 enforced; 265 excluded (59 parse, 206 raw-bind) | `calor0425-corpus-ledger.json` |
 | Calor0270 ledger, raw-bag rule | 193 across 38 of 305 bound | `calor0270-corpus-ledger.json` |
-| Resolver-key ledger | 259 bound / 812 string | `effect-resolver-key-ledger.json`; R:532-537 |
+| Resolver-key ledger | 259 bound / 812 string — *#1120 (W3(c)) regenerates for its fixture: 265 / 814* | `effect-resolver-key-ledger.json`; R:532-537 |
 | Metadata gate 6 | **817/1248 = 65.46 %** (129/226, 104/113, 584/909) | `metadata-binding-corpus-ledger.json` |
 
 **The production denominator (N:S2, measured twice — in-process with the propagation policy, and
@@ -228,7 +228,9 @@ power and arms UNDERPOWERED.
   tool references `ProjectIndex` today. *Touches:* `Mcp/Tools/QueryTool.cs` (new),
   `Commands/QueryCommand.cs` (reader extraction), `Mcp/McpMessageHandler.cs`, `docs/`. *Gates:*
   gate 3's MCP leg (compile through MCP → same diagnostics and index bytes as the CLI, R:889-905)
-  and gate 7's E7 leg (the ten effects goldens answered byte-for-byte via `calor_query`) — two
+  and gate 7's E7 leg (the effects goldens answered byte-for-byte via `calor_query` — eleven as
+  the corpus stands: eight `effects` rows and three `impact-effects` rows; earlier drafts said
+  "ten", which miscounted the corpus) — two
   legs, stated separately in §5. *Discriminating:* answer from an in-memory graph instead of the
   index and the gate-7 golden for the cross-module fold (`Whisper`) fails.
 - **K1 — the P32 ledger mirrors the shipping rule (kickoff sweep, DECIDED; scoped to P32).**
@@ -482,8 +484,12 @@ indicator; register-then-merge enforced by A-1.10.
    test-compiled `.calr`); leg (b) unbuilt (§6). W3-attributable new diagnostics are separated
    and published (R:941-944).
 6. **Resolution floor** 817/1248 exact per subject, two-sided (R:947-958).
-7. **Index/query goldens** — the ten E5 goldens; **E7 leg unconditional:** the same ten answered
-   byte-for-byte through `calor_query`.
+7. **Index/query goldens** — the E5 goldens; **E7 leg unconditional:** the same ones answered
+   byte-for-byte through `calor_query`. Counted at E7: **eleven** effects goldens (eight
+   `effects`, three `impact-effects`) inside a corpus of 28, of which 21 are tool-answerable —
+   the whole tool-answerable set is on the leg, not just the effects rows. ("Ten" in earlier
+   drafts was a miscount; the denominator is pinned by
+   `QueryToolGateTests.TheLegCoversEveryEffectsGolden`.)
 
 **New:**
 
@@ -542,7 +548,7 @@ indicator; register-then-merge enforced by A-1.10.
 | ρ_body under-approximation on an escaping lambda (reported as Calor0425) | e4:230-234 | a fixture measured silent | DEFERRED |
 | Index folds cross-module charges for bindable files | e5:265-272 | — | 0.16 SHOULD W8 |
 | Interface methods not indexed; index-build cost unmeasured | e5:273-275; :259-261 | — | 0.16 SHOULD W8 |
-| `§FLD`/`§B` rows not index positions; hover declared-only; `--json` on `effects` only | e5:168-175 | E7 | with E7 |
+| `§FLD`/`§B` rows not index positions; hover declared-only; `--json` **closed for the four E7 facets** (`callers`, `callees`, `impact`, `effects`) — `symbol`, `contracts`, `assumptions` stay text-only | e5:168-175 | E7 | `--json` clause CLOSED (E7 PR); the `§FLD`/`§B` and hover clauses carry to 0.16.x |
 | Solution-level manifests not consulted by the index | e5:256-258 | a corpus solution with manifests | 0.16.x |
 | Calor0419 at BCL argument sites (D-A = 2) | e4:249-251 | D-A `calor0419FunctionTyped` > 10 | 0.17 with IL rows |
 | BCL-returned delegates → Unknown | D:1660-1664 | `UnknownSource + InvocationUndetermined` > 10 over K1's set | DEFERRED, demand-triggered |
