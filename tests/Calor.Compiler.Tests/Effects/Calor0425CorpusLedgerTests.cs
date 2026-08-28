@@ -190,18 +190,21 @@ public class Calor0425CorpusLedgerTests
             new SubjectFloor("FluentValidation", 137),
         ],
         2,
-        59,
-        "W3(a)",
+        0,
+        "",
         99,
         "ModulesEnforced >= 250 is a live regression floor (six below the 256 observed at "
         + "registration; the per-subject MediatR/serilog floors are EXACT and the slack sits in "
-        + "FluentValidation). ExcludedParseFailed <= 2 is the registered user-visible bar and is "
-        + "NOT met at registration: 59 modules fail to parse, and W3(a) (#903 clusters 1-2, "
-        + "PR #1125) recovers 57 of them. Until that merges the aggregate is pinned EXACTLY at "
-        + "ExcludedParseFailedRegisteredAt, which is what makes W3(a)'s merge flip this rule "
-        + "rather than silently satisfying a weakened one. When the observed value drops to "
-        + "<= ExcludedParseFailedMax, ExcludedParseFailedPendingUntil must be cleared to the "
-        + "empty string in the same PR — the test asserts that consistency.");
+        + "FluentValidation). ExcludedParseFailed <= 2 is the registered user-visible bar. It was "
+        + "NOT met at K1's registration — 59 modules failed to parse, pinned EXACTLY at "
+        + "ExcludedParseFailedRegisteredAt with ExcludedParseFailedPendingUntil = \"W3(a)\" so "
+        + "that W3(a)'s merge would flip this rule rather than silently satisfy a weakened one. "
+        + "v0.16 W3(a) (#903 clusters 1-2, PR #1125) then recovered ALL 59, not the 57 it was "
+        + "registered for: clusters 1 and 2 account for 57 and cluster 3 (Calor0117, two modules) "
+        + "turned out to be trivial and landed with them. The observed value is now 0, at or "
+        + "under the bar, so the pending state is cleared and RegisteredAt is restated at the "
+        + "value the gate now holds EXACTLY — the leg is live rather than pending, and a "
+        + "regression to even one parse failure reds it.");
 
     /// <summary>
     /// v0.16 K1, §S2's registration-time cross-check, recorded so it cannot go
@@ -215,25 +218,33 @@ public class Calor0425CorpusLedgerTests
     /// in-process number without re-running the CLI leg therefore FAILS instead
     /// of quietly dropping the second measurement.
     ///
-    /// <para>Note the one place the two rules differ in DETAIL while agreeing on
-    /// the outcome: the in-process propagated bag's first-code histogram is
-    /// Calor0208 32 / Calor0250 9 / Calor0201 8, the CLI's is 29 / 13 / 7,
-    /// because <c>BindValidationPass</c> (<c>Program.cs:790</c>) reports
-    /// Calor0250 ahead of the binder in the CLI. The SETS coincide — 0 of 364
-    /// modules land in a different bucket — which is why the per-subject
-    /// equalities below hold and why the histogram is recorded here in prose
-    /// rather than pinned as a number.</para>
+    /// <para>Note the places the two rules differ in DETAIL while agreeing on the
+    /// outcome. First, the first-code histogram: <c>BindValidationPass</c>
+    /// (<c>Program.cs:790</c>) reports Calor0250 ahead of the binder in the CLI,
+    /// so the two legs bucket the same modules under different codes; the SETS
+    /// coincide, which is why the per-subject equalities below hold and why the
+    /// histogram is recorded in prose rather than pinned as a number. Second — new
+    /// with W3(a) — three of the newly-recovered FluentValidation modules stop in
+    /// the CLI at Calor0209 (IllegalYield, <c>ReturnValidationPass</c>,
+    /// <c>Program.cs:799</c>), a pass the in-process leg does not run at all. They
+    /// are counted in <c>ReachEffectPass</c> so the per-subject equality with the
+    /// in-process denominator still holds, and separately in
+    /// <c>StoppedInCliOnlyPass</c> so the outcome buckets still add up. This is
+    /// the roadmap's documented CLI-only-pass divergence (§5 gate 9's
+    /// NOT-ADJUDICATED route names <c>ReturnValidationPass</c> explicitly),
+    /// recorded rather than smoothed away.</para>
     /// </summary>
     private static CliCrossCheck RegisteredCliCrossCheck() => new(
         "dotnet calor.dll -i <converted-module>.calr -o <scratch>/<name>.g.cs — no flags, "
         + "LC_ALL=C, one process per module, inputs dumped into a scratch directory holding no "
         + ".calor-effects.json (Program.cs:509 would otherwise read it)",
-        "v0.16 K1 registration, re-run on this branch's tree after rebasing onto W3(c); "
-        + "364 modules, zero crashes, exit codes {0: 82, 1: 282}",
+        "v0.16 K1 registration; RE-RUN in full on W3(a)'s tree (PR #1125), which "
+        + "recovers all 59 parse failures and therefore moves every bucket: 364 modules, "
+        + "zero crashes, exit codes {0: 83, 1: 281}",
         [
-            new CliCrossCheckSubject("MediatR", 36, 3, 4, 29, 7, 1, 12, 9, 3, 3),
-            new CliCrossCheckSubject("serilog", 112, 8, 20, 84, 44, 3, 26, 11, 11, 22),
-            new CliCrossCheckSubject("FluentValidation", 216, 48, 25, 143, 64, 3, 14, 62, 16, 42),
+            new CliCrossCheckSubject("MediatR", 36, 0, 5, 31, 8, 1, 12, 10, 0, 3, 3),
+            new CliCrossCheckSubject("serilog", 112, 0, 24, 88, 46, 5, 26, 11, 0, 11, 22),
+            new CliCrossCheckSubject("FluentValidation", 216, 0, 31, 185, 102, 3, 15, 62, 3, 26, 65),
         ]);
 
     private static string RepoRoot()
@@ -452,15 +463,17 @@ public class Calor0425CorpusLedgerTests
     }
 
     /// <summary>
-    /// Gate 9's PENDING leg, in the only honest form available before W3(a)
-    /// merges. The registered bar is <c>ExcludedParseFailed ≤ 2</c>; the value
-    /// today is 59, and #903 clusters 1–2 (W3(a), PR #1125 — which merges AFTER
-    /// K1) recover 57 of them. So the bar is recorded as registered, and the
-    /// CURRENT value is pinned EXACTLY: W3(a)'s merge is what turns this red and
-    /// forces the flip, and a regression in the meantime turns it red too. When
-    /// the observed value finally meets the bar, <c>PendingUntil</c> must be
-    /// cleared in the same PR — the last assertion is that consistency, so the
-    /// pending state cannot outlive the thing it waits on.
+    /// Gate 9's <c>ExcludedParseFailed</c> leg. K1 registered it PENDING: the bar
+    /// is <c>≤ 2</c>, the value at registration was 59, and the current value was
+    /// pinned EXACTLY with <c>PendingUntil = "W3(a)"</c> so that W3(a)'s merge
+    /// would turn this red and force the flip rather than silently satisfying a
+    /// weakened rule. <b>That flip has now happened</b> (W3(a) = #903 clusters
+    /// 1–2, PR #1125, which also carried cluster 3): the observed value is 0, so
+    /// <c>PendingUntil</c> is cleared and <c>RegisteredAt</c> restated at 0. The
+    /// leg is now LIVE — the same exact-equality assertion reds on any regression
+    /// to even one parse failure — and the second assertion is the consistency
+    /// that stops a pending state outliving the thing it waited on. The method
+    /// name is kept as K1 wrote it so its cross-references still resolve.
     /// </summary>
     [Fact]
     public void Gate9_ExcludedParseFailedLeg_PinsTheRegistrationValueUntilW3a()
@@ -581,18 +594,22 @@ public class Calor0425CorpusLedgerTests
                 + $"{inProcess.ModulesEnforced + inProcess.ModulesNotMeasured}");
 
             // The CLI row's own arithmetic: every module that reaches the pass
-            // lands in exactly one outcome bucket.
+            // lands in exactly one outcome bucket — or is stopped first by one of
+            // the documented CLI-only passes, which the in-process leg does not
+            // run (see StoppedInCliOnlyPass).
             Assert.Equal(
                 cliRow.ReachEffectPass,
                 cliRow.StopCalor0410 + cliRow.StopCalor0422Or0423 + cliRow.StopCalor1002
-                    + cliRow.CompileClean);
+                    + cliRow.CompileClean + cliRow.StoppedInCliOnlyPass);
             Assert.Equal(
                 cliRow.Files,
                 cliRow.ParseFailed + cliRow.BindStopped + cliRow.ReachEffectPass);
         }
 
         Assert.Equal(364, cli.PerSubject.Sum(s => s.Files));
-        Assert.Equal(256, cli.PerSubject.Sum(s => s.ReachEffectPass));
+        // 256 at K1's registration; 304 after W3(a) recovered all 59 parse failures.
+        Assert.Equal(304, cli.PerSubject.Sum(s => s.ReachEffectPass));
+        Assert.Equal(0, cli.PerSubject.Sum(s => s.ParseFailed));
     }
 
     /// <summary>
@@ -1196,6 +1213,19 @@ public class Calor0425CorpusLedgerTests
         int StopCalor0422Or0423,
         int StopCalor1002,
         int CompileClean,
+        /// <summary>
+        /// v0.16 W3(a): modules the CLI stops at one of the DOCUMENTED CLI-ONLY
+        /// passes (<c>Program.cs:760-808</c> — TypeChecker, PatternChecker,
+        /// BindValidationPass, ReturnValidationPass) after binding and before the
+        /// effect pass. They are inside <c>ReachEffectPass</c> — the in-process
+        /// leg has no such pass and enforces them — but they produce no effect-pass
+        /// outcome, so they are their own bucket rather than being smuggled into
+        /// one of the four. Zero at K1's registration; three after W3(a), all of
+        /// them newly-parsing FluentValidation modules stopping at Calor0209
+        /// (IllegalYield, ReturnValidationPass): EmptyTester, NotEmptyTester and
+        /// ITestValidationContinuation.
+        /// </summary>
+        int StoppedInCliOnlyPass,
         int Calor0425Modules,
         int Calor0425Sites);
 

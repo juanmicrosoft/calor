@@ -351,6 +351,10 @@ public static class ConvertCommand
         // unconvertible member is preserved as an interop block rather than written as
         // invalid Calor. Off by default, so default CLI behavior is unchanged.
         PassthroughOnError = passthrough,
+        // Review C1(b)/N2: the CLI discards the output entirely when conversion
+        // fails, so preserving one unusable member as §CSHARP beats writing
+        // nothing. Library callers keep the native tree (option defaults false).
+        RescueUnusableMembers = true,
         UseImplicitCallCloser = !explicitCallClosers
     };
 

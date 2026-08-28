@@ -170,23 +170,25 @@ public class Calor0270CorpusVolumeTests
     }
 
     /// <summary>
-    /// The ledger's aggregate as it stood BEFORE v0.16 K1, restated so that
-    /// "K1 changed the schema and nothing else" is observable rather than merely
-    /// asserted in a PR body.
+    /// The ledger's aggregate, restated so that a change of schema or of rule is
+    /// observable rather than merely asserted in a PR body. K1 registered the
+    /// pre-K1 values (193 / 38 / 305) to show it changed the schema and nothing
+    /// else; W3(a) is the first PR entitled to move them, and did.
     ///
-    /// <para><b>This baseline is expected to move, and the next author should
-    /// know why before it does.</b> <c>AggregateModulesBound</c> is "modules that
-    /// PARSE" = 364 − 59 parse failures. v0.16 W3(a) (#903 clusters 1–2,
-    /// PR #1125) recovers 57 of those 59, so <b>this constant and the ledger it
-    /// pins must be updated inside #1125's own PR</b>, alongside the Calor0425
-    /// ledger's <c>ExcludedParseFailed</c> flip — the newly-parsing modules will
-    /// also contribute Calor0270 Infos. That is a regeneration of the Calor0270
-    /// ledger (<c>CALOR_REGENERATE_CALOR0270_LEDGER=1</c>) with the cause named,
-    /// not an edit of these constants alone.</para>
+    /// <para><b>Moved by v0.16 W3(a) (#903, PR #1125), as K1 predicted here.</b>
+    /// <c>AggregateModulesBound</c> is "modules that PARSE" = 364 − parse
+    /// failures; W3(a) recovered all 59 (clusters 1–2 were registered for 57;
+    /// cluster 3's two modules came with them), so it is now 364 — every subject
+    /// module parses. The newly-parsing modules also carry Calor0270 Infos, which
+    /// is the whole of the 193 → 315 move; the Calor0425 ledger's
+    /// <c>ExcludedParseFailed</c> flip is the same event seen through the other
+    /// ledger. Both were REGENERATED through their documented hooks
+    /// (<c>CALOR_REGENERATE_CALOR0270_LEDGER=1</c>), not edited, and the
+    /// per-subject causes are named in #1125's PR body.</para>
     /// </summary>
-    private const int PreK1AggregateDiagnostics = 193;
-    private const int PreK1AggregateModulesWithDiagnostics = 38;
-    private const int PreK1AggregateModulesBound = 305;
+    private const int PreK1AggregateDiagnostics = 315;
+    private const int PreK1AggregateModulesWithDiagnostics = 39;
+    private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
     /// v0.16 K1 (roadmap §3.1 K1, §6 row 2) — the schema field, and only the

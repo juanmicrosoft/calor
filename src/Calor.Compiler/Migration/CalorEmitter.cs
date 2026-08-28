@@ -20,6 +20,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _hoistCounter;
     private int _memberBodyDepth;
 
+    // How many lambda bodies deep we are emitting. A block lambda nested inside
+    // ANOTHER lambda's body must never be hoisted to the enclosing statement:
+    // the hoisted §B lands outside the outer lambda's parameter scope, so the
+    // emitted Calor references a parameter that is not in scope there (review C1
+    // - the output still parses, so #717's parse-keyed post-validation does not
+    // rewrap it, and round-trip C# validation then fails the whole conversion).
+    private int _lambdaBodyDepth;
+
     // Counter for "inline sibling expression contexts" — places where multiple
     // expressions are joined on the same emitted line (e.g. §A arg chains,
     // §ARR / §ROW / §SALLOC initializers). In these contexts a zero-arg
@@ -56,6 +64,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _ternaryCounter = 0;
         _hoistCounter = 0;
         _memberBodyDepth = 0;
+        _lambdaBodyDepth = 0;
         _inInterpolation = false;
         _inInlineSiblingContext = 0;
         Visit(module);
@@ -136,6 +145,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Save current builder state
         var savedBuilder = _builder;
         var savedIndent = _indentLevel;
+        // #903 cluster 1: isolate the hoist queue. Without this, bindings hoisted by
+        // an EARLIER sibling expression (still pending at capture time) were flushed
+        // into the captured statement at column 0, and bindings hoisted INSIDE the
+        // capture stayed pending for the enclosing statement. Either way the
+        // captured text carried a raw newline into a single-line context.
+        var savedPending = _pendingHoistedLines.ToList();
+        _pendingHoistedLines.Clear();
 
         // Create temporary builder
         _builder = new StringBuilder();
@@ -144,14 +160,129 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Visit the statement (this will append to the temp builder)
         stmt.Accept(this);
 
-        // Capture result
+        // Capture result. Any binding still pending belongs to this statement
+        // (the visitor returned without an AppendLine), so it leads the capture.
+        var leftover = _pendingHoistedLines.ToList();
         var result = _builder.ToString().TrimEnd('\r', '\n');
+        if (leftover.Count > 0)
+            result = string.Join("\n", leftover) + "\n" + result;
 
-        // Restore original builder
+        // Restore original builder and the caller's hoist queue
         _builder = savedBuilder;
         _indentLevel = savedIndent;
+        _pendingHoistedLines.Clear();
+        _pendingHoistedLines.AddRange(savedPending);
 
         return result;
+    }
+
+    /// <summary>
+    /// Renders every statement of a block-bodied lambda at indent 0 (each capture
+    /// keeps its own relative indentation). Shared by the inline attempt and the
+    /// block form so a lambda is visited exactly once regardless of which form wins.
+    /// </summary>
+    private List<string> CaptureLambdaStatements(LambdaExpressionNode node, bool inlineSibling)
+    {
+        if (inlineSibling) _inInlineSiblingContext++;
+        _lambdaBodyDepth++;
+        try
+        {
+            return node.StatementBody!
+                .Select(s => CaptureStatementOutput(s).Trim())
+                .ToList();
+        }
+        finally
+        {
+            _lambdaBodyDepth--;
+            if (inlineSibling) _inInlineSiblingContext--;
+        }
+    }
+
+    private string BuildLambdaHeader(LambdaExpressionNode node)
+    {
+        // Format: §LAM{id[:static][:async]:param1:type1[:param2:type2:...]}
+        // The parameter list is positional name:type pairs. A parameter whose
+        // type the converter could not infer (#1097: TypeName null, previously
+        // written as the bare "?" the binder cannot canonicalize) is written
+        // WITHOUT a type when it is the last parameter — the parser reads a
+        // trailing unpaired name as untyped, the binder defaults it to OBJECT
+        // (Binder.BindLambdaExpression), and the C# emitter writes the bare
+        // name so C# infers it. An earlier untyped parameter still needs a slot
+        // to keep the pairing aligned (an empty slot lexes as `::`), so it is
+        // written as `object` — the same type the binder would default to.
+        var headerParts = new List<string> { node.Id };
+        if (node.IsStatic) headerParts.Add("static");
+        if (node.IsAsync) headerParts.Add("async");
+        for (var i = 0; i < node.Parameters.Count; i++)
+        {
+            var p = node.Parameters[i];
+            headerParts.Add(p.Name);
+            if (p.TypeName != null)
+                headerParts.Add(TypeMapper.CSharpToCalor(p.TypeName));
+            else if (i < node.Parameters.Count - 1)
+                headerParts.Add("object");
+        }
+        return string.Join(":", headerParts);
+    }
+
+    /// <summary>
+    /// Block form of a statement-bodied lambda as a list of lines relative to
+    /// indent 0: <c>{opener} §LAM{header}</c>, each captured statement's lines one
+    /// level deeper, and <c>§/LAM{id}</c> at the opener's column. Nested block
+    /// content keeps its relative indentation, so prefixing every line by the
+    /// caller's indent (AppendLine / FlushHoistedLines) yields a well-formed block
+    /// wherever it lands (#903 cluster 1: the legacy multi-line string put the
+    /// closer at column 0 and only re-indented the first line of each statement).
+    /// </summary>
+    private static List<string> BuildBlockLambdaLines(
+        string opener, string header, string lambdaRow, string lambdaId, IReadOnlyList<string> capturedStatements)
+    {
+        var lines = new List<string> { $"{opener}§LAM{{{header}}}{lambdaRow}" };
+        foreach (var stmt in capturedStatements)
+        {
+            if (string.IsNullOrWhiteSpace(stmt)) continue;
+            foreach (var line in stmt.Split('\n'))
+            {
+                var trimmed = line.TrimEnd('\r');
+                lines.Add(trimmed.Length == 0 ? "" : "  " + trimmed);
+            }
+        }
+        lines.Add($"§/LAM{{{lambdaId}}}");
+        return lines;
+    }
+
+    /// <summary>
+    /// True when a statement-bodied lambda may be space-joined on one line:
+    /// at most two statements, none a fallback/raw node, and — new for #903 — none
+    /// whose captured rendering spans several lines (a nested block lambda, an object
+    /// initializer, or a hoisted temp all do). The old check looked only at node
+    /// kinds, so a two-statement lambda with a multi-line statement was joined onto
+    /// one line and its continuation lines landed at column 0/2 mid-block.
+    /// </summary>
+    private static bool CanInlineLambdaStatements(LambdaExpressionNode node, IReadOnlyList<string> captured)
+        => node.StatementBody!.Count <= 2
+           && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
+           && captured.All(s => !s.Contains('\n'));
+
+    /// <summary>
+    /// Captures a statement-bodied lambda's statements once and reports whether the
+    /// single-line form is valid. When it is, <paramref name="inline"/> holds the
+    /// complete <c>§LAM{...} ... §/LAM{id}</c> text; otherwise the caller builds the
+    /// block form from <paramref name="stmts"/> without re-visiting the body.
+    /// </summary>
+    private bool TryRenderStatementLambdaInline(
+        LambdaExpressionNode node, string header, string lambdaRow, out string inline, out List<string> stmts)
+    {
+        var shortCandidate = node.StatementBody!.Count <= 2
+            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode);
+        stmts = CaptureLambdaStatements(node, inlineSibling: shortCandidate);
+        if (shortCandidate && CanInlineLambdaStatements(node, stmts))
+        {
+            inline = $"§LAM{{{header}}}{lambdaRow} {string.Join(" ", stmts)} §/LAM{{{node.Id}}}";
+            return true;
+        }
+        inline = "";
+        return false;
     }
 
     public string Visit(ModuleNode node)
@@ -1478,7 +1609,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
                         DictionaryCreationNode d => d.Id,
                         SetCreationNode s => s.Id,
                         ArrayCreationNode a => a.Id,
-                        MultiDimArrayCreationNode m => m.Id,
+                        // The §ARR2D block binds its rows to a NAME, not to the
+                        // node id its siblings use (review N1): reference the same
+                        // name, or the emitted C# names a variable that does not
+                        // exist and the round trip fails.
+                        MultiDimArrayCreationNode m => MultiDimVariableName(m),
                         _ => null
                     };
                     if (collectionRef != null)
@@ -1554,21 +1689,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private void EmitBlockLambdaAsBindingInitializer(string bindHeader, LambdaExpressionNode lambda)
     {
-        var headerParts = new List<string> { lambda.Id };
-        if (lambda.IsStatic) headerParts.Add("static");
-        if (lambda.IsAsync) headerParts.Add("async");
-        foreach (var p in lambda.Parameters)
-        {
-            headerParts.Add(p.Name);
-            headerParts.Add(p.TypeName != null ? TypeMapper.CSharpToCalor(p.TypeName) : "object");
-        }
-        var header = string.Join(":", headerParts);
+        var header = BuildLambdaHeader(lambda);
 
         AppendLine($"{bindHeader} §LAM{{{header}}}{(lambda.Effects != null ? " " + FormatEffectsTag(lambda.Effects) : "")}");
         Indent();
-        foreach (var stmt in lambda.StatementBody!)
+        // Review m12: this is a lambda BODY like any other, so it bumps the depth
+        // that stops a nested block lambda being hoisted out of scope. Benign
+        // today (the statements are emitted at the correct indent right here), but
+        // the invariant should not depend on that happening to be true.
+        _lambdaBodyDepth++;
+        try
         {
-            stmt.Accept(this);
+            foreach (var stmt in lambda.StatementBody!)
+            {
+                stmt.Accept(this);
+            }
+        }
+        finally
+        {
+            _lambdaBodyDepth--;
         }
         Dedent();
         AppendLine($"§/LAM{{{lambda.Id}}}");
@@ -1602,7 +1741,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return (named, standardWrapped, argValue);
         }).ToList();
 
-        var target = ConvertVerbatimStringsInTarget(node.Target.Replace("->", "."));
+        var target = ConvertVerbatimStringsInTarget(NormalizeCallTarget(node.Target).Replace("->", "."));
         if (node.TypeArguments is { Count: > 0 })
             target += $"<{string.Join(", ", node.TypeArguments)}>";
 
@@ -1807,6 +1946,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
+        // Short (1-2 statement) block lambda: inline when its statements render on
+        // one line; otherwise block form under the binding's OWN name (#903 cluster
+        // 1). Routing through the generic path would hoist a §B{_hoistLamNNN}
+        // alias and bind the name to a reference instead of the lambda.
+        if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } shortLambda)
+        {
+            var lamHeader = BuildLambdaHeader(shortLambda);
+            var lamRow = shortLambda.Effects != null ? " " + FormatEffectsTag(shortLambda.Effects) : "";
+            if (TryRenderStatementLambdaInline(shortLambda, lamHeader, lamRow, out var inline, out var stmts))
+            {
+                AppendLine($"{bindHeader} {inline}");
+                return "";
+            }
+            foreach (var line in BuildBlockLambdaLines($"{bindHeader} ", lamHeader, lamRow, shortLambda.Id, stmts))
+                AppendLine(line);
+            return "";
+        }
+
         // Parser expects: §B[type:name] expression (no = sign)
         var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
         AppendLine($"{bindHeader}{initPart}");
@@ -1832,6 +1989,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var element in node.Elements)
         {
             var val = AcceptInInlineSibling(element);
+            // #903: a multi-line element (an object initializer) cannot sit on an
+            // element line; hoist it so the block lands at the enclosing indent.
+            if (val.Contains('\n'))
+                val = HoistToTempVar(val);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -1872,6 +2033,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // otherwise the parser would absorb the value (or next §KV) as the call's arg.
             var key = AcceptInInlineSibling(entry.Key);
             var value = AcceptInInlineSibling(entry.Value);
+            // Review M3: the KEY needs the same guard as the value - a dictionary
+            // whose key is an object initializer is multi-line too.
+            if (key.Contains('\n'))
+                key = HoistToTempVar(key);
+            if (value.Contains('\n'))
+                value = HoistToTempVar(value);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -1912,6 +2079,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var element in node.Elements)
         {
             var val = AcceptInInlineSibling(element);
+            // #903: a multi-line element (an object initializer) cannot sit on an
+            // element line; hoist it so the block lands at the enclosing indent.
+            if (val.Contains('\n'))
+                val = HoistToTempVar(val);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -2017,13 +2188,41 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Initializer.Count > 0)
         {
-            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}}}");
-            Indent();
+            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener and emit
+            // any hoisted bindings ahead of it — exactly as Visit(ListNode) does.
+            // Flushing them from inside the block would put §B{~_hoistNNN} lines
+            // into the §ARR2D body, which accepts only §ROW (Calor0100).
+            var evaluatedRows = new List<List<string>>();
+            var allHoisted = new List<string>();
             foreach (var row in node.Initializer)
             {
-                var elements = string.Join(" ", row.Select(e => AcceptInInlineSibling(e)));
-                AppendLine($"§ROW {elements}");
+                var rowValues = new List<string>();
+                foreach (var element in row)
+                {
+                    var value = AcceptInInlineSibling(element);
+                    // A multi-line element (an object initializer) cannot sit on a
+                    // §ROW line; it becomes a temp bound BEFORE the array (the
+                    // hoists are flushed above the opener, never into the §ARR2D
+                    // body, which accepts only §ROW - review N1).
+                    if (value.Contains('\n'))
+                        value = HoistToTempVar(value);
+                    rowValues.Add(value);
+                }
+                if (_pendingHoistedLines.Count > 0)
+                {
+                    allHoisted.AddRange(_pendingHoistedLines);
+                    _pendingHoistedLines.Clear();
+                }
+                evaluatedRows.Add(rowValues);
             }
+
+            foreach (var hoisted in allHoisted)
+                AppendLine(hoisted);
+
+            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}}}");
+            Indent();
+            foreach (var rowValues in evaluatedRows)
+                AppendLine($"§ROW {string.Join(" ", rowValues)}");
             Dedent();
             EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
         }
@@ -2130,48 +2329,74 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(IfStatementNode node)
     {
         var condition = node.Condition.Accept(this);
+        EmitIfChain(node.Id, condition, node.ThenBody, node.ElseIfClauses, 0, node.ElseBody);
+        EmitBlockEnd($"§/I{{{node.Id}}}");
+        return "";
+    }
 
-        AppendLine($"§IF{{{node.Id}}} {condition}");
+    /// <summary>
+    /// Emits <c>§IF cond</c> / body / the else-if clauses from
+    /// <paramref name="firstElseIf"/> on / <c>§EL</c>. An else-if condition that
+    /// hoists a temp (an indexer read, a call result) used to flush that
+    /// <c>§B{~_hoistNNN}</c> line between the previous body and its <c>§EI</c>,
+    /// closing the if-chain before the clause was read (Calor0117, #903 cluster
+    /// 3). Such a clause is re-nested instead: <c>§EL</c>, the hoisted binding,
+    /// and a fresh <c>§IF</c> carrying the rest of the chain
+    /// (review m8: the synthesised id is <c>{id}e{n}</c>. Converter ids are
+    /// generated as <c>if</c> + a counter, so <c>if007e1</c> cannot collide with a
+    /// generated <c>if…</c>; a HAND-WRITTEN <c>§IF{if007e1}</c> in the same module
+    /// could, which the id scanner reports as a duplicate rather than silently
+    /// merging - and this path only ever runs on converter output) — the C# meaning of
+    /// <c>else if</c> is exactly that nesting, so the emitted program is unchanged.
+    /// </summary>
+    private void EmitIfChain(
+        string id,
+        string condition,
+        IReadOnlyList<StatementNode> thenBody,
+        IReadOnlyList<ElseIfClauseNode> elseIfs,
+        int firstElseIf,
+        IReadOnlyList<StatementNode>? elseBody)
+    {
+        AppendLine($"§IF{{{id}}} {condition}");
         Indent();
-
-        foreach (var stmt in node.ThenBody)
-        {
+        foreach (var stmt in thenBody)
             stmt.Accept(this);
-        }
-
         Dedent();
 
-        // ElseIf clauses
-        foreach (var elseIf in node.ElseIfClauses)
+        for (var i = firstElseIf; i < elseIfs.Count; i++)
         {
+            var elseIf = elseIfs[i];
+            var pendingBefore = _pendingHoistedLines.Count;
             var elseIfCondition = elseIf.Condition.Accept(this);
-            AppendLine($"§EI {elseIfCondition}");
-            Indent();
-
-            foreach (var stmt in elseIf.Body)
+            if (_pendingHoistedLines.Count > pendingBefore)
             {
-                stmt.Accept(this);
+                // Park the condition's hoists so §EL is written first, then let
+                // them flush INSIDE the else body ahead of the nested §IF.
+                var conditionHoists = _pendingHoistedLines.Skip(pendingBefore).ToList();
+                _pendingHoistedLines.RemoveRange(pendingBefore, conditionHoists.Count);
+                AppendLine("§EL");
+                Indent();
+                _pendingHoistedLines.AddRange(conditionHoists);
+                EmitIfChain($"{id}e{i + 1}", elseIfCondition, elseIf.Body, elseIfs, i + 1, elseBody);
+                Dedent();
+                return;
             }
 
+            AppendLine($"§EI {elseIfCondition}");
+            Indent();
+            foreach (var stmt in elseIf.Body)
+                stmt.Accept(this);
             Dedent();
         }
 
-        // Else clause
-        if (node.ElseBody != null)
+        if (elseBody != null)
         {
             AppendLine("§EL");
             Indent();
-
-            foreach (var stmt in node.ElseBody)
-            {
+            foreach (var stmt in elseBody)
                 stmt.Accept(this);
-            }
-
             Dedent();
         }
-
-        EmitBlockEnd($"§/I{{{node.Id}}}");
-        return "";
     }
 
     public string Visit(ElseIfClauseNode node)
@@ -2282,6 +2507,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var element in node.Elements)
         {
             var val = AcceptInInlineSibling(element);
+            // #903: a multi-line element (an object initializer) cannot sit on an
+            // element line; hoist it so the block lands at the enclosing indent.
+            if (val.Contains('\n'))
+                val = HoistToTempVar(val);
             // Collect any hoisted lines generated during element evaluation
             if (_pendingHoistedLines.Count > 0)
             {
@@ -2323,6 +2552,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // See sibling DictionaryNode visitor: AcceptInInlineSibling protects nested zero-arg calls.
             var key = AcceptInInlineSibling(entry.Key);
             var value = AcceptInInlineSibling(entry.Value);
+            // Review M3: the KEY needs the same guard as the value - a dictionary
+            // whose key is an object initializer is multi-line too.
+            if (key.Contains('\n'))
+                key = HoistToTempVar(key);
+            if (value.Contains('\n'))
+                value = HoistToTempVar(value);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -2372,6 +2607,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var element in node.Elements)
         {
             var val = AcceptInInlineSibling(element);
+            // #903: a multi-line element (an object initializer) cannot sit on an
+            // element line; hoist it so the block lands at the enclosing indent.
+            if (val.Contains('\n'))
+                val = HoistToTempVar(val);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -2753,6 +2992,52 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// Adds a §B{~tempVar} expr line to _pendingHoistedLines and returns the temp var name.
     /// This prevents § markers from appearing inside Lisp (op ...) expressions.
     /// </summary>
+    /// <summary>
+    /// #903 cluster 1 (second shape): a fluent chain the converter could not
+    /// decompose keeps the C# line break before its <c>.Member</c>, so the target
+    /// reached <c>§C{receiver\n    .Member}</c> and the lexer split the tag across
+    /// lines. Line breaks (and the indentation around them) carry no meaning
+    /// inside a member path, so they are removed rather than replaced by a space.
+    /// </summary>
+    private static string NormalizeCallTarget(string target)
+    {
+        if (target.IndexOfAny(['\n', '\r']) < 0)
+            return target;
+
+        // Review m10: the comment stripping below is not string-literal aware, so
+        // `"a//b"` inside a target would lose half the literal. No converter path
+        // produces a multi-line target containing a literal today; rather than
+        // rely on that, refuse outright and let the fallback preserve the member.
+        if (target.Contains('"'))
+            return target;
+
+        // Review M1: a chain can carry COMMENTS across the break
+        // (`xs\n  // sort in place\n  .Sort()`). Joining blindly would bake the
+        // comment text into the member path - a corrupted identifier, and for a
+        // `//` comment everything after it is swallowed. Drop comments first; if
+        // anything comment-like survives (an unterminated block comment, a `//`
+        // inside a string literal in the target) refuse to normalise and hand the
+        // original back, so the §CS{...} / §CSHARP fallbacks preserve the member
+        // instead of the emitter shipping a corrupt one.
+        var stripped = System.Text.RegularExpressions.Regex.Replace(
+            target, @"/\*.*?\*/", " ", System.Text.RegularExpressions.RegexOptions.Singleline);
+        stripped = System.Text.RegularExpressions.Regex.Replace(stripped, @"//[^\n\r]*", " ");
+        if (stripped.Contains("/*", StringComparison.Ordinal)
+            || stripped.Contains("*/", StringComparison.Ordinal)
+            || stripped.Contains("//", StringComparison.Ordinal))
+        {
+            return target;
+        }
+
+        var joined = System.Text.RegularExpressions.Regex.Replace(
+            stripped, @"[ \t]*\r?\n[ \t]*", "");
+        // Where a comment stood between receiver and member the join leaves the
+        // space that replaced it (`xs .Sort`). A member path has no spaces: close
+        // them up around the '.', and refuse if any whitespace still remains.
+        joined = System.Text.RegularExpressions.Regex.Replace(joined, @"\s*\.\s*", ".").Trim();
+        return joined.Any(char.IsWhiteSpace) ? target : joined;
+    }
+
     private string HoistToTempVar(string expr)
     {
         // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
@@ -2949,7 +3234,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         // Escape braces in target to avoid conflicts with Calor tag syntax,
         // but preserve braces inside quoted string portions (e.g. "text {0}".FormatWith)
-        var escapedTarget = EscapeBracesInIdentifier(node.Target.Replace("->", "."));
+        var escapedTarget = EscapeBracesInIdentifier(NormalizeCallTarget(node.Target).Replace("->", "."));
         var fullTarget = escapedTarget + typeArgsSuffix;
 
         if (node.Arguments.Count == 0)
@@ -3262,22 +3547,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(LambdaExpressionNode node)
     {
         // Build §LAM{id:p1:t1:p2:t2} header
-        // Format: §LAM{id[:async]:param1:type1[:param2:type2:...]}
-        var headerParts = new List<string> { node.Id };
-        if (node.IsStatic)
-        {
-            headerParts.Add("static");
-        }
-        if (node.IsAsync)
-        {
-            headerParts.Add("async");
-        }
-        foreach (var p in node.Parameters)
-        {
-            headerParts.Add(p.Name);
-            headerParts.Add(p.TypeName != null ? TypeMapper.CSharpToCalor(p.TypeName) : "object");
-        }
-        var header = string.Join(":", headerParts);
+        var header = BuildLambdaHeader(node);
 
         // Position 2 (§3.3 / §5): §LAM{lam1:x:i32} §E{…}. The parser has always read
         // this tag; the emitter never wrote it back, so a lambda row did not survive a
@@ -3292,56 +3562,55 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // inside the body (v0.6.3 RFC §2.1) would absorb the §/LAM as its
             // inline argument and corrupt the AST. Mirrors the v0.6.1 zero-arg
             // discipline at all other sibling-context sites.
-            var body = AcceptInInlineSibling(node.ExpressionBody);
+            _lambdaBodyDepth++;
+            string body;
+            try { body = AcceptInInlineSibling(node.ExpressionBody); }
+            finally { _lambdaBodyDepth--; }
             return $"§LAM{{{header}}}{lambdaRow} {body} §/LAM{{{node.Id}}}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
         {
+            // Short lambdas (1-2 statements) are space-joined on one line. The
+            // statements are captured in inline-sibling context so any nested
+            // zero-arg §C{...} keeps §/C — otherwise the next statement's leading
+            // token is absorbed as the call's inline argument (v0.6.1 loop-4
+            // devil's-advocate finding #1). The capture is reused for the block
+            // form below, so the body is visited exactly once.
+            if (TryRenderStatementLambdaInline(node, header, lambdaRow, out var inline, out var stmts))
+                return inline;
+
+            // Longer (or multi-line) lambdas in expression position — a §R operand,
+            // an object-initializer value, a call argument, an assignment RHS —
+            // are hoisted to a §B{_hoistLamNNN} block at the enclosing statement's
+            // indent and referenced by name (#903 cluster 1). The block's lines are
+            // queued exactly like any other hoisted binding, so they flush ahead of
+            // the statement that uses the lambda and inherit its column.
+            // NOT while inside another lambda's body (review C1): the hoisted §B
+            // would land ahead of the enclosing statement, outside the outer
+            // lambda's parameter scope, and the emitted Calor would reference a
+            // parameter that is not in scope there. In that case fall through to
+            // the in-place block form below, which stays inside the body.
+            if (_memberBodyDepth > 0 && _lambdaBodyDepth == 0)
+            {
+                var name = $"_hoistLam{_hoistCounter++:D3}";
+                _pendingHoistedLines.AddRange(
+                    BuildBlockLambdaLines($"§B{{{name}}} ", header, lambdaRow, node.Id, stmts));
+                return name;
+            }
+
+            // Rendered in place at the CURRENT indent when there is no statement to
+            // hoist ahead of (a field initializer at type scope, e.g. a collection
+            // initializer of lambdas) or when hoisting would escape an enclosing
+            // lambda's scope (C1) —
+            // body one level deeper, §/LAM at the opener's column — the same
+            // absolute-indent convention Visit(NewExpressionNode) uses for its own
+            // continuation lines. (The old string fixed the body at column 2 and the
+            // closer at column 0, which the lexer rejected with Calor0099.)
+            var indent = new string(' ', _indentLevel * 2);
             var sb = new System.Text.StringBuilder();
             sb.Append($"§LAM{{{header}}}{lambdaRow}");
-
-            // For short lambdas (1-2 statements), emit inline — unless any statement
-            // produces multi-line output (e.g. FallbackCommentNode), which would bury
-            // the §/LAM closing tag inside a comment line.
-            var hasMultiLineStmt = node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode);
-            if (node.StatementBody.Count <= 2 && !hasMultiLineStmt)
-            {
-                // Inline-sibling context: each statement is space-joined on a single
-                // emitted line, so any nested zero-arg §C{...} inside a statement
-                // must keep §/C — otherwise the next statement's leading token
-                // (which may be §C{...} or other expression-start) is absorbed as
-                // the call's inline argument.
-                // Defect: v0.6.1 loop-4 devil's-advocate finding #1.
-                _inInlineSiblingContext++;
-                List<string> stmts;
-                try
-                {
-                    stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
-                }
-                finally
-                {
-                    _inInlineSiblingContext--;
-                }
-                sb.Append(" ");
-                sb.Append(string.Join(" ", stmts));
-                sb.Append($" §/LAM{{{node.Id}}}");
-            }
-            else
-            {
-                // For longer lambdas, emit multi-line
-                sb.AppendLine();
-                var indent = "  ";
-                foreach (var stmt in node.StatementBody)
-                {
-                    var stmtStr = CaptureStatementOutput(stmt);
-                    if (!string.IsNullOrWhiteSpace(stmtStr))
-                    {
-                        sb.Append(indent);
-                        sb.AppendLine(stmtStr.Trim());
-                    }
-                }
-                sb.Append($"§/LAM{{{node.Id}}}");
-            }
+            foreach (var line in BuildBlockLambdaLines("", header, lambdaRow, node.Id, stmts).Skip(1))
+                sb.Append('\n').Append(line.Length == 0 ? "" : indent).Append(line);
             return sb.ToString();
         }
         else
@@ -4845,6 +5114,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"§SIZEOF{{{typeName}}}";
     }
 
+    /// <summary>
+    /// The variable name an expression-position <c>§ARR2D</c> block binds its rows
+    /// to. Shared so a reference to the block cannot drift from the block itself.
+    /// </summary>
+    private static string MultiDimVariableName(MultiDimArrayCreationNode node)
+        => string.IsNullOrEmpty(node.Name) ? "_arr2d" : node.Name;
+
     public string Visit(MultiDimArrayCreationNode node)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
@@ -4863,14 +5139,42 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Initializer.Count > 0)
         {
-            var id = string.IsNullOrEmpty(node.Name) ? "_arr2d" : node.Name;
-            AppendLine($"§ARR2D{{{node.Id}:{id}:{elementType}}}");
-            Indent();
+            var id = MultiDimVariableName(node);
+            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener and emit
+            // any hoisted bindings ahead of it — exactly as Visit(ListNode) does.
+            // Flushing them from inside the block would put §B{~_hoistNNN} lines
+            // into the §ARR2D body, which accepts only §ROW (Calor0100).
+            var evaluatedRows = new List<List<string>>();
+            var allHoisted = new List<string>();
             foreach (var row in node.Initializer)
             {
-                var elements = string.Join(" ", row.Select(e => AcceptInInlineSibling(e)));
-                AppendLine($"§ROW {elements}");
+                var rowValues = new List<string>();
+                foreach (var element in row)
+                {
+                    var value = AcceptInInlineSibling(element);
+                    // A multi-line element (an object initializer) cannot sit on a
+                    // §ROW line; it becomes a temp bound BEFORE the array (the
+                    // hoists are flushed above the opener, never into the §ARR2D
+                    // body, which accepts only §ROW - review N1).
+                    if (value.Contains('\n'))
+                        value = HoistToTempVar(value);
+                    rowValues.Add(value);
+                }
+                if (_pendingHoistedLines.Count > 0)
+                {
+                    allHoisted.AddRange(_pendingHoistedLines);
+                    _pendingHoistedLines.Clear();
+                }
+                evaluatedRows.Add(rowValues);
             }
+
+            foreach (var hoisted in allHoisted)
+                AppendLine(hoisted);
+
+            AppendLine($"§ARR2D{{{node.Id}:{id}:{elementType}}}");
+            Indent();
+            foreach (var rowValues in evaluatedRows)
+                AppendLine($"§ROW {string.Join(" ", rowValues)}");
             Dedent();
             EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
             return "";

@@ -2410,14 +2410,28 @@ public class CSharpToCalorConversionTests
         Assert.Contains("§LAM{", conversionResult.CalorSource);
         Assert.DoesNotContain("§ERR", conversionResult.CalorSource);
         Assert.DoesNotContain("→", conversionResult.CalorSource);
+        // #1097: without `using System.Linq` the lambda parameters cannot be
+        // typed; they must be emitted untyped, never as the bare "?" the binder
+        // cannot canonicalize.
+        Assert.DoesNotContain(":?", conversionResult.CalorSource);
 
-        // Calor -> C#
+        // Calor -> C#. EnforceEffects = false like the sibling round-trip tests.
+        // With effects on, the blocker is `error Calor0410: Function 'Run' uses
+        // effect 'unknown' but does not declare it` (review M5): the converter
+        // writes §E{alloc} on Run while emitting LINQ calls it cannot classify,
+        // so the inferred row is 'unknown' and does not fit the declared one.
+        // The Calor0411 warnings on those calls are the cause, not the failure.
+        // That converter-reach gap is filed separately; this test is about the
+        // lambda shape surviving the round trip. Before #1097 the effect pass
+        // never ran here at all — the "?" parameter type ICE'd the binder and
+        // abandoned the member, which is what kept the errors invisible.
         var compilationResult = Program.Compile(
             conversionResult.CalorSource!,
             null,
-            new CompilationOptions { DeferGeneratedOutputValidation = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true, EnforceEffects = false });
         Assert.False(compilationResult.HasErrors,
             $"Lambda roundtrip failed:\nCalor:\n{conversionResult.CalorSource}\nErrors:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
+        Assert.DoesNotContain(compilationResult.Diagnostics, d => d.Code == DiagnosticCode.AnalysisICE);
     }
 
     [Fact]

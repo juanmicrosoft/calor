@@ -202,6 +202,26 @@ public sealed class ConversionOptions
     public bool PassthroughOnError { get; set; } = false;
 
     /// <summary>
+    /// When the emitted Calor PARSES but does not survive the C# round trip,
+    /// preserve the offending member's original C# as a §CSHARP interop block
+    /// (#717's rewrap, extended by review C1(b)) instead of letting round-trip
+    /// validation fail the whole conversion — and only in a C#-preserving mode
+    /// (<see cref="ConversionContext.ShouldPreserveCSharp"/>: Lossless fidelity,
+    /// Interop mode, or <see cref="PassthroughOnError"/>). Setting this flag alone
+    /// in a mode that does not preserve C# changes nothing: there is no original
+    /// C# kept to rewrap with, so the conversion still reports the failure.
+    ///
+    /// <para>The axis is what the CALLER does on failure, not the mode it asked
+    /// for. The CLI discards the output entirely when conversion fails, so
+    /// rewrapping one member is strictly better than writing nothing, and no
+    /// consumer is left holding a degraded tree — <c>ConvertCommand</c> therefore
+    /// sets this true. Library callers read <see cref="ConversionResult.Ast"/>
+    /// even when <see cref="ConversionResult.Success"/> is false and must keep the
+    /// natively converted tree, so the default is false.</para>
+    /// </summary>
+    public bool RescueUnusableMembers { get; set; } = false;
+
+    /// <summary>
     /// Whether the emitter should elide `§/C` for zero-argument calls (v0.6.1 default behaviour).
     /// Set to <c>false</c> to produce v0.6.0-compatible output that always emits explicit `§/C` closers.
     /// Default is <c>true</c> (matches <see cref="ConversionContext.UseImplicitCallCloser"/>).
@@ -493,9 +513,46 @@ public sealed class CSharpToCalorConverter
             // PassthroughOnError), rewrap each offending top-level member as a §CSHARP
             // interop block carrying its original C#, so the output is always valid
             // Calor rather than silently-broken text.
-            if (context.ShouldPreserveCSharp && !ParsesCleanly(calorSource))
+            // Review C1(b) / N2: when RescueUnusableMembers is set, the trigger is
+            // "the output is not USABLE", not merely "the output does not parse".
+            // A member can emit Calor that parses and still not survive the round
+            // trip (a name referenced outside the scope that declares it), in which
+            // case round-trip validation below fails the whole conversion and
+            // NOTHING is written - strictly worse, for a caller that discards the
+            // output on failure, than preserving that one member's original C#.
+            // The option is the axis rather than the fidelity/preserve mode,
+            // because what distinguishes the two callers is what they DO on
+            // failure: the CLI throws the result away (so it opts in), while a
+            // library caller reads `Ast` even when Success is false and must keep
+            // the natively converted tree (so it stays opted out by default).
+            var roundTripGate = _options.ValidateRoundTripCSharp
+                && (_options.Fidelity == ConversionFidelity.Lossless
+                    || _options.PreprocessorMode
+                        == PreprocessorConversionMode.SelectActiveBranchLossy);
+            var parseFailed = !ParsesCleanly(calorSource);
+            // Only rescue an otherwise-CLEAN conversion. When the context already
+            // holds errors, the member-level fallbacks have already shaped the
+            // output (an unsupported construct preserved as a member §CSHARP, say)
+            // and re-wrapping the whole type over the top would discard that.
+            var roundTripFailed = !parseFailed
+                // Review m15: PassthroughOnError's documented contract is
+                // literally "never hand me broken output", so it reaches the
+                // rescue on its own as well. No user-visible change today (the
+                // CLI sets RescueUnusableMembers, and --passthrough sets both),
+                // but the contract now holds without relying on that pairing.
+                && (_options.RescueUnusableMembers || _options.PassthroughOnError)
+                && !context.HasErrors
+                && context.ShouldPreserveCSharp
+                && roundTripGate
+                && !RoundTripCompiles(calorSource, context, parseOptions, effectiveOutputKind, cancellationToken);
+            if (context.ShouldPreserveCSharp && (parseFailed || roundTripFailed))
             {
-                var rewrapped = TryRewrapUnparseableMembers(calorAst, root, context);
+                var rewrapped = TryRewrapUnparseableMembers(
+                    calorAst, root, context,
+                    requireRoundTrip: roundTripFailed,
+                    parseOptions: parseOptions,
+                    outputKind: effectiveOutputKind,
+                    cancellationToken: cancellationToken);
                 if (rewrapped != null)
                 {
                     calorAst = rewrapped;
@@ -507,11 +564,14 @@ public sealed class CSharpToCalorConverter
                 // the rewrap itself was insufficient — never ship it silently. Warn
                 // always, and fail under passthroughOnError, whose contract is exactly
                 // "never hand me broken output".
-                if (!ParsesCleanly(calorSource))
+                if (!ParsesCleanly(calorSource)
+                    || (roundTripFailed
+                        && !RoundTripCompiles(calorSource, context, parseOptions, effectiveOutputKind, cancellationToken)))
                 {
                     context.AddWarning(
-                        "Emitted Calor does not parse and could not be fully preserved as " +
-                        "§CSHARP interop blocks; the output may be invalid.",
+                        "Emitted Calor does not parse (or does not survive the C# round trip) " +
+                        "and could not be fully preserved as §CSHARP interop blocks; the output " +
+                        "may be invalid.",
                         feature: "post-validation-fallback");
 
                     if (_options.PassthroughOnError)
@@ -867,8 +927,28 @@ public sealed class CSharpToCalorConverter
     /// rewrapped (leave the output unchanged for the caller to surface).
     /// </summary>
     private ModuleNode? TryRewrapUnparseableMembers(
-        ModuleNode module, CompilationUnitSyntax root, ConversionContext context)
+        ModuleNode module,
+        CompilationUnitSyntax root,
+        ConversionContext context,
+        bool requireRoundTrip = false,
+        CSharpParseOptions? parseOptions = null,
+        OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary,
+        CancellationToken cancellationToken = default)
     {
+        // requireRoundTrip (review C1(b)): a member is "failed" when its emitted
+        // Calor does not parse OR - when the whole output's round trip failed -
+        // when the member alone does not survive the round trip.
+        bool MemberFailed(
+            IReadOnlyList<ClassDefinitionNode>? classes = null,
+            IReadOnlyList<InterfaceDefinitionNode>? interfaces = null,
+            IReadOnlyList<EnumDefinitionNode>? enums = null,
+            IReadOnlyList<DelegateDefinitionNode>? delegates = null)
+            => !MemberParsesCleanly(module, classes, interfaces, enums, delegates)
+               || (requireRoundTrip
+                   && !MemberRoundTripsCleanly(
+                       module, context, parseOptions, outputKind, cancellationToken,
+                       classes, interfaces, enums, delegates));
+
         var sources = CollectTopLevelTypeSources(root);
 
         var failedClasses = new List<ClassDefinitionNode>();
@@ -880,7 +960,7 @@ public sealed class CSharpToCalorConverter
 
         foreach (var cls in module.Classes)
         {
-            if (!MemberParsesCleanly(module, classes: new[] { cls }) &&
+            if (MemberFailed(classes: new[] { cls }) &&
                 TryTakeSource(sources, "class", GetSymbolIdentity(cls, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, cls);
@@ -892,7 +972,7 @@ public sealed class CSharpToCalorConverter
 
         foreach (var iface in module.Interfaces)
         {
-            if (!MemberParsesCleanly(module, interfaces: new[] { iface }) &&
+            if (MemberFailed(interfaces: new[] { iface }) &&
                 TryTakeSource(sources, "interface", GetSymbolIdentity(iface, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, iface);
@@ -904,7 +984,7 @@ public sealed class CSharpToCalorConverter
 
         foreach (var en in module.Enums)
         {
-            if (!MemberParsesCleanly(module, enums: new[] { en }) &&
+            if (MemberFailed(enums: new[] { en }) &&
                 TryTakeSource(sources, "enum", GetSymbolIdentity(en, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, en);
@@ -916,7 +996,7 @@ public sealed class CSharpToCalorConverter
 
         foreach (var del in module.Delegates)
         {
-            if (!MemberParsesCleanly(module, delegates: new[] { del }) &&
+            if (MemberFailed(delegates: new[] { del }) &&
                 TryTakeSource(sources, "delegate", GetSymbolIdentity(del, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, del);
@@ -971,6 +1051,20 @@ public sealed class CSharpToCalorConverter
         IReadOnlyList<InterfaceDefinitionNode>? interfaces = null,
         IReadOnlyList<EnumDefinitionNode>? enums = null,
         IReadOnlyList<DelegateDefinitionNode>? delegates = null)
+        => MemberParsesCleanly(module, out _, classes, interfaces, enums, delegates);
+
+    /// <summary>
+    /// As above, also handing back the emitted Calor so a caller can put the
+    /// member through a further check without constructing a second solo module
+    /// (this is the one module-construction site the architecture test allows).
+    /// </summary>
+    private bool MemberParsesCleanly(
+        ModuleNode module,
+        out string emitted,
+        IReadOnlyList<ClassDefinitionNode>? classes = null,
+        IReadOnlyList<InterfaceDefinitionNode>? interfaces = null,
+        IReadOnlyList<EnumDefinitionNode>? enums = null,
+        IReadOnlyList<DelegateDefinitionNode>? delegates = null)
     {
         var solo = new ModuleNode(
             module.Span, module.Id, module.Name, module.Usings,
@@ -985,8 +1079,88 @@ public sealed class CSharpToCalorConverter
             namespaceScopes: module.NamespaceScopes);
 
         // Fresh context so the probe emission does not perturb the real conversion's stats.
-        var emitted = new CalorEmitter(CreateContext(null)).Emit(solo);
+        emitted = new CalorEmitter(CreateContext(null)).Emit(solo);
         return ParsesCleanly(emitted);
+    }
+
+    /// <summary>
+    /// Review C1(b): true when <paramref name="calorSource"/> compiles to C# that
+    /// itself compiles - the same check <see cref="ValidateLosslessRoundTrip"/>
+    /// performs, but as a predicate that records no diagnostics, so it can gate
+    /// the #717 rewrap before the real validation runs.
+    /// </summary>
+    private static bool RoundTripCompiles(
+        string calorSource,
+        ConversionContext context,
+        CSharpParseOptions parseOptions,
+        OutputKind outputKind,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var compileResult = global::Calor.Compiler.Program.Compile(
+                calorSource,
+                context.SourceFile ?? "converted-output.calr",
+                new CompilationOptions
+                {
+                    EnforceEffects = false,
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    DeferGeneratedOutputValidation = true,
+                    CancellationToken = cancellationToken
+                });
+            if (compileResult.HasErrors)
+                return false;
+
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(
+                    compileResult.GeneratedCode,
+                    context.SourceFile ?? "converted-output.g.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    LanguageVersion = parseOptions.LanguageVersion,
+                    DocumentationMode = parseOptions.DocumentationMode,
+                    SourceCodeKind = parseOptions.Kind,
+                    Features = parseOptions.Features,
+                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+                    References = context.Metadata.References.Select(
+                        reference => new GeneratedCSharpReference(
+                            reference.Path,
+                            reference.Aliases)),
+                    OutputKind = outputKind
+                });
+            return validation.SyntaxErrors.Count == 0 && validation.CompilationErrors.Count == 0;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The <see cref="MemberParsesCleanly"/> sibling for review C1(b): emits the
+    /// member alone (through that method, so the solo module is built in exactly
+    /// one place) and asks whether that Calor survives the C# round trip.
+    /// </summary>
+    private bool MemberRoundTripsCleanly(
+        ModuleNode module,
+        ConversionContext context,
+        CSharpParseOptions? parseOptions,
+        OutputKind outputKind,
+        CancellationToken cancellationToken,
+        IReadOnlyList<ClassDefinitionNode>? classes = null,
+        IReadOnlyList<InterfaceDefinitionNode>? interfaces = null,
+        IReadOnlyList<EnumDefinitionNode>? enums = null,
+        IReadOnlyList<DelegateDefinitionNode>? delegates = null)
+    {
+        if (parseOptions == null)
+            return true;
+
+        return MemberParsesCleanly(module, out var emitted, classes, interfaces, enums, delegates)
+            && RoundTripCompiles(emitted, context, parseOptions, outputKind, cancellationToken);
     }
 
     private static CSharpInteropBlockNode MakeFallbackInterop(
@@ -996,7 +1170,7 @@ public sealed class CSharpToCalorConverter
             Parsing.TextSpan.Empty,
             csharpSource,
             featureName: "post-validation-fallback",
-            reason: $"Converted Calor for '{member.FullyQualifiedSymbolIdentity ?? member.Name}' did not parse; original C# preserved (#717)."));
+            reason: $"Converted Calor for '{member.FullyQualifiedSymbolIdentity ?? member.Name}' did not parse or did not survive the C# round trip; original C# preserved (#717)."));
 
     private sealed record TypeSource(bool IsPartial, string Text);
 
