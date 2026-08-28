@@ -1,0 +1,42 @@
+{
+  "name": "shape-not-realized",
+  "why": "the shape-realized indicator, published per cell beside the escape rate: arm B's agents never wrote the registered field-stored shape, so a null leg A here is \"the shape under test was never written\", not \"rows did not help\".",
+  "expect": {
+    "verdict": "MISS",
+    "route": null,
+    "legAMeetsBar": false
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 0,
+        "shapeRealized": false
+      },
+      "B": {
+        "escapes": 0,
+        "shapeRealized": false
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 0,
+        "shapeRealized": false
+      },
+      "B": {
+        "escapes": 0,
+        "shapeRealized": false
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 0,
+        "shapeRealized": false
+      },
+      "B": {
+        "escapes": 0,
+        "shapeRealized": false
+      }
+    }
+  }
+}

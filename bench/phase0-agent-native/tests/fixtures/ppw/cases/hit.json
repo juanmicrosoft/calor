@@ -1,0 +1,37 @@
+{
+  "name": "hit",
+  "why": "leg A at bar (arm A launders on every blind run, arm B on none) and leg B not failing: the registered HIT, read as \"rows, fail-closed, caught the registered classes at no large loop tax\" and never as \"rows are free\".",
+  "expect": {
+    "verdict": "HIT",
+    "route": null,
+    "legAMeetsBar": true,
+    "legBFails": false
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

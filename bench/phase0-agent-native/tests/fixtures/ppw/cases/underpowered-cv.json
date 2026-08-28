@@ -1,0 +1,45 @@
+{
+  "name": "underpowered-cv",
+  "why": "leg A at bar, leg B not failing, but the realized median within-cell CV is over the registered 0.41 cap (1.5 x e1-rows-parity-001's 0.2746) \u2014 above it the margin's calibration no longer holds.",
+  "expect": {
+    "verdict": "UNDERPOWERED",
+    "route": null,
+    "legAMeetsBar": true,
+    "legBFails": false
+  },
+  "runsPerArm": 4,
+  "defaultCell": {
+    "tokens": [
+      400,
+      1600,
+      400,
+      1600
+    ]
+  },
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

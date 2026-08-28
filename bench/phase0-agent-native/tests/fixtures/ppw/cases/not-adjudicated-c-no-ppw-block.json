@@ -1,0 +1,39 @@
+{
+  "name": "not-adjudicated-c-no-ppw-block",
+  "why": "route (c) via validity condition (4): an epoch whose pins.json carries no ppW block is not a valid epoch. A-1.12 wires (4) to route (c) explicitly so an instrument defect cannot fall through \"any route not listed is a MISS\" \u2014 and keeps it under the own-goal clause, which is what makes a harness misconfigured by its author a MISS rather than a free pass.",
+  "expect": {
+    "verdict": "MISS",
+    "route": "c",
+    "ownGoal": true
+  },
+  "runsPerArm": 4,
+  "pins": {
+    "ppW": null
+  },
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

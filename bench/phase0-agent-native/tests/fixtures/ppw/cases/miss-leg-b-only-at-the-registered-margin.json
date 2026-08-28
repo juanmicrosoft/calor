@@ -1,0 +1,34 @@
+{
+  "name": "miss-leg-b-only-at-the-registered-margin",
+  "why": "THE SENSITIVITY OBLIGATION, made observable. Leg B's point is 1.25 — over the registered 1.20 margin, under the pooled 1.30 and under w5-parity-002's 1.35 — with the bound firing. The verdict is read at 1.20 AND ONLY AT 1.20, so this is a MISS; the ledger must publish the point and the bound at all three candidates so a leg-B pass that survives only at the most lenient one is visible on the face of the instrument rather than inferable from a paragraph.",
+  "expect": {
+    "verdict": "MISS",
+    "route": null,
+    "legAMeetsBar": true,
+    "legBFails": true
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1250}
+    },
+    "W-002-map-and-report": {
+      "A": {"escapes": 0, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1250}
+    },
+    "W-003-match-fallback": {
+      "A": {"escapes": 0, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1250}
+    },
+    "W-004-counter-peek": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1250}
+    },
+    "W-006-map-doubler": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1250}
+    }
+  },
+  "defaultCell": {"tokens": 1000}
+}

@@ -1,0 +1,39 @@
+{
+  "name": "miss-leg-a",
+  "why": "leg A below its bar on a valid harness \u2014 arm B launders exactly as often as arm A, so the median blind delta is 0 and its one-sided lower bound does not exceed 0. A-1.12: a depressed leg-A delta is a MISS, never a not-adjudicated route.",
+  "expect": {
+    "verdict": "MISS",
+    "route": null,
+    "legAMeetsBar": false
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 2
+      },
+      "B": {
+        "escapes": 2,
+        "escapeSource": "unregistered-this-qualified-escape-b"
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 2
+      },
+      "B": {
+        "escapes": 2,
+        "escapeSource": "unregistered-this-qualified-escape-b"
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 2
+      },
+      "B": {
+        "escapes": 2,
+        "escapeSource": "unregistered-this-qualified-escape-b"
+      }
+    }
+  }
+}

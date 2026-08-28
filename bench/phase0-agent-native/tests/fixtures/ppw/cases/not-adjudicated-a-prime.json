@@ -1,0 +1,48 @@
+{
+  "name": "not-adjudicated-a-prime",
+  "why": "route (a'): fewer than two blind cells survive (a). The blind floor is TWO and it is what carries the power, so below it nothing is adjudicated.",
+  "expect": {
+    "verdict": "NOT-ADJUDICATED",
+    "route": "a",
+    "aPrimeFires": true
+  },
+  "runsPerArm": 4,
+  "starterCompiles": {
+    "break": [
+      [
+        "W-001-middleware-stage",
+        "B"
+      ],
+      [
+        "W-004-counter-peek",
+        "B"
+      ]
+    ]
+  },
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "miss-leg-b",
+  "why": "leg A at bar but leg B fails BOTH its conditions — the one-sided 95 % lower bound of the median paired ratio exceeds 1.0 AND the point exceeds the registered 1.20 margin. Every leg-B pair carries the 1.5x treatment cost, so the median is not carried by the blind cells alone.",
+  "expect": {
+    "verdict": "MISS",
+    "route": null,
+    "legAMeetsBar": true,
+    "legBFails": true
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1500}
+    },
+    "W-002-map-and-report": {
+      "A": {"escapes": 0, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1500}
+    },
+    "W-003-match-fallback": {
+      "A": {"escapes": 0, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1500}
+    },
+    "W-004-counter-peek": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1500}
+    },
+    "W-006-map-doubler": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1500}
+    }
+  },
+  "defaultCell": {"tokens": 1000}
+}

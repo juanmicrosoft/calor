@@ -1,0 +1,44 @@
+{
+  "name": "not-adjudicated-a",
+  "why": "route (a): one UNMUTATED starter does not reproduce its frozen multiset on its arm. Two blind cells still survive (a), so (a') does not fire. The starter's BYTES are intact, so this is not attributed to an own goal \u2014 gates \u00a70.3 forbids guessing at a cause the instrument cannot see.",
+  "expect": {
+    "verdict": "NOT-ADJUDICATED",
+    "route": "a",
+    "ownGoal": false
+  },
+  "runsPerArm": 4,
+  "starterCompiles": {
+    "break": [
+      [
+        "W-001-middleware-stage",
+        "B"
+      ]
+    ]
+  },
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

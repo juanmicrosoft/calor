@@ -63,6 +63,16 @@ Subcommands (each prints one JSON document to stdout; exit codes below):
         per-arm clean cell as `seeded.clean.<armId>`. `reference` is null when
         the pair has none; the runner decides that is fatal for --null-agent.
 
+    heldout-final <.ho_final.txt>
+        {failedTests, source}. The SIMPLE method names of the held-out tests
+        that failed in the declared-done run — the spelling `pair.json` uses
+        for `effectObservingTests`. A-1.12's leg-A escape is "at least one
+        named effectObservingTest failing on a workspace that BUILT", a
+        per-TEST fact `result.json`'s `escapedBugs` count cannot carry.
+        source "missing" when the log is absent, which is also what a
+        declared-done state that did not build looks like (run-pair.sh runs the
+        held-out suite only after a successful build). Exit 0.
+
     leg-b-pairs <pins.json>
         {legBPairs, blindPairs, suite, excludedFromLegB}. `legBPairs` is the
         registered leg-B denominator (roadmap §3.1 W2 / §4.1) read from the
@@ -476,6 +486,40 @@ def resolve_pair_config(pair_json, key, arm=None):
 
 
 # ---------------------------------------------------------------------------
+# The declared-done held-out run, per TEST (annex A-1.12 leg A)
+#
+# A-1.12 registers leg A's escape as "at least one of the pair's named
+# `effectObservingTests` failing on a workspace that BUILT" — a per-TEST fact
+# that `result.json`'s `escapedBugs` count cannot carry. This reads the names
+# out of the final `dotnet test` log so ppw-analyze.py never has to guess which
+# of a 6-to-11-test suite failed.
+# ---------------------------------------------------------------------------
+_FAILED_VSTEST = re.compile(r"^\s*(?:X\s+)?Failed\s+(?P<name>[A-Za-z_][A-Za-z0-9_.<>,]*)")
+_FAILED_MTP = re.compile(r"^\s*failed\s+(?P<name>[A-Za-z_][A-Za-z0-9_.<>,]*)")
+
+
+def read_heldout_final(path):
+    """{failedTests, source}. `failedTests` carries the SIMPLE method names, the
+    spelling `pair.json` uses for `effectObservingTests`. source is "log" when
+    the log was read, "missing" when it is absent — which is also what a
+    declared-done state that did not BUILD looks like, since run-pair.sh only
+    runs the held-out suite after a successful build."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return {"failedTests": [], "source": "missing"}
+    names = set()
+    for line in text.splitlines():
+        match = _FAILED_VSTEST.match(line) or _FAILED_MTP.match(line)
+        if match:
+            name = match.group("name").split("(")[0].strip()
+            if name:
+                names.add(name.split(".")[-1])
+    return {"failedTests": sorted(names), "source": "log"}
+
+
+# ---------------------------------------------------------------------------
 # legBPairs (roadmap §3.1 W2 / §4.1)
 # ---------------------------------------------------------------------------
 def read_leg_b_pairs(pins_json):
@@ -550,6 +594,20 @@ def _self_test():
             json.dump({"formatVersion": "3.0", "compilerHash": "abc"}, fh)
         check(read_build_state(state)["compilerHash"] == "abc", "build state")
         check(read_build_state(os.path.join(tmp, "none"))["source"] == "missing", "build state missing")
+        ho = os.path.join(tmp, ".ho_final.txt")
+        with open(ho, "w") as fh:
+            fh.write("  Failed HeldOut.EffectTests.Twice_IsSilent_OnFreshBehavior [3 ms]\n"
+                     "  Error Message:\n   expected silence\n"
+                     "  Failed Twice_IsSilent_AfterProbe [1 ms]\n"
+                     "  Passed Twice_ReturnsSum [1 ms]\n"
+                     "Failed! - Failed: 2, Passed: 5, Skipped: 0, Total: 7\n")
+        h = read_heldout_final(ho)
+        check(h["failedTests"] == ["Twice_IsSilent_AfterProbe", "Twice_IsSilent_OnFreshBehavior"],
+              "heldout-final names %r" % h)
+        check(h["source"] == "log", "heldout-final source %r" % h)
+        # A declared-done state that did not BUILD leaves no .ho_final.txt at all.
+        check(read_heldout_final(os.path.join(tmp, "nope.txt"))
+              == {"failedTests": [], "source": "missing"}, "heldout-final missing")
     check(admit_config(STRICT_CONFIG) == (True, None, "strict calor arm (gates §1 pin)"), "strict admitted")
     pre = dict(STRICT_CONFIG, permissiveEffects=True, controlArmKind="pre-rows")
     check(admit_config(pre)[0] and admit_config(pre)[1] == "pre-rows", "pre-rows admitted")
@@ -577,6 +635,7 @@ def main(argv=None):
     p = sub.add_parser("pair-config"); p.add_argument("pair_json"); p.add_argument("key")
     p.add_argument("--arm", default=None, choices=(None, "calor", "csharp"))
     p = sub.add_parser("leg-b-pairs"); p.add_argument("pins_json")
+    p = sub.add_parser("heldout-final"); p.add_argument("path")
     sub.add_parser("self-test")
     args = parser.parse_args(argv)
     if args.cmd == "turns":
@@ -589,6 +648,10 @@ def main(argv=None):
         return 0
     if args.cmd == "build-state":
         json.dump(read_build_state(args.path), sys.stdout, sort_keys=True)
+        sys.stdout.write("\n")
+        return 0
+    if args.cmd == "heldout-final":
+        json.dump(read_heldout_final(args.path), sys.stdout, sort_keys=True)
         sys.stdout.write("\n")
         return 0
     if args.cmd == "pair-config":
