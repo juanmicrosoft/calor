@@ -59,7 +59,7 @@ public sealed class QueryTool : McpToolBase
             "properties": {
                 "projectDirectory": {
                     "type": "string",
-                    "description": "Project directory whose .calr files the index covers (the CLI's --project)"
+                    "description": "Project directory whose .calr files the index covers (the CLI's --project). Must be inside the server root (`calor mcp --root`); the path is canonicalized (symlinks and `..` resolved) before it is checked and used, and refusals name the canonical path"
                 },
                 "facet": {
                     "type": "string",
@@ -204,7 +204,10 @@ public sealed class QueryTool : McpToolBase
         // Write confinement (the same rule calor_file_write applies): this tool
         // rebuilds — and therefore writes — the index, so both the project it
         // reads and the directory it would write to must be inside the pinned
-        // root. Canonicalized first, so `..` and symlinks cannot step outside.
+        // root. Canonicalized first, so `..` and symlinks cannot step outside —
+        // and the CANONICAL path is what the rest of this method uses, so the
+        // value that was checked is the value that is acted on (and the value
+        // any refusal names).
         string canonicalProject;
         try
         {
@@ -245,27 +248,36 @@ public sealed class QueryTool : McpToolBase
                 return McpToolResult.Error($"Parameter 'indexPath' is not a usable path: {exception.Message}");
             }
 
-            // Under the root AND under the project: an index directory belongs
-            // to the project it indexes. Without the second check this argument
-            // — which has no CLI counterpart, so "byte-identical to `calor
-            // query`" gives it no cover — could create a tree anywhere under the
-            // root, or overwrite another project's index in place.
+            // Inside the root, like every other path this tool touches. It need
+            // not be inside the project: `calor index build --output` may put an
+            // index anywhere, and reading one from a sibling directory is
+            // harmless because nothing is ever written through this argument
+            // (see the read-only rule below) and a foreign index is refused by
+            // its own header.
             if (!CanonicalPath.IsUnder(canonicalIndex, _root))
             {
                 return McpToolResult.Error(
                     $"Parameter 'indexPath' is outside the server's root '{_root}'");
             }
 
+            indexPath = canonicalIndex;
         }
 
         // An explicit index path is READ-ONLY. Rebuilding through it would
         // create a tree wherever it points, or overwrite another project's
         // index in place with this project's contents — and the argument has no
         // CLI counterpart, so "byte-identical to `calor query`" gives it no
-        // cover. A stale or missing index at an explicit path is refused, the
-        // way `--no-build` refuses.
+        // cover. A stale or missing index at an explicit path is therefore
+        // refused; the refusal says how to rebuild it, since "drop --no-build"
+        // would be advice the caller cannot take.
         var index = ProjectIndexQueryReader.Resolve(
-            projectDirectory, noBuild || indexPath != null, out var error, indexPath);
+            canonicalProject,
+            noBuild || indexPath != null,
+            out var error,
+            indexPath,
+            indexPath == null
+                ? null
+                : $"`indexPath` is read-only; rebuild it with `calor index build --output {indexPath}`.");
         if (index == null)
             return Refusal(error!);
 

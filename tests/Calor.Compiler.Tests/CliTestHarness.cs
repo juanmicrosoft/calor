@@ -153,6 +153,17 @@ internal static class CliTestHarness
                 return matching;
         }
 
+        // Nothing matched by content. Under a profiler that is expected, and
+        // the right fallback is the configuration THIS test process was built
+        // in: a stale sibling build of the other configuration would otherwise
+        // be run against, and the failure surfaces as a content diff rather
+        // than as "your build is stale".
+        var ownConfiguration = AppContext.BaseDirectory.Replace('\\', '/').Contains("/Release/", StringComparison.Ordinal)
+            ? "Release"
+            : "Debug";
+        var own = candidates.FirstOrDefault(candidate =>
+            candidate.Replace('\\', '/').Contains($"/{ownConfiguration}/", StringComparison.Ordinal));
+
         // Nothing matched. Under the coverage lane that is expected — coverlet
         // rewrites the assemblies this process loaded, so no file on disk can
         // be byte-equal to them — and it says nothing about the builds on disk.
@@ -162,12 +173,12 @@ internal static class CliTestHarness
         // identity ask CliCompilerIsThisCompiler and handle both answers.
         Console.Error.WriteLine(
             "CliTestHarness: no calor.dll on disk matches the Calor.Compiler assembly this test "
-                + $"process loaded ({loaded}); falling back to {candidates[0]}. "
+                + $"process loaded ({loaded}); falling back to {own ?? candidates[0]}. "
                 + (IsProfilerAttached
                     ? "A profiler is attached (coverage lane), where this is expected."
                     : "No profiler detected — this usually means a stale build of the other configuration."));
 
-        return candidates[0];
+        return own ?? candidates[0];
     }
 
     /// <summary>

@@ -545,7 +545,7 @@ indicator; register-then-merge enforced by A-1.10.
 | ρ_body under-approximation on an escaping lambda (reported as Calor0425) | e4:230-234 | a fixture measured silent | DEFERRED |
 | Index folds cross-module charges for bindable files | e5:265-272 | — | 0.16 SHOULD W8 |
 | Interface methods not indexed; index-build cost unmeasured | e5:273-275; :259-261 | — | 0.16 SHOULD W8 |
-| `§FLD`/`§B` rows not index positions; hover declared-only; `--json` on `effects` only | e5:168-175 | E7 | with E7 |
+| `§FLD`/`§B` rows not index positions; hover declared-only; `--json` **closed for the four E7 facets** (`callers`, `callees`, `impact`, `effects`) — `symbol`, `contracts`, `assumptions` stay text-only | e5:168-175 | E7 | `--json` clause CLOSED (E7 PR); the `§FLD`/`§B` and hover clauses carry to 0.16.x |
 | Solution-level manifests not consulted by the index | e5:256-258 | a corpus solution with manifests | 0.16.x |
 | Calor0419 at BCL argument sites (D-A = 2) | e4:249-251 | D-A `calor0419FunctionTyped` > 10 | 0.17 with IL rows |
 | BCL-returned delegates → Unknown | D:1660-1664 | `UnknownSource + InvocationUndetermined` > 10 over K1's set | DEFERRED, demand-triggered |

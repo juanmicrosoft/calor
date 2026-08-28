@@ -41,11 +41,18 @@ public static class ProjectIndexQueryReader
     /// Where the index lives; defaults to the directory <c>calor index build</c>
     /// writes to (<c>obj/calor</c> under the project).
     /// </param>
+    /// <param name="unusableHint">
+    /// What to tell the caller when a stale or missing index may not be
+    /// rebuilt. Defaults to the CLI's own advice; a caller for whom
+    /// <c>--no-build</c> is not the reason (an explicit read-only index path,
+    /// say) supplies advice the caller can actually act on.
+    /// </param>
     public static ProjectIndex? Resolve(
         string projectDirectory,
         bool noBuild,
         out string? error,
-        string? indexDirectory = null)
+        string? indexDirectory = null,
+        string? unusableHint = null)
     {
         error = null;
         if (!Directory.Exists(projectDirectory))
@@ -84,7 +91,7 @@ public static class ProjectIndexQueryReader
         if (noBuild)
         {
             error = $"Error: index unusable — {ProjectIndex.Explain(freshness)}. "
-                + "Run `calor index build` (or drop --no-build).";
+                + (unusableHint ?? "Run `calor index build` (or drop --no-build).");
             return null;
         }
 

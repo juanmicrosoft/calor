@@ -2,6 +2,7 @@ using System.Text.Json;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Indexing;
 using Calor.Compiler.Mcp;
+using Calor.Compiler.Mcp.Sessions;
 using Calor.Compiler.Mcp.Tools;
 using Xunit;
 
@@ -232,10 +233,15 @@ public sealed class QueryToolTests : IDisposable
     [Fact]
     public async Task DirectoryNotFound_IsTheCliError()
     {
+        // The message names the path the tool actually consulted — the
+        // canonical one, which is also the one the confinement check ran
+        // against. The CLI, handed that same path, prints the same line.
         var missing = Path.Combine(TempDir(), "nope");
         var result = await Call(Args(missing, "callers", "Scale"));
         Assert.True(result.IsError);
-        Assert.Equal($"Error: directory not found: {missing}" + Environment.NewLine, Text(result));
+        Assert.Equal(
+            $"Error: directory not found: {CanonicalPath.Resolve(missing)}" + Environment.NewLine,
+            Text(result));
     }
 
     [Fact]
@@ -244,7 +250,9 @@ public sealed class QueryToolTests : IDisposable
         var dir = TempDir();
         var result = await Call(Args(dir, "callers", "Scale"));
         Assert.True(result.IsError);
-        Assert.Equal($"Error: no .calr files under {dir}" + Environment.NewLine, Text(result));
+        Assert.Equal(
+            $"Error: no .calr files under {CanonicalPath.Resolve(dir)}" + Environment.NewLine,
+            Text(result));
     }
 
     [Fact]
@@ -345,6 +353,13 @@ public sealed class QueryToolTests : IDisposable
 
         Assert.True(result.IsError);
         Assert.StartsWith("Error: index unusable — the source files changed.", Text(result));
+        // The caller never passed --no-build, and dropping it would not help:
+        // this path is read-only by design, so the refusal says what WOULD.
+        Assert.DoesNotContain("--no-build", Text(result));
+        Assert.Contains(
+            "`indexPath` is read-only; rebuild it with `calor index build --output "
+                + CanonicalPath.Resolve(custom) + "`.",
+            Text(result));
         Assert.Equal(before, File.ReadAllBytes(ProjectIndex.PathFor(custom)));
         Assert.False(File.Exists(IndexFile(dir)));
     }
