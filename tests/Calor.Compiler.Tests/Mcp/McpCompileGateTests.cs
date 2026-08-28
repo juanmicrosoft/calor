@@ -51,8 +51,9 @@ public sealed class McpCompileGateTests : IDisposable
     [Fact]
     public void TheDenominatorIsTheWholeCorpus()
     {
-        // Seven scripts, the same seven EditScriptIdentityTests pins; a script
-        // dropped here would have to edit this list in the diff.
+        // Eight scripts, the same eight EditScriptIdentityTests pins; a script
+        // dropped here would have to edit this list in the diff. ES-08 (the
+        // effect-row edit script) is registered by this PR.
         Assert.Equal(
             new[]
             {
@@ -63,6 +64,7 @@ public sealed class McpCompileGateTests : IDisposable
                 "ES-05-options-flip",
                 "ES-06-touch-noop",
                 "ES-07-persistent-finding",
+                "ES-08-effect-row-edit",
             },
             EnumerateScriptDirectories().Select(Path.GetFileName).ToArray());
     }
@@ -87,6 +89,7 @@ public sealed class McpCompileGateTests : IDisposable
             ["ES-06-touch-noop/0"] = "nothing is wrong in this corpus; the script pins that nothing moves",
             ["ES-06-touch-noop/1"] = "identical rewrite",
             ["ES-06-touch-noop/2"] = "identical rewrite",
+            ["ES-08-effect-row-edit/0"] = "the pre-edit baseline: the callee's row is correct, so nothing is reported; the row widens in step 1 and is erased in step 2",
         };
 
     [Theory]
@@ -144,18 +147,18 @@ public sealed class McpCompileGateTests : IDisposable
         }
 
         // And it may not swallow the corpus. The honest numbers, stated rather
-        // than implied: 21 steps, of which 12 are clean by construction (a
+        // than implied: 24 steps, of which 13 are clean by construction (a
         // baseline, an addition of a clean file, a deletion, a reversal, the
-        // effects-off step, and all three of ES-06's identical rewrites) and 9
-        // carry findings. A leg comparing two paths on an empty list proves
+        // effects-off step, all three of ES-06's identical rewrites, and
+        // ES-08's pre-edit baseline) and 11 carry findings. A leg comparing two paths on an empty list proves
         // nothing, so the 9 are what makes it load-bearing — and if that number
         // drops, this test says so before the theory quietly passes.
         var totalSteps = EnumerateScriptDirectories()
             .Select(directory => LoadScript(Path.GetFileName(directory)).Steps.Count)
             .Sum();
-        Assert.Equal(21, totalSteps);
-        Assert.Equal(12, CleanSteps.Count);
-        Assert.Equal(9, totalSteps - CleanSteps.Count);
+        Assert.Equal(24, totalSteps);
+        Assert.Equal(13, CleanSteps.Count);
+        Assert.Equal(11, totalSteps - CleanSteps.Count);
 
         // Every script except ES-06 (whose whole point is that nothing moves)
         // must observe at least one step with findings.

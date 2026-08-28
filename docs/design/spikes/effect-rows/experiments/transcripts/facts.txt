@@ -36,15 +36,18 @@ src/Calor.Compiler/Effects/EffectTypes.cs
 src/Calor.Compiler/Effects/ExternalCallCollector.cs
 
 ### tests/TestData function-typed .calr
-count: 1
+count: 4
 
 ### whole-corpus function-typed positions (IsFunctionTypeName shapes)
-7
+10
 tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr
 tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr
 tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr
 tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr
 tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr
+tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr
+tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr
+tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/combinators.calr
 tests/TestData/QueryCorpus/project/app.calr
 
 ### Conversion tests: effect pass?

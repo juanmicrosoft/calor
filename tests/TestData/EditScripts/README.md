@@ -48,6 +48,7 @@ differently from a cross-module one under caching.
 | ES-05 | option flipped | the #788 / #883 shape: a diagnostics-affecting option outside the options token, so a warm cache answers for the previous option set |
 | ES-06 | identical rewrite | diagnostics moving when nothing changed; also the anti-vacuity check that "identity" is not bought by rebuilding everything |
 | ES-07 | finding on an unedited file | a **per-file** diagnostic vanishing on warm builds, if diagnostic-bearing files were ever cached |
+| ES-08 | callee's effect **row** changes | the effect-row shape of ES-04: a row-polymorphic `Map<eff e>` in `combinators.calr` is instantiated across a module boundary by two callers in `app.calr`; step 1 widens the declared row (the unedited caller draws Calor0410), step 2 erases it (the callee draws Calor0425 + the fail-closed Calor0410). A **stale cross-module summary** would let the unedited caller's finding vanish on a warm build — that is the diagnostics leg's claim. The index leg is fresh-vs-fresh (v1 rebuilds wholesale), so it pins that the `EffectRows` facet **moves with the edit**, not that a stale facet is caught; and `app.calr` contributes no `effrow` row at all, only the cross-module residual. `bystander.calr` (never edited, never a caller) pins that the delta is confined. Registered late — see `docs/plans/v0.13-freeze-registrations.md` F-3′ §6, residual R-F3-5 |
 
 ES-04 and ES-07 look similar and are not. Cross-module diagnostics (ES-04) are
 recomputed from cached effect summaries on every run, so they survive a file

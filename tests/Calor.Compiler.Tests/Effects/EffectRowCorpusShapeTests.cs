@@ -22,8 +22,9 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
 /// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
-/// <c>final-src/*.calr</c> solutions; 927 since #1104's crash-repro fixture, see
-/// the count pin below) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
+/// <c>final-src/*.calr</c> solutions; 927 since #1104's crash-repro fixture; 936
+/// since ES-08's nine edit-script snapshots — see the count pin below) is the
+/// <c>compile-all-committed-calr</c> CI leg (gate 5), and
 /// the 23-file two-line <c>§O</c>/<c>§E</c> subset is already pinned by
 /// <c>o53/baseline.json</c> through P30.</para>
 /// </summary>
@@ -81,11 +82,19 @@ public sealed class EffectRowCorpusShapeTests
     /// <item><c>tests/TestData/QueryCorpus/project/app.calr</c> — v0.15 E5 (review
     /// round 1, #2): gate 7's polymorphic golden, <c>Map&lt;eff e&gt; (Func&lt;i32,i32&gt;:f §E{e}, …)</c>,
     /// pins that the inferred row of a rank-1 body keeps its variable part.</item>
+    /// <item><c>tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr</c>
+    /// and <c>…/step-01-callee-row-widens/combinators.calr</c> — v0.16 kickoff sweep: the
+    /// effect-row edit script (F-3′ §6), whose callee is the same rank-1 shape
+    /// (<c>Map&lt;eff e&gt; (…, Func&lt;i32,i32&gt;:f §E{e})</c>) so that a cross-module
+    /// caller instantiates a row under the driver cache. Step 2 erases the row and is
+    /// therefore NOT allowlisted — it writes no same-line row.</item>
     /// </list>
     /// </summary>
     private static readonly HashSet<string> AuthoredUnderDecisionOne = new(StringComparer.Ordinal)
     {
         "tests/TestData/QueryCorpus/project/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr",
     };
 
     [Fact]
@@ -97,11 +106,13 @@ public sealed class EffectRowCorpusShapeTests
         // §3.2 and §9 both quote 886 — the corpus the design doc's argument was
         // measured on. PP-E1 leg B (epoch e1-rows-parity-001) archived its 40 declared-done
         // solutions as final-src/*.calr, exactly as w5-parity-002 does, so the committed
-        // corpus is 926 = 886 + 40 since then, and 927 since #1104's crash-repro fixture
+        // corpus is 926 = 886 + 40 since then; 927 with #1104's crash-repro fixture
         // (tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr,
-        // v0.16 W3(c)); the sweep below still covers every file. A drift from 927 means the
-        // sweep is no longer measuring the corpus it claims to.
-        Assert.Equal(927, files.Count);
+        // v0.16 W3(c)); and 936 = 927 + 9 since the v0.16 kickoff sweep registered ES-08
+        // (three steps × three files under tests/TestData/EditScripts/ES-08-effect-row-edit/).
+        // The sweep below still covers every file. A drift from 936 means the sweep is no
+        // longer measuring the corpus it claims to.
+        Assert.Equal(936, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.

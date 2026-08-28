@@ -136,6 +136,26 @@ public sealed class EditScriptIdentityTests : IDisposable
             lines.Add(
                 $"occ|{occurrence.File}|{occurrence.Line}|{occurrence.Column}|{occurrence.Kind}");
         }
+        // v0.15 E5's effects facet (ProjectIndex format 4.0). Gate 3 observes
+        // effects "as diagnostics and index bytes"; without these lines an
+        // effect-row edit (ES-08) that moved only the facet would be invisible
+        // to this leg.
+        //
+        // Symbol ids are not printed: they embed the canonicalised source
+        // identity (Binder: `source/<identity>/module/...`), which differs
+        // between the two temp workspaces the way the header hashes do. The
+        // row is identified by file, line, kind and name instead.
+        foreach (var row in index.EffectRows)
+        {
+            lines.Add(
+                $"effrow|{row.File}|{row.Line}|{row.Kind}|{row.Name}"
+                    + $"|declared={row.Declared}"
+                    + $"|{DescribeRow(row.DeclaredRow)}|{DescribeRow(row.InferredRow)}"
+                    + $"|{row.Verdict}|{row.DiagnosticCode}"
+                    + $"|forbidden={string.Join(",", row.Forbidden)}|bound={row.BoundRow}");
+        }
+        foreach (var unavailable in index.Residual.EffectRowsUnavailable)
+            lines.Add($"residual-effect-rows-unavailable|{unavailable}");
         foreach (var unreadable in index.Residual.UnreadableFiles)
             lines.Add($"residual-unreadable|{unreadable}");
         foreach (var unresolved in index.Residual.UnresolvedCalls)
@@ -144,6 +164,17 @@ public sealed class EditScriptIdentityTests : IDisposable
             lines.Add($"residual-ambiguous|{ambiguous}");
 
         return string.Join("\n", lines);
+    }
+
+    private static string DescribeRow(Indexing.IndexedRow? row)
+    {
+        if (row is null)
+            return "-";
+        var variables = string.Join(
+            ",",
+            row.Variables.Select(variable => $"{variable.Ordinal}:{variable.Name}"));
+        return $"{row.State}{{{string.Join(",", row.Effects)}}}<{variables}>"
+            + $"[{string.Join(",", row.Reasons)}]";
     }
 
     [Theory]
@@ -228,8 +259,167 @@ public sealed class EditScriptIdentityTests : IDisposable
                 "ES-05-options-flip",
                 "ES-06-touch-noop",
                 "ES-07-persistent-finding",
+                // v0.16 kickoff sweep: the effect-row script (roadmap-v0.13-v0.15
+                // §4.4 gate 3), registered under F-3′ §4 of
+                // docs/plans/v0.13-freeze-registrations.md with its breach
+                // disclosed (it was to land before E2 merged; E2 merged first).
+                "ES-08-effect-row-edit",
             },
             EnumerateScriptDirectories().Select(Path.GetFileName).ToArray());
+    }
+
+    // --- ES-08: the effect-row script ---------------------------------------
+
+    /// <summary>
+    /// ES-08's per-step diagnostic outcome, pinned by file, severity, code and
+    /// POSITION so the script's registered meaning (F-3′ §6) is a tested claim
+    /// and not prose: the row edits in <c>combinators.calr</c> move the UNEDITED
+    /// caller's Calor0410 (step 1) and the callee's own Calor0425 plus the
+    /// fail-closed Calor0410 (step 2), and <c>bystander.calr</c> never reports
+    /// anything. Each entry is <c>file: severity Calor####@line,column</c>,
+    /// ordinally sorted, over a from-scratch compile — PP-E1's shape
+    /// (<c>SpikeVerdictTests</c>), because the registration text claims severity
+    /// and a code-only multiset cannot tell an error from a demoted warning, or
+    /// a moved span from a stable one.
+    /// </summary>
+    private static readonly IReadOnlyList<string>[] Es08ExpectedDiagnosticsPerStep =
+    [
+        // step-00-clean: Map<eff e> is instantiated with a pure function by
+        // UsePure and with a printing one by UseImpure; every row fits.
+        [],
+        // step-01-callee-row-widens: Map's declared row gains `cw`. UsePure
+        // declares §E{alloc, mut} and was not edited — the cross-module charge
+        // now names an effect it does not declare. UseImpure declares `cw`
+        // and stays clean.
+        // …at `§F{f003:UsePure:pub}` (12,5) — the declaration in the file that
+        // was NOT edited, reported as an ERROR under the shipped 0.15 rule.
+        ["app.calr: error Calor0410@12,5"],
+        // step-02-callee-row-erased: Map loses `<eff e>` and its parameter's
+        // §E{e}. Invoking the row-less `f` inside Map is "cannot tell"
+        // (Calor0425, a warning at the invocation) plus the fail-closed
+        // Unknown charge on Map itself (Calor0410, the shipped 0.15 rule:
+        // `--permissive-effects` is the only waiver); the callers no longer
+        // instantiate a row and Map's declared row covers what they declare.
+        // No Calor1002 on app.calr: `app.calr` calls the failed `combinators.calr`,
+        // so GeneratedValidationScope drops its output from generated-C#
+        // validation (and, because nothing checked it, from publication) —
+        // identically on cold and warm builds. Outputs that do NOT reference the
+        // failed module are still validated, so this hides no real error.
+        // …Calor0410 at `Map`'s own `§E` row (3,5), an error; Calor0425 at the
+        // row-less invocation `§C{f}` (7,22), a warning.
+        [
+            "combinators.calr: error Calor0410@3,5",
+            "combinators.calr: warning Calor0425@7,22",
+        ],
+    ];
+
+    [Fact]
+    public void Es08_EffectRowEdit_DiagnosticsMoveAsRegistered()
+    {
+        var script = LoadScript("ES-08-effect-row-edit");
+        Assert.Equal(Es08ExpectedDiagnosticsPerStep.Length, script.Steps.Count);
+
+        for (var index = 0; index < script.Steps.Count; index++)
+        {
+            var workspace = CreateTempDir();
+            SyncWorkspace(workspace, script.Steps[index].SourceDirectory);
+            var outcome = RunStep(workspace, script.Steps[index], clearFirst: true);
+
+            var reported = outcome.Diagnostics
+                .Select(line =>
+                {
+                    // Canonical form is file|code|severity|line|column|message;
+                    // re-shaped to PP-E1's `severity Calor####@line,column`.
+                    var parts = line.Split('|');
+                    return $"{parts[0]}: {parts[2].ToLowerInvariant()} {parts[1]}"
+                        + $"@{parts[3]},{parts[4]}";
+                })
+                .OrderBy(line => line, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.True(
+                Es08ExpectedDiagnosticsPerStep[index].SequenceEqual(reported, StringComparer.Ordinal),
+                $"ES-08 step {index}: expected [{string.Join(", ", Es08ExpectedDiagnosticsPerStep[index])}] "
+                    + $"but the compiler reported [{string.Join(", ", reported)}]. The script's "
+                    + "registered outcome (F-3′ §6) moved — re-register with disclosure; do "
+                    + "not edit the fixture to fit. Full diagnostics:\n  "
+                    + string.Join("\n  ", outcome.Diagnostics));
+        }
+    }
+
+    [Fact]
+    public void Es08_EffectRowEdit_DeltaIsConfinedToTheCalleeAndItsCallers()
+    {
+        // Gate 3's "confined to the affected declarations and their callers"
+        // clause, made observable: the bystander module is never edited and
+        // never calls Map, so neither its diagnostics nor its index lines
+        // (declarations, occurrences, effect rows, residuals) may move across
+        // the three steps — while the callee's own effect-row entry MUST move,
+        // or the EffectRows facet is not observing the edit at all.
+        //
+        // The LIMITS of the facet leg are pinned here rather than assumed
+        // (review round 1, M1; disclosed in F-3′ §6):
+        //
+        //   * `app.calr` — the CALLER file, the one whose diagnostics move —
+        //     contributes NO `effrow` line at any step. Its `§C{Map}` is
+        //     cross-module, so the index records it under
+        //     `residual-effect-rows-unavailable` instead. The facet claim
+        //     therefore rests on `combinators.calr` alone, and the assertion
+        //     below says so in both directions: zero rows, and the residual
+        //     present, at every step.
+        //   * The index leg is fresh-vs-fresh (ProjectIndexBuilder holds no
+        //     cache), so no ES-08 assertion can observe a STALE facet. What it
+        //     observes is that the facet is a function of the workspace state
+        //     and moves with the row edit.
+        var script = LoadScript("ES-08-effect-row-edit");
+
+        var bystanderIndexPerStep = new List<string>();
+        var calleeRowPerStep = new List<string>();
+        for (var index = 0; index < script.Steps.Count; index++)
+        {
+            var workspace = CreateTempDir();
+            SyncWorkspace(workspace, script.Steps[index].SourceDirectory);
+            var outcome = RunStep(workspace, script.Steps[index], clearFirst: true);
+
+            Assert.DoesNotContain(
+                outcome.Diagnostics,
+                line => line.StartsWith("bystander.calr|", StringComparison.Ordinal));
+
+            var lines = SerializeIndex(workspace, script.Steps[index]).Split('\n');
+
+            // Probe A, inverted: the caller's rows are absent and its residual
+            // is present. If the index ever starts recording cross-module
+            // positions as rows, this fails and the F-3′ §6 residual is stale.
+            Assert.DoesNotContain(
+                lines,
+                line => line.StartsWith("effrow|app.calr|", StringComparison.Ordinal));
+            Assert.Contains(
+                lines,
+                line => line.StartsWith("residual-effect-rows-unavailable|", StringComparison.Ordinal)
+                    && line.Contains("app.calr", StringComparison.Ordinal));
+
+            // Both index shapes name a file: `<kind>|bystander.calr|…` for rows
+            // and declarations, `residual-…|bystander.calr: …` for residuals.
+            bystanderIndexPerStep.Add(string.Join(
+                "\n",
+                lines.Where(line => line.Contains("bystander.calr", StringComparison.Ordinal))));
+            calleeRowPerStep.Add(string.Join(
+                "\n",
+                lines.Where(line =>
+                    line.StartsWith("effrow|combinators.calr|", StringComparison.Ordinal))));
+        }
+
+        Assert.NotEmpty(bystanderIndexPerStep[0]);
+        for (var index = 1; index < script.Steps.Count; index++)
+            Assert.Equal(bystanderIndexPerStep[0], bystanderIndexPerStep[index]);
+
+        Assert.NotEmpty(calleeRowPerStep[0]);
+        // All three states differ: widening the row is not the same facet as
+        // erasing it, and without the last comparison a facet that only noticed
+        // "declared vs not declared" would pass (review round 1).
+        Assert.NotEqual(calleeRowPerStep[0], calleeRowPerStep[1]);
+        Assert.NotEqual(calleeRowPerStep[0], calleeRowPerStep[2]);
+        Assert.NotEqual(calleeRowPerStep[1], calleeRowPerStep[2]);
     }
 
     [Theory]

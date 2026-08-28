@@ -1,0 +1,8 @@
+§M{m001:Combinators}
+  §F{f001:Map:pub}<eff e> ([i32]:xs, Func<i32,i32>:f §E{e}) -> [i32]
+    §E{e, alloc, mut}
+    §B{n:i32} (len xs)
+    §B{~out:[i32]} §ARR{i32} n
+    §L{l1:i:0:n:1}
+      §SETIDX{out} i §C{f} §A §IDX xs i §/C
+    §R out
