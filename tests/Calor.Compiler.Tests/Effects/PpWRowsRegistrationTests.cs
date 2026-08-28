@@ -134,6 +134,18 @@ public sealed class PpWRowsRegistrationTests
         // Outcome.
         ("outcome precedence", "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT"),
         ("own-goal clause", "OWN-GOAL CLAUSE"),
+        // Review round 2 (#1123's own review): the confound, the shape indicator, the escape
+        // rule, and the two disclosures that change what a verdict means.
+        ("this-qualified confound", "PRE-REGISTERED CONFOUND ON LEG A"),
+        ("confound hits two blind cells", "two argument-position blind cells and not the direct-invocation"),
+        ("W-004 fails closed", "**W-004 is UNAFFECTED and fails closed:**"),
+        ("floor risk from the confound", "NOT-ADJUDICATED by route (a\u2032)"),
+        ("shape-realized indicator", "A SHAPE-REALIZED INDICATOR IS OBLIGATORY"),
+        ("escape semantics", "failing on a workspace that BUILT"),
+        ("non-building runs published separately", "did not build at declared-done"),
+        ("permissive lattice", "**`EffectSet.Empty`, not `EffectSet.Unknown`**"),
+        ("leg-B cluster dependence", "W-002 and W-006 share a starter blob"),
+        ("arm-A route (a) is new", "**Arm A's are NEW and are registered here, not cited:**"),
     ];
 
     /// <summary>
@@ -330,6 +342,37 @@ public sealed class PpWRowsRegistrationTests
                     + "A-1.12 row does not record. The row cannot be edited after merge: register "
                     + "the corrected measurement in a NEW annex entry.");
             }
+
+            // The other direction, PER ARM (review round 1 follow-up). Checking bare codes over
+            // the whole cell is too weak: a spurious `warning Calor0410` added to W-004's arm-A
+            // prose would pass, because Calor0410 already appears in that pair's arm-B cell. So
+            // the assertion is on (severity, code) pairs within each arm's own half of the cell.
+            // A bare mention with no severity word — "**no `Calor0410`**" — is deliberately not
+            // matched by the pattern and so is not treated as a claimed diagnostic.
+            var half = PairCellHalf(row, shortId, isArmA: string.Equals(arm, "A", StringComparison.Ordinal));
+            var claimed = System.Text.RegularExpressions.Regex
+                .Matches(half, "`(warning|error) (Calor0\\d{3})`")
+                .Select(m => (Severity: m.Groups[1].Value, Code: m.Groups[2].Value))
+                .Distinct()
+                .ToArray();
+            var emitted = compiles.EnumerateArray()
+                .Where(c => c.GetProperty("pair").GetString()!.StartsWith(shortId, StringComparison.Ordinal)
+                    && c.GetProperty("role").GetString()!.StartsWith("shortcut", StringComparison.Ordinal)
+                    && c.GetProperty("arm").GetString() == arm)
+                .SelectMany(c => c.GetProperty("diagnostics").EnumerateArray())
+                .Select(x => (
+                    Severity: x.GetProperty("severity").GetString()!,
+                    Code: x.GetProperty("code").GetString()!))
+                .Distinct()
+                .ToArray();
+            foreach (var (severity, code) in claimed)
+            {
+                Assert.True(
+                    emitted.Contains((severity, code)),
+                    $"the frozen A-1.12 row's {shortId} arm-{arm} cell claims a {severity} {code}, "
+                    + "which that pair's shortcut compile on that arm does not emit — the row "
+                    + "claims a diagnostic the artifact does not have.");
+            }
         }
 
         Assert.True(seen >= 12, $"expected at least the six pairs' two shortcut cells, saw {seen}");
@@ -350,6 +393,135 @@ public sealed class PpWRowsRegistrationTests
                 $"{directory} names {observing} effect-observing tests; the frozen A-1.12 row "
                 + "publishes the pre-measured escape as exactly 2 per pair.");
         }
+    }
+
+    /// <summary>
+    /// Route (a) — "any unmutated starter fails to reproduce its frozen multiset on its arm" — is
+    /// A-1.12's first NOT-ADJUDICATED route. Its two references have different provenance and the
+    /// pin keeps them apart (#1123 review round 1, M4):
+    /// <list type="bullet">
+    ///   <item><b>Arm B is inherited.</b> The six arm-B starters must reproduce
+    ///   <b>A-1.11.1</b>'s corrected post-E4 control — a byte-frozen entry A-1.12 rests on and may
+    ///   not amend.</item>
+    ///   <item><b>Arm A is A-1.12's own.</b> A-1.11 recorded those <c>Calor0418</c> locations under
+    ///   the pinned FLAGLESS invocation, as <b>errors</b> at <b>exit 1</b>; arm A runs
+    ///   <c>--permissive-effects</c>, where they are <b>warnings</b> at <b>exit 0</b>. Only the
+    ///   positions coincide.</item>
+    /// </list>
+    /// Severity and exit are therefore asserted, not just code and position: a check on codes and
+    /// positions alone cannot tell the pinned invocation from the forbidden one, which is exactly
+    /// how A-1.11's A2 baseline came to be unreproducible (A-1.11.1). Skips until #1123 lands.
+    /// </summary>
+    [SkippableFact]
+    public void StarterCompilesReproduceTheRegisteredRouteAMultisets()
+    {
+        var manifest = Path.Combine(
+            RepositoryRoot(), "bench", "phase0-agent-native", "pairs", "ppw-seeded-compiles.json");
+        Skip.IfNot(
+            File.Exists(manifest),
+            "ppw-seeded-compiles.json is not in the tree yet (branch bench/s3-ppw-rows-pairs, "
+            + "PR #1123, unmerged at A-1.12's registration)");
+
+        // A-1.12's OWN arm-A multisets: same positions as A-1.11's row-less Calor0418s, but
+        // WARNINGS at exit 0 under --permissive-effects, where A-1.11 recorded errors at exit 1.
+        var armA = new Dictionary<string, (int Line, int Column)[]>(StringComparer.Ordinal)
+        {
+            ["W-001"] = [(4, 19), (5, 20)],
+            ["W-002"] = [(7, 22)],
+            ["W-003"] = [(5, 10), (6, 8)],
+            ["W-004"] = [(6, 7)],
+            ["W-005"] = [(25, 27)],
+            ["W-006"] = [(7, 22)],
+        };
+
+        // A-1.11.1's corrected post-E4 control, per arm-B starter: the four A3 fixtures exit 0
+        // with zero diagnostics; A2 is 1x Calor0410 at (23,9) + 2x Calor0411.
+        var armB = new Dictionary<string, (string Code, int Line, int Column)[]>(StringComparer.Ordinal)
+        {
+            ["W-001"] = [],
+            ["W-002"] = [],
+            ["W-003"] = [],
+            ["W-004"] = [],
+            ["W-006"] = [],
+            ["W-005"] = [("Calor0410", 23, 9), ("Calor0411", 26, 24), ("Calor0411", 28, 19)],
+        };
+
+        using var document = JsonDocument.Parse(File.ReadAllText(manifest));
+        var starters = 0;
+        foreach (var compile in document.RootElement.GetProperty("compiles").EnumerateArray())
+        {
+            if (!string.Equals(compile.GetProperty("role").GetString(), "starter", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var shortId = compile.GetProperty("pair").GetString()![..5];
+            var arm = compile.GetProperty("arm").GetString()!;
+            var isArmA = string.Equals(arm, "A", StringComparison.Ordinal);
+            var observed = compile.GetProperty("diagnostics").EnumerateArray()
+                .Select(x => (
+                    Code: x.GetProperty("code").GetString()!,
+                    Severity: x.GetProperty("severity").GetString()!,
+                    Line: x.GetProperty("line").GetInt32(),
+                    Column: x.GetProperty("column").GetInt32()))
+                .OrderBy(x => x.Code, StringComparer.Ordinal)
+                .ThenBy(x => x.Line).ThenBy(x => x.Column)
+                .ToArray();
+
+            // Severity is part of the registered multiset: the forbidden flagless invocation
+            // emits the same codes at the same positions with a different severity and exit.
+            var expected = isArmA
+                ? armA[shortId].Select(x => ("Calor0418", "warning", x.Line, x.Column))
+                    .OrderBy(x => x.Item3).ThenBy(x => x.Item4).ToArray()
+                : armB[shortId]
+                    .Select(x => (x.Code, x.Code == "Calor0410" ? "error" : "warning", x.Line, x.Column))
+                    .OrderBy(x => x.Item1, StringComparer.Ordinal)
+                    .ThenBy(x => x.Item3).ThenBy(x => x.Item4).ToArray();
+
+            Assert.True(
+                observed.SequenceEqual(expected),
+                $"{shortId} arm {arm}'s unmutated starter no longer reproduces the multiset "
+                + (isArmA
+                    ? "REGISTERED BY A-1.12 for arm A (permissive: warnings at exit 0 — NOT A-1.11's "
+                      + "flagless errors)"
+                    : "frozen by A-1.11.1 (the corrected post-E4 control)")
+                + $". Observed [{string.Join(", ", observed)}], registered [{string.Join(", ", expected)}]. "
+                + "That is A-1.12's route (a): NOT-ADJUDICATED, and MISS under the own-goal clause "
+                + "if this workstream caused it.");
+
+            // Exit code is registered too: arm A builds under the waiver, and A2 is the only
+            // arm-B starter that does not.
+            var expectedExit = isArmA ? 0 : (shortId == "W-005" ? 1 : 0);
+            Assert.True(
+                compile.GetProperty("exitCode").GetInt32() == expectedExit,
+                $"{shortId} arm {arm} starter exit code moved; A-1.12 registers {expectedExit}.");
+            starters++;
+        }
+
+        Assert.Equal(12, starters);
+    }
+
+    /// <summary>
+    /// One arm's half of the row's cell-by-cell enumeration for a pair. The cell runs from
+    /// <c>**W-00n** shortcut:</c> to the next pair marker (or the end of the enumeration) and is
+    /// split at <c>; B exit</c>, which is how every cell separates the arms.
+    /// </summary>
+    private static string PairCellHalf(string row, string shortId, bool isArmA)
+    {
+        var start = row.IndexOf($"**{shortId}** shortcut:", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"the frozen A-1.12 row does not enumerate {shortId}'s shortcut cell");
+        var next = PairDirectories
+            .Select(p => row.IndexOf($"**{p.Pair}** shortcut:", StringComparison.Ordinal))
+            .Where(i => i > start)
+            .DefaultIfEmpty(-1)
+            .Min();
+        var stop = next > start ? next : row.IndexOf("Every **clean** solution", StringComparison.Ordinal);
+        Assert.True(stop > start, $"could not bound {shortId}'s cell");
+        var cell = row[start..stop];
+
+        var split = cell.IndexOf("; B exit", StringComparison.Ordinal);
+        Assert.True(split > 0, $"{shortId}'s cell does not separate the arms with \"; B exit\"");
+        return isArmA ? cell[..split] : cell[split..];
     }
 
     /// <summary>
