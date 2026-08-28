@@ -806,6 +806,7 @@ public class BuildStateCacheTests : IDisposable
             },
             new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, Verbose = true },
             new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, EnforceEffects = false },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, PermissiveEffects = true },
             new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, TypeCheck = false },
             new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, Verify = true },
             new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, EnableILAnalysis = true },

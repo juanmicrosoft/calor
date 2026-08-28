@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
   "did not converge" for such a file instead of recording half-finished rows. (v0.16 W5,
   gate 11)
 
+- New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
+
 ### Changed
 
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code

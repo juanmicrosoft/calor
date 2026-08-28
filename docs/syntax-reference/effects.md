@@ -478,6 +478,24 @@ Or in MSBuild:
 </PropertyGroup>
 ```
 
+A gentler step for converted code keeps enforcement on but relaxes what the compiler
+assumes about calls it cannot resolve — the CLI's `--permissive-effects`, or in MSBuild:
+
+```xml
+<PropertyGroup>
+  <CalorPermissiveEffects>true</CalorPermissiveEffects>
+</PropertyGroup>
+```
+
+The default is `false` (strict). Under the permissive policy unknown calls are assumed pure,
+so `Calor0411` (unknown external call) and `Calor0425` ("cannot be decided") are suppressed,
+and `Calor0410` — "uses effect X but does not declare it" — is reported as a warning, in the
+per-file pass and in the cross-module pass alike.
+
+It does **not** waive a row the code states and then contradicts: `Calor0424` (a row that
+does not fit) and `Calor0420` / `Calor0421` (an override or interface implementation that
+**broadens** the effects it inherited; narrowing is legal) remain errors under every flag.
+
 ---
 
 ## Next

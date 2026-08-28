@@ -83,7 +83,7 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 98,
+      "expectedTotal": 111,
       "expectedSkipped": 0
     },
     {

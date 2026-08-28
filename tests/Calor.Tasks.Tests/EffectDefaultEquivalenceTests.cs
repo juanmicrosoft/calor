@@ -46,16 +46,5 @@ public sealed class EffectDefaultEquivalenceTests
             match.Groups[1].Value);
     }
 
-    private static string FindSdkTargets()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir != null)
-        {
-            var candidate = Path.Combine(dir, "src", "Calor.Sdk", "Sdk", "Sdk.targets");
-            if (File.Exists(candidate)) return candidate;
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        throw new InvalidOperationException("src/Calor.Sdk/Sdk/Sdk.targets not found above " + AppContext.BaseDirectory);
-    }
+    private static string FindSdkTargets() => RepoPaths.SdkFile("Sdk.targets");
 }
