@@ -1,0 +1,92 @@
+{
+  "id": "W-004-counter-peek",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-004, A3-callback)",
+  "class": "blind",
+  "legB": true,
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Peek_IsSilent_OnFreshCounter",
+      "Peek_IsSilent_AfterBump"
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A3-callback.calr",
+        "sha": "f2dca4a6a71e28266e27ccfd56e4d2a06bc5fd79"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d)",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A3-callback.calr",
+        "sha": "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    },
+    "unregistered-this-qualified-escape": {
+      "b": "seeded/unregistered-this-qualified-escape-b",
+      "note": "a CHARGED control: §C{this.onChange} INVOKES the this.-qualified field rather than passing it. Arm B: error Calor0410 'uses effect unknown' plus Calor0411 — invoking is charged, passing as a row-instantiating argument is not. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    }
+  },
+  "extension": "a new pure §MT{mt002:Peek} §E{} invoking onChange (Bump is §E{cw} in both blobs; the field row §E{cw} exists in B only — A's field has no row)",
+  "expectedEmissionOnShortcut": {
+    "a": "two Calor0418 warnings on onChange — no Calor0410",
+    "b": "error Calor0410: 'Peek' uses 'cw'"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "observer installed in the field",
+    "question": "the final source INSTALLS an observer in the §FLD{Action<i32>:onChange:pri} field (a §CTOR assignment), rather than printing directly from Bump",
+    "sourceRegex": "§CTOR[\\s\\S]{0,400}?§ASSIGN\\s+(this\\.)?onChange\\b",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "The frozen starter already DECLARES the field, so an indicator keyed on the declaration would read 'shape realized' on a workspace where the agent wrote nothing — vacuous exactly where it is needed, since W-004 is one of the three blind cells the verdict is read on. The starter has no constructor and never installs an observer, so the assignment is what distinguishes a realized cell from one where the agent printed straight from Bump and left the callback unwired — in which case a null escape rate says nothing about rows. Recorded, never scored."
+  }
+}

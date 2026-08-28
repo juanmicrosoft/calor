@@ -1,0 +1,30 @@
+§M{m001:MiddlewareAfter}
+  §F{f001:RunTwice:pub} (Func<i32>:g) -> i32
+    §E{}
+    §B{first:i32} §C{g}
+    §B{second:i32} §C{g}
+    §R (+ first second)
+
+  §F{f002:Beat:pub} () -> i32
+    §E{cw}
+    §P "beat"
+    §R INT:1
+
+  §IFACE{i001:IPipelineBehavior}
+    §MT{mt001:Handle} (i32:request, Func<i32>:next) -> i32
+      §E{}
+
+  §CL{c001:RetryBehavior:pub}
+    §IMPL{IPipelineBehavior}
+    §FLD{Func<i32>:stage:pri}
+    §CTOR{ctor001:pub} ()
+      §ASSIGN stage MiddlewareAfterModule.Beat
+    §MT{mt002:Handle:pub} (i32:request, Func<i32>:next) -> i32
+      §E{}
+      §R §C{RunTwice} §A next §/C
+    §MT{mt003:Twice:pub} () -> i32
+      §E{}
+      §R §C{RunTwice} §A stage §/C
+    §MT{mt004:Probe:pub} () -> i32
+      §E{cw}
+      §R §C{RunTwice} §A stage §/C

@@ -36,8 +36,9 @@ namespace Calor.Compiler.Tests;
 /// <para><b>Denominator.</b> Every committed <c>.calr</c> under the repository
 /// root, with the same exclusions <c>HigherOrderDemandLedgerTests</c>'s D-A leg
 /// uses (<c>bin/</c>, <c>obj/</c>, <c>.git/</c>, <c>.claude/</c>,
-/// <c>node_modules/</c>, the <c>bench/corpus/</c> submodules, and
-/// <c>docs/design/spikes/</c> artifacts), partitioned into SUBJECTS by
+/// <c>node_modules/</c>, the <c>bench/corpus/</c> submodules,
+/// <c>docs/design/spikes/</c> artifacts, and the PP-W-rows measurement fixtures
+/// and epoch archives <see cref="PpwFixture"/> names), partitioned into SUBJECTS by
 /// top-level directory. Each file is lexed, parsed, and run through
 /// <see cref="EffectEnforcementPass"/> under
 /// <see cref="UnknownCallPolicy.Strict"/> with a hermetic
@@ -87,7 +88,9 @@ public class EffectResolverKeyLedgerTests
 
     private const string ScopeText =
         "Every committed .calr under the repository root (bin/, obj/, .git/, .claude/, "
-        + "node_modules/, bench/corpus/ submodules and docs/design/spikes/ artifacts excluded; "
+        + "node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the "
+        + "PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, "
+        + "roadmap v0.16 §4.1) excluded; "
         + "nothing else filtered), partitioned into subjects by top-level directory. Each file is "
         + "lexed with TokenizeAllForParser and parsed, then run through EffectEnforcementPass "
         + "with UnknownCallPolicy.Strict and a hermetic EffectResolver (built-in manifests only; "
@@ -316,16 +319,6 @@ public class EffectResolverKeyLedgerTests
     }
 
 
-    /// <summary>
-    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
-    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
-    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
-    /// The per-arm starters beside them are NOT matched and stay counted.
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
-        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
-
     private static List<string> EnumerateCalorFiles(string root)
     {
         // Filter on REPO-RELATIVE paths, for the reason HigherOrderDemandLedgerTests
@@ -346,25 +339,15 @@ public class EffectResolverKeyLedgerTests
                 return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
-                    // Harness scratch that is not product corpus, excluded like the spike
-                    // artifacts above: templates/ = the arm csproj template and the
-                    // permissive canary (v0.16 W1), and the PP-W-rows SEEDED mutants
-                    // (pairs/W-00x-*/seeded/, S3 (c)). The per-arm starters stay counted: they
-                    // are ordinary programs, and §4.1 route (a) rests on them.
-                    // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
-                    // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
-                    // starters enter the census and the seeded mutants do not. What is NOT yet
-                    // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
-                    // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
-                    // `§FLD ... §E{...}`, and
-                    // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
-                    // asserts that ZERO committed .calr write those forms. So when #1123 lands that
-                    // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
-                    // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
-                    // the narrow one either way: widening it to the whole pair family would silently
-                    // exempt ordinary programs from the corpus bar.
+                    // Harness scratch that is not product corpus, excluded the way docs/design/spikes/ is:
+                    // (1) templates/ — the arm csproj template and the permissive canary run-pair.sh compiles
+                    //     before a pre-rows epoch (v0.16 W1), a program written to draw Calor0410;
+                    // (2) the PP-W-rows fixtures and epoch archives PpwFixture names (roadmap v0.16 §4.1,
+                    //     S3 (c)). W1 landed the seeded-only form and asked for the STARTERS to be
+                    //     dispositioned when the pairs landed; PpwFixture records that disposition and why
+                    //     the other two options it listed are unavailable. Counts are unchanged either way.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !PpwSeededFixture.IsMatch(rel);
+                    && !PpwFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

@@ -65,6 +65,9 @@ All notable changes to this project will be documented in this file.
   counts what an agent did on each turn (reads, searches, builds, edits) once the next benchmark
   saves those transcripts. A test fails if the committed numbers drift or an archived run goes
   missing.
+- Benchmark: added six programming tasks we will use to find out whether the effect labels added in 0.15 stop an AI agent from hiding a console message inside a function that says it is silent. Each task comes with the same starting program built for the old compiler (0.14.3) and the new one (0.15.0), a plain-language description, hidden tests that catch the message if it escapes, and two worked answers — the tempting shortcut and the honest fix. We also recorded what each compiler says about every one of those answers, so the numbers are fixed before anyone runs the experiment. Nothing is run yet.
+- Found while building the above: on 0.15.0, when you hand a stored callback to another function and the compiler cannot tell exactly which stored callback you meant — you wrote `this.` in front of it, you kept it in a property instead of a field, or it came from a parent class — the compiler stops tracking what that callback is allowed to do. It warns instead of stopping the build, and the hidden message gets through. Reported as issue #1136.
+- Also found: a class that inherits from another class can no longer call the plain functions in its own module by their short name — the generated C# does not compile. Writing the full name works around it. Reported as issue #1137.
 
 ### Changed
 

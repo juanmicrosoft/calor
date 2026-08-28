@@ -1,0 +1,113 @@
+{
+  "id": "W-001-middleware-stage",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-001, A3-middleware)",
+  "class": "blind",
+  "legB": true,
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Twice_IsSilent_OnFreshBehavior",
+      "Twice_IsSilent_AfterProbe"
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A3-middleware.calr",
+        "sha": "2d351d101f5972cf1f5c4cb5640be3bd2870974f"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d)",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+        "sha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    },
+    "sibling-W-001s": {
+      "a": "seeded/sibling-w001s-a",
+      "b": "seeded/sibling-w001s-b",
+      "note": "published sibling, not adjudicated; see sibling-W-001s.md"
+    },
+    "unregistered-this-qualified-escape": {
+      "b": "seeded/unregistered-this-qualified-escape-b",
+      "note": "the registered shortcut with ONE token changed in Twice — §A this.stage instead of §A stage. Arm B: warning Calor0425, exit 0, nothing charged; runtime 2 of 7 held-out tests escape on a workspace that built. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    },
+    "unregistered-property-backed-escape": {
+      "b": "seeded/unregistered-property-backed-escape-b",
+      "note": "the same laundering with a §PROP{p001:Stage:Func<i32>:pub:get,set} instead of the §FLD, passed by SIMPLE NAME (§A Stage — no receiver at all). Arm B: 1x warning Calor0425 (27,10), exit 0, runtime 2 of 7. A §PROP also cannot carry a row (§PROP{...} §E{cw} is 4x error Calor0100; ParseProperty never consumes an Effects token and PropertyNode has no effects member), so this cell is Unknown by construction and #1136's proposed fix is unimplementable for properties. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    },
+    "unregistered-resolvable-alias-control": {
+      "b": "seeded/unregistered-resolvable-alias-control-b",
+      "note": "a CHARGED control: the rowed §FLD aliased to a local (§B{s:Func<i32>} stage) and passed as §A s. Arm B: error Calor0410 'Twice' uses effect 'cw'. A local bound from the FIELD is charged; a local bound from `this` (§B{me:Holder} this, then §A me.stage) escapes — measured. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    },
+    "unregistered-other-receiver-escape": {
+      "b": "seeded/unregistered-other-receiver-escape-b",
+      "note": "a §FLD on ANOTHER INSTANCE of the same class: TwiceOf takes a RetryBehavior parameter and passes §A other.stage. Arm B: warning Calor0425 (30,10), exit 0 — it escapes, though the declaration is in the enclosing class, which is what withdrew the second one-line rule. The same file's Twice passes the same field by simple name and IS charged (declared §E{cw} here so the file builds). No §NEW in either method, deliberately. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    },
+    "unregistered-method-group-receiver-escape": {
+      "b": "seeded/unregistered-method-group-receiver-escape-b",
+      "note": "an INSTANCE METHOD GROUP with a parameter receiver: TwiceOf takes a Ticker and passes §A ticker.Beat, where Ticker.Beat is §E{cw}. Arm B: warning Calor0425 (30,10), exit 0 — it escapes. An earlier measurement called this shape 'fails closed'; that fixture allocated the receiver with §NEW in the constructor, and the Calor0410 it drew was for 'alloc', not the callback's 'cw'. This fixture has no §NEW and no other member, so it records one fact. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    }
+  },
+  "extension": "a field-stored stage §FLD{Func<i32>:stage:pri} (row §E{cw} on arm B) passed to RunTwice from a new pure §MT{mt003:Twice} §E{}",
+  "expectedEmissionOnShortcut": {
+    "a": "only the pre-existing Calor0418 warnings on g — no Calor0410",
+    "b": "error Calor0410: 'Twice' uses 'cw'"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "field- or property-stored stage",
+    "question": "the final source keeps the step as class state — a function-typed §FLD or §PROP in RetryBehavior — and Twice passes it to RunTwice",
+    "sourceRegex": "(§FLD\\{Func<i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}|§PROP\\{[^}]*:Func<i32>[^}]*\\})",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "This cell is blind only when the step is stored as class state: arm A cannot see through a rowed field or property, arm B charges through it. The natural spellings are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling can land on the W-001s lambda shape instead, which arm A WARNS about, silently degrading this cell to warning-vs-error at run time. The regex accepts a §PROP as well as a §FLD because the property realization is equally idiomatic and equally launders on arm B (#1136); counting it as 'shape not realized' would confuse the two questions. Recorded, never scored."
+  }
+}

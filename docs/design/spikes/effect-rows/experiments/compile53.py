@@ -34,6 +34,12 @@ os.makedirs(OUT, exist_ok=True)
 os.chdir(ROOT)
 
 files = subprocess.run(["git","ls-files","*.calr"],capture_output=True,text=True).stdout.split()
+# PP-W-rows measurement fixtures (roadmap v0.16 §4.1) are excluded here for the reason
+# facts.py excludes the spike artifacts: frozen per-arm starters, their seeded mutants and
+# a PP-W epoch's per-run archives are measurement inputs, not corpus. None of them writes
+# the two-line §O/§E form this script compiles, so the transcript is unchanged today.
+PPW = re.compile(r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-[0-9]{3}-")
+files = [f for f in files if not PPW.match(f)]
 hits=[]
 for f in files:
     L=open(f,encoding="utf-8",errors="replace").read().split("\n")

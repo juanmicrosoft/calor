@@ -16,9 +16,24 @@ namespace Calor.Compiler.Tests;
 /// committed .calr writes any of those forms</b>. §3.2 measured it once, by hand,
 /// at one commit.</para>
 ///
-/// <para>This test keeps measuring it. If someone adds a file using a same-line
-/// <c>§E</c>, the meaning of that file changed under this feature and the change has
-/// to be looked at rather than discovered later.</para>
+/// <para>This test keeps measuring it <b>over the swept corpus</b>. If someone adds a
+/// file using a same-line <c>§E</c>, the meaning of that file changed under this feature
+/// and the change has to be looked at rather than discovered later.</para>
+///
+/// <para><b>What is deliberately outside the sweep, stated rather than implied.</b> Two
+/// fixture sets are excluded because rows are their subject matter, not an accident:
+/// <c>docs/design/spikes/</c> (the emitter spike's before/after evidence) and the
+/// PP-W-rows measurement fixtures and epoch archives <see cref="PpwFixture"/> names.
+/// Measured on this PR's tree, with the walker's complete filter (spikes, templates,
+/// PP-W): <b>936 files are swept</b> — the number the count assert pins — and <b>39
+/// excluded files do write a meaning-changing form</b>: 8 spike artifacts, 0 under
+/// templates/, and 31 PP-W-rows fixtures (the
+/// per-arm <c>after/</c> starters carry inline parameter rows verbatim, and the seeded
+/// mutants carry field and binding rows). That number grows with every PP-W-rows epoch
+/// archive. The disposition is deliberate: those files were authored under the line rule
+/// as inputs to a measurement, so they are not regressions of §3.2's claim, and sweeping
+/// them would turn the pin into a permanent red. Nothing outside these two sets is
+/// exempt.</para>
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
 /// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
@@ -176,18 +191,12 @@ public sealed class EffectRowCorpusShapeTests
     /// <c>docs/design/spikes/</c> is excluded for the same reason
     /// <c>HigherOrderDemandLedgerTests</c>, <c>LosslessFormattingTests</c> and
     /// <c>facts.py</c> exclude it (§13.5(b)): the emitter spike commits before/after
-    /// .calr fixtures as EVIDENCE, and they are deliberately full of rows.
+    /// .calr fixtures as EVIDENCE, and they are deliberately full of rows. The
+    /// PP-W-rows measurement fixtures and epoch archives <see cref="PpwFixture"/>
+    /// names are excluded by the same rule and for the same reason — they are those
+    /// fixtures again, as per-arm starters plus seeded mutants. The class summary
+    /// records how many excluded files actually write a meaning-changing form.
     /// </summary>
-
-    /// <summary>
-    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
-    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
-    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
-    /// The per-arm starters beside them are NOT matched and stay counted.
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
-        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static IReadOnlyList<string> CommittedCalrFiles(string root)
     {
@@ -206,29 +215,15 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
-            // Harness scratch that is not product corpus, excluded exactly the way
-            // docs/design/spikes/ is: (1) templates/ — the arm csproj template and the
-            // permissive canary run-pair.sh compiles before a pre-rows epoch (v0.16 W1), a
-            // program written to draw Calor0410; (2) the PP-W-rows SEEDED mutants
-            // (pairs/W-00x-*/seeded/, S3 (c)) — the spike blobs plus deliberate laundering
-            // shortcuts. The per-arm STARTERS are deliberately NOT excluded: they are
-            // ordinary programs, the same bar applies to them as to every other pair
-            // fixture, and §4.1 route (a) depends on them, so they keep the automatic
-            // round-trip and effect-row-shape check. `W-\d{3}` rather than `W-00` so W-010+ is covered.
-            // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
-            // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
-            // starters enter the census and the seeded mutants do not. What is NOT yet
-            // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
-            // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
-            // `§FLD ... §E{...}`, and
-            // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
-            // asserts that ZERO committed .calr write those forms. So when #1123 lands that
-            // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
-            // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
-            // the narrow one either way: widening it to the whole pair family would silently
-            // exempt ordinary programs from the corpus bar.
+            // Harness scratch that is not product corpus, excluded the way docs/design/spikes/ is:
+            // (1) templates/ — the arm csproj template and the permissive canary run-pair.sh compiles
+            //     before a pre-rows epoch (v0.16 W1), a program written to draw Calor0410;
+            // (2) the PP-W-rows fixtures and epoch archives PpwFixture names (roadmap v0.16 §4.1,
+            //     S3 (c)). W1 landed the seeded-only form and asked for the STARTERS to be
+            //     dispositioned when the pairs landed; PpwFixture records that disposition and why
+            //     the other two options it listed are unavailable. Counts are unchanged either way.
             .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
-            .Where(line => !PpwSeededFixture.IsMatch(line))
+            .Where(line => !PpwFixture.IsMatch(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }
