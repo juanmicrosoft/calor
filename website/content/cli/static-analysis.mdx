@@ -52,7 +52,7 @@ calor -i MyModule.calr --analyze --verify --permissive-effects
 |:-------|:------------|
 | `--analyze` | Enable static analysis (dataflow, bug patterns, taint tracking) |
 | `--all-findings` | Report all findings including inconclusive and low-confidence results |
-| `--permissive-effects` | Recommended for converted code: suppresses unknown-effect warnings |
+| `--permissive-effects` | For converted code: a call the compiler cannot look up is assumed to do nothing, so `Calor0411` and `Calor0425` go unreported and `Calor0410` becomes a warning ([details](/docs/syntax-reference/effects/#turning-the-checks-down)) |
 | `--verification-timeout` | Z3 solver timeout per check in milliseconds (default: 5000) |
 | `--verbose` | Show analysis summary (functions analyzed, patterns found) |
 

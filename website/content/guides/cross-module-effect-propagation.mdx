@@ -80,9 +80,18 @@ If A calls B, and B calls C, the cross-module pass checks **each boundary indepe
 
 It does **not** transitively require A to cover C's effects directly. Each module's `§E` is its contract — if B declares `db:w`, A only needs to declare `db:w` too, regardless of whether that `db:w` came from B's body or from B's own call to C.
 
-### Violations are always errors
+### Violations are errors, unless you waive them
 
-Per-file Permissive mode (`--permissive-effects`) demotes *unknown* external calls from errors to warnings, because there's genuine uncertainty about what an unknown `.NET` call does. Cross-module Calor calls have **no such uncertainty** — the callee's declared effects are known and explicit — so cross-module violations are always reported as errors regardless of the mode.
+By default a cross-module violation is an error: the callee's declared effects
+are known and explicit, so there is no uncertainty to be generous about.
+
+`--permissive-effects` (in a project file,
+`CalorPermissiveEffects`) reaches this pass too, and reports these
+violations as warnings rather than errors — the same treatment it gives
+`Calor0410` inside a single file. It does not silence them, and it does not
+touch the checks on effects you wrote down yourself: `Calor0424`, `Calor0420`,
+and `Calor0421` stay errors under every flag. See
+[Effects](/docs/syntax-reference/effects/#turning-the-checks-down).
 
 ---
 

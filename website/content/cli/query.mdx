@@ -1,0 +1,269 @@
+---
+title: "query"
+section: "cli"
+order: 9
+description: "Ask the project index who calls what, what a change could break, and what effects a declaration has"
+---
+
+Ask the project index about your code.
+
+```bash
+calor query <facet> <name> [options]
+```
+
+`calor query` answers questions you would otherwise answer by reading every
+file: who calls this function, what does it call, what could break if I change
+it, and does it really do what it says it does. It reads the answers out of a
+saved index, so asking is fast and the answer does not depend on which files you
+happen to have open.
+
+Two rules run through the whole command:
+
+- **An out-of-date index never answers.** It is rebuilt first, or the query
+  refuses. A stale answer that looks fresh is worse than no answer.
+- **Every answer says what it could not account for.** If the index could not
+  work out where a call goes, the answer says so instead of quietly leaving it
+  out.
+
+---
+
+## The Index
+
+The index lives in `obj/calor/.calor-index.json` under your project. Two
+commands manage it:
+
+```bash
+calor index build           # build it (defaults to the current directory)
+calor index status          # say whether it is still current
+```
+
+| Command | Options | Description |
+|:--------|:--------|:------------|
+| `calor index build [path]` | `--output` | Index every `.calr` file under `path`. `--output` writes it somewhere other than `<path>/obj/calor`. |
+| `calor index status [path]` | `--output` | Report whether the saved index still matches your sources. |
+
+You rarely need to run `build` yourself. If `calor query` finds the index
+missing or out of date, it rebuilds it and answers from the fresh one. Pass
+`--no-build` to have it refuse instead — useful in CI, or when you are timing
+how long a query takes and do not want a build hiding in the number.
+
+The index is out of date whenever your source files, the compiler, the
+compilation options, or an effect manifest have changed since it was written.
+
+Files under `obj/` and `bin/` are skipped.
+
+---
+
+## Facets
+
+Each question is a subcommand, called a facet. All of them take the **name** of
+a declaration:
+
+| Facet | Answers | `--json` |
+|:------|:--------|:---------|
+| `calor query symbol <name>` | Where a name is declared | — |
+| `calor query callers <name>` | What calls it | Yes |
+| `calor query callees <name>` | What it calls | Yes |
+| `calor query impact <name>` | What a change to it could affect | Yes |
+| `calor query contracts <name>` | The contracts written on it | — |
+| `calor query assumptions <name>` | The assumptions in force for it | — |
+| `calor query effects <name>` | What effects it declares, what the compiler worked out it really does, and whether the two agree | Yes |
+
+### Shared options
+
+| Option | Description |
+|:-------|:------------|
+| `--project` | Project directory; defaults to `.` |
+| `--in-file` | Which file you meant, when several files declare the same name |
+| `--no-build` | Refuse a missing or out-of-date index instead of rebuilding it |
+| `--json` | Return the answer as data instead of text. Available on `callers`, `callees`, `impact`, and `effects` only. |
+
+### Extra Options on impact
+
+| Option | Description |
+|:-------|:------------|
+| `--file` | Treat the subject as a whole changed **file** rather than one declaration |
+| `--effects` | Ask which callers would stop compiling if the declaration's effects changed |
+| `--row` | With `--effects`: the effects it would have after the change, written as comma-separated codes (`"cw,fs:w"`, or `""` for none). Defaults to what it declares today. |
+
+`--effects` and `--file` cannot be used together: one asks about a single
+declaration's effects, the other about a whole file.
+
+---
+
+## Examples
+
+### Who calls this?
+
+```bash
+calor query callers Log
+```
+
+```
+  app.calr:11:11 function Leaky
+  app.calr:17:11 function Fan
+query: 2 caller(s) of app.calr:8:11 function Log
+```
+
+`callees` reads the same way, in the other direction.
+
+### What could a change break?
+
+```bash
+calor query impact Log
+```
+
+```
+  app.calr:11:11 function Leaky
+  app.calr:17:11 function Fan
+  app.calr:23:11 function Main
+impact: 3 declaration(s) in 1 file(s) affected by a change to app.calr:8:11 function Log
+```
+
+This follows calls all the way up, not just the direct callers — `Main` is
+here because it calls `Fan`, which calls `Log`. To ask about a
+whole file instead, name the file and add `--file`; the answer then covers
+everything that reaches anything in it, and says so:
+
+```
+impact: file-grained — a change to ANY declaration in this file implicates all of these. Ask about a declaration for a precise answer.
+```
+
+### Does it do what it says?
+
+```bash
+calor query effects Leaky
+```
+
+```
+  app.calr:11:11 function Leaky
+    declared: [pure]
+    inferred: cw
+    verdict:  does not fit — Calor0410 fires (undeclared: cw)
+query: effect row of app.calr:11:11 function Leaky — declared [pure], inferred cw, does not fit — Calor0410 fires (undeclared: cw)
+```
+
+`declared` is what the `§E{…}` line says. `inferred` is what the compiler
+worked out the body really does. The verdict is the same judgement the compiler
+makes when it builds, read from the same place — so the query and the build can
+never disagree. If the compiler had to assume something, the answer says what it
+assumed and why.
+
+### What would break if the effects changed?
+
+```bash
+calor query impact Log --effects --row fs:w
+```
+
+```
+  app.calr:11:11 function Leaky — declares [pure]: does-not-fit
+  app.calr:17:11 function Fan — declares cw: does-not-fit
+  app.calr:23:11 function Main — declares (no row recorded): cannot-tell
+impact: 2 of 3 affected declaration(s) would stop fitting a row of fs:w on app.calr:8:11 function Log
+impact: 1 of 3 cannot tell — no declared row the index could compare against
+```
+
+That asks: if `Log` were allowed to write files, which of the functions that
+reach it would stop compiling? Leave `--row` off to ask about the effects it
+already declares — the answer then says `(its current declared row)` after the
+effects it used.
+
+A caller the index has no recorded effects for is counted as **cannot tell**,
+never as broken. Only a definite "does not fit" is counted in the first number.
+
+---
+
+## JSON Output
+
+`callers`, `callees`, `impact`, and `effects` accept `--json`. The answer comes
+back in the shared [envelope](/docs/cli/envelope-schema/) — schema version
+`2.0`, with `command` set to `"query"` and the answer under `data`:
+
+```json
+{
+  "version": "2.0",
+  "command": "query",
+  "diagnostics": [],
+  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
+  "data": {
+    "facet": "effects",
+    "subject": "app.calr:11:11 function Leaky",
+    "rows": [ ... ],
+    "partial": false
+  }
+}
+```
+
+Because `command` is `"query"` for every facet, the `data.facet` field is what
+tells a program which answer it is holding. Its values are `callers`, `callees`,
+`impact`, `impact-effects` (that is `impact --effects`), and `effects`.
+
+The text output of every facet is unchanged from 0.15, character for character.
+`--json` on `callers`, `callees`, and `impact` is new in 0.16, as are the
+`facet` field and the `residual` object below; nothing was removed or renamed.
+
+The other three facets — `symbol`, `contracts`, and `assumptions` — are text
+only.
+
+---
+
+## Partial Answers
+
+Calor binds one file at a time, so a call can be matched to a declaration only
+when exactly one declaration bears that name. When the index could not place
+something, the answer says so rather than dropping it:
+
+```
+query: PARTIAL — this answer may be incomplete. Calor binds one file at a time, so a call resolves only when exactly one declaration bears the name:
+  unresolved call: app.calr: Helper
+  ambiguous name: Run (several declarations share it)
+  unreadable file: broken.calr (nothing in it is indexed)
+```
+
+That list is the **residual**: everything the index could not account for. In
+`--json` output it is the `residual` object, and it appears only when `partial`
+is `true`. It holds `unresolvedCalls`, `ambiguousCallees`, `unreadableFiles`,
+and `effectRowsUnavailable`.
+
+"3 callers" printed over a silently dropped fourth is the mistake this is here
+to prevent. Read the residual before you trust a count.
+
+---
+
+## When It Refuses
+
+Every refusal below exits with code `1`.
+
+| Message | What happened |
+|:--------|:--------------|
+| `Error: directory not found: <path>` | `--project` points at nothing. |
+| `Error: no .calr files under <path>` | There is nothing to index. |
+| `Error: index unusable — <reason>.` | You passed `--no-build` and the index is missing or out of date, so it was not rebuilt. The message ends by telling you to run `calor index build` or drop `--no-build`. The reason is one of: no index has been built; the index file could not be read; the index format version changed; the compiler's semantics version changed; the compiler changed; the compilation options changed; an effect manifest changed; the source files changed. |
+| `query: no declaration named '<name>'` | Nothing in the index has that name. `impact` says the same thing and adds `Use --file to ask about a file.` |
+| `Error: '<name>' is declared in N places; narrow it with --in-file:` | Several files declare that name. The candidates are listed underneath; pick one with `--in-file`. |
+| `Error: '<file>' is not an indexed source file.` | `impact --file` was given a path the index does not cover. |
+| `Error: --effects asks about one declaration's row; it cannot be combined with --file.` | Use one or the other. |
+| `Error: --row '<row>' is not a row of effect codes: ...` | `--row` must be comma-separated effect codes, such as `cw,fs:w`. |
+| `Error: no effect row is recorded for <declaration>; pass --row to ask about a hypothetical one.` | `--effects` with no `--row`, on a declaration that has no recorded effects to fall back on. |
+| `query: no effect row for <declaration> — <reason>` | The `effects` facet has nothing to report. Only functions, methods, constructors, accessors, and parameters or returns carrying a row have effects to show. |
+
+One quirk worth knowing: `calor query effects` on a declaration with no recorded
+effects exits `1` in text mode but `0` with `--json`, where the empty `rows`
+list and the `unavailable` reason carry the same fact.
+
+---
+
+## For AI Agents
+
+The same four `--json` facets are available over the MCP server as the
+`calor_query` tool, which reads the same index through the same code and returns
+byte-identical answers. See [calor mcp](/docs/cli/mcp/#the-calor-query-tool).
+
+---
+
+## See Also
+
+- [calor mcp](/docs/cli/mcp/) - the same questions, for coding agents
+- [Effects](/docs/syntax-reference/effects/) - what the effect rows in `query effects` mean
+- [calor verify](/docs/cli/verify/) - `query contracts` reports what is written, not what is proved
+- [Envelope schema](/docs/cli/envelope-schema/) - the shape of `--json` output

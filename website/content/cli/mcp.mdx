@@ -16,7 +16,7 @@ calor mcp --stdio --root /absolute/project/path
 |:-------|:------------|
 | `--stdio` | Use standard input/output; enabled by default |
 | `--verbose`, `-v` | Write debug logs to stderr |
-| `--root` | Confine project sessions and file writes to this directory |
+| `--root` | Confine project sessions, file writes, and index queries to this directory |
 
 Pin `--root` in harnesses and CI. Without it, write confinement falls back to
 the server process's working directory, which depends on how the client starts
@@ -39,7 +39,7 @@ assuming names from pre-consolidation documentation.
 | `calor_help` | Syntax, support, diagnostic, and example lookup |
 | `calor_navigate` | Definition, reference, symbol, type, and scope queries |
 | `calor_structure` | Outline, call graph, and change-impact analysis |
-| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effect row) could break, and its declared vs inferred effect row — byte-identical to `calor query` |
+| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effect row) could break, and its declared vs inferred effect row — byte-identical to [`calor query`](/docs/cli/query/) |
 | `calor_edit_preview` | Classify a proposed edit as safe, warning-bearing, or breaking |
 | `calor_format` | Format source or check/assign declaration IDs |
 | `calor_session_open` | Parse a project and return a session for cross-file checks |
@@ -53,6 +53,82 @@ assuming names from pre-consolidation documentation.
 Diagnostic-producing tools use the shared [schema 2.0 envelope](/docs/cli/envelope-schema/)
 inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`.
+
+## The calor_query Tool
+
+New in 0.16. This tool answers questions about how your code fits together by
+reading the [project index](/docs/cli/query/) — the same file `calor index build`
+writes and `calor query` reads. It runs no analysis of its own, so an agent and a
+person at the terminal always get the same answer, character for character.
+
+| Input | Required | Description |
+|:------|:---------|:------------|
+| `projectDirectory` | Yes | The folder whose `.calr` files the index covers. Must be inside the server's root. |
+| `facet` | Yes | `callers`, `callees`, `impact`, or `effects` |
+| `symbol` | Yes | The name of the declaration you are asking about |
+| `inFile` | No | Which file you meant, when several files declare the same name |
+| `effects` | No | `impact` only: ask which callers would stop compiling if the declaration's effects changed |
+| `row` | No | With `effects: true`: the effects it would have after the change, such as `"cw,fs:w"` (`""` means "no effects"). Defaults to what it declares today. |
+| `noBuild` | No | Refuse an out-of-date index instead of rebuilding it |
+| `indexPath` | No | Read an index from somewhere other than `obj/calor`. Read-only — see below. |
+| `format` | No | `json` (the default) returns the same document `calor query … --json` prints; `text` returns the lines `calor query` prints |
+
+```json
+{
+  "name": "calor_query",
+  "arguments": {
+    "projectDirectory": "/work/myapp",
+    "facet": "impact",
+    "symbol": "Log",
+    "effects": true,
+    "row": "fs:w"
+  }
+}
+```
+
+That asks: if `Log` started writing files, which of the functions that reach it
+would stop compiling? Ask `facet: "callers"` for who calls it, `"callees"` for
+what it calls, and `"effects"` for what a declaration says it does next to what
+the compiler worked out it really does.
+
+The four facets are the four `calor query` facets that support `--json`. The
+CLI has three more — `symbol`, `contracts`, and `assumptions` — and whole-file
+impact (`calor query impact <file> --file`) is command-line only.
+
+### Where it may look, and what it may write
+
+Answering can mean rebuilding the index, and rebuilding writes to disk. So this
+tool is confined exactly like `calor_file_write`:
+
+- `projectDirectory` must be inside the folder you started the server on
+  (`calor mcp --root /absolute/project/path`). The path is resolved first —
+  symlinks and `..` are followed — and then checked, so it cannot step outside.
+  Without `--root`, the root is the server process's working directory, which
+  depends on how your client launched it. Pin it.
+- If the index is missing or out of date, the tool rebuilds it and answers from
+  the fresh one. Pass `noBuild: true` to have it refuse instead; that setting
+  never writes anything.
+- `indexPath` is **read-only**. It lets you point at an index built elsewhere
+  with `calor index build --output <dir>`, and it must also be inside the root.
+  Nothing is ever written through it: if the index it names is missing or out of
+  date, the tool refuses and tells you to rebuild it yourself rather than
+  writing over a directory you only meant to read.
+
+An out-of-date index is never answered from. Every answer says when it may be
+incomplete and why — see [residuals](/docs/cli/query/#partial-answers).
+
+## calor_compile Options
+
+`calor_compile` takes an `options` object. The ones added in 0.16:
+
+| Option | Default | Description |
+|:-------|:--------|:------------|
+| `crossModule` | `false` | Batch mode only. Compile the whole file set as one project, the way `calor -i a.calr -i b.calr` does, so effects are checked across files. Without it, batch mode compiles each file on its own with contracts off and effects permissive — useful for triaging a migration, not for judging a project. |
+| `enforceEffects` | `true` | The command line's `--no-enforce-effects` is `false` here. |
+| `requireDocs` | `false` | The command line's `--require-docs`: public functions and types must be documented. |
+
+With `crossModule`, every diagnostic — warnings included — comes back for each
+file under that file's `diagnostics[]`.
 
 ## Project Configuration
 

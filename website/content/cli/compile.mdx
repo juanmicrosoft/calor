@@ -54,7 +54,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--all-findings` | | No | Report all analysis findings including inconclusive results (requires `--analyze`) |
 | `--no-enforce-effects` | | No | Opt out of default-on effect enforcement |
 | `--strict-effects` | | No | Promote unknown external-call diagnostics (`Calor0411`) to errors |
-| `--permissive-effects` | | No | Assume unknown calls pure and demote effect violations; this voids the effect guarantee |
+| `--permissive-effects` | | No | Assume a call the compiler cannot look up does nothing: `Calor0411` and `Calor0425` go unreported and `Calor0410` becomes a warning. Never waives `Calor0424`, `Calor0420`, or `Calor0421`. This voids the effect guarantee — see [Effects](/docs/syntax-reference/effects/#turning-the-checks-down) |
 | `--no-type-check` | | No | Opt out of the default-on type checker for this command |
 | `--cache` | | No | Opt into the incremental build cache for the default output layout |
 | `--no-cache` | | No | Disable verification and incremental-build caches |

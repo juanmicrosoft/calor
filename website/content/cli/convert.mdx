@@ -94,6 +94,23 @@ losses and requested validation passed.
 | `for` loop | `§L{id:var:from:to:step}` |
 | `while` loop | `§WH{id}` |
 
+### What Changed in 0.16
+
+Converted code is only useful if the compiler can read it back. We test that on
+three real open-source projects — MediatR, Serilog, and FluentValidation — which
+come to 364 files.
+
+In 0.15, 59 of those 364 files came out of the converter as Calor the compiler
+could not parse. Long lambdas were written at the wrong indent, calls split
+across lines came out wrong, and a few other patterns tripped it. In 0.16 all
+364 parse.
+
+A second problem is fixed with them: when the converter could not work out a
+lambda parameter's type, it used to write `?`, which the compiler cannot read —
+it gave up on the rest of that method. It now treats the parameter as untyped,
+and reads the type from the `Func<...>` or `Action<...>` the lambda is handed
+to. Across the same three projects that removes 72 of 73 such failures.
+
 ---
 
 ## Benchmark Comparison

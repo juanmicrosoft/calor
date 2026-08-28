@@ -204,6 +204,57 @@ obj/<Configuration>/<TargetFramework>/calor/
 
 This keeps generated files out of your source tree.
 
+### Build Settings
+
+You can change how Calor builds by adding properties to your `.csproj`. For
+example, to turn off contract proving and keep the default for everything else:
+
+```xml
+<PropertyGroup>
+  <CalorVerify>false</CalorVerify>
+</PropertyGroup>
+```
+
+| Property | Default | What it does |
+|:---------|:--------|:-------------|
+| `CalorEnforceEffects` | `true` | Check that each function's `§E{…}` list covers what its body really does. Set it to `false` to switch the check off. |
+| `CalorPermissiveEffects` | `false` | Keep the effect checks on, but go easy on calls the compiler cannot look up. See below. |
+| `CalorTypeCheck` | `true` | Run the type checker. |
+| `CalorVerify` | `false` | Try to prove contracts with Z3 during the build. |
+| `CalorElideProvenGuards` | `true` | When a contract is proved, leave its runtime check out of the generated C#. Only matters with `CalorVerify`. |
+| `CalorEnableILAnalysis` | `false` | Read the compiled .NET assemblies you reference to work out what library calls do. |
+| `CalorTranspileOnly` | `false` | Write the C# without type checking or Roslyn validation. Output made this way is never cached. |
+| `CalorOutputDirectory` | `obj/…/calor/` | Where the generated `.g.cs` files go. |
+| `CalorVerbose` | `false` | Print more detail while compiling. |
+
+### CalorPermissiveEffects (New in 0.16)
+
+This is the project-file version of the command line's
+[`--permissive-effects`](/docs/cli/compile/). Turning it on tells the compiler
+to assume that a call it cannot look up does nothing surprising, which helps
+while you are converting older code:
+
+```xml
+<PropertyGroup>
+  <CalorPermissiveEffects>true</CalorPermissiveEffects>
+</PropertyGroup>
+```
+
+It stops the two "I cannot tell what this does" messages (`Calor0411` and
+`Calor0425`) and reports "this function does something it never said it would"
+(`Calor0410`) as a warning instead of an error, both inside one file and across
+files. It never excuses an effect you wrote down yourself and then broke:
+`Calor0424`, `Calor0420`, and `Calor0421` stay errors. See
+[Effects](/docs/syntax-reference/effects/) for the full list.
+
+Two things worth knowing:
+
+- **Only `true` and `false` work.** Writing `1` is not a value MSBuild can read
+  as a yes-or-no answer, so the build stops with `MSB4030`.
+- **The first build after you change it is a full rebuild.** The setting is part
+  of the fingerprint that decides whether cached work can be reused, so flipping
+  it makes every file compile again once. Builds after that are back to normal.
+
 ---
 
 ## Examples
