@@ -104,6 +104,19 @@ public sealed class PpWRowsRegistrationTests
         ("null p95", "p95 1.1766"),
         ("across-seed range", "range **1.1766–1.1864**"),
         ("Monte-Carlo half-width", "half-width of **0.005**"),
+        // M8 — the derived half-width disclosure. Each figure was recomputed from the three
+        // measured p95s at registration; none is a quoted number.
+        ("half-width is half the range", "(1.1864 \u2212 1.1766) / 2 = 0.0049"),
+        ("grid-line flip distance", "**0.0136** below the 1.20 grid line"),
+        ("sample sd of the three p95s", "sample sd **0.005048**"),
+        ("standard error", "standard error **0.002914**"),
+        ("t half-width, df = 2", "4.3027 \u00d7 0.002914 = **0.01254**"),
+        ("t-based headroom", "roughly **8 %** headroom"),
+        // M9 — the spend-basis skew, recomputed from the 40 archived agent.json files.
+        ("cost median", "**median is $0.8245**"),
+        ("cost max", "**max $2.9843**"),
+        ("cost CV", "the CV **0.50**"),
+        ("runs above the mean", "only **15 of 40** runs sit above the mean"),
         ("margin rule", "the smallest 0.05 grid line at or above (p95 + its Monte-Carlo half-width)"),
         ("CV cap arithmetic", "1.5 × 0.2746 = 0.4119 → cap 0.41"),
         // Spend.
