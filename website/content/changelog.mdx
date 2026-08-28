@@ -138,7 +138,7 @@ Completes the 0.13 project-model program: the persistent index and `calor query`
 
 ### Added
 
-- **Persistent project index and `calor query`.** `calor index build` writes a versioned index under `obj/calor/`; `calor index status` says whether it can still be trusted. `calor query` answers six facets: `symbol`, `callers`, `callees`, `impact`, `contracts`, `assumptions`. Two rules are enforced rather than documented — a stale index never answers, and every answer carries its residual, naming what could not be resolved rather than quietly omitting it.
+- **Persistent project index and `calor query`.** `calor index build` writes a versioned index under `obj/calor/`; `calor index status` says whether it can still be trusted. `calor query` answers six facets: `symbol`, `callers`, `callees`, `impact`, `contracts`, `assumptions`. (A seventh, `effects`, was added in 0.15 — see [calor query](/docs/cli/query/) for the current list.) Two rules are enforced rather than documented — a stale index never answers, and every answer carries its residual, naming what could not be resolved rather than quietly omitting it.
 - **`calor rename`** — rename addressed by symbol identity rather than text, refusing rather than guessing on ambiguity, stale sources, collisions, and declarations split across files.
 - **Dogfood utility** — a real in-repo tool whose only source is Calor, built and run by CI.
 - **Four release gates closed**: full-vs-incremental diagnostic identity, index/query correctness, rename (with an apply-recompile-and-run behaviour oracle), and the performance envelope (index build 0.40s against a 30s budget; warm queries under a millisecond against 500ms).

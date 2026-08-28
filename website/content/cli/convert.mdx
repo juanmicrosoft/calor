@@ -52,7 +52,7 @@ calor convert MyService.cs --benchmark
 | `--explain` | `-e` | `false` | Explain unsupported features in detail |
 | `--no-fallback` | — | `false` | Fail on unsupported constructs instead of emitting fallback TODOs |
 | `--validate` | — | `false` | Parse generated Calor before writing and report errors |
-| `--passthrough` | — | `false` | Preserve unconvertible C# members as `§CSHARP` interop blocks |
+| `--passthrough` | — | `false` | Widen the set of C# members preserved as `§CSHARP` interop blocks. Since 0.16 `calor convert` already rescues a member it cannot convert this way; see [What Changed in 0.16](#what-changed-in-0-16) |
 | `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
@@ -79,9 +79,10 @@ operators, patterns, compound assignments, namespace handling, and local
 functions no longer silently substitute a different construct.
 
 When native conversion is impossible, the containing member is preserved as a
-`§CSHARP` interop block and counted. `--passthrough` broadens that preservation
-path. "Conversion successful" is printed only when there are no recorded
-losses and requested validation passed.
+`§CSHARP` interop block and counted — on the command line this happens by
+default, without `--passthrough`, which widens it further. "Conversion
+successful" is printed only when there are no recorded losses and requested
+validation passed.
 
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
@@ -98,18 +99,27 @@ losses and requested validation passed.
 
 Converted code is only useful if the compiler can read it back. We test that on
 three real open-source projects — MediatR, Serilog, and FluentValidation — which
-come to 364 files.
+come to 364 modules.
 
-In 0.15, 59 of those 364 files came out of the converter as Calor the compiler
+In 0.15, 59 of those 364 modules came out of the converter as Calor the compiler
 could not parse. Long lambdas were written at the wrong indent, calls split
 across lines came out wrong, and a few other patterns tripped it. In 0.16 all
 364 parse.
 
-A second problem is fixed with them: when the converter could not work out a
+One more thing is fixed alongside those: when the converter could not work out a
 lambda parameter's type, it used to write `?`, which the compiler cannot read —
 it gave up on the rest of that method. It now treats the parameter as untyped,
 and reads the type from the `Func<...>` or `Action<...>` the lambda is handed
-to. Across the same three projects that removes 72 of 73 such failures.
+to. Between that fix and the parsing fixes above, the number of modules where
+the converter crashed part-way through dropped from 73 to 1 across the same
+three projects.
+
+There is one change to what you get back. `calor convert` now rescues a member
+it could not convert into working Calor by wrapping the original C# in a
+`§CSHARP` block, instead of failing the whole file. That means converted output
+can contain `§CSHARP` blocks even when you did not pass `--passthrough`, and the
+report tells you how many. Partly converted beats nothing converted, but treat
+each block as work still to do.
 
 ---
 

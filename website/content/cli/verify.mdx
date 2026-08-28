@@ -43,6 +43,33 @@ produces a model. Vacuity is a separate flag.
 | `1` | A contract was refuted, a file was missing, or compilation failed |
 | `2` | Invalid weakening-check invocation |
 
+## When the Solver Is Missing
+
+Verification needs the Z3 solver. If the Z3 native library is not installed
+next to the compiler, nothing can be proved — so every contract comes back
+`Skipped`, and the command still exits `0`, because nothing was refuted.
+
+Through 0.15 the plain text report said none of that: you saw a wall of
+`Skipped` with no reason, and only `--format json` carried the explanation. New
+in 0.16, the text report says it outright, for each file, above the counts it
+explains:
+
+```
+File: c.calr
+  !! NOT VERIFIED: the Z3 solver is unavailable, so nothing below was proved.
+     Calor0710: Static contract verification skipped: Z3 SMT solver is not available. Install the Z3 native library for static verification support.
+  Proven:      0
+  Unproven:    0
+  Disproven:   0
+  Unsupported: 0
+  Skipped:     2
+```
+
+If you gate a build on `calor verify`, gate it on this line too. A run that
+proved nothing exits `0` exactly like a run that proved everything.
+
+## Reporting, Not Rewriting
+
 `calor verify` reports verdicts; it never rewrites generated code. Guard
 elision happens in `calor compile --verify`, where (since 0.15) a clean
 `proven` verdict drops its runtime guard by default; add

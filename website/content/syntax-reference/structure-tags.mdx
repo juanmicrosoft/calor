@@ -795,6 +795,25 @@ Generic types are written inline using angle bracket syntax.
     §O{T}
 ```
 
+**Empty interface (changed in 0.16):** a marker interface has no members, so
+there is nothing indented under it and no blank-line rule to tell the parser
+where it stops. From 0.16 an empty `§IFACE` ends at the next type opener —
+`§CL`, `§IFACE`, `§EN`, `§D`, `§DEL`, or a `§CSHARP` block — written at
+**exactly the same column** as the `§IFACE` itself:
+
+```
+§M{m001:Demo}
+  §IFACE{i001:IMarker:pub}
+  §CL{c001:Thing:pub}
+    §MT{mt1:Go:pub} () -> void
+      §E{}
+```
+
+The column has to match. An indented type opener is not a sibling — it looks
+like you meant to nest one type inside the interface, which Calor does not
+have — so it is still a `Calor0100` error rather than being quietly moved out
+one level.
+
 ---
 
 ## C# Attributes

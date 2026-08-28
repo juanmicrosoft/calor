@@ -39,7 +39,7 @@ assuming names from pre-consolidation documentation.
 | `calor_help` | Syntax, support, diagnostic, and example lookup |
 | `calor_navigate` | Definition, reference, symbol, type, and scope queries |
 | `calor_structure` | Outline, call graph, and change-impact analysis |
-| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effect row) could break, and its declared vs inferred effect row — byte-identical to [`calor query`](/docs/cli/query/) |
+| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effects) could break, and what it declares versus what it really does — exactly the same answer [`calor query`](/docs/cli/query/) gives, character for character |
 | `calor_edit_preview` | Classify a proposed edit as safe, warning-bearing, or breaking |
 | `calor_format` | Format source or check/assign declaration IDs |
 | `calor_session_open` | Parse a project and return a session for cross-file checks |
@@ -127,8 +127,16 @@ incomplete and why — see [residuals](/docs/cli/query/#partial-answers).
 | `enforceEffects` | `true` | The command line's `--no-enforce-effects` is `false` here. |
 | `requireDocs` | `false` | The command line's `--require-docs`: public functions and types must be documented. |
 
-With `crossModule`, every diagnostic — warnings included — comes back for each
-file under that file's `diagnostics[]`.
+New in 0.16, batch mode returns every diagnostic — warnings included — for each
+file under that file's `diagnostics[]`, with or without `crossModule`. Through
+0.15 each file in a batch came back with a count of its warnings and a list of
+its errors as plain sentences; there was no `diagnostics[]` at all, so nothing
+carried a code, a position, or a suggested fix.
+
+What `crossModule` adds is the checking only a whole-project compile can do:
+effects followed across file boundaries, and contracts, which plain batch mode
+leaves off. Turn it on when you want the answer `calor` gives for the project as
+a whole — not to get warnings, which you now get either way.
 
 ## Project Configuration
 

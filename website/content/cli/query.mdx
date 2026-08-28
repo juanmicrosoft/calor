@@ -89,6 +89,11 @@ a declaration:
 `--effects` and `--file` cannot be used together: one asks about a single
 declaration's effects, the other about a whole file.
 
+The command calls a declaration's list of effects its **row** — the set of
+things written between the braces of `§E{…}`. You will see the word in the
+`--row` option, in the output of `calor query effects`, and in the messages
+below. It always means the same thing: this declaration's effects.
+
 ---
 
 ## Examples
@@ -144,9 +149,9 @@ query: effect row of app.calr:11:11 function Leaky — declared [pure], inferred
 ```
 
 `declared` is what the `§E{…}` line says. `inferred` is what the compiler
-worked out the body really does. The verdict is the same judgement the compiler
-makes when it builds, read from the same place — so the query and the build can
-never disagree. If the compiler had to assume something, the answer says what it
+worked out the body really does. The verdict is not recomputed for the query —
+it is the compiler's own verdict, recorded when the index was built and read
+back out. If the compiler had to assume something, the answer says what it
 assumed and why.
 
 ### What would break if the effects changed?
@@ -176,8 +181,10 @@ never as broken. Only a definite "does not fit" is counted in the first number.
 ## JSON Output
 
 `callers`, `callees`, `impact`, and `effects` accept `--json`. The answer comes
-back in the shared [envelope](/docs/cli/envelope-schema/) — schema version
-`2.0`, with `command` set to `"query"` and the answer under `data`:
+back in the [envelope](/docs/cli/envelope-schema/) — the standard wrapper every
+Calor command uses for JSON output, so a program can read any of them the same
+way. It carries a `version` (currently `2.0`), the `command` that produced it
+(here, `"query"`), any diagnostics, and the answer itself under `data`:
 
 ```json
 {
@@ -215,9 +222,9 @@ something, the answer says so rather than dropping it:
 
 ```
 query: PARTIAL — this answer may be incomplete. Calor binds one file at a time, so a call resolves only when exactly one declaration bears the name:
+  unreadable file: broken.calr (nothing in it is indexed)
   unresolved call: app.calr: Helper
   ambiguous name: Run (several declarations share it)
-  unreadable file: broken.calr (nothing in it is indexed)
 ```
 
 That list is the **residual**: everything the index could not account for. In
@@ -239,17 +246,21 @@ Every refusal below exits with code `1`.
 | `Error: directory not found: <path>` | `--project` points at nothing. |
 | `Error: no .calr files under <path>` | There is nothing to index. |
 | `Error: index unusable — <reason>.` | You passed `--no-build` and the index is missing or out of date, so it was not rebuilt. The message ends by telling you to run `calor index build` or drop `--no-build`. The reason is one of: no index has been built; the index file could not be read; the index format version changed; the compiler's semantics version changed; the compiler changed; the compilation options changed; an effect manifest changed; the source files changed. |
-| `query: no declaration named '<name>'` | Nothing in the index has that name. `impact` says the same thing and adds `Use --file to ask about a file.` |
+| `query: no declaration named '<name>'` | Nothing in the index has that name. `impact` prints a differently worded version: `Error: no declaration named '<name>'. Use --file to ask about a file.` |
 | `Error: '<name>' is declared in N places; narrow it with --in-file:` | Several files declare that name. The candidates are listed underneath; pick one with `--in-file`. |
 | `Error: '<file>' is not an indexed source file.` | `impact --file` was given a path the index does not cover. |
 | `Error: --effects asks about one declaration's row; it cannot be combined with --file.` | Use one or the other. |
 | `Error: --row '<row>' is not a row of effect codes: ...` | `--row` must be comma-separated effect codes, such as `cw,fs:w`. |
 | `Error: no effect row is recorded for <declaration>; pass --row to ask about a hypothetical one.` | `--effects` with no `--row`, on a declaration that has no recorded effects to fall back on. |
-| `query: no effect row for <declaration> — <reason>` | The `effects` facet has nothing to report. Only functions, methods, constructors, accessors, and parameters or returns carrying a row have effects to show. |
+| `query: no effect row is recorded for <declaration> (only functions, methods, constructors, accessors and rowed parameters/returns carry one)` | You asked `query effects` about something that cannot have effects at all — a local variable, a field, a type. This is the message you will normally see. |
+| `query: no effect row for <declaration> — <reason>` | Rarer. The declaration is one that *could* carry effects, but the index recorded a reason it has none to report, and prints that reason. |
 
 One quirk worth knowing: `calor query effects` on a declaration with no recorded
-effects exits `1` in text mode but `0` with `--json`, where the empty `rows`
-list and the `unavailable` reason carry the same fact.
+effects exits `1` in text mode but `0` with `--json`. In JSON the fact is
+carried by an empty `rows` list, so that is what a program should test. There is
+also an `unavailable` field, but it is left out of the JSON entirely unless the
+index recorded a reason — which is the rarer of the two cases above — so do not
+wait for it to appear.
 
 ---
 
@@ -257,7 +268,8 @@ list and the `unavailable` reason carry the same fact.
 
 The same four `--json` facets are available over the MCP server as the
 `calor_query` tool, which reads the same index through the same code and returns
-byte-identical answers. See [calor mcp](/docs/cli/mcp/#the-calor-query-tool).
+exactly the same answer, character for character. See
+[calor mcp](/docs/cli/mcp/#the-calor-query-tool).
 
 ---
 

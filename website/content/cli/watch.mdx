@@ -36,7 +36,11 @@ calor watch src/ --format json
 
 The cache validates source bytes, generated-output hashes, compiler options,
 and effect summaries. Diagnostic-bearing files are not cached, so their
-messages reappear. Watch is compile-only; it has no `--run` mode.
+messages reappear. Since 0.16, a file whose generated C# could not be checked
+because a *different* file failed is not cached either, and no `.g.cs` is
+written for it — see
+[When One File Fails](/docs/cli/compile/#when-one-file-fails). Watch is
+compile-only; it has no `--run` mode.
 
 JSON mode emits one schema 2.0 envelope per line, including clean and failed
 rebuilds. See [Structured Output](/docs/cli/structured-output/).

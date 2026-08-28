@@ -18,10 +18,17 @@ and the resolved Calor call graph. A function marked `§E{}` cannot contain a
 known I/O operation or call a resolved effectful function without a matching
 declaration.
 
-Unknown external calls, unresolved delegates, and raw interop are explicit
-soundness boundaries: the compiler surfaces diagnostics or assumptions rather
-than proving their behavior. `--permissive-effects` waives those boundaries and
-voids the effect guarantee.
+Unknown external calls and raw interop are explicit soundness boundaries: the
+compiler surfaces diagnostics or assumptions rather than proving their
+behavior. Calling a callback is no longer one of them — since 0.15 the compiler
+reads the callback's declared `§E{…}` and charges it to the caller, and reports
+`Calor0425` when neither side is annotated well enough to tell.
+
+`--permissive-effects` waives the "cannot tell" boundary — `Calor0411` and
+`Calor0425` go unreported and `Calor0410` becomes a warning — which voids the
+effect guarantee, since unknown calls are then counted as doing nothing. It
+never waives `Calor0424`, `Calor0420`, or `Calor0421`. See
+[Effects](/docs/syntax-reference/effects/#turning-the-checks-down).
 
 ---
 

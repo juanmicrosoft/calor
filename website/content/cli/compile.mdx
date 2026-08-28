@@ -101,6 +101,43 @@ For machine-readable diagnostics, use `--format json|sarif` or the
 
 ---
 
+## When One File Fails
+
+Changed in 0.16. This affects `calor` on the command line and `dotnet build`
+alike.
+
+The compiler checks the C# it generates by handing it to Roslyn; if Roslyn
+rejects it, that is `Calor1002`. The catch is that a file which failed to
+compile leaves the types it was supposed to declare missing, so every *other*
+file that mentions one of those types now fails to build too — not because
+anything is wrong with it, but because a piece it needs was never produced.
+Those follow-on failures are noise. They hide the one real error underneath a
+pile of `Calor1002`s that vanish as soon as you fix it.
+
+From 0.16 the compiler works out which types the failed file was going to
+declare, and skips the Roslyn check only for the outputs that mention them.
+Everything else is still checked, so a genuine `Calor1002` in an unrelated file
+is still reported.
+
+The outputs it skipped are treated as unfinished, not as fine:
+
+- no `.g.cs` file is written for them,
+- no entry goes in the build cache, so the next build redoes them rather than
+  trusting a result that was never checked,
+- and the build does not claim they compiled successfully.
+
+Two edges are worth knowing. If a file is broken badly enough that the compiler
+cannot even read its tokens, there is no way to tell what it *would* have
+declared — so nothing is written for that run at all, which is the safe answer
+rather than the convenient one. And `--transpile-only` is exempt: it already
+opts out of the Roslyn check, so it still writes its output.
+
+Neither surface did any of this before 0.16, and they now run the very same
+code, so `calor` and `dotnet build` report the same errors for the same
+sources.
+
+---
+
 ## Integration with MSBuild
 
 For automatic compilation during `dotnet build`, use [`calor init`](/docs/cli/init/) to set up MSBuild integration.
