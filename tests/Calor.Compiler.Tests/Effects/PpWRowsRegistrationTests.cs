@@ -145,6 +145,12 @@ public sealed class PpWRowsRegistrationTests
         ("non-building runs published separately", "did not build at declared-done"),
         ("permissive lattice", "**`EffectSet.Empty`, not `EffectSet.Unknown`**"),
         ("leg-B cluster dependence", "W-002 and W-006 share a starter blob"),
+        // Review round 4: #1123's independent reproduction, the runtime escapes, and #1136.
+        ("confound issue", "#1136"),
+        ("W-001 escape at runtime", "escapes **2 of 7**"),
+        ("W-006 escape at runtime", "**2 of 10**"),
+        ("W-004 negative control", "W-004 as a **negative control**"),
+        ("unregistered roles excluded from the pin", "**excluded by name** from the frozen-cells pin"),
         ("arm-A route (a) is new", "**Arm A's are NEW and are registered here, not cited:**"),
     ];
 
@@ -296,7 +302,18 @@ public sealed class PpWRowsRegistrationTests
         var seen = 0;
         foreach (var compile in compiles.EnumerateArray())
         {
-            if (!string.Equals(compile.GetProperty("role").GetString(), "shortcut", StringComparison.Ordinal))
+            var role = compile.GetProperty("role").GetString()!;
+
+            // REGISTERED ROLES ONLY. `unregistered-*` cells are recorded evidence for a
+            // published confound (#1136), not part of any frozen denominator: enumerating
+            // them in the row would promote them into the registration, which is the
+            // post-hoc change gates §0.3 forbids. They are pinned instead — as recorded
+            // evidence that must not vanish — by TheThisQualifiedEscapeEvidenceIsRecorded.
+            Assert.False(
+                role.StartsWith("unregistered-", StringComparison.Ordinal) && RegisteredRoles.Contains(role),
+                $"role '{role}' cannot be both unregistered and registered");
+            if (role.StartsWith("unregistered-", StringComparison.Ordinal)
+                || !string.Equals(role, "shortcut", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -365,6 +382,7 @@ public sealed class PpWRowsRegistrationTests
             var emitted = compiles.EnumerateArray()
                 .Where(c => c.GetProperty("pair").GetString()!.StartsWith(shortId, StringComparison.Ordinal)
                     && c.GetProperty("role").GetString()!.StartsWith("shortcut", StringComparison.Ordinal)
+                    && !c.GetProperty("role").GetString()!.StartsWith("unregistered-", StringComparison.Ordinal)
                     && c.GetProperty("arm").GetString() == arm)
                 .SelectMany(c => c.GetProperty("diagnostics").EnumerateArray())
                 .Select(x => (
@@ -457,7 +475,9 @@ public sealed class PpWRowsRegistrationTests
         var starters = 0;
         foreach (var compile in document.RootElement.GetProperty("compiles").EnumerateArray())
         {
-            if (!string.Equals(compile.GetProperty("role").GetString(), "starter", StringComparison.Ordinal))
+            var role = compile.GetProperty("role").GetString()!;
+            if (role.StartsWith("unregistered-", StringComparison.Ordinal)
+                || !string.Equals(role, "starter", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -506,6 +526,79 @@ public sealed class PpWRowsRegistrationTests
         }
 
         Assert.Equal(12, starters);
+    }
+
+    /// <summary>
+    /// The three roles A-1.12 registers. Everything else in
+    /// <c>ppw-seeded-compiles.json</c> — every <c>unregistered-*</c> role, the published
+    /// <c>sibling-W-001s</c>, the <c>shortcut-b-repaired</c> disclosure — is recorded evidence
+    /// that sits outside every denominator.
+    /// </summary>
+    private static readonly string[] RegisteredRoles = ["starter", "shortcut", "clean"];
+
+    /// <summary>
+    /// The other half of the honesty bargain (review round 4). The frozen-cells pin deliberately
+    /// ignores <c>unregistered-*</c> roles so that recording the confound cannot promote it into
+    /// the registration. That alone would let the evidence be deleted silently, so the evidence is
+    /// pinned here instead — as evidence, not as a denominator.
+    ///
+    /// <para>The published confound (#1136): on <b>arm B</b>, <c>this.</c>-qualifying the field at
+    /// the argument position instantiates the row to Unknown, so nothing is charged and the
+    /// program builds. W-001 and W-006 escape; <b>W-004 is the negative control and fails
+    /// closed</b>. A correction to the instruction that produced this test: the role is present
+    /// for W-004 too — it is not absent — and what distinguishes it is the OUTCOME, so that is
+    /// what is asserted.</para>
+    /// </summary>
+    [SkippableFact]
+    public void TheThisQualifiedEscapeEvidenceIsRecorded()
+    {
+        var manifest = Path.Combine(
+            RepositoryRoot(), "bench", "phase0-agent-native", "pairs", "ppw-seeded-compiles.json");
+        Skip.IfNot(
+            File.Exists(manifest),
+            "ppw-seeded-compiles.json is not in the tree yet (branch bench/s3-ppw-rows-pairs, "
+            + "PR #1123, unmerged at A-1.12's registration)");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(manifest));
+        var cells = document.RootElement.GetProperty("compiles").EnumerateArray()
+            .Where(c => string.Equals(
+                c.GetProperty("role").GetString(), "unregistered-this-qualified-escape", StringComparison.Ordinal))
+            .ToDictionary(c => c.GetProperty("pair").GetString()![..5], c => c, StringComparer.Ordinal);
+
+        foreach (var pair in new[] { "W-001", "W-006", "W-004" })
+        {
+            Assert.True(
+                cells.ContainsKey(pair),
+                $"the #1136 `this.`-qualified escape evidence for {pair} is gone from "
+                + "ppw-seeded-compiles.json. A-1.12 publishes that confound; its evidence may be "
+                + "superseded by a NEW annex entry, never silently deleted.");
+            Assert.Equal("B", cells[pair].GetProperty("arm").GetString());
+        }
+
+        // W-001 and W-006 escape: they BUILD, and nothing is charged (Calor0425, not Calor0410).
+        foreach (var (pair, count) in new[] { ("W-001", 1), ("W-006", 2) })
+        {
+            var cell = cells[pair];
+            Assert.True(
+                cell.GetProperty("exitCode").GetInt32() == 0,
+                $"{pair}'s `this.`-qualified seed no longer builds on arm B; #1136's escape is the "
+                + "claim that it does.");
+            var codes = cell.GetProperty("diagnostics").EnumerateArray()
+                .Select(x => x.GetProperty("code").GetString()!).ToArray();
+            Assert.Equal(count, codes.Count(c => c == "Calor0425"));
+            Assert.DoesNotContain("Calor0410", codes);
+        }
+
+        // W-004 is the negative control: the same spelling still fails closed.
+        var control = cells["W-004"];
+        Assert.True(
+            control.GetProperty("exitCode").GetInt32() == 1,
+            "W-004 is #1136's negative control and must still fail closed; if it builds, the "
+            + "confound has widened to all three blind cells and needs a NEW annex entry.");
+        Assert.Contains(
+            "Calor0410",
+            control.GetProperty("diagnostics").EnumerateArray()
+                .Select(x => x.GetProperty("code").GetString()!));
     }
 
     /// <summary>
