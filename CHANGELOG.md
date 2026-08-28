@@ -41,6 +41,15 @@ All notable changes to this project will be documented in this file.
   checking effects across files the way `calor -i a.calr -i b.calr` does, and it now returns
   every diagnostic (warnings included) for each file. `options.enforceEffects` and
   `options.requireDocs` match the command line's `--no-enforce-effects` and `--require-docs`.
+- **Benchmarks: a script that explains the "more turns" gap from what was archived.** Our 0.15
+  agent benchmark showed the new compiler's agents taking a few more turns than the old one's, and
+  we could not say why. `bench/phase0-agent-native/ppe1-turn-attribution.py` now recomputes every
+  number behind that finding from the archived runs — turns, tokens, wall-clock, the compiler
+  messages each build produced (none from the new effect checks), and two significance tests — so
+  anyone can rerun it and get the same file byte for byte. It also has a `--transcripts` mode that
+  counts what an agent did on each turn (reads, searches, builds, edits) once the next benchmark
+  saves those transcripts. A test fails if the committed numbers drift or an archived run goes
+  missing.
 
 ### Changed
 

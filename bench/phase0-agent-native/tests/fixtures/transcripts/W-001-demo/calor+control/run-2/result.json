@@ -1,0 +1,7 @@
+{
+  "pair": "W-001-demo",
+  "arm": "calor+control",
+  "run": 2,
+  "invalid": false,
+  "censored": false
+}

@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7939,
+      "expectedTotal": 7943,
       "expectedSkipped": 7
     },
     {
@@ -119,6 +119,11 @@
     }
   ],
   "allowedRuntimeSkipSites": [
+    {
+      "_comment": "counts are per Skip.If/Skip.IfNot CALL SITE (check_test_quality.py regex-counts occurrences in test sources), not per test: EpochTurnAttributionTests routes four SkippableFacts through one Skip.If inside RunScript",
+      "reason": "python3 not on PATH",
+      "count": 1
+    },
     {
       "reason": "Benchmark file not found",
       "count": 7
