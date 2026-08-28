@@ -683,6 +683,84 @@ class CanaryRefusals(unittest.TestCase):
             self.assertEqual(r["armCanary"], "skipped")
 
 
+class PreflightArmProof(unittest.TestCase):
+    """The compilerHash disjointness assert runs BEFORE the first paid run, not only after
+    collection. The canary is the only build the harness can make before an agent exists,
+    and it writes the same obj/calor/.calor-build-state.json #1094 archives per run — so
+    a mis-pointed arm is a five-second refusal instead of a $135 loss."""
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_canary_only_reports_the_verdict_and_the_hash_without_running_anything(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = CanaryRefusals._pair(tmp)
+            b = CanaryRefusals._fake_dotnet(
+                tmp, "canary.calr(4,5): error Calor0410: 'Quiet' uses effect 'cw'", 1)
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
+                       "--out", os.path.join(tmp, "out")], timeout=300,
+                      env=dict(os.environ, PATH=b + os.pathsep + os.environ["PATH"]))
+            self.assertEqual(out.returncode, 0, out.stderr[-2000:])
+            doc = json.loads(out.stdout)
+            self.assertEqual(doc["armCanary"], "strict-ok")
+            self.assertIn("compilerHash", doc)          # null here: the fake dotnet builds nothing
+            # nothing was run: no per-run archive exists
+            self.assertFalse(os.path.isdir(os.path.join(tmp, "out", "T-900-canary")))
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_canary_only_propagates_a_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = CanaryRefusals._pair(tmp)
+            b = CanaryRefusals._fake_dotnet(
+                tmp, "canary.calr(4,5): warning Calor0410: 'Quiet' uses effect 'cw'", 0)
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
+                       "--out", os.path.join(tmp, "out")], timeout=300,
+                      env=dict(os.environ, PATH=b + os.pathsep + os.environ["PATH"]))
+            self.assertEqual(out.returncode, 3, out.stderr[-2000:])
+            self.assertIn("did not reject a laundered effect", out.stderr)
+
+    @unittest.skipUnless(HAVE_PRODUCT and HAVE_JQ,
+                         "Release product not built (dotnet build src/Calor.{Compiler,Tasks,Runtime} -c Release)")
+    def test_canary_only_reads_a_real_compiler_hash_from_the_canary_build(self):
+        """Against a REAL product: the hash the pre-flight reports is the same field the
+        per-run archive carries, which is what makes comparing them meaningful."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = CanaryRefusals._pair(tmp)
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
+                       "--out", os.path.join(tmp, "out")], timeout=900)
+            if "MSB4064" in out.stderr or "MSB4063" in out.stderr or "MSB4062" in out.stderr:
+                self.skipTest("this checkout's Calor.Tasks assembly is stale or unloadable")
+            self.assertEqual(out.returncode, 0, out.stderr[-3000:])
+            doc = json.loads(out.stdout)
+            self.assertRegex(doc["compilerHash"] or "", r"^[0-9a-f]{64}$")
+            self.assertEqual(doc["armCanary"], "strict-ok")
+
+    def test_the_epoch_runner_refuses_two_arms_that_share_a_compiler_before_spending(self):
+        src = _read(RUN_PPW)
+        preflight = src[src.index("PRE-FLIGHT ARM PROOF"):src.index("cat <<PLAN")]
+        # runs before the plan, and therefore before --confirm-paid-epoch is even read
+        self.assertLess(src.index("PRE-FLIGHT ARM PROOF"), src.index("REFUSING TO RUN"))
+        self.assertIn("--canary-only", preflight)
+        self.assertIn('if [[ "$PREFLIGHT_A_HASH" == "$PREFLIGHT_B_HASH" ]]', preflight)
+        self.assertIn("Refusing BEFORE any spend", preflight)
+        self.assertIn("exit 5", preflight)
+        # an unreadable build state is refused too, rather than passing an empty compare
+        self.assertIn('-z "$PREFLIGHT_A_HASH" || -z "$PREFLIGHT_B_HASH"', preflight)
+        # and the post-collection assert stays as the mid-epoch guard
+        self.assertIn("compiler_hashes()", src)
+
+    def test_the_plan_block_shows_both_pre_flight_hashes(self):
+        """The plan block is what a reader checks before typing --confirm-paid-epoch."""
+        src = _read(RUN_PPW)
+        # the heredoc BODY: from the opening marker to the terminator on its own line
+        # (searching for "PLAN\n" alone finds the opening `cat <<PLAN` itself)
+        start = src.index("cat <<PLAN")
+        plan = src[start:src.index("\nPLAN\n", start)]
+        self.assertIn("${PREFLIGHT_A_HASH:0:12}", plan)
+        self.assertIn("${PREFLIGHT_B_HASH:0:12}", plan)
+        # beside the material they qualify
+        self.assertIn("Calor.Tasks ${a_tasks:0:12}   compilerHash", plan)
+        self.assertIn("Calor.Tasks ${b_tasks:0:12}   compilerHash", plan)
+
+
 class EpochGuards(unittest.TestCase):
     """M4 and M6 in run-ppw-epoch.sh."""
 

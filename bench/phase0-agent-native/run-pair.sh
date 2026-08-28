@@ -186,12 +186,19 @@ ARM_LABEL_OVERRIDE=""
 # own `before/` starter) and the strict arm (`calor`) — so the key is a
 # parameter. The entry's `fixture` names the starter directory under the pair.
 ARM_CONFIG_KEY=""
+# --canary-only: run the arm proof and stop, printing one JSON line
+# {armConfigKey, arm, repoRoot, controlArmKind, armCanary, compilerHash}. The epoch runner
+# uses it as a PRE-FLIGHT: the canary is the only build the harness can make before an
+# agent exists, and it writes the same build state #1094 reads, so the arms' compilers can
+# be proven distinct before a single paid run instead of after collection.
+CANARY_ONLY=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --pair) PAIR_DIR="$2"; shift 2 ;;
         --arm) ARM="$2"; shift 2 ;;
         --arm-config) ARM_CONFIG_KEY="$2"; shift 2 ;;
+        --canary-only) CANARY_ONLY=1; shift ;;
         --runs) RUNS="$2"; shift 2 ;;
         --out) OUT_DIR="$2"; shift 2 ;;
         --null-agent) NULL_AGENT=1; shift ;;
@@ -205,7 +212,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
 # only the CLI/MCP/envelope build; the workspace's own `dotnet build` binds
@@ -290,6 +297,7 @@ REFERENCE_DIR="$(jq -r '.reference // empty' <<<"$ARM_CONFIG_JSON")"
 REFERENCE_SOURCE="$(jq -r '.referenceSource // "none"' <<<"$ARM_CONFIG_JSON")"
 # Set by check_pins; archived per run so an epoch cannot claim a proof it never ran.
 ARM_CANARY_STATUS="not-run"
+ARM_CANARY_COMPILER_HASH=""
 PERMISSIVE_EFFECTS="$(jq -r 'if .permissiveEffects == true then "true" else "false" end' <<<"$ARM_CONFIG_JSON")"
 TIMEOUT_SECS="$(jq -r '.timeoutSeconds // 600' "$PAIR_DIR/pair.json")"
 # Test hook: lets watchdog behavior be exercised without a 10+ minute wait.
@@ -428,6 +436,10 @@ arm_canary() {
     render_template "$dir/src/Src.csproj"
     cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
     out="$(cd "$dir/src" && CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet build --nologo -v q 2>&1)" || rc=$?
+    # The canary builds through the arm's own Calor.Tasks, so it leaves the same
+    # obj/calor/.calor-build-state.json #1094 archives per run — which makes the arm's
+    # compilerHash observable BEFORE any agent is invoked. Read here, while $dir lives.
+    ARM_CANARY_COMPILER_HASH="$(python3 "$HARNESS_CAPTURE" build-state "$dir/src/obj/calor/.calor-build-state.json" 2>/dev/null | jq -r '.compilerHash // empty')"
 
     # Task-assembly mismatch first: it explains every other symptom. MSB4062 is
     # included so a MISSING/unloadable Calor.Tasks.dll is diagnosed as what it is
@@ -450,7 +462,7 @@ arm_canary() {
                 return 1
             fi
             ARM_CANARY_STATUS="permissive-ok"
-            echo "arm canary OK (pre-rows): Calor0410 is a warning under the arm's Calor.Tasks build ($ARM_REPO_ROOT)" >&2
+            echo "arm canary OK (pre-rows): Calor0410 is a warning under the arm's Calor.Tasks build ($ARM_REPO_ROOT); compilerHash ${ARM_CANARY_COMPILER_HASH:0:12}" >&2
             ;;
         strict)
             if [[ $rc -eq 0 ]] || ! grep -q 'error Calor0410' <<<"$out"; then
@@ -458,7 +470,7 @@ arm_canary() {
                 return 1
             fi
             ARM_CANARY_STATUS="strict-ok"
-            echo "arm canary OK (strict): Calor0410 is an error under the arm's Calor.Tasks build ($ARM_REPO_ROOT)" >&2
+            echo "arm canary OK (strict): Calor0410 is an error under the arm's Calor.Tasks build ($ARM_REPO_ROOT); compilerHash ${ARM_CANARY_COMPILER_HASH:0:12}" >&2
             ;;
     esac
     return 0
@@ -1368,6 +1380,20 @@ wipe_ws_out() {
 
 # ---------------------------------------------------------------------------
 check_pins
+
+# --canary-only stops here: check_pins has just proven this arm (or refused it), and the
+# hash below is this arm's compiler as its own product reports it.
+if [[ $CANARY_ONLY -eq 1 ]]; then
+    jq -n --arg key "$ARM_CONFIG_KEY" --arg arm "$ARM_LABEL" --arg root "$ARM_REPO_ROOT" \
+          --arg kind "$CONTROL_ARM_KIND" --arg status "$ARM_CANARY_STATUS" \
+          --arg hash "${ARM_CANARY_COMPILER_HASH:-}" \
+        '{armConfigKey:$key, arm:$arm, repoRoot:$root,
+          controlArmKind:(if $kind == "" then null else $kind end),
+          armCanary:$status,
+          compilerHash:(if $hash == "" then null else $hash end)}'
+    exit 0
+fi
+
 for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
     mkdir -p "$WS_OUT"
