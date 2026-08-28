@@ -24,7 +24,7 @@ the process.
 
 ## The Tool Surface
 
-The server registers 18 tools. Several older one-purpose names were folded
+The server registers 19 tools. Several older one-purpose names were folded
 into action-based tools; clients should discover the live tool list rather than
 assuming names from pre-consolidation documentation.
 
@@ -39,6 +39,7 @@ assuming names from pre-consolidation documentation.
 | `calor_help` | Syntax, support, diagnostic, and example lookup |
 | `calor_navigate` | Definition, reference, symbol, type, and scope queries |
 | `calor_structure` | Outline, call graph, and change-impact analysis |
+| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effect row) could break, and its declared vs inferred effect row — byte-identical to `calor query` |
 | `calor_edit_preview` | Classify a proposed edit as safe, warning-bearing, or breaking |
 | `calor_format` | Format source or check/assign declaration IDs |
 | `calor_session_open` | Parse a project and return a session for cross-file checks |

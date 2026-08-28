@@ -64,6 +64,10 @@
     "clean": {
       "a": "seeded/clean-a",
       "b": "seeded/clean-b"
+    },
+    "unregistered-rowless-lambda-control": {
+      "b": "seeded/unregistered-rowless-lambda-control-b",
+      "note": "the negative control for #1136 on the lambda shape: the §B-bound printing §LAM with its row omitted. Arm B FAILS CLOSED — 2x error Calor0410 ('MapAndReport', 'Total') — because a lambda the pass CAN name is charged from its body. Only an argument it cannot resolve to a rowed declaration escapes."
     }
   },
   "extension": "MapAndReport: a printing §LAM bound by §B and passed to Map (the §B-bound form; an inline §LAM as §A draws Calor0208 on both arms), plus a silent Total built on it",
@@ -78,11 +82,11 @@
   "iterationBudget": 10,
   "timeoutSeconds": 600,
   "shapeRealizedIndicator": {
-    "name": "§B-bound printing step",
-    "question": "the final source binds the printing step with §B (a §LAM or a named function) and MapAndReport passes it to Map",
+    "name": "§B-bound printing step passed to Map",
+    "question": "the final source binds the printing step with §B (a §LAM or a named function) and MapAndReport passes it to Map, rather than writing a second loop of its own",
     "sourceRegex": "§B\\{[A-Za-z_][A-Za-z0-9_]*(:[^}]*)?\\}\\s*(§E\\{[^}]*\\}\\s*)?§LAM",
     "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
     "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
-    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+    "why": "This is a warning-vs-error cell, and the §B-bound §LAM is its EXPECTED shape, not a shortcut: the contrast is that arm A warns about it where arm B errors. The indicator separates 'the agent went through Map with a bound step' from 'the agent wrote its own loop and printed inline' — the second is a cell that never exercised the mechanism, which reads as a null delta rather than as evidence. An inline §LAM as §A draws Calor0208 on both arms, so the bound form is the only route through Map. Recorded, never scored."
   }
 }

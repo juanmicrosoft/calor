@@ -89,6 +89,6 @@
     "sourceRegex": "§IMPL\\{IRequestPreProcessor",
     "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
     "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
-    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+    "why": "Leg-A-only cell whose arm-B starter must be repaired before it can be extended. The indicator says whether the agent reached the pipeline's own extension point or took the §P-inside-Handle shortcut, and it is the only way to tell a cell that was never realized (the agent spent its budget on the repair) from one that was realized honestly. Recorded, never scored."
   }
 }

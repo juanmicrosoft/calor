@@ -223,6 +223,44 @@
       ]
     },
     {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-property-backed-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-property-backed-escape-b/A3-middleware.calr",
+      "blobSha": "0327990fe76d56a33e41e533491cb74fb718eca8",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 27,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-resolvable-alias-control",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-resolvable-alias-control-b/A3-middleware.calr",
+      "blobSha": "3607c5302bf2dd25ecaa5335b58a9625f989bec3",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 26,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
       "pair": "W-002-map-and-report",
       "role": "starter",
       "arm": "A",
@@ -340,6 +378,32 @@
       "emitted": true,
       "diagnosticCount": 0,
       "diagnostics": []
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "unregistered-rowless-lambda-control",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/seeded/unregistered-rowless-lambda-control-b/A3-map.calr",
+      "blobSha": "b11eff5bd20bc0f31cc529a43d64dc64175524dd",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 28,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'MapAndReport' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 37,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Total' uses effect 'cw' but does not declare it"
+        }
+      ]
     },
     {
       "pair": "W-003-match-fallback",
@@ -1004,6 +1068,39 @@
           "code": "Calor0425",
           "severity": "warning",
           "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "unregistered-property-backed-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/unregistered-property-backed-escape-b/A3-map.calr",
+      "blobSha": "9a35a1ebf34cb2d6a59f86eb32b2959991ebe410",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 3,
+      "diagnostics": [
+        {
+          "line": 40,
+          "column": 16,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        },
+        {
+          "line": 41,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        },
+        {
+          "line": 45,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Loud' for it. State a row on the argument's declaration, or compile with --permissive-effects."
         }
       ]
     }

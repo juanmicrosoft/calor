@@ -249,7 +249,7 @@ class FrozenCompiles(unittest.TestCase):
         got = {(c["pair"], c["role"], c["arm"], c["path"]) for c in self.doc["compiles"]}
         self.assertEqual(expected, got, "ppw-seeded-compiles.json does not cover exactly the "
                                         "sources ppw-compile.py enumerates — regenerate it")
-        self.assertEqual(46, len(self.doc["compiles"]))
+        self.assertEqual(50, len(self.doc["compiles"]))
         self.assertEqual(len(expected), len(self.doc["compiles"]), "duplicate rows")
 
     def test_every_source_is_recorded_once_per_arm_and_blob_matches_disk(self):
@@ -333,23 +333,47 @@ class FrozenCompiles(unittest.TestCase):
         self.assertEqual(0, a["exitCode"])
         self.assertIn(("error", "Calor0410"), sev_codes(b))
 
-    def test_this_qualified_escape_is_recorded_on_the_treatment_arm(self):
-        # Issue #1136, recorded before any agent run: on arm B `§A this.field` makes the
-        # row variable instantiate to Unknown — warning Calor0425, exit 0, nothing charged
-        # — so two of the three blind cells have a laundering route through the TREATMENT
-        # arm. A-1.12 registers it as a pre-registered confound on leg A's direction.
+    def test_unresolvable_argument_escapes_are_recorded_on_the_treatment_arm(self):
+        # Issue #1136, recorded before any agent run. The rule is NOT the `this.` spelling:
+        # ANY argument the effect pass cannot resolve to a rowed declaration in the enclosing
+        # class instantiates the callee's row variable to Unknown and charges nothing —
+        # warning Calor0425, exit 0. Both registered spellings are pinned here, because two
+        # of the three blind cells have this route through the TREATMENT arm and A-1.12
+        # registers it as a pre-registered confound on leg A's direction.
         for pid in ("W-001-middleware-stage", "W-006-map-doubler"):
-            row = rows(self.doc, pid, "unregistered-this-qualified-escape", "B")[0]
-            self.assertEqual(0, row["exitCode"], f"{pid}: the escape must BUILD on arm B")
-            self.assertTrue(row["emitted"])
-            self.assertNotIn("Calor0410", codes(row), f"{pid}: nothing is charged — that is the defect")
-            self.assertTrue(all(c == "Calor0425" for c in codes(row)) and codes(row),
-                            f"{pid}: expected Calor0425 warnings only")
-            self.assertTrue(all(d["severity"] == "warning" for d in row["diagnostics"]))
-        # The negative control: direct invocation of a this.-qualified field fails closed.
-        control = rows(self.doc, "W-004-counter-peek", "unregistered-this-qualified-escape", "B")[0]
-        self.assertEqual(1, control["exitCode"])
-        self.assertIn(("error", "Calor0410"), sev_codes(control))
+            for role in ("unregistered-this-qualified-escape", "unregistered-property-backed-escape"):
+                row = rows(self.doc, pid, role, "B")[0]
+                self.assertEqual(0, row["exitCode"], f"{pid}/{role}: the escape must BUILD on arm B")
+                self.assertTrue(row["emitted"])
+                self.assertNotIn("Calor0410", codes(row), f"{pid}/{role}: nothing is charged — that is the defect")
+                self.assertTrue(codes(row) and all(c == "Calor0425" for c in codes(row)),
+                                f"{pid}/{role}: expected Calor0425 warnings only")
+                self.assertTrue(all(d["severity"] == "warning" for d in row["diagnostics"]))
+                self.assertTrue(any("nothing is charged" in d["text"] for d in row["diagnostics"]), f"{pid}/{role}")
+        # The property spelling carries no `this.` at the call site: the escape is about what
+        # the pass can resolve, not about the qualifier.
+        prop = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "unregistered-property-backed-escape-b")
+        body = "".join(open(os.path.join(prop, f), encoding="utf-8").read()
+                       for f in sorted(os.listdir(prop)) if f.endswith(".calr"))
+        self.assertIn("§PROP{", body)
+        self.assertIn("§A Stage §/C", body)
+        self.assertNotIn("§A this.", body)
+
+    def test_the_registered_negative_controls_fail_closed(self):
+        # Three shapes the pass CAN resolve, so #1136 is bounded rather than "any indirection":
+        controls = [
+            # direct invocation of a this.-qualified field
+            ("W-004-counter-peek", "unregistered-this-qualified-escape"),
+            # a local alias of a rowed field, passed as the argument
+            ("W-001-middleware-stage", "unregistered-resolvable-alias-control"),
+            # a §B-bound printing lambda with its row omitted
+            ("W-002-map-and-report", "unregistered-rowless-lambda-control"),
+        ]
+        for pid, role in controls:
+            row = rows(self.doc, pid, role, "B")[0]
+            self.assertEqual(1, row["exitCode"], f"{pid}/{role} must fail closed on arm B")
+            self.assertFalse(row["emitted"])
+            self.assertIn(("error", "Calor0410"), sev_codes(row), f"{pid}/{role}")
 
     def test_specs_pin_the_escape_indicator_and_the_shape_indicator(self):
         for pid in PAIR_IDS:
@@ -364,16 +388,47 @@ class FrozenCompiles(unittest.TestCase):
             indicator = manifest["shapeRealizedIndicator"]
             for key in ("name", "question", "sourceRegex", "measuredOn", "reportedBy", "why"):
                 self.assertTrue(indicator.get(key), f"{pid}: shapeRealizedIndicator.{key} missing")
-            self.assertIn(indicator["name"], spec, f"{pid}: shape indicator not disclosed in the spec")
+            # Disclosed, but not named mechanically: the spec says the harness records
+            # whether the shape was reached, and pair.json holds what "the shape" is. Naming
+            # the mechanism in the agent-visible text would steer the very choice M2 measures.
+            self.assertIn("whether the finished source reached the shape this task describes", spec,
+                          f"{pid}: shape indicator not disclosed in the spec")
+            self.assertIn("without scoring it", spec, pid)
+            for banned in ("§FLD", "§PROP", "§LAM", "regex"):
+                self.assertNotIn(banned, spec, f"{pid}: the spec must not name the shape mechanically")
             re.compile(indicator["sourceRegex"])
-            # The indicator must actually separate the two reference solutions it exists to
-            # tell apart: the seeded shortcut realizes the shape, and (for the blind cells)
-            # the published lambda sibling does not.
-            shortcut = os.path.join(PAIRS, pid, manifest["seeded"]["shortcut"]["b"])
-            body = "".join(open(os.path.join(shortcut, f), encoding="utf-8").read()
-                           for f in sorted(os.listdir(shortcut)) if f.endswith(".calr"))
-            self.assertRegex(body, indicator["sourceRegex"],
+
+            def read(rel):
+                d = os.path.join(PAIRS, pid, rel)
+                return "".join(open(os.path.join(d, f), encoding="utf-8").read()
+                               for f in sorted(os.listdir(d)) if f.endswith(".calr"))
+
+            # (1) It must fire on the shape the task asks for — both reference solutions.
+            self.assertRegex(read(manifest["seeded"]["shortcut"]["b"]), indicator["sourceRegex"],
                              f"{pid}: the seeded shortcut does not match its own shape indicator")
+            self.assertRegex(read(manifest["seeded"]["clean"]["b"]), indicator["sourceRegex"],
+                             f"{pid}: the clean solution does not match the shape indicator")
+            # (2) It must NOT fire on the frozen starters: an indicator that matches the
+            # code the agent was handed reads "shape realized" on a workspace where nothing
+            # was written, which is exactly the ambiguity it exists to remove.
+            for arm in ("starter-a", "starter-b"):
+                self.assertNotRegex(read(arm), indicator["sourceRegex"],
+                                    f"{pid}: shapeRealizedIndicator matches its own {arm} — vacuous")
+
+        # (3) W-001's indicator must separate the registered blind shape from the published
+        # lambda sibling, which arm A only WARNS about (the degradation M2 exists to catch).
+        w1 = load_pair("W-001-middleware-stage")
+        sib = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "sibling-w001s-b")
+        sib_body = "".join(open(os.path.join(sib, f), encoding="utf-8").read()
+                           for f in sorted(os.listdir(sib)) if f.endswith(".calr"))
+        self.assertNotRegex(sib_body, w1["shapeRealizedIndicator"]["sourceRegex"],
+                            "W-001: the lambda sibling must read as 'shape not realized'")
+        # …and the property realization of the same shape must read as realized (#1136).
+        prop = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "unregistered-property-backed-escape-b")
+        prop_body = "".join(open(os.path.join(prop, f), encoding="utf-8").read()
+                            for f in sorted(os.listdir(prop)) if f.endswith(".calr"))
+        self.assertRegex(prop_body, w1["shapeRealizedIndicator"]["sourceRegex"],
+                         "W-001: a §PROP realization is the same shape and must not read as unrealized")
 
     def test_unregistered_extras_are_recorded_as_measured(self):
         # §4.1: the A3-match field shape with a field for onNone is blind on both arms.

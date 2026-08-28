@@ -68,5 +68,6 @@ workspace that built*. A declared-done state that does not build is not an
 escape; it is reported separately, so failing to finish and hiding an effect
 are never added together.
 
-The harness also records, without scoring it, whether the finished source
-reached this task's expected shape (field-stored stage). That figure is published beside the result; it affects no run.
+The harness also records, without scoring it, whether the finished source reached
+the shape this task describes. That figure is published beside the result; it
+affects no run.

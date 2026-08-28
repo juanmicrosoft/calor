@@ -20,14 +20,55 @@ All notable changes to this project will be documented in this file.
 
 - New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
 
+- **AI agents can now ask the MCP server about your project's structure.** A new `calor_query`
+  tool answers four questions about any function or method: who calls it (`callers`), what it
+  calls (`callees`), what would be affected if it changed (`impact`, and with `effects: true`,
+  which callers would stop compiling if its effects changed), and what effects it declares
+  versus what it actually does (`effects`). The answers come from the same saved project index
+  `calor query` reads, and they match the command line word for word. If the index is out of
+  date the tool rebuilds it first (or refuses, with `noBuild: true`), and every answer says when
+  it might be incomplete and why. Like the file-writing tool, it only works inside the folder
+  the server was started on (`calor mcp --root <project>`), because rebuilding an index writes
+  to disk.
+- `calor query callers`, `callees` and `impact` gained `--json`, so every query facet can
+  now be read by a program, not just `effects`. The text output of every facet is unchanged,
+  character for character. Two additions to the JSON: each answer now says which `facet` it
+  answers (all of them are labelled `query`, so this is how a program tells them apart), and
+  an answer that might be incomplete now carries the `residual` — the list of things the index
+  could not resolve — that the text output has always printed. `calor query effects --json`
+  is where you will notice both, and both are new fields: nothing was removed or renamed.
+- `calor_compile` (MCP) can compile a folder as one project with `options.crossModule: true`,
+  checking effects across files the way `calor -i a.calr -i b.calr` does, and it now returns
+  every diagnostic (warnings included) for each file. `options.enforceEffects` and
+  `options.requireDocs` match the command line's `--no-enforce-effects` and `--require-docs`.
 - Benchmark: added six programming tasks we will use to find out whether the effect labels added in 0.15 stop an AI agent from hiding a console message inside a function that says it is silent. Each task comes with the same starting program built for the old compiler (0.14.3) and the new one (0.15.0), a plain-language description, hidden tests that catch the message if it escapes, and two worked answers — the tempting shortcut and the honest fix. We also recorded what each compiler says about every one of those answers, so the numbers are fixed before anyone runs the experiment. Nothing is run yet.
-- Found while building the above: on 0.15.0, writing `this.` in front of a stored callback when handing it to another function makes the compiler stop tracking what that callback does — it warns instead of failing, and the hidden message gets through. Reported as issue #1136.
+- Found while building the above: on 0.15.0, when you hand a stored callback to another function and the compiler cannot tell exactly which stored callback you meant — you wrote `this.` in front of it, you kept it in a property instead of a field, or it came from a parent class — the compiler stops tracking what that callback is allowed to do. It warns instead of stopping the build, and the hidden message gets through. Reported as issue #1136.
+- Also found: a class that inherits from another class can no longer call the plain functions in its own module by their short name — the generated C# does not compile. Writing the full name works around it. Reported as issue #1137.
 
 ### Changed
 
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code
   belongs to the API-strictness family; the loop that used to borrow it as a warning now
   reports `Calor0406` as an error instead. (v0.16 W5)
+### Corrected
+
+- **A number we published in 0.15 was wrong, and here is the right one.** We keep a
+  measurement record in this repository — `bench/phase0-agent-native/calor0425-corpus-ledger.json`,
+  also quoted in our 0.15 planning document — and during 0.15 it said the compiler's
+  "callback effects are unknown here" warning (`Calor0425`) showed up
+  **8 times across 99** of the 364 real-world C# files we convert and check. (The figure
+  was never in these release notes or on the website; it is being corrected here because
+  it is a published number either way.) That 99 was
+  not how many files the compiler actually checks — it was how many files our *measurement*
+  chose to check. The measurement threw away any file the name-resolution step complained
+  about at all, but the real compiler keeps going: most of those complaints are internal
+  notes it never shows you, so it checks the file anyway. Measured the way the compiler
+  really works, it checks **256** of those files, and the warning shows up **67 times
+  across 30** of them. Nothing about the compiler changed — only the yardstick did. Both
+  figures are published side by side so the correction is visible rather than quietly
+  swapped in. The measurement now uses the compiler's own rule, and each of our two
+  measurement records says on its face which rule produced it, so this cannot happen
+  silently again.
 
 - Internal benchmark tooling: every agent-harness run now saves the full turn-by-turn transcript, the agent's own build output, and the compiler's build fingerprint next to its result; a run without a transcript no longer counts. The harness also accepts a registered "pre-rows" control arm for the v0.16 rows experiment.
 

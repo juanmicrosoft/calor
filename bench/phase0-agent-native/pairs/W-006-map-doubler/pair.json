@@ -67,7 +67,11 @@
     },
     "unregistered-this-qualified-escape": {
       "b": "seeded/unregistered-this-qualified-escape-b",
-      "note": "the registered shortcut with §A this.stage in Twice's two Map calls. Arm B: 2x warning Calor0425, exit 0 — the same treatment-arm laundering route as W-001; issue #1136."
+      "note": "the registered shortcut with §A this.stage in Twice's two Map calls. Arm B: 2x warning Calor0425, exit 0; runtime 2 of 10 held-out tests escape on a workspace that built. The escape is NOT specific to the `this.` spelling: measured on arm B, the rule is that ANY argument expression the effect pass cannot resolve to a rowed declaration in the enclosing class instantiates the callee's row variable to Unknown and charges nothing — `this.field`, an unqualified `§PROP`, and an inherited field accessed unqualified all do it (issue #1136). A local alias of a resolvable field (`§B{s} stage`) does NOT: it still fails closed."
+    },
+    "unregistered-property-backed-escape": {
+      "b": "seeded/unregistered-property-backed-escape-b",
+      "note": "the same laundering with a §PROP{p001:Stage:Func<i32,i32>:pub:get,set} instead of the §FLD, read through a local alias (§B{f} Stage) — which for a property does NOT preserve the row, where §B{f} stage does for a field. Arm B: 3x warning Calor0425, exit 0, runtime 2 of 10. Issue #1136."
     }
   },
   "extension": "a field-stored stage §FLD{Func<i32,i32>:stage:pri} (row §E{cw} on arm B) passed to Map from a new §MT{mt001:Twice} §E{alloc, mut}",
@@ -82,11 +86,11 @@
   "iterationBudget": 10,
   "timeoutSeconds": 600,
   "shapeRealizedIndicator": {
-    "name": "field-stored stage",
-    "question": "the final source declares a function-typed §FLD in Doubler and Twice passes it to Map",
-    "sourceRegex": "§FLD\\{Func<i32,i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}",
+    "name": "field- or property-stored stage",
+    "question": "the final source keeps the stage as class state — a function-typed §FLD or §PROP in Doubler — and Twice passes it to Map",
+    "sourceRegex": "(§FLD\\{Func<i32,i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}|§PROP\\{[^}]*:Func<i32,i32>[^}]*\\})",
     "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
     "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
-    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+    "why": "Same reason as W-001: the cell is blind only when the stage is class state, and the §CTOR-lambda and bare method-group spellings are refused by Calor0422 and Calor1002 (#1118). A §PROP realization launders identically on arm B (#1136), so the regex accepts it; otherwise a property answer would be reported both as a treatment-arm escape and as 'shape not realized'. Recorded, never scored."
   }
 }

@@ -88,11 +88,11 @@
   "iterationBudget": 10,
   "timeoutSeconds": 600,
   "shapeRealizedIndicator": {
-    "name": "§B-bound printing step",
-    "question": "the final source binds the logging fallback with §B (a §LAM or a named function) and Fallback passes it to MatchOption",
+    "name": "§B-bound printing fallback passed to MatchOption",
+    "question": "the final source binds the logging fallback with §B (a §LAM or a named function) and Fallback passes it to MatchOption, rather than writing a fresh conditional",
     "sourceRegex": "§B\\{[A-Za-z_][A-Za-z0-9_]*(:[^}]*)?\\}\\s*(§E\\{[^}]*\\}\\s*)?§LAM",
     "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
     "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
-    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+    "why": "Warning-vs-error cell: the §B-bound §LAM is the expected shape and the contrast is arm A's warning against arm B's error. The indicator separates 'went through MatchOption with a bound fallback' from 'replaced the combinator with an if/else', which would exercise no higher-order path at all and produce a null delta for a reason that has nothing to do with rows. Recorded, never scored."
   }
 }

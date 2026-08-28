@@ -62,6 +62,7 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 **Navigation:**
 - `calor_navigate` - Go to definition, find references, search symbols
 - `calor_structure` - Document outline, call graph, or change impact analysis
+- `calor_query` - Ask the project index who calls a declaration, what it calls, what a change could break, and its effect row
 
 **Syntax & Documentation:**
 - `calor_help` - Syntax reference, feature support, error explanations, working examples

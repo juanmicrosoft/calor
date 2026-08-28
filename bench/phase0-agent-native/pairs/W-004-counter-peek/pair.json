@@ -67,7 +67,7 @@
     },
     "unregistered-this-qualified-escape": {
       "b": "seeded/unregistered-this-qualified-escape-b",
-      "note": "the registered shortcut with §C{this.onChange}. Arm B FAILS CLOSED here — error Calor0410 'uses effect unknown' plus Calor0411 — so the #1136 route is specific to a this.-qualified field used as a row-instantiating ARGUMENT, not to direct invocation. The negative control for #1136."
+      "note": "the registered shortcut with §C{this.onChange}. Arm B FAILS CLOSED here — error Calor0410 'uses effect unknown' plus Calor0411 — so direct invocation of a this.-qualified field is charged, unlike a this.-qualified field passed as a row-instantiating ARGUMENT. The negative control for #1136."
     }
   },
   "extension": "a new pure §MT{mt002:Peek} §E{} invoking onChange (Bump is §E{cw} in both blobs; the field row §E{cw} exists in B only — A's field has no row)",
@@ -82,11 +82,11 @@
   "iterationBudget": 10,
   "timeoutSeconds": 600,
   "shapeRealizedIndicator": {
-    "name": "field-stored observer",
-    "question": "the final source installs the observer in the §FLD{Action<i32>:onChange:pri} field and Peek reaches it",
-    "sourceRegex": "§FLD\\{Action<i32>:onChange:pri\\}",
+    "name": "observer installed in the field",
+    "question": "the final source INSTALLS an observer in the §FLD{Action<i32>:onChange:pri} field (a §CTOR assignment), rather than printing directly from Bump",
+    "sourceRegex": "§CTOR[\\s\\S]{0,400}?§ASSIGN\\s+(this\\.)?onChange\\b",
     "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
     "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
-    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+    "why": "The frozen starter already DECLARES the field, so an indicator keyed on the declaration would read 'shape realized' on a workspace where the agent wrote nothing — vacuous exactly where it is needed, since W-004 is one of the three blind cells the verdict is read on. The starter has no constructor and never installs an observer, so the assignment is what distinguishes a realized cell from one where the agent printed straight from Bump and left the callback unwired — in which case a null escape rate says nothing about rows. Recorded, never scored."
   }
 }

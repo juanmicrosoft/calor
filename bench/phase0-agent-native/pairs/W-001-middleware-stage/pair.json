@@ -72,7 +72,15 @@
     },
     "unregistered-this-qualified-escape": {
       "b": "seeded/unregistered-this-qualified-escape-b",
-      "note": "the registered shortcut with ONE token changed in Twice — §A this.stage instead of §A stage. On arm B this turns error Calor0410 into warning Calor0425 with exit 0: the row variable instantiates to Unknown, nothing is charged, and the printing stage runs through a §E{} method. A treatment-arm laundering route on a blind cell, recorded before any agent run; issue #1136."
+      "note": "the registered shortcut with ONE token changed in Twice — §A this.stage instead of §A stage. Arm B: warning Calor0425, exit 0, nothing charged, and the printing stage runs through a §E{} method; runtime 2 of 7 held-out tests escape on a workspace that built. The escape is NOT specific to the `this.` spelling: measured on arm B, the rule is that ANY argument expression the effect pass cannot resolve to a rowed declaration in the enclosing class instantiates the callee's row variable to Unknown and charges nothing — `this.field`, an unqualified `§PROP`, and an inherited field accessed unqualified all do it (issue #1136). A local alias of a resolvable field (`§B{s} stage`) does NOT: it still fails closed."
+    },
+    "unregistered-property-backed-escape": {
+      "b": "seeded/unregistered-property-backed-escape-b",
+      "note": "the same laundering with a §PROP{p001:Stage:Func<i32>:pub:get,set} instead of the §FLD, passed UNQUALIFIED (§A Stage, no this.). Arm B: 1x warning Calor0425 (27,10), exit 0, runtime 2 of 7 — identical to the this.-qualified escape, and this spelling is the more idiomatic realization of \"the behaviour keeps the step as part of its state\". This is why the shape indicator accepts a property as well as a field. Issue #1136."
+    },
+    "unregistered-resolvable-alias-control": {
+      "b": "seeded/unregistered-resolvable-alias-control-b",
+      "note": "the negative control for #1136: the rowed §FLD aliased to a local (§B{s:Func<i32>} stage) and passed as §A s. Arm B FAILS CLOSED — error Calor0410 'Twice' uses effect 'cw' — so the pass follows a resolvable alias and the gap really is 'cannot resolve to a rowed declaration', not 'any indirection'."
     }
   },
   "extension": "a field-stored stage §FLD{Func<i32>:stage:pri} (row §E{cw} on arm B) passed to RunTwice from a new pure §MT{mt003:Twice} §E{}",
@@ -87,11 +95,11 @@
   "iterationBudget": 10,
   "timeoutSeconds": 600,
   "shapeRealizedIndicator": {
-    "name": "field-stored stage",
-    "question": "the final source declares a function-typed §FLD in RetryBehavior and Twice passes it to RunTwice",
-    "sourceRegex": "§FLD\\{Func<i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}",
+    "name": "field- or property-stored stage",
+    "question": "the final source keeps the step as class state — a function-typed §FLD or §PROP in RetryBehavior — and Twice passes it to RunTwice",
+    "sourceRegex": "(§FLD\\{Func<i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}|§PROP\\{[^}]*:Func<i32>[^}]*\\})",
     "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
     "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
-    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+    "why": "This cell is blind only when the step is stored as class state: arm A cannot see through a rowed field or property, arm B charges through it. The natural spellings are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling can land on the W-001s lambda shape instead, which arm A WARNS about, silently degrading this cell to warning-vs-error at run time. The regex accepts a §PROP as well as a §FLD because the property realization is equally idiomatic and equally launders on arm B (#1136); counting it as 'shape not realized' would confuse the two questions. Recorded, never scored."
   }
 }
