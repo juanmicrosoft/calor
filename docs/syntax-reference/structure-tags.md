@@ -850,6 +850,25 @@ Type parameters are declared using `<T>` suffix syntax after the tag attributes.
 §MT{id:name:vis}<T>        // Generic method
 ```
 
+An **empty** `§IFACE` body — a marker interface — ends at the next type opener
+(`§CL`, `§IFACE`, `§EN`, `§D`, `§DEL`, or a `§CSHARP` block) that sits at
+**exactly the interface's own column**, because a same-column line produces no
+dedent for the parser to stop on:
+
+```calor
+§M{m001:Contracts}
+  §IFACE{i001:IMarker}
+  §CL{c002:Impl:pub}       // sibling — ends the interface body
+    §IMPL{IMarker}
+```
+
+An opener *indented* under the interface is not a sibling and is still a
+`Calor0100` error: interfaces cannot nest types. This makes `§IFACE` asymmetric
+with `§CL` / `§EN`, whose empty bodies do **not** stop at a same-column opener —
+a same-column type after an empty `§CL` is still read as nested. Only the
+interface case was a converter-reach blocker (#903 cluster 2), so only it was
+changed; the class and enum cases are tracked separately.
+
 Variance is legal only on interface type parameters:
 
 ```calor

@@ -306,6 +306,31 @@ public sealed class Parser
         => Check(closer1) || Check(closer2) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
     /// <summary>
+    /// True when the current token opens a type declaration (§CL / §IFACE / §EN /
+    /// §D / §DEL, or a §CSHARP block) at EXACTLY <paramref name="ownerColumn"/> - the column of the
+    /// §IFACE whose body we are reading. Used by
+    /// <see cref="ParseInterfaceDefinition"/> to end an empty interface body at a
+    /// same-column sibling, which the lexer cannot mark with a Dedent (#903
+    /// cluster 2). The column test is load-bearing (review M2): an INDENTED type
+    /// opener is not a sibling, and silently reparenting it to the enclosing
+    /// scope would accept, with no diagnostic, a nesting the language does not
+    /// have. Such an opener falls through to the loop's error arm as before.
+    /// </summary>
+    private bool IsSiblingTypeOpenerAt(int ownerColumn)
+        => Current.Span.Column == ownerColumn
+           && (Check(TokenKind.Class)
+               || Check(TokenKind.Interface)
+               || Check(TokenKind.Enum)
+               || Check(TokenKind.Record)
+               || Check(TokenKind.Delegate)
+               // Review m1: a §CSHARP block at the interface's OWN column is a
+               // sibling too - #717's rewrap emits exactly that when a sibling
+               // type could not be converted, and it was being absorbed as an
+               // interface member with no diagnostic. Deeper §CSHARP is still a
+               // member (an interface can carry interop).
+               || Check(TokenKind.CSharpInterop));
+
+    /// <summary>
     /// Phase 3 (indent-aware) -- consumes the block-end marker and returns
     /// the consumed token (for AST span end calculation).
     ///
@@ -8459,9 +8484,17 @@ public sealed class Parser
         var preprocessorBlocks = new List<MemberPreprocessorBlockNode>();
         var interfaceItems = new List<AstNode>();
 
+        // An EMPTY interface body (a marker interface) followed by a sibling type
+        // at the SAME COLUMN as the §IFACE produces no Dedent, so the sibling's
+        // opener is the next token. Interfaces cannot nest types, so a type opener
+        // at that exact column can only be a sibling: stop and let the enclosing
+        // scope parse it (#903 cluster 2, Calor0100 "Expected EXT, METHOD, PROP,
+        // IXER, or END_IFACE"). An INDENTED type opener is NOT a sibling and still
+        // reports Calor0100 - review M2.
         while (!IsAtEnd
                && !IsBlockEnd(TokenKind.EndInterface)
-               && !Check(TokenKind.Namespace))
+               && !Check(TokenKind.Namespace)
+               && !IsSiblingTypeOpenerAt(startToken.Span.Column))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -8525,7 +8558,7 @@ public sealed class Parser
         }
 
         Token endToken;
-        if (Check(TokenKind.Namespace))
+        if (Check(TokenKind.Namespace) || IsSiblingTypeOpenerAt(startToken.Span.Column))
         {
             endToken = Peek(-1);
         }

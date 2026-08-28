@@ -122,6 +122,22 @@ All notable changes to this project will be documented in this file.
   loaded, the normal text report now says so at the top and again in the summary.
   Before, that notice only appeared in JSON output, so a broken install looked like
   "0 proved, everything skipped" with no explanation. Carried over from PR #982.
+- Converting C# to Calor now produces Calor the compiler can read for 59 more real-world
+  files (#903). Before, over the three sample projects we test against (MediatR, Serilog,
+  FluentValidation), 59 of 364 converted files failed to parse: long lambdas that were
+  written at the wrong indent (`Calor0099`), a marker interface with nothing in it followed
+  by the next type (`Calor0100`), a method call split across lines (`Calor0100`), a list of
+  objects with property initializers (`Calor0100`), and an `else if` whose condition needed a
+  temporary (`Calor0117`). All 364 now parse. An empty interface followed by a sibling type
+  is also accepted in hand-written Calor, as long as the next type starts in the same
+  column as the interface; a type indented underneath one is still an error, because
+  interfaces cannot contain types.
+- Converting a lambda whose parameter type could not be worked out no longer writes `?` as
+  the type (#1097). The compiler could not read `?` and gave up on the rest of that method
+  with an internal error (`Calor0932`); it now treats the parameter like any other untyped
+  lambda parameter, and when the lambda is handed to a written `Func<...>` or `Action<...>`
+  it now reads the parameter type from there. Over the same three projects this removes
+  72 of 73 internal errors.
 
 ## [0.15.0] - 2026-08-27
 

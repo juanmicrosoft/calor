@@ -7,23 +7,23 @@
   "Conversion": {
     "Incomplete": 0,
     "LegacySourceOrderAttempted": 18005,
-    "RoslynSelectedAttempted": 17457,
+    "RoslynSelectedAttempted": 34942,
     "FilesSeen": 364,
-    "ConvertedAndBound": 305,
+    "ConvertedAndBound": 364,
     "ConvertExceptions": 0,
     "EmptyOutput": 0,
-    "OutputParseFailures": 59
+    "OutputParseFailures": 0
   },
   "PreserveCoverage": {
     "FilesSeen": 364,
-    "OpaqueBoundaries": 121,
-    "OpaqueExpressions": 42206,
+    "OpaqueBoundaries": 89,
+    "OpaqueExpressions": 6423,
     "OpaqueUnmapped": 0,
-    "OpaqueIdentityCount": 121,
-    "UnconvertedFiles": 17,
-    "UnconvertedIdentityCount": 17,
+    "OpaqueIdentityCount": 89,
+    "UnconvertedFiles": 2,
+    "UnconvertedIdentityCount": 2,
     "ConvertExceptions": 0,
     "EmptyOutput": 0,
-    "OutputParseFailures": 15
+    "OutputParseFailures": 0
   }
 }

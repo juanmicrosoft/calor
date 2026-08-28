@@ -11779,9 +11779,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             var symbol = _semanticModel.GetDeclaredSymbol(parameter);
             if (symbol is IParameterSymbol paramSymbol && paramSymbol.Type != null
-                && paramSymbol.Type.SpecialType != SpecialType.System_Object)
+                && paramSymbol.Type.SpecialType != SpecialType.System_Object
+                // #1097: a parameter whose type inference FAILED gets a nameless
+                // error type that displays as "?" — or as "IGrouping<?, T>" / "?[]"
+                // when nested — which is not a Calor type. "Could not infer" is the
+                // honest answer; the emitter then writes its usual placeholder
+                // instead of a spelling the binder cannot canonicalize. An error type
+                // that carries a NAME (an explicitly typed parameter whose type lives
+                // in another file of the single-file conversion compilation) keeps
+                // that name: it is a real spelling, and dropping it would change what
+                // the binder is told for no reason.
+                && !ContainsUnnamedErrorType(paramSymbol.Type))
             {
-                return TypeMapper.CSharpToCalor(paramSymbol.Type.ToDisplayString());
+                var mapped = TypeMapper.CSharpToCalor(paramSymbol.Type.ToDisplayString());
+                return IsCanonicalizableCalorType(mapped) ? mapped : null;
             }
         }
         catch
@@ -11790,6 +11801,122 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// True when <paramref name="type"/> is, or structurally contains, a Roslyn
+    /// error type with no name — the "?" of a failed inference — as opposed to an
+    /// unresolved but explicitly written type name.
+    /// </summary>
+    private static bool ContainsUnnamedErrorType(ITypeSymbol type)
+    {
+        if (type.TypeKind == TypeKind.Error && string.IsNullOrEmpty(type.Name))
+            return true;
+        return type switch
+        {
+            IArrayTypeSymbol array => ContainsUnnamedErrorType(array.ElementType),
+            IPointerTypeSymbol pointer => ContainsUnnamedErrorType(pointer.PointedAtType),
+            INamedTypeSymbol named => named.TypeArguments.Any(ContainsUnnamedErrorType)
+                || (named.ContainingType != null && ContainsUnnamedErrorType(named.ContainingType)),
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// #1097 second source: when the semantic model cannot type a lambda
+    /// parameter (the delegate type itself is unresolved — e.g. <c>Func&lt;int,int&gt;</c>
+    /// without <c>using System;</c>), the delegate's written type arguments still
+    /// say what the parameter is. Reads the enclosing declaration's type syntax
+    /// (no semantic model needed), then the converted type, for the
+    /// <c>Func</c> / <c>Action</c> / <c>Predicate</c> families whose arity matches.
+    /// </summary>
+    private string? TryInferLambdaParameterTypeFromDelegate(LambdaExpressionSyntax lambda, int index, int parameterCount)
+    {
+        // Review m3: the whole body sits inside the try. This method exists so an
+        // un-canonicalizable spelling never reaches the binder; letting an
+        // exception escape from the syntax branch would defeat that.
+        try
+        {
+            if (lambda.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax declaration } }
+                && declaration.Type is GenericNameSyntax generic
+                && TryDelegateArity(generic.Identifier.Text, parameterCount, out var expectedArity)
+                && generic.TypeArgumentList.Arguments.Count == expectedArity)
+            {
+                var written = TypeMapper.CSharpToCalor(generic.TypeArgumentList.Arguments[index].ToString());
+                if (IsCanonicalizableCalorType(written))
+                    return written;
+            }
+
+            if (_semanticModel == null) return null;
+            var typeInfo = _semanticModel.GetTypeInfo(lambda);
+            if ((typeInfo.ConvertedType ?? typeInfo.Type) is INamedTypeSymbol named
+                && TryDelegateArity(named.Name, parameterCount, out var arity)
+                && named.TypeArguments.Length == arity
+                && IsSystemDelegateNamespace(named.ContainingNamespace)
+                && !ContainsUnnamedErrorType(named.TypeArguments[index]))
+            {
+                var mapped = TypeMapper.CSharpToCalor(named.TypeArguments[index].ToDisplayString());
+                if (IsCanonicalizableCalorType(mapped))
+                    return mapped;
+            }
+        }
+        catch
+        {
+            // Best-effort, like TryInferLambdaParameterType.
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Review m4: <c>Func</c> / <c>Action</c> / <c>Predicate</c> are matched by name.
+    /// For a RESOLVED type the caller also checks that it lives in <c>System</c>
+    /// (<see cref="IsSystemDelegateNamespace"/>). The syntax branch cannot: the
+    /// name is unresolved there, which is precisely why that branch exists. A
+    /// user-defined <c>Func&lt;T,R&gt;</c> whose type arguments are in the same
+    /// order would be read the same way - the same assumption the C# reader makes,
+    /// and it only ever supplies a type the parameter had no other spelling for.
+    /// </summary>
+    private static bool TryDelegateArity(string delegateName, int parameterCount, out int typeArgumentCount)
+    {
+        switch (delegateName)
+        {
+            case "Func":
+                typeArgumentCount = parameterCount + 1;
+                return true;
+            case "Action":
+                typeArgumentCount = parameterCount;
+                return parameterCount > 0;
+            case "Predicate":
+                typeArgumentCount = 1;
+                return parameterCount == 1;
+            default:
+                typeArgumentCount = 0;
+                return false;
+        }
+    }
+
+    /// <summary>Review m4: the resolved delegate must be one of System's.</summary>
+    private static bool IsSystemDelegateNamespace(INamespaceSymbol? ns)
+        => ns != null && ns.Name == "System" && (ns.ContainingNamespace?.IsGlobalNamespace ?? false);
+
+    /// <summary>
+    /// #1097 belt-and-braces: the inferred spelling must survive the binder's
+    /// <see cref="Binding.TypeIdentity.Canonicalize"/> — a spelling it rejects would
+    /// surface later as an AnalysisICE (Calor0932) that abandons the enclosing member.
+    /// </summary>
+    private static bool IsCanonicalizableCalorType(string? mapped)
+    {
+        if (string.IsNullOrWhiteSpace(mapped))
+            return false;
+        try
+        {
+            Binding.TypeIdentity.Canonicalize(mapped);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static string? TryGetDeclaredArrayElementType(SyntaxNode node)
@@ -11874,15 +12001,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 parameters.Add(new LambdaParameterNode(
                     GetTextSpan(simple.Parameter),
                     simple.Parameter.Identifier.Text,
-                    TryInferLambdaParameterType(simple.Parameter)));
+                    TryInferLambdaParameterType(simple.Parameter)
+                        ?? TryInferLambdaParameterTypeFromDelegate(lambda, 0, 1)));
                 break;
 
             case ParenthesizedLambdaExpressionSyntax paren:
-                foreach (var param in paren.ParameterList.Parameters)
+                var parenParams = paren.ParameterList.Parameters;
+                for (var i = 0; i < parenParams.Count; i++)
                 {
+                    var param = parenParams[i];
                     var typeName = param.Type != null
                         ? TypeMapper.CSharpToCalor(param.Type.ToString())
-                        : TryInferLambdaParameterType(param);
+                        : TryInferLambdaParameterType(param)
+                            ?? TryInferLambdaParameterTypeFromDelegate(lambda, i, parenParams.Count);
                     parameters.Add(new LambdaParameterNode(
                         GetTextSpan(param),
                         param.Identifier.Text,
