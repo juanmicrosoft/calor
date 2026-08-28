@@ -30,10 +30,13 @@ public static class ProjectIndexBuilder
     {
         /// <summary>
         /// v0.16 W5 — test-only injection of the effect pass's SCC fixpoint cap
-        /// (<see cref="EffectEnforcementPass.SccFixpointIterationCap"/>); null
-        /// keeps the pass's default. Not part of the options hash: it exists so
-        /// a test can drive a small fixture into Calor0406 and observe that the
-        /// index records a residual rather than partial facts.
+        /// (<see cref="EffectEnforcementPass.SccFixpointIterationCap"/>). Null
+        /// means <b>nothing is injected</b>, so the pass applies the same
+        /// size-floored effective cap <c>calor build</c> applies — see
+        /// <see cref="CreateEffectPass"/> for why null must not be turned into
+        /// the default here. Not part of the options hash: it exists so a test
+        /// can drive a small fixture into Calor0406 and observe that the index
+        /// records a residual rather than partial facts.
         /// </summary>
         internal int? SccFixpointIterationCap { get; init; }
 
@@ -302,18 +305,8 @@ public static class ProjectIndexBuilder
                 // no residual — `calor build` fails on that file, so the index
                 // says the same thing.
                 var effectDiagnostics = new DiagnosticBag();
-                var pass = new EffectEnforcementPass(
-                    effectDiagnostics,
-                    UnknownCallPolicy.Strict,
-                    resolver: resolver,
-                    projectDirectory: projectDirectory,
-                    crossModuleFunctionNames: crossModuleNames)
-                {
-                    SccFixpointIterationCap = options.SccFixpointIterationCap
-                        ?? EffectEnforcementPass.DefaultSccFixpointIterationCap,
-                    InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap
-                        ?? EffectEnforcementPass.DefaultInstantiatedChargeIterationCap,
-                };
+                var pass = CreateEffectPass(
+                    effectDiagnostics, resolver, projectDirectory, crossModuleNames, options);
                 pass.Enforce(document.Ast);
                 if (effectDiagnostics.Any(d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge))
                 {
@@ -365,6 +358,86 @@ public static class ProjectIndexBuilder
             }
         }
     }
+
+    /// <summary>
+    /// The effect pass the index runs over one document.
+    ///
+    /// <para>A cap is set on the pass <b>only when the caller actually configured
+    /// one</b>. That is not a style choice: assigning
+    /// <see cref="EffectEnforcementPass.SccFixpointIterationCap"/> at all — even to
+    /// <see cref="EffectEnforcementPass.DefaultSccFixpointIterationCap"/> — marks
+    /// the cap as injected, and an injected cap is used <b>verbatim</b>, which
+    /// switches off the size floor (<c>max(default, scc.Count + 1)</c>) the
+    /// compiler runs with. Passing <c>cap ?? Default</c> therefore gave the index
+    /// a FLAT cap of 100 while <c>calor build</c> had the floored one.
+    ///
+    /// <para>The trigger is an SCC whose fixpoint needs MORE THAN 100 rounds —
+    /// which requires 100+ members but is not implied by having them. A doubly
+    /// linked <b>chain</b> is the shape that diverged (the effect travels one back
+    /// edge per round, so n members cost ~n rounds): measured, n = 99 agreed and
+    /// n = 100/101/150 reported Calor0406 against a clean compile. A
+    /// one-directional <b>ring</b> of the same size does not: every member changes
+    /// in round 1, so it settles in a couple of rounds and indexed fine even at
+    /// n = 400 on the buggy binary. Do not restate this as "100+ mutually
+    /// recursive functions" — that is the wrong rule.</para>
+    ///
+    /// <para>The pass's caps are <c>init</c>-only (the pins in
+    /// <c>NonConvergenceTests</c> and <c>ProjectIndexTests</c> rely on injection,
+    /// and making them settable would let a cap change mid-pass), so "set it only
+    /// if configured" cannot be an assignment after construction — hence the
+    /// switch over the four null/non-null combinations. The
+    /// instantiated-charge arm is kept even though that cap has no injected flag
+    /// today: the shape stays correct if one is ever added, and it mirrors the
+    /// same helper in <c>NonConvergenceTests</c>. Every arm is observed by
+    /// <c>ProjectIndexTests.EffectsFacet_EveryConfiguredCapArrivesAtThePass</c>.</para>
+    ///
+    /// <para><b>Follow-up:</b> the real fix is to delete the trap rather than
+    /// remember it — make the pass's caps <c>int?</c> so null-means-default is the
+    /// identity, at which point both four-arm switches collapse to a plain
+    /// assignment. Tracked separately; this PR does not touch the pass.</para>
+    /// </summary>
+    /// <remarks>
+    /// <c>internal</c> rather than <c>private</c> so a test can assert the
+    /// resulting pass's EFFECTIVE cap directly
+    /// (<c>EffectiveSccFixpointIterationCap(500) == 501</c> when nothing is
+    /// configured) — a behavioural guard that is red for <c>?? Default</c>, for
+    /// <c>?? 100</c>, and for any future spelling of the same mistake.
+    /// </remarks>
+    internal static EffectEnforcementPass CreateEffectPass(
+        DiagnosticBag diagnostics,
+        EffectResolver resolver,
+        string projectDirectory,
+        IEnumerable<string> crossModuleFunctionNames,
+        Options options) =>
+        (options.SccFixpointIterationCap, options.InstantiatedChargeIterationCap) switch
+        {
+            (null, null) => new EffectEnforcementPass(
+                diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
+                projectDirectory: projectDirectory,
+                crossModuleFunctionNames: crossModuleFunctionNames),
+            (not null, null) => new EffectEnforcementPass(
+                diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
+                projectDirectory: projectDirectory,
+                crossModuleFunctionNames: crossModuleFunctionNames)
+            {
+                SccFixpointIterationCap = options.SccFixpointIterationCap.Value,
+            },
+            (null, not null) => new EffectEnforcementPass(
+                diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
+                projectDirectory: projectDirectory,
+                crossModuleFunctionNames: crossModuleFunctionNames)
+            {
+                InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap.Value,
+            },
+            _ => new EffectEnforcementPass(
+                diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
+                projectDirectory: projectDirectory,
+                crossModuleFunctionNames: crossModuleFunctionNames)
+            {
+                SccFixpointIterationCap = options.SccFixpointIterationCap!.Value,
+                InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap!.Value,
+            },
+        };
 
     /// <summary>
     /// The bound symbol a pass fact belongs to: the one whose definition starts
