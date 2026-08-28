@@ -7,14 +7,15 @@
   "legBExclusionReason": "arm B's starter does not build (exit 1, PP-E1's frozen post-E4 multiset: 1x Calor0410 'unknown' at m008 (23,9) + 2x Calor0411 on the ConfigureAwait calls); the agent must repair Handle before extending, so its runs are archived (tokens.output) and never enter the leg-B ratio. Disclosed in spec.md.",
   "spec": "spec.md",
   "tests": {
-    "path": "heldout",
+    "path": "tests",
     "runner": "dotnet-test",
     "heldOut": true,
-    "shim": "heldout/shims/TestShim.calor.cs",
+    "shim": "tests/shims/TestShim.calor.cs",
     "effectObservingTests": [
       "Handle_NoPreProcessors_IsSilent",
       "Handle_RecordingPreProcessorOnly_IsSilent"
-    ]
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
   },
   "armKind": "calor",
   "arms": {

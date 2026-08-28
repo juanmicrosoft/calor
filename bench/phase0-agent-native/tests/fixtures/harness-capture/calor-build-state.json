@@ -1,0 +1,115 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "6474337f4e0657b11d936bd6e45547b4f1de8bc70805002147688263ee06c9ce",
+  "optionsHash": "331d6d9a9cd498ca82a097ddde5410df2137b877e74cd1c7cb1d239abb51456f",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "TextUtils.calr": {
+      "contentHash": "5b96ab39a3b79c3ec122e3bb458505f90bcab47d7e2b4d2b87d62d16b40e3623",
+      "lastModified": "2026-08-27T22:10:34.4800182Z",
+      "fileSize": 851,
+      "effectSummary": {
+        "moduleName": "TextUtils",
+        "publicFunctions": [
+          {
+            "name": "Slugify",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Truncate",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 7,
+            "declarationColumn": 3
+          },
+          {
+            "name": "WordCount",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 15,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [],
+        "internalFunctionNames": [
+          "Slugify",
+          "Truncate",
+          "WordCount"
+        ],
+        "internalMethodNames": [],
+        "callers": [
+          {
+            "callerId": "f001",
+            "displayName": "Slugify",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "s.ToLowerInvariant",
+                "isConstructor": false
+              },
+              {
+                "target": "lower.Replace",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f002",
+            "displayName": "Truncate",
+            "diagnosticLine": 8,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "s.Substring",
+                "isConstructor": false
+              },
+              {
+                "target": "s.Substring",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f003",
+            "displayName": "WordCount",
+            "diagnosticLine": 16,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "s.Replace",
+                "isConstructor": false
+              },
+              {
+                "target": "tabs.Replace",
+                "isConstructor": false
+              },
+              {
+                "target": "returns.Replace",
+                "isConstructor": false
+              },
+              {
+                "target": "norm.Split",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "3954792332b81e0d6460a8697def7ebb86dab75a31dfc39bc0f0dd6a46720483",
+      "diagnostics": []
+    }
+  }
+}

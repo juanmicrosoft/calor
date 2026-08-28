@@ -6,14 +6,15 @@
   "legB": true,
   "spec": "spec.md",
   "tests": {
-    "path": "heldout",
+    "path": "tests",
     "runner": "dotnet-test",
     "heldOut": true,
-    "shim": "heldout/shims/TestShim.calor.cs",
+    "shim": "tests/shims/TestShim.calor.cs",
     "effectObservingTests": [
       "Sum2_IsSilent_OneAbsent",
       "Sum2_IsSilent_BothAbsent"
-    ]
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
   },
   "armKind": "calor",
   "arms": {

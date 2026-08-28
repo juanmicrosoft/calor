@@ -312,6 +312,7 @@ public class EffectResolverKeyLedgerTests
             .ToList();
     }
 
+
     private static List<string> EnumerateCalorFiles(string root)
     {
         // Filter on REPO-RELATIVE paths, for the reason HigherOrderDemandLedgerTests
@@ -332,8 +333,14 @@ public class EffectResolverKeyLedgerTests
                 return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
-                    // Same rule, same reason, for the PP-W-rows measurement fixtures — see
-                    // PpwFixture.
+                    // Harness scratch that is not product corpus, excluded the way docs/design/spikes/ is:
+                    // (1) templates/ — the arm csproj template and the permissive canary run-pair.sh compiles
+                    //     before a pre-rows epoch (v0.16 W1), a program written to draw Calor0410;
+                    // (2) the PP-W-rows fixtures and epoch archives PpwFixture names (roadmap v0.16 §4.1,
+                    //     S3 (c)). W1 landed the seeded-only form and asked for the STARTERS to be
+                    //     dispositioned when the pairs landed; PpwFixture records that disposition and why
+                    //     the other two options it listed are unavailable. Counts are unchanged either way.
+                    && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
                     && !PpwFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)

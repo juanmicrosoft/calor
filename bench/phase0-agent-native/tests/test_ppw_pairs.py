@@ -6,8 +6,9 @@ and the frozen artifact `pairs/ppw-seeded-compiles.json`.
 Always-on checks (no compiler needed):
 
   * every pair directory has spec.md, pair.json, starter-a/, starter-b/,
-    heldout/ (with an xUnit test file and shims/TestShim.calor.cs), and the
-    seeded shortcut/clean directories for both arms;
+    tests/ (with an xUnit test file and shims/TestShim.calor.cs — the layout
+    run-pair.sh materializes, both arms being calor arms), and the seeded
+    shortcut/clean directories for both arms;
   * every starter blob's `git hash-object` SHA equals the SHA pinned in
     pair.json (the 7d621c0d freeze);
   * arm A's config carries permissiveEffects: true + controlArmKind "pre-rows";
@@ -127,11 +128,11 @@ class PairLayout(unittest.TestCase):
     def test_every_pair_has_the_required_files(self):
         for pid in PAIR_IDS:
             pdir = os.path.join(PAIRS, pid)
-            for rel in ("spec.md", "pair.json", "starter-a", "starter-b", "heldout",
-                        "heldout/shims/TestShim.calor.cs",
+            for rel in ("spec.md", "pair.json", "starter-a", "starter-b", "tests",
+                        "tests/shims/TestShim.calor.cs",
                         "seeded/shortcut-a", "seeded/shortcut-b", "seeded/clean-a", "seeded/clean-b"):
                 self.assertTrue(os.path.exists(os.path.join(pdir, rel)), f"{pid}: missing {rel}")
-            tests = [f for f in os.listdir(os.path.join(pdir, "heldout")) if f.endswith(".cs")]
+            tests = [f for f in os.listdir(os.path.join(pdir, "tests")) if f.endswith(".cs")]
             self.assertTrue(tests, f"{pid}: no held-out test file")
             for sub in ("starter-a", "starter-b", "seeded/shortcut-a", "seeded/shortcut-b",
                         "seeded/clean-a", "seeded/clean-b"):

@@ -22,6 +22,20 @@ namespace Calor.Compiler.Tests;
 ///   adjudicates as an own-goal MISS.</description></item>
 /// </list>
 ///
+/// <para><b>Starters are inside the rule, and that is the disposition v0.16 W1 asked for.</b>
+/// W1 (#1119) landed the narrow form — <c>pairs/W-\d{3}-*/seeded/</c> only — and left a note
+/// saying the per-arm starters "must be dispositioned" when the pairs land, because 9 of the
+/// <c>starter-b</c> files write inline parameter rows and same-line <c>§FLD … §E{…}</c>, exactly
+/// the forms <c>EffectRowCorpusShapeTests</c> asserts no committed <c>.calr</c> writes. Of the
+/// three options it listed — exclude the starters, retire the §3.2 claim, or rewrite the
+/// fixtures — only the first is available: the starters are frozen by blob SHA at
+/// <c>7d621c0d</c> (§4.1 route (a) reads their multisets, and
+/// <c>test_ppw_pairs.py</c> asserts the bytes), so they cannot be rewritten, and the §3.2 claim
+/// is about programs written before the line rule, which these are not. So the whole pair family
+/// is excluded and the §3.2 claim keeps its meaning over the corpus it is about. It also keeps
+/// the corpus counts where they are: including the 12 starters would move the census 927 → 939
+/// and force a formatter-baseline regeneration from this workstream.</para>
+///
 /// <para><b>Why it is the same rule as <c>docs/design/spikes/</c>.</b> These are
 /// deliberately frozen measurement inputs, not source any corpus baseline speaks for.
 /// The narrower <c>epochs/**/final-src/</c> would not do: 210 committed archive

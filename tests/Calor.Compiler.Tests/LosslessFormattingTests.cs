@@ -914,6 +914,7 @@ public sealed class LosslessFormattingTests : IDisposable
             $"Removed: [{string.Join(", ", expected.Except(actual).Order())}].");
     }
 
+
     private static string[] GetTrackedCalorFiles(string repoRoot)
     {
         var startInfo = new ProcessStartInfo("git")
@@ -946,8 +947,14 @@ public sealed class LosslessFormattingTests : IDisposable
             // and this line does not change it, because those files were never
             // among the 886.
             .Where(path => !path.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
-            // Same rule, same reason, for the PP-W-rows measurement fixtures — see
-            // PpwFixture.
+            // Harness scratch that is not product corpus, excluded the way docs/design/spikes/ is:
+            // (1) templates/ — the arm csproj template and the permissive canary run-pair.sh compiles
+            //     before a pre-rows epoch (v0.16 W1), a program written to draw Calor0410;
+            // (2) the PP-W-rows fixtures and epoch archives PpwFixture names (roadmap v0.16 §4.1,
+            //     S3 (c)). W1 landed the seeded-only form and asked for the STARTERS to be
+            //     dispositioned when the pairs landed; PpwFixture records that disposition and why
+            //     the other two options it listed are unavailable. Counts are unchanged either way.
+            .Where(path => !path.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
             .Where(path => !PpwFixture.IsMatch(path))
             .Order(StringComparer.Ordinal)
             .ToArray();

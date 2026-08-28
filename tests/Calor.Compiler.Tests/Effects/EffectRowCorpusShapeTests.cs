@@ -184,6 +184,7 @@ public sealed class EffectRowCorpusShapeTests
     /// fixtures again, as per-arm starters plus seeded mutants. The class summary
     /// records how many excluded files actually write a meaning-changing form.
     /// </summary>
+
     private static IReadOnlyList<string> CommittedCalrFiles(string root)
     {
         var process = Process.Start(new ProcessStartInfo("git", "ls-files *.calr")
@@ -201,8 +202,14 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
-            // Same rule, same reason, for the PP-W-rows measurement fixtures — see
-            // PpwFixture.
+            // Harness scratch that is not product corpus, excluded the way docs/design/spikes/ is:
+            // (1) templates/ — the arm csproj template and the permissive canary run-pair.sh compiles
+            //     before a pre-rows epoch (v0.16 W1), a program written to draw Calor0410;
+            // (2) the PP-W-rows fixtures and epoch archives PpwFixture names (roadmap v0.16 §4.1,
+            //     S3 (c)). W1 landed the seeded-only form and asked for the STARTERS to be
+            //     dispositioned when the pairs landed; PpwFixture records that disposition and why
+            //     the other two options it listed are unavailable. Counts are unchanged either way.
+            .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
             .Where(line => !PpwFixture.IsMatch(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();

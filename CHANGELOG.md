@@ -29,6 +29,8 @@ All notable changes to this project will be documented in this file.
   belongs to the API-strictness family; the loop that used to borrow it as a warning now
   reports `Calor0406` as an error instead. (v0.16 W5)
 
+- Internal benchmark tooling: every agent-harness run now saves the full turn-by-turn transcript, the agent's own build output, and the compiler's build fingerprint next to its result; a run without a transcript no longer counts. The harness also accepts a registered "pre-rows" control arm for the v0.16 rows experiment.
+
 ### Fixed
 
 - The compiler no longer crashes on converted code whose local bindings form a cycle
