@@ -277,6 +277,17 @@ public class HigherOrderDemandLedgerTests
             PerFile: perFile);
     }
 
+
+    /// <summary>
+    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
+    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
+    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
+    /// The per-arm starters beside them are NOT matched and stay counted.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
+        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static List<string> EnumerateCalorFiles(string root)
     {
         // Filter on REPO-RELATIVE paths: the checkout itself may live under a
@@ -307,16 +318,17 @@ public class HigherOrderDemandLedgerTests
                     // excluded by path instead. The ledger's counts are unchanged
                     // by this line — these files were never part of the 886.
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
-                    // Harness scratch under bench/phase0-agent-native/ is the same case:
-                    // templates/ holds the arm csproj template and the permissive canary
-                    // run-pair.sh compiles before a pre-rows epoch (v0.16 W1) — a program
-                    // written to draw Calor0410, never product code — and pairs/W-00x-*
-                    // are the PP-W-rows per-arm starters and seeded mutants (§4.1, S3 (c)).
-                    // The archived epoch outputs under epochs/ and the authored N1/W1..W5
-                    // pairs stay counted, as they are today; the ledger's counts are
-                    // unchanged by these two lines.
+                    // Harness scratch that is not product corpus, the same case: templates/
+                    // holds the arm csproj template and the permissive canary run-pair.sh
+                    // compiles before a pre-rows epoch (v0.16 W1) — a program written to
+                    // draw Calor0410, never product code — and pairs/W-00x-*/seeded/ holds
+                    // the PP-W-rows seeded mutants (§4.1, S3 (c)). The per-arm STARTERS are
+                    // not excluded: they are ordinary programs and are held to the same bar
+                    // as the other 50 pair fixtures. The archived epoch outputs under
+                    // epochs/ and the authored N1/W1..W5 pairs stay counted, as today; the
+                    // ledger's counts are unchanged by these two lines.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
+                    && !PpwSeededFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

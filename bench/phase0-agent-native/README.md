@@ -50,7 +50,9 @@ New `result.json` fields:
 
 | Field | Meaning |
 |---|---|
-| `turns.assistantMessages` | number of **distinct assistant `message.id`** values in the transcript — the per-turn field A-1.12 registers. stream-json emits one event per content block, so events are not turns; and it is **not** `num_turns`. Subagent messages (visible because of `--forward-subagent-text`, `parent_tool_use_id` set) are counted in the total and split out as `turns.assistantMessagesSubagent` / `turns.assistantMessagesTopLevel`, matching the corrected-token rule (A-1.9.1) which already sums subagent tokens. |
+| `turns.assistantMessages` | number of **distinct top-level assistant `message.id`** values in the transcript (events whose `parent_tool_use_id` is null) — the per-turn field A-1.12 registers, defined as [#1117](https://github.com/juanmicrosoft/calor/issues/1117) defines it. stream-json emits one event per content block, so events are not turns; and it is **not** `num_turns`. |
+| `turns.subagentMessages` | distinct `message.id` of subagent messages (`parent_tool_use_id` set — visible only because the runner passes `--forward-subagent-text`). Counted **separately** on purpose: the registered field must not move depending on whether that flag was passed. |
+| `turns.assistantMessagesIncludingSubagents` | their sum, for audit beside the corrected-token rule (A-1.9.1), which does include subagent tokens. |
 | `turns.numTurns` | the envelope's `num_turns`, archived beside it. |
 | `agentBuilds.count` | records in `agent-builds.jsonl`. |
 | `compilerHash` / `buildState` | from `calor-build-state.json` (#1094): the compiler's own attestation of the product that built the agent's code, so an analyzer can assert both arms of a parity epoch differ. `buildState.archivedFrom` is `agent-workspace`, or `harness-final-build` when the agent never built and the harness's final build produced the state; `null` on the C# arm. |

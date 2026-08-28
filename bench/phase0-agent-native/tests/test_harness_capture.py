@@ -105,15 +105,18 @@ def write_pair_json(path, calor_config=None, extra_arms=None, fixture_name=None)
 
 # ---------------------------------------------------------------------------
 class AssistantMessagesAreDistinctMessageIds(unittest.TestCase):
-    """§2.1 S1: turns.assistantMessages = distinct assistant message.id."""
+    """§2.1 S1 as A-1.12 registers it, following #1117: turns.assistantMessages =
+    distinct TOP-LEVEL assistant message.id (parent_tool_use_id null), with the
+    subagent count reported separately so the registered field cannot be inflated by
+    whether --forward-subagent-text was passed."""
 
     def test_multi_block_messages_count_once(self):
         t = hc.count_turns(fixture("multi-block-run.transcript.jsonl"))
         # msg_A spans three events (thinking, text, tool_use); msg_D two.
         self.assertEqual(t["assistantEvents"], 10)
         self.assertEqual(t["assistantMessages"], 7)
-        self.assertEqual(t["assistantMessagesTopLevel"], 7)
-        self.assertEqual(t["assistantMessagesSubagent"], 0)
+        self.assertEqual(t["subagentMessages"], 0)
+        self.assertEqual(t["assistantMessagesIncludingSubagents"], 7)
         self.assertEqual(t["resultEvents"], 1)
         self.assertEqual(t["source"], "transcript")
 
@@ -127,12 +130,28 @@ class AssistantMessagesAreDistinctMessageIds(unittest.TestCase):
         self.assertEqual(num_turns, 16)
         self.assertNotEqual(t["assistantMessages"], num_turns)
 
-    def test_subagent_messages_are_counted_and_reported_separately(self):
+    def test_subagent_messages_are_reported_separately_and_excluded_from_the_field(self):
+        # #1117's definition, registered by A-1.12: the field counts top-level ids only.
+        # Passing or not passing --forward-subagent-text must not move it.
         t = hc.count_turns(fixture("subagent-run.transcript.jsonl"))
-        self.assertEqual(t["assistantMessagesTopLevel"], 3)
-        self.assertEqual(t["assistantMessagesSubagent"], 2)
-        self.assertEqual(t["assistantMessages"], 5)
+        self.assertEqual(t["assistantMessages"], 3)            # top-level only
+        self.assertEqual(t["subagentMessages"], 2)
+        self.assertEqual(t["assistantMessagesIncludingSubagents"], 5)
         self.assertEqual(t["assistantEvents"], 7)
+
+    def test_the_field_is_invariant_to_forward_subagent_text(self):
+        # The same run without the flag: the subagent events simply are not there.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "no-forward.jsonl")
+            kept = [e for e in hc.read_events(fixture("subagent-run.transcript.jsonl"))
+                    if not e.get("parent_tool_use_id")]
+            with open(path, "w") as fh:
+                for event in kept:
+                    fh.write(json.dumps(event) + "\n")
+            without = hc.count_turns(path)
+        with_flag = hc.count_turns(fixture("subagent-run.transcript.jsonl"))
+        self.assertEqual(without["assistantMessages"], with_flag["assistantMessages"])
+        self.assertEqual(without["subagentMessages"], 0)
 
     def test_empty_and_missing_transcripts_read_as_missing(self):
         for path in (fixture("empty.transcript.jsonl"), fixture("does-not-exist.jsonl")):
@@ -152,14 +171,15 @@ class AssistantMessagesAreDistinctMessageIds(unittest.TestCase):
                                      "message": {"id": "m1", "content": []}}) + "\n")
             t = hc.count_turns(path)
             self.assertEqual(t["assistantMessages"], 1)      # m1 once, not twice
-            self.assertEqual(t["assistantMessagesSubagent"], 0)
+            self.assertEqual(t["subagentMessages"], 0)
             self.assertEqual(t["assistantEventsWithoutId"], 1)
             self.assertEqual(t["events"], 3)
 
     def test_cli_turns_matches_module(self):
         out = run([sys.executable, HELPER, "turns", fixture("subagent-run.transcript.jsonl")])
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(json.loads(out.stdout)["assistantMessages"], 5)
+        self.assertEqual(json.loads(out.stdout)["assistantMessages"], 3)
+        self.assertEqual(json.loads(out.stdout)["subagentMessages"], 2)
 
 
 # ---------------------------------------------------------------------------
@@ -252,11 +272,48 @@ class AgentBuildsAreArchived(unittest.TestCase):
         self.assertEqual([r["index"] for r in b], [1, 2, 3, 4])
         self.assertEqual([r["toolCallOrdinal"] for r in b], [1, 4, 5, 6])   # Read/Edit/ls skipped, still ordinal
         self.assertEqual([r["exitCode"] for r in b], [0, 1, 0, 0])
+        # m4: a failing Bash tool_result usually carries only `Build FAILED` + is_error.
+        # exitCode must then be 1, never null — null would read as "no failure".
+        self.assertTrue(all(r["exitCode"] is not None for r in b))
         self.assertEqual([r["isError"] for r in b], [False, True, False, False])
         self.assertIn("error Calor0410", b[1]["output"])
         self.assertIn("Build succeeded", b[0]["output"])
         self.assertEqual(b[1]["messageId"], "msg_D")
         self.assertTrue(all(r["hasResult"] for r in b))
+
+    def test_workspace_path_is_not_a_calor_invocation(self):
+        """M1 — the calor arm's workspace is `.../p0-<pair>-calor-XXXXXX`, so matching a
+        bare `calor` recorded nearly every Bash call that named the workspace as a build,
+        on the calor arm only (`-csharp-` never matched). That inflates agentBuilds
+        arm-asymmetrically in the very artifact meant to answer "why more turns"."""
+        commands = [
+            "cd /tmp/p0-N1-001-calor-ab12/src && ls -la",
+            "grep -rn 'Slugify' /tmp/p0-N1-001-calor-ab12/src",
+            "cat /tmp/p0-N1-001-calor-ab12/spec.md",
+            "cd /tmp/p0-N1-001-calor-ab12/src && dotnet build",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "t.jsonl")
+            with open(path, "w") as fh:
+                for i, command in enumerate(commands, start=1):
+                    fh.write(json.dumps({"type": "assistant", "message": {"id": "m%d" % i, "content": [
+                        {"type": "tool_use", "id": "t%d" % i, "name": "Bash",
+                         "input": {"command": command}}]}}) + "\n")
+                    fh.write(json.dumps({"type": "user", "message": {"content": [
+                        {"type": "tool_result", "tool_use_id": "t%d" % i, "content": "ok"}]}}) + "\n")
+            records = hc.extract_builds(path)
+        self.assertEqual([r["command"] for r in records], [commands[-1]])
+        self.assertEqual([r["kind"] for r in records], ["dotnet-build"])
+
+    def test_calor_invocations_still_register(self):
+        for command, kind in [("calor --version", "calor"),
+                              ("dotnet /opt/calor/calor.dll ids index x.calr", "calor"),
+                              ("dotnet test --nologo", "dotnet-test"),
+                              ("echo calorimeter", None),
+                              ("ls /tmp/p0-N1-001-csharp-ab12/src", None)]:
+            self.assertEqual(bool(hc.BUILD_COMMAND_RE.search(command)), kind is not None, command)
+            if kind:
+                self.assertEqual(hc.classify_command(command), kind, command)
 
     def test_output_is_capped_and_marked_truncated(self):
         b = hc.extract_builds(fixture("multi-block-run.transcript.jsonl"), max_output=20)
@@ -349,7 +406,13 @@ class PairConfigAdmission(unittest.TestCase):
         for bad in (dict(STRICT, contractMode="off"), dict(STRICT, z3Required=False),
                     dict(STRICT, enforceEffects=False), dict(PRE_ROWS, contractMode="release"),
                     dict(PRE_ROWS, z3Required=False), dict(PRE_ROWS, controlArmKind="post-rows"),
-                    dict(STRICT, permissiveEffects="true"), {}, None):
+                    dict(STRICT, permissiveEffects="true"),
+                    # m1: Python's 1 == True and 0 == False would admit these through a
+                    # plain dict comparison — a loosening against the jq check this
+                    # replaced, and the second one would slip a permissive arm through.
+                    dict(STRICT, enforceEffects=1, permissiveEffects=0),
+                    dict(PRE_ROWS, permissiveEffects=1),
+                    dict(STRICT, contractMode=None), {}, None):
             self.assertFalse(hc.admit_config(bad)[0], repr(bad))
 
     def _check(self, pair_json, key, arm=None):
@@ -516,6 +579,20 @@ class LegBPairsAreRegisteredInPins(unittest.TestCase):
         self.assertIn('ARM_A_BRANCH="arm/v0.14.3-pre-rows"', src)
         self.assertIn('[[ "$ARM_A_COMMIT" != "$ARM_A_EXPECTED_COMMIT" ]]', src)
         self.assertIn('== "src/Calor.Sdk/Sdk/Sdk.targets src/Calor.Tasks/CompileCalor.cs "', src)
+        # M2 — the product is built from the WORKING TREE, so a commit pin alone would
+        # certify a build that does not match the commit.
+        self.assertIn('git -C "$ARM_A_ROOT" status --porcelain', src)
+        self.assertIn('git -C "$ARM_B_ROOT" status --porcelain', src)
+        self.assertIn("armDirtyFiles", src)
+        # M3 — compilerHash cannot witness the POLICY (both arms built from one product
+        # share it); optionsHash is what moves.
+        self.assertIn("optionsHash", src)
+        # m2 — the blind floor is checked before spend, not discovered after $135.
+        self.assertIn("the registered floor is 2", src)
+        # m3 — a null-agent run never lands on a live epoch id, whatever id was passed.
+        self.assertIn('[[ -n "$NULL_FLAG" && "$EPOCH" != *-null ]]', src)
+        # m5 — every registered pair must actually have produced runs.
+        self.assertIn("missing_results", src)
         m5 = _read(RUN_M5)
         self.assertIn("--arm-a-config) ARM_A_CONFIG=", m5)
         self.assertIn('--arm-config "$cfg"', m5)
@@ -562,6 +639,46 @@ class RunPpwEpochFailsLoudOnMissingPairs(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+class CensusExclusionIsNarrow(unittest.TestCase):
+    """M4 — harness scratch is excluded from the committed-.calr census, but only the
+    part that is scratch: the canary under templates/ and the PP-W-rows SEEDED mutants.
+    The per-arm starters are ordinary programs and stay counted, because §4.1 route (a)
+    rests on them and every other pair fixture is held to the same bar."""
+
+    WALKERS = [
+        os.path.join(REPO, "tests", "Calor.Compiler.Tests", "LosslessFormattingTests.cs"),
+        os.path.join(REPO, "tests", "Calor.Compiler.Tests", "Effects", "EffectRowCorpusShapeTests.cs"),
+        os.path.join(REPO, "tests", "Calor.Compiler.Tests", "Effects", "EffectResolverKeyLedgerTests.cs"),
+        os.path.join(REPO, "tests", "Calor.Compiler.Tests", "Effects", "HigherOrderDemandLedgerTests.cs"),
+    ]
+
+    def test_every_walker_excludes_templates_and_only_seeded_pairs(self):
+        for walker in self.WALKERS:
+            src = _read(walker)
+            self.assertIn("bench/phase0-agent-native/templates/", src, walker)
+            self.assertIn(r"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/", src, walker)
+            # the over-broad form must be gone: it would exempt the starters too
+            self.assertNotIn('"bench/phase0-agent-native/pairs/W-00"', src, walker)
+
+    def test_the_regex_matches_seeded_but_not_starters(self):
+        import re as _re
+        pattern = _re.compile(r"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/")
+        matches = [
+            "bench/phase0-agent-native/pairs/W-001-middleware/seeded/shortcut.calr",
+            "bench/phase0-agent-native/pairs/W-010-later/seeded/x.calr",   # W-010+, not just W-00x
+        ]
+        non_matches = [
+            "bench/phase0-agent-native/pairs/W-001-middleware/starter-a/Prog.calr",
+            "bench/phase0-agent-native/pairs/W-001-middleware/starter-b/Prog.calr",
+            "bench/phase0-agent-native/pairs/W1-001-temperature-converter/calor/Temp.calr",
+            "bench/phase0-agent-native/pairs/N1-001-string-utils/calor/TextUtils.calr",
+        ]
+        for path in matches:
+            self.assertIsNotNone(pattern.match(path), path)
+        for path in non_matches:
+            self.assertIsNone(pattern.match(path), path)
+
+
 class MarginDerivation(unittest.TestCase):
     """§2.3(b): population flag, SIMS >= 3000, grid extended to 1.15/1.20 —
     with the A-1.11 defaults frozen byte for byte."""

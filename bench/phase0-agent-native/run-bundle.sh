@@ -520,7 +520,7 @@ extract_metrics() {
     # state is null there unless the project itself compiles .calr.
     local turns num_turns agent_builds build_state compiler_hash
     turns="$(python3 "$HARNESS_CAPTURE" turns "$ws_out/transcript.jsonl" 2>/dev/null)" \
-        || turns='{"assistantMessages":null,"assistantMessagesTopLevel":null,"assistantMessagesSubagent":null,"source":"helper-error"}'
+        || turns='{"assistantMessages":null,"subagentMessages":null,"assistantMessagesIncludingSubagents":null,"source":"helper-error"}'
     num_turns="$(jq -c '.num_turns // null' "$ws_out/agent.json" 2>/dev/null || echo null)"
     [[ -n "$num_turns" ]] || num_turns=null
     turns="$(jq -c --argjson nt "$num_turns" '. + {numTurns: $nt, transcript: "transcript.jsonl"}' <<<"$turns")"
@@ -574,7 +574,7 @@ write_invalid_result() {
           iterations:0, iterationsToDeclaredDone:0,
           costUsd:0, tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
           wallClockSeconds:0,
-          turns:{assistantMessages:null, assistantMessagesTopLevel:null, assistantMessagesSubagent:null,
+          turns:{assistantMessages:null, subagentMessages:null, assistantMessagesIncludingSubagents:null,
                  numTurns:null, source:"invalid", transcript:null},
           agentBuilds:{count:0, file:null},
           compilerHash:null, buildState:{compilerHash:null, source:"invalid", archivedFrom:"none", file:null},

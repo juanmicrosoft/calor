@@ -14,16 +14,18 @@ transcript is read; the shell runners call it and the tests import it.
 Subcommands (each prints one JSON document to stdout; exit codes below):
 
     turns <transcript.jsonl>
-        {assistantMessages, assistantMessagesTopLevel, assistantMessagesSubagent,
+        {assistantMessages, subagentMessages, assistantMessagesIncludingSubagents,
          assistantEvents, assistantEventsWithoutId, resultEvents, events,
          eventTypes, source}
-        `assistantMessages` is the field A-1.12 registers: the number of DISTINCT
-        assistant `message.id` values in the transcript. stream-json emits one
+        `assistantMessages` is the field A-1.12 registers, defined as #1117
+        defines it: the number of distinct **top-level** assistant `message.id`
+        values — events with `parent_tool_use_id` null. stream-json emits one
         `assistant` event per content block, so events are NOT turns; the
-        message id is. Subagent messages (present only because the runner
-        passes --forward-subagent-text) carry `parent_tool_use_id` and are
-        counted in the total AND reported separately, so the total matches the
-        corrected-token rule (A-1.9.1 sums subagent tokens too).
+        message id is. Subagent messages (visible only because the runner passes
+        --forward-subagent-text) are counted SEPARATELY as `subagentMessages`,
+        so the registered field cannot be inflated by whether that flag was
+        passed; `assistantMessagesIncludingSubagents` is their sum, reported for
+        audit beside the corrected-token rule (A-1.9.1 sums subagent tokens).
         A missing / empty file yields zeros with source "missing"; exit 0.
 
     builds <transcript.jsonl> [--max-output N]
@@ -75,7 +77,14 @@ import os
 import re
 import sys
 
-BUILD_COMMAND_RE = re.compile(r"\bdotnet\s+(build|test)\b|\bcalor\b")
+# `calor` must be an INVOCATION, not any occurrence of the word. The calor arm's workspace
+# is `mktemp -d .../p0-<pair>-calor-XXXXXX`, so a bare \bcalor\b matched the WORKSPACE PATH
+# in nearly every Bash command the agent ran ("cd .../p0-N1-001-calor-ab12/src && ls") while
+# the C# arm's `-csharp-` path did not — an arm-asymmetric inflation of agentBuilds in the
+# very artifact that is supposed to answer "why more turns".
+BUILD_COMMAND_RE = re.compile(
+    r"\bdotnet\s+(build|test)\b"
+    r"|(?:^|[;&|(]\s*|\s)(?:dotnet\s+\S*calor\.dll|calor)(?=\s|$)")
 EXIT_CODE_RE = re.compile(r"(?:Exit code|exit code|exited with code|Exit Code):?\s*(-?\d+)")
 DEFAULT_MAX_OUTPUT = 4000
 
@@ -127,8 +136,8 @@ def count_turns(path):
     if not events:
         return {
             "assistantMessages": 0,
-            "assistantMessagesTopLevel": 0,
-            "assistantMessagesSubagent": 0,
+            "subagentMessages": 0,
+            "assistantMessagesIncludingSubagents": 0,
             "assistantEvents": 0,
             "assistantEventsWithoutId": 0,
             "resultEvents": 0,
@@ -161,9 +170,10 @@ def count_turns(path):
     # counted once, on the top-level side.
     sub -= top
     return {
-        "assistantMessages": len(top) + len(sub),
-        "assistantMessagesTopLevel": len(top),
-        "assistantMessagesSubagent": len(sub),
+        # #1117's definition, registered by A-1.12: top-level ids only.
+        "assistantMessages": len(top),
+        "subagentMessages": len(sub),
+        "assistantMessagesIncludingSubagents": len(top) + len(sub),
         "assistantEvents": assistant_events,
         "assistantEventsWithoutId": without_id,
         "resultEvents": result_events,
@@ -194,12 +204,18 @@ def _tool_result_text(block):
     return json.dumps(content)
 
 
+CALOR_INVOCATION_RE = re.compile(
+    r"(?:^|[;&|(]\s*|\s)(?:dotnet\s+\S*calor\.dll|calor)(?=\s|$)")
+
+
 def classify_command(command):
     if re.search(r"\bdotnet\s+test\b", command):
         return "dotnet-test"
     if re.search(r"\bdotnet\s+build\b", command):
         return "dotnet-build"
-    if re.search(r"\bcalor\b", command):
+    # Same invocation shape as BUILD_COMMAND_RE: a workspace path containing "-calor-"
+    # is not a calor call.
+    if CALOR_INVOCATION_RE.search(command):
         return "calor"
     return "other"
 
@@ -251,13 +267,17 @@ def extract_builds(path, max_output=DEFAULT_MAX_OUTPUT):
             if max_output is not None and max_output >= 0 and len(text) > max_output:
                 text = text[:max_output]
                 truncated = True
+            # exitCode: read from the tool_result when it names one ("Exit code: N"),
+            # else 0 for a successful call and 1 for a failed one — most real failing
+            # builds carry only `Build FAILED` plus is_error, and null there would read
+            # as "no failure" to an analyzer. null now means only "no result recorded".
             exit_code = None
             if result:
                 m = EXIT_CODE_RE.search(result["text"])
                 if m:
                     exit_code = int(m.group(1))
-                elif not result["is_error"]:
-                    exit_code = 0
+                else:
+                    exit_code = 1 if result["is_error"] else 0
             records.append({
                 "index": len(records) + 1,
                 "toolCallOrdinal": ordinal,
@@ -310,6 +330,18 @@ def admit_config(config):
         return False, None, "arm config is missing or not an object"
     kind = config.get("controlArmKind")
     pins = {k: config.get(k) for k in STRICT_CONFIG}
+    # Type check BEFORE the dict comparison: in Python 1 == True and 0 == False, so
+    # {"enforceEffects": 1, "permissiveEffects": 0, ...} would otherwise be admitted —
+    # a loosening against the jq check this replaced, and `permissiveEffects: 1` would
+    # slip a permissive arm past the pre-rows requirement.
+    for key, expected in STRICT_CONFIG.items():
+        value = pins[key]
+        if isinstance(expected, bool) and not isinstance(value, bool):
+            return False, None, (
+                "%s must be a JSON boolean, got %r (%s)" % (key, value, type(value).__name__))
+        if isinstance(expected, str) and not isinstance(value, str):
+            return False, None, (
+                "%s must be a JSON string, got %r (%s)" % (key, value, type(value).__name__))
     permissive = pins["permissiveEffects"]
     if kind is not None and kind not in ADMITTED_CONTROL_ARM_KINDS:
         return False, None, "unknown controlArmKind %r (admitted: %s)" % (
@@ -434,9 +466,9 @@ def _self_test():
             for obj in lines:
                 fh.write(json.dumps(obj) + "\n")
         t = count_turns(transcript)
-        check(t["assistantMessages"] == 3, "turns total %r" % t)
-        check(t["assistantMessagesTopLevel"] == 2, "turns top %r" % t)
-        check(t["assistantMessagesSubagent"] == 1, "turns sub %r" % t)
+        check(t["assistantMessages"] == 2, "turns top-level %r" % t)
+        check(t["subagentMessages"] == 1, "turns sub %r" % t)
+        check(t["assistantMessagesIncludingSubagents"] == 3, "turns total %r" % t)
         check(t["assistantEvents"] == 4, "assistant events %r" % t)
         b = extract_builds(transcript)
         check(len(b) == 1 and b[0]["kind"] == "dotnet-build" and b[0]["exitCode"] == 0, "builds %r" % b)
@@ -453,6 +485,10 @@ def _self_test():
     check(not admit_config(dict(STRICT_CONFIG, controlArmKind="pre-rows"))[0], "kind without permissive rejected")
     check(not admit_config(dict(STRICT_CONFIG, contractMode="off"))[0], "other config rejected")
     check(not admit_config(dict(pre, controlArmKind="post-rows"))[0], "unknown kind rejected")
+    check(not admit_config(dict(STRICT_CONFIG, enforceEffects=1, permissiveEffects=0))[0],
+          "1/0 in place of true/false rejected")
+    check(not admit_config(dict(pre, permissiveEffects=1))[0], "permissiveEffects: 1 rejected")
+    check(extract_builds.__doc__ is None or True, "placeholder")
     if ok:
         print("harness-capture.py self-test OK")
         return 0

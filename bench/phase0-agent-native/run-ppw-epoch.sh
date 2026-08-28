@@ -104,9 +104,11 @@ done
 
 # A null-agent run never lands in the registered directory: it is a plumbing
 # check, and the analyzer must refuse to adjudicate an epoch that holds one.
-if [[ -n "$NULL_FLAG" && "$EPOCH" == "$REGISTERED_EPOCH" ]]; then
-    EPOCH="${REGISTERED_EPOCH}-null"
-    echo "NOTE: --null-agent forces the epoch id to '$EPOCH' (the registered id is for the live epoch only)"
+# A null-agent run is a plumbing check and must never land in a directory an analyzer
+# could read as a live epoch — whatever id was passed, not only the registered one.
+if [[ -n "$NULL_FLAG" && "$EPOCH" != *-null ]]; then
+    EPOCH="${EPOCH}-null"
+    echo "NOTE: --null-agent forces the epoch id to '$EPOCH' (live ids are for live runs only)"
 fi
 
 [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {
@@ -142,7 +144,6 @@ b_tasks="$(shasum "$ARM_B_ROOT/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.d
 # pairs are listed together and the runner exits BEFORE any spend — never a
 # warn-and-skip that would silently shrink the registered denominator.
 # ---------------------------------------------------------------------------
-declare -a PAIR_DIRS=()
 problems=()
 for pid in "${PAIRS[@]}"; do
     matches=()
@@ -165,7 +166,6 @@ for pid in "${PAIRS[@]}"; do
             problems+=("$pid: arms.$key must be the strict arm (no controlArmKind)")
         fi
     done
-    PAIR_DIRS+=("$d")
 done
 for p in "$LEG_B_PAIRS" "$BLIND_PAIRS"; do
     for id in $p; do
@@ -174,6 +174,12 @@ for p in "$LEG_B_PAIRS" "$BLIND_PAIRS"; do
     done
 done
 [[ -n "$LEG_B_PAIRS" ]] || problems+=("--leg-b-pairs is empty (the leg-B denominator is registered, never defaulted to nothing)")
+# Blind floor (roadmap §4.1): the leg-A verdict is read on the blind cells and below two
+# of them the PP reads NOT-ADJUDICATED (route a'). A typo that shrinks the set must be
+# caught here, not after the epoch has been paid for.
+blind_count=0
+for _ in $BLIND_PAIRS; do blind_count=$((blind_count + 1)); done
+(( blind_count >= 2 )) || problems+=("--blind-pairs has $blind_count entries ('$BLIND_PAIRS'); the registered floor is 2 — below it the PP reads NOT-ADJUDICATED (route a'), so this is refused before spend")
 if [[ ${#problems[@]} -gt 0 ]]; then
     echo "ERROR: PP-W-rows pair set is not runnable (${#problems[@]} problem(s)); refusing before any spend:" >&2
     printf '  - %s\n' "${problems[@]}" >&2
@@ -225,8 +231,24 @@ arm_a_diff="$(git -C "$ARM_A_ROOT" diff --name-only "$ARM_A_BASE_TAG" "$ARM_A_EX
 [[ "$arm_a_diff" == "src/Calor.Sdk/Sdk/Sdk.targets src/Calor.Tasks/CompileCalor.cs " ]] || {
     echo "ERROR: arm A's diff against $ARM_A_BASE_TAG is not confined to src/Calor.Tasks/CompileCalor.cs + src/Calor.Sdk/Sdk/Sdk.targets: [$arm_a_diff]" >&2
     exit 2; }
-echo "arm A provenance verified: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT, diff confined to {$arm_a_diff}"
-[[ "$ARM_B_DESCRIBE" == "$ARM_B_TAG" ]] || echo "WARNING: arm B is not checked out at the $ARM_B_TAG tag (git describe: $ARM_B_DESCRIBE). §4.1 names the $ARM_B_TAG release tag as treatment." >&2
+# A commit pin alone is not provenance: the PRODUCT is built from the WORKING TREE, so an
+# uncommitted edit in either checkout compiles into the arm while every pin above still
+# reads clean. Both arms must therefore be pristine, and the counts are stamped into
+# pins.json so an analyzer can see they were checked.
+ARM_A_DIRTY="$(git -C "$ARM_A_ROOT" status --porcelain | wc -l | tr -d ' ')"
+ARM_B_DIRTY="$(git -C "$ARM_B_ROOT" status --porcelain | wc -l | tr -d ' ')"
+for arm in A B; do
+    root_var="ARM_${arm}_ROOT"; dirty_var="ARM_${arm}_DIRTY"
+    if [[ "${!dirty_var}" != "0" ]]; then
+        echo "ERROR: arm $arm's checkout has ${!dirty_var} uncommitted change(s) (${!root_var}). The product is built from the working tree, so the commit pin would certify a build that does not match the commit. Commit, stash or discard them." >&2
+        git -C "${!root_var}" status --porcelain | head -20 >&2
+        exit 2
+    fi
+done
+echo "arm A provenance verified: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT, diff confined to {$arm_a_diff}, both checkouts clean"
+[[ "$ARM_B_DESCRIBE" == "$ARM_B_TAG" ]] || {
+    echo "ERROR: arm B is not checked out at the $ARM_B_TAG tag (git describe: $ARM_B_DESCRIBE). §4.1 names the $ARM_B_TAG release tag as treatment; a different build is a different experiment." >&2
+    exit 2; }
 
 if [[ -z "$NULL_FLAG" && $CONFIRM -ne 1 ]]; then
     echo
@@ -251,6 +273,7 @@ stamp_pins() {
        --argjson legb "$(printf '%s\n' $LEG_B_PAIRS | jq -R . | jq -s .)" \
        --argjson blind "$(printf '%s\n' $BLIND_PAIRS | jq -R . | jq -s .)" \
        --arg a_cfg "$ARM_A_CONFIG" --arg b_cfg "$ARM_B_CONFIG" \
+       --arg a_dirty "${ARM_A_DIRTY:-0}" --arg b_dirty "${ARM_B_DIRTY:-0}" \
        '. + {ppW: {gate: "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12)",
                    legA: {metric: "median over blind pairs of the per-pair escape-rate delta (A - B)", bar: "one-sided 95% lower bound > 0", effectSize: 0.5, blindFloor: 2},
                    legB: {metric: "output-tokens-to-green (token-usage.py corrected, A-1.9.1)", lowerBoundGate: 1.0,
@@ -259,8 +282,9 @@ stamp_pins() {
                    pairs: $pairs, legBPairs: $legb, blindPairs: $blind,
                    excludedFromLegB: ($pairs - $legb),
                    controlArm: {armConfig: $a_cfg, controlArmKind: "pre-rows", permissiveEffects: true},
+                   armDirtyFiles: {armA: ($a_dirty|tonumber), armB: ($b_dirty|tonumber)},
                    treatmentArm: {armConfig: $b_cfg, controlArmKind: null, permissiveEffects: false},
-                   validity: "every run must archive transcript.jsonl (W1, gate 8) and both arms must record distinct compilerHash values (#1094)",
+                   validity: "every run must archive transcript.jsonl (W1, gate 8); both arms must record distinct compilerHash values (#1094, witnessing different compilers) AND arm A\u0027s buildState.optionsHash must differ from arm B\u0027s, which is what witnesses the permissive policy — a control arm built from the right commit but run STRICT keeps compilerHash identical and moves only optionsHash",
                    runner: "bench/phase0-agent-native/run-ppw-epoch.sh"}}' \
        "$OUT/pins.json" > "$OUT/pins.json.tmp" && mv "$OUT/pins.json.tmp" "$OUT/pins.json"
 }
@@ -279,6 +303,19 @@ trap stamp_pins EXIT
 
 stamp_pins
 trap - EXIT
+
+# run-m5-epoch.sh re-globs the pair ids and WARNS-and-skips one it cannot resolve, which
+# would silently shrink the denominator after the spend. The pre-flight above proves every
+# id resolves; this proves every id actually produced runs.
+missing_results=()
+for pid in "${PAIRS[@]}"; do
+    find "$OUT" -path "*/${pid}-*/*/run-*/result.json" -print -quit 2>/dev/null | grep -q . \
+        || missing_results+=("$pid")
+done
+if [[ ${#missing_results[@]} -gt 0 ]]; then
+    echo "ERROR: no result.json under $OUT for: ${missing_results[*]} — the epoch is incomplete and must not be adjudicated as if it were the registered six." >&2
+    exit 4
+fi
 
 echo "--- collection complete; verify the registered leg-B denominator was stamped ---"
 python3 "$HARNESS_CAPTURE" leg-b-pairs "$OUT/pins.json"

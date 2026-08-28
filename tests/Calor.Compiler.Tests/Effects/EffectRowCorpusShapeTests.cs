@@ -167,6 +167,17 @@ public sealed class EffectRowCorpusShapeTests
     /// <c>facts.py</c> exclude it (§13.5(b)): the emitter spike commits before/after
     /// .calr fixtures as EVIDENCE, and they are deliberately full of rows.
     /// </summary>
+
+    /// <summary>
+    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
+    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
+    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
+    /// The per-arm starters beside them are NOT matched and stay counted.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
+        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static IReadOnlyList<string> CommittedCalrFiles(string root)
     {
         var process = Process.Start(new ProcessStartInfo("git", "ls-files *.calr")
@@ -184,13 +195,17 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
-            // Harness scratch under bench/phase0-agent-native/, excluded for the same
-            // reason as the spike artifacts: templates/ carries the arm csproj template
-            // and its permissive canary (v0.16 W1 — a deliberate Calor0410 program),
-            // pairs/W-00x-* the PP-W-rows starters and seeded mutants (§4.1, S3 (c)).
-            // Measurement fixtures, not corpus; the counted set is unchanged.
+            // Harness scratch that is not product corpus, excluded exactly the way
+            // docs/design/spikes/ is: (1) templates/ — the arm csproj template and the
+            // permissive canary run-pair.sh compiles before a pre-rows epoch (v0.16 W1), a
+            // program written to draw Calor0410; (2) the PP-W-rows SEEDED mutants
+            // (pairs/W-00x-*/seeded/, S3 (c)) — the spike blobs plus deliberate laundering
+            // shortcuts. The per-arm STARTERS are deliberately NOT excluded: they are
+            // ordinary programs, every other pair fixture is held to this bar, and §4.1
+            // route (a) depends on them, so they keep the automatic round-trip and
+            // effect-row-shape check. `W-\d{3}` rather than `W-00` so W-010+ is covered.
             .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
-            .Where(line => !line.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal))
+            .Where(line => !PpwSeededFixture.IsMatch(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

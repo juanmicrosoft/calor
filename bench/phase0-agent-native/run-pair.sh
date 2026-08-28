@@ -1076,12 +1076,14 @@ extract_metrics() {
     tokens_in=$TOKENS_IN; tokens_out=$TOKENS_OUT; token_usage=$TOKEN_USAGE_JSON
 
     # W1: per-turn fields from transcript.jsonl. turns.assistantMessages =
-    # distinct assistant message.id (the field A-1.12 registers — stream-json
-    # emits one event per content block, so events are not turns); num_turns
-    # from the result envelope stays archived beside it as turns.numTurns.
+    # distinct TOP-LEVEL assistant message.id — the field A-1.12 registers, defined
+    # as #1117 defines it (stream-json emits one event per content block, so events
+    # are not turns, and subagent messages are counted separately as
+    # turns.subagentMessages so the field cannot move with --forward-subagent-text);
+    # num_turns from the result envelope stays archived beside it as turns.numTurns.
     local turns num_turns agent_builds
     turns="$(python3 "$HARNESS_CAPTURE" turns "$ws_out/transcript.jsonl" 2>/dev/null)" \
-        || turns='{"assistantMessages":null,"assistantMessagesTopLevel":null,"assistantMessagesSubagent":null,"source":"helper-error"}'
+        || turns='{"assistantMessages":null,"subagentMessages":null,"assistantMessagesIncludingSubagents":null,"source":"helper-error"}'
     num_turns="$(jq -c '.num_turns // null' "$ws_out/agent.json" 2>/dev/null || echo null)"
     [[ -n "$num_turns" ]] || num_turns=null
     turns="$(jq -c --argjson nt "$num_turns" '. + {numTurns: $nt, transcript: "transcript.jsonl"}' <<<"$turns")"
@@ -1243,7 +1245,7 @@ write_invalid_result() {
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
-          turns:{assistantMessages:null, assistantMessagesTopLevel:null, assistantMessagesSubagent:null,
+          turns:{assistantMessages:null, subagentMessages:null, assistantMessagesIncludingSubagents:null,
                  numTurns:null, source:"invalid", transcript:(if $has_transcript then "transcript.jsonl" else null end)},
           agentBuilds:{count:0, file:null},
           tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
