@@ -30,7 +30,7 @@ calor watch src/ --format json
 | `--strict-api` | Require breaking-change markers for public API changes |
 | `--require-docs` | Require documentation on public functions and types |
 | `--no-enforce-effects` | Opt out of default-on effect enforcement |
-| `--strict-effects` | Promote unknown external calls to errors |
+| `--strict-effects` | Promote the "I cannot tell" effect warnings — `Calor0411`, `Calor0419`, `Calor0425` — to errors |
 | `--permissive-effects` | Assume a call the compiler cannot look up does nothing: `Calor0411` and `Calor0425` go unreported and `Calor0410` becomes a warning ([details](/docs/syntax-reference/effects/#turning-the-checks-down)) |
 | `--contract-mode` | `off`, `debug`, or `release` |
 

@@ -22,7 +22,7 @@ Unknown external calls and raw interop are explicit soundness boundaries: the
 compiler surfaces diagnostics or assumptions rather than proving their
 behavior. Calling a callback is no longer one of them — since 0.15 the compiler
 reads the callback's declared `§E{…}` and charges it to the caller, and reports
-`Calor0425` when neither side is annotated well enough to tell.
+`Calor0425` when one side carries no `§E{…}` and it cannot tell.
 
 `--permissive-effects` waives the "cannot tell" boundary — `Calor0411` and
 `Calor0425` go unreported and `Calor0410` becomes a warning — which voids the

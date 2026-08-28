@@ -796,23 +796,33 @@ Generic types are written inline using angle bracket syntax.
 ```
 
 **Empty interface (changed in 0.16):** a marker interface has no members, so
-there is nothing indented under it and no blank-line rule to tell the parser
-where it stops. From 0.16 an empty `§IFACE` ends at the next type opener —
-`§CL`, `§IFACE`, `§EN`, `§D`, `§DEL`, or a `§CSHARP` block — written at
-**exactly the same column** as the `§IFACE` itself:
+there is nothing indented under it to tell the parser where it stops. From 0.16
+an empty `§IFACE` ends at the next **type** opener — `§CL`, `§IFACE`, `§EN`,
+`§D`, `§DEL`, or a `§CSHARP` block — written at **exactly the same column** as
+the `§IFACE` itself:
 
 ```
 §M{m001:Demo}
-  §IFACE{i001:IMarker:pub}
+  §IFACE{i001:IMarker}
   §CL{c001:Thing:pub}
     §MT{mt1:Go:pub} () -> void
       §E{}
 ```
 
-The column has to match. An indented type opener is not a sibling — it looks
-like you meant to nest one type inside the interface, which Calor does not
-have — so it is still a `Calor0100` error rather than being quietly moved out
-one level.
+Three things this rule does *not* say:
+
+- **The column has to match.** An indented type opener is not a sibling — it
+  looks like you meant to nest one type inside the interface, which Calor does
+  not have — so it is still a `Calor0100` error rather than being quietly moved
+  out one level.
+- **Only type openers end it.** A same-column `§F` after an empty `§IFACE` is
+  still `Calor0100`; the rule is about types sitting next to each other, not
+  about columns in general.
+- **This is an interface rule, not a general one.** An empty `§CL` does *not*
+  behave the same way, and the difference is silent: a `§CL` written at the same
+  column right after an empty `§CL` is parsed as **nested inside** it, with no
+  diagnostic at all. If you write an empty class, give it a body or expect the
+  next one to end up inside it.
 
 ---
 

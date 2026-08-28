@@ -114,12 +114,17 @@ to. Between that fix and the parsing fixes above, the number of modules where
 the converter crashed part-way through dropped from 73 to 1 across the same
 three projects.
 
-There is one change to what you get back. `calor convert` now rescues a member
-it could not convert into working Calor by wrapping the original C# in a
-`§CSHARP` block, instead of failing the whole file. That means converted output
+There is one change to what you get back. `calor convert` now often rescues a
+member it could not convert into working Calor, by wrapping the original C# in a
+`§CSHARP` block rather than sinking the whole file. That means converted output
 can contain `§CSHARP` blocks even when you did not pass `--passthrough`, and the
 report tells you how many. Partly converted beats nothing converted, but treat
 each block as work still to do.
+
+The rescue is not a guarantee. It fires when the generated Calor fails to parse
+or fails to round-trip back to C#; output that parses but that Calor's own
+compiler then rejects still fails the conversion, with nothing written and exit
+`1`. `--passthrough` does not change that outcome.
 
 ---
 

@@ -39,7 +39,7 @@ assuming names from pre-consolidation documentation.
 | `calor_help` | Syntax, support, diagnostic, and example lookup |
 | `calor_navigate` | Definition, reference, symbol, type, and scope queries |
 | `calor_structure` | Outline, call graph, and change-impact analysis |
-| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effects) could break, and what it declares versus what it really does — exactly the same answer [`calor query`](/docs/cli/query/) gives, character for character |
+| `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effects) could break, and what it declares versus what it really does — the same answer [`calor query`](/docs/cli/query/) gives, from the same index |
 | `calor_edit_preview` | Classify a proposed edit as safe, warning-bearing, or breaking |
 | `calor_format` | Format source or check/assign declaration IDs |
 | `calor_session_open` | Parse a project and return a session for cross-file checks |
@@ -58,8 +58,9 @@ inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 
 New in 0.16. This tool answers questions about how your code fits together by
 reading the [project index](/docs/cli/query/) — the same file `calor index build`
-writes and `calor query` reads. It runs no analysis of its own, so an agent and a
-person at the terminal always get the same answer, character for character.
+writes and `calor query` reads. It never computes a second opinion — it reads the
+index, rebuilding it first if it is out of date — so an agent and a person at the
+terminal get the same answer, from the same index.
 
 | Input | Required | Description |
 |:------|:---------|:------------|
