@@ -228,6 +228,12 @@ public class EffectResolverKeyLedgerTests
         Assert.Equal(Floor, committed.GetProperty("floor").GetInt32());
         Assert.Equal(FloorRule, committed.GetProperty("floorRule").GetString());
 
+        // CONVENTION (v0.16 kickoff sweep, review round 1, M3; shape-only by
+        // necessity — a test cannot know its own future commit): this names the
+        // commit whose TREE the counts were measured against, so a PR that
+        // changes the corpus regenerates with the corpus change already
+        // committed. Stamping the branch base records a count that is not
+        // reproducible at the commit named.
         var measuredCommit = committed.GetProperty("measuredCommit").GetString();
         Assert.True(
             measuredCommit != null && Regex.IsMatch(measuredCommit, "^[0-9a-f]{40}$"),

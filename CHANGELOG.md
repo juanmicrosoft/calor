@@ -17,6 +17,21 @@ All notable changes to this project will be documented in this file.
   big but ordinary group never trips it. The project index (`calor query effects`) says
   "did not converge" for such a file instead of recording half-finished rows. (v0.16 W5,
   gate 11)
+- **A new "edit script" test, ES-08, checks effect rows across files.** The compiler's
+  build-cache test suite replays small editing sessions and checks that a fresh build
+  and a cached build report exactly the same problems. ES-08 is the first script whose
+  edit changes a shared helper's *effect row* (what side effects a function passed
+  into it is allowed to have). It confirms that callers in files you did not touch get
+  the right new errors, that the project index's effect-row entries move with the
+  edit, and that unrelated files are left alone. This script was supposed to be
+  registered before the effect-row feature merged in 0.15 and was not; the
+  registration record says so.
+- **CI now installs the `calor` command-line tool from a freshly built package** on
+  Windows, Linux and macOS and checks that it can actually prove contracts — and that
+  when the Z3 solver is missing it says so out loud instead of quietly skipping
+  everything. Carried over from PR #982. Note this check is **advisory for now**: like
+  the matching check for the SDK package, it is not on the list of checks that must pass
+  before a change can be merged, so a failure is visible but does not block anything.
 
 - New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
 
@@ -94,6 +109,19 @@ All notable changes to this project will be documented in this file.
   that stays under the limit — which is all ordinary code, by a wide margin — is
   checked exactly as before, and code past it is treated as "type unknown" instead of
   crashing. (#1104)
+- **No more misleading "generated C# failed" errors next to a real error.** When one
+  file in a project failed to compile, a fresh build used to also blame every file that
+  called into it (Calor1002, "name does not exist"), while a cached rebuild of the same
+  project did not — and `dotnet build` and `calor build` disagreed about it. Now both
+  report only the real error: the compiler skips checking just the generated code that
+  calls into the failed file, and still checks everything else, so a genuine problem in
+  an unrelated file is not hidden. A file whose generated code was skipped this way is
+  not written out or cached, because nothing checked it; the next build checks it.
+  Found while building ES-08.
+- **`calor verify` tells you when nothing was proved.** If the Z3 solver cannot be
+  loaded, the normal text report now says so at the top and again in the summary.
+  Before, that notice only appeared in JSON output, so a broken install looked like
+  "0 proved, everything skipped" with no explanation. Carried over from PR #982.
 
 ## [0.15.0] - 2026-08-27
 
@@ -611,6 +639,53 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
   annotations on type arguments, but the binder does not yet consult it for well-known
   containers (`Option<T>`, `List<T>`, etc.); user-declared classes need declaration-site
   annotation propagation.
+
+### Also in this release — recorded late (added 2026-08-27, from PR #981)
+These eleven changes merged between v0.13.2 and v0.14.0 (2026-08-13 to 2026-08-15) and
+shipped in 0.14.0, but the notes above never mentioned them. PR #981 wrote them up while they
+were still unreleased; this section carries that write-up to where it belongs. Several of them
+make the compiler stricter, so a program that built on 0.13.2 could start reporting errors on
+0.14.0 without any edit — those are marked **stricter**.
+
+- **Effect checking resolves real symbols and fails closed (#968).** Calls, constructors,
+  property getters and setters, overloads, delegates and inherited members are matched by
+  their actual signature instead of by name. **Stricter:** if the compiler cannot work out
+  what an operation is, it no longer assumes it is pure. The CLI, MCP server, MSBuild task
+  and SDK now all enforce effects with the same defaults.
+- **Bug-pattern checks rebuilt on typed control flow (#970).** Findings are now split into
+  three kinds: verified, heuristic hint, and "analysis was incomplete". **Stricter:** the set
+  of findings and how they are labelled both changed.
+- **Taint analysis rebuilt on control-flow graphs (#969).** Tracks data by symbol and access
+  path, through aliases, collections and calls, and reports the full path from source to sink.
+  **Stricter:** direct-injection findings are on by default.
+- **Control-flow code generation is structural (#972).** Loops, matches with guards and
+  block lambdas keep their shape when lowered to C#; `yield` legality is checked across nested
+  control flow.
+- **Contract inheritance is checked as a whole (#966).** Preconditions and postconditions
+  inherited from a base type or interface are compared with the override's as complete
+  conjunctions, keyed by the full method identity. **Stricter:** an override whose contract is
+  incompatible with what it inherits is now an error.
+- **Postconditions with early or nested returns are lowered correctly (#967).** One shared
+  path handles functions, methods, enum extensions and operators; each return runs the
+  postcondition exactly once. **Stricter:** postconditions on iterators are rejected, and a
+  raw-C# return the compiler cannot see through is an error.
+- **Proof and refinement guards use program state (#964).** Runtime guards are emitted for
+  refined parameters, returns, bindings and explicit proof sites, and kept whenever a proof
+  did not fully succeed.
+- **Literals, string interpolation and raw C# survive code generation exactly (#975).**
+  Integer width, sign, base and separators; interpolation placeholders and escapes;
+  precedence-safe expressions; raw C# bytes untouched.
+- **Declarations, types and modules survive code generation exactly (#977).** Using
+  directives, `#if` branches and source order are kept; generic variance and constraints are
+  validated. **Stricter:** generated C# is standalone, with implicit usings turned off.
+- **The language server's analysis is immutable and cycle-safe (#980).** Snapshots are
+  versioned and atomic; stale versions are rejected; internal failures and inheritance cycles
+  show up as diagnostics instead of hangs. Live end-to-end stress runs are part of CI.
+- **The CI performance ceiling is calibrated from CI (#978, #974).** The 21.0s limit had
+  been set from a developer machine and sat inside the range CI runners normally produce, so
+  it failed depending on which runner a job landed on. It is now 24.0s with the evidence
+  recorded, and the gate streams its output. The runner terminations tracked in #965 were not
+  root-caused by this change.
 
 ## [0.13.2] - 2026-08-12
 

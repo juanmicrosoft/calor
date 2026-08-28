@@ -708,9 +708,16 @@ public sealed class SpikeVerdictTests
     // clause of the control that E3 can put at risk and therefore the clause E3
     // owes.
     //
-    // What this test deliberately does NOT assert is the control's full
-    // per-fixture multiset. That is asserted separately, by
-    // PpE1NegativeControls_MatchA1111Baselines_PostE4 below.
+    // Since the v0.16 kickoff sweep this pin ALSO asserts the control's full
+    // per-fixture multiset under the pinned invocation, the same table
+    // PpE1NegativeControls_MatchA1111Baselines_PostE4 below asserts; the two
+    // differ in what they name on failure (a barred code vs. a moved
+    // multiset), not in what they compile — and since review round 1 (m3) they
+    // literally SHARE the compile: CompileControlFixture is memoised, so the
+    // redundancy costs no process spawns. Both are kept rather than collapsed
+    // because the gate row's "no barred code anywhere in a control compile" and
+    // A-1.11.1's per-fixture multiset are two distinct registered claims, and a
+    // failure should say which one moved.
     //
     // THE BASELINE A-1.11 FROZE IS SUPERSEDED. A-1.11's leg-A negative control
     // read "A2 = 1x Calor0410 at (23,9) + 3x Calor0411; the four A3 = exit 0
@@ -749,46 +756,71 @@ public sealed class SpikeVerdictTests
         "A2", "A3-map", "A3-match", "A3-middleware", "A3-callback",
     ];
 
+    /// <summary>
+    /// The codes the gate row bars "anywhere in a control compile" (annex
+    /// A-1.11), plus Calor0425 — E3/E4's only other row-family emission.
+    /// </summary>
+    private static readonly string[] PpE1BarredCodes =
+    [
+        Compiler.Diagnostics.DiagnosticCode.EffectRowMismatch,      // Calor0424
+        Compiler.Diagnostics.DiagnosticCode.EffectRowUnknown,       // Calor0425
+        Compiler.Diagnostics.DiagnosticCode.OverrideEffectVariance, // Calor0420
+        Compiler.Diagnostics.DiagnosticCode.InterfaceEffectVariance, // Calor0421
+        "Calor0405",
+    ];
+
     [Fact]
     public void PpE1NegativeControl_NoEffectRowDiagnosticOnAnyUnmutatedFixture()
     {
+        // REWRITTEN in the v0.16 kickoff sweep (roadmap-v0.16 §6, "PP-E1
+        // negative-control pin skips the effect pass on A3-map/A3-match";
+        // e3b notes). As first written, this pin built Parser → Binder →
+        // EffectEnforcementPass by hand, and that chain reports Calor0202 on
+        // A3-map's and A3-match's method-group arguments — which the real
+        // pipeline does not — so `if (!diagnostics.HasErrors)` skipped the
+        // effect pass on exactly the two fixtures that exercise rank-1
+        // instantiation. The pin passed on those two by never looking.
+        //
+        // It now drives the PINNED invocation — the CLI, `-i <file> -o <out>`,
+        // NO --permissive-effects (the gate row forbids the flag here, because
+        // it waives Calor0425 and would satisfy every L7 cell for free) —
+        // through PpE1Probe, the same shelling the ledger test uses, on all
+        // five fixtures. Two assertions per fixture, neither skippable: no
+        // barred code anywhere in the output, and exit code + multiset equal to
+        // A-1.11.1's frozen post-E4 table (PpE1PostE4Baselines). The frozen
+        // numbers are not touched by this rewrite; the A3 fixtures are exit 0
+        // with zero diagnostics, A2 is its exact registered multiset.
+        Assert.Equal(
+            PpE1ControlFixtures.OrderBy(f => f, StringComparer.Ordinal),
+            PpE1PostE4Baselines.Select(b => b.Fixture).OrderBy(f => f, StringComparer.Ordinal));
+
         var failures = new List<string>();
 
-        foreach (var fixture in PpE1ControlFixtures)
+        foreach (var (fixture, expectedExitCode, expected) in PpE1PostE4Baselines)
         {
-            var path = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
-            Assert.True(File.Exists(path), $"PP-E1 control fixture missing: {path}");
+            var (exitCode, actual) = CompileControlFixture(fixture);
 
-            var source = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
-            var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
-            var module = new Compiler.Parsing.Parser(
-                new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(),
-                diagnostics).Parse();
-            new Compiler.Binding.Binder(diagnostics, fixture + ".calr").Bind(module);
-            if (!diagnostics.HasErrors)
+            foreach (var diagnostic in actual)
             {
-                // The pinned invocation is the CLI default: enforcement on,
-                // UnknownCallPolicy.Strict, NO --permissive-effects. The gate row
-                // forbids the flag here, because it waives Calor0425 and would
-                // satisfy every L7 cell for free.
-                new Compiler.Effects.EffectEnforcementPass(diagnostics).Enforce(module);
+                if (PpE1BarredCodes.Any(code => diagnostic.Contains(code, StringComparison.Ordinal)))
+                    failures.Add($"{fixture}: barred code in the control compile — {diagnostic}");
             }
 
-            foreach (var diagnostic in diagnostics)
+            if (exitCode != expectedExitCode)
+                failures.Add($"{fixture}: expected exit {expectedExitCode} but got exit {exitCode}");
+
+            if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
             {
-                if (diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMismatch
-                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowUnknown
-                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.OverrideEffectVariance
-                    || diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.InterfaceEffectVariance)
-                {
-                    failures.Add($"{fixture}: {diagnostic.Code} — {diagnostic.Message}");
-                }
+                failures.Add(
+                    $"{fixture}: expected [{string.Join(", ", expected)}] "
+                    + $"but got [{string.Join(", ", actual)}]");
             }
         }
 
         Assert.True(failures.Count == 0,
             "PP-E1 leg A's negative control is FROZEN: an unmutated fixture must draw no "
-            + "row-family diagnostic. E3's emission put one there, which means the L5/L7 "
+            + "row-family diagnostic under the pinned invocation, and its multiset must be "
+            + "A-1.11.1's registered post-E4 one. A row-family emission here means the L5/L7 "
             + "detection cells can no longer discriminate the feature under test. STOP and "
             + "report before pushing — do not regenerate the baseline.\n  "
             + string.Join("\n  ", failures));
@@ -835,9 +867,10 @@ public sealed class SpikeVerdictTests
         // directly reports Calor0202 ("'Double' is a function, not a variable")
         // on their method-group arguments, which the real pipeline does not, so
         // the hand-built chain SKIPS the effect pass on exactly the two fixtures
-        // that exercise rank-1 instantiation. `PpE1NegativeControl_*` above has
-        // that shape and is therefore vacuous for those two; this pin does not
-        // inherit it. UnsafeTranspileOnly stops at C# emission, which removes
+        // that exercise rank-1 instantiation. `PpE1NegativeControl_*` above
+        // had that shape until the v0.16 kickoff sweep rewrote it onto the
+        // pinned CLI invocation; this pin never inherited it.
+        // UnsafeTranspileOnly stops at C# emission, which removes
         // only Calor1002 relative to the pinned CLI invocation.
         var result = Compiler.Program.Compile(
             source,
@@ -1031,11 +1064,25 @@ public sealed class SpikeVerdictTests
     /// itself lives in <see cref="PpE1Probe"/>, shared with the PP-E1 ledger
     /// test so both read the same invocation.</para>
     /// </summary>
+    /// <summary>
+    /// Memoised across the whole assembly (review round 1, m3): three pins now
+    /// compile the same five unmutated fixtures with the same pinned, flagless
+    /// invocation — the barred-code control, the A-1.11.1 multiset control, and
+    /// each L7 cell's baseline. The invocation is deterministic and the fixtures
+    /// are blob-SHA frozen, so one process per fixture answers all of them; this
+    /// removes five process spawns per run without weakening any assertion.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string, (int ExitCode, string[] Diagnostics)> PpE1ControlCompiles = new(StringComparer.Ordinal);
+
     private static (int ExitCode, string[] Diagnostics) CompileControlFixture(string fixture)
     {
-        var source = Path.Combine(SpikeDirectory(), "after", fixture + ".calr");
-        Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
-        return CompileControlSource(source);
+        return PpE1ControlCompiles.GetOrAdd(fixture, static key =>
+        {
+            var source = Path.Combine(SpikeDirectory(), "after", key + ".calr");
+            Assert.True(File.Exists(source), $"PP-E1 control fixture missing: {source}");
+            return CompileControlSource(source);
+        });
     }
 
     /// <summary>The pinned invocation over an arbitrary source path — the L7

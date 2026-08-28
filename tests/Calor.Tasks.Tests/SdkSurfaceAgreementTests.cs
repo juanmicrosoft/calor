@@ -59,8 +59,11 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
     [Fact]
     public void TheDenominatorIsRegistered()
     {
-        // Seven scripts in the corpus; six are expressible. A script that
+        // Eight scripts in the corpus; seven are expressible. A script that
         // appears or disappears has to edit this test in the diff.
+        // ES-08 (the effect-row edit script, registered in this PR) runs the
+        // effects-on profile at every step, which CompileCalor expresses, so it
+        // joins the leg rather than being excluded.
         Assert.Equal(
             new[]
             {
@@ -71,9 +74,10 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
                 "ES-05-options-flip",
                 "ES-06-touch-noop",
                 "ES-07-persistent-finding",
+                "ES-08-effect-row-edit",
             },
             EnumerateScriptDirectories().Select(Path.GetFileName).ToArray());
-        Assert.Equal(6, ExpressibleScripts().Count());
+        Assert.Equal(7, ExpressibleScripts().Count());
 
         // The exclusion is real: the profile is in use, and the task has no
         // property to express it. If either changes, ES-07 joins the leg.
