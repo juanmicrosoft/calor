@@ -10,11 +10,19 @@ namespace Calor.Tasks.Tests;
 /// <c>dotnet build</c> through Calor.Tasks, so the policy must reach
 /// <see cref="Calor.Compiler.Effects.UnknownCallPolicy"/> from MSBuild, not only from the CLI).
 ///
-/// <para><b>What the waiver covers, exactly</b> — the tests below pin both halves:
-/// <c>Calor0410</c>/<c>Calor0411</c> (single-module and cross-module) are demoted to
-/// warnings and <c>Calor0425</c> is suppressed; <c>Calor0424</c> (a row that does not
-/// fit), <c>Calor0420</c>/<c>Calor0421</c> and <c>Calor0418</c> stay errors under every
-/// flag (<c>Diagnostic.cs</c>: "never waived, at any site, by any flag").</para>
+/// <para><b>What the waiver covers, exactly</b> — the tests below pin both halves.
+/// <c>Calor0410</c> (uses an effect it does not declare) is demoted to a warning, in the
+/// per-file pass and in the cross-module pass alike. <c>Calor0411</c> (unknown external
+/// call) and <c>Calor0425</c> ("cannot be decided") are <b>suppressed</b>, not demoted:
+/// <c>ReportUnknownCall</c> reports only when the policy is Strict or
+/// <c>StrictEffects</c> is on (<c>EffectEnforcementPass.cs:4101</c>), and the
+/// cross-module pass returns early under Permissive
+/// (<c>CrossModuleEffectEnforcementPass.cs:237</c>). NB <c>Calor0411</c> is a warning
+/// under MSBuild even at the strict default — the task exposes no <c>StrictEffects</c>
+/// parameter — so there is no demotion of it to describe. What is never waived, by this
+/// flag or any other: <c>Calor0424</c> (a row that does not fit) and <c>Calor0420</c>/
+/// <c>Calor0421</c> (an override or interface implementation that BROADENS the effects
+/// it inherited; narrowing is legal).</para>
 /// </summary>
 public sealed class PermissiveEffectsTests : IDisposable
 {
@@ -170,10 +178,13 @@ public sealed class PermissiveEffectsTests : IDisposable
     public void MsBuildProperty_ReachesTheTask_EndToEnd()
     {
         var strictBuild = RunMsBuild(permissive: false, out var strictOut);
-        Assert.False(strictBuild, "strict build must fail:\n" + strictOut);
-        Assert.Contains("error Calor0410", strictOut);
+        // MSBuild-level causes first: a misspelled task parameter (MSB4064) or a bad
+        // property value (MSB4030) also fails the build, and must not be reported as
+        // "the diagnostic was missing".
         Assert.DoesNotContain("MSB4064", strictOut);   // unknown task parameter
         Assert.DoesNotContain("MSB4030", strictOut);   // bad property value
+        Assert.False(strictBuild, "strict build must fail:\n" + strictOut);
+        Assert.Contains("error Calor0410", strictOut);
 
         var permissiveBuild = RunMsBuild(permissive: true, out var permissiveOut);
         Assert.True(permissiveBuild, "permissive build must succeed:\n" + permissiveOut);
@@ -329,20 +340,30 @@ public sealed class PermissiveEffectsTests : IDisposable
         Assert.DoesNotContain(Engine(strict).Messages, m => m.Contains("skipping (up-to-date)"));
     }
 
-    /// <summary>P4 — the other direction, which is the one the control arm takes.</summary>
+    /// <summary>
+    /// P4 — the other direction, which is the one the control arm takes. The source must
+    /// SUCCEED under strict: only then is a cache entry written that a policy-blind warm
+    /// build could wrongly serve, and only then is the "did not skip" assertion load-bearing.
+    /// (With a source that fails under strict, nothing is cached, the second build recompiles
+    /// whatever the policy, and the assertion is vacuous — it stays green with the policy
+    /// removed from the options fingerprint.) The same-policy leg is the control that proves
+    /// this build WOULD have skipped.
+    /// </summary>
     [Fact]
     public void FlippingStrictToPermissive_Recompiles_RatherThanServingTheStrictVerdict()
     {
-        var source = Write("Canary.calr", LaunderingSource);
+        var source = Write("Clean.calr", CleanSource);   // SUCCEEDS under strict, so a cache entry exists to be wrongly served
 
         var strict = CreateTask(permissive: null, source);
-        Assert.False(strict.Execute());
+        Assert.True(strict.Execute(), "errors: " + string.Join("; ", Engine(strict).Errors));
+
+        var warmSame = CreateTask(permissive: null, source);            // control: same policy DOES skip
+        Assert.True(warmSame.Execute());
+        Assert.Contains(Engine(warmSame).Messages, m => m.Contains("skipping (up-to-date)"));
 
         var permissive = CreateTask(permissive: true, source);
-        var engine = Engine(permissive);
-        Assert.True(permissive.Execute(), "errors: " + string.Join("; ", engine.Errors));
-        Assert.Contains(engine.Warnings, w => w.Contains("Quiet") && w.Contains("cw"));
-        Assert.DoesNotContain(engine.Messages, m => m.Contains("skipping (up-to-date)"));
+        Assert.True(permissive.Execute(), "errors: " + string.Join("; ", Engine(permissive).Errors));
+        Assert.DoesNotContain(Engine(permissive).Messages, m => m.Contains("skipping (up-to-date)"));
     }
 
     /// <summary>
@@ -377,7 +398,7 @@ public sealed class PermissiveEffectsTests : IDisposable
     /// </summary>
     private bool RunMsBuild(bool permissive, out string output)
     {
-        var root = RepositoryRoot();
+        var root = RepoPaths.Root;
         var dir = Path.Combine(_tempDir, "e2e-" + (permissive ? "permissive" : "strict"));
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "canary.calr"), LaunderingSource);
@@ -403,6 +424,24 @@ public sealed class PermissiveEffectsTests : IDisposable
             </Project>
             """);
 
+        // Restored once, then built with --no-restore so the build itself stays off the
+        // network and off NuGet's lock.
+        RunDotnet(dir, ["restore", "E2E.csproj", "--nologo"], out var restoreOut, mustSucceed: true);
+        var ok = RunDotnet(dir, ["build", "E2E.csproj", "--nologo", "-v", "q", "--no-restore"],
+                           out var buildOut, mustSucceed: false);
+        output = restoreOut + buildOut;
+        return ok;
+    }
+
+    /// <summary>
+    /// Runs `dotnet` in <paramref name="dir"/>. Both pipes are drained CONCURRENTLY —
+    /// reading stdout to the end first can block forever on a child that fills the stderr
+    /// pipe — and WaitForExit's return value is honoured: on a timeout the process tree is
+    /// terminated and the test fails with the output, because reading ExitCode on a live
+    /// process throws and would hide the real story.
+    /// </summary>
+    private static bool RunDotnet(string dir, string[] args, out string output, bool mustSucceed)
+    {
         var psi = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = dir,
@@ -410,31 +449,26 @@ public sealed class PermissiveEffectsTests : IDisposable
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        foreach (var arg in new[] { "build", "E2E.csproj", "--nologo", "-v", "q" })
+        foreach (var arg in args)
             psi.ArgumentList.Add(arg);
         psi.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en";
 
         using var process = Process.Start(psi)!;
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit(milliseconds: 300_000);
-        output = stdout + stderr;
-        return process.ExitCode == 0;
-    }
-
-    private static string SdkFile(string name)
-        => Path.Combine(RepositoryRoot(), "src", "Calor.Sdk", "Sdk", name);
-
-    private static string RepositoryRoot()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir != null)
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        var exited = process.WaitForExit(milliseconds: 300_000);
+        output = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
+        if (!exited)
         {
-            if (File.Exists(Path.Combine(dir, "src", "Calor.Sdk", "Sdk", "Sdk.targets")))
-                return dir;
-            dir = Path.GetDirectoryName(dir);
+            try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+            Assert.Fail($"dotnet {string.Join(' ', args)} did not exit within 300 s:\n{output}");
         }
 
-        throw new InvalidOperationException("repository root not found above " + AppContext.BaseDirectory);
+        var succeeded = process.ExitCode == 0;
+        if (mustSucceed)
+            Assert.True(succeeded, $"dotnet {string.Join(' ', args)} failed:\n{output}");
+        return succeeded;
     }
+
+    private static string SdkFile(string name) => RepoPaths.SdkFile(name);
 }

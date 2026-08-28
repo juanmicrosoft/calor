@@ -487,14 +487,14 @@ assumes about calls it cannot resolve — the CLI's `--permissive-effects`, or i
 </PropertyGroup>
 ```
 
-The default is `false` (strict). Under the permissive policy unknown calls are assumed
-pure, so `Calor0425` is suppressed, and undeclared-effect violations — `Calor0410` and
-`Calor0411`, single-module and cross-module — are reported as warnings.
+The default is `false` (strict). Under the permissive policy unknown calls are assumed pure,
+so `Calor0411` (unknown external call) and `Calor0425` ("cannot be decided") are suppressed,
+and `Calor0410` — "uses effect X but does not declare it" — is reported as a warning, in the
+per-file pass and in the cross-module pass alike.
 
 It does **not** waive a row the code states and then contradicts: `Calor0424` (a row that
-does not fit), `Calor0420` / `Calor0421` (a broadened or narrowed row on an override or
-interface implementation) and `Calor0418` (a function-typed value with no row at a checked
-position) remain errors under every flag.
+does not fit) and `Calor0420` / `Calor0421` (an override or interface implementation that
+**broadens** the effects it inherited; narrowing is legal) remain errors under every flag.
 
 ---
 
