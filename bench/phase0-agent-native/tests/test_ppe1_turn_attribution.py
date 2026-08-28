@@ -360,6 +360,64 @@ class ArchiveAttribution(unittest.TestCase):
         self.assertEqual(arm["unparsableJournalLines"], 1)
 
 
+class AgreesWithW1HarnessCapture(unittest.TestCase):
+    """The A-1.12 turn field means the same thing in both instruments.
+
+    W1 (#1119) added `harness-capture.py`, whose `count_turns` records
+    `turns.assistantMessages` in each run's `result.json` at collection time;
+    this script derives the same field from an archived transcript at analysis
+    time. `harness-capture.py`'s docstring names #1117 (this script) as the
+    definition. If either drifts — say one starts counting forwarded subagent
+    messages in the top-level total — a PP-W-rows epoch's recorded turn count
+    would stop matching its own transcript, silently. This pins them together
+    on both suites' fixtures.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mine = _load()
+        spec = importlib.util.spec_from_file_location(
+            "harness_capture", os.path.join(BENCH, "harness-capture.py"))
+        cls.w1 = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.w1)
+
+    def _fixtures(self):
+        here = os.path.join(TRANSCRIPT_FIXTURES, "W-001-demo")
+        return [
+            os.path.join(here, "calor+treatment", "run-1", "transcript.jsonl"),
+            os.path.join(here, "calor+treatment", "run-2", "transcript.jsonl"),
+            os.path.join(here, "calor+control", "run-1", "transcript.jsonl"),
+            os.path.join(HERE, "fixtures", "harness-capture", "multi-block-run.transcript.jsonl"),
+            os.path.join(HERE, "fixtures", "harness-capture", "subagent-run.transcript.jsonl"),
+            os.path.join(HERE, "fixtures", "harness-capture", "empty.transcript.jsonl"),
+        ]
+
+    def test_both_instruments_count_the_same_turns_on_every_fixture(self):
+        checked = 0
+        for path in self._fixtures():
+            if not os.path.exists(path):
+                continue
+            mine = self.mine.tabulate_transcript(path)["turns"]
+            theirs = self.w1.count_turns(path)
+            self.assertEqual(
+                (mine["assistantMessages"], mine["subagentMessages"]),
+                (theirs["assistantMessages"], theirs["subagentMessages"]),
+                f"{os.path.basename(path)}: this script and harness-capture.py disagree on "
+                "the A-1.12 turn field")
+            # W1's convenience sum stays derivable from the two counts
+            self.assertEqual(theirs["assistantMessagesIncludingSubagents"],
+                             mine["assistantMessages"] + mine["subagentMessages"])
+            checked += 1
+        self.assertGreaterEqual(checked, 6, "expected both suites' transcript fixtures to be present")
+
+    def test_the_subagent_fixture_actually_exercises_the_split(self):
+        """Guard: the agreement above would be vacuous if no fixture had subagent turns."""
+        path = os.path.join(HERE, "fixtures", "harness-capture", "subagent-run.transcript.jsonl")
+        mine = self.mine.tabulate_transcript(path)["turns"]
+        self.assertGreater(mine["subagentMessages"], 0)
+        self.assertGreater(mine["assistantMessages"], 0)
+
+
 class TranscriptTabulation(unittest.TestCase):
     """W4's per-turn tool-class table over synthetic stream-json fixtures."""
 
