@@ -518,7 +518,10 @@ indicator; register-then-merge enforced by A-1.10.
    — then the floor is re-registered from K1's number with the artifact. *Pin:* revert the
    converter fix → `ExcludedParseFailed` rises → red; restore the raw-bag guard →
    `ModulesEnforced` drops to 99 → red. Two-sided as gate 6.
-10. **PP-W-rows.** *Instrument:* `effect-rows-benefit-ledger.json` + exact-equality test +
+10. **PP-W-rows** (registered in the annex under the §A.2 key **`PP-W6`** — the freeze guard keys
+    a frozen row on an ASCII `PP-<LETTERS><DIGITS>` id and rejects a cell reading `PP-W-rows`
+    outright; one proof point, two spellings, and there is no wedge category `W6`).
+    *Instrument:* `effect-rows-benefit-ledger.json` + exact-equality test +
     `ppw-analyze.py`. *Denominator:* six pairs × N cells × two arms, two cell classes; blind floor two. *Freeze:* A-1.12. *Pin:* the annex guard; dropping a pair fails the test.
 11. **Non-convergence coverage.** *Instrument:* W5's two `_IsReported` pins at injected caps,
     both emitting Calor0406. *Denominator:* the two caps (`:455`, `:1129`). *Freeze:* §3.1 W5.
