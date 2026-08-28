@@ -2600,11 +2600,13 @@ public sealed class EffectEnforcementPass
     /// StackOverflowException is a fail-fast: the host dies, nothing catches it.</para>
     ///
     /// <para><b>Who reaches this unbound.</b> Not only the in-process ledgers:
-    /// <c>EditPreviewTool.CheckEffects</c> — the MCP server's
-    /// <c>edit_preview</c> — runs this pass on a lex/parse-only
-    /// <c>ParseResult</c> with no binder anywhere on the path, so
-    /// <c>calor mcp</c> died on any parsed <c>.calr</c> of this shape. That is
-    /// a shipping surface, and it is why a cycle stop stays SILENT here: the
+    /// <c>EditPreviewTool.CheckEffects</c> runs this pass on a lex/parse-only
+    /// <c>ParseResult</c> with no binder anywhere on the path, and TWO MCP
+    /// tools call it — <c>edit_preview</c> (<c>EditPreviewTool</c>) and
+    /// <c>file_write</c> (<c>FileWriteTool</c>, which calls the same helper
+    /// for its effect check). <c>calor mcp</c> therefore died on any parsed
+    /// <c>.calr</c> of this shape, through either tool. Those are shipping
+    /// surfaces, and they are why a cycle stop stays SILENT here: the
     /// author of the edited file cannot act on a converter artifact, the call
     /// the cycle sits on is already reported (Calor0411), and edit_preview
     /// would otherwise grow a diagnostic about the compiler's own search.
@@ -2651,11 +2653,10 @@ public sealed class EffectEnforcementPass
         /// budget is doubled against a deeper stack above this pass or a
         /// costlier frame in a future build. The corpus needs 13 frames at its
         /// worst — measured over all 364 corpus modules enforced without
-        /// binding, deepest in
-        /// <c>serilog/Settings/KeyValuePairs/SettingValueConversions.cs</c>,
-        /// with zero cap stops (pinned by
-        /// <c>EffectInferrerCorpusDepthTests</c>) — so ordinary code sits an
-        /// order of magnitude below the cap and never reaches it.</para>
+        /// binding, with zero cap stops (pinned by
+        /// <c>EffectInferrerCorpusDepthTests</c>; several modules reach 13, so
+        /// no one file is "the deepest") — so ordinary code sits an order of
+        /// magnitude below the cap and never reaches it.</para>
         /// </summary>
         public const int DefaultDepthCap = 224;
 
@@ -4127,6 +4128,12 @@ public sealed class EffectEnforcementPass
                 return UnknownLocalTypeSentinel;
             }
 
+            // The cap check below is TryEnterAstFrame's, inlined: this one has
+            // to leave the visited set on the way out and answer the sentinel
+            // rather than a bool, which the shared helper cannot do. The two
+            // are equivalent today (same comparison, same counters) and must be
+            // changed together — if this method ever stops needing the sentinel
+            // return, delete the copy and call TryEnterAstFrame.
             if (_astResolutionDepth >= bound.DepthCap)
             {
                 _astResolutionInProgress.Remove(name);

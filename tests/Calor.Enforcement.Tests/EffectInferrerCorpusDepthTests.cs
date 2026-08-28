@@ -36,8 +36,10 @@ public class EffectInferrerCorpusDepthTests
 {
     /// <summary>
     /// Measured over all 364 corpus modules at the pinned submodule SHAs:
-    /// deepest is 13 frames, in
-    /// <c>serilog/Settings/KeyValuePairs/SettingValueConversions.cs</c>. Held a
+    /// deepest is 13 frames. No single module owns that number — several reach
+    /// it, and <c>deepestFile</c> below names whichever RAISED the maximum
+    /// first in the Ordinal file order, so the name is a debugging aid and not
+    /// a fact about the corpus. Held a
     /// little above the measurement so an unrelated converter tweak does not
     /// fail the build for one extra frame, and far below
     /// <see cref="EffectEnforcementPass.AstResolutionBound.DefaultDepthCap"/>

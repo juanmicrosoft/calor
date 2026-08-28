@@ -19,12 +19,14 @@ namespace Calor.Enforcement.Tests;
 /// <para>Every test here enforces the PARSED module directly —
 /// <c>new EffectEnforcementPass(bag).Enforce(module)</c> with no binder in
 /// front of it. That is the reproduction path from the issue, and it is not
-/// hypothetical: <see cref="EditPreviewTool.CheckEffects"/> (the MCP server's
-/// <c>edit_preview</c>) runs the pass on a lex/parse-only <c>ParseResult</c>
-/// with no binder anywhere on the path, so <c>calor mcp</c> died on any parsed
-/// <c>.calr</c> of this shape. The in-process ledgers (the Calor0425 corpus
-/// ledger, K1) are the second unbound caller. The CLI binds first and returns
-/// on binding errors, which is why it never saw this.</para>
+/// hypothetical: <see cref="EditPreviewTool.CheckEffects"/> runs the pass on a
+/// lex/parse-only <c>ParseResult</c> with no binder anywhere on the path, and
+/// BOTH MCP tools that check effects go through it — <c>edit_preview</c>
+/// (<see cref="EditPreviewTool"/>) and <c>file_write</c>
+/// (<c>FileWriteTool</c>, same helper). <c>calor mcp</c> died on any parsed
+/// <c>.calr</c> of this shape through either one. The in-process ledgers (the
+/// Calor0425 corpus ledger, K1) are the third unbound caller. The CLI binds
+/// first and returns on binding errors, which is why it never saw this.</para>
 ///
 /// <para><b>Discriminating revert</b> (roadmap §3.1 W3(c), verbatim): "revert
 /// (c) → the recursion test crashes the host". A StackOverflowException is a
@@ -73,12 +75,16 @@ public class EffectInferrerRecursionTests
     [Fact]
     public void SerilogFixture_ThroughMcpEditPreview_CompletesInsteadOfCrashingTheHost()
     {
-        // Review round 2, MAJOR M1 — the SHIPPING unbound caller.
-        // EditPreviewTool.CheckEffects runs the effect pass on a lex/parse-only
-        // ParseResult (CalorSourceHelper.Parse; no binder on that path), so
-        // `calor mcp`'s edit_preview aborted on any parsed .calr of this shape.
-        // Driven through the real entry point, not a re-implementation of it,
-        // so a refactor that reintroduces an unbounded pass here is caught.
+        // Review round 2, MAJOR M1 (+ verification-pass minor B) — the
+        // SHIPPING unbound callers. EditPreviewTool.CheckEffects runs the
+        // effect pass on a lex/parse-only ParseResult (CalorSourceHelper.Parse;
+        // no binder on that path), so `calor mcp` aborted on any parsed .calr
+        // of this shape. TWO tools reach it: edit_preview (EditPreviewTool:124)
+        // and file_write (FileWriteTool:246). Both call THIS method — it is the
+        // single implementation, not two copies — so driving it once covers
+        // both, and doing it through the real entry point rather than a
+        // re-implementation is what catches a refactor that reintroduces an
+        // unbounded pass on either path.
         var parse = CalorSourceHelper.Parse(
             TestHarness.LoadScenario(FixturePath), "Issue1104.calr");
         Assert.True(parse.IsSuccess);
