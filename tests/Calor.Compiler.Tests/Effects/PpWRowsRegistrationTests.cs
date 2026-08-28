@@ -164,6 +164,13 @@ public sealed class PpWRowsRegistrationTests
         ("method-group correction", "so it **escapes**"),
         ("property cannot carry a row", "a `§PROP` CANNOT CARRY A ROW AT ALL"),
         ("fix set is bounded", "{allow a row on `§PROP`} \u222a {fail closed}"),
+        // Review round 7: the passing/invoking split, and the two shapes that are
+        // disclosure-only or did not reproduce.
+        ("charged: invoking a this.-qualified field", "INVOKING \u2014 as opposed to passing"),
+        ("invoking is charged as unknown", "charged as `unknown` through the UNKNOWN-CALL path"),
+        ("W-004's protection is incidental", "incidental rather than principled"),
+        ("inherited is disclosure-only", "DISCLOSURE-ONLY and deliberately not a table row"),
+        ("module-qualified-in-class disagreement", "A REPORTED SHAPE THAT DID NOT REPRODUCE HERE"),
         ("four-way escape classification", "`this-qualified` / `property` / `inherited` / "),
         ("indicator non-vacuity", "MUST NOT BE SATISFIABLE BY THE STARTER ITSELF"),
         ("unregistered roles excluded from the pin", "**excluded by name** from the frozen-cells pin"),
