@@ -391,25 +391,45 @@ def resolve_reference(pair_json, pair, entry, fixture):
     none, and it is the RUNNER that decides a missing reference is fatal for a
     --null-agent run. Returning it as data keeps that decision in one place and lets
     the tests observe every branch.
+
+    Two refusals rather than guesses: a `seeded.clean.<armId>` that pair.json DECLARES
+    but that does not exist stops here as
+    `seeded-clean-declared-missing:<path>` instead of falling through to (3) — silently
+    applying a different program than the pair names is worse than failing — and any
+    candidate that is absolute or climbs out of the pair with `..` is rejected outright.
     """
     pair_dir = os.path.dirname(os.path.abspath(pair_json))
 
+    def inside(rel):
+        """A pair-relative directory that really is inside the pair. pair.json is data;
+        an absolute path or one climbing out with `..` would let it point the null path
+        at anything on the machine."""
+        if not isinstance(rel, str) or not rel or os.path.isabs(rel):
+            return None
+        full = os.path.normpath(os.path.join(pair_dir, rel))
+        if not full.startswith(pair_dir + os.sep):
+            return None
+        return full if os.path.isdir(full) else None
+
     candidate = os.path.join("reference", fixture)
-    if os.path.isdir(os.path.join(pair_dir, candidate)):
+    if inside(candidate):
         return candidate, "reference"
 
     arm_id = entry.get("armId")
     seeded = pair.get("seeded") if isinstance(pair.get("seeded"), dict) else {}
     clean = seeded.get("clean") if isinstance(seeded.get("clean"), dict) else {}
-    if isinstance(arm_id, str) and isinstance(clean.get(arm_id), str):
-        declared = clean[arm_id]
-        if os.path.isdir(os.path.join(pair_dir, declared)):
+    declared = clean.get(arm_id) if isinstance(arm_id, str) else None
+    if declared is not None:
+        # DECLARED but not usable is an error, not a cue to guess: falling through to the
+        # derived form would silently apply a different program than pair.json names.
+        if inside(declared):
             return declared, "seeded-clean-declared"
+        return None, "seeded-clean-declared-missing:%s" % declared
 
     suffix = fixture.rsplit("-", 1)[-1] if "-" in fixture else None
     if suffix:
         derived = os.path.join("seeded", "clean-" + suffix)
-        if os.path.isdir(os.path.join(pair_dir, derived)):
+        if inside(derived):
             return derived, "seeded-clean-derived"
 
     return None, "none"

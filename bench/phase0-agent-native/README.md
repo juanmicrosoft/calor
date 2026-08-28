@@ -154,23 +154,48 @@ unconditionally. Both arms build with `CalorEnforceEffects=true`, so neither dif
 exercised.
 
 **Running a free `--null-agent` epoch first.** A null epoch applies each arm's *reference*
-solution instead of calling an agent, so it exercises workspaces, shims, the held-out suite,
-metrics and every W1 artifact at zero API cost — the only end-to-end validation available
-before spend. Two things to know:
+solution instead of calling an agent. **What it does and does not validate, stated plainly:** it
+proves the plumbing — workspaces, shims, the held-out suite, metrics, and that every W1 artifact
+is written and every guard fires — at zero API cost. It does **not** exercise the leg-B
+measurement: every null run logs `tokensOut: 0` with `tokenUsage.source=missing`, and its
+`transcript.jsonl` is a single synthetic line, so the corrected-token figure, the turn-attribution
+input and the `stream-json` capture path are precisely what the paid epoch buys and are untested
+by it. Treat a green null epoch as "the harness will not throw the run away", not as "the metric
+works".
 
-- The reference is resolved per arm: `reference/<fixture>/` on pre-0.16 pairs, and the
-  declared `seeded.clean.<armId>` cell on the PP-W-rows pairs (they ship `starter-a`/`starter-b`
-  and `seeded/`, no `reference/`). `run-pair.sh` exits 3 naming both lookups if neither exists.
-- The epoch id is forced to end in `-null`, and that directory is **scratch: delete it when the
-  run is done**. Gate 12's turn-attribution instrument counts *every* entry under `epochs/`, so a
-  leftover null epoch changes its frozen denominator and reds `test_ppe1_turn_attribution`.
+- The reference is resolved per arm: `reference/<fixture>/` on pre-0.16 pairs, and the declared
+  `seeded.clean.<armId>` cell on the PP-W-rows pairs (they ship `starter-a`/`starter-b` and
+  `seeded/`, no `reference/`). A cell that pair.json declares but that is missing is an error, not
+  a cue to guess; so is any path that is absolute or climbs out of the pair. `run-pair.sh` exits 3
+  naming every lookup it tried, and `result.json` records `reference` / `referenceSource`.
+- The epoch id is rewritten to a **dot-prefixed** `.null-<id>` directory. Gate 12's
+  turn-attribution instrument counts every *non-dot* entry under `epochs/` in its frozen
+  denominator, so a plain null epoch reds two of its exact-equality tests — and that failure
+  suggests regenerating, which would bake the null run into the instrument. A dot entry is skipped
+  by construction, so the trap cannot spring; the directory is still scratch and can be deleted.
 
 Before any run, each calor arm is canaried through its own template and product: the pre-rows arm
-must produce `warning Calor0410`, the strict arm `error Calor0410`. The canary also catches the
-case where MSBuild loads a task assembly that does not match the arm's `Sdk.targets` (`MSB4064`/
-`MSB4063`) — most often **node reuse** serving a previously-loaded `Calor.Tasks.dll` after a
-rebuild (`dotnet build-server shutdown`), not a stale file. Without it every workspace build in
-that arm fails and the runs are recorded as task failures rather than as a broken arm.
+must produce `warning Calor0410`, the strict arm `error Calor0410`, and either refusal exits 3.
+The canary also catches the case where the task assembly MSBuild loads does not match the arm's
+`Sdk.targets` (`MSB4064` / `MSB4063` / `MSB4062`) — cause: a **stale, mis-built or missing
+product**; `dotnet build-server shutdown` is the second thing to try, not the mechanism (MSBuild
+workers reload the assembly from disk on every build — probed directly with pinned worker pids).
+Without the canary, every workspace build in that arm fails and the runs are recorded as task
+failures rather than as a broken arm. `run-ppw-epoch.sh` also does one `build-server shutdown`
+before the first run, outside the measurement.
+
+Each run records `armCanary: "permissive-ok" | "strict-ok" | "skipped"`.
+`CALOR_P0_SKIP_ARM_CANARY=1` is honoured **only** for a `--null-agent` run writing into a `-null`
+directory, so it cannot silently produce a paid archive that looks like one where every arm was
+proven.
+
+**What the canary structurally cannot catch, and what does.** Arm A's `Sdk.targets` passes
+`PermissiveEffects` and arm B's does not, so arm B loading arm A's task assembly is a strict
+*superset* of parameters: no `MSB4064`, no error, and arm B silently measured with the v0.14.3
+compiler. The only witness is `compilerHash` (#1094), so after collection `run-ppw-epoch.sh`
+asserts that each arm recorded exactly one distinct `compilerHash` and that the two differ,
+exiting non-zero otherwise — the rule that otherwise lived only as prose in `pins.json.validity`
+awaiting `ppw-analyze.py`.
 
 `run-ppw-epoch.sh` drives the six `W-001 … W-006` pairs (exact-id directory match; the `W1-`/`W2-`/`W3-`/`W5A-` directories cannot collide), interleaved, arm A = `v0.14.3` under `arms["calor-pre-rows"]`, arm B = `v0.15.0` under `arms.calor`, with the same rails as `run-ppe1-epoch.sh` (`--confirm-paid-epoch`, distinct `Calor.Tasks` hashes, run-once epoch ids, null-agent ids suffixed `-null`). It fails before any spend listing every missing or malformed pair. Its `pins.json` `ppW` block carries the registered leg-B denominator `legBPairs` (default `W-001 W-002 W-003 W-004 W-006`; W-005 is leg A only) and `blindPairs` (`W-001 W-004 W-006`); `ppw-analyze.py` (W2) reads them from there, never from a script default.
 

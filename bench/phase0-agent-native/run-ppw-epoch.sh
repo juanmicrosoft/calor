@@ -102,13 +102,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# A null-agent run never lands in the registered directory: it is a plumbing
-# check, and the analyzer must refuse to adjudicate an epoch that holds one.
 # A null-agent run is a plumbing check and must never land in a directory an analyzer
 # could read as a live epoch — whatever id was passed, not only the registered one.
-if [[ -n "$NULL_FLAG" && "$EPOCH" != *-null ]]; then
-    EPOCH="${EPOCH}-null"
-    echo "NOTE: --null-agent forces the epoch id to '$EPOCH' (live ids are for live runs only)"
+# DOT-PREFIXED on purpose: gate 12's turn-attribution instrument
+# (ppe1-turn-attribution.py) counts every non-dot entry under epochs/ as part of its
+# frozen denominator, so a leftover null epoch reds two of its exact-equality tests —
+# and the failing assertion helpfully suggests regenerating, which would bake the null
+# run into the instrument. A dot entry is skipped there by construction
+# (ppe1-turn-attribution.py's `name.startswith(".")`, pinned by
+# test_dotfiles_in_epochs_root_are_not_entries), so the trap cannot spring.
+if [[ -n "$NULL_FLAG" && "$EPOCH" != .* ]]; then
+    EPOCH=".null-${EPOCH#.}"
+    EPOCH="${EPOCH%-null}"
+    echo "NOTE: --null-agent writes to the dot-prefixed epoch '$EPOCH' (scratch; invisible to the archive instruments, and never a live epoch id)"
 fi
 
 [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {
@@ -257,6 +263,16 @@ if [[ -z "$NULL_FLAG" && $CONFIRM -ne 1 ]]; then
     exit 3
 fi
 
+# One MSBuild worker shutdown before the first run. It is outside the measurement (no
+# agent has started), costs a second, and removes a class of confusion: a worker holding
+# an assembly from an earlier arm or an earlier build. It is NOT the cause of the
+# MSB4064 story — workers reload from disk (probed) — but a passing canary only warms
+# the workers it happened to use, and `dotnet build -m` fans out to others.
+if command -v dotnet >/dev/null 2>&1; then
+    echo "--- dotnet build-server shutdown (once, before the first run) ---"
+    dotnet build-server shutdown >/dev/null 2>&1 || true
+fi
+
 OUT="$SCRIPT_DIR/epochs/$EPOCH"
 if [[ -d "$OUT" ]] && find "$OUT" -name result.json | grep -q .; then
     echo "ERROR: $OUT already holds results. An epoch is run once; a re-run is a new epoch id (append-only evidence)." >&2
@@ -316,6 +332,29 @@ if [[ ${#missing_results[@]} -gt 0 ]]; then
     echo "ERROR: no result.json under $OUT for: ${missing_results[*]} — the epoch is incomplete and must not be adjudicated as if it were the registered six." >&2
     exit 4
 fi
+
+# M4 — the only witness that each arm ran ITS OWN compiler. The canary cannot catch the
+# dangerous direction: arm A's Sdk.targets passes PermissiveEffects and arm B's does not,
+# so arm B loading arm A's assembly is a strict SUPERSET of parameters — no MSB4064, no
+# error, and arm B silently measured with the v0.14.3 compiler. pins.json states the rule
+# in prose for ppw-analyze.py, which does not exist yet; assert it here, now.
+compiler_hashes() {  # <arm label>
+    find "$OUT" -path "*/$1/run-*/result.json" -exec jq -r '.compilerHash // empty' {} + 2>/dev/null \
+        | sort -u | grep -v '^$' || true
+}
+a_hashes="$(compiler_hashes "$ARM_A_LABEL")"; b_hashes="$(compiler_hashes "$ARM_B_LABEL")"
+a_count="$(printf '%s\n' "$a_hashes" | grep -c . || true)"
+b_count="$(printf '%s\n' "$b_hashes" | grep -c . || true)"
+if [[ "$a_count" != "1" || "$b_count" != "1" ]]; then
+    echo "ERROR: each arm must record exactly ONE compilerHash across its runs (arm A: $a_count distinct, arm B: $b_count distinct). A second hash means the arm's product changed mid-epoch; zero means no run archived one." >&2
+    printf '  arm A: %s\n  arm B: %s\n' "${a_hashes:-<none>}" "${b_hashes:-<none>}" >&2
+    exit 5
+fi
+if [[ "$a_hashes" == "$b_hashes" ]]; then
+    echo "ERROR: both arms recorded the SAME compilerHash ($a_hashes) — the arms did not run different compilers, whatever the pins say. This is the failure the canary structurally cannot catch (arm B loading arm A's task assembly passes a superset of parameters, so nothing errors). Epoch void." >&2
+    exit 5
+fi
+echo "arm compilers verified distinct: A ${a_hashes:0:12} vs B ${b_hashes:0:12}"
 
 echo "--- collection complete; verify the registered leg-B denominator was stamped ---"
 python3 "$HARNESS_CAPTURE" leg-b-pairs "$OUT/pins.json"
