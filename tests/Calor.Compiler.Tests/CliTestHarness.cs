@@ -38,6 +38,41 @@ internal static class CliTestHarness
         throw new InvalidOperationException("Repository root (Calor.sln) not found from " + Directory.GetCurrentDirectory());
     }
 
+    /// <summary>
+    /// The compiler-identity hash of the <c>calor.dll</c> a <see cref="RunCli"/>
+    /// child will load — <see cref="Incremental.BuildStateCache.ComputeCompilerHash"/>
+    /// over that file, which is exactly what the child computes for itself.
+    /// </summary>
+    internal static string ChildCompilerHash() =>
+        Incremental.BuildStateCache.ComputeCompilerHash([FindCalorDll()]);
+
+    /// <summary>
+    /// Makes an index built <b>in this process</b> acceptable to a
+    /// <see cref="RunCli"/> child, by stamping it with the child's compiler hash
+    /// before it is saved.
+    ///
+    /// <para><b>Why this is needed.</b> A project index records the identity hash
+    /// of the compiler that produced it, and a reader refuses an index whose hash
+    /// is not its own (<c>Error: index unusable — the compiler changed</c>). The
+    /// test host and the child normally load byte-identical copies of
+    /// <c>calor.dll</c>, so the hashes agree and nothing is needed — but under
+    /// <c>--collect:"XPlat Code Coverage"</c> the collector instruments the test
+    /// host's copy in place, its hash changes, and every test that builds an
+    /// index in-process and then queries it through the CLI fails in the coverage
+    /// lane only. Stamping is honest rather than a bypass: the value written is
+    /// the hash of the very assembly that will read the index, and a genuinely
+    /// stale <c>calor.dll</c> is still rejected on the other inputs (options,
+    /// manifest, file list), which this does not touch.</para>
+    ///
+    /// <para>Call it on the index object immediately before <c>Save</c>. Outside
+    /// the coverage lane it writes the same value the builder already computed.</para>
+    /// </summary>
+    internal static void StampForChildCli(Indexing.ProjectIndex index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        index.CompilerHash = ChildCompilerHash();
+    }
+
     private static string FindCalorDllCore()
     {
         foreach (var config in new[] { "Release", "Debug" })
