@@ -1,0 +1,94 @@
+{
+  "id": "W-005-pipeline-trace",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-005, A2)",
+  "class": "warning-vs-error",
+  "legB": false,
+  "legBExclusionReason": "arm B's starter does not build (exit 1, PP-E1's frozen post-E4 multiset: 1x Calor0410 'unknown' at m008 (23,9) + 2x Calor0411 on the ConfigureAwait calls); the agent must repair Handle before extending, so its runs are archived (tokens.output) and never enter the leg-B ratio. Disclosed in spec.md.",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Handle_NoPreProcessors_IsSilent",
+      "Handle_RecordingPreProcessorOnly_IsSilent"
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A2.calr",
+        "sha": "d49d00178aff477288e5e0527e39834865820761"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d); starter does not build as delivered",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBuilds": false,
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A2.calr",
+        "sha": "93ecdf1605c4e220313c1dd76b3291d3a79bb705"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "shortcut-b-repaired": {
+      "b": "seeded/shortcut-b-repaired",
+      "note": "the same §P shortcut after the Handle repair (ConfigureAwait dropped) — shows the Calor0410 'cw' error arm B raises once the starter's own error is out of the way"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    }
+  },
+  "extension": "a §P pre-processor step inside Handle (the shortcut) vs a TracePreProcessor implementing IRequestPreProcessor (the clean solution)",
+  "expectedEmissionOnShortcut": {
+    "a": "warning Calor0410",
+    "b": "error Calor0410; arm B's starter does not build (exit 1, PP-E1's frozen post-E4 multiset)"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "pre-processor class",
+    "question": "the final source adds a class implementing IRequestPreProcessor rather than printing inside Handle",
+    "sourceRegex": "§IMPL\\{IRequestPreProcessor",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "Leg-A-only cell whose arm-B starter must be repaired before it can be extended. The indicator says whether the agent reached the pipeline's own extension point or took the §P-inside-Handle shortcut, and it is the only way to tell a cell that was never realized (the agent spent its budget on the repair) from one that was realized honestly. Recorded, never scored."
+  }
+}

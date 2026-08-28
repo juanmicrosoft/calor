@@ -25,6 +25,11 @@ print(sh("sed -n '/1. \\*\\*Effect laundering, closed classes/,/^2\\. \\*\\*High
 
 print("\n### files with two-line §O then §E (23 files)")
 files = subprocess.run(["git","ls-files","*.calr"],capture_output=True,text=True).stdout.split()
+# PP-W-rows measurement fixtures (roadmap v0.16 §4.1): per-arm starters, their seeded
+# mutants (which carry §LAM) and a PP-W epoch's per-run archives. Excluded for the same
+# reason facts.py excludes the spike artifacts; keyed on the W-<three digits>- pair id.
+PPW = re.compile(r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-[0-9]{3}-")
+files = [f for f in files if not PPW.match(f)]
 hits=[]
 for f in files:
     L=open(f,encoding="utf-8",errors="replace").read().split("\n")

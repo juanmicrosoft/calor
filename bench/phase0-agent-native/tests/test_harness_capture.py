@@ -600,8 +600,20 @@ class LegBPairsAreRegisteredInPins(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class RunPpwEpochFailsLoudOnMissingPairs(unittest.TestCase):
-    """§3.1 W1: the six W-00x directories are authored elsewhere; the runner
-    must list every missing one and exit before any spend."""
+    """§3.1 W1: the runner must list every unrunnable W-00x pair and exit before any spend.
+
+    The six pair directories landed with #1123 (S3 (c)), so the missing-pair path is now
+    exercised against a COPY of the runner beside an empty `pairs/` — the behaviour is the
+    point, not the accident of the tree not holding the pairs yet. `test_the_real_pair_set_passes_preflight`
+    covers the other side: with the committed pairs present, no pair problem is raised."""
+
+    def _fake_harness(self, tmp):
+        """A harness dir holding just what run-ppw-epoch.sh reads from SCRIPT_DIR, and no pairs."""
+        harness = os.path.join(tmp, "bench", "phase0-agent-native")
+        os.makedirs(os.path.join(harness, "pairs"))
+        for name in ("run-ppw-epoch.sh", "harness-capture.py"):
+            shutil.copy(os.path.join(BENCH, name), os.path.join(harness, name))
+        return os.path.join(harness, "run-ppw-epoch.sh")
 
     def _fake_root(self, tmp, name, tasks_bytes):
         root = os.path.join(tmp, name)
@@ -614,11 +626,32 @@ class RunPpwEpochFailsLoudOnMissingPairs(unittest.TestCase):
         return root
 
     @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
-    def test_lists_every_missing_pair_and_exits_2(self):
+    def test_the_real_pair_set_passes_preflight(self):
+        # With the committed pairs present the pair preflight must raise NO problem —
+        # every id resolves to exactly one directory and both arm entries are admitted.
+        # The run still refuses before spend, on the arm-A commit pin, which is the next
+        # gate; what must not appear is a pair problem.
         with tempfile.TemporaryDirectory() as tmp:
             a = self._fake_root(tmp, "armA", b"A")
             b = self._fake_root(tmp, "armB", b"B")
             out = run(["bash", RUN_PPW, "--arm-a-repo-root", a, "--arm-b-repo-root", b, "--null-agent"])
+            self.assertEqual(out.returncode, 2, out.stdout + out.stderr)
+            self.assertNotIn("refusing before any spend", out.stderr)
+            self.assertNotIn("no directory pairs/", out.stderr)
+            self.assertNotIn("rejected —", out.stderr)
+            self.assertNotIn("fixture directory missing", out.stderr)
+            # The plan is echoed first and the refusal follows it; what matters is that the
+            # refusal is the arm-A pin (the next gate) and that no run was dispatched.
+            self.assertIn("arm A must be checked out at", out.stderr)
+            self.assertNotIn("run-pair.sh", out.stdout)
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_lists_every_missing_pair_and_exits_2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a = self._fake_root(tmp, "armA", b"A")
+            b = self._fake_root(tmp, "armB", b"B")
+            runner = self._fake_harness(tmp)
+            out = run(["bash", runner, "--arm-a-repo-root", a, "--arm-b-repo-root", b, "--null-agent"])
             self.assertEqual(out.returncode, 2, out.stdout + out.stderr)
             self.assertIn("refusing before any spend", out.stderr)
             for pid in ("W-001", "W-002", "W-003", "W-004", "W-005", "W-006"):
@@ -640,10 +673,27 @@ class RunPpwEpochFailsLoudOnMissingPairs(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class CensusExclusionIsNarrow(unittest.TestCase):
-    """M4 — harness scratch is excluded from the committed-.calr census, but only the
-    part that is scratch: the canary under templates/ and the PP-W-rows SEEDED mutants.
-    The per-arm starters are ordinary programs and stay counted, because §4.1 route (a)
-    rests on them and every other pair fixture is held to the same bar."""
+    """M4 — harness scratch is excluded from the committed-.calr census, and nothing else is.
+
+    **Dispositioned when the PP-W-rows pairs landed (#1123, S3 (c)).** W1 shipped the
+    seeded-only form and recorded that the per-arm STARTERS needed a decision, because 9
+    of the `starter-b` files write inline parameter rows and same-line `§FLD … §E{…}` —
+    exactly the forms `EffectRowCorpusShapeTests` asserts no committed `.calr` writes. Of
+    the three options W1 listed — exclude the starters, retire the §3.2 line-rule claim,
+    or rewrite the fixtures — only the first was available: the starters are frozen by
+    blob SHA at `7d621c0d` (§4.1 route (a) reads their multisets and `test_ppw_pairs.py`
+    asserts their bytes), and §3.2's claim is about programs written before the line rule,
+    which these are not. Including them would also have moved the census 927 → 939 and
+    forced a formatter-baseline regeneration from the workstream that runs the probe.
+
+    So the rule is now one shared helper, `tests/Calor.Compiler.Tests/Effects/PpwFixture.cs`
+    — `^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-\\d{3}-` — covering the whole PP-W
+    pair family AND the per-run archives a PP-W epoch writes (every arm-B run archives
+    `final-src/*.calr` carrying the starter's rows verbatim; without this the first epoch
+    would red the shape pin and drift the count, which §4.1 adjudicates as an own-goal MISS).
+
+    Narrowness is still the property under test: no other pair family, and no other epoch,
+    is exempt."""
 
     WALKERS = [
         os.path.join(REPO, "tests", "Calor.Compiler.Tests", "LosslessFormattingTests.cs"),
@@ -652,26 +702,42 @@ class CensusExclusionIsNarrow(unittest.TestCase):
         os.path.join(REPO, "tests", "Calor.Compiler.Tests", "Effects", "HigherOrderDemandLedgerTests.cs"),
     ]
 
-    def test_every_walker_excludes_templates_and_only_seeded_pairs(self):
+    HELPER = os.path.join(REPO, "tests", "Calor.Compiler.Tests", "Effects", "PpwFixture.cs")
+    PATTERN = r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-\d{3}-"
+
+    def test_every_walker_excludes_templates_and_the_ppw_fixtures(self):
         for walker in self.WALKERS:
             src = _read(walker)
             self.assertIn("bench/phase0-agent-native/templates/", src, walker)
-            self.assertIn(r"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/", src, walker)
-            # the over-broad form must be gone: it would exempt the starters too
+            # one shared rule, not four copies of a regex that can drift apart
+            self.assertIn("PpwFixture.IsMatch", src, walker)
+            # the un-anchored prefix form must be gone: it stops covering W-010+
             self.assertNotIn('"bench/phase0-agent-native/pairs/W-00"', src, walker)
 
-    def test_the_regex_matches_seeded_but_not_starters(self):
+    def test_the_helper_carries_the_anchored_rule_and_says_why(self):
+        src = _read(self.HELPER)
+        self.assertIn(self.PATTERN, src)
+        for word in ("frozen", "epoch", "own-goal", "starters"):
+            self.assertIn(word, src, f"PpwFixture must record the disposition ({word})")
+
+    def test_the_regex_matches_the_ppw_family_and_its_epoch_archives_only(self):
         import re as _re
-        pattern = _re.compile(r"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/")
+        pattern = _re.compile(self.PATTERN)
         matches = [
             "bench/phase0-agent-native/pairs/W-001-middleware/seeded/shortcut.calr",
-            "bench/phase0-agent-native/pairs/W-010-later/seeded/x.calr",   # W-010+, not just W-00x
-        ]
-        non_matches = [
             "bench/phase0-agent-native/pairs/W-001-middleware/starter-a/Prog.calr",
             "bench/phase0-agent-native/pairs/W-001-middleware/starter-b/Prog.calr",
+            "bench/phase0-agent-native/pairs/W-010-later/seeded/x.calr",   # W-010+, not just W-00x
+            # what a PP-W epoch archives, run by run — the reason the rule covers epochs/
+            "bench/phase0-agent-native/epochs/w-rows-001/W-001-middleware/calor/run-1/final-src/Prog.calr",
+        ]
+        non_matches = [
             "bench/phase0-agent-native/pairs/W1-001-temperature-converter/calor/Temp.calr",
             "bench/phase0-agent-native/pairs/N1-001-string-utils/calor/TextUtils.calr",
+            # other epochs stay in the census: 210 of their archived .calr are inside the
+            # committed counts today, and excluding them would regenerate every ledger
+            "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-003-csv-row/calor/run-5/final-src/CsvRow.calr",
+            "bench/phase0-agent-native/epochs/w5-parity-002/N1-001-string-utils/calor/run-1/final-src/T.calr",
         ]
         for path in matches:
             self.assertIsNotNone(pattern.match(path), path)

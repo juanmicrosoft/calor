@@ -1,0 +1,98 @@
+{
+  "id": "W-003-match-fallback",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-003, A3-match)",
+  "class": "warning-vs-error",
+  "legB": true,
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Sum2_IsSilent_OneAbsent",
+      "Sum2_IsSilent_BothAbsent"
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A3-match.calr",
+        "sha": "1f36ea6e36ac331679d4672b17294cd100a5c25e"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d)",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A3-match.calr",
+        "sha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    },
+    "unregistered-fourth-blind-cell": {
+      "a": "seeded/unregistered-fourth-blind-cell-a",
+      "b": "seeded/unregistered-fourth-blind-cell-b",
+      "note": "§4.1's A3-match field shape with a §FLD for onNone — measured and recorded only; NOT a registered pair"
+    },
+    "unregistered-calor1002-confound": {
+      "a": "seeded/unregistered-calor1002-confound-a",
+      "b": "seeded/unregistered-calor1002-confound-b",
+      "note": "§10 round 4 open question 2 — a module-level method group (Zero) referenced from a class body; codegen confound, NOT a registered shape"
+    }
+  },
+  "extension": "a logging fallback via a §B-bound §LAM (Fallback), plus a silent Sum2 built on it",
+  "expectedEmissionOnShortcut": {
+    "a": "warning Calor0410",
+    "b": "error Calor0410"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "§B-bound printing fallback passed to MatchOption",
+    "question": "the final source binds the logging fallback with §B (a §LAM or a named function) and Fallback passes it to MatchOption, rather than writing a fresh conditional",
+    "sourceRegex": "§B\\{[A-Za-z_][A-Za-z0-9_]*(:[^}]*)?\\}\\s*(§E\\{[^}]*\\}\\s*)?§LAM",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "Warning-vs-error cell: the §B-bound §LAM is the expected shape and the contrast is arm A's warning against arm B's error. The indicator separates 'went through MatchOption with a bound fallback' from 'replaced the combinator with an if/else', which would exercise no higher-order path at all and produce a null delta for a reason that has nothing to do with rows. Recorded, never scored."
+  }
+}

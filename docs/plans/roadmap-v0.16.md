@@ -26,8 +26,12 @@ read-only), `v0.13-freeze-registrations.md` (*F:*), the open issue list on 2026-
 - **Breach 1 — ES-08 never registered.** F:364-366 registers the effect-row edit script "before
   roadmap §4.2 E2 merges"; `tests/TestData/EditScripts/` holds ES-01…ES-07 and E2 merged (PRs
   #1101/#1102). Gate 3 (R:889-905) was not met as written. §6 carries it.
-- **Breach 2 — R:987 said PRs #982/#981/#976 would be "merged or closed in the 0.15 kickoff
-  sweep"; all three are open.** #982 is gate 3's CLI-process leg. §6 carries each.
+- **Breach 2 — R:1022 said PRs #982/#981/#976 would be "merged or closed in the 0.15 kickoff
+  sweep"; all three are open.** §6 carries each. *(Corrected 2026-08-27 in the kickoff sweep, with
+  evidence: the citation is R:1022, not R:987; and #982 is **gate 7's CLI leg** — clean-consumer
+  install of the `calor` global tool with a solver verdict, R:203-210 and R:1022's own words — not
+  gate 3's CLI-process leg. Gate 3's CLI-process and `Calor.Sdk` legs, R:918-919, are a separate,
+  still-unbuilt instrument; carrying #982 does not build them.)*
 - **Correction to a published 0.15 number.** The P32 ledger's "8 Calor0425 sites over 99 of 364
   modules" (`calor0425-corpus-ledger.json`; cited at R:654-656) counts modules that pass the
   **raw** binder bag, but the shipping compiler applies `BindingDiagnosticPolicy.
@@ -535,8 +539,9 @@ indicator; register-then-merge enforced by A-1.10.
 | P32 ledger gates on the raw binder bag; the published "8 over 99" | §0.1; N:S2 | — | **kickoff K1** (P32 only), after W3(c) |
 | Calor0270 ledger counts Infos over every parsed module (no bind guard) | `Calor0270CorpusVolumeTests.cs:118,188-208` | — | K1 records `bindRule: "parsed"`; no regeneration |
 | ES-08 never registered while E2 merged | F:364-366; §0.1 | — | kickoff sweep: register under F-3's supersession rule with the breach disclosed |
-| Gate 3 CLI-process leg (PR #982 open); `Calor.Sdk` leg unbuilt | R:891-893 | E7 lands | #982 merged or closed in the kickoff sweep; SDK leg with E7 |
-| PRs #981, #976 open | R:987 | — | kickoff sweep: merge, close, or re-open as issues |
+| PR #982 = **gate 7's** CLI-consumer leg (not gate 3's; corrected 2026-08-27) | R:203-210; R:1022 | — | **DONE** — carried into the kickoff sweep PR (job `cli-tool-consumer`, 3 RIDs) and #982 closed. **Advisory, not blocking**, until `cli-tool-consumer (…)` is added to the required contexts — as `sdk-package-consumer` has always been (R:212's amendment) |
+| **Gate 3's CLI-process and `Calor.Sdk` legs unbuilt** — the edit-script corpus is compared clean-vs-incremental in one in-process path only | R:916-932 | E7 lands | issue #1116; the MCP leg (E7) lands with them |
+| PRs #981, #976 open | R:1022 | — | **DONE** — kickoff sweep: #981's write-up carried into `CHANGELOG.md` `[0.14.0]`, #976's strategy doc into `docs/plans/`, phases 3–4 as issue #1115; both closed |
 | Gate 5 leg (b) never built | R:938-940 | — | 0.16.x; gate 5 claims leg (a) only until then |
 | PP-E1 negative-control pin skips the effect pass on `A3-map`/`A3-match` | e3b:272-278 | — | kickoff sweep with #949 |
 | `ProcessScc` emits `Calor0600` (API-strictness band) for non-convergence | `EffectEnforcementPass.cs:486`; `Diagnostic.cs:522-523` | — | **0.16 MUST W5** (Calor0406) |

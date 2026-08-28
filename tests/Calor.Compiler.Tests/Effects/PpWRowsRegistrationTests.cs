@@ -596,51 +596,85 @@ public sealed class PpWRowsRegistrationTests
             .OrderBy(r => r, StringComparer.Ordinal)
             .ToArray();
 
-        // The this.-qualified instance is the one A-1.12 measured itself; it must be on the record.
+        // The this.-qualified instance is the one A-1.12 measured itself, on all three cells;
+        // it must be on the record in full.
         Assert.Contains("unregistered-this-qualified-escape", escapeRoles, StringComparer.Ordinal);
+        foreach (var required in new[] { "W-001", "W-006", "W-004" })
+        {
+            Assert.True(
+                CellsFor(document, "unregistered-this-qualified-escape").ContainsKey(required),
+                $"the #1136 this.-qualified evidence for {required} is gone from "
+                + "ppw-seeded-compiles.json. A-1.12 measured that instance on all three cells; its "
+                + "evidence may be superseded by a NEW annex entry, never silently deleted.");
+        }
 
+        // Every escape role, WHEREVER it is seeded. The row registers the general rule and its
+        // instances; it never claims an instance is seeded on both blind cells, and the landed
+        // artifact seeds `method-group-receiver` and `other-receiver` on W-001 alone as single
+        // facts. So the assertion is conditional on presence, not on coverage.
         foreach (var role in escapeRoles)
         {
-            var cells = document.RootElement.GetProperty("compiles").EnumerateArray()
-                .Where(c => string.Equals(c.GetProperty("role").GetString(), role, StringComparison.Ordinal))
-                .ToDictionary(c => c.GetProperty("pair").GetString()![..5], c => c, StringComparer.Ordinal);
-
-            // W-001 and W-006 are the argument-position cells: the route reaches them.
-            foreach (var pair in new[] { "W-001", "W-006" })
+            foreach (var (pair, cell) in CellsFor(document, role))
             {
-                Assert.True(
-                    cells.ContainsKey(pair),
-                    $"the #1136 escape evidence '{role}' for {pair} is gone from "
-                    + "ppw-seeded-compiles.json. A-1.12 publishes that confound; its evidence may "
-                    + "be superseded by a NEW annex entry, never silently deleted.");
-                var cell = cells[pair];
                 Assert.Equal("B", cell.GetProperty("arm").GetString());
-                Assert.True(
-                    cell.GetProperty("exitCode").GetInt32() == 0,
-                    $"{pair}'s '{role}' seed no longer builds on arm B; #1136's escape is the claim "
-                    + "that it does.");
                 var codes = cell.GetProperty("diagnostics").EnumerateArray()
                     .Select(x => x.GetProperty("code").GetString()!).ToArray();
-                Assert.Contains("Calor0425", codes);
-                Assert.DoesNotContain("Calor0410", codes);
-            }
 
-            // W-004 is the direct-invocation cell: the route must NOT reach it. Where the seed
-            // exists it is the negative control and must still fail closed.
-            if (cells.TryGetValue("W-004", out var control))
+                if (pair is "W-001" or "W-006")
+                {
+                    // Argument-position cells: the route reaches them.
+                    Assert.True(
+                        cell.GetProperty("exitCode").GetInt32() == 0,
+                        $"{pair}'s '{role}' seed no longer builds on arm B; #1136's escape is the "
+                        + "claim that it does.");
+                    Assert.Contains("Calor0425", codes);
+                    Assert.DoesNotContain("Calor0410", codes);
+                }
+                else if (pair == "W-004")
+                {
+                    // Direct-invocation cell: the route must not reach it.
+                    Assert.True(
+                        cell.GetProperty("exitCode").GetInt32() == 1,
+                        $"W-004 is #1136's negative control for '{role}' and must still fail "
+                        + "closed; if it builds, the confound has widened to the direct-invocation "
+                        + "cell and needs a NEW annex entry.");
+                    Assert.Contains("Calor0410", codes);
+                }
+            }
+        }
+
+        // The BOUNDARY the row registers is evidence too: the fail-closed controls must keep
+        // failing closed, or "unresolvable argument expressions, not fields and not aliasing"
+        // stops being true.
+        var controlRoles = document.RootElement.GetProperty("compiles").EnumerateArray()
+            .Select(c => c.GetProperty("role").GetString()!)
+            .Where(r => r.StartsWith("unregistered-", StringComparison.Ordinal)
+                && r.EndsWith("-control", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        Assert.NotEmpty(controlRoles);
+        foreach (var role in controlRoles)
+        {
+            foreach (var (pair, cell) in CellsFor(document, role))
             {
                 Assert.True(
-                    control.GetProperty("exitCode").GetInt32() == 1,
-                    $"W-004 is #1136's negative control for '{role}' and must still fail closed; if "
-                    + "it builds, the confound has widened to all three blind cells and needs a NEW "
-                    + "annex entry.");
+                    cell.GetProperty("exitCode").GetInt32() == 1,
+                    $"{pair}'s fail-closed control '{role}' now BUILDS on arm B. A-1.12 registers "
+                    + "the boundary as well as the hole; if a control escapes, the registered "
+                    + "boundary is wrong and needs a NEW annex entry.");
                 Assert.Contains(
                     "Calor0410",
-                    control.GetProperty("diagnostics").EnumerateArray()
+                    cell.GetProperty("diagnostics").EnumerateArray()
                         .Select(x => x.GetProperty("code").GetString()!));
             }
         }
     }
+
+    /// <summary>Every cell carrying a given role, keyed by the pair's short id.</summary>
+    private static Dictionary<string, JsonElement> CellsFor(JsonDocument document, string role)
+        => document.RootElement.GetProperty("compiles").EnumerateArray()
+            .Where(c => string.Equals(c.GetProperty("role").GetString(), role, StringComparison.Ordinal))
+            .ToDictionary(c => c.GetProperty("pair").GetString()![..5], c => c, StringComparer.Ordinal);
 
     /// <summary>
     /// One arm's half of the row's cell-by-cell enumeration for a pair. The cell runs from

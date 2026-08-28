@@ -23,7 +23,10 @@ namespace Calor.Compiler.Tests;
 /// and cannot re-derive them:</para>
 ///
 /// <list type="bullet">
-/// <item><b>D-A (Calor-native):</b> every committed <c>.calr</c> in the repo is
+/// <item><b>D-A (Calor-native):</b> every committed <c>.calr</c> in the repo —
+/// less the <c>bench/corpus/</c> submodules, the <c>docs/design/spikes/</c>
+/// artifacts and the PP-W-rows measurement fixtures and epoch archives
+/// <see cref="PpwFixture"/> names — is
 /// compiled in-process under the DEFAULT effect policy (<c>EnforceEffects</c>
 /// on, <c>UnknownCallPolicy.Strict</c> — never <c>--permissive-effects</c>) and
 /// the ledger records (a) Calor0418 <c>DelegateInvocation</c> firings and (b)
@@ -68,8 +71,10 @@ public class HigherOrderDemandLedgerTests
         + "ledger's registration PR and is not re-tuned after the design doc opens.";
 
     private const string ScopeText =
-        "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/ "
-        + "and bench/corpus/ submodules excluded; nothing else filtered), compiled one file at a "
+        "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, "
+        + "bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement "
+        + "fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap §4.1) excluded; "
+        + "nothing else filtered), compiled one file at a "
         + "time via Program.Compile with EnforceEffects=true, UnknownCallPolicy.Strict, "
         + "StrictEffects=false, EnableTypeChecking=true (the CLI default), "
         + "UnsafeTranspileOnly=false, DeferGeneratedOutputValidation=true (per-file Roslyn "
@@ -278,16 +283,6 @@ public class HigherOrderDemandLedgerTests
     }
 
 
-    /// <summary>
-    /// The PP-W-rows seeded mutants (roadmap v0.16 §4.1, S3 (c)):
-    /// <c>bench/phase0-agent-native/pairs/W-00x-.../seeded/*.calr</c>. Measurement
-    /// fixtures, excluded from the committed-corpus census like the spike artifacts.
-    /// The per-arm starters beside them are NOT matched and stay counted.
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex PpwSeededFixture =
-        new(@"^bench/phase0-agent-native/pairs/W-\d{3}-[^/]+/seeded/",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
-
     private static List<string> EnumerateCalorFiles(string root)
     {
         // Filter on REPO-RELATIVE paths: the checkout itself may live under a
@@ -318,29 +313,15 @@ public class HigherOrderDemandLedgerTests
                     // excluded by path instead. The ledger's counts are unchanged
                     // by this line — these files were never part of the 886.
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
-                    // Harness scratch that is not product corpus, the same case: templates/
-                    // holds the arm csproj template and the permissive canary run-pair.sh
-                    // compiles before a pre-rows epoch (v0.16 W1) — a program written to
-                    // draw Calor0410, never product code — and pairs/W-00x-*/seeded/ holds
-                    // the PP-W-rows seeded mutants (§4.1, S3 (c)). The per-arm STARTERS are
-                    // not excluded: they are ordinary programs, so the corpus bar applies to
-                    // them as it does to every other pair fixture. The archived epoch outputs under
-                    // epochs/ and the authored N1/W1..W5 pairs stay counted, as today; the
-                    // ledger's counts are unchanged by these two lines.
-                    // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
-                    // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
-                    // starters enter the census and the seeded mutants do not. What is NOT yet
-                    // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
-                    // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
-                    // `§FLD ... §E{...}`, and
-                    // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
-                    // asserts that ZERO committed .calr write those forms. So when #1123 lands that
-                    // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
-                    // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
-                    // the narrow one either way: widening it to the whole pair family would silently
-                    // exempt ordinary programs from the corpus bar.
+                    // Harness scratch that is not product corpus, excluded the way docs/design/spikes/ is:
+                    // (1) templates/ — the arm csproj template and the permissive canary run-pair.sh compiles
+                    //     before a pre-rows epoch (v0.16 W1), a program written to draw Calor0410;
+                    // (2) the PP-W-rows fixtures and epoch archives PpwFixture names (roadmap v0.16 §4.1,
+                    //     S3 (c)). W1 landed the seeded-only form and asked for the STARTERS to be
+                    //     dispositioned when the pairs landed; PpwFixture records that disposition and why
+                    //     the other two options it listed are unavailable. Counts are unchanged either way.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !PpwSeededFixture.IsMatch(rel);
+                    && !PpwFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))
@@ -538,6 +519,14 @@ public class HigherOrderDemandLedgerTests
         Assert.Equal(RegisteredAt, ledger.RegisteredAt);
         Assert.Equal(Floor, ledger.Floor);
         Assert.Equal(FloorRule, ledger.FloorRule);
+        // CONVENTION (recorded in review round 1 of the v0.16 kickoff sweep, M3;
+        // the check stays shape-only because a test cannot know its own future
+        // commit). `measuredCommit` names the commit whose TREE the counts were
+        // measured against. When a PR changes the corpus, the regeneration must
+        // therefore run with the corpus change already committed, so the stamp
+        // names a commit in which the counted files EXIST — the PR's own branch
+        // commit, as PR #1110 stamped its own. Stamping the branch BASE records
+        // a count that is not reproducible at the commit named.
         Assert.True(IsSha(ledger.MeasuredCommit),
             $"measuredCommit must be a 40-hex commit SHA, was '{ledger.MeasuredCommit}'");
         Assert.Equal(ScopeText, ledger.Scope);

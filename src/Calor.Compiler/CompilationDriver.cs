@@ -7,6 +7,251 @@ using Calor.Compiler.Incremental;
 namespace Calor.Compiler;
 
 /// <summary>
+/// Which generated C# outputs may be validated when some file in the same run
+/// FAILED — the one place the rule lives, shared by every surface that batches
+/// generated sources into a single Roslyn compilation
+/// (<see cref="CompilationDriver"/> and the MSBuild <c>CompileCalor</c> task).
+///
+/// <para><b>The problem.</b> Generated-output validation compiles this run's
+/// outputs together. A file that failed contributes no output, so every clean
+/// file that CALLS it fails to compile for a reason that is not its own —
+/// <c>Calor1002</c>, "the name 'Map' does not exist" — while the failing file's
+/// real diagnostic scrolls past above. Worse, the two paths disagreed: a warm
+/// build whose only uncached file was the failing one had nothing pending and
+/// skipped validation entirely, so the same workspace reported different
+/// diagnostics cold and warm (found by ES-08, `tests/TestData/EditScripts`).</para>
+///
+/// <para><b>The rule.</b> Drop from the validation set exactly the outputs that
+/// reference a failed file's module, and validate everything else. A genuine
+/// <c>Calor1002</c> in an unrelated file is therefore still reported in the same
+/// run — the naive fix, "skip validation whenever anything failed", hides it
+/// (review round 2, C1). Suppressed outputs are treated as UNVALIDATED: they are
+/// not written, not cached, and not reported successful, because nothing checked
+/// them. They are re-validated on the next run, once the failing file is fixed
+/// or its callers are.</para>
+///
+/// <para><b>Reference</b> means: the output's C# mentions an identifier the
+/// failed module owns — its module name, the emitted static-class name for any
+/// of its functions, its function names, and the names of the types it declares.
+/// Matching is on whole identifier tokens. It is deliberately over-inclusive: a
+/// false positive defers one file's validation by one run, while a false
+/// negative brings the cascade back.</para>
+///
+/// <para><b>Parse failures.</b> A file that did not parse yields no module, so
+/// its owned identifiers are unknowable and no scope can be computed. Callers
+/// are told so (<c>scopeIsComplete: false</c>) and must then do BOTH halves:
+/// validate nothing, and treat every output of the run as suppressed. Doing only
+/// the first half is what the round-2 fix did, and it was permissive rather than
+/// conservative — nothing was checked, yet everything was written, cached and
+/// reported successful (review round 3, C1-residual). A syntax error is the most
+/// common build failure, so this branch runs constantly.</para>
+/// </summary>
+internal static class GeneratedValidationScope
+{
+    /// <summary>
+    /// The identifiers the failed modules own in emitted C#.
+    /// <paramref name="scopeIsComplete"/> is false when any failed file has no
+    /// module (it did not parse), in which case the set is meaningless and the
+    /// caller must not validate anything.
+    /// </summary>
+    internal static HashSet<string> OwnedIdentifiers(
+        IEnumerable<ModuleNode?> failedModules,
+        out bool scopeIsComplete)
+    {
+        ArgumentNullException.ThrowIfNull(failedModules);
+
+        var owned = new HashSet<string>(StringComparer.Ordinal);
+        scopeIsComplete = true;
+
+        foreach (var module in failedModules)
+        {
+            if (module == null)
+            {
+                scopeIsComplete = false;
+                continue;
+            }
+
+            Add(module.Name);
+            foreach (var function in module.Functions)
+            {
+                Add(function.Name);
+                var target = CrossModuleFunctionTarget.Create(module, function);
+                if (target == null)
+                    continue;
+                Add(target.ModuleClassName);
+                foreach (var segment in target.NamespaceIdentity.Split(
+                             '.', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    Add(segment);
+                }
+            }
+
+            // Every declaration family that becomes a name in emitted C#. Missing
+            // one is a false NEGATIVE — the cascade comes back for anything that
+            // referenced it — so the list is exhaustive over ModuleNode rather
+            // than "the common cases" (review round 3).
+            foreach (var declaration in module.Classes)
+                Add(declaration.Name);
+            foreach (var declaration in module.Interfaces)
+                Add(declaration.Name);
+            foreach (var declaration in module.Enums)
+                Add(declaration.Name);
+            foreach (var declaration in module.EnumExtensions)
+                Add(declaration.EnumName);
+            foreach (var declaration in module.Delegates)
+                Add(declaration.Name);
+            foreach (var declaration in module.RefinementTypes)
+                Add(declaration.Name);
+            foreach (var declaration in module.IndexedTypes)
+                Add(declaration.Name);
+
+            // Types the module declares inside a §CSHARP block are emitted
+            // verbatim and are just as referenceable; their names are not in the
+            // AST as declarations, so they are read out of the interop text.
+            foreach (var interop in module.InteropBlocks)
+                AddInteropDeclarations(interop.CSharpCode);
+            // …and the class- and interface-level blocks, which is where an
+            // interop type most often sits in practice (review round 4, optional
+            // minor — false-negative direction).
+            foreach (var declaration in module.Classes)
+                foreach (var interop in declaration.InteropBlocks)
+                    AddInteropDeclarations(interop.CSharpCode);
+            foreach (var declaration in module.Interfaces)
+                foreach (var interop in declaration.InteropBlocks)
+                    AddInteropDeclarations(interop.CSharpCode);
+        }
+
+        return owned;
+
+        void Add(string? identifier)
+        {
+            if (string.IsNullOrEmpty(identifier) || identifier == "_global")
+                return;
+            // Defence in depth (review round 4, V1): a C# keyword is never a
+            // declaration name, and admitting one is catastrophic rather than
+            // merely wrong — every generated file contains `class`, so a single
+            // keyword in the owned set makes References() true for everything
+            // and silently degrades the scoped rule to "suppress the whole run".
+            // The regex below is the first line of defence; this caps the blast
+            // radius of any future slip in it.
+            if (ReservedWords.Contains(identifier))
+                return;
+            owned.Add(identifier);
+        }
+
+        // `class Foo`, `record class Money`, `record struct Point`,
+        // `interface IBaz`, `enum Qux`, `delegate int Quux<T>(...)` — the
+        // identifier after a type-declaring keyword. Text-level on purpose:
+        // interop is preserved verbatim and never parsed into the AST, so there
+        // is nothing else to read.
+        void AddInteropDeclarations(string? code)
+        {
+            if (string.IsNullOrEmpty(code))
+                return;
+
+            foreach (System.Text.RegularExpressions.Match match in
+                     InteropTypeDeclaration.Matches(code))
+            {
+                Add(match.Groups["name"].Value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The `record` alternative comes FIRST and consumes an optional
+    /// `class`/`struct` modifier. Written the other way round (review round 4,
+    /// V1) `record class Money` matched the `record` branch and captured
+    /// **`class`** as the type name — which every generated file contains, so
+    /// the whole run was suppressed on ordinary modern C#.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex InteropTypeDeclaration = new(
+        @"\brecord\s+(?:class\s+|struct\s+)?(?<name>[A-Za-z_][A-Za-z0-9_]*)"
+            + @"|\b(?:class|struct|interface|enum)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)"
+            + @"|\bdelegate\s+[^\s(]+\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^(>]*>)?\s*\(",
+        System.Text.RegularExpressions.RegexOptions.Compiled
+            | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Words that can never be a declaration name. Admitting one poisons the
+    /// scope (see <see cref="InteropTypeDeclaration"/>), so they are refused at
+    /// the point of entry regardless of how they were produced.
+    /// </summary>
+    private static readonly HashSet<string> ReservedWords = new(StringComparer.Ordinal)
+    {
+        "class", "struct", "record", "interface", "enum", "delegate", "namespace",
+        "using", "var", "void", "public", "private", "protected", "internal",
+        "static", "sealed", "abstract", "partial", "readonly", "const", "new",
+        "object", "string", "int", "long", "short", "byte", "bool", "char",
+        "float", "double", "decimal", "uint", "ulong", "ushort", "sbyte",
+        "dynamic", "this", "base", "null", "true", "false", "ref", "out", "in",
+    };
+
+    /// <summary>
+    /// Whether one generated output mentions any owned identifier, matched on
+    /// whole identifier tokens (so <c>MapReduce</c> is not a hit for <c>Map</c>).
+    /// </summary>
+    internal static bool References(string generatedCSharp, IReadOnlySet<string> owned)
+    {
+        ArgumentNullException.ThrowIfNull(generatedCSharp);
+        ArgumentNullException.ThrowIfNull(owned);
+        if (owned.Count == 0)
+            return false;
+
+        var start = -1;
+        for (var i = 0; i <= generatedCSharp.Length; i++)
+        {
+            var isTokenChar = i < generatedCSharp.Length
+                && (char.IsLetterOrDigit(generatedCSharp[i]) || generatedCSharp[i] == '_');
+            if (isTokenChar)
+            {
+                if (start < 0)
+                    start = i;
+                continue;
+            }
+
+            if (start >= 0)
+            {
+                if (owned.Contains(generatedCSharp[start..i]))
+                    return true;
+                start = -1;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Splits the candidate outputs into the ones that may be validated and the
+    /// source paths whose outputs are cascade-suppressed. Suppressed paths are
+    /// full paths, compared with the platform's path comparer.
+    /// </summary>
+    internal static List<GeneratedCSharpSource> Retain(
+        IEnumerable<GeneratedCSharpSource> candidates,
+        IReadOnlySet<string> owned,
+        out HashSet<string> suppressedSourcePaths)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        var retained = new List<GeneratedCSharpSource>();
+        suppressedSourcePaths = new HashSet<string>(BuildStateCache.GetPathComparer());
+
+        foreach (var candidate in candidates)
+        {
+            if (References(candidate.Text, owned))
+            {
+                if (!string.IsNullOrEmpty(candidate.SourcePath))
+                    suppressedSourcePaths.Add(Path.GetFullPath(candidate.SourcePath));
+                continue;
+            }
+
+            retained.Add(candidate);
+        }
+
+        return retained;
+    }
+}
+
+/// <summary>
 /// Shared multi-file compile orchestration used by the top-level compile command
 /// (<see cref="Program"/>), <c>calor watch</c>, and <c>calor run</c> / <c>calor test</c>
 /// (<c>ExecutionWorkspace</c>). One place owns the loop semantics:
@@ -102,6 +347,9 @@ internal static class CompilationDriver
         var pending = new List<PendingFile>();
         var skipped = new List<FileInfo>();
         var skippedGeneratedSources = new List<GeneratedCSharpSource>();
+        // Modules of files that failed this run; null for a file that did not
+        // parse. Scopes generated-output validation (GeneratedValidationScope).
+        var failedModules = new List<ModuleNode?>();
         // Per-module effect summaries feeding cross-module enforcement: fresh
         // summaries for compiled files, cache-restored summaries for skipped ones.
         var moduleSummaries = new List<(EffectSummary Summary, string FilePath)>();
@@ -262,6 +510,9 @@ internal static class CompilationDriver
                     validated: false);
                 onFailed?.Invoke(file);
                 anyErrors = true;
+                // Its module (null when the file did not parse) scopes which
+                // other outputs may be validated — see GeneratedValidationScope.
+                failedModules.Add(result.Ast);
                 continue;
             }
 
@@ -277,35 +528,87 @@ internal static class CompilationDriver
         }
 
         var generatedValidationFailed = false;
-        if (pending.Count > 0 && pending.Any(item => !item.Options.UnsafeTranspileOnly))
+        // Generated-output validation runs over the outputs of THIS run's clean
+        // files plus every cached output, as one Roslyn compilation. A file that
+        // failed above contributes no output, so its CALLERS fail against the
+        // hole with cascade Calor1002s that are not theirs — and cold and warm
+        // disagreed, because a warm build whose only uncached file was the
+        // failing one had nothing pending and skipped validation altogether
+        // (found by ES-08, tests/TestData/EditScripts).
+        //
+        // The rule (GeneratedValidationScope, shared with the MSBuild task):
+        // validate every output EXCEPT the ones that reference a failed file's
+        // module. A genuine Calor1002 in an unrelated file still surfaces in the
+        // same run. Suppressed outputs are unvalidated, so they are neither
+        // published nor cached below.
+        var owned = GeneratedValidationScope.OwnedIdentifiers(
+            failedModules, out var validationScopeIsComplete);
+        var cascadeSuppressed = new HashSet<string>(BuildStateCache.GetPathComparer());
+        if (!validationScopeIsComplete)
         {
-            var generatedSources = pending
-                .Select(item => new GeneratedCSharpSource(
-                    item.Result.GeneratedCode,
-                    cache?.OutputPathFor(item.File)
-                        ?? Path.ChangeExtension(item.File.FullName, ".g.cs"),
-                    item.File.FullName))
-                .Concat(skippedGeneratedSources)
-                .ToList();
+            // A file that did not parse hides what it owns, so nothing in this
+            // run can be validated — and nothing may CLAIM to have been. Marking
+            // every pending file suppressed is what makes that true: without it
+            // the run published and cached unvalidated output and reported
+            // success, which is the permissive answer, not the conservative one
+            // (review round 3, C1-residual). An unterminated string or a stray
+            // marker is what reaches here — a plain syntax error keeps its AST
+            // and takes the scoped path below.
+            //
+            // `--transpile-only` is exempt, exactly as it is on the scoped path
+            // and in the MSBuild task: it opts out of the validation this
+            // suppression protects, so withholding its output would remove the
+            // artifact the flag exists to produce (review round 4, V2 — the two
+            // surfaces disagreed here, which is the class M1 closed).
+            foreach (var item in pending)
+            {
+                if (!item.Options.UnsafeTranspileOnly)
+                    cascadeSuppressed.Add(Path.GetFullPath(item.File.FullName));
+            }
+        }
+        else if (pending.Any(item => !item.Options.UnsafeTranspileOnly)
+            || skippedGeneratedSources.Count > 0)
+        {
+            // Cached outputs count: a warm run with nothing pending still has a
+            // generated set worth validating.
+            var generatedSources = GeneratedValidationScope.Retain(
+                pending
+                    .Where(item => !item.Options.UnsafeTranspileOnly)
+                    .Select(item => new GeneratedCSharpSource(
+                        item.Result.GeneratedCode,
+                        cache?.OutputPathFor(item.File)
+                            ?? Path.ChangeExtension(item.File.FullName, ".g.cs"),
+                        item.File.FullName))
+                    .Concat(skippedGeneratedSources),
+                owned,
+                out cascadeSuppressed);
             var references = pending
                 .SelectMany(item => item.Options.ReferencedAssemblyPaths ?? [])
                 .Distinct(BuildStateCache.GetPathComparer());
-            var validation = GeneratedCSharpCompiler.Validate(generatedSources, references);
-            if (!validation.CompilationSuccess)
+            var validation = generatedSources.Count > 0
+                ? GeneratedCSharpCompiler.Validate(generatedSources, references)
+                : null;
+            if (validation != null && !validation.CompilationSuccess)
             {
                 generatedValidationFailed = true;
                 anyErrors = true;
                 var validationDiagnostics = new DiagnosticBag();
+                // Fallback file for a diagnostic with no source location. Pending
+                // first; on a warm run validating only cached outputs there is no
+                // pending file, so the generated set's own first entry names it.
+                var fallbackPath = pending.Count > 0
+                    ? pending[0].File.FullName
+                    : generatedSources[0].SourcePath ?? generatedSources[0].Path;
                 Program.AddGeneratedOutputDiagnostics(
-                    validation, validationDiagnostics, pending[0].File.FullName);
+                    validation, validationDiagnostics, fallbackPath);
                 foreach (var diagnostic in validationDiagnostics)
                 {
                     var owner = pending.FirstOrDefault(item =>
                         BuildStateCache.GetPathComparer().Equals(
                             Path.GetFullPath(item.File.FullName),
-                            Path.GetFullPath(diagnostic.FilePath ?? item.File.FullName)))
-                        ?? pending[0];
-                    owner.Result.Diagnostics.Add(diagnostic);
+                            Path.GetFullPath(diagnostic.FilePath ?? item.File.FullName)));
+                    owner ??= pending.Count > 0 ? pending[0] : null;
+                    owner?.Result.Diagnostics.Add(diagnostic);
                     if (diagnosticSink != null)
                     {
                         diagnosticSink.Add(diagnostic);
@@ -387,13 +690,27 @@ internal static class CompilationDriver
                 outcomeDiagnostics,
                 validated: !item.Options.UnsafeTranspileOnly &&
                     !generatedValidationFailed &&
-                    !crossModuleDiagnostics.HasErrors);
+                    !crossModuleDiagnostics.HasErrors &&
+                    // Cascade-suppressed: nothing validated this output, so no
+                    // validated-success claim may be made for it.
+                    !cascadeSuppressed.Contains(Path.GetFullPath(item.File.FullName)));
         }
 
         if (!publishFailed)
         {
             foreach (var item in pending)
             {
+                // A cascade-suppressed output was never validated (its module
+                // calls a file that failed), so it is not published, not cached
+                // and not reported successful — the same treatment a file whose
+                // validation failed gets, for the same reason: nothing checked
+                // it. The next run validates it.
+                if (cascadeSuppressed.Contains(Path.GetFullPath(item.File.FullName)))
+                {
+                    onFailed?.Invoke(item.File);
+                    continue;
+                }
+
                 compiled.Add(new FileResult(item.File, item.Result));
                 onCompiled?.Invoke(item.File, item.Result);
 

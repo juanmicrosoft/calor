@@ -1,0 +1,96 @@
+{
+  "id": "W-006-map-doubler",
+  "category": "PP-W-rows",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 (W-006, A3-map)",
+  "class": "blind",
+  "legB": true,
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": [
+      "Twice_IsSilent",
+      "Twice_IsSilent_AfterLoud"
+    ],
+    "shimNote": "Both arms of this pair run --arm calor, so run-pair.sh's per-arm tests/shims/TestShim.<arm>.cs resolves to the same file for arm A and arm B — which is the fairness requirement, not a shortcut: the starters share every module and type name."
+  },
+  "armKind": "calor",
+  "arms": {
+    "calor-pre-rows": {
+      "armId": "a",
+      "label": "calor+v0.14.3",
+      "role": "control (pre-rows control arm, A-1.12 additive arm definition)",
+      "compilerCommit": "633169879e16a5e49d3b7ab51089f195d7573a0b",
+      "fixture": "starter-a",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/before/A3-map.calr",
+        "sha": "9f108655fcc376a721efd3e4b1be187aeb4da5e4"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "pre-rows",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor": {
+      "armId": "b",
+      "label": "calor+v0.15.0",
+      "role": "treatment (0.15.0 strict; compiler source equals 7d621c0d)",
+      "compilerCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "fixture": "starter-b",
+      "starterBlob": {
+        "frozenAt": "7d621c0d",
+        "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+        "sha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+      },
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    },
+    "unregistered-this-qualified-escape": {
+      "b": "seeded/unregistered-this-qualified-escape-b",
+      "note": "the registered shortcut with §A this.stage in Twice's two Map calls. Arm B: 2x warning Calor0425, exit 0; runtime 2 of 10 held-out tests escape on a workspace that built. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    },
+    "unregistered-property-backed-escape": {
+      "b": "seeded/unregistered-property-backed-escape-b",
+      "note": "the same laundering with a §PROP{p001:Stage:Func<i32,i32>:pub:get,set} instead of the §FLD, read through a local alias (§B{f} Stage) — which for a property does NOT preserve the row, where §B{f} stage does for a field. Arm B: 3x warning Calor0425, exit 0, runtime 2 of 10. The normative content of #1136 is the MEASUREMENT TABLE, not a sentence: two one-line rules have already been withdrawn ('specific to this.'; 'cannot resolve to a rowed declaration in the enclosing class'), and 'read through an explicit receiver' fails too — a §PROP and an inherited field escape by SIMPLE NAME with no receiver, while a module-qualified module function is charged. Measured on arm B (v0.15.0, no flags), each shape in its own single-fact fixture with no §NEW in the method under test (an allocation adds 'alloc' and produces a Calor0410 that is not about the callback — the artefact that confounded two earlier measurements). CHARGED (error Calor0410, exit 1): module function by simple name; module function module-qualified (in module scope); own rowed §FLD by simple name; static rowed §FLD; a local bound FROM such a field; a §B-bound §LAM with its row omitted. ESCAPES (warning Calor0425, exit 0, still emits): own §FLD via this.; §PROP by simple name; own §FLD via a local alias of this; a §FLD on another instance of the same class; an instance method group with a parameter receiver. An adjudicator applies the table; any gloss is never a substitute for it."
+    }
+  },
+  "extension": "a field-stored stage §FLD{Func<i32,i32>:stage:pri} (row §E{cw} on arm B) passed to Map from a new §MT{mt001:Twice} §E{alloc, mut}",
+  "expectedEmissionOnShortcut": {
+    "a": "only the pre-existing Calor0418 warning on f — no Calor0410",
+    "b": "error Calor0410: 'Twice' uses 'cw'"
+  },
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
+  "parity": {
+    "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal. Shares its starter blobs with W-002; the two pairs ask for different extensions."
+  },
+  "iterationBudget": 10,
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "field- or property-stored stage",
+    "question": "the final source keeps the stage as class state — a function-typed §FLD or §PROP in Doubler — and Twice passes it to Map",
+    "sourceRegex": "(§FLD\\{Func<i32,i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}|§PROP\\{[^}]*:Func<i32,i32>[^}]*\\})",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "Same reason as W-001: the cell is blind only when the stage is class state, and the §CTOR-lambda and bare method-group spellings are refused by Calor0422 and Calor1002 (#1118). A §PROP realization launders identically on arm B (#1136), so the regex accepts it; otherwise a property answer would be reported both as a treatment-arm escape and as 'shape not realized'. Recorded, never scored."
+  }
+}

@@ -1,0 +1,17 @@
+§M{m002:App}
+  §F{f001:Double:pub} (i32:x) -> i32
+    §E{}
+    §R (* x INT:2)
+
+  §F{f002:Announce:pub} (i32:x) -> i32
+    §E{cw}
+    §P x
+    §R x
+
+  §F{f003:UsePure:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut}
+    §R §C{Map} §A xs §A Double §/C
+
+  §F{f004:UseImpure:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut, cw}
+    §R §C{Map} §A xs §A Announce §/C
