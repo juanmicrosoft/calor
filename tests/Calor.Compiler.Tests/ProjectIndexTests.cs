@@ -278,10 +278,15 @@ public sealed class ProjectIndexTests : IDisposable
     /// The contract of <see cref="CliTestHarness.StampForChildCli"/>, pinned
     /// directly: the hash it stamps is the one a child <c>calor</c> computes for
     /// itself. Built by the child (<c>calor index build</c>) and read back, so a
-    /// helper that hashed the wrong file — the test host's instrumented copy, a
-    /// stale path, the runtime assembly — is red here rather than showing up as
-    /// a puzzling "index unusable" in whichever test used it next. Lane-neutral:
-    /// nothing in-process contributes the value being compared.
+    /// helper that hashed the wrong file is red here rather than showing up as a
+    /// puzzling "index unusable" in whichever test used it next.
+    ///
+    /// <para>What each lane catches, measured: hashing the wrong assembly
+    /// (<c>Calor.Runtime.dll</c>) is red in both lanes; hashing the test host's
+    /// own copy (<c>ComputeCliCompilerHash</c>) is caught by the coverage lane
+    /// specifically, since outside it that file is byte-identical to the child's
+    /// — an information-theoretic limit rather than a gap, and CI runs both
+    /// lanes.</para>
     /// </summary>
     [Fact]
     public void StampForChildCli_UsesTheHashTheChildComputesForItself()
@@ -305,11 +310,13 @@ public sealed class ProjectIndexTests : IDisposable
     /// answers from it.
     ///
     /// <para>The index is stamped with the child's compiler hash before it is
-    /// saved (<see cref="CliTestHarness.StampForChildCli"/>): under
-    /// <c>--collect:"XPlat Code Coverage"</c> the collector instruments the test
-    /// host's copy of <c>calor.dll</c>, so an index built in-process would
-    /// otherwise be refused by the child with <c>index unusable — the compiler
-    /// changed</c>, which is how this pin failed in the coverage lane alone.
+    /// saved (<see cref="CliTestHarness.StampForChildCli"/>, whose comment states
+    /// what that suppresses): an index built in-process is otherwise refused by
+    /// the child with <c>index unusable — the compiler changed</c> whenever the
+    /// two load different <c>calor.dll</c> files — under
+    /// <c>--collect:"XPlat Code Coverage"</c>, which instruments the host's copy,
+    /// and equally in a tree where both build configurations exist, since a Debug
+    /// test host is handed the Release binary for the child.
     /// <c>--no-build</c> is kept deliberately: it makes any remaining mismatch a
     /// hard error rather than a silent rebuild that would erase the residual, so
     /// the pin cannot pass by accident — and the assertions below check the

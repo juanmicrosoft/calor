@@ -54,18 +54,34 @@ internal static class CliTestHarness
     /// <para><b>Why this is needed.</b> A project index records the identity hash
     /// of the compiler that produced it, and a reader refuses an index whose hash
     /// is not its own (<c>Error: index unusable — the compiler changed</c>). The
-    /// test host and the child normally load byte-identical copies of
-    /// <c>calor.dll</c>, so the hashes agree and nothing is needed — but under
-    /// <c>--collect:"XPlat Code Coverage"</c> the collector instruments the test
-    /// host's copy in place, its hash changes, and every test that builds an
-    /// index in-process and then queries it through the CLI fails in the coverage
-    /// lane only. Stamping is honest rather than a bypass: the value written is
-    /// the hash of the very assembly that will read the index, and a genuinely
-    /// stale <c>calor.dll</c> is still rejected on the other inputs (options,
-    /// manifest, file list), which this does not touch.</para>
+    /// test host and the child do not always load the same <c>calor.dll</c>: under
+    /// <c>--collect:"XPlat Code Coverage"</c> the collector instruments the host's
+    /// copy in place, and when both build configurations are present a Debug test
+    /// host loads the Debug build while <see cref="FindCalorDll"/> hands the child
+    /// the Release one. Either way an index built in-process is then refused.</para>
     ///
-    /// <para>Call it on the index object immediately before <c>Save</c>. Outside
-    /// the coverage lane it writes the same value the builder already computed.</para>
+    /// <para><b>What this suppresses — read before copying it.</b> It suppresses
+    /// the compiler-identity check <i>in full</i>. <c>CompilerHash</c> is the only
+    /// input in <c>ProjectIndex.CheckFreshness</c> that distinguishes one
+    /// <c>calor.dll</c> from another: <c>OptionsHash</c>, <c>ManifestHash</c> and
+    /// the file list are workspace inputs, identical whichever binary runs, and
+    /// <c>FormatVersion</c>/<c>CompilerSemanticsVersion</c> move only on a
+    /// deliberate bump. Overwriting <c>CompilerHash</c> therefore makes the child
+    /// accept an index produced by a <i>genuinely different</i> compiler, not only
+    /// by an instrumented copy of the same one.</para>
+    ///
+    /// <para><b>Precondition for that to be sound:</b> the host builds the index,
+    /// the child only reads it, and both binaries come from the same working tree
+    /// and the same build configuration — so they differ at most by instrumentation.
+    /// <b>If that breaks</b> — a stale <c>bin/Release</c>, or a mixed Debug/Release
+    /// tree — the child will silently answer from an index a different compiler
+    /// produced, and the test will report whatever that older compiler recorded
+    /// instead of failing. Use this only where the index genuinely must be built
+    /// in-process (an injected knob with no CLI surface). Where the child can
+    /// build the index itself (<c>calor index build</c>), prefer that: it keeps
+    /// the identity check in force.</para>
+    ///
+    /// <para>Call it on the index object immediately before <c>Save</c>.</para>
     /// </summary>
     internal static void StampForChildCli(Indexing.ProjectIndex index)
     {
