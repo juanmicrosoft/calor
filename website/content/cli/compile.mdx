@@ -53,8 +53,8 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--analyze` | | No | Enable [static analysis](/docs/cli/static-analysis/) (dataflow, bug patterns, taint tracking) |
 | `--all-findings` | | No | Report all analysis findings including inconclusive results (requires `--analyze`) |
 | `--no-enforce-effects` | | No | Opt out of default-on effect enforcement |
-| `--strict-effects` | | No | Promote unknown external-call diagnostics (`Calor0411`) to errors |
-| `--permissive-effects` | | No | Assume unknown calls pure and demote effect violations; this voids the effect guarantee |
+| `--strict-effects` | | No | Promote the "I cannot tell" effect warnings — `Calor0411`, `Calor0419`, `Calor0425` — to errors |
+| `--permissive-effects` | | No | Assume a call the compiler cannot look up does nothing: `Calor0411` and `Calor0425` go unreported and `Calor0410` becomes a warning. Never waives `Calor0424`, `Calor0420`, or `Calor0421`. This voids the effect guarantee — see [Effects](/docs/syntax-reference/effects/#turning-the-checks-down) |
 | `--no-type-check` | | No | Opt out of the default-on type checker for this command |
 | `--cache` | | No | Opt into the incremental build cache for the default output layout |
 | `--no-cache` | | No | Disable verification and incremental-build caches |
@@ -98,6 +98,49 @@ Compilation failed with 1 error
 
 For machine-readable diagnostics, use `--format json|sarif` or the
 `calor_check` MCP tool. See [Structured Output](/docs/cli/structured-output/).
+
+---
+
+## When One File Fails
+
+Changed in 0.16. This affects `calor` on the command line and `dotnet build`
+alike.
+
+The compiler checks the C# it generates by handing it to Roslyn — Microsoft's
+own C# compiler — and if Roslyn rejects it, that is `Calor1002`. The catch is
+that a file which failed to
+compile leaves the types it was supposed to declare missing, so every *other*
+file that mentions one of those types now fails to build too — not because
+anything is wrong with it, but because a piece it needs was never produced.
+Those follow-on failures are noise. They hide the one real error underneath a
+pile of `Calor1002`s that vanish as soon as you fix it.
+
+From 0.16 the compiler works out which types the failed file was going to
+declare, and skips the Roslyn check only for the outputs that mention them.
+Everything else is still checked, so a genuine `Calor1002` in an unrelated file
+is still reported.
+
+The outputs it skipped are treated as unfinished, not as fine:
+
+- no `.g.cs` file is written for them,
+- no entry goes in the build cache, so the next build redoes them rather than
+  trusting a result that was never checked,
+- and the build does not claim they compiled successfully.
+
+Two edges are worth knowing. If a file is broken badly enough that the compiler
+cannot work out what it declares — an unterminated string or a stray marker,
+rather than an ordinary syntax error, which keeps enough structure to be
+scoped — then nothing is written for that run at all, which is the safe answer
+rather than the convenient one. And `--transpile-only` is exempt: it already
+opts out of the Roslyn check, so it still writes its output.
+
+Neither surface did any of this before 0.16, and both now apply the same rule
+from the same code, so neither reports cascade errors the other does not. They
+are not identical in general: `dotnet build` hands Roslyn the rest of your
+project's C#, its assembly references, its analyzers and its `Nullable` and
+`TreatWarningsAsErrors` settings, and `calor` on the command line hands it none
+of that — so the two can still reach different verdicts on the same file for
+reasons that have nothing to do with cascading.
 
 ---
 

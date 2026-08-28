@@ -225,26 +225,96 @@ Or explicitly:
 ## Effect Checking
 
 Effect enforcement is on by default for compile, build, and watch workflows.
-The compiler reports:
-
-1. **Missing effect**: a function uses an effect it did not declare
-2. **Propagation**: a caller does not include a callee's effects
-3. **Unknown calls**: interop and unmodeled calls become `Assumed` and propagate
-   (`Calor0419`) instead of silently becoming pure
-4. **Delegate calls**: invoking a delegate stored in a parameter, binding, or
-   field is an error (`Calor0418`) unless permissive mode is explicitly chosen
-5. **Variance**: overrides and interface implementations may not declare more
-   effects than their base contracts (`Calor0420` and `Calor0421`)
+Two rules drive everything: a function must declare every effect its body has,
+and a caller must declare everything its callees may do. A call the compiler
+cannot look up is never quietly treated as harmless.
 
 Collection mutators such as `Add`, `Remove`, `Clear`, `Insert`, `Sort`, and
-`CopyTo` are not on the known-pure list. Use `--no-enforce-effects` only as an
-explicit migration waiver. `--permissive-effects` assumes unknown calls are
-pure and voids the effect guarantee; [review packets](/docs/cli/review-packet/)
-disclose that waiver on their first line.
+`CopyTo` are not on the known-pure list.
+
+### What the Compiler Reports
+
+| Code | Level | What it means |
+|:-----|:------|:--------------|
+| `Calor0410` | Error | A function does something its `§E{…}` line does not list. The message often shows the chain of calls that got there. |
+| `Calor0411` | Warning | The compiler cannot look up what an outside call does. Add the method to a `.calor-effects.json` manifest. `--strict-effects` makes it an error. |
+| `Calor0417` | Warning | A public function has no `§E{…}` at all, so callers in other files have nothing to check against. Raised by the cross-module pass, so it only appears when you compile more than one file together. |
+| `Calor0419` | Warning | The effects are assumed rather than checked — the body holds raw C# interop, or something the compiler does not recognise, or a call to a function whose own effects are assumed. `--strict-effects` makes it an error. |
+| `Calor0420` | Error | An override declares **more** effects than the method it overrides. Declaring fewer is fine. |
+| `Calor0421` | Error | An interface implementation declares **more** effects than the interface method. Declaring fewer is fine. |
+| `Calor0424` | Error | A callback's effects do not fit where it is being bound, passed, or returned. |
+| `Calor0425` | Warning | The compiler cannot decide whether a callback fits, because one side carries no `§E{…}`. `--strict-effects` makes it an error. |
+| `Calor0418` | Error | You invoked something that is provably not a function — an `i32`, a string, an array — so there is no effect list to charge. |
+| `Calor0406` | Error | Effect checking stopped before it finished. New in 0.16; see below. |
+
+Calling a function value — a callback parameter, a lambda you bound to a name,
+a callback field — is not an error. Since 0.15 the compiler reads the
+callback's own `§E{…}` and charges it to whoever calls it. `Calor0418` is left
+for the one case where the thing being invoked is not a function at all.
+
+### When Effect Checking Gives Up: Calor0406
+
+New in 0.16. Effect checking runs two loops, and each has a safety limit so
+that a tangle of functions calling each other cannot make the compiler spin
+forever:
+
+- Working out the effects of a group of functions that all call each other.
+  The limit is 100 rounds. From 100 functions upward the limit is instead one
+  round per function in the group, plus one more round to confirm nothing
+  changed — so a big but ordinary group never trips it.
+- Carrying the real value of an effect placeholder up through a chain of
+  callers. The limit is 10,000 steps.
+
+If either loop reaches its limit while the answer is still changing, the
+compiler reports `Calor0406`, naming which loop stopped, the limit, and the
+functions involved. It is always an error and no flag waives it: a check the
+compiler did not finish must not be handed back as a clean build.
+
+Before 0.16 the first loop reported `Calor0600` — a code that belongs to a
+different family — and the second stopped without saying anything at all.
+
+### Turning the Checks Down
+
+`--no-enforce-effects` switches effect checking off. Use it only as a
+deliberate migration waiver.
+
+`--permissive-effects` is the gentler step. It keeps checking on but assumes a
+call the compiler cannot look up does nothing. In a project file:
+
+```xml
+<PropertyGroup>
+  <CalorPermissiveEffects>true</CalorPermissiveEffects>
+</PropertyGroup>
+```
+
+What it waives:
+
+- `Calor0411` and `Calor0425` — the two "I cannot tell what this does"
+  messages — are not reported at all.
+- `Calor0410`, "this function does something it never said it would", is
+  reported as a warning instead of an error. That holds both inside a single
+  file and across files.
+
+What it never waives — these stay errors under every flag:
+
+- `Calor0424`, a callback whose effects do not fit where it is going.
+- `Calor0420` and `Calor0421`, an override or interface implementation that
+  declares **more** effects than the member it inherits from. Declaring fewer
+  is always allowed.
+- `Calor0418` and `Calor0406`.
+- Three narrower forms of `Calor0410`: the one about a lambda's own `§E{…}`
+  line, and two about effect variables.
+
+Waiving "we cannot tell" is honest; waiving "we know this is wrong" is not.
+
+Because unknown calls are counted as doing nothing, permissive mode gives up
+the effect guarantee. [Review packets](/docs/cli/review-packet/) disclose that
+waiver on their first line.
 
 ---
 
 ## Next
 
 - [Effect manifests and package import](/docs/guides/effect-manifests-dotnet-ecosystem/) - External call coverage
+- [calor query](/docs/cli/query/) - Ask what a function declares, what it really does, and what a change would break
 - [Adoption Playbook](/docs/guides/adoption-playbook/) - Applying effects in an existing solution

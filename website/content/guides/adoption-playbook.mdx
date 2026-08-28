@@ -53,6 +53,10 @@ The package contains the build task, compiler/runtime dependencies, and Z3
 natives. `CalorVerify=true` runs the contract verification gate during the
 build. Type checking and effect enforcement are on by default; the explicit
 MSBuild opt-outs are `CalorTypeCheck=false` and `CalorEnforceEffects=false`.
+For converted code, `CalorPermissiveEffects=true` is the gentler step — it
+keeps effect checking on but goes easy on calls the compiler cannot look up.
+The [full list of build settings](/docs/cli/init/#build-settings) is on the
+`calor init` page.
 
 ## 2. Add a Small Module
 

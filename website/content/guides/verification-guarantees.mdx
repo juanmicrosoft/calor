@@ -85,10 +85,20 @@ Type checking is on by default. Use `--no-type-check` on the root
 build command, `CALOR_NO_TYPE_CHECK=1` on other entry points, or
 `CalorTypeCheck=false` in MSBuild only as explicit migration opt-outs.
 
-Effect enforcement is also on by default. Interop assumptions propagate,
-delegate calls fail loud, and override/interface effect variance is checked.
-`--no-enforce-effects` disables the gate; `--permissive-effects` assumes unknown
-calls are pure and therefore voids the guarantee.
+Effect enforcement is also on by default. Interop assumptions propagate, and
+override/interface effect variance is checked. Since 0.15, calling a function
+value — a callback parameter, a bound lambda, a callback field — is not an
+error: the compiler reads the callback's own `§E{…}` and charges it to the
+caller. `Calor0418` is reserved for invoking something that is provably not a
+function at all.
+
+`--no-enforce-effects` disables the gate. `--permissive-effects` assumes a call
+the compiler cannot look up does nothing, so `Calor0411` and `Calor0425` go
+unreported and `Calor0410` is demoted to a warning; it never waives
+`Calor0424`, `Calor0420`, or `Calor0421`. Because unknown calls are counted as
+doing nothing, it voids the effect guarantee — see
+[Effects](/docs/syntax-reference/effects/#turning-the-checks-down) for exactly
+what it does and does not waive.
 
 ## Review Checklist
 
