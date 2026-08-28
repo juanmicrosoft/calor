@@ -323,10 +323,22 @@ public class HigherOrderDemandLedgerTests
                     // compiles before a pre-rows epoch (v0.16 W1) — a program written to
                     // draw Calor0410, never product code — and pairs/W-00x-*/seeded/ holds
                     // the PP-W-rows seeded mutants (§4.1, S3 (c)). The per-arm STARTERS are
-                    // not excluded: they are ordinary programs and are held to the same bar
-                    // as the other 50 pair fixtures. The archived epoch outputs under
+                    // not excluded: they are ordinary programs, so the corpus bar applies to
+                    // them as it does to every other pair fixture. The archived epoch outputs under
                     // epochs/ and the authored N1/W1..W5 pairs stay counted, as today; the
                     // ledger's counts are unchanged by these two lines.
+                    // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
+                    // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
+                    // starters enter the census and the seeded mutants do not. What is NOT yet
+                    // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
+                    // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
+                    // `§FLD ... §E{...}`, and
+                    // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
+                    // asserts that ZERO committed .calr write those forms. So when #1123 lands that
+                    // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
+                    // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
+                    // the narrow one either way: widening it to the whole pair family would silently
+                    // exempt ordinary programs from the corpus bar.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
                     && !PpwSeededFixture.IsMatch(rel);
             })

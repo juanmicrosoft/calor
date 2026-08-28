@@ -488,7 +488,6 @@ def _self_test():
     check(not admit_config(dict(STRICT_CONFIG, enforceEffects=1, permissiveEffects=0))[0],
           "1/0 in place of true/false rejected")
     check(not admit_config(dict(pre, permissiveEffects=1))[0], "permissiveEffects: 1 rejected")
-    check(extract_builds.__doc__ is None or True, "placeholder")
     if ok:
         print("harness-capture.py self-test OK")
         return 0

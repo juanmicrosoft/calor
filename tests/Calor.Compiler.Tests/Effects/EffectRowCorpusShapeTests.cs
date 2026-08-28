@@ -201,9 +201,21 @@ public sealed class EffectRowCorpusShapeTests
             // program written to draw Calor0410; (2) the PP-W-rows SEEDED mutants
             // (pairs/W-00x-*/seeded/, S3 (c)) — the spike blobs plus deliberate laundering
             // shortcuts. The per-arm STARTERS are deliberately NOT excluded: they are
-            // ordinary programs, every other pair fixture is held to this bar, and §4.1
-            // route (a) depends on them, so they keep the automatic round-trip and
-            // effect-row-shape check. `W-\d{3}` rather than `W-00` so W-010+ is covered.
+            // ordinary programs, the same bar applies to them as to every other pair
+            // fixture, and §4.1 route (a) depends on them, so they keep the automatic
+            // round-trip and effect-row-shape check. `W-\d{3}` rather than `W-00` so W-010+ is covered.
+            // VERIFIED, not assumed (round-1 review, with #1123's pairs staged locally):
+            // the regex splits that tree correctly — 926 -> 938, i.e. the 12 per-arm
+            // starters enter the census and the seeded mutants do not. What is NOT yet
+            // settled is whether all 12 PASS: 9 of the `starter-b` files write inline
+            // parameter rows (`§F{...}<eff e> (Func<i32>:g §E{e}) -> i32`) and same-line
+            // `§FLD ... §E{...}`, and
+            // EffectRowCorpusShapeTests.NoCommittedCalrWritesAFormWhoseMeaningTheLineRuleChanges
+            // asserts that ZERO committed .calr write those forms. So when #1123 lands that
+            // claim must be dispositioned — exclude `starter-b/` too, retire or scope the
+            // §3.2 line-rule claim, or rewrite the frozen fixtures. The exclusion here stays
+            // the narrow one either way: widening it to the whole pair family would silently
+            // exempt ordinary programs from the corpus bar.
             .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
             .Where(line => !PpwSeededFixture.IsMatch(line))
             .OrderBy(line => line, StringComparer.Ordinal)

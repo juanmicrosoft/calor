@@ -284,7 +284,7 @@ stamp_pins() {
                    controlArm: {armConfig: $a_cfg, controlArmKind: "pre-rows", permissiveEffects: true},
                    armDirtyFiles: {armA: ($a_dirty|tonumber), armB: ($b_dirty|tonumber)},
                    treatmentArm: {armConfig: $b_cfg, controlArmKind: null, permissiveEffects: false},
-                   validity: "every run must archive transcript.jsonl (W1, gate 8); both arms must record distinct compilerHash values (#1094, witnessing different compilers) AND arm A\u0027s buildState.optionsHash must differ from arm B\u0027s, which is what witnesses the permissive policy — a control arm built from the right commit but run STRICT keeps compilerHash identical and moves only optionsHash",
+                   validity: "every run must archive transcript.jsonl (W1, gate 8); both arms must record distinct compilerHash values (#1094, witnessing different compilers) AND arm A\u0027s buildState.optionsHash must differ from arm B\u0027s, which is what witnesses the permissive policy — a control arm built from the right commit but run STRICT leaves compilerHash unchanged and moves only optionsHash",
                    runner: "bench/phase0-agent-native/run-ppw-epoch.sh"}}' \
        "$OUT/pins.json" > "$OUT/pins.json.tmp" && mv "$OUT/pins.json.tmp" "$OUT/pins.json"
 }
