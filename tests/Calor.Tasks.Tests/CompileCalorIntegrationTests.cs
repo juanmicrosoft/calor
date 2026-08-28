@@ -1464,6 +1464,43 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Equal(driverCodes, taskCodes);
     }
 
+    /// <summary>
+    /// The parse-failure branch on the MSBuild surface (review round 3,
+    /// C1-residual). A file the lexer rejects yields no module, so nothing in
+    /// the build can be validated — and nothing may be written or cached as if
+    /// it had been. The task had the identical hole the driver did.
+    /// </summary>
+    [Fact]
+    public void CascadeSuppression_ParseFailedSibling_PublishesNothingUnvalidated()
+    {
+        // Calor0002 comes from the LEXER, so Program.Compile returns a null Ast.
+        const string UnlexableSource = """
+            §M{m001:Broken}
+              §F{f001:Boom:pub} () -> void
+                §E{cw}
+                §P "unterminated
+            """;
+        const string CleanSource = """
+            §M{m002:Interop}
+              §F{f001:Use:pub} () -> i32
+                §E{}
+                §R INT:1
+            """;
+
+        var broken = CreateSourceFile("Broken.calr", UnlexableSource);
+        var clean = CreateSourceFile("Clean.calr", CleanSource);
+
+        var task = CreateTask(broken, clean);
+        Assert.False(task.Execute());
+
+        Assert.False(
+            File.Exists(Path.Combine(_outputDir, "Clean.g.cs")),
+            "nothing validated this output, so the task must not publish it");
+        Assert.False(
+            File.Exists(Path.Combine(_projectDir, ".calor-build-state.json")),
+            "an unvalidated output must not produce a cache entry");
+    }
+
     [Fact]
     public void VerifyGate_FlippedOnOverWarmCache_Recompiles()
     {

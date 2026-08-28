@@ -300,9 +300,11 @@ public sealed class EditScriptIdentityTests : IDisposable
         // Unknown charge on Map itself (Calor0410, the shipped 0.15 rule:
         // `--permissive-effects` is the only waiver); the callers no longer
         // instantiate a row and Map's declared row covers what they declare.
-        // No Calor1002 on app.calr: the callee's failure excludes its output
-        // from generated-C# validation, and CompilationDriver now skips that
-        // validation when any file failed — on cold and warm builds alike.
+        // No Calor1002 on app.calr: `app.calr` calls the failed `combinators.calr`,
+        // so GeneratedValidationScope drops its output from generated-C#
+        // validation (and, because nothing checked it, from publication) —
+        // identically on cold and warm builds. Outputs that do NOT reference the
+        // failed module are still validated, so this hides no real error.
         // …Calor0410 at `Map`'s own `§E` row (3,5), an error; Calor0425 at the
         // row-less invocation `§C{f}` (7,22), a warning.
         [

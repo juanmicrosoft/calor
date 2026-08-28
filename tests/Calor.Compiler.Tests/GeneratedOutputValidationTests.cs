@@ -291,6 +291,100 @@ public class GeneratedOutputValidationTests
     }
 
     /// <summary>
+    /// A file the LEXER rejects (Calor0006). <c>Program.Compile</c> returns
+    /// before parsing, so its <c>Ast</c> is null and nothing can be known about
+    /// what it owns — the parse-failure branch of
+    /// <see cref="GeneratedValidationScope"/>. A file that merely fails to PARSE
+    /// still carries an AST, so it does not reach that branch.
+    /// </summary>
+    private const string UnlexableSource = """
+        §M{m001:Broken}
+          §ZZQ{bogus}
+            §E{}
+        """;
+
+    /// <summary>
+    /// Review round 3's Probe A — the parse-failure branch, at the DRIVER level.
+    /// A file that does not parse yields no module, so nothing in the run can be
+    /// validated. The round-2 fix stopped there, which was permissive, not
+    /// conservative: nothing was checked, and yet every other file was written,
+    /// cached and reported successful, with its genuine Calor1002 gone. Both
+    /// halves are now required — validate nothing, claim nothing.
+    ///
+    /// <para>The helper's unit test below only observes <c>scopeIsComplete ==
+    /// false</c>; this observes what the driver does with it.</para>
+    /// </summary>
+    [Fact]
+    public void ProbeA_ParseFailedSibling_StillHidesAGenuineCalor1002_AndPublishesIt()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            // Lexes badly, so Program.Compile returns a NULL Ast (Calor0006) —
+            // the branch where the compiler cannot see what the failed file owns.
+            File.WriteAllText(Path.Combine(workspace, "broken.calr"), UnlexableSource);
+            File.WriteAllText(Path.Combine(workspace, "interop.calr"), """
+                §M{m002:Interop}
+                  §F{f001:Use:pub} () -> void
+                    §E{}
+                    §B{x:i32} STR:"not an int"
+                """);
+
+            var result = DriveAll(workspace, clearFirst: true, enableTypeChecking: false);
+
+            Assert.True(result.AnyErrors);
+            // Nothing was validated, so nothing may be published or cached and
+            // nothing may be reported compiled.
+            Assert.Empty(result.CompiledFiles);
+            Assert.False(File.Exists(Path.Combine(workspace, "interop.g.cs")));
+            Assert.Contains("interop.calr", result.FailedFiles);
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The same branch end-to-end through the CLI: no <c>.g.cs</c> on disk, no
+    /// build-state entry, and no success line for a file nothing validated.
+    /// </summary>
+    [Fact]
+    public void Cli_ParseFailedSibling_WritesNoOutputAndNoCacheEntry()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(), $"calor-cli-parsefail-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var broken = Path.Combine(directory, "broken.calr");
+            var interop = Path.Combine(directory, "interop.calr");
+            File.WriteAllText(broken, UnlexableSource);
+            File.WriteAllText(interop, """
+                §M{m002:Interop}
+                  §F{f001:Use:pub} () -> void
+                    §E{}
+                    §B{x:i32} STR:"not an int"
+                """);
+
+            var run = CliTestHarness.RunCli(
+                directory,
+                "--input", broken,
+                "--input", interop,
+                "--no-type-check");
+
+            Assert.Equal(1, run.ExitCode);
+            Assert.DoesNotContain("Compilation successful", run.StdOut + run.StdErr);
+            Assert.False(File.Exists(Path.Combine(directory, "interop.g.cs")));
+            Assert.False(File.Exists(Path.Combine(directory, ".calor-build-state.json")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>
     /// The scope helper's own unit test: "references a failed module" is one
     /// rule in one place, read by the driver and by the MSBuild task alike.
     /// </summary>

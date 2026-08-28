@@ -39,9 +39,12 @@ namespace Calor.Compiler;
 ///
 /// <para><b>Parse failures.</b> A file that did not parse yields no module, so
 /// its owned identifiers are unknowable and no scope can be computed. Callers
-/// are told so (<c>scopeIsComplete: false</c>) and skip validation for the whole
-/// run — the conservative branch, and the only one that keeps cold and warm
-/// agreeing when the compiler cannot see what failed.</para>
+/// are told so (<c>scopeIsComplete: false</c>) and must then do BOTH halves:
+/// validate nothing, and treat every output of the run as suppressed. Doing only
+/// the first half is what the round-2 fix did, and it was permissive rather than
+/// conservative — nothing was checked, yet everything was written, cached and
+/// reported successful (review round 3, C1-residual). A syntax error is the most
+/// common build failure, so this branch runs constantly.</para>
 /// </summary>
 internal static class GeneratedValidationScope
 {
@@ -83,14 +86,30 @@ internal static class GeneratedValidationScope
                 }
             }
 
+            // Every declaration family that becomes a name in emitted C#. Missing
+            // one is a false NEGATIVE — the cascade comes back for anything that
+            // referenced it — so the list is exhaustive over ModuleNode rather
+            // than "the common cases" (review round 3).
             foreach (var declaration in module.Classes)
                 Add(declaration.Name);
             foreach (var declaration in module.Interfaces)
                 Add(declaration.Name);
             foreach (var declaration in module.Enums)
                 Add(declaration.Name);
+            foreach (var declaration in module.EnumExtensions)
+                Add(declaration.EnumName);
             foreach (var declaration in module.Delegates)
                 Add(declaration.Name);
+            foreach (var declaration in module.RefinementTypes)
+                Add(declaration.Name);
+            foreach (var declaration in module.IndexedTypes)
+                Add(declaration.Name);
+
+            // Types the module declares inside a §CSHARP block are emitted
+            // verbatim and are just as referenceable; their names are not in the
+            // AST as declarations, so they are read out of the interop text.
+            foreach (var interop in module.InteropBlocks)
+                AddInteropDeclarations(interop.CSharpCode);
         }
 
         return owned;
@@ -100,7 +119,29 @@ internal static class GeneratedValidationScope
             if (!string.IsNullOrEmpty(identifier) && identifier != "_global")
                 owned.Add(identifier);
         }
+
+        // `class Foo`, `record struct Bar`, `interface IBaz`, `enum Qux`,
+        // `delegate int Quux(...)` — the identifier after a type-declaring
+        // keyword. Text-level on purpose: interop is preserved verbatim and
+        // never parsed into the AST, so there is nothing else to read.
+        void AddInteropDeclarations(string? code)
+        {
+            if (string.IsNullOrEmpty(code))
+                return;
+
+            foreach (System.Text.RegularExpressions.Match match in
+                     InteropTypeDeclaration.Matches(code))
+            {
+                Add(match.Groups["name"].Value);
+            }
+        }
     }
+
+    private static readonly System.Text.RegularExpressions.Regex InteropTypeDeclaration = new(
+        @"\b(?:class|struct|interface|enum|record)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)"
+            + @"|\bdelegate\s+[^\s(]+\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+        System.Text.RegularExpressions.RegexOptions.Compiled
+            | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Whether one generated output mentions any owned identifier, matched on
@@ -460,9 +501,20 @@ internal static class CompilationDriver
         var owned = GeneratedValidationScope.OwnedIdentifiers(
             failedModules, out var validationScopeIsComplete);
         var cascadeSuppressed = new HashSet<string>(BuildStateCache.GetPathComparer());
-        if (validationScopeIsComplete
-            && (pending.Any(item => !item.Options.UnsafeTranspileOnly)
-                || skippedGeneratedSources.Count > 0))
+        if (!validationScopeIsComplete)
+        {
+            // A file that did not parse hides what it owns, so nothing in this
+            // run can be validated — and nothing may CLAIM to have been. Marking
+            // every pending file suppressed is what makes that true: without it
+            // the run published and cached unvalidated output and reported
+            // success, which is the permissive answer, not the conservative one
+            // (review round 3, C1-residual). A syntax error is the most common
+            // build failure, so this is the branch users hit daily.
+            foreach (var item in pending)
+                cascadeSuppressed.Add(Path.GetFullPath(item.File.FullName));
+        }
+        else if (pending.Any(item => !item.Options.UnsafeTranspileOnly)
+            || skippedGeneratedSources.Count > 0)
         {
             // Cached outputs count: a warm run with nothing pending still has a
             // generated set worth validating.

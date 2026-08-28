@@ -851,8 +851,16 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // cannot disagree about a project (Calor.Compiler.GeneratedValidationScope).
         var validationOwned = Calor.Compiler.GeneratedValidationScope.OwnedIdentifiers(
             failedModules, out var validationScopeIsComplete);
-        if (!TranspileOnly
-            && validationScopeIsComplete
+        if (!TranspileOnly && !validationScopeIsComplete)
+        {
+            // A file that did not parse hides what it owns: nothing here can be
+            // validated, and nothing may claim to have been. Same rule, same
+            // wording, as CompilationDriver — the two surfaces must agree on the
+            // parse-failure branch as well (review round 3, C1-residual).
+            foreach (var pending in pendingOutputs)
+                cascadeSuppressed.Add(Path.GetFullPath(pending.InputPath));
+        }
+        else if (!TranspileOnly
             && (generatedFiles.Count > 0 || pendingOutputs.Count > 0))
         {
             var generatedSources = generatedFiles
