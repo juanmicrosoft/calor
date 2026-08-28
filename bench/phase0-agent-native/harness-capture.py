@@ -57,7 +57,11 @@ Subcommands (each prints one JSON document to stdout; exit codes below):
         Also resolves the FIXTURE directory for the arm entry
         (`arms[key].fixture`, defaulting to the arm language), so a pair can
         carry per-arm starters (PP-W-rows: `before/` for the pre-rows arm and
-        `after/` for the strict arm, §4.1).
+        `after/` for the strict arm, §4.1), and the REFERENCE solution the
+        --null-agent path applies (`reference` / `referenceSource`): pre-0.16
+        pairs ship `reference/<fixture>/`, the PP-W-rows pairs declare their
+        per-arm clean cell as `seeded.clean.<armId>`. `reference` is null when
+        the pair has none; the runner decides that is fatal for --null-agent.
 
     leg-b-pairs <pins.json>
         {legBPairs, blindPairs, suite, excludedFromLegB}. `legBPairs` is the
@@ -367,6 +371,50 @@ def _fmt(pins):
     return json.dumps(pins, sort_keys=True)
 
 
+def resolve_reference(pair_json, pair, entry, fixture):
+    """Locate the null-agent reference solution for one arm entry.
+
+    The null path applies a *correct* solution to the workspace and checks that the
+    shim, the held-out suite and the metrics all fire — zero API spend, full plumbing.
+    Pairs authored before v0.16 ship `reference/<fixture>/`. The PP-W-rows pairs
+    (roadmap §4.1, S3 (c)) do not: their per-arm clean solutions are the seeded
+    `clean` cells, declared in pair.json as `seeded.clean.<armId>` — the same programs
+    the epoch uses as its non-laundering control, which is exactly what the null path
+    wants. Resolution order, most explicit first; returns (path-relative-to-pair, source):
+
+      1. `reference/<fixture>/`                      -> "reference"
+      2. pair.json `seeded.clean.<arms[key].armId>`  -> "seeded-clean-declared"
+      3. `seeded/clean-<suffix of fixture>`          -> "seeded-clean-derived"
+      4. nothing                                     -> (None, "none")
+
+    (4) is not an error here: the C# arm and any pair without a reference simply have
+    none, and it is the RUNNER that decides a missing reference is fatal for a
+    --null-agent run. Returning it as data keeps that decision in one place and lets
+    the tests observe every branch.
+    """
+    pair_dir = os.path.dirname(os.path.abspath(pair_json))
+
+    candidate = os.path.join("reference", fixture)
+    if os.path.isdir(os.path.join(pair_dir, candidate)):
+        return candidate, "reference"
+
+    arm_id = entry.get("armId")
+    seeded = pair.get("seeded") if isinstance(pair.get("seeded"), dict) else {}
+    clean = seeded.get("clean") if isinstance(seeded.get("clean"), dict) else {}
+    if isinstance(arm_id, str) and isinstance(clean.get(arm_id), str):
+        declared = clean[arm_id]
+        if os.path.isdir(os.path.join(pair_dir, declared)):
+            return declared, "seeded-clean-declared"
+
+    suffix = fixture.rsplit("-", 1)[-1] if "-" in fixture else None
+    if suffix:
+        derived = os.path.join("seeded", "clean-" + suffix)
+        if os.path.isdir(os.path.join(pair_dir, derived)):
+            return derived, "seeded-clean-derived"
+
+    return None, "none"
+
+
 def resolve_pair_config(pair_json, key, arm=None):
     """Read arms[key] from pair.json and admit it. Returns the JSON dict the
     runner consumes; `admitted` false carries `reason`."""
@@ -377,18 +425,22 @@ def resolve_pair_config(pair_json, key, arm=None):
     except (OSError, ValueError) as exc:
         return {"admitted": False, "reason": "cannot read pair.json: %s" % exc,
                 "armConfigKey": key, "arm": arm, "controlArmKind": None,
-                "permissiveEffects": None, "fixture": None}
+                "permissiveEffects": None, "fixture": None,
+                "reference": None, "referenceSource": "none"}
     arms = pair.get("arms") if isinstance(pair, dict) else None
     entry = arms.get(key) if isinstance(arms, dict) else None
     if not isinstance(entry, dict):
         return {"admitted": False,
                 "reason": "pair.json has no arms[%r] entry" % key,
                 "armConfigKey": key, "arm": arm, "controlArmKind": None,
-                "permissiveEffects": None, "fixture": None}
+                "permissiveEffects": None, "fixture": None,
+                "reference": None, "referenceSource": "none"}
     fixture = entry.get("fixture")
     if not isinstance(fixture, str) or not fixture:
         fixture = arm
+    reference, reference_source = resolve_reference(pair_json, pair, entry, fixture)
     base = {"armConfigKey": key, "arm": arm, "fixture": fixture,
+            "reference": reference, "referenceSource": reference_source,
             "pairId": pair.get("id")}
     if arm != "calor":
         base.update({"admitted": True, "controlArmKind": None,

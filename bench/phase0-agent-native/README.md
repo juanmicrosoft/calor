@@ -153,6 +153,25 @@ task gates its cross-module pass on `EnforceEffects` while the CLI runs cross-mo
 unconditionally. Both arms build with `CalorEnforceEffects=true`, so neither difference is
 exercised.
 
+**Running a free `--null-agent` epoch first.** A null epoch applies each arm's *reference*
+solution instead of calling an agent, so it exercises workspaces, shims, the held-out suite,
+metrics and every W1 artifact at zero API cost — the only end-to-end validation available
+before spend. Two things to know:
+
+- The reference is resolved per arm: `reference/<fixture>/` on pre-0.16 pairs, and the
+  declared `seeded.clean.<armId>` cell on the PP-W-rows pairs (they ship `starter-a`/`starter-b`
+  and `seeded/`, no `reference/`). `run-pair.sh` exits 3 naming both lookups if neither exists.
+- The epoch id is forced to end in `-null`, and that directory is **scratch: delete it when the
+  run is done**. Gate 12's turn-attribution instrument counts *every* entry under `epochs/`, so a
+  leftover null epoch changes its frozen denominator and reds `test_ppe1_turn_attribution`.
+
+Before any run, each calor arm is canaried through its own template and product: the pre-rows arm
+must produce `warning Calor0410`, the strict arm `error Calor0410`. The canary also catches the
+case where MSBuild loads a task assembly that does not match the arm's `Sdk.targets` (`MSB4064`/
+`MSB4063`) — most often **node reuse** serving a previously-loaded `Calor.Tasks.dll` after a
+rebuild (`dotnet build-server shutdown`), not a stale file. Without it every workspace build in
+that arm fails and the runs are recorded as task failures rather than as a broken arm.
+
 `run-ppw-epoch.sh` drives the six `W-001 … W-006` pairs (exact-id directory match; the `W1-`/`W2-`/`W3-`/`W5A-` directories cannot collide), interleaved, arm A = `v0.14.3` under `arms["calor-pre-rows"]`, arm B = `v0.15.0` under `arms.calor`, with the same rails as `run-ppe1-epoch.sh` (`--confirm-paid-epoch`, distinct `Calor.Tasks` hashes, run-once epoch ids, null-agent ids suffixed `-null`). It fails before any spend listing every missing or malformed pair. Its `pins.json` `ppW` block carries the registered leg-B denominator `legBPairs` (default `W-001 W-002 W-003 W-004 W-006`; W-005 is leg A only) and `blindPairs` (`W-001 W-004 W-006`); `ppw-analyze.py` (W2) reads them from there, never from a script default.
 
 `ppe1-margin-derivation.py` gained `--population {w5-parity-002,e1-rows-parity-001,pooled}`, `--sims`, `--boot`, `--seed`, `--grid {frozen,extended}` (adds 1.15/1.20) and `--half-width`; the defaults reproduce the committed `ppe1-margin-derivation.txt` byte for byte, and `ppw-margin-derivation.txt` is the PP-W-rows run (`--population e1-rows-parity-001 --sims 3000 --seed 4537 --grid extended`).
