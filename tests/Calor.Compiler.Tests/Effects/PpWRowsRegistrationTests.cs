@@ -137,8 +137,8 @@ public sealed class PpWRowsRegistrationTests
         // Review round 2 (#1123's own review): the confound, the shape indicator, the escape
         // rule, and the two disclosures that change what a verdict means.
         ("this-qualified confound", "PRE-REGISTERED CONFOUND ON LEG A"),
-        ("confound hits two blind cells", "two argument-position blind cells and not the direct-invocation"),
-        ("W-004 fails closed", "**W-004 is UNAFFECTED and fails closed:**"),
+        ("confound hits two blind cells", "two ARGUMENT-POSITION blind cells and not the direct-invocation one"),
+        ("W-004 fails closed", "**W-004 is UNAFFECTED and fails closed**"),
         ("floor risk from the confound", "NOT-ADJUDICATED by route (a\u2032)"),
         ("shape-realized indicator", "A SHAPE-REALIZED INDICATOR IS OBLIGATORY"),
         ("escape semantics", "failing on a workspace that BUILT"),
@@ -149,7 +149,15 @@ public sealed class PpWRowsRegistrationTests
         ("confound issue", "#1136"),
         ("W-001 escape at runtime", "escapes **2 of 7**"),
         ("W-006 escape at runtime", "**2 of 10**"),
-        ("W-004 negative control", "W-004 as a **negative control**"),
+        ("W-004 negative control", "W-004 the **negative control**"),
+        // Review round 5: the rule is general, not `this.`-specific.
+        ("general rule", "any argument expression the effect pass cannot resolve to a rowed"),
+        ("property instance", "a `§PROP` property, passed UNQUALIFIED"),
+        ("property cannot carry a row", "a `§PROP` CANNOT CARRY A ROW AT ALL"),
+        ("inherited instance", "an inherited field accessed unqualified"),
+        ("fail-closed controls", "two controls that genuinely fail closed"),
+        ("four-way escape classification", "`this-qualified` / `property` / `inherited` / "),
+        ("indicator non-vacuity", "MUST NOT BE SATISFIABLE BY THE STARTER ITSELF"),
         ("unregistered roles excluded from the pin", "**excluded by name** from the frozen-cells pin"),
         ("arm-A route (a) is new", "**Arm A's are NEW and are registered here, not cited:**"),
     ];
@@ -537,20 +545,25 @@ public sealed class PpWRowsRegistrationTests
     private static readonly string[] RegisteredRoles = ["starter", "shortcut", "clean"];
 
     /// <summary>
-    /// The other half of the honesty bargain (review round 4). The frozen-cells pin deliberately
-    /// ignores <c>unregistered-*</c> roles so that recording the confound cannot promote it into
-    /// the registration. That alone would let the evidence be deleted silently, so the evidence is
-    /// pinned here instead — as evidence, not as a denominator.
+    /// The other half of the honesty bargain (review rounds 4–5). The frozen-cells pin
+    /// deliberately ignores <c>unregistered-*</c> roles so that recording the confound cannot
+    /// promote it into the registration. That alone would let the evidence be deleted silently, so
+    /// the evidence is pinned here instead — as evidence, not as a denominator.
     ///
-    /// <para>The published confound (#1136): on <b>arm B</b>, <c>this.</c>-qualifying the field at
-    /// the argument position instantiates the row to Unknown, so nothing is charged and the
-    /// program builds. W-001 and W-006 escape; <b>W-004 is the negative control and fails
-    /// closed</b>. A correction to the instruction that produced this test: the role is present
-    /// for W-004 too — it is not absent — and what distinguishes it is the OUTCOME, so that is
-    /// what is asserted.</para>
+    /// <para>The published confound (#1136) is <b>general</b>: on arm B the row charge is defeated
+    /// by any argument expression the effect pass cannot resolve to a rowed declaration in the
+    /// enclosing class. Known instances: a <c>this.</c>-qualified field, a <c>§PROP</c> property
+    /// passed unqualified, and an inherited field. W-001 and W-006 escape; <b>W-004 is the negative
+    /// control and fails closed</b>.</para>
+    ///
+    /// <para>Two corrections this pin carries. First, the role is present for W-004 too — it is not
+    /// absent — so what is asserted is the OUTCOME that distinguishes it. Second, the pin is named
+    /// for the general rule, not for the <c>this.</c>-qualified instance it was first written
+    /// against: every <c>unregistered-*-escape</c> role is required to show the escape on W-001 and
+    /// W-006, so #1123's property seeds tighten this automatically when they land.</para>
     /// </summary>
     [SkippableFact]
-    public void TheThisQualifiedEscapeEvidenceIsRecorded()
+    public void TheArgumentResolutionEscapeEvidenceIsRecorded()
     {
         var manifest = Path.Combine(
             RepositoryRoot(), "bench", "phase0-agent-native", "pairs", "ppw-seeded-compiles.json");
@@ -560,45 +573,58 @@ public sealed class PpWRowsRegistrationTests
             + "PR #1123, unmerged at A-1.12's registration)");
 
         using var document = JsonDocument.Parse(File.ReadAllText(manifest));
-        var cells = document.RootElement.GetProperty("compiles").EnumerateArray()
-            .Where(c => string.Equals(
-                c.GetProperty("role").GetString(), "unregistered-this-qualified-escape", StringComparison.Ordinal))
-            .ToDictionary(c => c.GetProperty("pair").GetString()![..5], c => c, StringComparer.Ordinal);
+        var escapeRoles = document.RootElement.GetProperty("compiles").EnumerateArray()
+            .Select(c => c.GetProperty("role").GetString()!)
+            .Where(r => r.StartsWith("unregistered-", StringComparison.Ordinal)
+                && r.EndsWith("-escape", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(r => r, StringComparer.Ordinal)
+            .ToArray();
 
-        foreach (var pair in new[] { "W-001", "W-006", "W-004" })
+        // The this.-qualified instance is the one A-1.12 measured itself; it must be on the record.
+        Assert.Contains("unregistered-this-qualified-escape", escapeRoles, StringComparer.Ordinal);
+
+        foreach (var role in escapeRoles)
         {
-            Assert.True(
-                cells.ContainsKey(pair),
-                $"the #1136 `this.`-qualified escape evidence for {pair} is gone from "
-                + "ppw-seeded-compiles.json. A-1.12 publishes that confound; its evidence may be "
-                + "superseded by a NEW annex entry, never silently deleted.");
-            Assert.Equal("B", cells[pair].GetProperty("arm").GetString());
-        }
+            var cells = document.RootElement.GetProperty("compiles").EnumerateArray()
+                .Where(c => string.Equals(c.GetProperty("role").GetString(), role, StringComparison.Ordinal))
+                .ToDictionary(c => c.GetProperty("pair").GetString()![..5], c => c, StringComparer.Ordinal);
 
-        // W-001 and W-006 escape: they BUILD, and nothing is charged (Calor0425, not Calor0410).
-        foreach (var (pair, count) in new[] { ("W-001", 1), ("W-006", 2) })
-        {
-            var cell = cells[pair];
-            Assert.True(
-                cell.GetProperty("exitCode").GetInt32() == 0,
-                $"{pair}'s `this.`-qualified seed no longer builds on arm B; #1136's escape is the "
-                + "claim that it does.");
-            var codes = cell.GetProperty("diagnostics").EnumerateArray()
-                .Select(x => x.GetProperty("code").GetString()!).ToArray();
-            Assert.Equal(count, codes.Count(c => c == "Calor0425"));
-            Assert.DoesNotContain("Calor0410", codes);
-        }
+            // W-001 and W-006 are the argument-position cells: the route reaches them.
+            foreach (var pair in new[] { "W-001", "W-006" })
+            {
+                Assert.True(
+                    cells.ContainsKey(pair),
+                    $"the #1136 escape evidence '{role}' for {pair} is gone from "
+                    + "ppw-seeded-compiles.json. A-1.12 publishes that confound; its evidence may "
+                    + "be superseded by a NEW annex entry, never silently deleted.");
+                var cell = cells[pair];
+                Assert.Equal("B", cell.GetProperty("arm").GetString());
+                Assert.True(
+                    cell.GetProperty("exitCode").GetInt32() == 0,
+                    $"{pair}'s '{role}' seed no longer builds on arm B; #1136's escape is the claim "
+                    + "that it does.");
+                var codes = cell.GetProperty("diagnostics").EnumerateArray()
+                    .Select(x => x.GetProperty("code").GetString()!).ToArray();
+                Assert.Contains("Calor0425", codes);
+                Assert.DoesNotContain("Calor0410", codes);
+            }
 
-        // W-004 is the negative control: the same spelling still fails closed.
-        var control = cells["W-004"];
-        Assert.True(
-            control.GetProperty("exitCode").GetInt32() == 1,
-            "W-004 is #1136's negative control and must still fail closed; if it builds, the "
-            + "confound has widened to all three blind cells and needs a NEW annex entry.");
-        Assert.Contains(
-            "Calor0410",
-            control.GetProperty("diagnostics").EnumerateArray()
-                .Select(x => x.GetProperty("code").GetString()!));
+            // W-004 is the direct-invocation cell: the route must NOT reach it. Where the seed
+            // exists it is the negative control and must still fail closed.
+            if (cells.TryGetValue("W-004", out var control))
+            {
+                Assert.True(
+                    control.GetProperty("exitCode").GetInt32() == 1,
+                    $"W-004 is #1136's negative control for '{role}' and must still fail closed; if "
+                    + "it builds, the confound has widened to all three blind cells and needs a NEW "
+                    + "annex entry.");
+                Assert.Contains(
+                    "Calor0410",
+                    control.GetProperty("diagnostics").EnumerateArray()
+                        .Select(x => x.GetProperty("code").GetString()!));
+            }
+        }
     }
 
     /// <summary>
