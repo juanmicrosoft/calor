@@ -417,6 +417,97 @@ public class GeneratedOutputValidationTests
         Assert.False(partial);
     }
 
+    /// <summary>
+    /// Review round 4, V1: a <c>record class</c> / <c>record struct</c> in a
+    /// failed module's <c>§CSHARP</c> block must contribute its TYPE NAME and
+    /// never the keyword after <c>record</c>. The first version of the regex put
+    /// the bare <c>record</c> alternative first, so <c>record class Money</c>
+    /// captured <b>`class`</b> — a token every generated file contains, which
+    /// silently turned the scoped rule into "suppress the whole run" on ordinary
+    /// modern C#. Two defences are pinned here: the alternation order, and the
+    /// reserved-word guard that refuses a keyword however it was produced.
+    /// </summary>
+    [Theory]
+    [InlineData("public record class Money(decimal Value);", "Money")]
+    [InlineData("public record struct Point(int X, int Y);", "Point")]
+    [InlineData("public record Plain(int X);", "Plain")]
+    [InlineData("public sealed class Widget { }", "Widget")]
+    [InlineData("public delegate int Transform<T>(T value);", "Transform")]
+    public void GeneratedValidationScope_InteropDeclaration_OwnsTheTypeNameNotTheKeyword(
+        string interopDeclaration, string expectedName)
+    {
+        var module = Program.Compile(
+            $$"""
+            §M{m001:Lib}
+              §CSHARP{
+                {{interopDeclaration}}
+              }§/CSHARP
+            """,
+            "lib.calr",
+            new CompilationOptions { UnsafeTranspileOnly = true }).Ast;
+        Assert.NotNull(module);
+
+        var owned = GeneratedValidationScope.OwnedIdentifiers([module], out _);
+
+        Assert.Contains(expectedName, owned);
+        foreach (var keyword in new[] { "class", "struct", "record", "delegate", "interface", "enum" })
+            Assert.DoesNotContain(keyword, owned);
+
+        // The consequence that matters: an unrelated file must not look like a
+        // reference just because it contains the word `class`.
+        Assert.False(
+            GeneratedValidationScope.References(
+                "public static class Unrelated { public static int X() => 1; }",
+                owned),
+            "a keyword in the owned set makes every generated file a 'reference' "
+                + "and suppresses the whole run");
+    }
+
+    /// <summary>
+    /// Review round 4, V2: <c>--transpile-only</c> opts out of the validation
+    /// that cascade suppression protects, so its output is published even when a
+    /// sibling failed to lex. The driver's incomplete-scope branch suppressed it
+    /// unconditionally while the scoped branch and the MSBuild task both exempt
+    /// it — a surface divergence of exactly the kind M1 closed.
+    /// </summary>
+    [Fact]
+    public void CompileAll_TranspileOnly_IsPublishedEvenWithAnUnlexableSibling()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(workspace, "broken.calr"), UnlexableSource);
+            File.WriteAllText(Path.Combine(workspace, "good.calr"), """
+                §M{m002:Good}
+                  §F{f001:One:pub} () -> i32
+                    §E{}
+                    §R INT:1
+                """);
+
+            var sources = Directory.GetFiles(workspace, "*.calr")
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(path => new FileInfo(path))
+                .ToList();
+            var sink = new DiagnosticBag();
+            var result = CompilationDriver.CompileAll(
+                sources,
+                _ => new CompilationOptions { UnsafeTranspileOnly = true },
+                crossModuleEnforcement: true,
+                crossModulePolicy: UnknownCallPolicy.Strict,
+                onCompiled: (file, compileResult) => File.WriteAllText(
+                    Path.ChangeExtension(file.FullName, ".g.cs"),
+                    compileResult.GeneratedCode),
+                diagnosticSink: sink);
+
+            Assert.Contains(result.Compiled, item => item.File.Name == "good.calr");
+            Assert.True(File.Exists(Path.Combine(workspace, "good.g.cs")));
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
     private sealed record DriveOutcome(
         string[] Codes,
         bool AnyErrors,

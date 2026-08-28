@@ -110,20 +110,40 @@ internal static class GeneratedValidationScope
             // AST as declarations, so they are read out of the interop text.
             foreach (var interop in module.InteropBlocks)
                 AddInteropDeclarations(interop.CSharpCode);
+            // …and the class- and interface-level blocks, which is where an
+            // interop type most often sits in practice (review round 4, optional
+            // minor — false-negative direction).
+            foreach (var declaration in module.Classes)
+                foreach (var interop in declaration.InteropBlocks)
+                    AddInteropDeclarations(interop.CSharpCode);
+            foreach (var declaration in module.Interfaces)
+                foreach (var interop in declaration.InteropBlocks)
+                    AddInteropDeclarations(interop.CSharpCode);
         }
 
         return owned;
 
         void Add(string? identifier)
         {
-            if (!string.IsNullOrEmpty(identifier) && identifier != "_global")
-                owned.Add(identifier);
+            if (string.IsNullOrEmpty(identifier) || identifier == "_global")
+                return;
+            // Defence in depth (review round 4, V1): a C# keyword is never a
+            // declaration name, and admitting one is catastrophic rather than
+            // merely wrong — every generated file contains `class`, so a single
+            // keyword in the owned set makes References() true for everything
+            // and silently degrades the scoped rule to "suppress the whole run".
+            // The regex below is the first line of defence; this caps the blast
+            // radius of any future slip in it.
+            if (ReservedWords.Contains(identifier))
+                return;
+            owned.Add(identifier);
         }
 
-        // `class Foo`, `record struct Bar`, `interface IBaz`, `enum Qux`,
-        // `delegate int Quux(...)` — the identifier after a type-declaring
-        // keyword. Text-level on purpose: interop is preserved verbatim and
-        // never parsed into the AST, so there is nothing else to read.
+        // `class Foo`, `record class Money`, `record struct Point`,
+        // `interface IBaz`, `enum Qux`, `delegate int Quux<T>(...)` — the
+        // identifier after a type-declaring keyword. Text-level on purpose:
+        // interop is preserved verbatim and never parsed into the AST, so there
+        // is nothing else to read.
         void AddInteropDeclarations(string? code)
         {
             if (string.IsNullOrEmpty(code))
@@ -137,11 +157,34 @@ internal static class GeneratedValidationScope
         }
     }
 
+    /// <summary>
+    /// The `record` alternative comes FIRST and consumes an optional
+    /// `class`/`struct` modifier. Written the other way round (review round 4,
+    /// V1) `record class Money` matched the `record` branch and captured
+    /// **`class`** as the type name — which every generated file contains, so
+    /// the whole run was suppressed on ordinary modern C#.
+    /// </summary>
     private static readonly System.Text.RegularExpressions.Regex InteropTypeDeclaration = new(
-        @"\b(?:class|struct|interface|enum|record)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)"
-            + @"|\bdelegate\s+[^\s(]+\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+        @"\brecord\s+(?:class\s+|struct\s+)?(?<name>[A-Za-z_][A-Za-z0-9_]*)"
+            + @"|\b(?:class|struct|interface|enum)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)"
+            + @"|\bdelegate\s+[^\s(]+\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^(>]*>)?\s*\(",
         System.Text.RegularExpressions.RegexOptions.Compiled
             | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Words that can never be a declaration name. Admitting one poisons the
+    /// scope (see <see cref="InteropTypeDeclaration"/>), so they are refused at
+    /// the point of entry regardless of how they were produced.
+    /// </summary>
+    private static readonly HashSet<string> ReservedWords = new(StringComparer.Ordinal)
+    {
+        "class", "struct", "record", "interface", "enum", "delegate", "namespace",
+        "using", "var", "void", "public", "private", "protected", "internal",
+        "static", "sealed", "abstract", "partial", "readonly", "const", "new",
+        "object", "string", "int", "long", "short", "byte", "bool", "char",
+        "float", "double", "decimal", "uint", "ulong", "ushort", "sbyte",
+        "dynamic", "this", "base", "null", "true", "false", "ref", "out", "in",
+    };
 
     /// <summary>
     /// Whether one generated output mentions any owned identifier, matched on
@@ -508,10 +551,20 @@ internal static class CompilationDriver
             // every pending file suppressed is what makes that true: without it
             // the run published and cached unvalidated output and reported
             // success, which is the permissive answer, not the conservative one
-            // (review round 3, C1-residual). A syntax error is the most common
-            // build failure, so this is the branch users hit daily.
+            // (review round 3, C1-residual). An unterminated string or a stray
+            // marker is what reaches here — a plain syntax error keeps its AST
+            // and takes the scoped path below.
+            //
+            // `--transpile-only` is exempt, exactly as it is on the scoped path
+            // and in the MSBuild task: it opts out of the validation this
+            // suppression protects, so withholding its output would remove the
+            // artifact the flag exists to produce (review round 4, V2 — the two
+            // surfaces disagreed here, which is the class M1 closed).
             foreach (var item in pending)
-                cascadeSuppressed.Add(Path.GetFullPath(item.File.FullName));
+            {
+                if (!item.Options.UnsafeTranspileOnly)
+                    cascadeSuppressed.Add(Path.GetFullPath(item.File.FullName));
+            }
         }
         else if (pending.Any(item => !item.Options.UnsafeTranspileOnly)
             || skippedGeneratedSources.Count > 0)

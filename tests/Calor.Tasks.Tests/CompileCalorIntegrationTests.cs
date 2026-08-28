@@ -1501,6 +1501,41 @@ public class CompileCalorIntegrationTests : IDisposable
             "an unvalidated output must not produce a cache entry");
     }
 
+    /// <summary>
+    /// Review round 4, V2, on the MSBuild surface: <c>TranspileOnly</c> opts out
+    /// of generated-output validation, so cascade suppression must not withhold
+    /// its output when a sibling fails to lex — the flag exists to produce that
+    /// artifact. The task already guarded this; the pin keeps the two surfaces
+    /// from drifting apart again.
+    /// </summary>
+    [Fact]
+    public void CascadeSuppression_TranspileOnly_PublishesDespiteAnUnlexableSibling()
+    {
+        const string UnlexableSource = """
+            §M{m001:Broken}
+              §F{f001:Boom:pub} () -> void
+                §E{cw}
+                §P "unterminated
+            """;
+        const string CleanSource = """
+            §M{m002:Good}
+              §F{f001:One:pub} () -> i32
+                §E{}
+                §R INT:1
+            """;
+
+        var broken = CreateSourceFile("Broken.calr", UnlexableSource);
+        var clean = CreateSourceFile("Good.calr", CleanSource);
+
+        var task = CreateTask(broken, clean);
+        task.TranspileOnly = true;
+        task.Execute();
+
+        Assert.True(
+            File.Exists(Path.Combine(_outputDir, "Good.g.cs")),
+            "--transpile-only opts out of validation, so its output must still be written");
+    }
+
     [Fact]
     public void VerifyGate_FlippedOnOverWarmCache_Recompiles()
     {
