@@ -49,7 +49,8 @@ TEMPLATE = os.path.join(BENCH, "templates", "calor-arm", "CalorArm.csproj.templa
 CANARY = os.path.join(BENCH, "templates", "calor-arm", "permissive-canary.calr")
 FIX = os.path.join(HERE, "fixtures", "harness-capture")
 TOKEN_FIX = os.path.join(HERE, "fixtures", "token-usage")
-N1_001 = os.path.join(BENCH, "pairs", "N1-001-string-utils")
+PAIRS = os.path.join(BENCH, "pairs")
+N1_001 = os.path.join(PAIRS, "N1-001-string-utils")
 
 RELEASE_CLI = os.path.join(REPO, "src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll")
 RELEASE_TASKS = os.path.join(REPO, "src", "Calor.Tasks", "bin", "Release", "net10.0", "Calor.Tasks.dll")
@@ -489,23 +490,301 @@ class PairConfigAdmission(unittest.TestCase):
             self.assertIn("controlArmKind", out.stderr)
             self.assertFalse(os.path.exists(os.path.join(tmp, "out", "T-000-synthetic")))
 
-    @unittest.skipUnless(HAVE_JQ and HAVE_DOTNET, "jq/dotnet not on PATH")
-    def test_pre_rows_arm_is_refused_unless_the_tasks_build_honours_the_property(self):
-        # As of 7d621c0d neither Sdk.targets nor CompileCalor.cs threads a
-        # permissive knob into UnknownCallPolicy, so the canary must FAIL on
-        # the harness checkout: the pre-rows arm is refused before spend with
-        # the canary's message, not admitted and silently run strict.
+    @unittest.skipUnless(HAVE_PRODUCT and HAVE_JQ,
+                         "Release product not built (dotnet build src/Calor.{Compiler,Tasks,Runtime} -c Release)")
+    def test_pre_rows_arm_canary_passes_now_that_the_product_honours_the_property(self):
+        """Before #1124 no product threaded <CalorPermissiveEffects> through Calor.Tasks,
+        so this pinned the REFUSAL. #1124 shipped the property, so the same run now has to
+        pass the canary and proceed — which is the end-to-end proof, against a REAL product,
+        that the paid control arm can actually run permissive. The refusal paths are pinned
+        executably by `CanaryRefusals` (fake `dotnet` on PATH, no product needed); this test
+        is the real-product counterpart."""
         with tempfile.TemporaryDirectory() as tmp:
             pair = self._synthetic_pair(tmp, STRICT, extra_arms={
                 "calor-pre-rows": {"fixture": "calor", "config": PRE_ROWS}})
-            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--arm-config", "calor-pre-rows",
-                       "--null-agent", "--out", os.path.join(tmp, "out")], timeout=600)
+            shutil.copytree(os.path.join(N1_001, "reference"), os.path.join(pair, "reference"))
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor",
+                       "--arm-config", "calor-pre-rows", "--null-agent",
+                       "--out", os.path.join(tmp, "out")], timeout=900)
+            if "MSB4064" in out.stderr or "MSB4063" in out.stderr:
+                self.skipTest("this checkout's Calor.Tasks assembly is stale or held by an "
+                              "MSBuild node (dotnet build-server shutdown)")
+            self.assertEqual(out.returncode, 0, out.stderr[-3000:])
+            self.assertIn("arm canary OK (pre-rows)", out.stderr)
+            self.assertIn("Calor0410 is a warning", out.stderr)
+            rd = os.path.join(tmp, "out", "T-000-synthetic", "calor", "run-1")
+            r = json.loads(_read(os.path.join(rd, "result.json")))
+            self.assertEqual(r["controlArmKind"], "pre-rows")
+            self.assertTrue(r["permissiveEffects"])
+            self.assertEqual(r["templateSource"], "harness")
+
+    @unittest.skipUnless(HAVE_PRODUCT and HAVE_JQ,
+                         "Release product not built (dotnet build src/Calor.{Compiler,Tasks,Runtime} -c Release)")
+    def test_strict_arm_is_canaried_too(self):
+        """The canary runs on BOTH arms: a task-assembly mismatch fails a strict arm
+        identically, and nothing downstream would distinguish it from a failing agent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._synthetic_pair(tmp, STRICT)
+            shutil.copytree(os.path.join(N1_001, "reference"), os.path.join(pair, "reference"))
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
+                       "--out", os.path.join(tmp, "out")], timeout=900)
+            if "MSB4064" in out.stderr or "MSB4063" in out.stderr:
+                self.skipTest("this checkout's Calor.Tasks assembly is stale or held by an "
+                              "MSBuild node (dotnet build-server shutdown)")
+            self.assertEqual(out.returncode, 0, out.stderr[-3000:])
+            self.assertIn("arm canary OK (strict)", out.stderr)
+            self.assertIn("Calor0410 is an error", out.stderr)
+
+    def test_arm_canary_diagnoses_a_task_assembly_mismatch_before_the_semantic_branches(self):
+        """Source-shape only — the EXECUTABLE coverage is CanaryRefusals below. Kept because
+        it localizes an ordering regression, and the ordering itself was corrected after
+        review: a stale/mis-built product is the cause, MSBuild worker reuse is not (probed:
+        workers reload the assembly from disk every build, same pids)."""
+        src = _read(RUN_PAIR)
+        canary = src[src.index("arm_canary() {"):src.index("# Config pin check")]
+        self.assertLess(canary.index("MSB4064|MSB4063|MSB4062"), canary.index('case "$expect" in'),
+                        "the task-assembly mismatch branch must be checked first")
+        # the corrected cause order: stale product first, build-server shutdown second
+        self.assertLess(canary.index("product is stale"), canary.index("build-server shutdown"),
+                        "a stale/mis-built product is the cause; worker reuse is the fallback")
+        self.assertIn("arm_canary permissive", src)
+        self.assertIn("arm_canary strict", src)
+        self.assertIn("MSBUILDDISABLENODEREUSE", src)      # named, and deliberately not set
+        self.assertNotIn("export MSBUILDDISABLENODEREUSE", src)
+
+
+class CanaryRefusals(unittest.TestCase):
+    """M1 — the canary's REFUSAL paths, adopted verbatim from the review probe.
+
+    Mutation that motivated them: replacing both semantic branches in `arm_canary` with
+    `if false; then` — the canary can no longer refuse an arm running the wrong policy,
+    which is the w5-parity-001 failure it exists to prevent — left the whole suite green,
+    because the only test that observed a refusal had been deleted by this PR.
+
+    Method: a fake `dotnet` first on PATH emits canned canary output. `arm_canary` is the
+    first thing `check_pins` does for a calor arm, so every branch is observable in about
+    a second with no product build at all.
+    """
+
+    @staticmethod
+    def _pair(tmp, extra_arms=None):
+        pair = os.path.join(tmp, "T-900-canary")
+        shutil.copytree(os.path.join(N1_001, "tests"), os.path.join(pair, "tests"))
+        shutil.copytree(os.path.join(N1_001, "calor"), os.path.join(pair, "calor"))
+        shutil.copytree(os.path.join(N1_001, "reference"), os.path.join(pair, "reference"))
+        shutil.copy(os.path.join(N1_001, "spec.md"), os.path.join(pair, "spec.md"))
+        arms = {"calor": {"fixture": "calor", "config": STRICT}}
+        arms.update(extra_arms or {})
+        _write_json(os.path.join(pair, "pair.json"),
+                    {"id": "T-900-canary", "category": "N1", "arms": arms,
+                     "iterationBudget": 10, "timeoutSeconds": 600})
+        return pair
+
+    @staticmethod
+    def _fake_dotnet(tmp, stdout_text, rc):
+        d = os.path.join(tmp, "fakebin")
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, "dotnet")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("#!/usr/bin/env bash\ncat <<'CANARY'\n%s\nCANARY\nexit %d\n" % (stdout_text, rc))
+        os.chmod(path, 0o755)
+        return d
+
+    def _run(self, pair, tmp, bindir, arm_config=None):
+        cmd = ["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
+               "--out", os.path.join(tmp, "out")]
+        if arm_config:
+            cmd += ["--arm-config", arm_config]
+        return run(cmd, timeout=300,
+                   env=dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"]))
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_pre_rows_arm_running_strict_is_refused(self):
+        """The w5-parity-001 failure: the control arm silently runs STRICT."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._pair(tmp, {"calor-pre-rows": {"fixture": "calor", "config": PRE_ROWS}})
+            b = self._fake_dotnet(tmp, "canary.calr(4,5): error Calor0410: 'Quiet' uses effect 'cw'", 1)
+            out = self._run(pair, tmp, b, "calor-pre-rows")
             self.assertEqual(out.returncode, 3, out.stderr[-2000:])
             self.assertIn("does not honor <CalorPermissiveEffects>", out.stderr)
-            self.assertNotIn("violates gates-doc pin", out.stderr)
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_strict_arm_running_permissive_is_refused(self):
+        """The mirror: a 'strict' arm whose product demotes Calor0410 to a warning."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._pair(tmp)
+            b = self._fake_dotnet(tmp, "canary.calr(4,5): warning Calor0410: 'Quiet' uses effect 'cw'", 0)
+            out = self._run(pair, tmp, b)
+            self.assertEqual(out.returncode, 3, out.stderr[-2000:])
+            self.assertIn("did not reject a laundered effect", out.stderr)
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_task_assembly_mismatch_is_refused_and_names_the_fix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._pair(tmp)
+            b = self._fake_dotnet(tmp, 'Src.csproj(1,1): error MSB4064: The "PermissiveEffects" '
+                                       'parameter is not supported by the "CompileCalor" task.', 1)
+            out = self._run(pair, tmp, b)
+            self.assertEqual(out.returncode, 3, out.stderr[-2000:])
+            self.assertIn("MSB4064", out.stderr)
+            self.assertIn("product is stale", out.stderr)          # the cause, first
+            self.assertIn("dotnet build-server shutdown", out.stderr)   # the fallback
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_a_missing_task_assembly_is_diagnosed_as_MSB4062_not_as_a_policy_story(self):
+        """m10: MSB4062 is "the task could not be loaded". Before it was in the pattern the
+        operator was told the arm "did not reject a laundered effect" — a config story for
+        what is really a missing Calor.Tasks.dll."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._pair(tmp)
+            b = self._fake_dotnet(tmp, 'Src.csproj(1,1): error MSB4062: The "Calor.Tasks.CompileCalor" '
+                                       'task could not be loaded from the assembly ... '
+                                       'Confirm that the declaration is correct.', 1)
+            out = self._run(pair, tmp, b)
+            self.assertEqual(out.returncode, 3, out.stderr[-2000:])
+            self.assertIn("MSB4062", out.stderr)
+            self.assertNotIn("did not reject a laundered effect", out.stderr)
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_a_correct_arm_passes_and_the_verdict_is_archived(self):
+        """M3: the verdict is provenance, not just a console line."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._pair(tmp)
+            b = self._fake_dotnet(tmp, "canary.calr(4,5): error Calor0410: 'Quiet' uses effect 'cw'", 1)
+            out = self._run(pair, tmp, b)
+            self.assertEqual(out.returncode, 0, out.stderr[-2000:])
+            self.assertIn("arm canary OK (strict)", out.stderr)
+            r = json.loads(_read(os.path.join(tmp, "out", "T-900-canary", "calor", "run-1", "result.json")))
+            self.assertEqual(r["armCanary"], "strict-ok")
+            self.assertEqual(r["reference"], os.path.join("reference", "calor"))   # m11
+            self.assertEqual(r["referenceSource"], "reference")
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_the_skip_is_bounded_and_recorded(self):
+        """M3: `CALOR_P0_SKIP_ARM_CANARY=1` set once and forgotten must not be able to
+        produce an archive indistinguishable from one where every arm was proven."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = self._pair(tmp)
+            b = self._fake_dotnet(tmp, "", 0)
+            # refused: the output directory is not a '-null' one
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
+                       "--out", os.path.join(tmp, "out")], timeout=300,
+                      env=dict(os.environ, PATH=b + os.pathsep + os.environ["PATH"],
+                               CALOR_P0_SKIP_ARM_CANARY="1"))
+            self.assertEqual(out.returncode, 3, out.stderr[-1500:])
+            self.assertIn("only honoured for a --null-agent run", out.stderr)
+            # honoured, and recorded, when it is
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
+                       "--out", os.path.join(tmp, "out-null")], timeout=300,
+                      env=dict(os.environ, PATH=b + os.pathsep + os.environ["PATH"],
+                               CALOR_P0_SKIP_ARM_CANARY="1"))
+            self.assertEqual(out.returncode, 0, out.stderr[-1500:])
+            r = json.loads(_read(os.path.join(tmp, "out-null", "T-900-canary", "calor", "run-1", "result.json")))
+            self.assertEqual(r["armCanary"], "skipped")
 
 
-# ---------------------------------------------------------------------------
+class PreflightArmProof(unittest.TestCase):
+    """The compilerHash disjointness assert runs BEFORE the first paid run, not only after
+    collection. The canary is the only build the harness can make before an agent exists,
+    and it writes the same obj/calor/.calor-build-state.json #1094 archives per run — so
+    a mis-pointed arm is a five-second refusal instead of a $135 loss."""
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_canary_only_reports_the_verdict_and_the_hash_without_running_anything(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = CanaryRefusals._pair(tmp)
+            b = CanaryRefusals._fake_dotnet(
+                tmp, "canary.calr(4,5): error Calor0410: 'Quiet' uses effect 'cw'", 1)
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
+                       "--out", os.path.join(tmp, "out")], timeout=300,
+                      env=dict(os.environ, PATH=b + os.pathsep + os.environ["PATH"]))
+            self.assertEqual(out.returncode, 0, out.stderr[-2000:])
+            doc = json.loads(out.stdout)
+            self.assertEqual(doc["armCanary"], "strict-ok")
+            self.assertIn("compilerHash", doc)          # null here: the fake dotnet builds nothing
+            # nothing was run: no per-run archive exists
+            self.assertFalse(os.path.isdir(os.path.join(tmp, "out", "T-900-canary")))
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_canary_only_propagates_a_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = CanaryRefusals._pair(tmp)
+            b = CanaryRefusals._fake_dotnet(
+                tmp, "canary.calr(4,5): warning Calor0410: 'Quiet' uses effect 'cw'", 0)
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
+                       "--out", os.path.join(tmp, "out")], timeout=300,
+                      env=dict(os.environ, PATH=b + os.pathsep + os.environ["PATH"]))
+            self.assertEqual(out.returncode, 3, out.stderr[-2000:])
+            self.assertIn("did not reject a laundered effect", out.stderr)
+
+    @unittest.skipUnless(HAVE_PRODUCT and HAVE_JQ,
+                         "Release product not built (dotnet build src/Calor.{Compiler,Tasks,Runtime} -c Release)")
+    def test_canary_only_reads_a_real_compiler_hash_from_the_canary_build(self):
+        """Against a REAL product: the hash the pre-flight reports is the same field the
+        per-run archive carries, which is what makes comparing them meaningful."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = CanaryRefusals._pair(tmp)
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--canary-only",
+                       "--out", os.path.join(tmp, "out")], timeout=900)
+            if "MSB4064" in out.stderr or "MSB4063" in out.stderr or "MSB4062" in out.stderr:
+                self.skipTest("this checkout's Calor.Tasks assembly is stale or unloadable")
+            self.assertEqual(out.returncode, 0, out.stderr[-3000:])
+            doc = json.loads(out.stdout)
+            self.assertRegex(doc["compilerHash"] or "", r"^[0-9a-f]{64}$")
+            self.assertEqual(doc["armCanary"], "strict-ok")
+
+    def test_the_epoch_runner_refuses_two_arms_that_share_a_compiler_before_spending(self):
+        src = _read(RUN_PPW)
+        preflight = src[src.index("PRE-FLIGHT ARM PROOF"):src.index("cat <<PLAN")]
+        # runs before the plan, and therefore before --confirm-paid-epoch is even read
+        self.assertLess(src.index("PRE-FLIGHT ARM PROOF"), src.index("REFUSING TO RUN"))
+        self.assertIn("--canary-only", preflight)
+        self.assertIn('if [[ "$PREFLIGHT_A_HASH" == "$PREFLIGHT_B_HASH" ]]', preflight)
+        self.assertIn("Refusing BEFORE any spend", preflight)
+        self.assertIn("exit 5", preflight)
+        # an unreadable build state is refused too, rather than passing an empty compare
+        self.assertIn('-z "$PREFLIGHT_A_HASH" || -z "$PREFLIGHT_B_HASH"', preflight)
+        # and the post-collection assert stays as the mid-epoch guard
+        self.assertIn("compiler_hashes()", src)
+
+    def test_the_plan_block_shows_both_pre_flight_hashes(self):
+        """The plan block is what a reader checks before typing --confirm-paid-epoch."""
+        src = _read(RUN_PPW)
+        # the heredoc BODY: from the opening marker to the terminator on its own line
+        # (searching for "PLAN\n" alone finds the opening `cat <<PLAN` itself)
+        start = src.index("cat <<PLAN")
+        plan = src[start:src.index("\nPLAN\n", start)]
+        self.assertIn("${PREFLIGHT_A_HASH:0:12}", plan)
+        self.assertIn("${PREFLIGHT_B_HASH:0:12}", plan)
+        # beside the material they qualify
+        self.assertIn("Calor.Tasks ${a_tasks:0:12}   compilerHash", plan)
+        self.assertIn("Calor.Tasks ${b_tasks:0:12}   compilerHash", plan)
+
+
+class EpochGuards(unittest.TestCase):
+    """M4 and M6 in run-ppw-epoch.sh."""
+
+    def test_arms_must_record_one_distinct_compiler_hash_each(self):
+        src = _read(RUN_PPW)
+        self.assertIn("compiler_hashes()", src)
+        self.assertIn('if [[ "$a_hashes" == "$b_hashes" ]]', src)
+        self.assertIn("exit 5", src)
+        # and the reason the canary cannot cover it is recorded
+        self.assertIn("superset of parameters", src)
+
+    def test_null_epochs_are_dot_prefixed_so_the_archive_walk_skips_them(self):
+        src = _read(RUN_PPW)
+        self.assertIn('EPOCH=".null-${EPOCH#.}"', src)
+        # the instrument this protects really does skip dot entries
+        attribution = _read(os.path.join(BENCH, "ppe1-turn-attribution.py"))
+        self.assertIn('if name.startswith("."):', attribution)
+
+    def test_one_build_server_shutdown_before_the_first_run(self):
+        src = _read(RUN_PPW)
+        self.assertIn("dotnet build-server shutdown", src)
+        self.assertLess(src.index("dotnet build-server shutdown"), src.index('OUT="$SCRIPT_DIR/epochs/$EPOCH"'))
+
+
 class TemplateCarriesPermissiveEffects(unittest.TestCase):
     def test_template_placeholder_follows_the_arm_config(self):
         tpl = _read(TEMPLATE)
@@ -589,8 +868,10 @@ class LegBPairsAreRegisteredInPins(unittest.TestCase):
         self.assertIn("optionsHash", src)
         # m2 — the blind floor is checked before spend, not discovered after $135.
         self.assertIn("the registered floor is 2", src)
-        # m3 — a null-agent run never lands on a live epoch id, whatever id was passed.
-        self.assertIn('[[ -n "$NULL_FLAG" && "$EPOCH" != *-null ]]', src)
+        # m3 + M6 — a null-agent run never lands on a live epoch id, whatever id was
+        # passed, and the directory is dot-prefixed so the archive instruments skip it.
+        self.assertIn('[[ -n "$NULL_FLAG" && "$EPOCH" != .* ]]', src)
+        self.assertIn('EPOCH=".null-${EPOCH#.}"', src)
         # m5 — every registered pair must actually have produced runs.
         self.assertIn("missing_results", src)
         m5 = _read(RUN_M5)
@@ -672,6 +953,189 @@ class RunPpwEpochFailsLoudOnMissingPairs(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+class NullAgentReferenceResolution(unittest.TestCase):
+    """The --null-agent path applies a correct solution and checks the whole loop at zero
+    spend. It assumed every pair ships `reference/<fixture>/`; the PP-W-rows pairs
+    (§4.1, S3 (c)) ship per-arm `seeded/clean-<armId>` instead, so a free null epoch over
+    the six W-00x pairs died at `cp` on the first run of the first pair."""
+
+    def test_pre_v016_pairs_still_resolve_reference_slash_fixture(self):
+        r = hc.resolve_pair_config(os.path.join(N1_001, "pair.json"), "calor")
+        self.assertEqual(r["reference"], os.path.join("reference", "calor"))
+        self.assertEqual(r["referenceSource"], "reference")
+
+    def test_ppw_pairs_resolve_their_declared_clean_cell(self):
+        for pair in sorted(p for p in os.listdir(PAIRS) if p.startswith("W-00")):
+            pj = os.path.join(PAIRS, pair, "pair.json")
+            if not os.path.isfile(pj):
+                continue
+            for key, arm_id in (("calor-pre-rows", "a"), ("calor", "b")):
+                r = hc.resolve_pair_config(pj, key)
+                self.assertTrue(r["admitted"], (pair, key, r["reason"]))
+                self.assertEqual(r["reference"], "seeded/clean-" + arm_id, (pair, key))
+                self.assertEqual(r["referenceSource"], "seeded-clean-declared", (pair, key))
+                self.assertTrue(os.path.isdir(os.path.join(PAIRS, pair, r["reference"])),
+                                (pair, key, "declared reference does not exist"))
+
+    def test_every_pair_in_the_tree_resolves_a_reference_that_exists(self):
+        seen = 0
+        for pair in sorted(os.listdir(PAIRS)):
+            pj = os.path.join(PAIRS, pair, "pair.json")
+            if not os.path.isfile(pj):
+                continue
+            with open(pj, encoding="utf-8") as fh:
+                keys = list((json.load(fh).get("arms") or {}).keys())
+            for key in keys:
+                r = hc.resolve_pair_config(pj, key)
+                self.assertIsNotNone(r["reference"], (pair, key, "no reference resolved"))
+                self.assertTrue(os.path.isdir(os.path.join(PAIRS, pair, r["reference"])),
+                                (pair, key, r["reference"]))
+                seen += 1
+        # 31 pairs x 2 arm entries = 62 today; asserted as a floor so a pair family that
+        # silently stops being walked is caught (the old `> 50` had no derivation).
+        pair_count = sum(1 for d in os.listdir(PAIRS)
+                         if os.path.isfile(os.path.join(PAIRS, d, "pair.json")))
+        self.assertGreaterEqual(seen, 2 * pair_count)
+        self.assertGreaterEqual(seen, 62)
+
+    def test_resolution_order_is_reference_then_declared_then_derived(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = os.path.join(tmp, "T-000")
+            os.makedirs(os.path.join(pair, "seeded", "clean-a"))
+            pj = os.path.join(pair, "pair.json")
+            entry = {"armId": "a", "fixture": "starter-a", "config": PRE_ROWS}
+            doc = {"id": "T-000", "arms": {"calor-pre-rows": entry},
+                   "seeded": {"clean": {"a": "seeded/clean-a"}}}
+            _write_json(pj, doc)
+            # (2) declared wins when reference/<fixture> is absent
+            r = hc.resolve_pair_config(pj, "calor-pre-rows")
+            self.assertEqual((r["reference"], r["referenceSource"]),
+                             ("seeded/clean-a", "seeded-clean-declared"))
+            # (3) derived from the fixture suffix when nothing is declared
+            _write_json(pj, {"id": "T-000", "arms": {"calor-pre-rows": entry}})
+            r = hc.resolve_pair_config(pj, "calor-pre-rows")
+            self.assertEqual((r["reference"], r["referenceSource"]),
+                             (os.path.join("seeded", "clean-a"), "seeded-clean-derived"))
+            # (1) an explicit reference/<fixture> outranks both
+            os.makedirs(os.path.join(pair, "reference", "starter-a"))
+            _write_json(pj, doc)
+            r = hc.resolve_pair_config(pj, "calor-pre-rows")
+            self.assertEqual((r["reference"], r["referenceSource"]),
+                             (os.path.join("reference", "starter-a"), "reference"))
+
+    def test_no_reference_at_all_is_reported_as_none_not_guessed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = os.path.join(tmp, "T-001")
+            os.makedirs(pair)
+            pj = os.path.join(pair, "pair.json")
+            _write_json(pj, {"id": "T-001", "arms": {
+                "calor-pre-rows": {"armId": "a", "fixture": "starter-a", "config": PRE_ROWS}}})
+            r = hc.resolve_pair_config(pj, "calor-pre-rows")
+            self.assertIsNone(r["reference"])
+            self.assertEqual(r["referenceSource"], "none")
+            # a declared cell that does not exist on disk is an ERROR, and must not fall
+            # through to the derived form: applying a different program than pair.json
+            # names is worse than failing (m2).
+            os.makedirs(os.path.join(pair, "seeded", "clean-a"))
+            _write_json(pj, {"id": "T-001", "arms": {
+                "calor-pre-rows": {"armId": "a", "fixture": "starter-a", "config": PRE_ROWS}},
+                "seeded": {"clean": {"a": "seeded/clean-typo"}}})
+            r = hc.resolve_pair_config(pj, "calor-pre-rows")
+            self.assertIsNone(r["reference"])
+            self.assertEqual(r["referenceSource"], "seeded-clean-declared-missing:seeded/clean-typo")
+
+    def test_a_reference_that_escapes_the_pair_directory_is_rejected(self):
+        """m4: pair.json is data. An absolute path or one climbing out with `..` would
+        point the null path at anything on the machine."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = os.path.join(tmp, "T-003")
+            os.makedirs(os.path.join(pair, "seeded", "clean-a"))
+            outside = os.path.join(tmp, "outside")
+            os.makedirs(outside)
+            pj = os.path.join(pair, "pair.json")
+            for escape in ("/etc", outside, "../outside", "seeded/../../outside"):
+                _write_json(pj, {"id": "T-003", "arms": {
+                    "calor-pre-rows": {"armId": "a", "fixture": "starter-a", "config": PRE_ROWS}},
+                    "seeded": {"clean": {"a": escape}}})
+                r = hc.resolve_pair_config(pj, "calor-pre-rows")
+                self.assertIsNone(r["reference"], escape)
+                self.assertTrue(r["referenceSource"].startswith("seeded-clean-declared-missing"), escape)
+
+    @unittest.skipUnless(HAVE_JQ, "jq not on PATH")
+    def test_run_pair_null_agent_exits_3_when_no_reference_exists(self):
+        """Defect 2: the guard printed and fell through into `cp`, which then failed with
+        a raw shell error and a zero-ish exit path. It must exit non-zero, before the copy."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pair = os.path.join(tmp, "T-002-no-reference")
+            shutil.copytree(os.path.join(N1_001, "tests"), os.path.join(pair, "tests"))
+            shutil.copytree(os.path.join(N1_001, "calor"), os.path.join(pair, "calor"))
+            shutil.copy(os.path.join(N1_001, "spec.md"), os.path.join(pair, "spec.md"))
+            _write_json(os.path.join(pair, "pair.json"), {
+                "id": "T-002-no-reference", "category": "N1",
+                "arms": {"calor": {"fixture": "calor", "config": STRICT},
+                         "csharp": {"fixture": "csharp", "toolkit": "full"}},
+                "iterationBudget": 10, "timeoutSeconds": 600})
+            # The arm canary runs before this guard and needs a built product; this test is
+            # about the reference guard itself, so the canary is switched off explicitly.
+            # the '-null' out dir is what M3's bounded skip requires
+            out = run(["bash", RUN_PAIR, "--pair", pair, "--arm", "calor", "--null-agent",
+                       "--out", os.path.join(tmp, "out-null")], timeout=900,
+                      env=dict(os.environ, CALOR_P0_SKIP_ARM_CANARY="1"))
+            self.assertEqual(out.returncode, 3, out.stdout[-800:] + out.stderr[-2000:])
+            self.assertIn("null-agent needs a reference solution", out.stderr)
+            self.assertIn("seeded.clean.<armId>", out.stderr)
+            # the raw shell error the old shape produced must be gone
+            self.assertNotIn("No such file or directory", out.stderr)
+
+    def test_runner_reads_the_resolved_reference_and_the_guard_exits(self):
+        src = _read(RUN_PAIR)
+        self.assertIn('REFERENCE_DIR="$(jq -r \'.reference // empty\'', src)
+        # m1: the copy is structurally safe. With REFERENCE_DIR empty and the guard above
+        # deleted, `cp -R "$PAIR_DIR//."` is a VALID copy of the whole pair directory —
+        # tests/ (the held-out suite) and pair.json included — into the agent's workspace.
+        self.assertIn('cp -R "$PAIR_DIR/${REFERENCE_DIR:?null-agent reference unresolved}/." "$ws/src/"', src)
+        self.assertNotIn('cp -R "$PAIR_DIR/reference/$FIXTURE_DIR/." "$ws/src/"', src)
+        self.assertNotIn('cp -R "$PAIR_DIR/$REFERENCE_DIR/." "$ws/src/"', src)
+        # Defect 2 was a `|| { echo ...; }` guard with no exit, which printed and then
+        # fell through. Audit EVERY diagnostic guard in the file by brace depth (a regex
+        # stops at the first `}` and truncates guards containing ${VAR:-default}).
+        no_exit = [g for g in _diagnostic_guards(src) if "exit " not in g]
+        self.assertEqual(
+            len(no_exit), 1,
+            "every `|| { echo ... }` guard must exit, except the deliberately non-fatal "
+            "starter build; found: %r" % no_exit)
+        self.assertIn("starter fixture failed to build", no_exit[0])
+        self.assertIn("Deliberately NOT fatal", src)   # and it says why
+
+
+def _diagnostic_guards(src):
+    """Every `|| { ... }` block in a shell source that reports something (contains echo),
+    extracted by brace depth so multi-line guards and ${VAR:-default} survive intact."""
+    guards = []
+    i = 0
+    while True:
+        i = src.find("|| {", i)
+        if i < 0:
+            return [g for g in guards if "echo" in g]
+        j = src.index("{", i)
+        depth, k = 0, j
+        while k < len(src):
+            if src[k] == "{":
+                depth += 1
+            elif src[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            k += 1
+        guards.append(src[i:k + 1])
+        i = k + 1
+
+
+def _write_json(path, doc):
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(doc, fh)
+
+
 class CensusExclusionIsNarrow(unittest.TestCase):
     """M4 — harness scratch is excluded from the committed-.calr census, and nothing else is.
 

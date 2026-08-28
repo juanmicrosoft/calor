@@ -186,12 +186,19 @@ ARM_LABEL_OVERRIDE=""
 # own `before/` starter) and the strict arm (`calor`) — so the key is a
 # parameter. The entry's `fixture` names the starter directory under the pair.
 ARM_CONFIG_KEY=""
+# --canary-only: run the arm proof and stop, printing one JSON line
+# {armConfigKey, arm, repoRoot, controlArmKind, armCanary, compilerHash}. The epoch runner
+# uses it as a PRE-FLIGHT: the canary is the only build the harness can make before an
+# agent exists, and it writes the same build state #1094 reads, so the arms' compilers can
+# be proven distinct before a single paid run instead of after collection.
+CANARY_ONLY=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --pair) PAIR_DIR="$2"; shift 2 ;;
         --arm) ARM="$2"; shift 2 ;;
         --arm-config) ARM_CONFIG_KEY="$2"; shift 2 ;;
+        --canary-only) CANARY_ONLY=1; shift ;;
         --runs) RUNS="$2"; shift 2 ;;
         --out) OUT_DIR="$2"; shift 2 ;;
         --null-agent) NULL_AGENT=1; shift ;;
@@ -205,7 +212,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
 # only the CLI/MCP/envelope build; the workspace's own `dotnet build` binds
@@ -283,6 +290,14 @@ ARM_CONFIG_JSON="$(python3 "$HARNESS_CAPTURE" pair-config "$PAIR_DIR/pair.json" 
 FIXTURE_DIR="$(jq -r '.fixture // empty' <<<"$ARM_CONFIG_JSON")"
 [[ -n "$FIXTURE_DIR" ]] || FIXTURE_DIR="$ARM"
 CONTROL_ARM_KIND="$(jq -r '.controlArmKind // empty' <<<"$ARM_CONFIG_JSON")"
+# The --null-agent reference solution for this arm, resolved by harness-capture.py:
+# `reference/<fixture>` on pre-0.16 pairs, the declared `seeded.clean.<armId>` cell on
+# the PP-W-rows pairs. Empty means the pair ships none.
+REFERENCE_DIR="$(jq -r '.reference // empty' <<<"$ARM_CONFIG_JSON")"
+REFERENCE_SOURCE="$(jq -r '.referenceSource // "none"' <<<"$ARM_CONFIG_JSON")"
+# Set by check_pins; archived per run so an epoch cannot claim a proof it never ran.
+ARM_CANARY_STATUS="not-run"
+ARM_CANARY_COMPILER_HASH=""
 PERMISSIVE_EFFECTS="$(jq -r 'if .permissiveEffects == true then "true" else "false" end' <<<"$ARM_CONFIG_JSON")"
 TIMEOUT_SECS="$(jq -r '.timeoutSeconds // 600' "$PAIR_DIR/pair.json")"
 # Test hook: lets watchdog behavior be exercised without a 10+ minute wait.
@@ -374,29 +389,90 @@ render_template() {  # <dest csproj path>
 }
 
 # ---------------------------------------------------------------------------
-# Pre-rows canary (roadmap §4.1; the #826 C3 lesson — config proves intent,
-# not effect). The arm's own Calor.Tasks build must actually HONOR
-# <CalorPermissiveEffects>: compile a canary whose strict compile is an
-# `error Calor0410` and whose permissive compile is the same code as a
-# WARNING, through the exact template + product root this arm's workspace
-# will use. Without this the "pre-rows" arm could silently run STRICT and
-# the epoch would measure nothing — the w5-parity-001 shape again.
-# Prints the reason and returns 1 when the arm cannot honor the property.
+# Arm canary (roadmap §4.1; the #826 C3 lesson — config proves intent, not
+# effect). Compiles a three-line program that launders `cw` through the EXACT
+# template + product root this arm's workspaces will use, and requires the
+# outcome the arm's configuration claims:
+#
+#   pre-rows arm  -> build SUCCEEDS carrying `warning Calor0410`
+#                    (without this the control arm could silently run STRICT
+#                    and the epoch would measure nothing — w5-parity-001 again)
+#   strict arm    -> build FAILS carrying `error Calor0410`
+#
+# It also catches the failure that motivated running it on BOTH arms: when the
+# task assembly MSBuild loads does not match the arm's Sdk.targets, every
+# workspace build fails (MSB4064 "the X parameter is not supported by the
+# CompileCalor task" / MSB4063 / MSB4062 "the task could not be loaded"), and
+# nothing downstream distinguishes that from an agent that could not finish — a
+# whole epoch reports as task failures.
+#
+# CAUSE ORDER, corrected after review: a genuinely stale or mis-built product is
+# the cause; MSBuild worker reuse is NOT. Probed directly (out-of-proc reusable
+# workers forced with MSBUILDNOINPROCNODE=1, worker pids pinned across builds,
+# the assembly swapped underneath them): the workers RELOAD the on-disk file on
+# every build — stale gives MSB4064, swapping a good one in gives Calor0410
+# again, same pids throughout. `dotnet build-server shutdown` does end the
+# workers, so it is a harmless second thing to try, but it is not the mechanism.
+# The earlier claim in this file was wrong: the product at that path really was
+# pre-#1124 and the shutdown was coincident with a rebuild.
+#
+# The harness deliberately does NOT set MSBUILDDISABLENODEREUSE for the agent's
+# own builds: those builds are the measurement (feedback latency, iteration
+# cadence), and changing how they are executed would change what the epoch
+# records. run-ppw-epoch.sh does one `build-server shutdown` before the first
+# run instead — outside the measurement.
+# Prints the reason and returns 1 when the arm cannot honor its configuration.
 # ---------------------------------------------------------------------------
 PERMISSIVE_CANARY="$SCRIPT_DIR/templates/calor-arm/permissive-canary.calr"
-permissive_canary() {
-    local dir out rc=0
-    dir="$(mktemp -d "${TMPDIR:-/tmp}/p0-prerows-canary-XXXXXX")"
+arm_canary() {
+    local dir out rc=0 expect="$1"
+    dir="$(mktemp -d "${TMPDIR:-/tmp}/p0-arm-canary-XXXXXX")"
+    # Removed on EVERY path, including the `exit 3` the refusals take (an epoch that
+    # refuses 96 times would otherwise leave 96 workspaces behind). The path is expanded
+    # HERE, when the trap is set: a single-quoted body would be evaluated after the
+    # function returned, when the local `dir` no longer exists (set -u -> unbound).
+    trap "rm -rf '$dir'" RETURN
     mkdir -p "$dir/src"
     render_template "$dir/src/Src.csproj"
     cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
     out="$(cd "$dir/src" && CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet build --nologo -v q 2>&1)" || rc=$?
-    rm -rf "$dir"
-    if [[ $rc -ne 0 ]] || grep -q 'error Calor0410' <<<"$out" || ! grep -q 'warning Calor0410' <<<"$out"; then
-        echo "INVALID: pre-rows control arm — the arm's Calor.Tasks build does not honor <CalorPermissiveEffects> (canary build exit $rc; expected a successful build carrying 'warning Calor0410', got: $(grep -o 'error Calor[0-9]*\|warning Calor[0-9]*' <<<"$out" | sort | uniq -c | tr -s ' \n' ' ' || true)). The arm would run STRICT; refusing before spend (roadmap §4.1)." >&2
+    # The canary builds through the arm's own Calor.Tasks, so it leaves the same
+    # obj/calor/.calor-build-state.json #1094 archives per run — which makes the arm's
+    # compilerHash observable BEFORE any agent is invoked. Read here, while $dir lives.
+    ARM_CANARY_COMPILER_HASH="$(python3 "$HARNESS_CAPTURE" build-state "$dir/src/obj/calor/.calor-build-state.json" 2>/dev/null | jq -r '.compilerHash // empty')"
+
+    # Task-assembly mismatch first: it explains every other symptom. MSB4062 is
+    # included so a MISSING/unloadable Calor.Tasks.dll is diagnosed as what it is
+    # rather than as "this arm did not reject a laundered effect".
+    if grep -qE 'MSB4064|MSB4063|MSB4062' <<<"$out"; then
+        echo "INVALID: the Calor.Tasks task assembly MSBuild loaded for this arm does not match its own Sdk.targets (MSB4064/MSB4063/MSB4062). In the order they actually bite:" >&2
+        echo "  1. The arm's product is stale, mis-built, or missing. Fix: dotnet build $ARM_REPO_ROOT/src/Calor.Tasks -c Release (and Calor.Compiler, Calor.Runtime). This is the cause; MSBuild workers reload the assembly from disk on every build." >&2
+        echo "  2. If a correct rebuild did not clear it: dotnet build-server shutdown, then retry." >&2
+        echo "  Either way EVERY workspace build in this arm fails, and without this canary the runs are recorded as task failures rather than as a broken arm. (CALOR_P0_SKIP_ARM_CANARY=1 skips this check for local plumbing work on an unbuilt tree, and only for a --null-agent run into a '-null' output directory.)" >&2
+        grep -E 'MSB4064|MSB4063|MSB4062' <<<"$out" | head -2 >&2
         return 1
     fi
-    echo "pre-rows canary OK: Calor0410 is a warning under the arm's Calor.Tasks build ($ARM_REPO_ROOT)" >&2
+
+    local seen
+    seen="$(grep -o 'error Calor[0-9]*\|warning Calor[0-9]*' <<<"$out" | sort | uniq -c | tr -s ' \n' ' ' || true)"
+    case "$expect" in
+        permissive)
+            if [[ $rc -ne 0 ]] || grep -q 'error Calor0410' <<<"$out" || ! grep -q 'warning Calor0410' <<<"$out"; then
+                echo "INVALID: pre-rows control arm — the arm's Calor.Tasks build does not honor <CalorPermissiveEffects> (canary build exit $rc; expected a successful build carrying 'warning Calor0410', got: $seen). The arm would run STRICT; refusing before spend (roadmap §4.1)." >&2
+                return 1
+            fi
+            ARM_CANARY_STATUS="permissive-ok"
+            echo "arm canary OK (pre-rows): Calor0410 is a warning under the arm's Calor.Tasks build ($ARM_REPO_ROOT); compilerHash ${ARM_CANARY_COMPILER_HASH:0:12}" >&2
+            ;;
+        strict)
+            if [[ $rc -eq 0 ]] || ! grep -q 'error Calor0410' <<<"$out"; then
+                echo "INVALID: strict arm — the arm's Calor.Tasks build did not reject a laundered effect (canary build exit $rc; expected a FAILED build carrying 'error Calor0410', got: $seen). Either the arm is running permissive, or its product is not the one this arm claims; refusing before spend." >&2
+                return 1
+            fi
+            ARM_CANARY_STATUS="strict-ok"
+            echo "arm canary OK (strict): Calor0410 is an error under the arm's Calor.Tasks build ($ARM_REPO_ROOT); compilerHash ${ARM_CANARY_COMPILER_HASH:0:12}" >&2
+            ;;
+    esac
     return 0
 }
 
@@ -413,8 +489,26 @@ check_pins() {
             echo "INVALID: pair.json arms.$ARM_CONFIG_KEY config violates gates-doc pin: $(jq -r '.reason' <<<"$ARM_CONFIG_JSON")" >&2
             exit 3
         fi
-        if [[ "$CONTROL_ARM_KIND" == "pre-rows" ]]; then
-            permissive_canary || exit 3
+        # Both arms are canaried: the pre-rows arm for the waiver it claims, the
+        # strict arm because a task-assembly mismatch fails it identically and
+        # nothing downstream would say so.
+        #
+        # The skip exists for local plumbing work on a tree with no product, and is
+        # BOUNDED so it cannot silently produce a paid epoch whose archive is
+        # indistinguishable from one where every arm was proven: it is honoured only
+        # for a --null-agent run writing into a '-null' output directory, and every
+        # run records armCanary in result.json either way.
+        if [[ "${CALOR_P0_SKIP_ARM_CANARY:-0}" == "1" ]]; then
+            if [[ $NULL_AGENT -ne 1 || "$OUT_DIR" != *-null ]]; then
+                echo "INVALID: CALOR_P0_SKIP_ARM_CANARY=1 is only honoured for a --null-agent run into an output directory whose name ends in '-null' (got: null_agent=$NULL_AGENT out=$OUT_DIR). A live or recorded run must prove its arm." >&2
+                exit 3
+            fi
+            ARM_CANARY_STATUS="skipped"
+            echo "arm canary SKIPPED (CALOR_P0_SKIP_ARM_CANARY=1, null-agent run into $OUT_DIR); result.json records armCanary=skipped" >&2
+        elif [[ "$CONTROL_ARM_KIND" == "pre-rows" ]]; then
+            arm_canary permissive || exit 3
+        else
+            arm_canary strict || exit 3
         fi
     fi
     # Annex A-1.3 instrumentation item 3: when the epoch declares the verify
@@ -718,7 +812,9 @@ now_ms() {
   fi
 }
 
-arm="$ARM"
+# The LABEL, not the language: both PP-W-rows arms are the calor language, so \$ARM
+# cannot tell the control arm's telemetry from the treatment arm's.
+arm="$ARM_LABEL"
 ts_iso="\$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 t0=\$(now_ms)
 "$real_dotnet" "\$@"; rc=\$?
@@ -933,13 +1029,27 @@ run_agent() {
     if [[ $NULL_AGENT -eq 1 ]]; then
         # First build the starter as shipped (observed, through the shim) so
         # every null-agent run also proves the starting fixture compiles.
+        # Deliberately NOT fatal: §4.1 registers W-005's arm-B starter as one that
+        # does not build, and the null run still has to exercise the rest of the loop.
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" dotnet build --nologo -v q >/dev/null 2>&1 ) || {
             echo "null-agent: starter fixture failed to build (pair=$PAIR_ID arm=$ARM)" >&2
         }
         # Then apply the reference solution and do one observed build (validates
-        # shim + held-out wiring end to end with zero API spend)
-        [[ -d "$PAIR_DIR/reference/$FIXTURE_DIR" ]] || { echo "null-agent: reference solution missing: $PAIR_DIR/reference/$FIXTURE_DIR" >&2; }
-        cp -R "$PAIR_DIR/reference/$FIXTURE_DIR/." "$ws/src/"
+        # shim + held-out wiring end to end with zero API spend). A missing reference
+        # IS fatal: without one the run applies nothing, the held-out suite fails, and
+        # the null epoch reports a plumbing failure as a task failure. This guard used
+        # to print and fall through into `cp`, which then failed with a raw shell error.
+        [[ -n "$REFERENCE_DIR" && -d "$PAIR_DIR/$REFERENCE_DIR" ]] || {
+            echo "ERROR: null-agent needs a reference solution for arms.$ARM_CONFIG_KEY (fixture '$FIXTURE_DIR') in $PAIR_DIR." >&2
+            echo "       Looked for: reference/$FIXTURE_DIR, then pair.json seeded.clean.<armId>, then seeded/clean-<suffix>." >&2
+            echo "       Resolution said: reference='${REFERENCE_DIR:-<none>}' source=$REFERENCE_SOURCE" >&2
+            exit 3
+        }
+        echo "null-agent: applying reference $REFERENCE_DIR (source: $REFERENCE_SOURCE)" >&2
+        # ${VAR:?} so that even with the guard above removed this cannot degrade into
+        # `cp -R "$PAIR_DIR//."` — a VALID copy of the whole pair directory, tests/ and
+        # pair.json included, into the agent-visible workspace.
+        cp -R "$PAIR_DIR/${REFERENCE_DIR:?null-agent reference unresolved}/." "$ws/src/"
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" dotnet build --nologo -v q >/dev/null 2>&1 ) || true
         echo '{"null_agent":true}' > "$ws_out/agent.json"
         # W1: the transcript pin holds for every run. A null-agent run has no
@@ -1200,7 +1310,8 @@ extract_metrics() {
         --argjson compiler_hash "$compiler_hash" --argjson build_state "$build_state" \
         --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
-        --arg template_source "$TEMPLATE_SOURCE" \
+        --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
+        --arg reference "$REFERENCE_DIR" --arg reference_source "$REFERENCE_SOURCE" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
@@ -1212,6 +1323,9 @@ extract_metrics() {
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
+          armCanary:$arm_canary,
+          reference:(if $reference == "" then null else $reference end),
+          referenceSource:$reference_source,
           turns:$turns, agentBuilds:$agent_builds,
           tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
           nullAgent:($null_agent==1)}' \
@@ -1234,7 +1348,8 @@ write_invalid_result() {
         --arg arm_repo_root "$ARM_REPO_ROOT" \
         --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
-        --arg template_source "$TEMPLATE_SOURCE" \
+        --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
+        --arg reference "$REFERENCE_DIR" --arg reference_source "$REFERENCE_SOURCE" \
         --argjson has_transcript "$([[ -s "$ws_out/transcript.jsonl" ]] && echo true || echo false)" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
@@ -1245,6 +1360,9 @@ write_invalid_result() {
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
+          armCanary:$arm_canary,
+          reference:(if $reference == "" then null else $reference end),
+          referenceSource:$reference_source,
           turns:{assistantMessages:null, subagentMessages:null, assistantMessagesIncludingSubagents:null,
                  numTurns:null, source:"invalid", transcript:(if $has_transcript then "transcript.jsonl" else null end)},
           agentBuilds:{count:0, file:null},
@@ -1262,6 +1380,20 @@ wipe_ws_out() {
 
 # ---------------------------------------------------------------------------
 check_pins
+
+# --canary-only stops here: check_pins has just proven this arm (or refused it), and the
+# hash below is this arm's compiler as its own product reports it.
+if [[ $CANARY_ONLY -eq 1 ]]; then
+    jq -n --arg key "$ARM_CONFIG_KEY" --arg arm "$ARM_LABEL" --arg root "$ARM_REPO_ROOT" \
+          --arg kind "$CONTROL_ARM_KIND" --arg status "$ARM_CANARY_STATUS" \
+          --arg hash "${ARM_CANARY_COMPILER_HASH:-}" \
+        '{armConfigKey:$key, arm:$arm, repoRoot:$root,
+          controlArmKind:(if $kind == "" then null else $kind end),
+          armCanary:$status,
+          compilerHash:(if $hash == "" then null else $hash end)}'
+    exit 0
+fi
+
 for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
     mkdir -p "$WS_OUT"

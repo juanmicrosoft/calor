@@ -102,13 +102,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# A null-agent run never lands in the registered directory: it is a plumbing
-# check, and the analyzer must refuse to adjudicate an epoch that holds one.
 # A null-agent run is a plumbing check and must never land in a directory an analyzer
 # could read as a live epoch — whatever id was passed, not only the registered one.
-if [[ -n "$NULL_FLAG" && "$EPOCH" != *-null ]]; then
-    EPOCH="${EPOCH}-null"
-    echo "NOTE: --null-agent forces the epoch id to '$EPOCH' (live ids are for live runs only)"
+# DOT-PREFIXED on purpose: gate 12's turn-attribution instrument
+# (ppe1-turn-attribution.py) counts every non-dot entry under epochs/ as part of its
+# frozen denominator, so a leftover null epoch reds two of its exact-equality tests —
+# and the failing assertion helpfully suggests regenerating, which would bake the null
+# run into the instrument. A dot entry is skipped there by construction
+# (ppe1-turn-attribution.py's `name.startswith(".")`, pinned by
+# test_dotfiles_in_epochs_root_are_not_entries), so the trap cannot spring.
+if [[ -n "$NULL_FLAG" && "$EPOCH" != .* ]]; then
+    EPOCH=".null-${EPOCH#.}"
+    EPOCH="${EPOCH%-null}"
+    echo "NOTE: --null-agent writes to the dot-prefixed epoch '$EPOCH' (scratch; invisible to the archive instruments, and never a live epoch id)"
 fi
 
 [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {
@@ -191,31 +197,6 @@ if [[ -z "$NULL_FLAG" && ( -z "${CLAUDE_MODEL:-}" || "${CLAUDE_MODEL:-}" == "def
     exit 2
 fi
 
-cat <<PLAN
-=== PP-W-rows — epoch plan ===
-epoch:        $EPOCH   (kind $KIND; registered epoch: $REGISTERED_EPOCH)
-pairs:        ${PAIRS[*]}   (six registered W-00x pairs, exact-id match)
-leg B pairs:  $LEG_B_PAIRS   (W-005 leg A only unless overridden)
-blind pairs:  $BLIND_PAIRS   (floor two)
-runs/arm:     $RUNS   interleaved, one run per arm at a time
-model:        ${CLAUDE_MODEL:-default}
-mechanism:    raw on both arms
-arm A:        $ARM_A_LABEL  $ARM_A_ROLE
-              root   $ARM_A_ROOT
-              commit $ARM_A_COMMIT  (registered: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT on $ARM_A_BRANCH; describe: $ARM_A_DESCRIBE)
-              pair.json arms.$ARM_A_CONFIG (permissive, controlArmKind pre-rows)
-              Calor.Tasks ${a_tasks:0:12}
-arm B:        $ARM_B_LABEL  $ARM_B_ROLE
-              root   $ARM_B_ROOT
-              commit $ARM_B_COMMIT  tag $ARM_B_DESCRIBE
-              pair.json arms.$ARM_B_CONFIG (strict)
-              Calor.Tasks ${b_tasks:0:12}
-mode:         ${NULL_FLAG:-live (PAID: $((RUNS * 2 * ${#PAIRS[@]})) agent runs)}
-output:       $SCRIPT_DIR/epochs/$EPOCH  (pins.json with ppW.legBPairs/blindPairs; per-run result.json, agent.json,
-              transcript.jsonl, agent-builds.jsonl, calor-build-state.json)
-adjudication: bench/phase0-agent-native/ppw-analyze.py (W2) reading pins.json ppW.legBPairs
-PLAN
-
 [[ "$a_tasks" != "$b_tasks" ]] || {
     echo "ERROR: both arms' Calor.Tasks.dll hash to the same value — the agent-visible compiler is identical on both arms. Epoch void before it starts." >&2
     exit 2; }
@@ -249,6 +230,101 @@ echo "arm A provenance verified: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT, diff 
 [[ "$ARM_B_DESCRIBE" == "$ARM_B_TAG" ]] || {
     echo "ERROR: arm B is not checked out at the $ARM_B_TAG tag (git describe: $ARM_B_DESCRIBE). §4.1 names the $ARM_B_TAG release tag as treatment; a different build is a different experiment." >&2
     exit 2; }
+
+# ---------------------------------------------------------------------------
+# PRE-FLIGHT ARM PROOF — before the plan is printed, and before any spend.
+#
+# One MSBuild worker shutdown first: outside the measurement (no agent has started),
+# a second's cost, and it clears a worker holding an assembly from an earlier build.
+# It is NOT the cause of the MSB4064 story — workers reload from disk (probed) — but a
+# passing canary only warms the workers it happened to use.
+#
+# Then one canary build per arm, through that arm's own template and product
+# (run-pair.sh --canary-only). Two things come out of it that nothing else could give
+# before an agent runs:
+#   1. the arm honours its declared policy (permissive vs strict) — the per-run canary
+#      repeats this, and stays, to catch mid-epoch drift;
+#   2. the arm's compilerHash, read from the canary's own obj/calor/.calor-build-state.json
+#      — the same file #1094 archives per run.
+# (2) is what makes the disjointness assert a PRE-flight. The post-collection assert
+# stays as the mid-epoch guard, but on its own it can only report a mis-pointed arm B
+# after the epoch has been paid for; this refuses in about five seconds instead.
+#
+# GATE ORDER, by cost: everything above this point is free (git metadata, file hashes,
+# pair resolution) and refuses with a more specific message, so it runs first. Only then
+# are two builds spent, and only then is the plan printed — with these hashes in it,
+# because the plan block is what a reader checks before typing --confirm-paid-epoch.
+# ---------------------------------------------------------------------------
+if command -v dotnet >/dev/null 2>&1; then
+    echo "--- dotnet build-server shutdown (once, before the pre-flight) ---"
+    dotnet build-server shutdown >/dev/null 2>&1 || true
+fi
+
+preflight_pair_dir=""
+for d in "$SCRIPT_DIR"/pairs/"${PAIRS[0]}"-*; do [[ -d "$d" ]] && preflight_pair_dir="$d"; done
+[[ -n "$preflight_pair_dir" ]] || { echo "ERROR: cannot resolve a pair directory for the pre-flight" >&2; exit 2; }
+
+preflight_arm() {  # <arm-config-key> <repo-root> <arm name for messages>
+    local key="$1" root="$2" name="$3" out err rc=0
+    # stdout and stderr are kept APART: stdout is the JSON document (pretty-printed, so
+    # it spans lines), stderr carries the canary's own narration.
+    err="$(mktemp "${TMPDIR:-/tmp}/ppw-preflight-XXXXXX")"
+    # --out to a TEMP dir: run-pair.sh mkdir -p's its output directory before anything
+    # else, and its default is epochs/adhoc — which would add a non-dot entry to
+    # epochs/ and so to gate 12's frozen denominator, just by pre-flighting.
+    local scratch; scratch="$(mktemp -d "${TMPDIR:-/tmp}/ppw-preflight-out-XXXXXX")"
+    out="$("$SCRIPT_DIR/run-pair.sh" --pair "$preflight_pair_dir" --arm calor \
+            --arm-config "$key" --arm-repo-root "$root" --canary-only \
+            --out "$scratch" 2>"$err")" || rc=$?
+    rm -rf "$scratch"
+    if [[ $rc -ne 0 ]]; then
+        echo "ERROR: pre-flight canary FAILED for arm $name ($root). No agent was invoked; nothing was spent." >&2
+        tail -6 "$err" >&2
+        rm -f "$err"
+        return 1
+    fi
+    cat "$err" >&2
+    rm -f "$err"
+    jq -r '.compilerHash // empty' <<<"$out"
+}
+
+echo "--- pre-flight arm proof (one canary build per arm; no agent runs) ---"
+PREFLIGHT_A_HASH="$(preflight_arm "$ARM_A_CONFIG" "$ARM_A_ROOT" "A")" || exit 5
+PREFLIGHT_B_HASH="$(preflight_arm "$ARM_B_CONFIG" "$ARM_B_ROOT" "B")" || exit 5
+if [[ -z "$PREFLIGHT_A_HASH" || -z "$PREFLIGHT_B_HASH" ]]; then
+    echo "ERROR: a pre-flight canary produced no compilerHash (A='${PREFLIGHT_A_HASH:-<none>}' B='${PREFLIGHT_B_HASH:-<none>}'). The arm's build state could not be read, so the arms cannot be proven distinct before spending." >&2
+    exit 5
+fi
+if [[ "$PREFLIGHT_A_HASH" == "$PREFLIGHT_B_HASH" ]]; then
+    echo "ERROR: both arms' canaries report the SAME compilerHash ($PREFLIGHT_A_HASH) — the arms would run the same compiler, whatever the pins and Calor.Tasks hashes say. This is the failure the per-run canary structurally cannot catch (arm B loading arm A's task assembly passes a superset of parameters, so nothing errors). Refusing BEFORE any spend." >&2
+    exit 5
+fi
+echo "pre-flight OK: arm A compilerHash ${PREFLIGHT_A_HASH:0:12} != arm B ${PREFLIGHT_B_HASH:0:12}"
+
+cat <<PLAN
+=== PP-W-rows — epoch plan ===
+epoch:        $EPOCH   (kind $KIND; registered epoch: $REGISTERED_EPOCH)
+pairs:        ${PAIRS[*]}   (six registered W-00x pairs, exact-id match)
+leg B pairs:  $LEG_B_PAIRS   (W-005 leg A only unless overridden)
+blind pairs:  $BLIND_PAIRS   (floor two)
+runs/arm:     $RUNS   interleaved, one run per arm at a time
+model:        ${CLAUDE_MODEL:-default}
+mechanism:    raw on both arms
+arm A:        $ARM_A_LABEL  $ARM_A_ROLE
+              root   $ARM_A_ROOT
+              commit $ARM_A_COMMIT  (registered: $ARM_A_BASE_TAG + $ARM_A_EXPECTED_COMMIT on $ARM_A_BRANCH; describe: $ARM_A_DESCRIBE)
+              pair.json arms.$ARM_A_CONFIG (permissive, controlArmKind pre-rows)
+              Calor.Tasks ${a_tasks:0:12}   compilerHash ${PREFLIGHT_A_HASH:0:12} (pre-flight canary)
+arm B:        $ARM_B_LABEL  $ARM_B_ROLE
+              root   $ARM_B_ROOT
+              commit $ARM_B_COMMIT  tag $ARM_B_DESCRIBE
+              pair.json arms.$ARM_B_CONFIG (strict)
+              Calor.Tasks ${b_tasks:0:12}   compilerHash ${PREFLIGHT_B_HASH:0:12} (pre-flight canary)
+mode:         ${NULL_FLAG:-live (PAID: $((RUNS * 2 * ${#PAIRS[@]})) agent runs)}
+output:       $SCRIPT_DIR/epochs/$EPOCH  (pins.json with ppW.legBPairs/blindPairs; per-run result.json, agent.json,
+              transcript.jsonl, agent-builds.jsonl, calor-build-state.json)
+adjudication: bench/phase0-agent-native/ppw-analyze.py (W2) reading pins.json ppW.legBPairs
+PLAN
 
 if [[ -z "$NULL_FLAG" && $CONFIRM -ne 1 ]]; then
     echo
@@ -316,6 +392,29 @@ if [[ ${#missing_results[@]} -gt 0 ]]; then
     echo "ERROR: no result.json under $OUT for: ${missing_results[*]} — the epoch is incomplete and must not be adjudicated as if it were the registered six." >&2
     exit 4
 fi
+
+# M4 — the only witness that each arm ran ITS OWN compiler. The canary cannot catch the
+# dangerous direction: arm A's Sdk.targets passes PermissiveEffects and arm B's does not,
+# so arm B loading arm A's assembly is a strict SUPERSET of parameters — no MSB4064, no
+# error, and arm B silently measured with the v0.14.3 compiler. pins.json states the rule
+# in prose for ppw-analyze.py, which does not exist yet; assert it here, now.
+compiler_hashes() {  # <arm label>
+    find "$OUT" -path "*/$1/run-*/result.json" -exec jq -r '.compilerHash // empty' {} + 2>/dev/null \
+        | sort -u | grep -v '^$' || true
+}
+a_hashes="$(compiler_hashes "$ARM_A_LABEL")"; b_hashes="$(compiler_hashes "$ARM_B_LABEL")"
+a_count="$(printf '%s\n' "$a_hashes" | grep -c . || true)"
+b_count="$(printf '%s\n' "$b_hashes" | grep -c . || true)"
+if [[ "$a_count" != "1" || "$b_count" != "1" ]]; then
+    echo "ERROR: each arm must record exactly ONE compilerHash across its runs (arm A: $a_count distinct, arm B: $b_count distinct). A second hash means the arm's product changed mid-epoch; zero means no run archived one." >&2
+    printf '  arm A: %s\n  arm B: %s\n' "${a_hashes:-<none>}" "${b_hashes:-<none>}" >&2
+    exit 5
+fi
+if [[ "$a_hashes" == "$b_hashes" ]]; then
+    echo "ERROR: both arms recorded the SAME compilerHash ($a_hashes) — the arms did not run different compilers, whatever the pins say. This is the failure the canary structurally cannot catch (arm B loading arm A's task assembly passes a superset of parameters, so nothing errors). Epoch void." >&2
+    exit 5
+fi
+echo "arm compilers verified distinct: A ${a_hashes:0:12} vs B ${b_hashes:0:12}"
 
 echo "--- collection complete; verify the registered leg-B denominator was stamped ---"
 python3 "$HARNESS_CAPTURE" leg-b-pairs "$OUT/pins.json"
