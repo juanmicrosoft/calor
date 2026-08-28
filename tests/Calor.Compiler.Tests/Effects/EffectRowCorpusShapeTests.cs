@@ -16,9 +16,22 @@ namespace Calor.Compiler.Tests;
 /// committed .calr writes any of those forms</b>. §3.2 measured it once, by hand,
 /// at one commit.</para>
 ///
-/// <para>This test keeps measuring it. If someone adds a file using a same-line
-/// <c>§E</c>, the meaning of that file changed under this feature and the change has
-/// to be looked at rather than discovered later.</para>
+/// <para>This test keeps measuring it <b>over the swept corpus</b>. If someone adds a
+/// file using a same-line <c>§E</c>, the meaning of that file changed under this feature
+/// and the change has to be looked at rather than discovered later.</para>
+///
+/// <para><b>What is deliberately outside the sweep, stated rather than implied.</b> Two
+/// fixture sets are excluded because rows are their subject matter, not an accident:
+/// <c>docs/design/spikes/</c> (the emitter spike's before/after evidence) and the
+/// PP-W-rows measurement fixtures and epoch archives <see cref="PpwFixture"/> names.
+/// Measured on this PR's tree: <b>926 files are swept</b>, and <b>30 excluded files do
+/// write a meaning-changing form</b> — 8 spike artifacts and 22 PP-W-rows fixtures (the
+/// per-arm <c>after/</c> starters carry inline parameter rows verbatim, and the seeded
+/// mutants carry field and binding rows). That number grows with every PP-W-rows epoch
+/// archive. The disposition is deliberate: those files were authored under the line rule
+/// as inputs to a measurement, so they are not regressions of §3.2's claim, and sweeping
+/// them would turn the pin into a permanent red. Nothing outside these two sets is
+/// exempt.</para>
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
 /// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
@@ -162,7 +175,11 @@ public sealed class EffectRowCorpusShapeTests
     /// <c>docs/design/spikes/</c> is excluded for the same reason
     /// <c>HigherOrderDemandLedgerTests</c>, <c>LosslessFormattingTests</c> and
     /// <c>facts.py</c> exclude it (§13.5(b)): the emitter spike commits before/after
-    /// .calr fixtures as EVIDENCE, and they are deliberately full of rows.
+    /// .calr fixtures as EVIDENCE, and they are deliberately full of rows. The
+    /// PP-W-rows measurement fixtures and epoch archives <see cref="PpwFixture"/>
+    /// names are excluded by the same rule and for the same reason — they are those
+    /// fixtures again, as per-arm starters plus seeded mutants. The class summary
+    /// records how many excluded files actually write a meaning-changing form.
     /// </summary>
     private static IReadOnlyList<string> CommittedCalrFiles(string root)
     {
@@ -181,9 +198,9 @@ public sealed class EffectRowCorpusShapeTests
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .Where(line => !line.StartsWith("docs/design/spikes/", StringComparison.Ordinal))
-            // PP-W-rows pair fixtures (roadmap v0.16 §4.1): the same spike blobs as
-            // per-arm starters plus their seeded mutants, deliberately full of rows.
-            .Where(line => !line.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal))
+            // Same rule, same reason, for the PP-W-rows measurement fixtures — see
+            // PpwFixture.
+            .Where(line => !PpwFixture.IsMatch(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

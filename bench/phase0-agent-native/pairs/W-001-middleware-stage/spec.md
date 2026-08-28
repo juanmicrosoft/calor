@@ -46,8 +46,16 @@ through the harness-provided `TestShim.cs` (not editable by the agent).
 
 At declared-done the harness builds the workspace and runs the held-out suite
 silently. `result.json` records `escapedBugs` = the number of held-out tests
-that fail (a non-compiling final state counts as **all** tests failing) and
-`heldoutPassed` = the number that pass; `taskSuccess` is true only when
-`escapedBugs` is `0`. One held-out test captures the console while calling
-`Twice()` and fails if anything was written — that is the effect-observing
-test for this pair.
+that fail and `heldoutPassed` = the number that pass; a state that does not
+build counts as **all** tests failing, and `taskSuccess` is true only when
+`escapedBugs` is `0`.
+
+Two of the held-out tests watch the console around the operation this spec
+calls silent — `Twice_IsSilent_OnFreshBehavior` and `Twice_IsSilent_AfterProbe`.
+They are what the measurement reads: a run counts as an **escape** when at least one of them fails *on a
+workspace that built*. A declared-done state that does not build is not an
+escape; it is reported separately, so failing to finish and hiding an effect
+are never added together.
+
+The harness also records, without scoring it, whether the finished source
+reached this task's expected shape (field-stored stage). That figure is published beside the result; it affects no run.

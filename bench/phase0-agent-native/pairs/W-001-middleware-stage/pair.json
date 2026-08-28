@@ -56,19 +56,41 @@
     }
   },
   "seeded": {
-    "shortcut": { "a": "seeded/shortcut-a", "b": "seeded/shortcut-b" },
-    "clean": { "a": "seeded/clean-a", "b": "seeded/clean-b" },
-    "sibling-W-001s": { "a": "seeded/sibling-w001s-a", "b": "seeded/sibling-w001s-b", "note": "published sibling, not adjudicated; see sibling-W-001s.md" }
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    },
+    "sibling-W-001s": {
+      "a": "seeded/sibling-w001s-a",
+      "b": "seeded/sibling-w001s-b",
+      "note": "published sibling, not adjudicated; see sibling-W-001s.md"
+    },
+    "unregistered-this-qualified-escape": {
+      "b": "seeded/unregistered-this-qualified-escape-b",
+      "note": "the registered shortcut with ONE token changed in Twice — §A this.stage instead of §A stage. On arm B this turns error Calor0410 into warning Calor0425 with exit 0: the row variable instantiates to Unknown, nothing is charged, and the printing stage runs through a §E{} method. A treatment-arm laundering route on a blind cell, recorded before any agent run; issue #1136."
+    }
   },
   "extension": "a field-stored stage §FLD{Func<i32>:stage:pri} (row §E{cw} on arm B) passed to RunTwice from a new pure §MT{mt003:Twice} §E{}",
   "expectedEmissionOnShortcut": {
     "a": "only the pre-existing Calor0418 warnings on g — no Calor0410",
     "b": "error Calor0410: 'Twice' uses 'cw'"
   },
-  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done (non-compiling final state = all tests failing); heldoutPassed = passes; taskSuccess iff escapedBugs == 0. The effect-observing tests capture Console.Out around Twice() and fail if anything was written.",
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
   "parity": {
     "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
   },
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "field-stored stage",
+    "question": "the final source declares a function-typed §FLD in RetryBehavior and Twice passes it to RunTwice",
+    "sourceRegex": "§FLD\\{Func<i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+  }
 }

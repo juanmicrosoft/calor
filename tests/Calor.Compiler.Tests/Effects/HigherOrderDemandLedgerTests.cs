@@ -23,7 +23,10 @@ namespace Calor.Compiler.Tests;
 /// and cannot re-derive them:</para>
 ///
 /// <list type="bullet">
-/// <item><b>D-A (Calor-native):</b> every committed <c>.calr</c> in the repo is
+/// <item><b>D-A (Calor-native):</b> every committed <c>.calr</c> in the repo —
+/// less the <c>bench/corpus/</c> submodules, the <c>docs/design/spikes/</c>
+/// artifacts and the PP-W-rows measurement fixtures and epoch archives
+/// <see cref="PpwFixture"/> names — is
 /// compiled in-process under the DEFAULT effect policy (<c>EnforceEffects</c>
 /// on, <c>UnknownCallPolicy.Strict</c> — never <c>--permissive-effects</c>) and
 /// the ledger records (a) Calor0418 <c>DelegateInvocation</c> firings and (b)
@@ -68,8 +71,10 @@ public class HigherOrderDemandLedgerTests
         + "ledger's registration PR and is not re-tuned after the design doc opens.";
 
     private const string ScopeText =
-        "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/ "
-        + "and bench/corpus/ submodules excluded; nothing else filtered), compiled one file at a "
+        "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, "
+        + "bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement "
+        + "fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap §4.1) excluded; "
+        + "nothing else filtered), compiled one file at a "
         + "time via Program.Compile with EnforceEffects=true, UnknownCallPolicy.Strict, "
         + "StrictEffects=false, EnableTypeChecking=true (the CLI default), "
         + "UnsafeTranspileOnly=false, DeferGeneratedOutputValidation=true (per-file Roslyn "
@@ -306,13 +311,9 @@ public class HigherOrderDemandLedgerTests
                     // excluded by path instead. The ledger's counts are unchanged
                     // by this line — these files were never part of the 886.
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
-                    // The PP-W-rows pairs (roadmap v0.16 §4.1) are those same spike
-                    // fixtures again — byte-identical copies of before/*.calr and
-                    // after/*.calr frozen at 7d621c0d as per-arm starters — plus their
-                    // seeded shortcut/clean mutants. They are measurement fixtures for
-                    // an agent epoch, not corpus, and the ledger's counts are unchanged
-                    // by this line (S3 (c), bench/phase0-agent-native/pairs/W-00x-*).
-                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
+                    // Same rule, same reason, for the PP-W-rows measurement fixtures — see
+                    // PpwFixture.
+                    && !PpwFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

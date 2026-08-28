@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Benchmark: added the six "PP-W-rows" task pairs (`bench/phase0-agent-native/pairs/W-00x-*`) that the v0.16 plan will use to check whether the effect rows from 0.15 stop AI agents from hiding a console print inside a function that claims to be silent. Each pair ships the frozen starting program for both compilers (0.14.3 and 0.15.0), a plain-language task, held-out tests that catch the hidden print at run time, and a worked example of both the shortcut and the honest solution, with every compile result recorded in `pairs/ppw-seeded-compiles.json`. No agent runs yet.
+- Benchmark: added six programming tasks we will use to find out whether the effect labels added in 0.15 stop an AI agent from hiding a console message inside a function that says it is silent. Each task comes with the same starting program built for the old compiler (0.14.3) and the new one (0.15.0), a plain-language description, hidden tests that catch the message if it escapes, and two worked answers — the tempting shortcut and the honest fix. We also recorded what each compiler says about every one of those answers, so the numbers are fixed before anyone runs the experiment. Nothing is run yet.
+- Found while building the above: on 0.15.0, writing `this.` in front of a stored callback when handing it to another function makes the compiler stop tracking what that callback does — it warns instead of failing, and the hidden message gets through. Reported as issue #1136.
 
 ## [0.15.0] - 2026-08-27
 

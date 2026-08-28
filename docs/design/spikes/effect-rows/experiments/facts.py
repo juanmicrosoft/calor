@@ -69,10 +69,13 @@ print("\n### whole-corpus function-typed positions (IsFunctionTypeName shapes)")
 # shapes in 5 files, all conversion snapshots" (§1) false by self-reference.
 # HigherOrderDemandLedgerTests and LosslessFormattingTests exclude the same path
 # for the same reason. This line does not change the count.
-# bench/phase0-agent-native/pairs/W-00*: the PP-W-rows pair fixtures (roadmap v0.16 §4.1) —
-# the spike blobs again as per-arm starters plus their seeded mutants; excluded for the
-# same reason the spike artifacts are.
-CORPUS = "git ls-files '*.calr' | grep -v '^docs/design/spikes/' | grep -v '^bench/phase0-agent-native/pairs/W-00'"
+# PP-W-rows measurement fixtures (roadmap v0.16 §4.1): the spike blobs again as per-arm
+# starters, their seeded mutants, and the per-run archives a PP-W epoch writes. Excluded
+# for the same reason the spike artifacts are; keyed on the W-<three digits>- pair id so a
+# later W-010 pair stays covered. Matches nothing else in the tree — counts unchanged.
+PPW = r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-[0-9]{3}-"
+CORPUS = ("git ls-files '*.calr' | grep -v '^docs/design/spikes/' "
+          f"| grep -Ev '{PPW}'")
 print(sh(f"{CORPUS} | xargs grep -hoE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null | wc -l"))
 print(sh_sorted(f"{CORPUS} | xargs grep -lE 'Func<|Action<|Action[}}:]|Predicate<|Comparison<|Converter<|EventHandler' 2>/dev/null"))
 
@@ -84,7 +87,12 @@ for ln in [152,172,219,245,260,472,502,555,582,587,607,640,656,728,745,612,106,1
     print(f"StrictnessBatchTests.cs:{ln}:", sh(f"sed -n '{ln}p' tests/Calor.Enforcement.Tests/StrictnessBatchTests.cs"))
 
 print("\n### demand ledger test exact-equality")
-print(sh("sed -n '186,200p' tests/Calor.Compiler.Tests/Effects/HigherOrderDemandLedgerTests.cs"))
+# Anchored on the assertion, not on a line range: the excerpt is the point, and a
+# comment added anywhere above it used to shift the range and drift this transcript
+# (it did, when the PP-W-rows path rule landed in that file). Same 15 lines, addressed
+# by what they say.
+print(sh("sed -n '/Assert.True(recordedFailing.SequenceEqual/,+14p' "
+         "tests/Calor.Compiler.Tests/Effects/HigherOrderDemandLedgerTests.cs"))
 
 print("\n### BoundTypeTests DisplayString pins")
 print(sh_sorted("grep -n 'DisplayString' tests/Calor.Compiler.Tests/Binding/BoundTypes/BoundTypeTests.cs"))

@@ -36,8 +36,9 @@ namespace Calor.Compiler.Tests;
 /// <para><b>Denominator.</b> Every committed <c>.calr</c> under the repository
 /// root, with the same exclusions <c>HigherOrderDemandLedgerTests</c>'s D-A leg
 /// uses (<c>bin/</c>, <c>obj/</c>, <c>.git/</c>, <c>.claude/</c>,
-/// <c>node_modules/</c>, the <c>bench/corpus/</c> submodules, and
-/// <c>docs/design/spikes/</c> artifacts), partitioned into SUBJECTS by
+/// <c>node_modules/</c>, the <c>bench/corpus/</c> submodules,
+/// <c>docs/design/spikes/</c> artifacts, and the PP-W-rows measurement fixtures
+/// and epoch archives <see cref="PpwFixture"/> names), partitioned into SUBJECTS by
 /// top-level directory. Each file is lexed, parsed, and run through
 /// <see cref="EffectEnforcementPass"/> under
 /// <see cref="UnknownCallPolicy.Strict"/> with a hermetic
@@ -87,7 +88,9 @@ public class EffectResolverKeyLedgerTests
 
     private const string ScopeText =
         "Every committed .calr under the repository root (bin/, obj/, .git/, .claude/, "
-        + "node_modules/, bench/corpus/ submodules and docs/design/spikes/ artifacts excluded; "
+        + "node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the "
+        + "PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, "
+        + "roadmap v0.16 §4.1) excluded; "
         + "nothing else filtered), partitioned into subjects by top-level directory. Each file is "
         + "lexed with TokenizeAllForParser and parsed, then run through EffectEnforcementPass "
         + "with UnknownCallPolicy.Strict and a hermetic EffectResolver (built-in manifests only; "
@@ -328,9 +331,9 @@ public class EffectResolverKeyLedgerTests
                 return !directories.Any(d => d is "bin" or "obj" or "node_modules" || d.StartsWith('.'))
                     && !rel.StartsWith("bench/corpus/", StringComparison.Ordinal)
                     && !rel.StartsWith("docs/design/spikes/", StringComparison.Ordinal)
-                    // PP-W-rows pair fixtures (roadmap v0.16 §4.1): the spike blobs again as
-                    // per-arm starters plus seeded mutants — not corpus; counts unchanged.
-                    && !rel.StartsWith("bench/phase0-agent-native/pairs/W-00", StringComparison.Ordinal);
+                    // Same rule, same reason, for the PP-W-rows measurement fixtures — see
+                    // PpwFixture.
+                    && !PpwFixture.IsMatch(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))

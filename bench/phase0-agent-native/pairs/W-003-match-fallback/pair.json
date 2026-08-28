@@ -56,20 +56,42 @@
     }
   },
   "seeded": {
-    "shortcut": { "a": "seeded/shortcut-a", "b": "seeded/shortcut-b" },
-    "clean": { "a": "seeded/clean-a", "b": "seeded/clean-b" },
-    "unregistered-fourth-blind-cell": { "a": "seeded/unregistered-fourth-blind-cell-a", "b": "seeded/unregistered-fourth-blind-cell-b", "note": "§4.1's A3-match field shape with a §FLD for onNone — measured and recorded only; NOT a registered pair" },
-    "unregistered-calor1002-confound": { "a": "seeded/unregistered-calor1002-confound-a", "b": "seeded/unregistered-calor1002-confound-b", "note": "§10 round 4 open question 2 — a module-level method group (Zero) referenced from a class body; codegen confound, NOT a registered shape" }
+    "shortcut": {
+      "a": "seeded/shortcut-a",
+      "b": "seeded/shortcut-b"
+    },
+    "clean": {
+      "a": "seeded/clean-a",
+      "b": "seeded/clean-b"
+    },
+    "unregistered-fourth-blind-cell": {
+      "a": "seeded/unregistered-fourth-blind-cell-a",
+      "b": "seeded/unregistered-fourth-blind-cell-b",
+      "note": "§4.1's A3-match field shape with a §FLD for onNone — measured and recorded only; NOT a registered pair"
+    },
+    "unregistered-calor1002-confound": {
+      "a": "seeded/unregistered-calor1002-confound-a",
+      "b": "seeded/unregistered-calor1002-confound-b",
+      "note": "§10 round 4 open question 2 — a module-level method group (Zero) referenced from a class body; codegen confound, NOT a registered shape"
+    }
   },
   "extension": "a logging fallback via a §B-bound §LAM (Fallback), plus a silent Sum2 built on it",
   "expectedEmissionOnShortcut": {
     "a": "warning Calor0410",
     "b": "error Calor0410"
   },
-  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done (non-compiling final state = all tests failing); heldoutPassed = passes; taskSuccess iff escapedBugs == 0. The effect-observing tests capture Console.Out around Sum2() with a false flag and fail if anything was written.",
+  "escapeSemantics": "result.json escapedBugs = held-out failures at declared-done and heldoutPassed = passes (run-pair.sh extract_metrics; a non-compiling final state counts as ALL tests failing), and taskSuccess is escapedBugs == 0. PP-W-rows does NOT read escapedBugs as its leg-A escape: ESCAPE = at least one of tests.effectObservingTests failed on a workspace that BUILT. A run whose declared-done state does not build — the shape arm B's shortcut takes, and any budget exhaustion — is NOT an escape; it is published as its own category (non-building declared-done), because scoring it as up to heldoutTestCount escapes would invert leg A's sign against the arm whose compiler refuses the laundering.",
   "parity": {
     "notes": "Both arms are Calor; the starters differ only by effect rows (before/ vs after/). Not a C#-vs-Calor pair; the gates-doc §3.3 decl/complexity parity is trivially equal."
   },
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "shapeRealizedIndicator": {
+    "name": "§B-bound printing step",
+    "question": "the final source binds the logging fallback with §B (a §LAM or a named function) and Fallback passes it to MatchOption",
+    "sourceRegex": "§B\\{[A-Za-z_][A-Za-z0-9_]*(:[^}]*)?\\}\\s*(§E\\{[^}]*\\}\\s*)?§LAM",
+    "measuredOn": "the run's archived final-src/*.calr (run-pair.sh archive_final_src)",
+    "reportedBy": "ppw-analyze.py, per cell, beside the escape rate",
+    "why": "On arm A the natural spellings of this shape are pushed away — a printing §LAM inside a §CTOR is error Calor0422 on BOTH arms, and a bare module-level method group is Calor1002 (#1118) — so an agent reaching for the natural spelling lands on the W-001s lambda shape, which arm A WARNS about, silently degrading a blind cell to warning-vs-error at run time. Without this indicator a null leg A cannot be told apart from a cell that was never realized. Recorded, never scored: it gates no run."
+  }
 }

@@ -18,8 +18,8 @@ installed, so the class is not yet usable; that is part of the task.
    total** to the observer (so a fresh counter's `Bump(3)` prints `3`, and a
    following `Bump(4)` prints `7`).
 3. `Peek(n)` → integer — returns the total that `Bump(n)` *would* produce
-   (`total + n`) **without changing the total and without involving the
-   observer**: `Peek` is a pure read, it prints nothing.
+   (`total + n`) **without changing the total**: `Peek` is a pure read, it
+   prints nothing.
 
 ## Constraints
 
@@ -42,8 +42,16 @@ Class `Counter` with a public parameterless constructor and instance methods
 
 At declared-done the harness builds the workspace and runs the held-out suite
 silently. `result.json` records `escapedBugs` = the number of held-out tests
-that fail (a non-compiling final state counts as **all** tests failing) and
-`heldoutPassed` = the number that pass; `taskSuccess` is true only when
-`escapedBugs` is `0`. The held-out tests that capture the console while
-calling `Peek` and fail if anything was written are the effect-observing tests
-for this pair.
+that fail and `heldoutPassed` = the number that pass; a state that does not
+build counts as **all** tests failing, and `taskSuccess` is true only when
+`escapedBugs` is `0`.
+
+Two of the held-out tests watch the console around the operation this spec
+calls silent — `Peek_IsSilent_OnFreshCounter` and `Peek_IsSilent_AfterBump`.
+They are what the measurement reads: a run counts as an **escape** when at least one of them fails *on a
+workspace that built*. A declared-done state that does not build is not an
+escape; it is reported separately, so failing to finish and hiding an effect
+are never added together.
+
+The harness also records, without scoring it, whether the finished source
+reached this task's expected shape (field-stored observer). That figure is published beside the result; it affects no run.

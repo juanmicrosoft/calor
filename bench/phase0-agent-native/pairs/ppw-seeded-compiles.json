@@ -204,6 +204,25 @@
       ]
     },
     {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-this-qualified-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-this-qualified-escape-b/A3-middleware.calr",
+      "blobSha": "9574a91501a44fdd7de60bf9788997080225ab88",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 27,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
       "pair": "W-002-map-and-report",
       "role": "starter",
       "arm": "A",
@@ -679,6 +698,32 @@
       "diagnostics": []
     },
     {
+      "pair": "W-004-counter-peek",
+      "role": "unregistered-this-qualified-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/seeded/unregistered-this-qualified-escape-b/A3-callback.calr",
+      "blobSha": "ad574fd0a25c6bccd85d5cd80105faa439b3e892",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 17,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Peek' uses effect 'unknown' but does not declare it"
+        },
+        {
+          "line": 19,
+          "column": 7,
+          "code": "Calor0411",
+          "severity": "warning",
+          "text": "Unknown external call to 'this.onChange'. Add effect declaration in a .calor-effects.json manifest."
+        }
+      ]
+    },
+    {
       "pair": "W-005-pipeline-trace",
       "role": "starter",
       "arm": "A",
@@ -935,6 +980,32 @@
       "emitted": true,
       "diagnosticCount": 0,
       "diagnostics": []
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "unregistered-this-qualified-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/unregistered-this-qualified-escape-b/A3-map.calr",
+      "blobSha": "40c759ae3940de323ab85b6e3b23e13d214780b2",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 39,
+          "column": 16,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        },
+        {
+          "line": 40,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
     }
   ]
 }

@@ -31,8 +31,10 @@ Recompute check (skipped with a reason unless BOTH arm builds are present):
 Run:  python3 bench/phase0-agent-native/tests/test_ppw_pairs.py
 """
 
+import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -87,6 +89,13 @@ FROZEN_STARTERS = {
 }
 
 
+def load_compile_module():
+    spec = importlib.util.spec_from_file_location("ppw_compile", COMPILE_PY)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def load_pair(pid):
     with open(os.path.join(PAIRS, pid, "pair.json"), encoding="utf-8") as fh:
         return json.load(fh)
@@ -132,8 +141,12 @@ class PairLayout(unittest.TestCase):
     def test_sibling_w001s_is_a_note_not_a_pair(self):
         self.assertTrue(os.path.isfile(os.path.join(PAIRS, "W-001-middleware-stage", "sibling-W-001s.md")))
         self.assertFalse(any(d.startswith("W-001s") for d in os.listdir(PAIRS)))
-        self.assertFalse(any(d.startswith("W-007") for d in os.listdir(PAIRS)),
-                         "the A3-match fourth blind cell is recorded, not registered (§4.1)")
+        # No PP-W pair directory beyond the six registered ones: the A3-match fourth
+        # blind cell and the recorded confounds are seeds, never pairs (§4.1), and an
+        # unregistered W-0xx pair would also slip past the census walkers' path rule.
+        stray = sorted(d for d in os.listdir(PAIRS)
+                       if re.match(r"^W-\d{3}-", d) and d not in PAIR_IDS)
+        self.assertEqual([], stray, "unregistered PP-W pair directory")
 
     def test_spec_is_arm_neutral(self):
         # The task statement must not steer the agent by naming the mechanism under test.
@@ -225,6 +238,19 @@ class FrozenCompiles(unittest.TestCase):
         self.assertEqual(sorted(LEG_B), sorted(self.doc["legBPairs"]))
         self.assertEqual(sorted(BLIND), sorted(self.doc["blindPairs"]))
 
+    def test_the_json_covers_exactly_the_sources_on_disk(self):
+        # Without this, a seed could enter the tree (a directory plus a pair.json
+        # entry) and never be compiled: every other check here reads the JSON, so an
+        # unrecorded source would be invisible until the DLL-gated recompute ran.
+        # This runs everywhere, with no compiler.
+        expected = {(pid, role, arm.upper(), rel)
+                    for pid, role, arm, rel in load_compile_module().enumerate_sources()}
+        got = {(c["pair"], c["role"], c["arm"], c["path"]) for c in self.doc["compiles"]}
+        self.assertEqual(expected, got, "ppw-seeded-compiles.json does not cover exactly the "
+                                        "sources ppw-compile.py enumerates — regenerate it")
+        self.assertEqual(46, len(self.doc["compiles"]))
+        self.assertEqual(len(expected), len(self.doc["compiles"]), "duplicate rows")
+
     def test_every_source_is_recorded_once_per_arm_and_blob_matches_disk(self):
         seen = set()
         for c in self.doc["compiles"]:
@@ -305,6 +331,48 @@ class FrozenCompiles(unittest.TestCase):
         self.assertIn(("warning", "Calor0410"), sev_codes(a))
         self.assertEqual(0, a["exitCode"])
         self.assertIn(("error", "Calor0410"), sev_codes(b))
+
+    def test_this_qualified_escape_is_recorded_on_the_treatment_arm(self):
+        # Issue #1136, recorded before any agent run: on arm B `§A this.field` makes the
+        # row variable instantiate to Unknown — warning Calor0425, exit 0, nothing charged
+        # — so two of the three blind cells have a laundering route through the TREATMENT
+        # arm. A-1.12 registers it as a pre-registered confound on leg A's direction.
+        for pid in ("W-001-middleware-stage", "W-006-map-doubler"):
+            row = rows(self.doc, pid, "unregistered-this-qualified-escape", "B")[0]
+            self.assertEqual(0, row["exitCode"], f"{pid}: the escape must BUILD on arm B")
+            self.assertTrue(row["emitted"])
+            self.assertNotIn("Calor0410", codes(row), f"{pid}: nothing is charged — that is the defect")
+            self.assertTrue(all(c == "Calor0425" for c in codes(row)) and codes(row),
+                            f"{pid}: expected Calor0425 warnings only")
+            self.assertTrue(all(d["severity"] == "warning" for d in row["diagnostics"]))
+        # The negative control: direct invocation of a this.-qualified field fails closed.
+        control = rows(self.doc, "W-004-counter-peek", "unregistered-this-qualified-escape", "B")[0]
+        self.assertEqual(1, control["exitCode"])
+        self.assertIn(("error", "Calor0410"), sev_codes(control))
+
+    def test_specs_pin_the_escape_indicator_and_the_shape_indicator(self):
+        for pid in PAIR_IDS:
+            manifest = load_pair(pid)
+            with open(os.path.join(PAIRS, pid, "spec.md"), encoding="utf-8") as fh:
+                spec = " ".join(fh.read().split())  # the spec is hard-wrapped; match on words
+            self.assertIn("on a workspace that built", spec, f"{pid}: escape indicator not pinned in spec")
+            self.assertIn("does not build is not an escape", spec, pid)
+            self.assertIn("at least one of tests.effectObservingTests failed on a workspace that BUILT",
+                          manifest["escapeSemantics"], pid)
+            self.assertIn("non-building declared-done", manifest["escapeSemantics"], pid)
+            indicator = manifest["shapeRealizedIndicator"]
+            for key in ("name", "question", "sourceRegex", "measuredOn", "reportedBy", "why"):
+                self.assertTrue(indicator.get(key), f"{pid}: shapeRealizedIndicator.{key} missing")
+            self.assertIn(indicator["name"], spec, f"{pid}: shape indicator not disclosed in the spec")
+            re.compile(indicator["sourceRegex"])
+            # The indicator must actually separate the two reference solutions it exists to
+            # tell apart: the seeded shortcut realizes the shape, and (for the blind cells)
+            # the published lambda sibling does not.
+            shortcut = os.path.join(PAIRS, pid, manifest["seeded"]["shortcut"]["b"])
+            body = "".join(open(os.path.join(shortcut, f), encoding="utf-8").read()
+                           for f in sorted(os.listdir(shortcut)) if f.endswith(".calr"))
+            self.assertRegex(body, indicator["sourceRegex"],
+                             f"{pid}: the seeded shortcut does not match its own shape indicator")
 
     def test_unregistered_extras_are_recorded_as_measured(self):
         # §4.1: the A3-match field shape with a field for onNone is blind on both arms.

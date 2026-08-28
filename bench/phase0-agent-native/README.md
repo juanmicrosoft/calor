@@ -9,7 +9,8 @@ This suite measures the strategy's narrow bet: *machine-checked proofs and enfor
 
 ```
 categories.json          Pre-registered category registry (machine-readable; freezes with the suite)
-task-spec-schema.json    Schema every pair manifest must validate against
+task-spec-schema.json    Schema every C#-vs-Calor pair manifest must validate against
+                         (the six PP-W-rows pairs are the one carve-out — see below)
 templates/calor-arm/     Execution-path template for the Calor arm (Calor.Sdk csproj + test project)
 pairs/<ID>/              One directory per fixture pair:
   pair.json              Pair manifest (schema above)
@@ -17,6 +18,7 @@ pairs/<ID>/              One directory per fixture pair:
   tests/                 Arm-shared held-out tests (black-box, run via dotnet test in either arm)
   csharp/                Idiomatic C# starting fixture
   calor/                 Idiomatic Calor starting fixture
+pairs/W-00N-<slug>/      PP-W-rows pairs (roadmap v0.16 §4.1) — see the carve-out below
 epochs/<epoch-id>/       Per-epoch pins.json + raw results (created by runs, never edited)
 ```
 
@@ -27,6 +29,30 @@ epochs/<epoch-id>/       Per-epoch pins.json + raw results (created by runs, nev
 3. **Structural parity at authoring:** declaration count and cyclomatic-complexity sum within ±30% across arms; recorded in `pair.json`.
 4. **Wedge pairs (W1–W3) are authored against** [`docs/verification-modeled-forms.md`](../../docs/verification-modeled-forms.md): intended contracts must fall inside the modeled-forms whitelist, and W3 effect boundaries must be manifest-covered (BCL manifests + `calor-runtime.calor-effects.json`). A wedge pair whose contracts fall outside the whitelist is invalid at authoring time.
 5. **Calor-arm config is pinned** (gates doc §1): SDK path, enforcement on, permissive off, contract mode debug, Z3 present. Runs violating the pin are invalid by automated check.
+
+### Carve-out: the PP-W-rows pairs (`pairs/W-00N-*`)
+
+The six `W-00N-*` pairs (roadmap v0.16 §4.1; entry-gate spike S3 (c)) are a
+**compiler-vs-compiler** probe, not a C#-vs-Calor pair, so rules 1–3 read
+differently and **their `pair.json` does not validate against
+`task-spec-schema.json`** — the schema requires a `csharp` arm, one `calor` arm
+with `permissiveEffects: false`, and a `W[1-5]|C[1-3]|N1`-shaped id, and all
+three are wrong for this probe. Concretely:
+
+- both arms are Calor: arm A is v0.14.3 with `--permissive-effects` (the
+  "pre-rows control arm" A-1.12 registers additively), arm B is v0.15.0 strict;
+- the starters are **per arm** and frozen by blob SHA (`before/*.calr` vs
+  `after/*.calr` at `7d621c0d`), because `after/` does not parse on v0.14.3;
+- the held-out suite lives in `heldout/` (not `tests/`) with one shim serving
+  both arms, and the pair records which of its tests are the effect-observing
+  ones;
+- structural parity is trivial: the two starters differ only by effect rows.
+
+`run-pair.sh` does not run them yet — admitting the control arm and the per-arm
+starter is v0.16 work item W1, which is also where the schema gains the arm
+shape. Until then the pairs are validated by
+`tests/test_ppw_pairs.py` and their both-arm compile multisets are frozen in
+`pairs/ppw-seeded-compiles.json` (regenerate with `ppw-compile.py`).
 
 ## Runner
 
