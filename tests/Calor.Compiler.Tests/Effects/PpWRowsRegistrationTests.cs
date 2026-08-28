@@ -309,6 +309,7 @@ public sealed class PpWRowsRegistrationTests
 
             // The class the row registers must match what the shortcut actually emitted:
             // blind  => arm A carries no Calor0410 and builds; otherwise arm A warns Calor0410.
+            var isArmA = string.Equals(arm, "A", StringComparison.Ordinal);
             var armAHasForbidden = string.Equals(arm, "A", StringComparison.Ordinal)
                 && compile.GetProperty("diagnostics").EnumerateArray()
                     .Any(x => x.GetProperty("code").GetString() == "Calor0410");
@@ -333,14 +334,20 @@ public sealed class PpWRowsRegistrationTests
                 // FACTS (code and position), not on a particular spelling: a cell
                 // whose position or code moves leaves the frozen row stale, and the
                 // row cannot be edited after merge.
+                // Scoped to THIS pair's THIS arm's half of the cell (review round 2, minor):
+                // whole-row containment let a corrupted position stay green whenever the correct
+                // value happened to appear in another cell — 5 of the 12 sampled positions are
+                // duplicated across the starter/clean/shortcut cells.
+                var forward = PairCellHalf(row, shortId, isArmA);
                 Assert.True(
-                    row.Contains(code, StringComparison.Ordinal),
-                    $"{pair} arm {arm} emits {code}, which the frozen A-1.12 row never names.");
+                    forward.Contains(code, StringComparison.Ordinal),
+                    $"{pair} arm {arm} emits {code}, which the frozen A-1.12 row's own "
+                    + $"{shortId} arm-{arm} cell never names.");
                 Assert.True(
-                    row.Contains($"({line},{column})", StringComparison.Ordinal),
+                    forward.Contains($"({line},{column})", StringComparison.Ordinal),
                     $"{pair} arm {arm} emits {code} at ({line},{column}), a position the frozen "
-                    + "A-1.12 row does not record. The row cannot be edited after merge: register "
-                    + "the corrected measurement in a NEW annex entry.");
+                    + $"A-1.12 row's {shortId} arm-{arm} cell does not record. The row cannot be "
+                    + "edited after merge: register the corrected measurement in a NEW annex entry.");
             }
 
             // The other direction, PER ARM (review round 1 follow-up). Checking bare codes over
@@ -349,7 +356,7 @@ public sealed class PpWRowsRegistrationTests
             // the assertion is on (severity, code) pairs within each arm's own half of the cell.
             // A bare mention with no severity word — "**no `Calor0410`**" — is deliberately not
             // matched by the pattern and so is not treated as a claimed diagnostic.
-            var half = PairCellHalf(row, shortId, isArmA: string.Equals(arm, "A", StringComparison.Ordinal));
+            var half = PairCellHalf(row, shortId, isArmA);
             var claimed = System.Text.RegularExpressions.Regex
                 .Matches(half, "`(warning|error) (Calor0\\d{3})`")
                 .Select(m => (Severity: m.Groups[1].Value, Code: m.Groups[2].Value))
