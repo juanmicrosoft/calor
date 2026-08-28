@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7772,
+      "expectedTotal": 7927,
       "expectedSkipped": 3
     },
     {
@@ -83,7 +83,7 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 111,
+      "expectedTotal": 119,
       "expectedSkipped": 0
     },
     {
