@@ -45,6 +45,16 @@
         "resolved": "2.5.4",
         "contentHash": "YUtEOBdArAISyb1cTWcHc6/bilSDB9q5lc8ughPQP1MqlAKSkxKMBqLQ+tiWMFRBd2o22E59nLD/4V5R3jfZxQ=="
       },
+      "Xunit.SkippableFact": {
+        "type": "Direct",
+        "requested": "[1.4.13, )",
+        "resolved": "1.4.13",
+        "contentHash": "IyzZNvJEtXGlXrzxDiSbtH5Lyxf4iJdRQADuyjGdDf00LjXRLJwIoezQNFhFGKTMtvk8IIgaSHxW4mAV4O7b8A==",
+        "dependencies": {
+          "Validation": "2.4.18",
+          "xunit.extensibility.execution": "2.4.0"
+        }
+      },
       "Microsoft.CodeAnalysis.Common": {
         "type": "Transitive",
         "resolved": "5.3.0",
@@ -98,6 +108,11 @@
         "resolved": "6.5.0",
         "contentHash": "QWINE2x3MbTODsWT1Gh71GaGb5icBz4chS8VYvTgsBnsi8esgN6wtHhydd7fvToWECYGq7T4cgBBDiKD/363fg=="
       },
+      "Validation": {
+        "type": "Transitive",
+        "resolved": "2.4.18",
+        "contentHash": "NfvWJ1QeuZ1FQCkqgXTu1cOkRkbNCfxs4Tat+abXLwom6OXbULVhRGp34BTvVB4XPxj6VIAl7KfLfStXMt/Ehw=="
+      },
       "xunit.abstractions": {
         "type": "Transitive",
         "resolved": "2.0.3",
@@ -143,7 +158,7 @@
       "calor": {
         "type": "Project",
         "dependencies": {
-          "Calor.Runtime": "[0.13.1, )",
+          "Calor.Runtime": "[0.15.0, )",
           "DiffPlex": "[1.7.2, )",
           "Microsoft.ApplicationInsights": "[2.22.0, )",
           "Microsoft.CodeAnalysis.CSharp": "[5.3.0, )",

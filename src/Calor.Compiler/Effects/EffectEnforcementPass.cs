@@ -628,6 +628,7 @@ public sealed class EffectEnforcementPass
                 _lambdaBodyRows[lambda] = new LambdaBodyFact(functionId, body, reasons),
             LambdaBodyRow = LambdaBodyRow,
             Invocations = _invocations,
+            AstResolution = AstResolution,
         };
         var inferrer = new EffectInferrer(context);
         var effects = inferrer.InferFromStatements(function.Body);
@@ -2586,6 +2587,121 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
+    /// #1104 (v0.16 W3(c)) — the bound on the nested <see cref="EffectInferrer"/>'s
+    /// AST-side local-type resolution, and the counters that make it observable.
+    ///
+    /// <para><see cref="EffectInferrer.ResolveLocalValueTypeFromAst"/> answers
+    /// "what is the declared type of the value called <c>name</c>" by reading
+    /// the name's <c>§B</c> initializer, and a call initializer is typed by
+    /// resolving its receiver and its arguments — each of which is again a
+    /// name. A converted module whose initializers refer back to the name being
+    /// resolved (Serilog's <c>out var</c> hoisting produces
+    /// <c>§B{~x} §C{f.M} §A x §/C</c>) therefore recursed without limit, and a
+    /// StackOverflowException is a fail-fast: the host dies, nothing catches it.</para>
+    ///
+    /// <para><b>Who reaches this unbound.</b> Not only the in-process ledgers:
+    /// <c>EditPreviewTool.CheckEffects</c> runs this pass on a lex/parse-only
+    /// <c>ParseResult</c> with no binder anywhere on the path, and TWO MCP
+    /// tools call it — <c>edit_preview</c> (<c>EditPreviewTool</c>) and
+    /// <c>file_write</c> (<c>FileWriteTool</c>, which calls the same helper
+    /// for its effect check). <c>calor mcp</c> therefore died on any parsed
+    /// <c>.calr</c> of this shape, through either tool. Those are shipping
+    /// surfaces, and they are why a cycle stop stays SILENT here: the
+    /// author of the edited file cannot act on a converter artifact, the call
+    /// the cycle sits on is already reported (Calor0411), and edit_preview
+    /// would otherwise grow a diagnostic about the compiler's own search.
+    /// The CLI binds first and returns on binding errors, which is why it
+    /// never saw any of this.</para>
+    ///
+    /// <para>Two guards, the way <see cref="RowSiteChecker"/> bounds its
+    /// structural walk. (1) A VISITED SET keyed on the name in progress: asking
+    /// for a name whose resolution is already on the stack is, by construction,
+    /// a cycle — the search is deterministic and context-free within one
+    /// function, so the inner ask could only repeat the outer one — and it
+    /// answers <see cref="EffectInferrer.UnknownLocalTypeSentinel"/> ("known
+    /// value, unknown type"). This guard alone guarantees termination: depth is
+    /// bounded by the number of distinct names in the function. It cannot fire
+    /// on acyclic code, so no resolution answer there changes (gate 6 / §9).
+    /// (2) A DEPTH CAP as a backstop for a very long ACYCLIC chain of distinct
+    /// temporaries, which terminates but could still exhaust a 1 MB thread; it
+    /// also answers the sentinel. <see cref="DefaultDepthCap"/> is an order of
+    /// magnitude past what the corpus reaches — measured over the 364 corpus
+    /// modules enforced without binding: deepest acyclic nesting 6, and the
+    /// only cycles are the two Serilog modules from the issue — and well inside
+    /// the frame budget (each nested ask costs roughly 2.5 KB of stack in
+    /// Debug; the CLI's main thread is 1 MB on Windows).</para>
+    ///
+    /// <para>Injectable so the boundary can be pinned at a small cap; the
+    /// counters distinguish a cycle stop from a cap stop so a test can say
+    /// which guard fired, and <see cref="MaxObservedDepth"/> lets a test pin
+    /// that an acyclic chain resolved all the way down rather than stopping.</para>
+    /// </summary>
+    internal sealed class AstResolutionBound
+    {
+        /// <summary>
+        /// Frames of the AST-side search allowed on the stack at once — name
+        /// asks and the structural walk's levels alike (review round 1, C1).
+        /// The (cap + 1)-th frame stops with the sentinel.
+        ///
+        /// <para><b>Chosen empirically, not by taste.</b> With frame-accurate
+        /// counting the worst shape is a chain whose links nest one <c>§IF</c>
+        /// deeper each time, which costs frames quadratically: 30 such links
+        /// reach 525 frames, 50 reach 1375. Driving the 200-link version on a
+        /// <b>1 MB</b> thread (what a test host gives a test, and the CLI's
+        /// main thread on Windows) at rising caps: 448 completes, 480
+        /// overflows. The default is half the largest surviving cap, so the
+        /// budget is doubled against a deeper stack above this pass or a
+        /// costlier frame in a future build. The corpus needs 13 frames at its
+        /// worst — measured over all 364 corpus modules enforced without
+        /// binding, with zero cap stops (pinned by
+        /// <c>EffectInferrerCorpusDepthTests</c>; several modules reach 13, so
+        /// no one file is "the deepest") — so ordinary code sits an order of
+        /// magnitude below the cap and never reaches it.</para>
+        /// </summary>
+        public const int DefaultDepthCap = 224;
+
+        public int DepthCap { get; init; } = DefaultDepthCap;
+
+        /// <summary>Asks refused because the name was already being resolved.</summary>
+        public int CycleStops { get; private set; }
+
+        /// <summary>Asks refused because <see cref="DepthCap"/> was reached.</summary>
+        public int DepthCapStops { get; private set; }
+
+        /// <summary>Deepest nesting any resolution reached (0 = never asked).</summary>
+        public int MaxObservedDepth { get; private set; }
+
+        private readonly List<string> _stoppedNames = new();
+
+        /// <summary>The names whose asks were refused, in order, by either guard.</summary>
+        public IReadOnlyList<string> StoppedNames => _stoppedNames;
+
+        internal void RecordCycleStop(string name)
+        {
+            CycleStops++;
+            _stoppedNames.Add(name);
+        }
+
+        internal void RecordDepthCapStop(string name)
+        {
+            DepthCapStops++;
+            _stoppedNames.Add(name);
+        }
+
+        internal void RecordDepth(int depth)
+        {
+            if (depth > MaxObservedDepth)
+                MaxObservedDepth = depth;
+        }
+    }
+
+    /// <summary>
+    /// #1104 — the AST-resolution bound this pass runs under. Shared by every
+    /// per-function inferrer the pass creates, so the counters are per Enforce.
+    /// </summary>
+    internal AstResolutionBound AstResolution { get; init; } = new();
+
+    /// <summary>
     /// Context for effect inference.
     /// </summary>
     private sealed class InferenceContext
@@ -2639,6 +2755,13 @@ public sealed class EffectEnforcementPass
         /// on-demand re-inference cannot emit the same one twice.
         /// </summary>
         public InvocationSink? Invocations { get; init; }
+
+        /// <summary>
+        /// #1104 — the bound on AST-side local-type resolution (cap and
+        /// counters). Defaults to a fresh bound so a context built without one
+        /// is still guarded.
+        /// </summary>
+        public AstResolutionBound AstResolution { get; init; } = new();
 
         public InferenceContext(
             EffectResolver resolver,
@@ -3962,11 +4085,109 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
+        /// #1104 — the names whose AST-side resolution is on the stack right
+        /// now. Every cycle through the local-type search re-enters
+        /// <see cref="ResolveLocalValueTypeFromAst"/> with a name (a call
+        /// initializer is typed by resolving its receiver and its arguments,
+        /// and <c>FindLocalDeclarationType</c> / <c>FindForeachVariableType</c>
+        /// are reached only from here), so this ONE choke point sees every
+        /// cycle. Per inferrer, i.e. per function: names are function-scoped
+        /// and an on-demand inference of another function gets its own.
+        ///
+        /// <para>Review round 1 (m3) — <see cref="FindForeachVariableType"/>
+        /// also calls <see cref="FindLocalDeclarationType"/> for a DIFFERENT
+        /// name (a §FE collection's), without going back through the ask. That
+        /// hop cannot make a cycle invisible: it reaches no ask, so it cannot
+        /// re-enter this set, and every frame it costs is still charged to the
+        /// shared depth counter. It is named here so the "one choke point"
+        /// claim is read as being about ASKS, not about frames — frames are
+        /// bounded separately by <see cref="TryEnterAstFrame"/>.</para>
+        /// </summary>
+        private readonly HashSet<string> _astResolutionInProgress = new(StringComparer.Ordinal);
+
+        /// <summary>#1104 — nesting depth of the AST-side resolution (backstop cap).</summary>
+        private int _astResolutionDepth;
+
+        /// <summary>
         /// The pre-slice-2b AST search, extracted so the resolver order above
         /// reads as "bound first, then this" and so the fallback can be probed
         /// on its own.
+        ///
+        /// <para>#1104 — bounded (see <see cref="AstResolutionBound"/>): a name
+        /// already being resolved is a cycle and answers
+        /// <see cref="UnknownLocalTypeSentinel"/>; past the depth cap every
+        /// ask answers the sentinel. Neither guard can fire on an acyclic chain
+        /// shorter than the cap, so nothing else changes.</para>
         /// </summary>
         private string? ResolveLocalValueTypeFromAst(string name)
+        {
+            var bound = _context.AstResolution;
+            if (!_astResolutionInProgress.Add(name))
+            {
+                bound.RecordCycleStop(name);
+                return UnknownLocalTypeSentinel;
+            }
+
+            // The cap check below is TryEnterAstFrame's, inlined: this one has
+            // to leave the visited set on the way out and answer the sentinel
+            // rather than a bool, which the shared helper cannot do. The two
+            // are equivalent today (same comparison, same counters) and must be
+            // changed together — if this method ever stops needing the sentinel
+            // return, delete the copy and call TryEnterAstFrame.
+            if (_astResolutionDepth >= bound.DepthCap)
+            {
+                _astResolutionInProgress.Remove(name);
+                bound.RecordDepthCapStop(name);
+                return UnknownLocalTypeSentinel;
+            }
+
+            _astResolutionDepth++;
+            bound.RecordDepth(_astResolutionDepth);
+            try
+            {
+                return ResolveLocalValueTypeFromAstUnbounded(name);
+            }
+            finally
+            {
+                _astResolutionDepth--;
+                _astResolutionInProgress.Remove(name);
+            }
+        }
+
+        /// <summary>
+        /// #1104, review round 1 (CRITICAL C1) — enters one FRAME of the
+        /// AST-side search and reports whether the cap admits it.
+        ///
+        /// <para>The first cut of this guard counted <i>name asks</i> only, and
+        /// that does not bound the stack: <see cref="FindLocalDeclarationType"/>
+        /// and <see cref="FindForeachVariableType"/> recurse STRUCTURALLY into
+        /// every nested statement body, and that walk runs inside each ask. A
+        /// chain whose links sit progressively deeper inside <c>§IF</c> blocks
+        /// therefore costs frames in proportion to links × nesting while an
+        /// ask-counter saw only <c>links</c>. Measured on the ask-counting
+        /// version at cap 64: 40 such links, no cycle, all names distinct,
+        /// <c>DepthCapStops == 0</c> — and the stack overflowed on a 1 MB
+        /// thread (the size a test host actually gives a test). Every recursion
+        /// inside the search now shares this one counter, so the cap bounds the
+        /// real frame cost rather than a proxy for it.</para>
+        /// </summary>
+        private bool TryEnterAstFrame(string name)
+        {
+            var bound = _context.AstResolution;
+            if (_astResolutionDepth >= bound.DepthCap)
+            {
+                bound.RecordDepthCapStop(name);
+                return false;
+            }
+
+            _astResolutionDepth++;
+            bound.RecordDepth(_astResolutionDepth);
+            return true;
+        }
+
+        private void ExitAstFrame() => _astResolutionDepth--;
+
+        private string? ResolveLocalValueTypeFromAstUnbounded(string name)
         {
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
                 return null;
@@ -4000,7 +4221,24 @@ public sealed class EffectEnforcementPass
             string name,
             IReadOnlyList<StatementNode> rootStatements)
         {
+            // #1104 C1 — one frame per structural level, sharing the ask
+            // counter (see TryEnterAstFrame). Declining at the cap loses a
+            // §FE variable's type, never invents one.
             string? Search(IEnumerable<StatementNode> statements)
+            {
+                if (!TryEnterAstFrame(name))
+                    return null;
+                try
+                {
+                    return SearchCore(statements);
+                }
+                finally
+                {
+                    ExitAstFrame();
+                }
+            }
+
+            string? SearchCore(IEnumerable<StatementNode> statements)
             {
                 foreach (var statement in statements)
                 {
@@ -4081,7 +4319,33 @@ public sealed class EffectEnforcementPass
                 : null;
         }
 
+        /// <summary>
+        /// #1104 C1 — the structural half of the search, and the half that
+        /// actually multiplies frames: it recurses into every nested statement
+        /// body, once per level, INSIDE each name ask. It therefore takes a
+        /// frame from the same counter the ask does
+        /// (<see cref="TryEnterAstFrame"/>). Declining at the cap returns "not
+        /// declared in this body", which is what an unsearched body honestly
+        /// says; the ask above it then falls through to its remaining
+        /// fallbacks. It never invents a declaration.
+        /// </summary>
         private string? FindLocalDeclarationType(string name, IEnumerable<StatementNode> statements)
+        {
+            if (!TryEnterAstFrame(name))
+                return null;
+            try
+            {
+                return FindLocalDeclarationTypeCore(name, statements);
+            }
+            finally
+            {
+                ExitAstFrame();
+            }
+        }
+
+        private string? FindLocalDeclarationTypeCore(
+            string name,
+            IEnumerable<StatementNode> statements)
         {
             foreach (var statement in statements)
             {

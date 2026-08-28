@@ -287,7 +287,8 @@ public class HigherOrderDemandLedgerTests
         // FILESYSTEM walk, not `git ls-files`, and the agent-native harness leaves
         // gitignored `.prev-src/` and `.envelope-src/` copies of every run's source
         // under `bench/phase0-agent-native/epochs/**/` (PP-E1 leg B, PR #1110: a tree
-        // with them present counted 1006 files where a clean checkout counts 926).
+        // with them present counted 1006 files where a clean checkout counts 926 —
+        // 927 since #1104's crash-repro fixture).
         // No committed .calr lives under a dot-directory, so the rule changes nothing
         // on a clean tree; it only stops a local regeneration from freezing a
         // denominator CI can never reproduce.
