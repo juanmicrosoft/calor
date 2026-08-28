@@ -109,7 +109,12 @@ All notable changes to this project will be documented in this file.
 - **No more misleading "generated C# failed" errors next to a real error.** When one
   file in a project failed to compile, a fresh build used to also blame every file that
   called into it (Calor1002, "name does not exist"), while a cached rebuild of the same
-  project did not. Both now report only the real error. Found while building ES-08.
+  project did not — and `dotnet build` and `calor build` disagreed about it. Now both
+  report only the real error: the compiler skips checking just the generated code that
+  calls into the failed file, and still checks everything else, so a genuine problem in
+  an unrelated file is not hidden. A file whose generated code was skipped this way is
+  not written out or cached, because nothing checked it; the next build checks it.
+  Found while building ES-08.
 - **`calor verify` tells you when nothing was proved.** If the Z3 solver cannot be
   loaded, the normal text report now says so at the top and again in the summary.
   Before, that notice only appeared in JSON output, so a broken install looked like

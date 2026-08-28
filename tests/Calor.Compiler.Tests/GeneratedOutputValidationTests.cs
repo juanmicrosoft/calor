@@ -56,9 +56,13 @@ public class GeneratedOutputValidationTests
     /// cascade Calor1002s ("name does not exist") on every caller of the failed
     /// file — on a cold build only, because a warm build whose sole uncached
     /// file was the failing one skipped validation (nothing pending). ES-08
-    /// (tests/TestData/EditScripts) found that disagreement; the rule now is
-    /// that validation is skipped whenever any file in the run failed, so cold
-    /// and warm agree and the only reported error is the real one.
+    /// (tests/TestData/EditScripts) found that disagreement.
+    ///
+    /// <para>The rule is <see cref="GeneratedValidationScope"/>: outputs that
+    /// REFERENCE a failed file's module are dropped from the validation set and
+    /// everything else is validated, so cold and warm agree without hiding an
+    /// unrelated file's genuine Calor1002 (review round 2, C1 — the first fix
+    /// skipped validation whenever anything failed, and did hide it).</para>
     /// </summary>
     [Fact]
     public void CompileAll_WhenAFileFails_ReportsNoCascadeCalor1002_ColdOrWarm()
@@ -150,7 +154,183 @@ public class GeneratedOutputValidationTests
         return dir;
     }
 
-    private static (string[] Codes, bool AnyErrors, int Skipped) DriveAll(
+    /// <summary>
+    /// Review round 2's Probe 1: a genuine Calor1002 in a file that has NOTHING
+    /// to do with the failing one must still be reported in the same run. The
+    /// first cascade fix skipped validation whenever any file failed, which hid
+    /// exactly this — a real emitter defect, invisible for as long as some other
+    /// file in the project was red.
+    ///
+    /// <para><c>broken.calr</c> fails effect enforcement; <c>interop.calr</c>
+    /// compiles but emits C# that Roslyn rejects. They share no symbol, so
+    /// <c>interop.calr</c> is not cascade-suppressed and its Calor1002 stands.</para>
+    /// </summary>
+    [Fact]
+    public void Probe1_GenuineCalor1002_InAnUnrelatedFile_IsHiddenByAFailingSibling()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(workspace, "broken.calr"), """
+                §M{m001:Broken}
+                  §F{f001:Boom:pub} () -> i32
+                    §E{}
+                    §P "x"
+                    §R INT:1
+                """);
+            File.WriteAllText(Path.Combine(workspace, "interop.calr"), """
+                §M{m002:Interop}
+                  §F{f001:Use:pub} () -> void
+                    §E{}
+                    §B{x:i32} STR:"not an int"
+                """);
+
+            var result = DriveAll(workspace, clearFirst: true, enableTypeChecking: false);
+
+            Assert.Contains(DiagnosticCode.ForbiddenEffect, result.Codes);
+            Assert.True(
+                result.Codes.Contains(DiagnosticCode.CodeGenCompilationError),
+                "the unrelated file's genuine Calor1002 must survive a failing sibling; "
+                    + $"reported [{string.Join(", ", result.Codes)}]");
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The publication half of the cascade rule (review round 2, C1): an output
+    /// EXCLUDED from validation because it calls a failed file was never
+    /// checked, so it must not be written, cached, or reported compiled. Before
+    /// this, the driver published and claimed success for a file whose generated
+    /// C# does not compile.
+    /// </summary>
+    [Fact]
+    public void CompileAll_CascadeSuppressedOutput_IsNotPublishedOrCached()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            File.WriteAllText(Path.Combine(workspace, "callee.calr"), """
+                §M{m001:Lib}
+                  §F{f001:Ping:pub} () -> i32
+                    §E{}
+                    §P "ping"
+                    §R INT:1
+                """);
+            File.WriteAllText(Path.Combine(workspace, "caller.calr"), """
+                §M{m002:App}
+                  §F{f001:Main:pub} () -> i32
+                    §E{}
+                    §R §C{Ping} §/C
+                """);
+
+            var result = DriveAll(workspace, clearFirst: true);
+
+            Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, result.Codes);
+            Assert.True(result.AnyErrors);
+            Assert.Empty(result.CompiledFiles);
+            Assert.False(File.Exists(Path.Combine(workspace, "caller.g.cs")));
+            Assert.Contains("caller.calr", result.FailedFiles);
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The warm-path variant: with the caller already cached and only the
+    /// now-failing callee recompiled, the cached caller's output is still the
+    /// validation set's business — and still suppressed, so warm and cold agree
+    /// on diagnostics AND on what is published.
+    /// </summary>
+    [Fact]
+    public void CompileAll_CascadeSuppression_AgreesBetweenWarmAndColdRuns()
+    {
+        var workspace = CreateWorkspace();
+        try
+        {
+            var callee = Path.Combine(workspace, "callee.calr");
+            File.WriteAllText(callee, """
+                §M{m001:Lib}
+                  §F{f001:Ping:pub} () -> i32
+                    §E{}
+                    §R INT:1
+                """);
+            File.WriteAllText(Path.Combine(workspace, "caller.calr"), """
+                §M{m002:App}
+                  §F{f001:Main:pub} () -> i32
+                    §E{}
+                    §R §C{Ping} §/C
+                """);
+
+            var clean = DriveAll(workspace, clearFirst: true);
+            Assert.Empty(clean.Codes);
+
+            File.WriteAllText(callee, """
+                §M{m001:Lib}
+                  §F{f001:Ping:pub} () -> i32
+                    §E{}
+                    §P "ping"
+                    §R INT:1
+                """);
+
+            var warm = DriveAll(workspace, clearFirst: false);
+            var cold = DriveAll(workspace, clearFirst: true);
+
+            Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, warm.Codes);
+            Assert.Equal(new[] { DiagnosticCode.ForbiddenEffect }, cold.Codes);
+            Assert.Equal(cold.CompiledFiles, warm.CompiledFiles);
+        }
+        finally
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The scope helper's own unit test: "references a failed module" is one
+    /// rule in one place, read by the driver and by the MSBuild task alike.
+    /// </summary>
+    [Fact]
+    public void GeneratedValidationScope_MatchesWholeIdentifiersOnly()
+    {
+        var module = Program.Compile(
+            """
+            §M{m001:Lib}
+              §F{f001:Map:pub} () -> i32
+                §E{}
+                §R INT:1
+            """,
+            "lib.calr",
+            new CompilationOptions { UnsafeTranspileOnly = true }).Ast;
+        Assert.NotNull(module);
+
+        var owned = GeneratedValidationScope.OwnedIdentifiers([module], out var complete);
+        Assert.True(complete);
+        Assert.Contains("Map", owned);
+        Assert.Contains("Lib", owned);
+
+        Assert.True(GeneratedValidationScope.References("var x = Lib.LibModule.Map();", owned));
+        Assert.False(GeneratedValidationScope.References("var x = MapReduce(Libs);", owned));
+        Assert.False(GeneratedValidationScope.References("var x = 1;", owned));
+
+        // A file that did not parse yields no module: the scope is incomplete
+        // and its caller must validate nothing.
+        GeneratedValidationScope.OwnedIdentifiers([module, null], out var partial);
+        Assert.False(partial);
+    }
+
+    private sealed record DriveOutcome(
+        string[] Codes,
+        bool AnyErrors,
+        int Skipped,
+        string[] CompiledFiles,
+        string[] FailedFiles);
+
+    private static DriveOutcome DriveAll(
         string workspace,
         bool clearFirst,
         bool enableTypeChecking = true)
@@ -160,6 +340,7 @@ public class GeneratedOutputValidationTests
             .Select(path => new FileInfo(path))
             .ToList();
         var sink = new DiagnosticBag();
+        var failed = new List<string>();
         var result = CompilationDriver.CompileAll(
             sources,
             _ => new CompilationOptions
@@ -177,12 +358,17 @@ public class GeneratedOutputValidationTests
                 workspace,
                 "effects-on",
                 clearFirst,
-                file => Path.ChangeExtension(file.FullName, ".g.cs")));
+                file => Path.ChangeExtension(file.FullName, ".g.cs")),
+            onFailed: file => failed.Add(Path.GetFileName(file.FullName)));
 
-        return (
-            sink.Select(d => d.Code).Distinct().OrderBy(c => c, StringComparer.Ordinal).ToArray(),
+        return new DriveOutcome(
+            [.. sink.Select(d => d.Code).Distinct().OrderBy(c => c, StringComparer.Ordinal)],
             result.AnyErrors,
-            result.Skipped.Count);
+            result.Skipped.Count,
+            [.. result.Compiled
+                .Select(item => Path.GetFileName(item.File.FullName))
+                .OrderBy(name => name, StringComparer.Ordinal)],
+            [.. failed.OrderBy(name => name, StringComparer.Ordinal)]);
     }
 
     [Fact]

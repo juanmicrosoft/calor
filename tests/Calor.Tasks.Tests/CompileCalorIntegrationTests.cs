@@ -11,6 +11,9 @@ namespace Calor.Tasks.Tests;
 internal sealed class TestBuildEngine : IBuildEngine
 {
     public List<string> Errors { get; } = [];
+    /// <summary>Diagnostic codes of logged errors (MSBuild carries the code out
+    /// of band, so message text alone cannot tell Calor0410 from Calor1002).</summary>
+    public List<string> ErrorCodes { get; } = [];
     public List<string> Warnings { get; } = [];
     public List<string> Messages { get; } = [];
 
@@ -23,7 +26,11 @@ internal sealed class TestBuildEngine : IBuildEngine
         System.Collections.IDictionary globalProperties, System.Collections.IDictionary targetOutputs) => true;
 
     public void LogCustomEvent(CustomBuildEventArgs e) { }
-    public void LogErrorEvent(BuildErrorEventArgs e) => Errors.Add(e.Message ?? "");
+    public void LogErrorEvent(BuildErrorEventArgs e)
+    {
+        Errors.Add(e.Message ?? "");
+        ErrorCodes.Add(e.Code ?? "");
+    }
     public void LogMessageEvent(BuildMessageEventArgs e) => Messages.Add(e.Message ?? "");
     public void LogWarningEvent(BuildWarningEventArgs e) => Warnings.Add(e.Message ?? "");
 }
@@ -1386,6 +1393,75 @@ public class CompileCalorIntegrationTests : IDisposable
                 + "the MSBuild verify gate would silently report Z3 unavailable (CopyZ3NativeToTasksOutput regressed?)");
         }
         Assert.True(checkedConfigs > 0, "No built Calor.Tasks output found to check");
+    }
+
+    /// <summary>
+    /// Cross-surface agreement on the cascade rule (review round 2, M1). The
+    /// MSBuild task and <c>CompilationDriver</c> each batch generated outputs
+    /// into one Roslyn compilation, and each must drop exactly the outputs that
+    /// reference a FAILED file's module — from the same helper
+    /// (<c>Calor.Compiler.GeneratedValidationScope</c>). Before this, the task
+    /// had no such rule at all: the same project reported one error through
+    /// <c>calor build</c> and three through <c>dotnet build</c> (the real one
+    /// plus two cascade Calor1002s).
+    ///
+    /// <para>The project is ES-08 step 2's shape: a callee that fails effect
+    /// enforcement, and a caller of it that compiles cleanly on its own.</para>
+    /// </summary>
+    [Fact]
+    public void CascadeSuppression_MsBuildTaskAgreesWithTheDriver()
+    {
+        const string CalleeSource = """
+            §M{m001:Lib}
+              §F{f001:Ping:pub} () -> i32
+                §E{}
+                §P "ping"
+                §R INT:1
+            """;
+        const string CallerSource = """
+            §M{m002:App}
+              §F{f001:Main:pub} () -> i32
+                §E{}
+                §R §C{Ping} §/C
+            """;
+
+        var callee = CreateSourceFile("Callee.calr", CalleeSource);
+        var caller = CreateSourceFile("Caller.calr", CallerSource);
+
+        var task = CreateTask(callee, caller);
+        Assert.False(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+
+        // Exactly the callee's own error. A cascade Calor1002 on the caller —
+        // "the name 'Ping' does not exist" — is what this pins out.
+        Assert.Contains("Calor0410", engine.ErrorCodes);
+        Assert.DoesNotContain("Calor1002", engine.ErrorCodes);
+
+        // And the unvalidated caller output is not published.
+        Assert.False(File.Exists(Path.Combine(_outputDir, "Caller.g.cs")));
+
+        // The same project through the driver: same codes.
+        var sink = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        Calor.Compiler.CompilationDriver.CompileAll(
+            [new FileInfo(callee), new FileInfo(caller)],
+            _ => new Calor.Compiler.CompilationOptions { EnforceEffects = true },
+            crossModuleEnforcement: true,
+            crossModulePolicy: Calor.Compiler.Effects.UnknownCallPolicy.Strict,
+            diagnosticSink: sink);
+
+        var driverCodes = sink
+            .Where(diagnostic => diagnostic.IsError)
+            .Select(diagnostic => diagnostic.Code)
+            .Distinct()
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToArray();
+        var taskCodes = engine.ErrorCodes
+            .Where(code => code.StartsWith("Calor", StringComparison.Ordinal))
+            .Distinct()
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(driverCodes, taskCodes);
     }
 
     [Fact]

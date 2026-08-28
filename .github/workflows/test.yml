@@ -1067,7 +1067,10 @@ jobs:
           - runner: windows-latest
             rid: win-x64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    # Windows packs, restores from a cold NuGet cache and installs a global tool
+    # noticeably slower than the POSIX legs; 20 minutes was tight enough that a
+    # slow runner would read as a gate failure (review round 2).
+    timeout-minutes: 35
 
     steps:
       - name: Checkout code

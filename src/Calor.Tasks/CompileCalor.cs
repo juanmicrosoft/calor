@@ -588,6 +588,11 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             byte[] GeneratedBytes,
             BuildFileEntry CacheEntry)>();
         var generatedValidationFailed = false;
+        // Modules of files that failed this build; null for one that did not
+        // parse. Feeds GeneratedValidationScope so `dotnet build` and
+        // `calor build` agree about which outputs may be validated.
+        var failedModules = new List<Calor.Compiler.Ast.ModuleNode?>();
+        var cascadeSuppressed = new HashSet<string>(BuildStateCache.GetPathComparer());
         var success = true;
         var pathComparer = BuildStateCache.GetPathComparer();
         var currentRelativePaths = new HashSet<string>(pathComparer);
@@ -798,6 +803,9 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     }
 
                     success = false;
+                    // Scopes generated-output validation below, exactly as in
+                    // CompilationDriver: null when the file did not parse.
+                    failedModules.Add(result.Ast);
                     continue;
                 }
 
@@ -838,7 +846,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             }
         }
 
-        if (!TranspileOnly && (generatedFiles.Count > 0 || pendingOutputs.Count > 0))
+        // Which outputs may be validated when something failed — the same rule
+        // the CLI/driver applies, from the same helper, so the two surfaces
+        // cannot disagree about a project (Calor.Compiler.GeneratedValidationScope).
+        var validationOwned = Calor.Compiler.GeneratedValidationScope.OwnedIdentifiers(
+            failedModules, out var validationScopeIsComplete);
+        if (!TranspileOnly
+            && validationScopeIsComplete
+            && (generatedFiles.Count > 0 || pendingOutputs.Count > 0))
         {
             var generatedSources = generatedFiles
                 .Select(item => item.GetMetadata("SourceFile") is { Length: > 0 } sourcePath
@@ -852,6 +867,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                         item.OutputPath,
                         item.InputPath)))
                 .ToList();
+            generatedSources = Calor.Compiler.GeneratedValidationScope.Retain(
+                generatedSources, validationOwned, out cascadeSuppressed);
             var generatedOutputPaths = generatedFiles
                 .Select(item => Path.GetFullPath(item.ItemSpec))
                 .Concat(pendingOutputs.Select(item => Path.GetFullPath(item.OutputPath)))
@@ -866,7 +883,9 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 .Select(path => new Calor.Compiler.CodeGen.GeneratedCSharpSource(
                     File.ReadAllText(path), path))
                 .ToList();
-            var validation = Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(
+            var validation = generatedSources.Count == 0
+                ? null
+                : Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(
                 generatedSources,
                 new Calor.Compiler.CodeGen.GeneratedCSharpCompilationContext
                 {
@@ -893,7 +912,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                         [';', ','],
                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 });
-            if (!validation.CompilationSuccess)
+            if (validation != null && !validation.CompilationSuccess)
             {
                 generatedValidationFailed = true;
                 success = false;
@@ -927,6 +946,19 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         {
             foreach (var pending in pendingOutputs)
             {
+                // Cascade-suppressed: this output was excluded from validation
+                // because it references a file that failed, so nothing checked
+                // it. Same treatment as a validation failure — no .g.cs, no
+                // cache entry, no "Generated:" line. The next build validates it.
+                if (cascadeSuppressed.Contains(Path.GetFullPath(pending.InputPath)))
+                {
+                    if (File.Exists(pending.OutputPath))
+                    {
+                        try { File.Delete(pending.OutputPath); } catch { /* best-effort */ }
+                    }
+                    continue;
+                }
+
                 try
                 {
                     File.WriteAllBytes(pending.OutputPath, pending.GeneratedBytes);

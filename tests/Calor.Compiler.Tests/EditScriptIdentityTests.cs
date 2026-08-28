@@ -412,8 +412,12 @@ public sealed class EditScriptIdentityTests : IDisposable
             Assert.Equal(bystanderIndexPerStep[0], bystanderIndexPerStep[index]);
 
         Assert.NotEmpty(calleeRowPerStep[0]);
+        // All three states differ: widening the row is not the same facet as
+        // erasing it, and without the last comparison a facet that only noticed
+        // "declared vs not declared" would pass (review round 1).
         Assert.NotEqual(calleeRowPerStep[0], calleeRowPerStep[1]);
         Assert.NotEqual(calleeRowPerStep[0], calleeRowPerStep[2]);
+        Assert.NotEqual(calleeRowPerStep[1], calleeRowPerStep[2]);
     }
 
     [Theory]
