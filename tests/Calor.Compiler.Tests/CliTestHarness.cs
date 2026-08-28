@@ -21,8 +21,19 @@ internal static class CliTestHarness
     /// Release build of any tool that references the compiler leaves one), and a
     /// child running the OTHER build is a different compiler: its compiler hash
     /// differs, so index headers and build-state entries written by one are
-    /// rejected by the other. Release is probed first only as the tie-break when
-    /// there is nothing to match against.
+    /// rejected by the other. When no candidate matches by content — which is
+    /// the normal state under a profiler, where the host's copy is instrumented
+    /// — the host's own build configuration is preferred, so a stale sibling
+    /// build is never run against silently.
+    ///
+    /// <para>This closes the Debug/Release half of the cross-process identity
+    /// problem by making the two binaries the same file. The instrumentation
+    /// half cannot be closed that way; a test whose index must be built
+    /// in-process suppresses the identity check instead, with
+    /// <see cref="StampForChildCli"/> and under its stated precondition, and a
+    /// test that can let the child build the index (<c>calor index build</c>)
+    /// keeps the check in force and asks <see cref="CliCompilerIsThisCompiler"/>
+    /// when it needs to know which lane it is in.</para>
     /// </summary>
     internal static string FindCalorDll() => CalorDll.Value;
 
@@ -96,9 +107,12 @@ internal static class CliTestHarness
     /// is not its own (<c>Error: index unusable — the compiler changed</c>). The
     /// test host and the child do not always load the same <c>calor.dll</c>: under
     /// <c>--collect:"XPlat Code Coverage"</c> the collector instruments the host's
-    /// copy in place, and when both build configurations are present a Debug test
-    /// host loads the Debug build while <see cref="FindCalorDll"/> hands the child
-    /// the Release one. Either way an index built in-process is then refused.</para>
+    /// copy in place, so no file on disk is byte-equal to it. (The other half of
+    /// this — a Debug host paired with a Release child when both configurations
+    /// are present — is now closed by <see cref="FindCalorDll"/>, which prefers
+    /// the build matching the host's own assembly and, failing that, the host's
+    /// own configuration. Instrumentation is what remains.) Either way an index
+    /// built in-process is then refused.</para>
     ///
     /// <para><b>What this suppresses — read before copying it.</b> It suppresses
     /// the compiler-identity check <i>in full</i>. <c>CompilerHash</c> is the only
@@ -153,24 +167,20 @@ internal static class CliTestHarness
                 return matching;
         }
 
-        // Nothing matched by content. Under a profiler that is expected, and
-        // the right fallback is the configuration THIS test process was built
-        // in: a stale sibling build of the other configuration would otherwise
-        // be run against, and the failure surfaces as a content diff rather
-        // than as "your build is stale".
+        // Nothing matched by content. Under a profiler that is expected —
+        // coverlet rewrites the assemblies this process loaded, so no file on
+        // disk can be byte-equal to them — and it says nothing about the builds
+        // on disk; off that lane it usually means a stale build. Either way the
+        // right fallback is the configuration THIS test process was built in:
+        // running a stale sibling build of the other configuration would
+        // surface as a content diff rather than as "your build is stale". Say
+        // so once, loudly, rather than choosing silently.
         var ownConfiguration = AppContext.BaseDirectory.Replace('\\', '/').Contains("/Release/", StringComparison.Ordinal)
             ? "Release"
             : "Debug";
         var own = candidates.FirstOrDefault(candidate =>
             candidate.Replace('\\', '/').Contains($"/{ownConfiguration}/", StringComparison.Ordinal));
 
-        // Nothing matched. Under the coverage lane that is expected — coverlet
-        // rewrites the assemblies this process loaded, so no file on disk can
-        // be byte-equal to them — and it says nothing about the builds on disk.
-        // Off that lane it usually means a stale build. Either way, say so
-        // once, loudly, rather than silently comparing this build's behaviour
-        // against another build's: tests that need cross-process compiler
-        // identity ask CliCompilerIsThisCompiler and handle both answers.
         Console.Error.WriteLine(
             "CliTestHarness: no calor.dll on disk matches the Calor.Compiler assembly this test "
                 + $"process loaded ({loaded}); falling back to {own ?? candidates[0]}. "
