@@ -98,15 +98,29 @@ semantics are v0.14.3's — nothing under `src/Calor.Compiler/` is touched.* `ru
 any other arm-A commit and re-verifies the diff confinement against the tag before spend; the canary
 against that build emits `warning Calor0410` (permissive) / `error Calor0410` (strict).
 
-**What the pre-rows arm's waiver covers, so nobody later blames the policy.** Permissive
-suppresses `Calor0425` and demotes `Calor0410` / `Calor0411` (single-module and cross-module) to
-warnings. It does **not** waive `Calor0424`, `Calor0420` / `Calor0421` or `Calor0418` — those stay
-errors under every flag, by design. Two harness-relevant asymmetries between the MSBuild path the
-agent builds through and the CLI, both inert for PP-W-rows and recorded here rather than
-rediscovered mid-epoch: the `CompileCalor` task has no `StrictEffects` parameter (the CLI's
-`--strict-effects` has no MSBuild form), and the task gates its cross-module pass on
-`EnforceEffects` while the CLI runs cross-module enforcement unconditionally. Both arms build with
-`CalorEnforceEffects=true`, so neither difference is exercised.
+**What the waiver covers — and it is NOT the same on the two arms.** This distinction matters
+because arm A is the whole contrast; do not copy one arm's list onto the other.
+
+| | arm B (treatment, `v0.15.0` — also main today) | arm A (control, the `v0.14.3` build) |
+|---|---|---|
+| `Calor0410` (uses an undeclared effect) | demoted to a warning, per-file and cross-module | demoted to a warning |
+| `Calor0411` (unknown external call) | suppressed | suppressed |
+| `Calor0425` ("cannot be decided") | suppressed | **does not exist at that tag** |
+| `Calor0424` (row does not fit) | **never waived** | **does not exist at that tag** |
+| `Calor0420` / `0421` (override/interface broadens its inherited row) | **never waived** | **also demoted** to warnings (`EffectEnforcementPass.cs:517-519`, `_policy == Permissive ? Warning : Error`; main has `const … Error` at `:758`) |
+| `Calor0418` (function-typed value with no row at a checked position) | retained only for "a value provably not a function type is invoked" | **demoted** (`:1457-1459`, `:2684-2686`) |
+
+So arm A's waiver is strictly **broader** than arm B's, which is the intended direction — arm A is
+"the pre-rows language as it was usable, warnings included" (§4.1's title) — but it means the
+docs shipped with #1124 describe **main/v0.15 only** and must not be transcribed into A-1.12's
+arm-A row. Verified against the `v0.14.3` sources at the line numbers above.
+
+Two harness-relevant asymmetries between the MSBuild path the agent builds through and the CLI,
+both inert for PP-W-rows and recorded here rather than rediscovered mid-epoch: the `CompileCalor`
+task has no `StrictEffects` parameter (the CLI's `--strict-effects` has no MSBuild form), and the
+task gates its cross-module pass on `EnforceEffects` while the CLI runs cross-module enforcement
+unconditionally. Both arms build with `CalorEnforceEffects=true`, so neither difference is
+exercised.
 
 `run-ppw-epoch.sh` drives the six `W-001 … W-006` pairs (exact-id directory match; the `W1-`/`W2-`/`W3-`/`W5A-` directories cannot collide), interleaved, arm A = `v0.14.3` under `arms["calor-pre-rows"]`, arm B = `v0.15.0` under `arms.calor`, with the same rails as `run-ppe1-epoch.sh` (`--confirm-paid-epoch`, distinct `Calor.Tasks` hashes, run-once epoch ids, null-agent ids suffixed `-null`). It fails before any spend listing every missing or malformed pair. Its `pins.json` `ppW` block carries the registered leg-B denominator `legBPairs` (default `W-001 W-002 W-003 W-004 W-006`; W-005 is leg A only) and `blindPairs` (`W-001 W-004 W-006`); `ppw-analyze.py` (W2) reads them from there, never from a script default.
 
