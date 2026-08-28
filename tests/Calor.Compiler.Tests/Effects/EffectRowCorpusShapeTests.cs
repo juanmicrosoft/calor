@@ -24,8 +24,8 @@ namespace Calor.Compiler.Tests;
 /// fixture sets are excluded because rows are their subject matter, not an accident:
 /// <c>docs/design/spikes/</c> (the emitter spike's before/after evidence) and the
 /// PP-W-rows measurement fixtures and epoch archives <see cref="PpwFixture"/> names.
-/// Measured on this PR's tree: <b>927 files are swept</b>, and <b>33 excluded files do
-/// write a meaning-changing form</b> — 8 spike artifacts and 25 PP-W-rows fixtures (the
+/// Measured on this PR's tree: <b>928 files are swept</b>, and <b>38 excluded files do
+/// write a meaning-changing form</b> — 8 spike artifacts and 30 PP-W-rows fixtures (the
 /// per-arm <c>after/</c> starters carry inline parameter rows verbatim, and the seeded
 /// mutants carry field and binding rows). That number grows with every PP-W-rows epoch
 /// archive. The disposition is deliberate: those files were authored under the line rule

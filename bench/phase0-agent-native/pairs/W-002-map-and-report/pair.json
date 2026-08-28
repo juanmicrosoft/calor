@@ -67,7 +67,7 @@
     },
     "unregistered-rowless-lambda-control": {
       "b": "seeded/unregistered-rowless-lambda-control-b",
-      "note": "the negative control for #1136 on the lambda shape: the §B-bound printing §LAM with its row omitted. Arm B FAILS CLOSED — 2x error Calor0410 ('MapAndReport', 'Total') — because a lambda the pass CAN name is charged from its body. Only an argument it cannot resolve to a rowed declaration escapes."
+      "note": "a negative control for #1136 on the lambda shape: the §B-bound printing §LAM with its row omitted. Arm B FAILS CLOSED — 2x error Calor0410 ('MapAndReport', 'Total') — because a lambda the pass CAN name is charged from its body. The operational rule, measured on arm B: a field or property read through an EXPLICIT RECEIVER escapes (`this.stage`, `me.stage` via a local `this` alias, `other.stage` on another object of the same class, and an unqualified `§PROP` — whose read is a receiver-bearing access in the bound tree); a SIMPLE NAME or a METHOD GROUP is charged (`stage`, a static rowed field read unqualified, `inner.Beat`). The earlier wording 'cannot resolve to a rowed declaration in the enclosing class' is WITHDRAWN: `other.stage` is exactly such a declaration and still escapes. Issue #1136."
     }
   },
   "extension": "MapAndReport: a printing §LAM bound by §B and passed to Map (the §B-bound form; an inline §LAM as §A draws Calor0208 on both arms), plus a silent Total built on it",

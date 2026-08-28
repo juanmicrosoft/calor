@@ -249,7 +249,7 @@ class FrozenCompiles(unittest.TestCase):
         got = {(c["pair"], c["role"], c["arm"], c["path"]) for c in self.doc["compiles"]}
         self.assertEqual(expected, got, "ppw-seeded-compiles.json does not cover exactly the "
                                         "sources ppw-compile.py enumerates — regenerate it")
-        self.assertEqual(50, len(self.doc["compiles"]))
+        self.assertEqual(51, len(self.doc["compiles"]))
         self.assertEqual(len(expected), len(self.doc["compiles"]), "duplicate rows")
 
     def test_every_source_is_recorded_once_per_arm_and_blob_matches_disk(self):
@@ -333,13 +333,15 @@ class FrozenCompiles(unittest.TestCase):
         self.assertEqual(0, a["exitCode"])
         self.assertIn(("error", "Calor0410"), sev_codes(b))
 
-    def test_unresolvable_argument_escapes_are_recorded_on_the_treatment_arm(self):
-        # Issue #1136, recorded before any agent run. The rule is NOT the `this.` spelling:
-        # ANY argument the effect pass cannot resolve to a rowed declaration in the enclosing
-        # class instantiates the callee's row variable to Unknown and charges nothing —
-        # warning Calor0425, exit 0. Both registered spellings are pinned here, because two
-        # of the three blind cells have this route through the TREATMENT arm and A-1.12
-        # registers it as a pre-registered confound on leg A's direction.
+    def test_receiver_read_escapes_are_recorded_on_the_treatment_arm(self):
+        # Issue #1136, recorded before any agent run. The rule is operational, and it is NOT
+        # about resolvability: a field or property read through an EXPLICIT RECEIVER escapes
+        # (`this.stage`, a local aliased to `this`, `other.stage` on another object of the same
+        # class, an unqualified `§PROP`), while a SIMPLE NAME or a METHOD GROUP is charged
+        # (`stage`, a static rowed field, `inner.Beat`). `other.stage` is a rowed declaration in
+        # the enclosing class and still escapes, which is why the earlier "cannot resolve to a
+        # rowed declaration" wording was withdrawn. Two of the three blind cells have this route
+        # through the TREATMENT arm; A-1.12 registers it as a confound on leg A's direction.
         for pid in ("W-001-middleware-stage", "W-006-map-doubler"):
             for role in ("unregistered-this-qualified-escape", "unregistered-property-backed-escape"):
                 row = rows(self.doc, pid, role, "B")[0]
@@ -350,14 +352,30 @@ class FrozenCompiles(unittest.TestCase):
                                 f"{pid}/{role}: expected Calor0425 warnings only")
                 self.assertTrue(all(d["severity"] == "warning" for d in row["diagnostics"]))
                 self.assertTrue(any("nothing is charged" in d["text"] for d in row["diagnostics"]), f"{pid}/{role}")
-        # The property spelling carries no `this.` at the call site: the escape is about what
-        # the pass can resolve, not about the qualifier.
+        # The property spelling carries no `this.` at the call site: what escapes is a read
+        # through a receiver, not the qualifier.
         prop = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "unregistered-property-backed-escape-b")
         body = "".join(open(os.path.join(prop, f), encoding="utf-8").read()
                        for f in sorted(os.listdir(prop)) if f.endswith(".calr"))
         self.assertIn("§PROP{", body)
         self.assertIn("§A Stage §/C", body)
         self.assertNotIn("§A this.", body)
+
+        # The counter-example that killed the "cannot resolve to a rowed declaration in the
+        # enclosing class" wording: `other.stage` IS that declaration, reached through a
+        # parameter receiver, and it escapes — while the same field passed by simple name in
+        # the same file is charged (its method is declared honestly so the file builds).
+        other = rows(self.doc, "W-001-middleware-stage", "unregistered-other-receiver-escape", "B")[0]
+        self.assertEqual(0, other["exitCode"], "the other-receiver escape must BUILD on arm B")
+        self.assertTrue(other["emitted"])
+        self.assertEqual(["Calor0425"], codes(other))
+        self.assertEqual("warning", other["diagnostics"][0]["severity"])
+        self.assertIn("nothing is charged to 'TwiceOf'", other["diagnostics"][0]["text"])
+        other_src = os.path.join(PAIRS, "W-001-middleware-stage", "seeded", "unregistered-other-receiver-escape-b")
+        other_body = "".join(open(os.path.join(other_src, f), encoding="utf-8").read()
+                             for f in sorted(os.listdir(other_src)) if f.endswith(".calr"))
+        self.assertIn("§A other.stage", other_body)
+        self.assertIn("§FLD{Func<i32>:stage:pri} §E{cw}", other_body)  # a rowed field of THIS class
 
     def test_the_registered_negative_controls_fail_closed(self):
         # Three shapes the pass CAN resolve, so #1136 is bounded rather than "any indirection":
