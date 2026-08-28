@@ -812,8 +812,8 @@ now_ms() {
   fi
 }
 
-# The LABEL, not the language: both PP-W-rows arms are `calor`, so $ARM cannot tell
-# the control arm's telemetry from the treatment arm's.
+# The LABEL, not the language: both PP-W-rows arms are the calor language, so \$ARM
+# cannot tell the control arm's telemetry from the treatment arm's.
 arm="$ARM_LABEL"
 ts_iso="\$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 t0=\$(now_ms)
