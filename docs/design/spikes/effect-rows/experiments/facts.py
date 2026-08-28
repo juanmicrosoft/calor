@@ -50,7 +50,10 @@ print(sh("grep -n 'AstSchema_CoversEveryNodeDispatchAndChildRelation' tests/Calo
 print(sh("grep -c 'BindStatementNode' eng/ast-schema.json"))
 
 print("\n### cross-module IsSubsetOf site")
-print(sh_sorted("grep -n 'IsSubsetOf' src/Calor.Compiler/Effects/*.cs"))
+# Line numbers stripped (v0.16 W5 review): the pin is WHICH files/sites call
+# IsSubsetOf, not where in the file — every insertion above the site used to
+# break the transcript.
+print(sh_sorted("grep -n 'IsSubsetOf' src/Calor.Compiler/Effects/*.cs | sed -E 's/:[0-9]+:/:/'"))
 
 print("\n### ProjectIndex references outside Commands/")
 print(sh_sorted("grep -rln 'ProjectIndex' src/ --include='*.cs' | sort"))

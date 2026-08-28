@@ -77,11 +77,11 @@ shape at design freeze; **1 of 359** now (E5's `QueryCorpus/project/app.calr`).
 
 | Instrument | Value | Source |
 |---|---|---|
-| Committed `.calr` in ledger scope | 941 = 926 + 15 spike artifacts (excluded, D:2722-2729) | `find`; ppe1:288-292 |
+| Committed `.calr` in ledger scope | 941 = 926 + 15 spike artifacts (excluded, D:2722-2729) — *#1120 (W3(c)) adds one crash-repro fixture: 942* | `find`; ppe1:288-292 |
 | D-A (Calor-native higher-order demand) | **2**; D-B (Roslyn, three subjects) **3121** over 364 files; floor 25 inert | `higher-order-demand-ledger.json` |
 | Calor0425 ledger (P32), **raw-bag rule** | 8 over 99 enforced; 265 excluded (59 parse, 206 raw-bind) | `calor0425-corpus-ledger.json` |
 | Calor0270 ledger, raw-bag rule | 193 across 38 of 305 bound | `calor0270-corpus-ledger.json` |
-| Resolver-key ledger | 259 bound / 812 string | `effect-resolver-key-ledger.json`; R:532-537 |
+| Resolver-key ledger | 259 bound / 812 string — *#1120 (W3(c)) regenerates for its fixture: 265 / 814* | `effect-resolver-key-ledger.json`; R:532-537 |
 | Metadata gate 6 | **817/1248 = 65.46 %** (129/226, 104/113, 584/909) | `metadata-binding-corpus-ledger.json` |
 
 **The production denominator (N:S2, measured twice — in-process with the propagation policy, and

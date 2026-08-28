@@ -24,8 +24,8 @@ namespace Calor.Compiler.Tests;
 /// fixture sets are excluded because rows are their subject matter, not an accident:
 /// <c>docs/design/spikes/</c> (the emitter spike's before/after evidence) and the
 /// PP-W-rows measurement fixtures and epoch archives <see cref="PpwFixture"/> names.
-/// Measured on this PR's tree: <b>926 files are swept</b>, and <b>30 excluded files do
-/// write a meaning-changing form</b> — 8 spike artifacts and 22 PP-W-rows fixtures (the
+/// Measured on this PR's tree: <b>927 files are swept</b>, and <b>33 excluded files do
+/// write a meaning-changing form</b> — 8 spike artifacts and 25 PP-W-rows fixtures (the
 /// per-arm <c>after/</c> starters carry inline parameter rows verbatim, and the seeded
 /// mutants carry field and binding rows). That number grows with every PP-W-rows epoch
 /// archive. The disposition is deliberate: those files were authored under the line rule
@@ -35,7 +35,8 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
 /// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
-/// <c>final-src/*.calr</c>) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
+/// <c>final-src/*.calr</c> solutions; 927 since #1104's crash-repro fixture, see
+/// the count pin below) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
 /// the 23-file two-line <c>§O</c>/<c>§E</c> subset is already pinned by
 /// <c>o53/baseline.json</c> through P30.</para>
 /// </summary>
@@ -109,9 +110,11 @@ public sealed class EffectRowCorpusShapeTests
         // §3.2 and §9 both quote 886 — the corpus the design doc's argument was
         // measured on. PP-E1 leg B (epoch e1-rows-parity-001) archived its 40 declared-done
         // solutions as final-src/*.calr, exactly as w5-parity-002 does, so the committed
-        // corpus is 926 = 886 + 40 since then; the sweep below still covers every file. A
-        // drift from 926 means the sweep is no longer measuring the corpus it claims to.
-        Assert.Equal(926, files.Count);
+        // corpus is 926 = 886 + 40 since then, and 927 since #1104's crash-repro fixture
+        // (tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr,
+        // v0.16 W3(c)); the sweep below still covers every file. A drift from 927 means the
+        // sweep is no longer measuring the corpus it claims to.
+        Assert.Equal(927, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.

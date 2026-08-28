@@ -4,8 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
+  Effect checking runs in loops that have a safety limit, so a tangle of functions that
+  call each other cannot make the compiler spin forever. Before, hitting that limit in the
+  loop that passes an effect up through a chain of callers was not reported at all — the
+  compiler just stopped and said the program was fine. Now both loops report `Calor0406`
+  as an error naming which loop stopped, the limit, and the functions involved, so a
+  result the compiler did not finish is never passed off as a clean build. The limit for
+  a group of functions that call each other now grows with the size of the group, so a
+  big but ordinary group never trips it. The project index (`calor query effects`) says
+  "did not converge" for such a file instead of recording half-finished rows. (v0.16 W5,
+  gate 11)
+
+- New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
+
 - Benchmark: added six programming tasks we will use to find out whether the effect labels added in 0.15 stop an AI agent from hiding a console message inside a function that says it is silent. Each task comes with the same starting program built for the old compiler (0.14.3) and the new one (0.15.0), a plain-language description, hidden tests that catch the message if it escapes, and two worked answers — the tempting shortcut and the honest fix. We also recorded what each compiler says about every one of those answers, so the numbers are fixed before anyone runs the experiment. Nothing is run yet.
 - Found while building the above: on 0.15.0, writing `this.` in front of a stored callback when handing it to another function makes the compiler stop tracking what that callback does — it warns instead of failing, and the hidden message gets through. Reported as issue #1136.
+
+### Changed
+
+- **`Calor0600` is no longer used for effect checking that did not finish.** That code
+  belongs to the API-strictness family; the loop that used to borrow it as a warning now
+  reports `Calor0406` as an error instead. (v0.16 W5)
+
+### Fixed
+
+- The compiler no longer crashes on converted code whose local bindings form a cycle
+  (for example, a value whose type depends on itself, which the C# → Calor converter
+  can produce from `out var` arguments). The effect checker now notices when it is
+  asking about a name it is already working out, treats that value's type as unknown,
+  and moves on. This also fixes two `calor mcp` tools — `edit_preview` and
+  `file_write` — which run the same check and could take the whole server down on a
+  file of that shape. There is also
+  a limit on how much work the checker will do to follow one chain of bindings: code
+  that stays under the limit — which is all ordinary code, by a wide margin — is
+  checked exactly as before, and code past it is treated as "type unknown" instead of
+  crashing. (#1104)
 
 ## [0.15.0] - 2026-08-27
 

@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7758,
+      "expectedTotal": 7762,
       "expectedSkipped": 3
     },
     {
@@ -19,8 +19,9 @@
       "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 565,
-      "expectedSkipped": 0
+      "expectedTotal": 640,
+      "expectedSkipped": 1,
+      "note": "expectedSkipped is 1 because EffectInferrerCorpusDepthTests skips without the corpus submodules, and the shard that feeds check_trx.py (.github/workflows/test.yml:375, matrix name 'enforcement') checks out submodules: false. It does run in the coverage job, which checks out submodules: recursive. If that shard ever gains submodules this pin breaks loudly — which is the intended failure mode."
     },
     {
       "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj",
@@ -82,7 +83,7 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 98,
+      "expectedTotal": 111,
       "expectedSkipped": 0
     },
     {
@@ -132,7 +133,7 @@
     },
     {
       "reason": "corpus submodules not initialized",
-      "count": 5
+      "count": 6
     },
     {
       "reason": "no committed .calr found under the repository root — partial checkout",

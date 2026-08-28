@@ -38,6 +38,57 @@ internal static class CliTestHarness
         throw new InvalidOperationException("Repository root (Calor.sln) not found from " + Directory.GetCurrentDirectory());
     }
 
+    /// <summary>
+    /// The compiler-identity hash of the <c>calor.dll</c> a <see cref="RunCli"/>
+    /// child will load — <see cref="Incremental.BuildStateCache.ComputeCompilerHash"/>
+    /// over that file, which is exactly what the child computes for itself.
+    /// </summary>
+    internal static string ChildCompilerHash() =>
+        Incremental.BuildStateCache.ComputeCompilerHash([FindCalorDll()]);
+
+    /// <summary>
+    /// Makes an index built <b>in this process</b> acceptable to a
+    /// <see cref="RunCli"/> child, by stamping it with the child's compiler hash
+    /// before it is saved.
+    ///
+    /// <para><b>Why this is needed.</b> A project index records the identity hash
+    /// of the compiler that produced it, and a reader refuses an index whose hash
+    /// is not its own (<c>Error: index unusable — the compiler changed</c>). The
+    /// test host and the child do not always load the same <c>calor.dll</c>: under
+    /// <c>--collect:"XPlat Code Coverage"</c> the collector instruments the host's
+    /// copy in place, and when both build configurations are present a Debug test
+    /// host loads the Debug build while <see cref="FindCalorDll"/> hands the child
+    /// the Release one. Either way an index built in-process is then refused.</para>
+    ///
+    /// <para><b>What this suppresses — read before copying it.</b> It suppresses
+    /// the compiler-identity check <i>in full</i>. <c>CompilerHash</c> is the only
+    /// input in <c>ProjectIndex.CheckFreshness</c> that distinguishes one
+    /// <c>calor.dll</c> from another: <c>OptionsHash</c>, <c>ManifestHash</c> and
+    /// the file list are workspace inputs, identical whichever binary runs, and
+    /// <c>FormatVersion</c>/<c>CompilerSemanticsVersion</c> move only on a
+    /// deliberate bump. Overwriting <c>CompilerHash</c> therefore makes the child
+    /// accept an index produced by a <i>genuinely different</i> compiler, not only
+    /// by an instrumented copy of the same one.</para>
+    ///
+    /// <para><b>Precondition for that to be sound:</b> the host builds the index,
+    /// the child only reads it, and both binaries come from the same working tree
+    /// and the same build configuration — so they differ at most by instrumentation.
+    /// <b>If that breaks</b> — a stale <c>bin/Release</c>, or a mixed Debug/Release
+    /// tree — the child will silently answer from an index a different compiler
+    /// produced, and the test will report whatever that older compiler recorded
+    /// instead of failing. Use this only where the index genuinely must be built
+    /// in-process (an injected knob with no CLI surface). Where the child can
+    /// build the index itself (<c>calor index build</c>), prefer that: it keeps
+    /// the identity check in force.</para>
+    ///
+    /// <para>Call it on the index object immediately before <c>Save</c>.</para>
+    /// </summary>
+    internal static void StampForChildCli(Indexing.ProjectIndex index)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        index.CompilerHash = ChildCompilerHash();
+    }
+
     private static string FindCalorDllCore()
     {
         foreach (var config in new[] { "Release", "Debug" })
