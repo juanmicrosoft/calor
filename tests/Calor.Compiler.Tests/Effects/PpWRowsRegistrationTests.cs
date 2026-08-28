@@ -151,11 +151,19 @@ public sealed class PpWRowsRegistrationTests
         ("W-006 escape at runtime", "**2 of 10**"),
         ("W-004 negative control", "W-004 the **negative control**"),
         // Review round 5: the rule is general, not `this.`-specific.
-        ("general rule", "any argument expression the effect pass cannot resolve to a rowed"),
-        ("property instance", "a `§PROP` property, passed UNQUALIFIED"),
+        // The rule is an enumerated TABLE, not a phrase — four successive phrasings were
+        // falsified by measurement, so the pins are on the table's own entries.
+        ("rule is a table", "THE REGISTERED RULE IS AN ENUMERATED TABLE"),
+        ("table is normative, gloss is not", "never a substitute for it"),
+        ("charged: module-qualified", "so an explicit *module* qualifier does NOT defeat the charge"),
+        ("charged: static field", "a **`static`** rowed field of the enclosing class by simple name"),
+        ("escapes: property by simple name", "by SIMPLE NAME, no receiver at all"),
+        ("escapes: inherited", "an **inherited** field, unqualified"),
+        ("escapes: other instance", "another instance of the same class"),
+        ("escapes: instance method group", "an **instance method group through a receiver**"),
+        ("method-group correction", "so it **escapes**"),
         ("property cannot carry a row", "a `§PROP` CANNOT CARRY A ROW AT ALL"),
-        ("inherited instance", "an inherited field accessed unqualified"),
-        ("fail-closed controls", "two controls that genuinely fail closed"),
+        ("fix set is bounded", "{allow a row on `§PROP`} \u222a {fail closed}"),
         ("four-way escape classification", "`this-qualified` / `property` / `inherited` / "),
         ("indicator non-vacuity", "MUST NOT BE SATISFIABLE BY THE STARTER ITSELF"),
         ("unregistered roles excluded from the pin", "**excluded by name** from the frozen-cells pin"),
