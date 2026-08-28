@@ -228,7 +228,9 @@ power and arms UNDERPOWERED.
   tool references `ProjectIndex` today. *Touches:* `Mcp/Tools/QueryTool.cs` (new),
   `Commands/QueryCommand.cs` (reader extraction), `Mcp/McpMessageHandler.cs`, `docs/`. *Gates:*
   gate 3's MCP leg (compile through MCP → same diagnostics and index bytes as the CLI, R:889-905)
-  and gate 7's E7 leg (the ten effects goldens answered byte-for-byte via `calor_query`) — two
+  and gate 7's E7 leg (the effects goldens answered byte-for-byte via `calor_query` — eleven as
+  the corpus stands: eight `effects` rows and three `impact-effects` rows; earlier drafts said
+  "ten", which miscounted the corpus) — two
   legs, stated separately in §5. *Discriminating:* answer from an in-memory graph instead of the
   index and the gate-7 golden for the cross-module fold (`Whisper`) fails.
 - **K1 — the P32 ledger mirrors the shipping rule (kickoff sweep, DECIDED; scoped to P32).**
@@ -482,8 +484,12 @@ indicator; register-then-merge enforced by A-1.10.
    test-compiled `.calr`); leg (b) unbuilt (§6). W3-attributable new diagnostics are separated
    and published (R:941-944).
 6. **Resolution floor** 817/1248 exact per subject, two-sided (R:947-958).
-7. **Index/query goldens** — the ten E5 goldens; **E7 leg unconditional:** the same ten answered
-   byte-for-byte through `calor_query`.
+7. **Index/query goldens** — the E5 goldens; **E7 leg unconditional:** the same ones answered
+   byte-for-byte through `calor_query`. Counted at E7: **eleven** effects goldens (eight
+   `effects`, three `impact-effects`) inside a corpus of 28, of which 21 are tool-answerable —
+   the whole tool-answerable set is on the leg, not just the effects rows. ("Ten" in earlier
+   drafts was a miscount; the denominator is pinned by
+   `QueryToolGateTests.TheLegCoversEveryEffectsGolden`.)
 
 **New:**
 

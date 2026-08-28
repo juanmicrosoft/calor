@@ -18,7 +18,13 @@ namespace Calor.Compiler.Tests.Mcp;
 public sealed class QueryToolTests : IDisposable
 {
     private readonly List<string> _dirs = [];
-    private readonly QueryTool _tool = new();
+
+    /// <summary>
+    /// The tool as the server registers it, confined to <paramref name="root"/>.
+    /// Every fixture here lives under the system temp directory, so the root is
+    /// the workspace itself unless a test is probing confinement.
+    /// </summary>
+    private static QueryTool ToolFor(string root) => new(root);
 
     public void Dispose()
     {
@@ -37,12 +43,13 @@ public sealed class QueryToolTests : IDisposable
         return dir;
     }
 
+    private static string FixtureCorpus => Path.Combine(
+        CliTestHarness.FindRepoRoot(), "tests", "TestData", "QueryCorpus", "project");
+
     private string Fixture()
     {
         var dir = TempDir();
-        var corpus = Path.Combine(
-            CliTestHarness.FindRepoRoot(), "tests", "TestData", "QueryCorpus", "project");
-        foreach (var source in Directory.GetFiles(corpus, "*.calr"))
+        foreach (var source in Directory.GetFiles(FixtureCorpus, "*.calr"))
             File.Copy(source, Path.Combine(dir, Path.GetFileName(source)));
         return dir;
     }
@@ -57,10 +64,26 @@ public sealed class QueryToolTests : IDisposable
             .Save(output ?? IndexCommand.DefaultOutputDirectory(dir));
     }
 
+    /// <summary>Calls the tool rooted at its own projectDirectory (the ordinary case).</summary>
     private async Task<McpToolResult> Call(string argumentsJson)
     {
         using var document = JsonDocument.Parse(argumentsJson);
-        return await _tool.ExecuteAsync(document.RootElement.Clone());
+        var arguments = document.RootElement.Clone();
+        var root = arguments.ValueKind == JsonValueKind.Object
+            && arguments.TryGetProperty("projectDirectory", out var directory)
+            && directory.ValueKind == JsonValueKind.String
+                ? directory.GetString()!
+                : Path.GetTempPath();
+        if (!Directory.Exists(root))
+            root = Path.GetTempPath();
+        return await ToolFor(root).ExecuteAsync(arguments);
+    }
+
+    /// <summary>Calls a tool pinned to <paramref name="serverRoot"/>, whatever the arguments ask for.</summary>
+    private static async Task<McpToolResult> CallRooted(string serverRoot, string argumentsJson)
+    {
+        using var document = JsonDocument.Parse(argumentsJson);
+        return await ToolFor(serverRoot).ExecuteAsync(document.RootElement.Clone());
     }
 
     private static string Text(McpToolResult result) => result.Content[0].Text ?? "";
@@ -73,16 +96,17 @@ public sealed class QueryToolTests : IDisposable
     [Fact]
     public void Name_IsCalorQuery()
     {
-        Assert.Equal("calor_query", _tool.Name);
-        Assert.Contains("callers", _tool.Description);
-        Assert.Contains("effects", _tool.Description);
-        Assert.Contains("PARTIAL", _tool.Description);
+        var tool = ToolFor(Path.GetTempPath());
+        Assert.Equal("calor_query", tool.Name);
+        Assert.Contains("callers", tool.Description);
+        Assert.Contains("effects", tool.Description);
+        Assert.Contains("PARTIAL", tool.Description);
     }
 
     [Fact]
     public void Annotations_NotReadOnly_BecauseResolvingRebuildsTheIndex()
     {
-        var annotations = _tool.Annotations;
+        var annotations = ToolFor(Path.GetTempPath()).Annotations;
         Assert.NotNull(annotations);
         Assert.False(annotations!.ReadOnlyHint);
         Assert.False(annotations.DestructiveHint);
@@ -92,7 +116,7 @@ public sealed class QueryToolTests : IDisposable
     [Fact]
     public void Schema_RequiresProjectDirectoryFacetAndSymbol()
     {
-        var schema = _tool.GetInputSchema();
+        var schema = ToolFor(Path.GetTempPath()).GetInputSchema();
         Assert.Equal(
             new[] { "projectDirectory", "facet", "symbol" },
             schema.GetProperty("required").EnumerateArray().Select(e => e.GetString()));
@@ -111,7 +135,7 @@ public sealed class QueryToolTests : IDisposable
     {
         var dir = Fixture();
         BuildIndex(dir);
-        var handler = new McpMessageHandler();
+        var handler = new McpMessageHandler(rootDirectory: dir);
 
         var list = await handler.HandleRequestAsync(new JsonRpcRequest
         {
@@ -211,7 +235,7 @@ public sealed class QueryToolTests : IDisposable
         var missing = Path.Combine(TempDir(), "nope");
         var result = await Call(Args(missing, "callers", "Scale"));
         Assert.True(result.IsError);
-        Assert.Equal($"Error: directory not found: {missing}", Text(result));
+        Assert.Equal($"Error: directory not found: {missing}" + Environment.NewLine, Text(result));
     }
 
     [Fact]
@@ -220,7 +244,7 @@ public sealed class QueryToolTests : IDisposable
         var dir = TempDir();
         var result = await Call(Args(dir, "callers", "Scale"));
         Assert.True(result.IsError);
-        Assert.Equal($"Error: no .calr files under {dir}", Text(result));
+        Assert.Equal($"Error: no .calr files under {dir}" + Environment.NewLine, Text(result));
     }
 
     [Fact]
@@ -230,7 +254,8 @@ public sealed class QueryToolTests : IDisposable
         var result = await Call(Args(dir, "callers", "Scale", ", \"noBuild\": true"));
         Assert.True(result.IsError);
         Assert.Equal(
-            "Error: index unusable — no index has been built. Run `calor index build` (or drop --no-build).",
+            "Error: index unusable — no index has been built. Run `calor index build` (or drop --no-build)."
+                + Environment.NewLine,
             Text(result));
         Assert.False(File.Exists(IndexFile(dir)));
     }
@@ -259,7 +284,8 @@ public sealed class QueryToolTests : IDisposable
         var result = await Call(Args(dir, "effects", "Leaky", ", \"noBuild\": true"));
         Assert.True(result.IsError);
         Assert.Equal(
-            "Error: index unusable — the index format version changed. Run `calor index build` (or drop --no-build).",
+            "Error: index unusable — the index format version changed. Run `calor index build` (or drop --no-build)."
+                + Environment.NewLine,
             Text(result));
     }
 
@@ -273,29 +299,227 @@ public sealed class QueryToolTests : IDisposable
         var result = await Call(Args(dir, "effects", "Leaky", ", \"noBuild\": true"));
         Assert.True(result.IsError);
         Assert.Equal(
-            "Error: index unusable — the source files changed. Run `calor index build` (or drop --no-build).",
+            "Error: index unusable — the source files changed. Run `calor index build` (or drop --no-build)."
+                + Environment.NewLine,
             Text(result));
     }
 
     [Fact]
-    public async Task IndexPath_PointsAtAnIndexBuiltElsewhere()
+    public async Task IndexPath_PointsAtAnIndexBuiltElsewhereInsideTheProject()
     {
         var dir = Fixture();
-        var custom = Path.Combine(TempDir(), "idx");
+        var custom = Path.Combine(dir, "idx");
         BuildIndex(dir, custom);
         Assert.False(File.Exists(IndexFile(dir)));
 
         var byDirectory = await Call(Args(dir, "callees", "ScaleTwice",
-            $", \"noBuild\": true, \"indexPath\": {JsonSerializer.Serialize(custom)}"));
-        Assert.False(byDirectory.IsError);
+            $", \"indexPath\": {JsonSerializer.Serialize(custom)}"));
+        Assert.False(byDirectory.IsError, Text(byDirectory));
 
         var byFile = await Call(Args(dir, "callees", "ScaleTwice",
-            $", \"noBuild\": true, \"indexPath\": {JsonSerializer.Serialize(ProjectIndex.PathFor(custom))}"));
+            $", \"indexPath\": {JsonSerializer.Serialize(ProjectIndex.PathFor(custom))}"));
         Assert.False(byFile.IsError);
         Assert.Equal(Text(byDirectory), Text(byFile));
 
         var withoutIt = await Call(Args(dir, "callees", "ScaleTwice", ", \"noBuild\": true"));
         Assert.True(withoutIt.IsError);
+    }
+
+    /// <summary>
+    /// An explicit index path is READ-ONLY: a stale index there is refused even
+    /// without noBuild, and nothing is written to it. Rebuilding through this
+    /// argument is what would let it create a tree anywhere, or overwrite
+    /// another project's index in place.
+    /// </summary>
+    [Fact]
+    public async Task IndexPath_IsReadOnly_AStaleOneIsRefusedRatherThanRebuilt()
+    {
+        var dir = Fixture();
+        var custom = Path.Combine(dir, "idx");
+        BuildIndex(dir, custom);
+        File.AppendAllText(Path.Combine(dir, "app.calr"), "\n");
+        var before = File.ReadAllBytes(ProjectIndex.PathFor(custom));
+
+        var result = await Call(Args(dir, "callees", "ScaleTwice",
+            $", \"indexPath\": {JsonSerializer.Serialize(custom)}"));
+
+        Assert.True(result.IsError);
+        Assert.StartsWith("Error: index unusable — the source files changed.", Text(result));
+        Assert.Equal(before, File.ReadAllBytes(ProjectIndex.PathFor(custom)));
+        Assert.False(File.Exists(IndexFile(dir)));
+    }
+
+    // --- write confinement (review #1 M1) -----------------------------------
+
+    /// <summary>
+    /// Resolving a stale or missing index REBUILDS it, so this tool writes —
+    /// and is confined to the server's root exactly as calor_file_write is.
+    /// An absolute project directory outside the root is refused, and nothing
+    /// is written there.
+    /// </summary>
+    [Fact]
+    public async Task ProjectDirectoryOutsideTheServerRoot_IsRefused_AndWritesNothing()
+    {
+        var outside = Fixture();
+        var serverRoot = TempDir();
+
+        var result = await CallRooted(serverRoot, Args(outside, "callers", "Scale"));
+
+        Assert.True(result.IsError);
+        Assert.StartsWith("Parameter 'projectDirectory' is outside the server's root ", Text(result));
+        Assert.False(File.Exists(IndexFile(outside)));
+        Assert.False(Directory.Exists(IndexCommand.DefaultOutputDirectory(outside)));
+    }
+
+    [Fact]
+    public async Task DotDotTraversalOutOfTheRoot_IsRefused()
+    {
+        // The escape is canonicalised before the check, so "<root>/../sibling"
+        // is rejected on where it LANDS, not on how it is spelled.
+        var parent = TempDir();
+        var serverRoot = Path.Combine(parent, "root");
+        Directory.CreateDirectory(serverRoot);
+        var sibling = Path.Combine(parent, "sibling");
+        Directory.CreateDirectory(sibling);
+        File.Copy(
+            Path.Combine(FixtureCorpus, "math.calr"),
+            Path.Combine(sibling, "math.calr"));
+
+        var traversal = Path.Combine(serverRoot, "..", "sibling");
+        var result = await CallRooted(serverRoot, Args(traversal, "callers", "Scale"));
+
+        Assert.True(result.IsError);
+        Assert.StartsWith("Parameter 'projectDirectory' is outside the server's root ", Text(result));
+        Assert.False(Directory.Exists(Path.Combine(sibling, "obj")));
+    }
+
+    [Fact]
+    public async Task IndexPathOutsideTheRoot_IsRefused_AndCreatesNothing()
+    {
+        var dir = Fixture();
+        var elsewhere = Path.Combine(TempDir(), "a", "b", "c", "not-a-calor-dir");
+
+        var result = await CallRooted(dir, Args(dir, "callers", "Scale",
+            $", \"indexPath\": {JsonSerializer.Serialize(elsewhere)}"));
+
+        Assert.True(result.IsError);
+        Assert.StartsWith("Parameter 'indexPath' is outside the server's root ", Text(result));
+        Assert.False(Directory.Exists(elsewhere));
+    }
+
+    /// <summary>
+    /// The overwrite probe: an index belonging to ANOTHER project, handed in
+    /// through indexPath, is neither answered from (its header does not match
+    /// this project) nor rewritten with this project's contents.
+    /// </summary>
+    [Fact]
+    public async Task AForeignIndex_IsNeitherAnsweredFromNorOverwritten()
+    {
+        var parent = TempDir();
+        var project = Path.Combine(parent, "project");
+        Directory.CreateDirectory(project);
+        foreach (var source in Directory.GetFiles(FixtureCorpus, "*.calr"))
+            File.Copy(source, Path.Combine(project, Path.GetFileName(source)));
+
+        var foreign = Path.Combine(parent, "foreign");
+        Directory.CreateDirectory(foreign);
+        File.WriteAllText(Path.Combine(foreign, "other.calr"), """
+            §M{m001:Other}
+              §F{f001:OtherOnly:pub} () -> i32
+                §E{}
+                §R INT:7
+            """);
+        var foreignIndexDirectory = Path.Combine(foreign, "obj", "calor");
+        BuildIndex(foreign, foreignIndexDirectory);
+        var foreignBytes = File.ReadAllBytes(ProjectIndex.PathFor(foreignIndexDirectory));
+
+        var result = await CallRooted(parent, Args(project, "callers", "Scale",
+            $", \"indexPath\": {JsonSerializer.Serialize(foreignIndexDirectory)}"));
+
+        Assert.True(result.IsError);
+        Assert.StartsWith("Error: index unusable — ", Text(result));
+        Assert.Equal(foreignBytes, File.ReadAllBytes(ProjectIndex.PathFor(foreignIndexDirectory)));
+        var (survived, _) = ProjectIndex.Load(foreignIndexDirectory);
+        Assert.NotEmpty(survived!.FindDeclarations("OtherOnly"));
+        Assert.Empty(survived.FindDeclarations("Scale"));
+    }
+
+    // --- argument kinds (review #1 M2 / M3) ---------------------------------
+
+    [Theory]
+    [InlineData("noBuild", "\"true\"")]
+    [InlineData("noBuild", "1")]
+    [InlineData("effects", "\"yes\"")]
+    public async Task NonBooleanFlag_IsRefused_RatherThanSilentlyIgnored(string name, string literal)
+    {
+        // GetBool returns the default for any non-boolean kind, which would turn
+        // "noBuild": "true" into "rebuild the index" — the opposite of what the
+        // caller asked, on the flag that decides whether this tool writes.
+        var dir = Fixture();
+        var facet = name == "effects" ? "impact" : "callers";
+        var result = await Call(Args(dir, facet, "Scale", $", \"{name}\": {literal}"));
+
+        Assert.True(result.IsError);
+        Assert.StartsWith($"Parameter '{name}' must be a boolean (true or false), not ", Text(result));
+        Assert.False(File.Exists(IndexFile(dir)));
+    }
+
+    [Theory]
+    [InlineData("noBuild")]
+    [InlineData("effects")]
+    public async Task NullFlag_IsTheDefault(string name)
+    {
+        var dir = Fixture();
+        BuildIndex(dir);
+        var facet = name == "effects" ? "impact" : "callers";
+        var result = await Call(Args(dir, facet, "Scale", $", \"{name}\": null"));
+        Assert.False(result.IsError, Text(result));
+    }
+
+    [Fact]
+    public async Task BlankIndexPath_IsNoOverride_NotAnInternalError()
+    {
+        // Path.GetFullPath("") throws; an exception here would leave the client
+        // with JSON-RPC -32603 instead of the refusal this tool promises.
+        var dir = Fixture();
+        BuildIndex(dir);
+        var result = await Call(Args(dir, "callers", "Scale", ", \"indexPath\": \"\", \"noBuild\": true"));
+        Assert.False(result.IsError, Text(result));
+        using var envelope = JsonDocument.Parse(Text(result));
+        Assert.Equal(2, envelope.RootElement.GetProperty("data").GetProperty("declarations").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task BlankIndexPath_ThroughTheServer_IsNotAProtocolError()
+    {
+        var dir = Fixture();
+        BuildIndex(dir);
+        var handler = new McpMessageHandler(rootDirectory: dir);
+        var response = await handler.HandleRequestAsync(new JsonRpcRequest
+        {
+            Id = JsonDocument.Parse("7").RootElement,
+            Method = "tools/call",
+            Params = JsonDocument.Parse($$"""
+                { "name": "calor_query", "arguments": {{Args(dir, "callers", "Scale", ", \"indexPath\": \"\", \"noBuild\": true, \"format\": \"text\"")}} }
+                """).RootElement,
+        });
+
+        Assert.NotNull(response);
+        Assert.Null(response!.Error);
+        var result = Assert.IsType<McpToolResult>(response.Result);
+        Assert.False(result.IsError, Text(result));
+    }
+
+    [Fact]
+    public async Task UnknownParameter_IsRefused()
+    {
+        // The schema declares additionalProperties:false; enforce it rather
+        // than trusting every client to validate.
+        var dir = Fixture();
+        var result = await Call(Args(dir, "callers", "Scale", ", \"noBuidl\": true"));
+        Assert.True(result.IsError);
+        Assert.StartsWith("Unknown parameter(s): noBuidl. Accepted: projectDirectory, facet, symbol", Text(result));
+        Assert.False(File.Exists(IndexFile(dir)));
     }
 
     // --- subject refusals ---------------------------------------------------
@@ -307,7 +531,7 @@ public sealed class QueryToolTests : IDisposable
         BuildIndex(dir);
         var result = await Call(Args(dir, "callers", "NoSuchName"));
         Assert.True(result.IsError);
-        Assert.Equal("query: no declaration named 'NoSuchName'", Text(result));
+        Assert.Equal("query: no declaration named 'NoSuchName'" + Environment.NewLine, Text(result));
     }
 
     [Fact]
@@ -317,7 +541,12 @@ public sealed class QueryToolTests : IDisposable
         BuildIndex(dir);
         var result = await Call(Args(dir, "impact", "NoSuchName"));
         Assert.True(result.IsError);
-        Assert.Equal("Error: no declaration named 'NoSuchName'. Use --file to ask about a file.", Text(result));
+        // The tool has no --file counterpart, so it names the CLI-only route
+        // instead of pointing at a flag it does not accept.
+        Assert.Equal(
+            "Error: no declaration named 'NoSuchName'. Whole-file impact is CLI-only: "
+                + "`calor query impact <file> --file`." + Environment.NewLine,
+            Text(result));
     }
 
     [Fact]
@@ -330,7 +559,7 @@ public sealed class QueryToolTests : IDisposable
         Assert.Equal(
             "Error: 'Shared' is declared in 2 places; narrow it with --in-file:" + Environment.NewLine
                 + "  ambiguous.calr:2:11 function Shared" + Environment.NewLine
-                + "  ambiguous2.calr:2:11 function Shared",
+                + "  ambiguous2.calr:2:11 function Shared" + Environment.NewLine,
             Text(result));
 
         var narrowed = await Call(Args(dir, "callers", "Shared", ", \"inFile\": \"ambiguous2.calr\", \"format\": \"text\""));
@@ -347,6 +576,7 @@ public sealed class QueryToolTests : IDisposable
         var result = await Call(Args(dir, "impact", "Log", ", \"effects\": true, \"row\": \"not-a-code\""));
         Assert.True(result.IsError);
         Assert.StartsWith("Error: --row 'not-a-code' is not a row of effect codes: ", Text(result));
+        Assert.EndsWith(Environment.NewLine, Text(result));
     }
 
     [Fact]
@@ -382,6 +612,9 @@ public sealed class QueryToolTests : IDisposable
         Assert.False(result.IsError);
         using var envelope = JsonDocument.Parse(Text(result));
         Assert.Equal("query", envelope.RootElement.GetProperty("command").GetString());
+        // The envelope's command is "query" for every facet, so the payload's
+        // own `facet` is what tells a client which answer it is holding.
+        Assert.Equal("effects", envelope.RootElement.GetProperty("data").GetProperty("facet").GetString());
         var row = Assert.Single(envelope.RootElement.GetProperty("data").GetProperty("rows").EnumerateArray());
         Assert.Equal("Calor0410", row.GetProperty("diagnosticCode").GetString());
     }

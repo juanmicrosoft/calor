@@ -27,9 +27,16 @@ All notable changes to this project will be documented in this file.
   versus what it actually does (`effects`). The answers come from the same saved project index
   `calor query` reads, and they match the command line word for word. If the index is out of
   date the tool rebuilds it first (or refuses, with `noBuild: true`), and every answer says when
-  it might be incomplete and why.
+  it might be incomplete and why. Like the file-writing tool, it only works inside the folder
+  the server was started on (`calor mcp --root <project>`), because rebuilding an index writes
+  to disk.
 - `calor query callers`, `callees` and `impact` gained `--json`, so every query facet can
-  now be read by a program, not just `effects`.
+  now be read by a program, not just `effects`. The text output of every facet is unchanged,
+  character for character. Two additions to the JSON: each answer now says which `facet` it
+  answers (all of them are labelled `query`, so this is how a program tells them apart), and
+  an answer that might be incomplete now carries the `residual` — the list of things the index
+  could not resolve — that the text output has always printed. `calor query effects --json`
+  is where you will notice both, and both are new fields: nothing was removed or renamed.
 - `calor_compile` (MCP) can compile a folder as one project with `options.crossModule: true`,
   checking effects across files the way `calor -i a.calr -i b.calr` does, and it now returns
   every diagnostic (warnings included) for each file. `options.enforceEffects` and

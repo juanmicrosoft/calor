@@ -4,7 +4,8 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Shared helpers for CLI-level subprocess tests: locates the built calor.dll
-/// (Release preferred over Debug) and invokes it with captured output.
+/// that MATCHES the compiler this test process loaded, and invokes it with
+/// captured output.
 /// </summary>
 internal static class CliTestHarness
 {
@@ -15,10 +16,49 @@ internal static class CliTestHarness
     internal static string FindRepoRoot() => RepoRoot.Value;
 
     /// <summary>
-    /// Locates the built calor.dll, probing Release before Debug (matching the
-    /// benchmark harness, which runs against Release builds).
+    /// Locates the built calor.dll that matches the Calor.Compiler assembly this
+    /// test process loaded. Both configurations can sit on disk at once (a
+    /// Release build of any tool that references the compiler leaves one), and a
+    /// child running the OTHER build is a different compiler: its compiler hash
+    /// differs, so index headers and build-state entries written by one are
+    /// rejected by the other. Release is probed first only as the tie-break when
+    /// there is nothing to match against.
     /// </summary>
     internal static string FindCalorDll() => CalorDll.Value;
+
+    /// <summary>
+    /// True when a CLR profiler is attached — which is how the coverage lane
+    /// runs (<c>--collect:"XPlat Code Coverage"</c>): coverlet rewrites the
+    /// assemblies this process loads, so the loaded Calor.Compiler is not
+    /// byte-equal to any calor.dll on disk and no cross-process compiler
+    /// identity can hold. Tests that would otherwise compare an in-process
+    /// compiler hash with a child process's must account for this rather than
+    /// fail for a reason that is not the code.
+    /// </summary>
+    internal static bool IsProfilerAttached =>
+        !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CORECLR_PROFILER"))
+        || Environment.GetEnvironmentVariable("CORECLR_ENABLE_PROFILING") == "1"
+        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("COR_PROFILER"))
+        || Environment.GetEnvironmentVariable("COR_ENABLE_PROFILING") == "1"
+        || AppDomain.CurrentDomain.GetAssemblies().Any(assembly =>
+            assembly.GetName().Name?.StartsWith("coverlet", StringComparison.OrdinalIgnoreCase) == true);
+
+    /// <summary>
+    /// True when the CLI child this harness launches IS the compiler this
+    /// process loaded, so an index header written by one is fresh for the
+    /// other. False under instrumentation.
+    /// </summary>
+    internal static bool CliCompilerIsThisCompiler
+    {
+        get
+        {
+            var loaded = typeof(Program).Assembly.Location;
+            if (string.IsNullOrEmpty(loaded) || !File.Exists(loaded))
+                return false;
+            return Incremental.BuildStateCache.ComputeCompilerHash([loaded])
+                == Incremental.BuildStateCache.ComputeCompilerHash([FindCalorDll()]);
+        }
+    }
 
     private static string FindRepoRootCore()
     {
@@ -112,6 +152,20 @@ internal static class CliTestHarness
             if (matching != null)
                 return matching;
         }
+
+        // Nothing matched. Under the coverage lane that is expected — coverlet
+        // rewrites the assemblies this process loaded, so no file on disk can
+        // be byte-equal to them — and it says nothing about the builds on disk.
+        // Off that lane it usually means a stale build. Either way, say so
+        // once, loudly, rather than silently comparing this build's behaviour
+        // against another build's: tests that need cross-process compiler
+        // identity ask CliCompilerIsThisCompiler and handle both answers.
+        Console.Error.WriteLine(
+            "CliTestHarness: no calor.dll on disk matches the Calor.Compiler assembly this test "
+                + $"process loaded ({loaded}); falling back to {candidates[0]}. "
+                + (IsProfilerAttached
+                    ? "A profiler is attached (coverage lane), where this is expected."
+                    : "No profiler detected — this usually means a stale build of the other configuration."));
 
         return candidates[0];
     }

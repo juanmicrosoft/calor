@@ -109,6 +109,33 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
             Assert.True(anyDiagnostics, $"{scriptName}: no step produced a diagnostic on either path; the comparison is vacuous");
     }
 
+    /// <summary>
+    /// The edit-script corpus's findings are errors (Calor0410) and, on the
+    /// excluded ES-07, warnings the task cannot request. So warning parity gets
+    /// its own subject: the query corpus, whose <c>app.calr</c> carries both an
+    /// error and a warning under default options. Without this the leg would
+    /// pin errors only, and a severity that drifted between the two paths would
+    /// go unobserved.
+    /// </summary>
+    [Fact]
+    public void WarningsAgreeToo_NotJustErrors()
+    {
+        var workspace = CreateTempDir();
+        var corpus = Path.Combine(RepoRoot, "tests", "TestData", "QueryCorpus", "project");
+        foreach (var source in Directory.GetFiles(corpus, "*.calr"))
+            File.Copy(source, Path.Combine(workspace, Path.GetFileName(source)));
+        var sources = Directory.GetFiles(workspace, "*.calr")
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        var sdk = CompileThroughTask(workspace, sources, "effects-on");
+        var cli = CompileThroughCliProcess(workspace, sources, "effects-on");
+
+        Assert.Equal(cli, sdk);
+        Assert.Contains(cli, line => line.Contains("|warning|", StringComparison.Ordinal));
+        Assert.Contains(cli, line => line.Contains("|error|", StringComparison.Ordinal));
+    }
+
     // --- the SDK path -------------------------------------------------------
 
     /// <summary>Records every logged event that carries a Calor diagnostic code.</summary>
@@ -278,9 +305,12 @@ public sealed class SdkSurfaceAgreementTests : IDisposable
         if (candidates.Length == 0)
             throw new InvalidOperationException("calor.dll not found — build the compiler first.");
 
-        // The CLI process must be THE compiler the task in this process uses:
+        // The CLI process should be THE compiler the task in this process uses:
         // when both configurations exist on disk, prefer the one whose bytes
-        // match the loaded Calor.Compiler assembly.
+        // match the loaded Calor.Compiler assembly. Under a profiler (the
+        // coverage lane) coverlet rewrites the loaded assembly, so no candidate
+        // can match; this leg compares DIAGNOSTICS, which do not depend on the
+        // compiler hash, so falling back is safe here.
         var loaded = typeof(Calor.Compiler.Program).Assembly.Location;
         if (!string.IsNullOrEmpty(loaded) && File.Exists(loaded))
         {

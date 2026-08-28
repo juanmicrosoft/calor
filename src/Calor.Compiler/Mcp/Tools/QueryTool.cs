@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Mcp.Sessions;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -17,6 +18,26 @@ namespace Calor.Compiler.Mcp.Tools;
 /// </summary>
 public sealed class QueryTool : McpToolBase
 {
+    /// <summary>
+    /// The write-confinement root, canonicalized. Resolving a stale or missing
+    /// index REBUILDS it — <c>ProjectIndex.Save</c> creates directories and
+    /// writes a file — so this tool is a writer and is confined exactly as
+    /// <see cref="FileWriteTool"/> is: <c>mcp --root</c> pins the root, and
+    /// with no root the server process's working directory is it.
+    /// </summary>
+    private readonly string _root;
+
+    /// <summary>Every argument the schema declares — the additionalProperties:false denominator.</summary>
+    private static readonly string[] KnownArguments =
+    [
+        "projectDirectory", "facet", "symbol", "inFile", "effects", "row", "noBuild", "indexPath", "format",
+    ];
+
+    internal QueryTool(string? rootDirectory = null)
+    {
+        _root = CanonicalPath.Resolve(rootDirectory ?? Environment.CurrentDirectory);
+    }
+
     public override string Name => "calor_query";
 
     public override string Description =>
@@ -69,7 +90,7 @@ public sealed class QueryTool : McpToolBase
                 },
                 "indexPath": {
                     "type": "string",
-                    "description": "Directory holding .calor-index.json, when the index was built with `calor index build --output`. Default: <projectDirectory>/obj/calor"
+                    "description": "READ-ONLY override: a directory (or the .calor-index.json file) holding an index built with `calor index build --output`, inside the server root. The index is never rebuilt or written through this argument — a stale or missing one is refused. Default: <projectDirectory>/obj/calor, which IS rebuilt when stale unless noBuild is true"
                 },
                 "format": {
                     "type": "string",
@@ -86,11 +107,70 @@ public sealed class QueryTool : McpToolBase
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
         => Task.FromResult(Execute(arguments));
 
-    private static McpToolResult Execute(JsonElement? arguments)
+    /// <summary>
+    /// A refusal the CLI would print. It carries the CLI's own text, and — like
+    /// every line the CLI writes — it ends with a newline, so an answer and a
+    /// refusal are the same shape to a client that concatenates them.
+    /// Argument-level validation (a missing or malformed parameter, which the
+    /// CLI's parser rejects before any of this) stays a bare message, as every
+    /// other MCP tool's does.
+    /// </summary>
+    private static McpToolResult Refusal(string text) =>
+        McpToolResult.Error(text.EndsWith(Environment.NewLine, StringComparison.Ordinal)
+            ? text
+            : text + Environment.NewLine);
+
+    /// <summary>
+    /// A boolean argument that must be a JSON boolean when present.
+    /// <see cref="McpToolBase.GetBool"/> silently returns the default for any
+    /// other kind, which would turn <c>"noBuild": "true"</c> (a string) into
+    /// "rebuild the index" — the opposite of what the caller asked, on the one
+    /// flag that decides whether this tool writes.
+    /// </summary>
+    private static bool ReadBool(JsonElement? arguments, string name, out string? error)
+    {
+        error = null;
+        if (arguments is not { ValueKind: JsonValueKind.Object } element
+            || !element.TryGetProperty(name, out var property))
+        {
+            return false;
+        }
+
+        switch (property.ValueKind)
+        {
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+            case JsonValueKind.Null:
+                return false;
+            default:
+                error = $"Parameter '{name}' must be a boolean (true or false), not {property.ValueKind.ToString().ToLowerInvariant()}";
+                return false;
+        }
+    }
+
+    private McpToolResult Execute(JsonElement? arguments)
     {
         var projectDirectory = GetString(arguments, "projectDirectory");
         if (string.IsNullOrWhiteSpace(projectDirectory))
             return McpToolResult.Error("Missing required parameter: projectDirectory");
+
+        // The schema says additionalProperties:false; enforce it rather than
+        // trusting every client to validate. A misspelled argument that is
+        // silently ignored is how "noBuild" becomes "the tool wrote anyway".
+        if (arguments is { ValueKind: JsonValueKind.Object } given)
+        {
+            var unknown = given.EnumerateObject()
+                .Select(property => property.Name)
+                .Where(name => !KnownArguments.Contains(name, StringComparer.Ordinal))
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+            if (unknown.Length > 0)
+            {
+                return McpToolResult.Error(
+                    $"Unknown parameter(s): {string.Join(", ", unknown)}. Accepted: {string.Join(", ", KnownArguments)}");
+            }
+        }
 
         var facet = GetString(arguments, "facet");
         if (facet == null || !ProjectIndexQueryReader.Facets.Contains(facet, StringComparer.Ordinal))
@@ -107,7 +187,9 @@ public sealed class QueryTool : McpToolBase
         if (format is not ("json" or "text"))
             return McpToolResult.Error("Parameter 'format' must be \"json\" or \"text\"");
 
-        var effects = GetBool(arguments, "effects");
+        var effects = ReadBool(arguments, "effects", out var argumentError);
+        if (argumentError != null)
+            return McpToolResult.Error(argumentError);
         var row = GetString(arguments, "row");
         if (facet != "impact" && (effects || row != null))
             return McpToolResult.Error("Parameters 'effects' and 'row' apply to facet \"impact\" only");
@@ -115,26 +197,94 @@ public sealed class QueryTool : McpToolBase
             return McpToolResult.Error("Parameter 'row' requires effects=true");
 
         var inFile = GetString(arguments, "inFile");
-        var noBuild = GetBool(arguments, "noBuild");
-        var indexPath = GetString(arguments, "indexPath");
-        if (indexPath != null && File.Exists(indexPath))
-            indexPath = Path.GetDirectoryName(Path.GetFullPath(indexPath));
+        var noBuild = ReadBool(arguments, "noBuild", out argumentError);
+        if (argumentError != null)
+            return McpToolResult.Error(argumentError);
 
-        var index = ProjectIndexQueryReader.Resolve(projectDirectory, noBuild, out var error, indexPath);
+        // Write confinement (the same rule calor_file_write applies): this tool
+        // rebuilds — and therefore writes — the index, so both the project it
+        // reads and the directory it would write to must be inside the pinned
+        // root. Canonicalized first, so `..` and symlinks cannot step outside.
+        string canonicalProject;
+        try
+        {
+            canonicalProject = CanonicalPath.Resolve(projectDirectory);
+        }
+        catch (Exception exception) when (exception is IOException or ArgumentException or NotSupportedException)
+        {
+            return McpToolResult.Error($"Parameter 'projectDirectory' is not a usable path: {exception.Message}");
+        }
+
+        if (!CanonicalPath.IsUnder(canonicalProject, _root))
+        {
+            return McpToolResult.Error(
+                $"Parameter 'projectDirectory' is outside the server's root '{_root}' — "
+                    + "start the server with `calor mcp --root <project>` over the directory you want to query");
+        }
+
+        // An empty string is not "no index path": Path.GetFullPath("") throws,
+        // and an exception here would leave the protocol with an internal error
+        // instead of the refusal this tool promises.
+        var indexPath = GetString(arguments, "indexPath");
+        if (string.IsNullOrWhiteSpace(indexPath))
+        {
+            indexPath = null;
+        }
+        else
+        {
+            if (File.Exists(indexPath))
+                indexPath = Path.GetDirectoryName(Path.GetFullPath(indexPath));
+
+            string canonicalIndex;
+            try
+            {
+                canonicalIndex = CanonicalPath.Resolve(indexPath!);
+            }
+            catch (Exception exception) when (exception is IOException or ArgumentException or NotSupportedException)
+            {
+                return McpToolResult.Error($"Parameter 'indexPath' is not a usable path: {exception.Message}");
+            }
+
+            // Under the root AND under the project: an index directory belongs
+            // to the project it indexes. Without the second check this argument
+            // — which has no CLI counterpart, so "byte-identical to `calor
+            // query`" gives it no cover — could create a tree anywhere under the
+            // root, or overwrite another project's index in place.
+            if (!CanonicalPath.IsUnder(canonicalIndex, _root))
+            {
+                return McpToolResult.Error(
+                    $"Parameter 'indexPath' is outside the server's root '{_root}'");
+            }
+
+        }
+
+        // An explicit index path is READ-ONLY. Rebuilding through it would
+        // create a tree wherever it points, or overwrite another project's
+        // index in place with this project's contents — and the argument has no
+        // CLI counterpart, so "byte-identical to `calor query`" gives it no
+        // cover. A stale or missing index at an explicit path is refused, the
+        // way `--no-build` refuses.
+        var index = ProjectIndexQueryReader.Resolve(
+            projectDirectory, noBuild || indexPath != null, out var error, indexPath);
         if (index == null)
-            return McpToolResult.Error(error!);
+            return Refusal(error!);
 
         var lookup = ProjectIndexQueryReader.ResolveSubject(index, symbol, inFile);
         if (lookup.NotFound)
         {
-            return McpToolResult.Error(facet == "impact"
-                ? QueryCommand.ImpactNotFoundText(symbol)
+            return Refusal(facet == "impact"
+                // The CLI's own text ends "Use --file to ask about a file",
+                // which this tool has no counterpart for: whole-file impact is
+                // CLI-only (`calor query impact <file> --file`). Say that
+                // instead of pointing at a flag that does not exist here.
+                ? $"Error: no declaration named '{symbol}'. Whole-file impact is CLI-only: "
+                    + "`calor query impact <file> --file`."
                 : string.Join(Environment.NewLine, QueryCommand.NotFoundLines(index, symbol)));
         }
 
         if (lookup.Subject == null)
         {
-            return McpToolResult.Error(string.Join(
+            return Refusal(string.Join(
                 Environment.NewLine, ProjectIndexQueryReader.AmbiguityLines(symbol, lookup.Candidates)));
         }
 
@@ -159,7 +309,7 @@ public sealed class QueryTool : McpToolBase
             {
                 var answer = ProjectIndexQueryReader.EffectImpact(index, lookup.Subject, row, out error);
                 if (answer == null)
-                    return McpToolResult.Error(error!);
+                    return Refusal(error!);
                 if (json)
                     writer.WriteLine(QueryCommand.ToJson(answer));
                 else

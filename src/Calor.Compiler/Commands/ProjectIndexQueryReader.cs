@@ -54,7 +54,12 @@ public static class ProjectIndexQueryReader
             return null;
         }
 
-        var output = indexDirectory ?? IndexCommand.DefaultOutputDirectory(projectDirectory);
+        // A blank override is "no override": Path.GetFullPath("") throws, and an
+        // exception here would surface as a protocol-level internal error
+        // instead of the refusal every other bad input gets.
+        var output = string.IsNullOrWhiteSpace(indexDirectory)
+            ? IndexCommand.DefaultOutputDirectory(projectDirectory)
+            : indexDirectory;
         var sources = ProjectIndexBuilder.DiscoverSources(projectDirectory);
         if (sources.Count == 0)
         {
@@ -179,6 +184,7 @@ public static class ProjectIndexQueryReader
     /// (<see cref="SymbolId"/> null, the file-grained answer).
     /// </summary>
     public sealed record ImpactAnswer(
+        string Facet,
         string Subject,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         string? SymbolId,
@@ -197,7 +203,7 @@ public static class ProjectIndexQueryReader
         var affected = ByPosition(index.FindImpactOfDeclarations([subject.SymbolId]));
         var partial = index.ImpactAnswerIsPartial();
         return new ImpactAnswer(
-            Describe(subject), subject.SymbolId, null, affected, CountFiles(affected),
+            "impact", Describe(subject), subject.SymbolId, null, affected, CountFiles(affected),
             partial, partial ? index.Residual : null);
     }
 
@@ -220,11 +226,17 @@ public static class ProjectIndexQueryReader
         var affected = ByPosition(index.FindImpactOfFile(normalized));
         var partial = index.ImpactAnswerIsPartial();
         return new ImpactAnswer(
-            $"the whole file {normalized}", null, normalized, affected, CountFiles(affected),
+            "impact", $"the whole file {normalized}", null, normalized, affected, CountFiles(affected),
             partial, partial ? index.Residual : null);
     }
 
-    /// <summary>One affected caller and whether the hypothetical row still fits its declared row.</summary>
+    /// <summary>
+    /// One affected caller and whether the hypothetical row still fits its
+    /// declared row. <see cref="DeclaredRow"/> is ABSENT (null, and omitted from
+    /// the JSON) exactly when the index holds no row for that caller — the case
+    /// the text answer renders as "(no row recorded)" and the verdict reports as
+    /// <c>cannot-tell</c>.
+    /// </summary>
     public sealed record EffectImpactEntry(
         IndexedDeclaration Declaration,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -239,6 +251,7 @@ public static class ProjectIndexQueryReader
     /// undecided, never broken.
     /// </summary>
     public sealed record EffectImpactAnswer(
+        string Facet,
         string Subject,
         string SymbolId,
         string Row,
@@ -304,6 +317,7 @@ public static class ProjectIndexQueryReader
             .ToArray();
         var partial = index.ImpactAnswerIsPartial();
         return new EffectImpactAnswer(
+            "impact-effects",
             Describe(subject),
             subject.SymbolId,
             rowDescribed,
@@ -322,6 +336,7 @@ public static class ProjectIndexQueryReader
     /// why a declaration has no row when the index recorded a reason.
     /// </summary>
     public sealed record EffectsAnswer(
+        string Facet,
         string Subject,
         string SymbolId,
         IReadOnlyList<IndexedEffectRow> Rows,
@@ -329,12 +344,7 @@ public static class ProjectIndexQueryReader
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         IndexResidual? Residual,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        string? Unavailable)
-    {
-        /// <summary>The declaration's own row, if the index holds one (positions excluded).</summary>
-        [JsonIgnore]
-        public IndexedEffectRow? Own => Rows.FirstOrDefault(IsOwnRow);
-    }
+        string? Unavailable);
 
     public static EffectsAnswer Effects(ProjectIndex index, IndexedDeclaration subject)
     {
@@ -352,7 +362,7 @@ public static class ProjectIndexQueryReader
         }
 
         return new EffectsAnswer(
-            Describe(subject), subject.SymbolId, rows, partial,
+            "effects", Describe(subject), subject.SymbolId, rows, partial,
             partial ? index.Residual : null, unavailable);
     }
 

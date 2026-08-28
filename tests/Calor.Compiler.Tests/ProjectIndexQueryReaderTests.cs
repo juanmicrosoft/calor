@@ -205,15 +205,78 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         // A query that rebuilt under a different token would see every index
         // `calor index build` wrote as stale and rebuild it on every question.
+        //
+        // The compiler-hash dimension is deliberately excluded: under the
+        // coverage lane coverlet rewrites the assemblies THIS process loaded,
+        // so the CLI child is a different compiler by construction and the
+        // header's compiler hash cannot match. Everything the options token
+        // governs — options hash, manifest hash, the file set — is compared,
+        // and the compiler dimension is pinned by
+        // CompilerHashIsWhatSeparatesUsFromTheCliBuiltIndex below.
         var dir = Fixture();
         var run = CliTestHarness.RunCli(dir, "index", "build", dir);
         Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
 
-        Assert.NotNull(ProjectIndexQueryReader.Resolve(dir, noBuild: true, out var error));
-        Assert.Null(error);
+        var (loaded, status) = ProjectIndex.Load(IndexCommand.DefaultOutputDirectory(dir));
+        Assert.Equal(ProjectIndex.Freshness.Fresh, status);
+        var inputs = ProjectIndexBuilder.CurrentInputs(new ProjectIndexBuilder.Options(
+            dir, ProjectIndexQueryReader.OptionsToken, ProjectIndexBuilder.DiscoverSources(dir)));
+
+        Assert.Equal(inputs.OptionsHash, loaded!.OptionsHash);
+        Assert.Equal(inputs.ManifestHash, loaded.ManifestHash);
+        Assert.Equal(inputs.Files, loaded.Files);
+        Assert.Equal(
+            ProjectIndex.Freshness.Fresh,
+            loaded.CheckFreshness(
+                loaded.CompilerHash, inputs.OptionsHash, inputs.ManifestHash, inputs.Files));
+    }
+
+    /// <summary>
+    /// The one header field that can separate this process from the CLI child
+    /// is the compiler hash — and only when they really are different builds,
+    /// which off the coverage lane they are not.
+    /// </summary>
+    [Fact]
+    public void CompilerHashIsWhatSeparatesUsFromTheCliBuiltIndex()
+    {
+        var dir = Fixture();
+        var run = CliTestHarness.RunCli(dir, "index", "build", dir);
+        Assert.True(run.ExitCode == 0, run.StdOut + run.StdErr);
+
+        var resolved = ProjectIndexQueryReader.Resolve(dir, noBuild: true, out var error);
+        if (CliTestHarness.CliCompilerIsThisCompiler)
+        {
+            Assert.NotNull(resolved);
+            Assert.Null(error);
+            return;
+        }
+
+        // The reader refuses rather than answering from a header written by a
+        // different compiler — which is the rule under test, whatever made the
+        // two compilers differ (a stale build, or the coverage lane's
+        // instrumentation of the assemblies this process loaded).
+        Assert.Null(resolved);
+        Assert.Equal(
+            "Error: index unusable — the compiler changed. Run `calor index build` (or drop --no-build).",
+            error);
     }
 
     // --- subject lookup -----------------------------------------------------
+
+    [Fact]
+    public void Resolve_BlankIndexDirectory_MeansTheDefault_NotAThrow()
+    {
+        // Path.GetFullPath("") throws, so a blank override must be read as "no
+        // override" before it reaches the filesystem.
+        var dir = Fixture();
+        BuildAndSave(dir);
+        foreach (var blank in new[] { "", "   " })
+        {
+            var index = ProjectIndexQueryReader.Resolve(dir, noBuild: true, out var error, blank);
+            Assert.Null(error);
+            Assert.NotNull(index);
+        }
+    }
 
     [Fact]
     public void ResolveSubject_UnknownName_IsNotFound()
@@ -439,7 +502,6 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var effects = ProjectIndexQueryReader.Effects(index, Subject(index, "Uses"));
         Assert.Empty(effects.Rows);
         Assert.NotNull(effects.Unavailable);
-        Assert.Null(effects.Own);
     }
 
     [Fact]
@@ -468,7 +530,6 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
 
         Assert.Equal("app.calr:11:11 function Leaky", answer.Subject);
         var own = Assert.Single(answer.Rows);
-        Assert.Same(own, answer.Own);
         Assert.True(ProjectIndexQueryReader.IsOwnRow(own));
         Assert.Equal("does-not-fit", own.Verdict);
         Assert.Equal("Calor0410", own.DiagnosticCode);
@@ -484,7 +545,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var index = BuildAndSave(Fixture());
         var answer = ProjectIndexQueryReader.Effects(index, Subject(index, "Twice"));
         Assert.Equal(2, answer.Rows.Count);
-        Assert.Equal("Twice", answer.Own!.Name);
+        Assert.Equal("Twice", Assert.Single(answer.Rows.Where(ProjectIndexQueryReader.IsOwnRow)).Name);
         var position = Assert.Single(answer.Rows.Where(row => !ProjectIndexQueryReader.IsOwnRow(row)));
         Assert.Equal("parameter", position.Kind);
         Assert.Equal("g", position.Name);
@@ -523,6 +584,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var index = BuildAndSave(Fixture());
         var data = Data(QueryCommand.ToJson(ProjectIndexQueryReader.Callers(index, Subject(index, "Scale"))));
         Assert.Equal(new[] { "facet", "subject", "symbolId", "declarations", "partial" }, Keys(data));
+        Assert.Equal("callers", data.GetProperty("facet").GetString());
         var declaration = data.GetProperty("declarations").EnumerateArray().First();
         Assert.Equal(
             new[] { "symbolId", "name", "kind", "file", "line", "column", "semanticHash" },
@@ -536,6 +598,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var data = Data(QueryCommand.ToJson(
             ProjectIndexQueryReader.Callers(index, Subject(index, "Shared", "ambiguous2.calr"))));
         Assert.Equal(new[] { "facet", "subject", "symbolId", "declarations", "partial", "residual" }, Keys(data));
+        Assert.Equal("callers", data.GetProperty("facet").GetString());
         Assert.True(data.GetProperty("partial").GetBoolean());
         Assert.Equal(
             new[] { "unreadableFiles", "unresolvedCalls", "ambiguousCallees", "effectRowsUnavailable" },
@@ -547,10 +610,11 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         var index = BuildAndSave(Fixture());
         var data = Data(QueryCommand.ToJson(ProjectIndexQueryReader.Impact(index, Subject(index, "Scale"))));
-        Assert.Equal(new[] { "subject", "symbolId", "affected", "affectedFiles", "partial", "residual" }, Keys(data));
+        Assert.Equal(new[] { "facet", "subject", "symbolId", "affected", "affectedFiles", "partial", "residual" }, Keys(data));
+        Assert.Equal("impact", data.GetProperty("facet").GetString());
 
         var file = Data(QueryCommand.ToJson(ProjectIndexQueryReader.ImpactOfFile(index, "math.calr", out _)!));
-        Assert.Equal(new[] { "subject", "file", "affected", "affectedFiles", "partial", "residual" }, Keys(file));
+        Assert.Equal(new[] { "facet", "subject", "file", "affected", "affectedFiles", "partial", "residual" }, Keys(file));
     }
 
     [Fact]
@@ -560,21 +624,25 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
         var data = Data(QueryCommand.ToJson(
             ProjectIndexQueryReader.EffectImpact(index, Subject(index, "Log"), "fs:w", out _)!));
         Assert.Equal(
-            new[] { "subject", "symbolId", "row", "rowIsCurrentDeclared", "impacts", "stopFitting", "cannotTell", "partial", "residual" },
+            new[] { "facet", "subject", "symbolId", "row", "rowIsCurrentDeclared", "impacts", "stopFitting", "cannotTell", "partial", "residual" },
             Keys(data));
+        Assert.Equal("impact-effects", data.GetProperty("facet").GetString());
         var impact = data.GetProperty("impacts").EnumerateArray().First();
         Assert.Equal(new[] { "declaration", "declaredRow", "verdict" }, Keys(impact));
     }
 
     [Fact]
-    public void Json_Effects_ShapeIsTheV015One_WhenComplete()
+    public void Json_Effects_ShapeIsTheV015OnePlusTheFacetLabel()
     {
-        // v0.15 E5 shipped {subject, symbolId, rows, partial}; E7 adds residual
-        // and unavailable only when they carry something, so a v0.15 consumer
-        // of a complete answer sees the same bytes.
+        // v0.15 E5 shipped {subject, symbolId, rows, partial}. E7 adds `facet`
+        // (the envelope's command is "query" for every facet, so the payload
+        // carries the discriminator) and, only when the answer is partial,
+        // `residual`. Both are additive: nothing was removed or renamed, so a
+        // v0.15 consumer keeps reading the fields it knows.
         var index = BuildAndSave(Fixture());
         var data = Data(QueryCommand.ToJson(ProjectIndexQueryReader.Effects(index, Subject(index, "Leaky"))));
-        Assert.Equal(new[] { "subject", "symbolId", "rows", "partial" }, Keys(data));
+        Assert.Equal(new[] { "facet", "subject", "symbolId", "rows", "partial" }, Keys(data));
+        Assert.Equal("effects", data.GetProperty("facet").GetString());
         var row = Assert.Single(data.GetProperty("rows").EnumerateArray());
         Assert.Equal(
             new[] { "symbolId", "ownerSymbolId", "name", "kind", "declared", "declaredRow", "inferredRow", "verdict", "diagnosticCode", "forbidden", "file", "line" },
@@ -587,7 +655,7 @@ public sealed class ProjectIndexQueryReaderTests : IDisposable
     {
         var index = BuildAndSave(Fixture());
         var data = Data(QueryCommand.ToJson(ProjectIndexQueryReader.Effects(index, Subject(index, "AsksMissing"))));
-        Assert.Equal(new[] { "subject", "symbolId", "rows", "partial", "residual" }, Keys(data));
+        Assert.Equal(new[] { "facet", "subject", "symbolId", "rows", "partial", "residual" }, Keys(data));
         Assert.True(data.GetProperty("partial").GetBoolean());
     }
 

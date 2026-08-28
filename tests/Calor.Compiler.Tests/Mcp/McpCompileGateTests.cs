@@ -67,14 +67,36 @@ public sealed class McpCompileGateTests : IDisposable
             EnumerateScriptDirectories().Select(Path.GetFileName).ToArray());
     }
 
+    /// <summary>
+    /// Steps whose two paths legitimately agree on an EMPTY finding set, with
+    /// the reason. Everywhere else, agreement on nothing would be agreement
+    /// about nothing, so the per-step check below demands a diagnostic.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> CleanSteps =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ES-01-local-edit/0"] = "baseline: the violation is introduced in step 2",
+            ["ES-01-local-edit/1"] = "the edit is inside a body; the violation is introduced in step 2",
+            ["ES-02-add-file/0"] = "baseline before any file is added",
+            ["ES-02-add-file/1"] = "the added file is the CLEAN one; the violating one arrives in step 2",
+            ["ES-03-delete-file/1"] = "the violating file has just been deleted; its finding must be gone",
+            ["ES-03-delete-file/2"] = "only the clean file remains",
+            ["ES-04-cross-module-effect/0"] = "clean state before the callee gains an effect",
+            ["ES-04-cross-module-effect/2"] = "the callee lost the effect again; the finding must disappear",
+            ["ES-05-options-flip/1"] = "effects enforcement is OFF for this step, which is the point of the flip",
+            ["ES-06-touch-noop/0"] = "nothing is wrong in this corpus; the script pins that nothing moves",
+            ["ES-06-touch-noop/1"] = "identical rewrite",
+            ["ES-06-touch-noop/2"] = "identical rewrite",
+        };
+
     [Theory]
     [MemberData(nameof(RegisteredScripts))]
     public async Task DiagnosticsThroughCalorCompileMatchTheCliProcess(string scriptName)
     {
         var script = LoadScript(scriptName);
-        var anyDiagnostics = false;
-        foreach (var step in script.Steps)
+        for (var index = 0; index < script.Steps.Count; index++)
         {
+            var step = script.Steps[index];
             var workspace = CreateTempDir();
             SyncWorkspace(workspace, step.SourceDirectory);
             var sources = Directory.GetFiles(workspace, "*.calr")
@@ -87,13 +109,65 @@ public sealed class McpCompileGateTests : IDisposable
             var cli = CompileThroughCliProcess(workspace, sources, step.Options);
 
             Assert.Equal(cli, mcp);
-            anyDiagnostics |= cli.Count > 0;
+
+            // Per-step anti-vacuity: two paths agreeing on an empty list agree
+            // about nothing. A step allowed to be clean must be registered as
+            // clean, with its reason — so a step that STOPS producing findings
+            // fails here instead of passing silently.
+            var key = $"{scriptName}/{index}";
+            if (CleanSteps.ContainsKey(key))
+            {
+                Assert.True(cli.Count == 0,
+                    $"{key} is registered as clean ({CleanSteps[key]}) but produced: {string.Join(" | ", cli)}");
+            }
+            else
+            {
+                Assert.True(cli.Count > 0,
+                    $"{key} produced no diagnostic on either path, so the comparison is vacuous. "
+                        + "Either the step regressed, or it belongs in CleanSteps with a reason.");
+            }
+        }
+    }
+
+    [Fact]
+    public void EveryRegisteredCleanStepExists()
+    {
+        // The clean-step registry cannot outlive the corpus: a key naming a
+        // script or a step that no longer exists is a stale exemption.
+        foreach (var key in CleanSteps.Keys)
+        {
+            var separator = key.LastIndexOf('/');
+            var scriptName = key[..separator];
+            var index = int.Parse(key[(separator + 1)..], System.Globalization.CultureInfo.InvariantCulture);
+            var script = LoadScript(scriptName);
+            Assert.True(index >= 0 && index < script.Steps.Count, $"{key}: no such step");
         }
 
-        // Anti-vacuity per script: ES-06 is the deliberate exception (nothing
-        // ever changes and nothing is ever wrong there is not what it pins).
-        if (scriptName != "ES-06-touch-noop")
-            Assert.True(anyDiagnostics, $"{scriptName}: no step produced a diagnostic on either path; the comparison is vacuous");
+        // And it may not swallow the corpus. The honest numbers, stated rather
+        // than implied: 21 steps, of which 12 are clean by construction (a
+        // baseline, an addition of a clean file, a deletion, a reversal, the
+        // effects-off step, and all three of ES-06's identical rewrites) and 9
+        // carry findings. A leg comparing two paths on an empty list proves
+        // nothing, so the 9 are what makes it load-bearing — and if that number
+        // drops, this test says so before the theory quietly passes.
+        var totalSteps = EnumerateScriptDirectories()
+            .Select(directory => LoadScript(Path.GetFileName(directory)).Steps.Count)
+            .Sum();
+        Assert.Equal(21, totalSteps);
+        Assert.Equal(12, CleanSteps.Count);
+        Assert.Equal(9, totalSteps - CleanSteps.Count);
+
+        // Every script except ES-06 (whose whole point is that nothing moves)
+        // must observe at least one step with findings.
+        foreach (var directory in EnumerateScriptDirectories())
+        {
+            var scriptName = Path.GetFileName(directory);
+            if (scriptName == "ES-06-touch-noop")
+                continue;
+            var steps = LoadScript(scriptName).Steps.Count;
+            var clean = Enumerable.Range(0, steps).Count(index => CleanSteps.ContainsKey($"{scriptName}/{index}"));
+            Assert.True(clean < steps, $"{scriptName}: every step is registered as clean, so the script observes nothing");
+        }
     }
 
     [Theory]
@@ -109,13 +183,13 @@ public sealed class McpCompileGateTests : IDisposable
 
             var build = CliTestHarness.RunCli(workspace, "index", "build", workspace);
             Assert.True(build.ExitCode == 0, build.StdOut + build.StdErr);
-            var cliBytes = File.ReadAllBytes(indexPath);
+            var cliText = File.ReadAllText(indexPath);
             var (built, _) = ProjectIndex.Load(IndexCommand.DefaultOutputDirectory(workspace));
             Assert.NotNull(built);
             var first = built!.Declarations.First();
             File.Delete(indexPath);
 
-            var result = await CallTool("calor_query", JsonSerializer.Serialize(new Dictionary<string, object?>
+            var result = await CallTool(workspace, "calor_query", JsonSerializer.Serialize(new Dictionary<string, object?>
             {
                 ["projectDirectory"] = workspace,
                 ["facet"] = "callers",
@@ -125,7 +199,22 @@ public sealed class McpCompileGateTests : IDisposable
             Assert.False(result.IsError, result.Content[0].Text);
             Assert.True(File.Exists(indexPath), "calor_query did not rebuild the missing index");
 
-            Assert.Equal(cliBytes, File.ReadAllBytes(indexPath));
+            var mcpText = File.ReadAllText(indexPath);
+            if (CliTestHarness.CliCompilerIsThisCompiler)
+            {
+                Assert.Equal(cliText, mcpText);
+                continue;
+            }
+
+            // Coverage lane: coverlet rewrites the assemblies this process
+            // loaded, so the in-process compiler hash cannot equal the CLI
+            // child's. Normalise that ONE header field and require every other
+            // byte to match — the index CONTENTS are what the gate claims.
+            var (fromMcp, _) = ProjectIndex.Load(IndexCommand.DefaultOutputDirectory(workspace));
+            Assert.NotEqual(built.CompilerHash, fromMcp!.CompilerHash);
+            Assert.Equal(
+                cliText.Replace(built.CompilerHash, "<compiler>", StringComparison.Ordinal),
+                mcpText.Replace(fromMcp.CompilerHash, "<compiler>", StringComparison.Ordinal));
         }
     }
 
@@ -143,14 +232,14 @@ public sealed class McpCompileGateTests : IDisposable
         var workspace = CreateTempDir();
         SyncWorkspace(workspace, Path.Combine(CorpusRoot, "ES-04-cross-module-effect", "step-01-callee-gains-effect"));
 
-        var perFile = await CallTool("calor_compile", JsonSerializer.Serialize(new { projectPath = workspace }));
+        var perFile = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new { projectPath = workspace }));
         using var lenient = JsonDocument.Parse(perFile.Content[0].Text!);
         Assert.False(lenient.RootElement.TryGetProperty("crossModule", out _));
         // Alone, caller.calr cannot resolve SaveOrder at all — a binder error,
         // never the effect verdict the project as a whole carries.
         Assert.DoesNotContain("Calor0410", perFile.Content[0].Text);
 
-        var project = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var project = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = workspace,
             options = new { crossModule = true },
@@ -168,13 +257,37 @@ public sealed class McpCompileGateTests : IDisposable
         Assert.Equal(1, strict.RootElement.GetProperty("errorCategories").GetProperty("Calor0410").GetInt32());
     }
 
+    /// <summary>
+    /// `--no-enforce-effects` turns off the per-file effect pass; the driver
+    /// still runs cross-module enforcement, so ES-04's violating step reports
+    /// Calor0410 with effects off — and the MCP path reports exactly what the
+    /// CLI process does. (ES-05's effects-off step does NOT pin this: its
+    /// violation is per-file, so both paths agree on an empty list there,
+    /// which is registered in <c>CleanSteps</c>.)
+    /// </summary>
+    [Fact]
+    public async Task CrossModuleEnforcement_StillRunsWithEffectsOff_AndAgreesWithTheCli()
+    {
+        var workspace = CreateTempDir();
+        SyncWorkspace(workspace, Path.Combine(CorpusRoot, "ES-04-cross-module-effect", "step-01-callee-gains-effect"));
+        var sources = Directory.GetFiles(workspace, "*.calr")
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        var mcp = await CompileThroughMcp(workspace, "effects-off");
+        var cli = CompileThroughCliProcess(workspace, sources, "effects-off");
+
+        Assert.Equal(cli, mcp);
+        Assert.Contains(cli, line => line.Contains("|Calor0410|error|", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task PerFileBatchMode_NowCarriesEnvelopeDiagnostics()
     {
         var workspace = CreateTempDir();
         SyncWorkspace(workspace, Path.Combine(CorpusRoot, "ES-07-persistent-finding", "step-00-finding-present"));
 
-        var result = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var result = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = workspace,
             options = new { crossModule = false, requireDocs = true },
@@ -190,23 +303,24 @@ public sealed class McpCompileGateTests : IDisposable
         var workspace = CreateTempDir();
         SyncWorkspace(workspace, Path.Combine(CorpusRoot, "ES-07-persistent-finding", "step-00-finding-present"));
 
-        var documented = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var documented = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = workspace,
             options = new { crossModule = true, requireDocs = true },
         }));
         Assert.Contains("Calor0601", documented.Content[0].Text);
 
-        var relaxed = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var relaxed = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = workspace,
             options = new { crossModule = true, requireDocs = false },
         }));
         Assert.DoesNotContain("Calor0601", relaxed.Content[0].Text);
 
-        // enforceEffects governs the per-file pass. Cross-module enforcement
-        // still runs with it off — exactly as `calor --no-enforce-effects` does
-        // (the gate theory above pins that agreement on ES-05's effects-off step).
+        // enforceEffects governs the PER-FILE pass only, which is what this
+        // single-module case shows. Cross-module enforcement is separate and
+        // keeps running with it off — pinned against the CLI in
+        // CrossModuleEnforcement_StillRunsWithEffectsOff_AndAgreesWithTheCli.
         var violating = CreateTempDir();
         File.WriteAllText(Path.Combine(violating, "leaky.calr"), """
             §M{m001:Leaky}
@@ -214,20 +328,20 @@ public sealed class McpCompileGateTests : IDisposable
                 §E{}
                 §P "cw without declaring it"
             """);
-        var effectsOn = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var effectsOn = await CallTool(violating, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = violating,
             options = new { crossModule = true },
         }));
         Assert.Contains("Calor0410", effectsOn.Content[0].Text);
-        var effectsOff = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var effectsOff = await CallTool(violating, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = violating,
             options = new { crossModule = true, enforceEffects = false },
         }));
         Assert.DoesNotContain("Calor0410", effectsOff.Content[0].Text);
 
-        var singleOff = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var singleOff = await CallTool(violating, "calor_compile", JsonSerializer.Serialize(new
         {
             source = File.ReadAllText(Path.Combine(violating, "leaky.calr")),
             options = new { enforceEffects = false, autoFix = false },
@@ -241,14 +355,14 @@ public sealed class McpCompileGateTests : IDisposable
         var source = File.ReadAllText(Path.Combine(
             CorpusRoot, "ES-07-persistent-finding", "step-00-finding-present", "violating.calr"));
 
-        var strict = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var strict = await CallTool(Path.GetTempPath(), "calor_compile", JsonSerializer.Serialize(new
         {
             source,
             options = new { requireDocs = true, autoFix = false },
         }));
         Assert.Contains("Calor0601", strict.Content[0].Text);
 
-        var lenient = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var lenient = await CallTool(Path.GetTempPath(), "calor_compile", JsonSerializer.Serialize(new
         {
             source,
             options = new { autoFix = false },
@@ -259,9 +373,10 @@ public sealed class McpCompileGateTests : IDisposable
     [Fact]
     public async Task CrossModule_MissingFile_IsAnError()
     {
-        var result = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var workspace = CreateTempDir();
+        var result = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
         {
-            files = new[] { Path.Combine(CreateTempDir(), "absent.calr") },
+            files = new[] { Path.Combine(workspace, "absent.calr") },
             options = new { crossModule = true },
         }));
         Assert.True(result.IsError);
@@ -270,9 +385,9 @@ public sealed class McpCompileGateTests : IDisposable
 
     // --- harness -----------------------------------------------------------
 
-    private static async Task<McpToolResult> CallTool(string name, string argumentsJson)
+    private static async Task<McpToolResult> CallTool(string rootDirectory, string name, string argumentsJson)
     {
-        var handler = new McpMessageHandler();
+        var handler = new McpMessageHandler(rootDirectory: rootDirectory);
         var response = await handler.HandleRequestAsync(new JsonRpcRequest
         {
             Id = JsonDocument.Parse("1").RootElement,
@@ -286,7 +401,7 @@ public sealed class McpCompileGateTests : IDisposable
 
     private static async Task<IReadOnlyList<string>> CompileThroughMcp(string workspace, string profile)
     {
-        var result = await CallTool("calor_compile", JsonSerializer.Serialize(new
+        var result = await CallTool(workspace, "calor_compile", JsonSerializer.Serialize(new
         {
             projectPath = workspace,
             options = new

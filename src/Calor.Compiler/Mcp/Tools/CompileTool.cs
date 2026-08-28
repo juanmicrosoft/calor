@@ -352,6 +352,20 @@ public sealed class CompileTool : McpToolBase
         };
     }
 
+    /// <summary>
+    /// A span→declaration-ID resolver for one file, so batch entries carry
+    /// <c>declarationId</c> exactly as single-file and project mode do. Null
+    /// when the file did not parse far enough to have an AST.
+    /// </summary>
+    private static DeclarationIdResolver? ResolverFor(string path, string source, CompilationResult result)
+    {
+        if (result.Ast == null)
+            return null;
+        var resolver = new DeclarationIdResolver();
+        resolver.AddFile(path, source, result.Ast);
+        return resolver;
+    }
+
     private static (ContractMode ContractMode, UnknownCallPolicy Policy, bool StrictEffects) ParseModes(JsonElement? options)
     {
         var contractModeStr = GetString(options, "contractMode") ?? "debug";
@@ -431,7 +445,7 @@ public sealed class CompileTool : McpToolBase
                     ErrorCount = errors.Count,
                     WarningCount = result.Diagnostics.Count(d => !d.IsError),
                     Errors = errors.Count > 0 ? errors : null,
-                    Diagnostics = DiagnosticEnvelope.Build(result.Diagnostics, null)
+                    Diagnostics = DiagnosticEnvelope.Build(result.Diagnostics, ResolverFor(path, source, result))
                 });
 
                 if (result.HasErrors) totalErrors++;

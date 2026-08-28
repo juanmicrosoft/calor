@@ -10,11 +10,23 @@ namespace Calor.Compiler.Tests.Mcp;
 /// <summary>
 /// v0.16 gate 7, E7 leg (roadmap-v0.16 §5 item 7, unconditional): the
 /// index/query goldens — every row an agent can ask <c>calor_query</c> for,
-/// including the ten-plus effects rows E5 registered — answered through the
-/// MCP tool, byte-for-byte with <c>calor query</c>, FROM THE INDEX FILE THE
-/// CLI WROTE. The discriminating pin (§3.1 E7): a tool that answered from an
-/// in-memory graph instead of the index would not see what the file says,
-/// and the cross-module fold (<c>Whisper</c>) is where that shows.
+/// including the eleven effects rows E5 registered — answered through the MCP
+/// tool, byte-for-byte with <c>calor query</c>, FROM THE INDEX FILE
+/// <c>calor index build</c> WROTE. The discriminating pin (§3.1 E7): a tool
+/// that answered from an in-memory graph would not see what the file says, and
+/// the cross-module fold (<c>Whisper</c>) is where that shows.
+///
+/// <para><b>One workspace, one index, two readers.</b> Symbol ids are derived
+/// from absolute paths, so both readers must see the same directory. The index
+/// is built once by the <c>calor</c> child process. In an ordinary run that one
+/// file serves both readers unchanged. Under the coverage lane it cannot:
+/// coverlet rewrites the assemblies THIS process loaded, so the in-process
+/// compiler hash differs from the child's and each side would call the other's
+/// header stale. There, the same index is also saved once under this process's
+/// identity, and the file is swapped between the two readers — the CONTENTS are
+/// identical, which <see cref="TheTwoIndexHeadersDifferOnlyInTheCompilerHash"/>
+/// pins. Every query passes <c>noBuild=true</c> / <c>--no-build</c>, so a stale
+/// or missing file is a failure, never a silent rebuild.</para>
 ///
 /// Corpus: tests/TestData/QueryCorpus/ (authored ground truth, see
 /// <see cref="QueryGoldenTests"/>).
@@ -22,18 +34,21 @@ namespace Calor.Compiler.Tests.Mcp;
 [Collection("McpSerial")]
 public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.IndexedCorpus>
 {
-    /// <summary>
-    /// The corpus copied to a workspace and indexed ONCE by the CLI process
-    /// (<c>calor index build</c>) — the file every test here reads through the
-    /// tool. Nothing in this class rebuilds it: every query passes
-    /// <c>noBuild=true</c>, so a stale or missing file is a failure, not a
-    /// silent rebuild.
-    /// </summary>
     public sealed class IndexedCorpus : IDisposable
     {
         public string Directory { get; }
         public string IndexPath { get; }
-        public byte[] IndexBytes { get; }
+
+        /// <summary>The index file exactly as <c>calor index build</c> wrote it.</summary>
+        public byte[] CliIndexBytes { get; }
+
+        /// <summary>
+        /// The same index under this process's compiler identity. Byte-equal to
+        /// <see cref="CliIndexBytes"/> unless a profiler is attached.
+        /// </summary>
+        public byte[] ToolIndexBytes { get; }
+
+        public bool SameCompiler { get; }
 
         public IndexedCorpus()
         {
@@ -48,8 +63,29 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
                 throw new InvalidOperationException("calor index build failed: " + build.StdOut + build.StdErr);
 
             IndexPath = ProjectIndex.PathFor(IndexCommand.DefaultOutputDirectory(Directory));
-            IndexBytes = File.ReadAllBytes(IndexPath);
+            CliIndexBytes = File.ReadAllBytes(IndexPath);
+
+            SameCompiler = CliTestHarness.CliCompilerIsThisCompiler;
+            if (SameCompiler)
+            {
+                ToolIndexBytes = CliIndexBytes;
+                return;
+            }
+
+            ProjectIndexBuilder.Build(new ProjectIndexBuilder.Options(
+                    Directory,
+                    ProjectIndexQueryReader.OptionsToken,
+                    ProjectIndexBuilder.DiscoverSources(Directory)))
+                .Save(IndexCommand.DefaultOutputDirectory(Directory));
+            ToolIndexBytes = File.ReadAllBytes(IndexPath);
+            File.WriteAllBytes(IndexPath, CliIndexBytes);
         }
+
+        /// <summary>Puts the file the in-process reader can use in place.</summary>
+        public void UseToolIndex() => File.WriteAllBytes(IndexPath, ToolIndexBytes);
+
+        /// <summary>Puts the file the CLI child can use in place — the bytes it wrote.</summary>
+        public void UseCliIndex() => File.WriteAllBytes(IndexPath, CliIndexBytes);
 
         public void Dispose()
         {
@@ -87,9 +123,9 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
         return data;
     }
 
-    private static async Task<McpToolResult> CallTool(string argumentsJson)
+    private async Task<McpToolResult> CallTool(string argumentsJson)
     {
-        var handler = new McpMessageHandler();
+        var handler = new McpMessageHandler(rootDirectory: _corpus.Directory);
         var response = await handler.HandleRequestAsync(new JsonRpcRequest
         {
             Id = JsonDocument.Parse("1").RootElement,
@@ -142,6 +178,42 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
     }
 
     /// <summary>
+    /// The file the tool reads and the file <c>calor index build</c> wrote are
+    /// the same index. In an ordinary run they are the same bytes — the tool
+    /// reads the CLI's file, full stop. Under instrumentation they differ in
+    /// exactly one header field, <c>CompilerHash</c>, which is what makes the
+    /// swap honest rather than a way to dodge a real difference.
+    /// </summary>
+    [Fact]
+    public void TheTwoIndexHeadersDifferOnlyInTheCompilerHash()
+    {
+        if (_corpus.SameCompiler)
+        {
+            Assert.Equal(_corpus.CliIndexBytes, _corpus.ToolIndexBytes);
+            return;
+        }
+
+        var cli = System.Text.Encoding.UTF8.GetString(_corpus.CliIndexBytes);
+        var tool = System.Text.Encoding.UTF8.GetString(_corpus.ToolIndexBytes);
+        var cliHash = HeaderHash(cli);
+        var toolHash = HeaderHash(tool);
+        Assert.NotEqual(cliHash, toolHash);
+
+        // Normalise the one field the profiler moves; every other byte — every
+        // declaration, edge, contract, assumption, effect row and residual, plus
+        // the options/manifest/file hashes — must match.
+        Assert.Equal(
+            cli.Replace(cliHash, "<compiler>", StringComparison.Ordinal),
+            tool.Replace(toolHash, "<compiler>", StringComparison.Ordinal));
+    }
+
+    private static string HeaderHash(string indexJson)
+    {
+        using var document = JsonDocument.Parse(indexJson);
+        return document.RootElement.GetProperty("CompilerHash").GetString()!;
+    }
+
+    /// <summary>
     /// The gate proper: each golden's answer, read off the tool's JSON payload
     /// and rendered in the golden's own vocabulary, equals the authored ground
     /// truth — including whether the answer is partial.
@@ -151,11 +223,13 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
     public async Task GoldenIsAnsweredThroughCalorQuery(int position, string label)
     {
         var golden = LoadGoldens()[position];
+        _corpus.UseToolIndex();
         var result = await CallTool(ToolArguments(golden, "json"));
         Assert.False(result.IsError, $"{label}: {result.Content[0].Text}");
 
         using var envelope = JsonDocument.Parse(result.Content[0].Text!);
         var data = envelope.RootElement.GetProperty("data");
+        Assert.Equal(golden.Facet, data.GetProperty("facet").GetString());
 
         IEnumerable<string> rendered = golden.Facet switch
         {
@@ -175,8 +249,9 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
 
     /// <summary>
     /// Byte-for-byte: the tool's text is the CLI's stdout, and the tool's JSON
-    /// is the CLI's <c>--json</c> stdout, for every golden — both read the
-    /// index the CLI built, neither rebuilds it.
+    /// is the CLI's <c>--json</c> stdout, for every golden. Neither side may
+    /// rebuild — both pass the no-build flag — so each is answering from the
+    /// index file already on disk.
     /// </summary>
     [Theory]
     [MemberData(nameof(ToolGoldens))]
@@ -184,34 +259,38 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
     {
         var golden = LoadGoldens()[position];
 
+        _corpus.UseToolIndex();
+        var toolText = await CallTool(ToolArguments(golden, "text"));
+        Assert.False(toolText.IsError, $"{label}: {toolText.Content[0].Text}");
+        var toolJson = await CallTool(ToolArguments(golden, "json"));
+        Assert.False(toolJson.IsError, $"{label}: {toolJson.Content[0].Text}");
+        Assert.Equal(_corpus.ToolIndexBytes, File.ReadAllBytes(_corpus.IndexPath));
+
+        _corpus.UseCliIndex();
         var cliText = CliTestHarness.RunCli(_corpus.Directory, CliArguments(golden, json: false));
         Assert.True(cliText.ExitCode == 0, $"{label}: {cliText.StdOut}{cliText.StdErr}");
-        var toolText = await CallTool(ToolArguments(golden, "text"));
-        Assert.False(toolText.IsError, label);
-        Assert.Equal(cliText.StdOut, toolText.Content[0].Text);
-
         var cliJson = CliTestHarness.RunCli(_corpus.Directory, CliArguments(golden, json: true));
         Assert.True(cliJson.ExitCode == 0, $"{label}: {cliJson.StdOut}{cliJson.StdErr}");
-        var toolJson = await CallTool(ToolArguments(golden, "json"));
-        Assert.False(toolJson.IsError, label);
-        Assert.Equal(cliJson.StdOut, toolJson.Content[0].Text);
+        Assert.Equal(_corpus.CliIndexBytes, File.ReadAllBytes(_corpus.IndexPath));
 
-        Assert.Equal(_corpus.IndexBytes, File.ReadAllBytes(_corpus.IndexPath));
+        Assert.Equal(cliText.StdOut, toolText.Content[0].Text);
+        Assert.Equal(cliJson.StdOut, toolJson.Content[0].Text);
     }
 
     /// <summary>
     /// The discriminating pin (§3.1 E7): the tool answers from the index FILE.
     /// The file's record for <c>Whisper</c> — the cross-module fold — is
     /// rewritten with a sentinel the source could never produce; the header is
-    /// untouched, so the index is still fresh and a reader honouring the
-    /// file returns the sentinel. A tool that rebuilt an in-memory graph
-    /// from the sources would return the real row and fail here, with or
-    /// without <c>noBuild</c>.
+    /// untouched, so the index is still fresh and a reader honouring the file
+    /// returns the sentinel. A tool that rebuilt an in-memory graph from the
+    /// sources would return the real row and fail here, with or without
+    /// <c>noBuild</c>.
     /// </summary>
     [Fact]
     public async Task AnswersComeFromTheIndexFile_NotFromAnInMemoryGraph()
     {
         var output = IndexCommand.DefaultOutputDirectory(_corpus.Directory);
+        _corpus.UseToolIndex();
         try
         {
             var (index, status) = ProjectIndex.Load(output);
@@ -242,7 +321,7 @@ public sealed class QueryToolGateTests : IClassFixture<QueryToolGateTests.Indexe
         }
         finally
         {
-            File.WriteAllBytes(_corpus.IndexPath, _corpus.IndexBytes);
+            _corpus.UseCliIndex();
         }
     }
 
