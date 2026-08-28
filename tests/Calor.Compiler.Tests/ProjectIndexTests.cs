@@ -379,6 +379,66 @@ public sealed class ProjectIndexTests : IDisposable
     }
 
     /// <summary>
+    /// Every arm of <see cref="ProjectIndexBuilder.CreateEffectPass"/> is observed,
+    /// including the both-caps-configured one that no other test reaches — an arm
+    /// no test can tell from a no-op is not insurance, it is unverified code.
+    ///
+    /// <para>Each half configures BOTH caps and makes only ONE of them capable of
+    /// causing Calor0406, so the diagnostic names which cap actually arrived:
+    /// a flat SCC cap of 100 over a 101-member chain with the charge cap parked at
+    /// its default; then a worklist cap of 2 over the rank-1 chain with the SCC cap
+    /// parked so high it cannot be the cause. Replacing the <c>_ =&gt;</c> arm's
+    /// body with the plain no-inject constructor is RED here (both halves index
+    /// cleanly instead).</para>
+    ///
+    /// <para>The third block is the behavioural guard on the no-caps arm: it asks
+    /// the constructed pass for its EFFECTIVE cap rather than inferring it from a
+    /// fixture, so it is red for <c>?? Default</c>, for <c>?? 100</c>, and for any
+    /// future spelling of the same mistake — in about a millisecond.</para>
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_EveryConfiguredCapArrivesAtThePass()
+    {
+        const string Residual =
+            "capped.calr: effect inference did not converge (Calor0406), facts not recorded";
+
+        // Both caps set; only the SCC cap can fire (101 members > a flat 100).
+        var sccDir = NewProject(("lib.calr", Library), ("capped.calr", DoubleChain(101)));
+        var bySccCap = ProjectIndexBuilder.Build(OptionsFor(sccDir) with
+        {
+            SccFixpointIterationCap = EffectEnforcementPass.DefaultSccFixpointIterationCap,
+            InstantiatedChargeIterationCap = EffectEnforcementPass.DefaultInstantiatedChargeIterationCap,
+        });
+        Assert.Equal(Residual, Assert.Single(bySccCap.Residual.EffectRowsUnavailable));
+        Assert.DoesNotContain(bySccCap.EffectRows, row => row.File == "capped.calr");
+
+        // Both caps set; only the worklist cap can fire (the SCC cap is parked far
+        // above anything a four-function chain could need).
+        var chargeDir = NewProject(("lib.calr", Library), ("capped.calr", ThreeHopRank1Chain));
+        var byChargeCap = ProjectIndexBuilder.Build(OptionsFor(chargeDir) with
+        {
+            SccFixpointIterationCap = 10_000,
+            InstantiatedChargeIterationCap = 2,
+        });
+        Assert.Equal(Residual, Assert.Single(byChargeCap.Residual.EffectRowsUnavailable));
+        Assert.DoesNotContain(byChargeCap.EffectRows, row => row.File == "capped.calr");
+
+        // Neither cap set: the pass must carry the compiler's size-floored
+        // effective cap, asked of the pass directly rather than via a fixture.
+        var resolver = new EffectResolver();
+        resolver.Initialize(sccDir);
+        var uncapped = ProjectIndexBuilder.CreateEffectPass(
+            new Calor.Compiler.Diagnostics.DiagnosticBag(), resolver, sccDir, [], OptionsFor(sccDir));
+        Assert.Equal(501, uncapped.EffectiveSccFixpointIterationCap(500));
+        Assert.Equal(
+            EffectEnforcementPass.DefaultSccFixpointIterationCap,
+            uncapped.EffectiveSccFixpointIterationCap(1));
+        Assert.Equal(
+            EffectEnforcementPass.DefaultInstantiatedChargeIterationCap,
+            uncapped.InstantiatedChargeIterationCap);
+    }
+
+    /// <summary>
     /// The contract of <see cref="CliTestHarness.StampForChildCli"/>, pinned
     /// directly: the hash it stamps is the one a child <c>calor</c> computes for
     /// itself. Built by the child (<c>calor index build</c>) and read back, so a

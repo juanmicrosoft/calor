@@ -104,11 +104,11 @@ All notable changes to this project will be documented in this file.
   limit on how many rounds it will run. That limit grows with the size of the group, so
   an ordinary big group never trips it — but the project index was accidentally pinning
   the limit to a flat 100 rounds, which switched the size-based growth off. The result:
-  a program with 100 or more mutually recursive functions compiled cleanly, yet the
+  a big group that needs more than 100 rounds to settle — a long chain of functions
+  where each one calls its neighbours, 100 members or more — compiled cleanly, yet the
   index reported `Calor0406` for that file, threw away every effect row in it, and
   answered "effect inference did not converge" for any function you asked about.
   The index now uses exactly the same limit the compiler uses, so the two agree.
-  Setting the limit explicitly (which only tests do) still works as before.
 
 - The compiler no longer crashes on converted code whose local bindings form a cycle
   (for example, a value whose type depends on itself, which the C# → Calor converter
