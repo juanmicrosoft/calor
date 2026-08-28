@@ -160,9 +160,15 @@ echo "== 5. degradation oracle: the RID whose native we do not ship =="
 # Reproduce an osx-x64 consumer's state: the tool is installed, and there is no
 # Z3 native for its RID.
 rm -rf "$TOOLDIR/.store/calor/$VERSION/calor/$VERSION/tools/net10.0/any/runtimes/$RID"
-if find "$TOOLDIR" -name "$NATIVE_NAME" -print -quit | grep -q .; then
-  echo "ERROR: $NATIVE_NAME still present after removal — the oracle would not be testing degradation" >&2
-  find "$TOOLDIR" -name "$NATIVE_NAME" >&2
+# Scoped to the runner's OWN rid: several RIDs share a native file NAME
+# (linux-x64 and linux-arm64 both ship libz3.so; win-x64 and win-arm64 both ship
+# libz3.dll), and only the current RID's copy is ever loaded. A bare -name search
+# finds a sibling RID's file and reports a removal that did happen as a failure —
+# which is what it did on the linux-x64 and win-x64 legs of this job's first CI
+# run (it passes on osx-arm64 only because that dylib name is unique).
+if find "$TOOLDIR" -path "*/runtimes/$RID/native/$NATIVE_NAME" -print -quit | grep -q .; then
+  echo "ERROR: $NATIVE_NAME for $RID still present after removal — the oracle would not be testing degradation" >&2
+  find "$TOOLDIR" -path "*/runtimes/$RID/native/$NATIVE_NAME" >&2
   exit 1
 fi
 
