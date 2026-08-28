@@ -2599,6 +2599,18 @@ public sealed class EffectEnforcementPass
     /// <c>§B{~x} §C{f.M} §A x §/C</c>) therefore recursed without limit, and a
     /// StackOverflowException is a fail-fast: the host dies, nothing catches it.</para>
     ///
+    /// <para><b>Who reaches this unbound.</b> Not only the in-process ledgers:
+    /// <c>EditPreviewTool.CheckEffects</c> — the MCP server's
+    /// <c>edit_preview</c> — runs this pass on a lex/parse-only
+    /// <c>ParseResult</c> with no binder anywhere on the path, so
+    /// <c>calor mcp</c> died on any parsed <c>.calr</c> of this shape. That is
+    /// a shipping surface, and it is why a cycle stop stays SILENT here: the
+    /// author of the edited file cannot act on a converter artifact, the call
+    /// the cycle sits on is already reported (Calor0411), and edit_preview
+    /// would otherwise grow a diagnostic about the compiler's own search.
+    /// The CLI binds first and returns on binding errors, which is why it
+    /// never saw any of this.</para>
+    ///
     /// <para>Two guards, the way <see cref="RowSiteChecker"/> bounds its
     /// structural walk. (1) A VISITED SET keyed on the name in progress: asking
     /// for a name whose resolution is already on the stack is, by construction,
@@ -2625,10 +2637,27 @@ public sealed class EffectEnforcementPass
     internal sealed class AstResolutionBound
     {
         /// <summary>
-        /// Nested AST-side resolutions allowed on the stack at once. The
-        /// (cap + 1)-th nested ask stops with the sentinel.
+        /// Frames of the AST-side search allowed on the stack at once — name
+        /// asks and the structural walk's levels alike (review round 1, C1).
+        /// The (cap + 1)-th frame stops with the sentinel.
+        ///
+        /// <para><b>Chosen empirically, not by taste.</b> With frame-accurate
+        /// counting the worst shape is a chain whose links nest one <c>§IF</c>
+        /// deeper each time, which costs frames quadratically: 30 such links
+        /// reach 525 frames, 50 reach 1375. Driving the 200-link version on a
+        /// <b>1 MB</b> thread (what a test host gives a test, and the CLI's
+        /// main thread on Windows) at rising caps: 448 completes, 480
+        /// overflows. The default is half the largest surviving cap, so the
+        /// budget is doubled against a deeper stack above this pass or a
+        /// costlier frame in a future build. The corpus needs 13 frames at its
+        /// worst — measured over all 364 corpus modules enforced without
+        /// binding, deepest in
+        /// <c>serilog/Settings/KeyValuePairs/SettingValueConversions.cs</c>,
+        /// with zero cap stops (pinned by
+        /// <c>EffectInferrerCorpusDepthTests</c>) — so ordinary code sits an
+        /// order of magnitude below the cap and never reaches it.</para>
         /// </summary>
-        public const int DefaultDepthCap = 64;
+        public const int DefaultDepthCap = 224;
 
         public int DepthCap { get; init; } = DefaultDepthCap;
 
@@ -4063,6 +4092,15 @@ public sealed class EffectEnforcementPass
         /// are reached only from here), so this ONE choke point sees every
         /// cycle. Per inferrer, i.e. per function: names are function-scoped
         /// and an on-demand inference of another function gets its own.
+        ///
+        /// <para>Review round 1 (m3) — <see cref="FindForeachVariableType"/>
+        /// also calls <see cref="FindLocalDeclarationType"/> for a DIFFERENT
+        /// name (a §FE collection's), without going back through the ask. That
+        /// hop cannot make a cycle invisible: it reaches no ask, so it cannot
+        /// re-enter this set, and every frame it costs is still charged to the
+        /// shared depth counter. It is named here so the "one choke point"
+        /// claim is read as being about ASKS, not about frames — frames are
+        /// bounded separately by <see cref="TryEnterAstFrame"/>.</para>
         /// </summary>
         private readonly HashSet<string> _astResolutionInProgress = new(StringComparer.Ordinal);
 
@@ -4109,6 +4147,39 @@ public sealed class EffectEnforcementPass
             }
         }
 
+        /// <summary>
+        /// #1104, review round 1 (CRITICAL C1) — enters one FRAME of the
+        /// AST-side search and reports whether the cap admits it.
+        ///
+        /// <para>The first cut of this guard counted <i>name asks</i> only, and
+        /// that does not bound the stack: <see cref="FindLocalDeclarationType"/>
+        /// and <see cref="FindForeachVariableType"/> recurse STRUCTURALLY into
+        /// every nested statement body, and that walk runs inside each ask. A
+        /// chain whose links sit progressively deeper inside <c>§IF</c> blocks
+        /// therefore costs frames in proportion to links × nesting while an
+        /// ask-counter saw only <c>links</c>. Measured on the ask-counting
+        /// version at cap 64: 40 such links, no cycle, all names distinct,
+        /// <c>DepthCapStops == 0</c> — and the stack overflowed on a 1 MB
+        /// thread (the size a test host actually gives a test). Every recursion
+        /// inside the search now shares this one counter, so the cap bounds the
+        /// real frame cost rather than a proxy for it.</para>
+        /// </summary>
+        private bool TryEnterAstFrame(string name)
+        {
+            var bound = _context.AstResolution;
+            if (_astResolutionDepth >= bound.DepthCap)
+            {
+                bound.RecordDepthCapStop(name);
+                return false;
+            }
+
+            _astResolutionDepth++;
+            bound.RecordDepth(_astResolutionDepth);
+            return true;
+        }
+
+        private void ExitAstFrame() => _astResolutionDepth--;
+
         private string? ResolveLocalValueTypeFromAstUnbounded(string name)
         {
             if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
@@ -4143,7 +4214,24 @@ public sealed class EffectEnforcementPass
             string name,
             IReadOnlyList<StatementNode> rootStatements)
         {
+            // #1104 C1 — one frame per structural level, sharing the ask
+            // counter (see TryEnterAstFrame). Declining at the cap loses a
+            // §FE variable's type, never invents one.
             string? Search(IEnumerable<StatementNode> statements)
+            {
+                if (!TryEnterAstFrame(name))
+                    return null;
+                try
+                {
+                    return SearchCore(statements);
+                }
+                finally
+                {
+                    ExitAstFrame();
+                }
+            }
+
+            string? SearchCore(IEnumerable<StatementNode> statements)
             {
                 foreach (var statement in statements)
                 {
@@ -4224,7 +4312,33 @@ public sealed class EffectEnforcementPass
                 : null;
         }
 
+        /// <summary>
+        /// #1104 C1 — the structural half of the search, and the half that
+        /// actually multiplies frames: it recurses into every nested statement
+        /// body, once per level, INSIDE each name ask. It therefore takes a
+        /// frame from the same counter the ask does
+        /// (<see cref="TryEnterAstFrame"/>). Declining at the cap returns "not
+        /// declared in this body", which is what an unsearched body honestly
+        /// says; the ask above it then falls through to its remaining
+        /// fallbacks. It never invents a declaration.
+        /// </summary>
         private string? FindLocalDeclarationType(string name, IEnumerable<StatementNode> statements)
+        {
+            if (!TryEnterAstFrame(name))
+                return null;
+            try
+            {
+                return FindLocalDeclarationTypeCore(name, statements);
+            }
+            finally
+            {
+                ExitAstFrame();
+            }
+        }
+
+        private string? FindLocalDeclarationTypeCore(
+            string name,
+            IEnumerable<StatementNode> statements)
         {
             foreach (var statement in statements)
             {

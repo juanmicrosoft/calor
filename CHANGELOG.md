@@ -30,8 +30,12 @@ All notable changes to this project will be documented in this file.
   (for example, a value whose type depends on itself, which the C# → Calor converter
   can produce from `out var` arguments). The effect checker now notices when it is
   asking about a name it is already working out, treats that value's type as unknown,
-  and moves on. A safety limit on how deep it will follow a chain of bindings backs
-  this up. Ordinary code is checked exactly as before. (#1104)
+  and moves on. This also fixes `calor mcp`'s `edit_preview`, which ran the same
+  check and could take the whole server down on a file of that shape. There is also
+  a limit on how much work the checker will do to follow one chain of bindings: code
+  that stays under the limit — which is all ordinary code, by a wide margin — is
+  checked exactly as before, and code past it is treated as "type unknown" instead of
+  crashing. (#1104)
 
 ## [0.15.0] - 2026-08-27
 

@@ -22,7 +22,8 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para>It is deliberately a <b>shape</b> pin, not a compile sweep: the full
 /// committed-corpus compile (886 at §3.2; 926 since PP-E1 leg B's 40 archived
-/// <c>final-src/*.calr</c>) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
+/// <c>final-src/*.calr</c> solutions; 927 since #1104's crash-repro fixture, see
+/// the count pin below) is the <c>compile-all-committed-calr</c> CI leg (gate 5), and
 /// the 23-file two-line <c>§O</c>/<c>§E</c> subset is already pinned by
 /// <c>o53/baseline.json</c> through P30.</para>
 /// </summary>

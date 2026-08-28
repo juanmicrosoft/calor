@@ -135,6 +135,7 @@
       "tests/Calor.Enforcement.Tests/Scenarios/Effects/E4_unknown_external.calr",
       "tests/Calor.Enforcement.Tests/Scenarios/Effects/E5_recursion.calr",
       "tests/Calor.Enforcement.Tests/Scenarios/Effects/E6_span_accuracy.calr",
+      "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr",
       "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Service.calr",
       "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Web.calr",
       "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Service.calr",
@@ -174,8 +175,7 @@
       "tests/TestData/QueryCorpus/project/app.calr",
       "tests/TestData/QueryCorpus/project/asks-across.calr",
       "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr",
-      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr",
-      "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"
+      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
     ],
     "generatedCSharpErrors": [
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m01.calr",

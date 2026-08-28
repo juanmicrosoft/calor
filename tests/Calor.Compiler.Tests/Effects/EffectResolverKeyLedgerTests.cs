@@ -317,7 +317,8 @@ public class EffectResolverKeyLedgerTests
         // absolute-path filter would then match every file. Every dot-directory is
         // skipped, for the reason recorded there too: this is a filesystem walk, and
         // the harness's gitignored `epochs/**/.prev-src/` / `.envelope-src/` copies
-        // would otherwise enter the denominator (1006 vs 926 on a clean tree, PR #1110).
+        // would otherwise enter the denominator (1006 vs 926 on a clean tree, PR #1110;
+        // the clean-tree count is 927 since #1104's crash-repro fixture).
         // No committed .calr lives under a dot-directory, so the counts are unchanged.
         return Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(root, f).Replace('\\', '/'))

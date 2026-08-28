@@ -15,6 +15,11 @@
 //      `§B{~shouldDropBatch}` / `§B{~shouldDropQueue}` / `§C{_batchScheduler.MarkFailure}` → crash
 //   3. drop the §NS wrapper and `§B{~shouldDropBatch}` (its initializer is null,
 //      it resolves in one step and is not on the cycle) → crash — this file.
+// This file does NOT bind or compile — that is the point of it (the effect pass is
+// reached here without a binder). It is therefore listed in
+// tests/TestData/Formatting/formatter-corpus-baseline.json under
+// conservativeFallbacks.semanticErrors, where the formatter records every committed
+// .calr it declines to reformat because the source has semantic errors.
 // The receiver field is load-bearing: a receiver that does not resolve to a type
 // returns before the arguments are typed and the cycle is never entered.
 §M{m001:Calor0425Leg}
