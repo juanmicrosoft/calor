@@ -1,3 +1,4 @@
+using Calor.Compiler.Effects;
 using Calor.Compiler.Indexing;
 using Xunit;
 
@@ -272,6 +273,109 @@ public sealed class ProjectIndexTests : IDisposable
         var converged = ProjectIndexBuilder.Build(OptionsFor(dir));
         Assert.Empty(converged.Residual.EffectRowsUnavailable);
         Assert.Contains(converged.EffectRows, row => row.File == "capped.calr" && row.Name == subject);
+    }
+
+    /// <summary>
+    /// A doubly-linked chain <c>A1 ⇄ A2 ⇄ … ⇄ An</c> sharing ONE effect (only
+    /// <c>A1</c> prints): one SCC of n members whose effect travels one back edge
+    /// per round, so the fixpoint needs about n rounds. The fixture
+    /// <c>NonConvergenceTests</c> uses for the size-floored default cap, restated
+    /// here because the two suites are separate assemblies.
+    /// </summary>
+    private static string DoubleChain(int n)
+    {
+        var sb = new System.Text.StringBuilder("§M{m001:M}\n");
+        for (var i = 1; i <= n; i++)
+        {
+            sb.Append($"  §F{{f{i:D4}:A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
+            if (i == 1)
+                sb.Append("    §C{Console.WriteLine} §A \"x\" §/C\n");
+            sb.Append($"    §IF{{if{i}}} (> n 0)\n");
+            if (i < n)
+                sb.Append($"      §B{{u{i}:i32}} §C{{A{i + 1}}} §A (- n 1) §/C\n");
+            sb.Append(i > 1 ? $"      §R §C{{A{i - 1}}} §A (- n 1) §/C\n" : "      §R 0\n");
+            sb.Append("    §R n\n");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// The index and the compiler must apply the SAME effective SCC cap when no
+    /// cap is configured. They did not: <c>RecordEffectRows</c> passed
+    /// <c>options.SccFixpointIterationCap ?? DefaultSccFixpointIterationCap</c>,
+    /// and setting the pass's cap AT ALL marks it injected — an injected cap is
+    /// used verbatim, which switches off the size floor
+    /// (<c>max(default, scc.Count + 1)</c>) that v0.16 W5 added precisely so a
+    /// large well-behaved recursive group never sees Calor0406. So a program
+    /// <c>calor build</c> compiles cleanly made the index emit Calor0406, drop
+    /// every row in that file, and answer <c>calor query effects</c> /
+    /// <c>calor_query</c> with "did not converge".
+    ///
+    /// <para>Measured on this fixture before the fix: n = 99 agreed (99 rows, no
+    /// residual); n = 100, 101 and 150 all compiled successfully yet indexed 0
+    /// rows with the Calor0406 residual. Two-sided by construction — the compile
+    /// side is the real CLI, the index side is <c>ProjectIndexBuilder.Build</c> —
+    /// so restoring the <c>?? Default</c> is RED here.</para>
+    /// </summary>
+    [Theory]
+    [InlineData(100)]
+    [InlineData(101)]
+    public void EffectsFacet_ALargeRecursiveGroup_IsIndexedTheWayTheCompilerCompilesIt(int members)
+    {
+        var dir = NewProject(("lib.calr", Library), ("chain.calr", DoubleChain(members)));
+
+        // The compiler's answer: clean, no Calor0406.
+        var emitted = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")[..12] + ".cs");
+        var compiled = CliTestHarness.RunCli(dir, "-i", "chain.calr", "-o", emitted);
+        try { File.Delete(emitted); } catch { }
+        Assert.True(compiled.ExitCode == 0, compiled.StdOut + compiled.StdErr);
+        Assert.DoesNotContain("Calor0406", compiled.StdOut + compiled.StdErr, StringComparison.Ordinal);
+
+        // The index's answer must be the same one: every member indexed, and no
+        // "effect inference did not converge" residual.
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        Assert.Empty(index.Residual.EffectRowsUnavailable);
+        var declarationRows = index.EffectRows
+            .Where(row => row.File == "chain.calr" && row.Kind == "function")
+            .ToList();
+        Assert.Equal(members, declarationRows.Count);
+        for (var i = 1; i <= members; i++)
+        {
+            var name = "A" + i;
+            var row = Assert.Single(declarationRows, candidate => candidate.Name == name);
+            Assert.Equal("fits", row.Verdict);
+            Assert.Equal("cw", row.DeclaredRow.Display);
+            Assert.Equal("cw", row.InferredRow?.Display);
+            Assert.Null(row.DiagnosticCode);
+        }
+    }
+
+    /// <summary>
+    /// …and the fix is "inject only what was configured", not "never inject": an
+    /// explicit cap still reaches the pass on the index path and is still used
+    /// verbatim. A flat 100 injected over a 101-member SCC is exactly the cap the
+    /// bug applied silently, so this goes RED if the fix drops injection
+    /// altogether — the mutation the pin above cannot see.
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_AnExplicitlyInjectedSccCap_StillApplies()
+    {
+        var dir = NewProject(("lib.calr", Library), ("chain.calr", DoubleChain(101)));
+
+        var capped = ProjectIndexBuilder.Build(
+            OptionsFor(dir) with { SccFixpointIterationCap = EffectEnforcementPass.DefaultSccFixpointIterationCap });
+
+        Assert.DoesNotContain(capped.EffectRows, row => row.File == "chain.calr");
+        Assert.Equal(
+            "chain.calr: effect inference did not converge (Calor0406), facts not recorded",
+            Assert.Single(capped.Residual.EffectRowsUnavailable));
+        Assert.Contains(capped.EffectRows, row => row.File == "lib.calr" && row.Name == "Double");
+
+        // Same project, nothing injected: the size floor applies and it converges.
+        var uncapped = ProjectIndexBuilder.Build(OptionsFor(dir));
+        Assert.Empty(uncapped.Residual.EffectRowsUnavailable);
+        Assert.Contains(uncapped.EffectRows, row => row.File == "chain.calr" && row.Name == "A101");
     }
 
     /// <summary>
