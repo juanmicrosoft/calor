@@ -1,0 +1,278 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+  "optionsHash": "c311c4457b2712ea96b6bd9f32a0eb4ea5134b0e82fdc3eb0e9f293757089080",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-map.calr": {
+      "contentHash": "d413fdd6e5d22ee20e9bf390758b2bc4b50b59ab47536e65ab7be18bc8cbb940",
+      "lastModified": "2026-09-01T17:07:56.5423371Z",
+      "fileSize": 1078,
+      "effectSummary": {
+        "moduleName": "MapAfter",
+        "publicFunctions": [
+          {
+            "name": "Map",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Double",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 11,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Announce",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 15,
+            "declarationColumn": 3
+          },
+          {
+            "name": "UsePure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 20,
+            "declarationColumn": 3
+          },
+          {
+            "name": "UseImpure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 24,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [
+          {
+            "name": "Loud",
+            "className": "Doubler",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 34,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Twice",
+            "className": "Doubler",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 38,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [
+          "Map",
+          "Double",
+          "Announce",
+          "UsePure",
+          "UseImpure"
+        ],
+        "internalMethodNames": [
+          "Loud",
+          "Twice"
+        ],
+        "callers": [
+          {
+            "callerId": "f001",
+            "displayName": "Map",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "f",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f004",
+            "displayName": "UsePure",
+            "diagnosticLine": 21,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f005",
+            "displayName": "UseImpure",
+            "diagnosticLine": 25,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "Doubler.mt001",
+            "displayName": "Doubler.Loud",
+            "diagnosticLine": 35,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              },
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "Doubler.mt002",
+            "displayName": "Doubler.Twice",
+            "diagnosticLine": 39,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              },
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "66b59f0cb8b2705962f75cf695f36ddae164aaced585ee6d77f5a0bc42e21f2e",
+      "diagnostics": []
+    }
+  }
+}

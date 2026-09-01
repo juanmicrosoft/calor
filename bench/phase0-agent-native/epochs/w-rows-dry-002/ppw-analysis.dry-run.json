@@ -1,0 +1,634 @@
+{
+  "gate": "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12, §A.2 row PP-W6)",
+  "epoch": "w-rows-dry-002",
+  "dryRun": true,
+  "dryRunNote": "DRY RUN: this epoch is not the registered w-rows-001; it exercises the arithmetic only and is never recorded in the ledger",
+  "registeredEpoch": "w-rows-001",
+  "constants": {
+    "legABar": 0.0,
+    "legAEffectSize": 0.5,
+    "blindFloor": 2,
+    "margin": 1.2,
+    "sensitivityMargins": [
+      1.2,
+      1.3,
+      1.35
+    ],
+    "lowerBoundGate": 1.0,
+    "cvCap": 0.41,
+    "minRunsPerCell": 2,
+    "censorCap": 0.4,
+    "minPower": 0.8,
+    "spendCeilingUsd": 150.0,
+    "bootstrapResamples": 2000,
+    "seed": 4537
+  },
+  "armA": {
+    "label": "calor+v0.14.3-pre-rows",
+    "role": "control",
+    "commit": "283ec9f9964ddd5b21da15b646a0dd77d53de99e",
+    "calorTasksSha": "6a0c0d25a43ea3e1c5e99da08ce3fb398e6a75b1",
+    "compilerHashes": [
+      "1fb60f7c041c33c0ed554ade45492f9949ea1b9e7d171835989ba268be9c0ee9"
+    ],
+    "optionsHashes": [
+      "0ad940536ce8f5e509b01aa51d16d80c924bca6a52e7b83fa5b957aaa528b3b5",
+      "1bc722ecd3c2408ce87f1cf8fd51d9d402ce8689ee4b4932f5c7335d050f1e29",
+      "1becd51a70f3d1f37a987d18e5e00008ed2b854afc8922445f795c0ad2033343",
+      "258e936522d5e4d56f1f07c1a3304bc83d7afdbb15e5707ad4fc19f43eb36830",
+      "355d8a792c63c4c2f687b40a83b5a0b9c4f8d1389222b19ff39b0bd39f6ea480",
+      "6dd81acd73a1fc7441c851426989357d9e1a5140cfaa393a49c842a79cae313e",
+      "83cff51ab5eccbd8e3f9d67c5a556284aa5bc528425658a279c42ee32b8328b0",
+      "86497ab6c62e381074f1eef9dac8449333527a8c85383617cf52196e04619a87",
+      "ae9ac094e2264c52b4c7ec13cfca6a01d4081f77669d389aab467b5f9de7ca54"
+    ],
+    "provenance": "tag v0.14.3 PLUS the one commit 283ec9f9964ddd5b21da15b646a0dd77d53de99e on the never-merged branch arm/v0.14.3-pre-rows that threads the existing --permissive-effects policy through Calor.Tasks; the +1 is the registered additive mechanism, not drift",
+    "editMechanism": "raw"
+  },
+  "armB": {
+    "label": "calor+v0.15.0",
+    "role": "treatment",
+    "commit": "3bb2601e3ff83597ddf2f27dcc334b6399ab97ea",
+    "calorTasksSha": "e39f4253c2419592ddd0fa8d18200f362e98bc76",
+    "compilerHashes": [
+      "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553"
+    ],
+    "optionsHashes": [
+      "1b8cc3d3f0569b42f5be6b35544ae3e0bef75452feca8f3121620109c33fcae5",
+      "34ba3c6a3ca4f0545a252af0368ffe9da7f42e143d4d4ca6385bd12d6d97f98c",
+      "357fe0ed837849fa67df33af5e9870f8760c98432e92756d9dbd44c66ff5d45f",
+      "663f329e690db9a90ca5b8137974c673648a3c6d1943dcb345c52b3cac34b6cd",
+      "ba786e47e51a7fb704bb31187f95de062bbce4bee610f6422a11a647fe398b20",
+      "c311c4457b2712ea96b6bd9f32a0eb4ea5134b0e82fdc3eb0e9f293757089080",
+      "d878ac031e092dcdb00fd5236a99e155ad27df151f9b77002683a1eaf63ec782",
+      "e23ddb390e331cf4b391c883b9a906cdbe4e4cfc2ed8ff44d46b0ac1bec7afbf",
+      "ed3b796c7d3b40e246d8c99bbe30fb7753ed454d85c53dc684ed724bbe2511a4"
+    ],
+    "provenance": "the v0.15.0 release tag, strict, no flags",
+    "editMechanism": "raw"
+  },
+  "harnessCommit": "54fcedd36816e2e40bcb912c025dcbd3642a3e32",
+  "inheritedPinsIgnored": [
+    "ppL5",
+    "ppL6",
+    "ppW5"
+  ],
+  "modelPin": "claude-opus-4-8",
+  "legBPairs": [
+    "W-004-counter-peek",
+    "W-006-map-doubler"
+  ],
+  "blindPairs": [
+    "W-004-counter-peek",
+    "W-006-map-doubler"
+  ],
+  "warningVsErrorPairs": [
+    "W-002-map-and-report",
+    "W-003-match-fallback",
+    "W-005-pipeline-trace"
+  ],
+  "pairsSurviving": [
+    "W-004-counter-peek",
+    "W-005-pipeline-trace",
+    "W-006-map-doubler"
+  ],
+  "pairsDropped": [
+    {
+      "pair": "W-002-map-and-report",
+      "controlValid": 0,
+      "treatmentValid": 0
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "controlValid": 0,
+      "treatmentValid": 0
+    }
+  ],
+  "missingTranscript": [],
+  "censored": {
+    "control": 0.0,
+    "treatment": 0.0
+  },
+  "tokenSources": {
+    "modelUsage": 18
+  },
+  "spendUsd": 36.5009,
+  "paidRuns": 18,
+  "measuredCostPerRunUsd": 2.0278,
+  "spendCeilingExceeded": false,
+  "disclosedLimitations": [
+    {
+      "id": "stderr-laundering-invisible-on-arm-A",
+      "detail": "a laundering implementation that prints to Console.Error instead of stdout compiles on arm A with NO Calor0410 and passes the held-out suite (the tests capture Console.Out), so it is an UNDETECTED escape. On arm B the same program is refused (4x error Calor0410, build exit 1).",
+      "direction": "removes escapes from ARM A ONLY, shrinking the A - B delta. It biases AGAINST this workstream's own hypothesis and cannot manufacture a HIT."
+    },
+    {
+      "id": "W-004-arm-B-zero-is-compiler-behaviour",
+      "detail": "W-004's laundering site INVOKES the field (§C{this.onChange}) rather than passing it, so 0.15 charges it through the unknown-call path and the arm-B escape rate is expected to be a hard zero.",
+      "direction": "not test blindness and not a defect: a zero there is the compiler working. W-004's `unregistered-this-qualified-escape-b` seed is a CHARGED CONTROL, unlike the identically-named seeds on W-001 and W-006, which do escape — the #1136 boilerplate pasted across those cells is cell-specific only in its first sentence and must not be read as making them the same cell."
+    },
+    {
+      "id": "silence-signature-required",
+      "detail": "W-001's and W-003's effect-observing tests assert the return value BEFORE the silence assertion, so a silent-but-wrong solution fails a named test having laundered nothing. Leg A therefore requires the SILENCE failure signature, not merely a named-test failure; the excluded cases are published per cell as namedTestFailuresWithoutSilence.",
+      "direction": "arm-symmetric — it removes noise from both arms and cannot move the sign."
+    }
+  ],
+  "indicatorSelfCheck": [
+    {
+      "pair": "W-002-map-and-report",
+      "hasIndicator": true,
+      "falseOnStarter": true,
+      "trueOnClean": true,
+      "ok": true
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "hasIndicator": true,
+      "falseOnStarter": true,
+      "trueOnClean": true,
+      "ok": true
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "hasIndicator": true,
+      "falseOnStarter": true,
+      "trueOnClean": true,
+      "ok": true
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "hasIndicator": true,
+      "falseOnStarter": true,
+      "trueOnClean": true,
+      "ok": true
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "hasIndicator": true,
+      "falseOnStarter": true,
+      "trueOnClean": true,
+      "ok": true
+    }
+  ],
+  "starterBlobDrift": [],
+  "perCell": [
+    {
+      "pair": "W-002-map-and-report",
+      "arm": "A",
+      "class": "warning-vs-error",
+      "validRuns": 0,
+      "readableRuns": 0,
+      "escapes": 0,
+      "escapeRate": null,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 0,
+      "shapeRealizedRate": null,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "arm": "B",
+      "class": "warning-vs-error",
+      "validRuns": 0,
+      "readableRuns": 0,
+      "escapes": 0,
+      "escapeRate": null,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 0,
+      "shapeRealizedRate": null,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "arm": "A",
+      "class": "warning-vs-error",
+      "validRuns": 0,
+      "readableRuns": 0,
+      "escapes": 0,
+      "escapeRate": null,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 0,
+      "shapeRealizedRate": null,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "arm": "B",
+      "class": "warning-vs-error",
+      "validRuns": 0,
+      "readableRuns": 0,
+      "escapes": 0,
+      "escapeRate": null,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 0,
+      "shapeRealizedRate": null,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "arm": "A",
+      "class": "blind",
+      "validRuns": 3,
+      "readableRuns": 3,
+      "escapes": 0,
+      "escapeRate": 0.0,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 2,
+      "shapeRealizedRate": 0.6667,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "arm": "B",
+      "class": "blind",
+      "validRuns": 3,
+      "readableRuns": 3,
+      "escapes": 0,
+      "escapeRate": 0.0,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 2,
+      "shapeRealizedRate": 0.6667,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "arm": "A",
+      "class": "warning-vs-error",
+      "validRuns": 3,
+      "readableRuns": 3,
+      "escapes": 0,
+      "escapeRate": 0.0,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 3,
+      "shapeRealizedRate": 1.0,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "arm": "B",
+      "class": "warning-vs-error",
+      "validRuns": 3,
+      "readableRuns": 3,
+      "escapes": 0,
+      "escapeRate": 0.0,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 3,
+      "shapeRealizedRate": 1.0,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "arm": "A",
+      "class": "blind",
+      "validRuns": 3,
+      "readableRuns": 3,
+      "escapes": 0,
+      "escapeRate": 0.0,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 1,
+      "shapeRealizedRate": 0.3333,
+      "escapeCategories": {}
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "arm": "B",
+      "class": "blind",
+      "validRuns": 3,
+      "readableRuns": 3,
+      "escapes": 0,
+      "escapeRate": 0.0,
+      "namedTestFailuresWithoutSilence": [],
+      "didNotBuildAtDeclaredDone": 0,
+      "didNotBuildRuns": [],
+      "shapeRealized": 0,
+      "shapeRealizedRate": 0.0,
+      "escapeCategories": {}
+    }
+  ],
+  "legA": {
+    "rule": "an escape is >= 1 named effectObservingTest failing on a workspace that BUILT; a non-building final state contributes NO escape and is published in its own category, still counting against the censoring cap",
+    "statistic": "the median over BLIND pairs of the per-pair escape-rate delta (A - B); odd -> the middle value, even -> the mean of the two middle values",
+    "bar": "the one-sided 95 % lower bound of that delta exceeds 0",
+    "blind": {
+      "pairs": [
+        "W-004-counter-peek",
+        "W-006-map-doubler"
+      ],
+      "perPair": [
+        {
+          "pair": "W-004-counter-peek",
+          "armA": 0.0,
+          "armB": 0.0,
+          "delta": 0.0
+        },
+        {
+          "pair": "W-006-map-doubler",
+          "armA": 0.0,
+          "armB": 0.0,
+          "delta": 0.0
+        }
+      ],
+      "medianDelta": 0.0,
+      "lowerBound95": 0.0,
+      "meetsBar": false
+    },
+    "warningVsError": {
+      "pairs": [
+        "W-005-pipeline-trace"
+      ],
+      "perPair": [
+        {
+          "pair": "W-005-pipeline-trace",
+          "armA": 0.0,
+          "armB": 0.0,
+          "delta": 0.0
+        }
+      ],
+      "medianDelta": 0.0,
+      "lowerBound95": 0.0,
+      "meetsBar": false
+    },
+    "meetsBar": false
+  },
+  "legB": {
+    "rule": "fails iff BOTH the one-sided 95 % cluster-bootstrap lower bound of the median paired per-pair output-tokens-to-green ratio (arm B / arm A) exceeds 1.0 AND the point estimate exceeds the margin 1.20; per-run figure = token-usage.py output_tokens_corrected (A-1.9.1), never usage.output_tokens",
+    "pairs": [
+      "W-004-counter-peek",
+      "W-006-map-doubler"
+    ],
+    "perPair": [
+      {
+        "pair": "W-004-counter-peek",
+        "controlMean": 21723.33,
+        "controlRuns": 3,
+        "treatmentMean": 25870,
+        "treatmentRuns": 3,
+        "ratio": 1.1909
+      },
+      {
+        "pair": "W-006-map-doubler",
+        "controlMean": 25389,
+        "controlRuns": 3,
+        "treatmentMean": 26508.33,
+        "treatmentRuns": 3,
+        "ratio": 1.0441
+      }
+    ],
+    "pointEstimate": 1.1175,
+    "lowerBound95": 0.8634,
+    "boundFires": false,
+    "realizedMedianWithinCellCv": 0.252,
+    "maxWithinCellCv": 0.3287,
+    "withinCellCv": [
+      {
+        "pair": "W-004-counter-peek",
+        "arm": "control",
+        "cv": 0.2763
+      },
+      {
+        "pair": "W-004-counter-peek",
+        "arm": "treatment",
+        "cv": 0.3287
+      },
+      {
+        "pair": "W-006-map-doubler",
+        "arm": "control",
+        "cv": 0.2223
+      },
+      {
+        "pair": "W-006-map-doubler",
+        "arm": "treatment",
+        "cv": 0.2277
+      }
+    ],
+    "sensitivity": [
+      {
+        "margin": 1.2,
+        "registered": true,
+        "population": "e1-rows-parity-001",
+        "pointEstimate": 1.1175,
+        "lowerBound95": 0.8634,
+        "pointExceedsMargin": false,
+        "fails": false
+      },
+      {
+        "margin": 1.3,
+        "registered": false,
+        "population": "pooled",
+        "pointEstimate": 1.1175,
+        "lowerBound95": 0.8634,
+        "pointExceedsMargin": false,
+        "fails": false
+      },
+      {
+        "margin": 1.35,
+        "registered": false,
+        "population": "w5-parity-002",
+        "pointEstimate": 1.1175,
+        "lowerBound95": 0.8634,
+        "pointExceedsMargin": false,
+        "fails": false
+      }
+    ],
+    "fails": false,
+    "iterationsToGreen": {
+      "control": {
+        "1": 4,
+        "2": 2,
+        "3": 2,
+        "4": 1
+      },
+      "treatment": {
+        "1": 1,
+        "2": 5,
+        "3": 2,
+        "6": 1
+      }
+    }
+  },
+  "sizing": {
+    "costPerRunUsd": 2.0278,
+    "costBasis": "measured on this dry epoch's own paid runs",
+    "priorSpendUsd": 67.5,
+    "rule": "the smallest N (runs per cell) reaching >= 0.80 power at Delta = 0.5 under the UPPER 95 % confidence bound of the dry run's observed between-pair variance; the dry run sizes N and NEVER moves the bar",
+    "blindPairsObserved": 2,
+    "blindFloor": 2,
+    "observedDeltas": [
+      0.0,
+      0.0
+    ],
+    "observedVariance": 0.0,
+    "varianceUpperBound95": 0.0,
+    "sims": 400,
+    "bootstrapResamples": 400,
+    "atPointVarianceNotRegistered": {
+      "note": "NOT the registered basis — A-1.12 sizes N under the UPPER confidence bound of the variance. Published so the cost of that choice is visible.",
+      "powerCurve": [],
+      "recommendedN": null
+    },
+    "powerCurve": [
+      {
+        "n": 2,
+        "power": 0.432,
+        "runs": 62,
+        "estimatedUsd": 116.17,
+        "fitsCeiling": true
+      },
+      {
+        "n": 3,
+        "power": 0.48,
+        "runs": 74,
+        "estimatedUsd": 140.5,
+        "fitsCeiling": true
+      },
+      {
+        "n": 4,
+        "power": 0.557,
+        "runs": 86,
+        "estimatedUsd": 164.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 5,
+        "power": 0.64,
+        "runs": 98,
+        "estimatedUsd": 189.17,
+        "fitsCeiling": false
+      },
+      {
+        "n": 6,
+        "power": 0.733,
+        "runs": 110,
+        "estimatedUsd": 213.51,
+        "fitsCeiling": false
+      },
+      {
+        "n": 7,
+        "power": 0.775,
+        "runs": 122,
+        "estimatedUsd": 237.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 8,
+        "power": 0.777,
+        "runs": 134,
+        "estimatedUsd": 262.17,
+        "fitsCeiling": false
+      },
+      {
+        "n": 9,
+        "power": 0.868,
+        "runs": 146,
+        "estimatedUsd": 286.51,
+        "fitsCeiling": false
+      },
+      {
+        "n": 10,
+        "power": 0.895,
+        "runs": 158,
+        "estimatedUsd": 310.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 11,
+        "power": 0.91,
+        "runs": 170,
+        "estimatedUsd": 335.18,
+        "fitsCeiling": false
+      },
+      {
+        "n": 12,
+        "power": 0.925,
+        "runs": 182,
+        "estimatedUsd": 359.51,
+        "fitsCeiling": false
+      }
+    ],
+    "recommendedN": 9,
+    "maxAffordableN": 3,
+    "recommendedFitsCeiling": false,
+    "recommendedRuns": 146,
+    "recommendedUsd": 286.51,
+    "achievablePower": 0.868,
+    "armsUnderpowered": true,
+    "note": "the N that reaches the power bar does not fit the $150 ceiling; A-1.12: the PP registers its achievable power and arms UNDERPOWERED rather than overrunning",
+    "priorDryEpochs": [
+      {
+        "epoch": "w-rows-dry-001",
+        "paidRuns": 19,
+        "spendUsd": 26.9461
+      }
+    ]
+  },
+  "achievablePower": null,
+  "harnessValid": false,
+  "blockers": [
+    "the PP-W5 validity floor dropped 2 pair(s) (a cell with < 2 valid runs drops its pair): W-002-map-and-report, W-003-match-fallback"
+  ],
+  "routes": {
+    "a": {
+      "fires": false,
+      "evaluated": true,
+      "rule": "any unmutated starter fails to reproduce its frozen multiset on its arm (severity and exit are part of the multiset)",
+      "artifact": "bench/phase0-agent-native/epochs/w-rows-dry-002/ppw-starter-compiles.json",
+      "evidence": []
+    },
+    "aPrime": {
+      "fires": false,
+      "rule": "fewer than two blind cells survive (a)",
+      "blindSurvivingA": [
+        "W-004-counter-peek",
+        "W-006-map-doubler"
+      ],
+      "floor": 2,
+      "artifact": "bench/phase0-agent-native/epochs/w-rows-dry-002/ppw-starter-compiles.json"
+    },
+    "b": {
+      "fires": false,
+      "rule": "any run lacks W1's transcript.jsonl",
+      "artifact": null,
+      "evidence": []
+    },
+    "c": {
+      "fires": true,
+      "rule": "the PP-W5 validity floor / distinct-hash / censoring routes, plus validity conditions (2) and (4), which A-1.12 wires here",
+      "artifact": "bench/phase0-agent-native/epochs/w-rows-dry-002/pins.json",
+      "evidence": [
+        "the PP-W5 validity floor dropped 2 pair(s) (a cell with < 2 valid runs drops its pair): W-002-map-and-report, W-003-match-fallback"
+      ]
+    },
+    "d": {
+      "fires": false,
+      "inert": true,
+      "rule": "W2 does not ship in 0.16.0 AND roadmap §9 cut line 2 was invoked in writing — INERT BY CONSTRUCTION: cut line 2's antecedent is \"if A-1.12 has not registered by the 0.16 branch cut\", which merging A-1.12 made permanently false. A W2 slip for any reason is a MISS.",
+      "artifact": null
+    }
+  },
+  "ownGoal": false,
+  "ownGoalCauses": [],
+  "ownGoalClause": "a not-adjudicated route caused by this workstream's own change is adjudicated MISS, and the cause is published WITH THE ARTIFACT that shows it, never asserted in prose",
+  "precedence": "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
+  "underpowered": false,
+  "verdict": null,
+  "route": null,
+  "reason": "DRY RUN: no verdict. This epoch is not the registered w-rows-001, so it sizes N and reports variance; it never adjudicates and is never recorded in the ledger."
+}

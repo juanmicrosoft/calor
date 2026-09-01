@@ -48,6 +48,21 @@ All notable changes to this project will be documented in this file.
   counts what an agent did on each turn — files read, searches, builds, edits — has real
   numbers behind it for the first time. (v0.16 W1/W4)
 
+- **The practice round finished, and it says the real experiment would be too small to
+  settle anything.** A second practice round covered the three tasks the usage limit cut
+  short, so all six now have results. The practice round's job is to work out how many runs
+  the real experiment needs, and the answer is **nine runs per task per compiler** — roughly
+  twice what the budget we fixed in advance can pay for, which affords three. Three runs
+  would give the experiment a *48 %* chance of detecting the effect even if the effect is
+  real, so by the rule we wrote down before starting, the experiment is recorded as
+  **underpowered** rather than being run anyway and reported as if it had settled the
+  question. Two other things worth saying plainly: across all 28 usable runs, **not one**
+  agent on either compiler hid a side effect where the tests could catch it — the thing
+  being measured did not happen at all — and the stricter compiler cost about 12 % more
+  work to reach a green build, below the threshold we had registered as "noticeable".
+  Neither is a result about effect rows yet; both are results about these six tasks.
+  (v0.16 W2)
+
 - **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
   Effect checking runs in loops that have a safety limit, so a tangle of functions that
   call each other cannot make the compiler spin forever. Before, hitting that limit in the

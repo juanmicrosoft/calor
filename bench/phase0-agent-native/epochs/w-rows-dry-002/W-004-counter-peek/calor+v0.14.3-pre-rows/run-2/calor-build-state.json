@@ -1,0 +1,77 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "1fb60f7c041c33c0ed554ade45492f9949ea1b9e7d171835989ba268be9c0ee9",
+  "optionsHash": "86497ab6c62e381074f1eef9dac8449333527a8c85383617cf52196e04619a87",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-callback.calr": {
+      "contentHash": "eceaad1d8a6402e5526d6d31b18684bbb6ef1baaa7721ba59f1affc420e36e45",
+      "lastModified": "2026-09-01T15:18:48.681653Z",
+      "fileSize": 382,
+      "effectSummary": {
+        "moduleName": "CallbackAfter",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Bump",
+            "className": "Counter",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 5,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Peek",
+            "className": "Counter",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 9,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Bump",
+          "Peek"
+        ],
+        "callers": [
+          {
+            "callerName": "Counter.Bump",
+            "diagnosticLine": 6,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "onChange",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "c3a464238093e9a8b949cdb9f2f9600f7f9cfd99ec147d25cae0bcd8303f26ce",
+      "diagnostics": [
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027onChange\u0027 (type \u0027Action\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 8,
+          "column": 7
+        }
+      ]
+    }
+  }
+}

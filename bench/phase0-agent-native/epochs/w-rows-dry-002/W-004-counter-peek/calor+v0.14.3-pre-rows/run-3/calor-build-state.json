@@ -1,0 +1,103 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "1fb60f7c041c33c0ed554ade45492f9949ea1b9e7d171835989ba268be9c0ee9",
+  "optionsHash": "6dd81acd73a1fc7441c851426989357d9e1a5140cfaa393a49c842a79cae313e",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-callback.calr": {
+      "contentHash": "13b03d6ea9378382e73bae4fc97c45cae9ac83fed467d48a0fb04d5e13bd0535",
+      "lastModified": "2026-09-01T15:33:05.2577341Z",
+      "fileSize": 474,
+      "effectSummary": {
+        "moduleName": "CallbackAfter",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Bump",
+            "className": "Counter",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 14,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Peek",
+            "className": "Counter",
+            "hasEffectDeclaration": false,
+            "declaredEffects": [],
+            "declarationLine": 19,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Emit",
+          "Bump",
+          "Peek"
+        ],
+        "callers": [
+          {
+            "callerName": "Counter.Emit",
+            "diagnosticLine": 11,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Console.WriteLine",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "Counter.Bump",
+            "diagnosticLine": 15,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "onChange",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "a3e9c03bc7d72e8ef2d4f3c012d252c7580c62dbec99e96bab707af2cf1c7886",
+      "diagnostics": [
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027onChange\u0027 (type \u0027Action\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 17,
+          "column": 7
+        }
+      ]
+    }
+  }
+}

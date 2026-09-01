@@ -1,0 +1,9 @@
+/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-005-pipeline-trace-calor-3iuUzE/src/A2.calr(25,27): Calor warning Calor0418: Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver). [/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-005-pipeline-trace-calor-3iuUzE/src/Src.csproj]
+
+Build succeeded.
+
+/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-005-pipeline-trace-calor-3iuUzE/src/A2.calr(25,27): Calor warning Calor0418: Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver). [/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-005-pipeline-trace-calor-3iuUzE/src/Src.csproj]
+    1 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.08

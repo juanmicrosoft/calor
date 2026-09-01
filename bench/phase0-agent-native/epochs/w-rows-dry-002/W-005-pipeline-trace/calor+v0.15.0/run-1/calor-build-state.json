@@ -1,0 +1,79 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+  "optionsHash": "1b8cc3d3f0569b42f5be6b35544ae3e0bef75452feca8f3121620109c33fcae5",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A2.calr": {
+      "contentHash": "fb4d5c3b7c4546238efddfb30ded86aa60fb490a45b89ec4a9d90bad8cd49fa6",
+      "lastModified": "2026-09-01T15:57:40.6130753Z",
+      "fileSize": 1571,
+      "effectSummary": {
+        "moduleName": "MediatR.Pipeline",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Handle",
+            "className": "RequestPreProcessorBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 23,
+            "declarationColumn": 7
+          },
+          {
+            "name": "Process",
+            "className": "TracePreProcessor",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 31,
+            "declarationColumn": 7
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Handle",
+          "Process"
+        ],
+        "callers": [
+          {
+            "callerId": "RequestPreProcessorBehavior.m008",
+            "displayName": "RequestPreProcessorBehavior.Handle",
+            "diagnosticLine": 24,
+            "diagnosticColumn": 9,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "processor.Process",
+                "isConstructor": false
+              },
+              {
+                "target": "next",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "3e17955759c0956d9ad41d3746f4f5e94658f89f160f83b660508c24d53ddf44",
+      "diagnostics": []
+    }
+  }
+}

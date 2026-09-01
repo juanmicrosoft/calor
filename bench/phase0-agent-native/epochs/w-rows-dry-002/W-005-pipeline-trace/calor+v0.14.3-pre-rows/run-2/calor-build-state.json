@@ -1,0 +1,70 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "1fb60f7c041c33c0ed554ade45492f9949ea1b9e7d171835989ba268be9c0ee9",
+  "optionsHash": "ae9ac094e2264c52b4c7ec13cfca6a01d4081f77669d389aab467b5f9de7ca54",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A2.calr": {
+      "contentHash": "ec62cc8df9c73730db2319c0196a1947bb170cd4acc15e7b7f53245eb48ee280",
+      "lastModified": "2026-09-01T16:04:57.6687933Z",
+      "fileSize": 1745,
+      "effectSummary": {
+        "moduleName": "MediatR.Pipeline",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Handle",
+            "className": "RequestPreProcessorBehavior",
+            "hasEffectDeclaration": false,
+            "declaredEffects": [],
+            "declarationLine": 21,
+            "declarationColumn": 7
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Handle"
+        ],
+        "callers": [
+          {
+            "callerName": "RequestPreProcessorBehavior.Handle",
+            "diagnosticLine": 21,
+            "diagnosticColumn": 7,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "processor.Process",
+                "isConstructor": false
+              },
+              {
+                "target": "_chainProcess010.ConfigureAwait",
+                "isConstructor": false
+              },
+              {
+                "target": "next",
+                "isConstructor": false
+              },
+              {
+                "target": "_chainNext011.ConfigureAwait",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "34c781507c22c7c8a8ee106da2aebe7c1f41ddc124ac25fee1b57bc01c388b0a",
+      "diagnostics": [
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of value \u0027next\u0027 (declared type \u0027RequestHandlerDelegate\u003CTResponse\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 25,
+          "column": 27
+        }
+      ]
+    }
+  }
+}

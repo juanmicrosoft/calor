@@ -1,0 +1,98 @@
+{
+  "pair": "W-006-map-doubler",
+  "arm": "calor+v0.15.0",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 10,
+  "finalBuild": {
+    "ok": true,
+    "log": ".src_final.txt"
+  },
+  "heldoutFinal": {
+    "failedTests": [],
+    "silenceFailures": [],
+    "source": "log",
+    "valueOnlyFailures": []
+  },
+  "iterations": 6,
+  "iterationsToGreen": 6,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1006,
+  "envelopeValidAll": false,
+  "mcpWrites": null,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/23fdc921-45c0-45dd-96dc-d776dcd57568/scratchpad/armB/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/23fdc921-45c0-45dd-96dc-d776dcd57568/scratchpad/armB",
+  "editMechanism": "raw",
+  "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+  "buildState": {
+    "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+    "compilerSemanticsVersion": "calor-compile-semantics-v1",
+    "formatVersion": "4.0",
+    "manifestHash": "",
+    "optionsHash": "e23ddb390e331cf4b391c883b9a906cdbe4e4cfc2ed8ff44d46b0ac1bec7afbf",
+    "source": "file",
+    "archivedFrom": "agent-workspace",
+    "file": "calor-build-state.json"
+  },
+  "armConfigKey": "calor",
+  "controlArmKind": null,
+  "permissiveEffects": false,
+  "fixture": "starter-b",
+  "templateSource": "arm-repo-root",
+  "armCanary": "strict-ok",
+  "reference": "seeded/clean-b",
+  "referenceSource": "seeded-clean-declared",
+  "turns": {
+    "assistantEvents": 60,
+    "assistantEventsWithoutId": 0,
+    "assistantMessages": 32,
+    "assistantMessagesIncludingSubagents": 32,
+    "eventTypes": {
+      "assistant": 60,
+      "rate_limit_event": 3,
+      "result": 1,
+      "system": 251,
+      "user": 33
+    },
+    "events": 348,
+    "resultEvents": 1,
+    "source": "transcript",
+    "subagentMessages": 0,
+    "numTurns": 34,
+    "transcript": "transcript.jsonl"
+  },
+  "agentBuilds": {
+    "count": 6,
+    "file": "agent-builds.jsonl"
+  },
+  "tokens": {
+    "input": 64,
+    "output": 34515
+  },
+  "tokenUsage": {
+    "cache_creation_input_tokens_corrected": 63483,
+    "cache_creation_input_tokens_naive": 63483,
+    "cache_read_input_tokens_corrected": 1413415,
+    "cache_read_input_tokens_naive": 1413415,
+    "input_tokens_corrected": 64,
+    "input_tokens_naive": 64,
+    "models_counted": [
+      "claude-opus-4-8"
+    ],
+    "models_excluded": {
+      "claude-haiku-4-5-20251001": 12
+    },
+    "num_turns": 34,
+    "origin_kind": null,
+    "output_tokens_all_models": 34527,
+    "output_tokens_corrected": 34515,
+    "output_tokens_naive": 34515,
+    "source": "modelUsage",
+    "undercount_flagged": false,
+    "undercount_ratio": 1.0
+  },
+  "nullAgent": false
+}

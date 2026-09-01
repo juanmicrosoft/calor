@@ -990,6 +990,40 @@ class DryRunSizesNAndNeverMovesTheBar(unittest.TestCase):
             self.assertGreater(hi["estimatedUsd"], lo["estimatedUsd"])
         self.assertLessEqual(dear["maxAffordableN"], cheap["maxAffordableN"])
 
+    def test_prior_spend_counts_every_sibling_dry_epoch(self):
+        """The ceiling is cumulative over the proof point. w-rows-dry-001 was
+        truncated by the weekly usage limit at 19 of 36 runs and w-rows-dry-002
+        finished the pairs it never reached, so an affordable N priced against
+        only the epoch in hand forgets $27 of the $150 — one whole N step."""
+        epoch = self.epoch()
+        root = os.path.dirname(epoch)
+        alone = PPW.prior_dry_spend(epoch)
+        self.assertEqual(alone["epochs"], [])
+
+        # A sibling collection of the same kind, beside it in the archive.
+        sibling = os.path.join(root, "w-rows-dry-sibling")
+        shutil.copytree(epoch, sibling)
+        with_sibling = PPW.prior_dry_spend(epoch)
+        self.assertEqual([e["epoch"] for e in with_sibling["epochs"]], ["w-rows-dry-sibling"])
+        self.assertGreater(with_sibling["spendUsd"], 0)
+
+        # The epoch never counts as prior spend to ITSELF, and the sibling's own
+        # view is symmetric.
+        self.assertNotIn(os.path.basename(epoch),
+                         [e["epoch"] for e in with_sibling["epochs"]])
+        self.assertEqual([e["epoch"] for e in PPW.prior_dry_spend(sibling)["epochs"]],
+                         [os.path.basename(epoch)])
+
+        # An epoch of another kind beside it is not this proof point's spend.
+        other = os.path.join(root, "not-a-ppw-epoch")
+        shutil.copytree(epoch, other)
+        pins_path = os.path.join(other, "pins.json")
+        pins = json.load(open(pins_path, encoding="utf-8"))
+        pins["kind"] = "pp-e1-rows-parity"
+        json.dump(pins, open(pins_path, "w", encoding="utf-8"))
+        self.assertEqual([e["epoch"] for e in PPW.prior_dry_spend(epoch)["epochs"]],
+                         ["w-rows-dry-sibling"])
+
     def test_the_stale_estimate_is_named_as_the_basis_when_nothing_was_measured(self):
         sizing = PPW.size_n([0.5, 0.4], 2, sims=10, boot=50)
         self.assertEqual(sizing["costPerRunUsd"], PPW.COST_PER_RUN_USD)

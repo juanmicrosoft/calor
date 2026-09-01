@@ -1582,10 +1582,13 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
         # dry epoch truncated part-way (a usage limit, an aborted collector) sizes
         # from what it spent rather than from the run count it planned.
         measured_cost = (spend_usd / paid_runs) if paid_runs else None
+        prior = prior_dry_spend(epoch_dir)
         sizing = size_n(deltas, len(deltas), sims=sizing_sims, boot=sizing_boot,
                         cost_per_run=measured_cost,
                         prior_usd=(None if measured_cost is None
-                                   else spend_usd + PILOT_RUNS * measured_cost))
+                                   else spend_usd + prior["spendUsd"]
+                                   + PILOT_RUNS * measured_cost))
+        sizing["priorDryEpochs"] = prior["epochs"]
     analysis["sizing"] = sizing
     analysis["achievablePower"] = achievable_power
     analysis["harnessValid"] = harness_valid
@@ -1667,6 +1670,48 @@ def _corrected_tokens(run_dir):
     """The one blessed derivation of the cost-leg token figure (A-1.9.1)."""
     usage = TOKEN_USAGE.compute(TOKEN_USAGE.load_envelope(os.path.join(run_dir, "agent.json")))
     return usage["output_tokens_corrected"], usage["source"]
+
+
+def prior_dry_spend(epoch_dir):
+    """Every OTHER pp-w-rows dry epoch's spend, summed.
+
+    The ceiling is cumulative over the whole proof point, and this experiment
+    has already spent across more than one collection: the weekly usage limit
+    truncated w-rows-dry-001 at 19 of 36 runs, so w-rows-dry-002 was collected
+    to finish the three pairs it never reached. Pricing the affordable N against
+    only the epoch in hand would forget the first collection entirely and
+    over-state what is left — here by $27 of the $150, which is one whole
+    runs-per-cell step.
+
+    Sibling epochs are found beside `epoch_dir`, keyed on `pins.json` kind, and
+    the registered epoch is never counted as prior spend to itself.
+    """
+    root = os.path.dirname(os.path.abspath(epoch_dir))
+    here = os.path.basename(os.path.abspath(epoch_dir))
+    total, runs = 0.0, 0
+    epochs = []
+    for name in sorted(os.listdir(root) if os.path.isdir(root) else []):
+        if name == here or name.startswith("."):
+            continue
+        sibling = os.path.join(root, name)
+        try:
+            with open(os.path.join(sibling, "pins.json"), encoding="utf-8") as fh:
+                pins = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(pins, dict) or pins.get("kind") != KIND:
+            continue
+        spend, paid = 0.0, 0
+        for path in glob.glob(os.path.join(sibling, "*", "*", "run-*", "result.json")):
+            cost = _run_cost(os.path.dirname(path))
+            if cost:
+                spend += cost
+                paid += 1
+        if paid:
+            epochs.append({"epoch": name, "paidRuns": paid, "spendUsd": round(spend, 4)})
+            total += spend
+            runs += paid
+    return {"epochs": epochs, "paidRuns": runs, "spendUsd": round(total, 4)}
 
 
 def _run_cost(run_dir):
