@@ -1,11 +1,14 @@
 # Roadmap — v0.17 "Reach, and the Rows We Shipped"
 
 **Date:** 2026-09-01
-**Status:** **Draft v3** — two adversarial rounds (§10). Round 1: self-conducted, twelve findings,
-all applied. **Round 2: independent (cloud multi-agent), and it found that two of round 1's twelve
-"Applied" dispositions were only half-applied** — which is the finding a self-review structurally
-cannot make. Nine round-2 findings applied, two recorded as stale-base artifacts with evidence.
-The v0.16 roadmap reached Draft v4 through three rounds; **round 3 is still owed.**
+**Status:** **Draft v4** — three adversarial rounds (§10), matching the v0.16 roadmap's bar.
+Round 1: self-conducted, twelve findings. **Round 2: independent (cloud multi-agent)** — found that
+three of round 1's twelve "Applied" dispositions were only half-applied, the finding a self-review
+structurally cannot make. **Round 3:** verified **27/27** dispositions landed, **independently
+recomputed §0.3's four trigger numbers** (the gap rounds 1 and 2 both left open — all reconcile,
+including three sum checks), and found six more, two of them Major: R4 mis-scoped a MUST against
+both issues' own text, and round 1's own effect-size fix had handed the release the power to set
+its target after seeing the data. All applied. **§10 names what is still unattacked.**
 **Written against:** `cb68afcf` (main after PR #1140), with PP-W-rows adjudicated in PR #1145.
 `Directory.Build.props:3` reads `0.15.0`; **v0.16.0 has not been released**, and every number
 below is measured at the 0.16 branch cut, not after it.
@@ -214,15 +217,30 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   behind it: #875 (non-nullable `str` at the binder, the root-cause fix for divergence D3) and
   #1082's remaining nullability follow-ons. *Discriminating:* gate 6 is already two-sided per
   subject; a fix that trades serilog for MediatR fails it as written.
-- **R4 — The converter's real-code failures, as a batch.** Four issues, one theme — converted real
-  code does not survive the pipeline: **#1128** (the emitter writes a narrow effect row while
-  emitting unclassified BCL/LINQ calls, so converted code fails Calor0410), **#1137 + #1118** (a
-  class with `§EXT`, or any class body, emits unqualified module-function calls → Calor1002 /
-  CS0103 — one root cause, two issues), **#1127** (binder ICE: a named argument matching no
-  parameter throws `IndexOutOfRangeException`, `Scope.cs:1677-1686`). *Note:* #1137/#1118 are on
-  the critical path for §3.2 S1 — #1136 records "inherited field, unqualified" as *not cleanly
-  measurable end-to-end today* precisely because of #1137.
-  *Discriminating:* each lands with the fixture that reproduced it.
+- **R4 — The converter's real-code failures. Four defects, not one batch.** Draft v2 called
+  #1137 and #1118 "one root cause, two issues"; **both issues say the opposite in their own text**
+  (§10 R3-a). They are *complementary*, which is why one fix cannot close both:
+  - **R4(a) — #1128:** the emitter writes a narrow effect row while emitting unclassified BCL/LINQ
+    calls, so converted code fails Calor0410. *(See §10 R3-f on whether this belongs with R3.)*
+  - **R4(b) — #1137:** a class with `§EXT` emits unqualified module-function **calls** → Calor1002
+    / CS0103. #1137: *"Same family as #1118 …, **different trigger**: this one hits ordinary
+    **calls**, which #1118 explicitly does not."*
+  - **R4(c) — #1118:** a module-level function referenced as a **method group** from a class body
+    is emitted unqualified. #1118: *"**Calls** … from the same position are **qualified
+    correctly** …, so **only the method-group form is affected**."*
+  - **R4(d) — #1127:** binder ICE — a named argument matching no parameter throws
+    `IndexOutOfRangeException` (`Scope.cs:1677-1686`).
+  *Critical path:* **R4(b) alone** is what §3.2 S1 waits on — #1136 records "inherited field,
+  unqualified" as *not cleanly measurable end-to-end today* because a class with `§EXT` cannot call
+  a module function unqualified, which is #1137. Draft v2 named both, which would have let R4(c)
+  block S1 for no reason. *Discriminating:* each lands with the fixture that reproduced it, and
+  fixing R4(b) must leave R4(c)'s fixture still red.
+
+**Tier boundary, stated because round 3 asked for it (§10 R3-f).** R3 is *metadata resolution* —
+what the binder can look up. R4 is *emission* — what the converter and codegen produce. **#1128
+straddles them**: "unclassified BCL/LINQ calls" is an unresolved-metadata symptom with an emission
+consequence. It is filed R4(a) because its **fix** is in the emitter, and the rule is stated so the
+next boundary case is decided by where the fix lands, not by which symptom is quoted.
 
 **Cut line 1.** If R3 overruns, it defers to 0.17.x **with** gate 6's movement leg restated as
 regression-only for this release, named in the release notes — not silently re-tiered. R1 may not
@@ -260,7 +278,9 @@ cluster is a finding, not an excuse.
   R1 measures it, so **S1 lands after R1 and reports the new-error count per subject in its own
   PR**. *Cut line 3:* if that count is large enough that S1 cannot land inside the release, S1
   slips **with §1's claim scoped down in the same commit** — the claim and the tier move together
-  or neither moves.
+  or neither moves. **Enforced, not promised** (§10 R3-e): gate 14 then reads **NOT-ADJUDICATED**
+  and is published as such. A dropped gate would let the claim outlive its own instrument; a
+  NOT-ADJUDICATED one cannot be mistaken for a pass.
 
 ### 3.3 SHOULD
 - **S2 — W7 carried: `FunctionBoundType.Row` end-to-end** (R15:747; D:2700-2708) and
@@ -301,16 +321,24 @@ and serilog ≥ 88 **exact**, FluentValidation ≥ 179 — this keeps gate 9's o
 reclassification of one or two modules in the largest subject is not a regression, and an
 all-exact floor would red the gate on one.
 
-***Effect size — the number Draft v1 did not register, and where it comes from.*** "Exceeds 304"
-makes a one-module improvement a HIT while §1 claims *materially more*, which is not a proof point.
-The honest size cannot be written today: it is a fraction of the largest binding cluster, and that
-cluster is what R1 exists to name. **PP-R1's effect size is therefore registered by R1's PR, before
-R2 merges, as a number derived from R1's breakdown** — a deferred registration with a named
-deadline and a named deriver, not an open field. Until R1 lands, PP-R1 has no HIT.
+***Effect size — the RULE is frozen here; only the NUMBER comes from R1.*** "Exceeds 304" makes a
+one-module improvement a HIT while §1 claims *materially more*, which is not a proof point. Draft
+v2 fixed that by deferring the whole effect size to R1's PR — and **round 3 found that this hands
+the release the power to choose its own target after seeing the data** (§10 R3-b), which is the one
+thing pre-registration exists to forbid. The size is therefore split:
+
+> **Frozen here, before R1 runs:** R2 must recover **at least half of the largest binding cluster
+> R1 names, and never fewer than 10 modules**. R1's PR supplies only that cluster's size; it may
+> not choose the fraction or the floor, and its PR asserts both unchanged from this line.
+
+Until R1 lands PP-R1 has no HIT — but the ambition is no longer R1's to set.
 *Outcome map:* HIT (both legs move by at least their registered sizes, nothing falls) /
-MISS (either fails to move) / **UNDERPOWERED** (R1's breakdown shows the largest cluster is smaller
-than the registered size demands, i.e. the corpus cannot supply the effect — registered here so the
-release cannot discover it after the fact) / NOT-ADJUDICATED (a submodule SHA moves, a ledger's
+MISS (either fails to move) / **UNDERPOWERED** — on **one condition only**: R1's breakdown
+shows the largest cluster is smaller than the frozen floor of **10 modules**, so the corpus cannot
+supply the effect under a rule fixed before the data was seen. It is **not** available because half
+the cluster turned out to be more work than expected; that is a MISS. (PP-W-rows' UNDERPOWERED
+meant "we could not afford the runs"; this one means "the corpus does not contain the thing" — two
+failure modes under one label, guarded rather than merged, §10 R3-c) / NOT-ADJUDICATED (a submodule SHA moves, a ledger's
 bind rule changes mid-release, or R1's effect size was never registered).
 *Discriminating:* revert R2 and `ModulesEnforced` returns to 304 → MISS.
 
@@ -423,9 +451,13 @@ regression pin only — its bytes must not change without a registered cause.
 
 C# cannot tell you that a callback passed into a helper does something the helper's signature says
 it does not. Calor can — **for every shape you can write it in**, which is what §4.2 makes
-testable and what today's compiler fails for five of twelve. And it can tell you over converted
-real code, which is what §4.1 makes testable and what today's compiler does for 304 of 364
-modules with a third of its metadata unresolved. Neither claim is about rows being clever; both
+testable and what today's compiler fails for five of twelve. And it can tell you so over converted real code — **which is
+the ambition, not today's state, and Draft v2's §8 said otherwise** (§10 R3-d). 304 of 364 modules
+reach the effect pass, but reaching it is not the same as the claim being *checkable* there:
+**D-A = 2** says Calor-native higher-order sites number two, and the converter emits no rows at all
+(D:1780-1783), so on nearly all of those 304 modules there is no callback row to check. §4.1 makes
+the **reach** testable. What no instrument yet makes testable is the claim *on* that reach, and no
+release should imply otherwise until the converter emits rows. Neither claim is about rows being clever; both
 are about the claim being *checkable on code someone actually wrote*.
 
 ---
@@ -542,3 +574,60 @@ boundary, or R4's four-issue batch, all of which round 1 also left alone; two ro
 passed over R4 without a finding. And it did not examine the new mechanisms round 1 introduced —
 cut lines 2 and 3, the deferred effect-size registration, PP-R1's `UNDERPOWERED` outcome — which
 remain reviewed by nobody.
+
+### Round 3 — 2026-09-01, on Draft v3
+
+**Task order fixed by round 2:** verify every prior disposition against the tree *before* looking
+for anything new. That pass ran first and mechanically — 27 assertions, one per disposition site,
+each checking the **body** of the document rather than §10's claim about it.
+
+**Verification: 27/27 landed.** Every round-1 and round-2 disposition is present at the site it
+names. Round 2's three half-applied fixes are the only ones that ever failed this check, and they
+are now closed.
+
+**§0.3's four trigger numbers, recomputed independently — the gap rounds 1 and 2 both left open.**
+Not re-read: recomputed from the raw JSON with fresh arithmetic, plus the sum checks that caught
+round 2's D-B defect.
+
+| Check | Result |
+|---|---|
+| IL rows: `UnknownSource` 0 + `InvocationUndetermined` 0 | **0**, does not fire (> 10) |
+| Calor0419: D-A `calor0419FunctionTyped` | **2**, does not fire |
+| Gate 6: 817 / 1248 recomputed from `perSubject` | **65.46 %**, matches |
+| Q4: `RowlessNeverInvoked` | **0**, does not fire |
+| **Sum check** — the seven cause fields vs `AggregateDiagnostics` | 90 = 90 **MATCH** (`InvocationWitness` 26 is an overlay, not a cause) |
+| **Sum check** — `ModulesEnforced` + all `Excluded` vs the 364 denominator | 304 + 60 = **364 OK** |
+| **Sum check** — D-B's five components vs its total | 3121 = 3121 **MATCH** |
+| Doc claims 304 / 60 / 0 / 90-over-40 / 53 = 59 % / 31-88-185 / D-A 2 | **all reconcile** |
+
+§0.3 is load-bearing and now stands on an independent recomputation.
+
+**Six new findings, all applied.**
+
+| # | Lens | Finding | Disposition |
+|---|---|---|---|
+| **R3-a** | plan | **R4 mis-scoped a MUST, and both issues say so in their own text.** Draft v2 called #1137 and #1118 "one root cause, two issues". #1137: *"different trigger: this one hits ordinary **calls**, which #1118 explicitly does not."* #1118: *"**Calls** … are **qualified correctly** …, so **only the method-group form is affected**."* They are complementary — one fix cannot close both — and #1136 calls them "same fixture family, **different mechanism**". A batch scoped on a shared root cause would have fixed one and reported the theme done. Two rounds passed over R4 without a finding; §10 predicted that silence was a miss. | **Applied.** R4 split into R4(a)–(d) with each issue's own words quoted. **S1's critical path corrected to R4(b) alone** — Draft v2 named both, which would have let R4(c) block a MUST for no reason. |
+| **R3-b** | process | **Round 1's own fix handed the release the power to set its own target after seeing the data.** m4 deferred PP-R1's *entire* effect size to R1's PR. But R1 is the measurement — so whoever writes R1's PR chooses the ambition **with the breakdown in front of them**, which is precisely what pre-registration forbids. A fix for an unregistered number created an unregistered *rule*. | **Applied.** Split: the **rule is frozen now** — R2 recovers *at least half the largest cluster R1 names, never fewer than 10 modules* — and R1 supplies only the cluster's size, asserting the fraction and floor unchanged. |
+| **R3-c** | measurement | **PP-R1's `UNDERPOWERED` conflated two failure modes under one label.** For PP-W-rows it meant *"we could not afford the runs"*; here it meant *"the corpus cannot supply the effect"* — and as written it was reachable whenever the cluster was smaller than a size R1 itself had chosen, i.e. an escape hatch from R3-b's hole. | **Applied.** Available on one condition only: the largest cluster is below the frozen floor of 10. "Harder than expected" is a **MISS**. |
+| **R3-d** | measurement | **§8 overstated what the release can demonstrate.** It said the callback claim is testable *"over converted real code … 304 of 364 modules"*. Reaching the effect pass is not the claim being checkable there: **D-A = 2**, and the converter emits no rows, so nearly all 304 modules contain no callback row to check. §4.1 makes the reach testable, not the claim on it. | **Applied.** §8 now separates the ambition from today's state and names D-A = 2 as the reason. |
+| **R3-e** | process | **Cut line 3 was a promise with no gate.** "S1 slips *with §1's claim scoped down in the same commit*" had nothing enforcing it; a slipped S1 would simply leave gate 14 unmentioned and the claim standing. | **Applied.** Gate 14 reads **NOT-ADJUDICATED** and is published as such — a claim may not outlive its instrument. |
+| **R3-f** | plan | **The R3/R4 tier boundary was never stated**, and #1128 straddles it: "unclassified BCL/LINQ calls" is an unresolved-metadata symptom with an emission consequence. Nothing said which tier owns it or why. | **Applied.** The rule is stated — **R3 is what the binder can look up, R4 is what the emitter produces, and a straddling issue is filed where its fix lands, not where its symptom is quoted.** #1128 stays R4(a) on that rule. |
+
+### A process note round 3 earned the hard way
+
+While applying these findings, the first edit script aborted on a later assertion **before writing**
+— the exact mechanism that caused round 1's three half-applied fixes (R2-b). It was caught because
+round 2 had made it a known failure mode, and the remaining edits were applied one per script with
+its own write. **The lesson generalises past this document:** a batch of fixes that commits at the
+end is one failed assertion away from silently applying none of them while the author believes all
+landed. Round 3's 27-assertion verification pass exists because of that, and should run at the top
+of every future round.
+
+### What round 3 did not do
+
+It did not attack §5's gates 1–8 and 11–12, carried from 0.16 and re-stated rather than re-derived.
+It did not check whether the eight 0.16 gates still *mean* anything against a 0.17 tree. It did not
+attack §7's dispositions for the two dozen issues not in R1–R4 or S1. And it remains a
+self-conducted round on a document this author wrote — the independent round (2) found three things
+no self-review had, and a fourth independent pass would be worth more than a fifth self-conducted
+one.
