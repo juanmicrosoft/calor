@@ -431,7 +431,7 @@ regression pin only — its bytes must not change without a registered cause.
 | Issue | Disposition |
 |---|---|
 | #1136 | **0.17 MUST S1** — the fix set entire; a partial fix is refused by the issue itself |
-| #1128, #1137, #1118, #1127 | **0.17 MUST R4**; #1137/#1118 share one root cause and unblock PP-S1's inherited-field shape |
+| #1128, #1137, #1118, #1127 | **0.17 MUST R4(a)–(d)** — four *complementary* defects, not one batch (§10 R3-a); **#1137 alone** (R4(b)) unblocks PP-S1's inherited-field shape |
 | #875, #1082 | 0.17 MUST R3, sequenced behind the measurement |
 | #1116 | 0.17 unconditional (gate 3's remaining legs) |
 | #965 | release-blocking for 0.17.0 if it recurs; observation due from the 0.16.0 release |
@@ -620,8 +620,15 @@ While applying these findings, the first edit script aborted on a later assertio
 round 2 had made it a known failure mode, and the remaining edits were applied one per script with
 its own write. **The lesson generalises past this document:** a batch of fixes that commits at the
 end is one failed assertion away from silently applying none of them while the author believes all
-landed. Round 3's 27-assertion verification pass exists because of that, and should run at the top
-of every future round.
+landed. Round 3's verification pass exists because of that, and should run at the top of every
+future round.
+
+**And it caught round 3 doing it too.** Re-running the assertions after applying R3-a–f showed §7
+still reading *"#1137/#1118 share one root cause"* — R3-a applied to §3.1 and not to §7, the third
+appearance of this exact half-application in three rounds. It is recorded rather than quietly
+fixed: **the failure mode is not carelessness that can be resolved by trying harder** — it recurred
+after being named, diagnosed, and consciously guarded against. What actually caught it was a
+mechanical re-check, both times.
 
 ### What round 3 did not do
 
