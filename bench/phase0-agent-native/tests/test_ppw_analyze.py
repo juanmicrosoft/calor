@@ -9,8 +9,11 @@ would go red if the rule were implemented wrongly. An analyzer that cannot fail
 on wrong input is worthless.
 
 The committed fixtures are `tests/fixtures/ppw/cases/*.json` (compact epoch
-specs, expanded by `ppw_epoch.py`) and `tests/fixtures/ppw/sources/*.calr` (the
-two arm-B escape spellings the pairs do not already commit as seeds). Every
+specs, expanded by `ppw_epoch.py`) and `tests/fixtures/ppw/sources/*.calr.txt` (the
+two arm-B escape spellings the pairs do not already commit as seeds — carried
+with a `.txt` suffix on purpose: they are classifier INPUTS, never compiled,
+and a committed `*.calr` under `bench/` would enter the whole-corpus counts the
+effect-rows ledgers and the design doc's transcripts pin). Every
 other classifier fixture is a REAL committed seed under `pairs/W-00x/seeded/`,
 so the classifier is pinned against the artifact #1123 froze rather than an
 imitation of it.
@@ -23,6 +26,7 @@ import importlib.util
 import json
 import os
 import shutil
+import statistics
 import sys
 import tempfile
 import unittest
@@ -125,7 +129,7 @@ class OutcomeMap(unittest.TestCase):
 
     def test_every_case_adjudicates_as_registered(self):
         names = ppw_epoch.case_names()
-        self.assertGreaterEqual(len(names), 14)
+        self.assertGreaterEqual(len(names), 16)
         for name in names:
             with self.subTest(case=name):
                 case, _, analysis = self.analyze(name)
@@ -150,7 +154,9 @@ class OutcomeMap(unittest.TestCase):
             _, _, analysis = self.analyze(name)
             if analysis["verdict"] == "HIT":
                 hits.append(name)
-        self.assertEqual(sorted(hits), ["hit", "non-building-runs-contribute-no-escape"])
+        self.assertEqual(sorted(hits), ["hit", "leg-a-read-from-the-archived-logs",
+                                        "non-building-read-from-the-archived-logs",
+                                        "non-building-runs-contribute-no-escape"])
 
     def test_route_d_is_inert_by_construction(self):
         """A-1.12: cut line 2's antecedent is "if A-1.12 has not registered by
@@ -171,6 +177,26 @@ class OutcomeMap(unittest.TestCase):
                 self.assertEqual(analysis["verdict"], "NOT-ADJUDICATED")
                 self.assertIsNotNone(analysis["route"])
                 self.assertIsNotNone(analysis["routes"][analysis["route"]]["artifact"])
+
+    def test_the_disclosed_limitations_are_published_with_their_direction(self):
+        """A limitation whose SIGN is unstated is not a disclosure. The stderr
+        channel removes escapes from arm A only, so it biases AGAINST this
+        workstream's own hypothesis and cannot manufacture a HIT."""
+        _, _, analysis = self.analyze("hit")
+        ids = [d["id"] for d in analysis["disclosedLimitations"]]
+        self.assertEqual(sorted(ids), ["W-004-arm-B-zero-is-compiler-behaviour",
+                                       "silence-signature-required",
+                                       "stderr-laundering-invisible-on-arm-A"])
+        for entry in analysis["disclosedLimitations"]:
+            self.assertTrue(entry["detail"])
+            self.assertTrue(entry["direction"])
+        stderr = next(d for d in analysis["disclosedLimitations"]
+                      if d["id"] == "stderr-laundering-invisible-on-arm-A")
+        self.assertIn("ARM A ONLY", stderr["direction"])
+        self.assertIn("cannot manufacture a HIT", stderr["direction"])
+        w004 = next(d for d in analysis["disclosedLimitations"]
+                    if d["id"] == "W-004-arm-B-zero-is-compiler-behaviour")
+        self.assertIn("CHARGED CONTROL", w004["direction"])
 
     def test_own_goal_causes_carry_an_artifact(self):
         _, _, analysis = self.analyze("not-adjudicated-c-no-ppw-block")
@@ -245,6 +271,108 @@ class LegAEscapeSemantics(unittest.TestCase):
         self.assertEqual(self.analysis["legA"]["blind"]["medianDelta"], 1.0)
         self.assertIs(self.analysis["legA"]["meetsBar"], True)
 
+    def test_escaped_bugs_is_never_read(self):
+        """`escapedBugs` is the AGGREGATE Failed: count for the whole held-out
+        suite, so it counts failures of tests that are not effect-observing at
+        all. Measured on W-006: an unfixed `Map` off-by-one gives Failed: 8
+        where the two SURVIVORS are precisely the effect-observing pair — a
+        maximal `escapedBugs` on a run that laundered nothing."""
+        source = open(os.path.join(BENCH, "ppw-analyze.py"), encoding="utf-8").read()
+        body = source[source.index("def read_declared_done"):source.index("def analyze(")]
+        self.assertNotIn('record.get("escapedBugs")', body)
+        self.assertNotIn('["escapedBugs"]', body)
+
+        case = copy.deepcopy(ppw_epoch.load_case("hit"))
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        epoch = ppw_epoch.build(case, tmp)
+        for run in range(1, 5):
+            path = os.path.join(epoch, "W-001-middleware-stage", ppw_epoch.ARM_B_LABEL,
+                                "run-%d" % run, "result.json")
+            record = json.load(open(path, encoding="utf-8"))
+            record["escapedBugs"] = 8       # eight IndexOutOfRangeExceptions
+            record["heldoutPassed"] = 2
+            json.dump(record, open(path, "w", encoding="utf-8"))
+        analysis, _ = PPW.analyze(epoch)
+        cell = next(c for c in analysis["perCell"]
+                    if c["pair"] == "W-001-middleware-stage" and c["arm"] == "B")
+        self.assertEqual(cell["escapeRate"], 0.0)
+        self.assertEqual(analysis["verdict"], "HIT")
+
+    def test_a_silent_but_wrong_solution_is_not_an_escape(self):
+        """W-001's Twice_IsSilent_AfterProbe and W-003's Sum2_* assert the RETURN
+        VALUE before the silence assertion, so a solution that returns 1 instead
+        of 2 and prints nothing fails a NAMED effect-observing test having
+        laundered nothing. Only the SILENCE failure signature counts."""
+        case = ppw_epoch.load_case("silent-but-wrong-is-not-an-escape")
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        analysis, _ = PPW.analyze(ppw_epoch.build(case, tmp))
+        cell = next(c for c in analysis["perCell"]
+                    if c["pair"] == "W-001-middleware-stage" and c["arm"] == "A")
+        self.assertEqual(cell["escapeRate"], 0.0)
+        # …and the excluded runs are PUBLISHED, not silently dropped.
+        self.assertEqual(len(cell["namedTestFailuresWithoutSilence"]), 4)
+        self.assertIs(analysis["legA"]["meetsBar"], False)
+        self.assertEqual(analysis["verdict"], "MISS")
+
+    def test_the_refinement_is_arm_symmetric(self):
+        """It removes noise from both arms and therefore cannot move the sign:
+        the same value-only failure on arm B scores zero too."""
+        case = copy.deepcopy(ppw_epoch.load_case("silent-but-wrong-is-not-an-escape"))
+        for pair in PPW.REGISTERED_BLIND:
+            case["cells"][pair]["B"] = {"escapes": 0, "namedOnlyFailures": 4}
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        analysis, _ = PPW.analyze(ppw_epoch.build(case, tmp))
+        for arm in ("A", "B"):
+            cell = next(c for c in analysis["perCell"]
+                        if c["pair"] == "W-004-counter-peek" and c["arm"] == arm)
+            self.assertEqual(cell["escapeRate"], 0.0, arm)
+            self.assertEqual(len(cell["namedTestFailuresWithoutSilence"]), 4, arm)
+        self.assertEqual(analysis["legA"]["blind"]["medianDelta"], 0.0)
+
+    def test_leg_a_is_recoverable_from_the_archived_logs_alone(self):
+        """The fallback the live dry epoch needs: `result.json` predates the
+        `finalBuild` / `heldoutFinal` fields, but `.ho_final.txt` and
+        `.src_final.txt` have always been archived, so no data is lost and
+        nothing needs re-running."""
+        case = ppw_epoch.load_case("leg-a-read-from-the-archived-logs")
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        epoch = ppw_epoch.build(case, tmp)
+        run = os.path.join(epoch, "W-001-middleware-stage", ppw_epoch.ARM_A_LABEL, "run-1")
+        record = json.load(open(os.path.join(run, "result.json"), encoding="utf-8"))
+        self.assertIsNone(record["finalBuild"])
+        self.assertIsNone(record["heldoutFinal"])
+        self.assertTrue(os.path.exists(os.path.join(run, ".ho_final.txt")))
+        self.assertTrue(os.path.exists(os.path.join(run, ".src_final.txt")))
+
+        built, failed, silence = PPW.read_declared_done(run, record)
+        self.assertIs(built, True)
+        self.assertEqual(silence, ["Twice_IsSilent_OnFreshBehavior"])
+        self.assertEqual(failed, ["Twice_IsSilent_OnFreshBehavior"])
+
+        analysis, _ = PPW.analyze(epoch)
+        self.assertEqual(analysis["verdict"], "HIT")
+        cell = next(c for c in analysis["perCell"]
+                    if c["pair"] == "W-001-middleware-stage" and c["arm"] == "A")
+        self.assertEqual(cell["escapeRate"], 1.0)
+
+    def test_a_run_with_neither_the_fields_nor_the_logs_is_invalid(self):
+        case = copy.deepcopy(ppw_epoch.load_case("leg-a-read-from-the-archived-logs"))
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        epoch = ppw_epoch.build(case, tmp)
+        for root, _, files in os.walk(epoch):
+            for name in (".ho_final.txt", ".src_final.txt"):
+                if name in files:
+                    os.remove(os.path.join(root, name))
+        analysis, _ = PPW.analyze(epoch)
+        self.assertEqual(analysis["route"], "c")
+        self.assertTrue(any("escapedBugs may not stand in for it" in b
+                            for b in analysis["blockers"]))
+
     def test_only_the_named_effect_observing_tests_count(self):
         """A functional miss elsewhere in a 6-to-11-test suite is not an escape."""
         case = ppw_epoch.load_case("hit")
@@ -253,11 +381,16 @@ class LegAEscapeSemantics(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp, True)
         epoch = ppw_epoch.build(case, tmp)
         for run in range(1, 5):
-            path = os.path.join(epoch, "W-001-middleware-stage", ppw_epoch.ARM_A_LABEL,
-                                "run-%d" % run, "result.json")
+            run_dir = os.path.join(epoch, "W-001-middleware-stage", ppw_epoch.ARM_A_LABEL,
+                                   "run-%d" % run)
+            path = os.path.join(run_dir, "result.json")
             record = json.load(open(path, encoding="utf-8"))
-            record["heldoutFinal"]["failedTests"] = ["Twice_ReturnsSum"]   # functional, not observing
+            # A functional test failing its own string assertion: a silence-shaped
+            # failure on a test that is NOT effect-observing.
+            record["heldoutFinal"]["failedTests"] = ["Twice_ReturnsSum"]
+            record["heldoutFinal"]["silenceFailures"] = ["Twice_ReturnsSum"]
             json.dump(record, open(path, "w", encoding="utf-8"))
+            os.remove(os.path.join(run_dir, ".ho_final.txt"))   # the fields are the source here
         analysis, _ = PPW.analyze(epoch)
         cell = next(c for c in analysis["perCell"]
                     if c["pair"] == "W-001-middleware-stage" and c["arm"] == "A")
@@ -457,17 +590,22 @@ class ValidityConditions(unittest.TestCase):
         self.assertTrue(analysis["missingTranscript"])
         self.assertEqual(analysis["verdict"], "NOT-ADJUDICATED")
 
-    def test_2_turns_assistant_messages_must_be_the_top_level_count(self):
-        """A-1.12 (v): the field must carry the TOP-LEVEL count, with forwarded
-        subagent messages counted separately. A run recording the TOTAL under
-        that name is recording a different metric under a registered name."""
+    def test_2_turns_assistant_messages_is_recomputed_from_the_transcript(self):
+        """A-1.12 (v): the field must carry the TOP-LEVEL count — distinct
+        assistant message.id values whose parent_tool_use_id is null — with
+        forwarded subagent messages counted separately and never folded in. The
+        analyzer does not take the recorded number on trust: it RECOMPUTES it
+        from the archived transcript, which is what makes the condition a check
+        rather than a restatement. Here the run records the total (7 top-level
+        + 3 subagent = 10) under the registered name."""
         def fold(record, root):
             record["turns"] = {"assistantMessages": 10, "subagentMessages": 3,
                                "assistantMessagesIncludingSubagents": 10,
                                "numTurns": 10, "source": "transcript.jsonl"}
         analysis, _ = PPW.analyze(self.build(mutate_runs=fold))
         self.assertEqual(analysis["route"], "c")
-        self.assertTrue(any("TOP-LEVEL count" in b for b in analysis["blockers"]))
+        self.assertTrue(any("TOP-LEVEL assistant message.id" in b
+                            for b in analysis["blockers"]), analysis["blockers"][:3])
 
     def test_2_a_missing_turn_count_is_invalid(self):
         def blank(record, root):
@@ -477,15 +615,45 @@ class ValidityConditions(unittest.TestCase):
         self.assertTrue(any("not an integer count" in b for b in analysis["blockers"]))
 
     def test_2_the_registered_shape_is_accepted(self):
-        """The control: top-level 7 with 3 forwarded subagent messages beside
-        it — the shape harness-capture.py writes — is VALID."""
-        def registered(record, root):
-            record["turns"] = {"assistantMessages": 7, "subagentMessages": 3,
-                               "assistantMessagesIncludingSubagents": 10,
-                               "numTurns": 10, "source": "transcript.jsonl"}
-        analysis, _ = PPW.analyze(self.build(mutate_runs=registered))
+        """The control: a run whose transcript holds 7 top-level assistant
+        messages and 3 forwarded subagent ones, recording 7 — the shape
+        harness-capture.py writes — is VALID."""
+        case = copy.deepcopy(ppw_epoch.load_case("hit"))
+        case["defaultCell"] = dict(case.get("defaultCell") or {}, turns=7, subagentTurns=3)
+        for cell in case["cells"].values():
+            for arm in cell.values():
+                arm.setdefault("turns", 7)
+                arm.setdefault("subagentTurns", 3)
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        epoch = ppw_epoch.build(case, tmp)
+        record = json.load(open(os.path.join(epoch, "W-001-middleware-stage",
+                                             ppw_epoch.ARM_A_LABEL, "run-1", "result.json"),
+                                encoding="utf-8"))
+        self.assertEqual(record["turns"]["assistantMessages"], 7)
+        self.assertEqual(record["turns"]["assistantMessagesIncludingSubagents"], 10)
+        analysis, _ = PPW.analyze(epoch)
         self.assertTrue(analysis["harnessValid"], analysis["blockers"])
         self.assertEqual(analysis["verdict"], "HIT")
+
+    def test_a_recorded_own_goal_needs_an_artifact_that_exists(self):
+        """A-1.12's own-goal clause covers causes the instrument cannot see (a
+        Calor0410 demotion changed before the epoch). The epoch may RECORD one,
+        but only WITH the artifact that shows it."""
+        honoured = self.build(mutate_pins=lambda p: p["ppW"].update(ownGoal={
+            "cause": "the Calor0410 demotion moved before the epoch",
+            "artifact": "bench/phase0-agent-native/pairs/ppw-seeded-compiles.json"}))
+        analysis, _ = PPW.analyze(honoured)
+        self.assertTrue(analysis["ownGoal"])
+        self.assertEqual(analysis["verdict"], "MISS")
+        self.assertTrue(any("recorded by the epoch" in c["cause"]
+                            for c in analysis["ownGoalCauses"]))
+
+        prose = self.build(mutate_pins=lambda p: p["ppW"].update(ownGoal={
+            "cause": "trust me", "artifact": "bench/phase0-agent-native/nope.json"}))
+        analysis, _ = PPW.analyze(prose)
+        self.assertEqual(analysis["route"], "c")
+        self.assertTrue(any("never asserted in prose" in b for b in analysis["blockers"]))
 
     def test_3_each_arm_must_record_exactly_one_compiler_hash(self):
         def drift(record, root):
@@ -508,6 +676,49 @@ class ValidityConditions(unittest.TestCase):
         self.assertEqual(analysis["route"], "c")
         self.assertTrue(any("Calor.Tasks.dll hash to the same value" in b
                             for b in analysis["blockers"]))
+
+    def test_3_the_permissive_policy_is_witnessed_by_optionsHash(self):
+        """A control arm built from the registered commit but run STRICT leaves
+        compilerHash unchanged and moves only buildState.optionsHash, so the
+        compilerHash leg alone cannot see it. The runner checks only that leg;
+        the analyzer checks both."""
+        analysis, _ = PPW.analyze(self.build("hit"))
+        self.assertTrue(analysis["harnessValid"], analysis["blockers"])
+        self.assertEqual(analysis["armA"]["optionsHashes"], ["options-permissive"])
+        self.assertEqual(analysis["armB"]["optionsHashes"], ["options-strict"])
+
+        def strict_control(record, root):
+            record["buildState"]["optionsHash"] = "options-strict"
+        shared = PPW.analyze(self.build(mutate_runs=strict_control))[0]
+        self.assertEqual(shared["route"], "c")
+        self.assertTrue(any("share a buildState.optionsHash" in b for b in shared["blockers"]))
+
+        def drop(record, root):
+            record["buildState"]["optionsHash"] = None
+        missing = PPW.analyze(self.build(mutate_runs=drop))[0]
+        self.assertEqual(missing["route"], "c")
+        self.assertTrue(any("optionsHash is not recorded" in b for b in missing["blockers"]))
+
+    def test_the_inherited_ppl5_ppl6_pins_are_ignored_and_named(self):
+        """`run-m5-epoch.sh`'s base pins carry ppL5.pairs (the W2-/W3- loop suite)
+        and ppL6.pairs (the N1- neutral set). They are NOT this experiment's
+        pairs; reading one would be a silent wrong-denominator bug."""
+        epoch = self.build(mutate_pins=lambda p: p.update(
+            ppL5={"pairs": ["W2-001", "W3-004"]},
+            ppL6={"pairs": ["N1-001", "N1-002"]},
+            ppW5=None))
+        analysis, lines = PPW.analyze(epoch)
+        self.assertEqual(analysis["inheritedPinsIgnored"], ["ppL5", "ppL6", "ppW5"])
+        self.assertEqual(analysis["legBPairs"], PPW.REGISTERED_LEG_B)
+        self.assertEqual(analysis["blindPairs"], PPW.REGISTERED_BLIND)
+        self.assertEqual(analysis["verdict"], "HIT")
+        self.assertTrue(any("inherited pins IGNORED" in line for line in lines))
+
+    def test_arm_provenance_names_the_plus_one_commit(self):
+        analysis, _ = PPW.analyze(self.build("hit"))
+        self.assertIn("283ec9f9964ddd5b21da15b646a0dd77d53de99e", analysis["armA"]["provenance"])
+        self.assertIn("arm/v0.14.3-pre-rows", analysis["armA"]["provenance"])
+        self.assertIn("not drift", analysis["armA"]["provenance"])
 
     def test_4_the_harness_commit_must_be_recorded(self):
         analysis, _ = PPW.analyze(self.build(mutate_pins=lambda p: p.pop("harnessCommit")))
@@ -560,6 +771,33 @@ class ValidityConditions(unittest.TestCase):
         self.assertTrue(analysis["dryRun"])
         self.assertIsNotNone(analysis["dryRunNote"])
 
+    def test_stripping_the_result_json_fields_falls_back_to_the_archived_logs(self):
+        """The fields are a convenience; the LOGS are the evidence. Removing
+        `finalBuild` / `heldoutFinal` must change nothing, because
+        `.ho_final.txt` and `.src_final.txt` carry both facts."""
+        def strip(record, root):
+            record.pop("finalBuild", None)
+            record.pop("heldoutFinal", None)
+        analysis, _ = PPW.analyze(self.build(mutate_runs=strip))
+        self.assertTrue(analysis["harnessValid"], analysis["blockers"])
+        self.assertEqual(analysis["verdict"], "HIT")
+
+    def test_a_run_with_neither_the_fields_nor_the_logs_is_invalid_here_too(self):
+        """Fail closed. `escapedBugs` may NOT stand in for the registered escape:
+        that substitution is the sign inversion A-1.12 replaces."""
+        def strip(record, root):
+            record.pop("finalBuild", None)
+            record.pop("heldoutFinal", None)
+            for name in (".ho_final.txt", ".src_final.txt"):
+                path = os.path.join(root, name)
+                if os.path.exists(path):
+                    os.remove(path)
+        analysis, _ = PPW.analyze(self.build(mutate_runs=strip))
+        self.assertEqual(analysis["route"], "c")
+        self.assertEqual(analysis["verdict"], "NOT-ADJUDICATED")
+        self.assertTrue(any("escapedBugs may not stand in for it" in b
+                            for b in analysis["blockers"]))
+
     def test_route_a_cannot_be_skipped(self):
         """An adjudication that never re-checked the unmutated starters against
         their frozen multisets is not an adjudication."""
@@ -573,6 +811,113 @@ class ValidityConditions(unittest.TestCase):
         self.assertFalse(analysis["routes"]["a"]["evaluated"])
         self.assertEqual(analysis["route"], "c")
         self.assertEqual(analysis["verdict"], "NOT-ADJUDICATED")
+
+
+class DryRunSizesNAndNeverMovesTheBar(unittest.TestCase):
+    """A:81 / A-1.12. The dry run's job is to SIZE N; emitting HIT or MISS from a
+    dry epoch is the worst failure mode this script has, so a dry run emits no
+    verdict at all and can never reach the ledger."""
+
+    def dry(self, **kwargs):
+        case = copy.deepcopy(ppw_epoch.load_case("hit"))
+        case.setdefault("pins", {})["epochId"] = "w-rows-dry-001"
+        case["runsPerArm"] = 3
+        for pair, escapes in (("W-001-middleware-stage", 3), ("W-004-counter-peek", 3),
+                              ("W-006-map-doubler", 2)):
+            case["cells"][pair] = {"A": {"escapes": escapes}, "B": {"escapes": 0}}
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        epoch = ppw_epoch.build(case, tmp)
+        return PPW.analyze(epoch, dry_run=True, sizing_sims=40, sizing_boot=100, **kwargs)
+
+    def test_a_dry_run_emits_no_verdict(self):
+        analysis, lines = self.dry()
+        self.assertTrue(analysis["dryRun"])
+        self.assertIsNone(analysis["verdict"])
+        self.assertIsNone(analysis["route"])
+        self.assertIn("sizes N", analysis["reason"])
+        self.assertTrue(any("verdict: (none" in line for line in lines))
+
+    def test_a_dry_run_can_never_reach_the_ledger(self):
+        analysis, _ = self.dry()
+        with self.assertRaises(SystemExit):
+            PPW.build_ledger(analysis)
+
+    def test_a_dry_run_still_reports_the_leg_statistics(self):
+        """Sizing needs the variance, so the legs are computed — they are just
+        never read as a verdict."""
+        analysis, _ = self.dry()
+        self.assertIsNotNone(analysis["legA"]["blind"]["medianDelta"])
+        self.assertIsNotNone(analysis["legB"]["pointEstimate"])
+
+    def test_the_sizing_output_is_first_class(self):
+        analysis, _ = self.dry()
+        sizing = analysis["sizing"]
+        self.assertEqual(sizing["blindPairsObserved"], 3)
+        self.assertEqual(sizing["blindFloor"], 2)
+        self.assertEqual(sizing["observedDeltas"], [1.0, 1.0, 0.6667])
+        self.assertIsNotNone(sizing["observedVariance"])
+        self.assertGreater(sizing["varianceUpperBound95"], sizing["observedVariance"])
+        self.assertEqual([e["n"] for e in sizing["powerCurve"]], list(range(2, 13)))
+        for entry in sizing["powerCurve"]:
+            self.assertEqual(entry["runs"], 2 + 36 + 6 * entry["n"] * 2)
+            self.assertEqual(entry["fitsCeiling"], entry["estimatedUsd"] <= 150.0)
+        self.assertIn("recommendedN", sizing)
+        self.assertIn("atPointVarianceNotRegistered", sizing)
+        self.assertIn("NOT the registered basis",
+                      sizing["atPointVarianceNotRegistered"]["note"])
+
+    def test_the_spend_arithmetic_is_a_1_12s(self):
+        """N = 8 -> 134 runs ~ $135; N = 9 -> 146 ~ $147; N = 10 -> 158 ~ $159,
+        already over the $150 ceiling."""
+        self.assertEqual((PPW._epoch_runs(8), PPW._epoch_runs(9), PPW._epoch_runs(10)),
+                         (134, 146, 158))
+        self.assertEqual(round(PPW._epoch_cost(8)), 135)
+        self.assertEqual(round(PPW._epoch_cost(9)), 147)
+        self.assertEqual(round(PPW._epoch_cost(10)), 159)
+        self.assertGreater(PPW._epoch_cost(10), PPW.SPEND_CEILING_USD)
+        self.assertLessEqual(PPW._epoch_cost(9), PPW.SPEND_CEILING_USD)
+
+    def test_the_variance_bound_is_the_upper_one(self):
+        """A-1.12 sizes N "under the UPPER confidence bound of its variance";
+        sizing on the point estimate would under-size by design. df = 2 gives
+        2 s^2 / 0.102587."""
+        values = [0.2, 0.5, 0.8]
+        self.assertAlmostEqual(PPW.variance_upper_bound(values),
+                               2 * statistics.variance(values) / 0.102587, places=6)
+        self.assertGreater(PPW.variance_upper_bound(values), statistics.variance(values))
+        self.assertIsNone(PPW.variance_upper_bound([0.5]))
+
+    def test_the_recommendation_is_not_carried_by_a_single_noisy_point(self):
+        curve = [{"n": 2, "power": 0.1}, {"n": 3, "power": 0.85},
+                 {"n": 4, "power": 0.2}, {"n": 5, "power": 0.3}]
+        self.assertIsNone(PPW._smallest_sufficient_n(curve))
+        curve = [{"n": 2, "power": 0.1}, {"n": 3, "power": 0.85},
+                 {"n": 4, "power": 0.9}, {"n": 5, "power": 0.95}]
+        self.assertEqual(PPW._smallest_sufficient_n(curve), 3)
+        self.assertIsNone(PPW._smallest_sufficient_n([]))
+
+    def test_the_registered_procedure_is_what_is_simulated(self):
+        """The sizing loop runs the SAME two-level cluster bootstrap the
+        adjudicator runs. Sanity anchor: at k = 2 blind pairs, 8 runs/cell and no
+        between-pair spread, power at Delta = 0.5 is high — the shape roadmap
+        §4.1's round-3 simulation reports (power 0.87, MDD ~ 0.45)."""
+        power = PPW._simulate_power(2, 8, 0.5, 0.0, sims=200, boot=400)
+        self.assertGreater(power, 0.7)
+        # and it is not vacuously high: at Delta = 0 the bar must almost never clear
+        null_power = PPW._simulate_power(2, 8, 0.0, 0.0, sims=200, boot=400)
+        self.assertLess(null_power, 0.2)
+
+    def test_sizing_arms_underpowered_when_nothing_affordable_reaches_the_bar(self):
+        sizing = PPW.size_n([1.0, 0.0, -0.5], 3, sims=40, boot=100)
+        self.assertIsNone(sizing["recommendedN"])
+        self.assertTrue(sizing["armsUnderpowered"])
+        self.assertIn("registers its achievable power", sizing["note"])
+
+    def test_sizing_refuses_below_the_blind_floor(self):
+        sizing = PPW.size_n([0.5], 1, sims=10, boot=50)
+        self.assertIsNone(sizing["recommendedN"])
+        self.assertIn("floor of two", sizing["note"])
 
 
 class ShapeRealizedIndicator(unittest.TestCase):
@@ -743,10 +1088,10 @@ class EscapeClassification(unittest.TestCase):
             "instance-method-group")
 
     def test_alias_of_this(self):
-        self.assert_class(fixture_source("alias-of-this.calr"), "alias-of-this")
+        self.assert_class(fixture_source("alias-of-this.calr.txt"), "alias-of-this")
 
     def test_inherited(self):
-        self.assert_class(fixture_source("inherited.calr"), "inherited")
+        self.assert_class(fixture_source("inherited.calr.txt"), "inherited")
 
     def test_every_registered_category_is_reachable(self):
         reached = set()
@@ -756,8 +1101,8 @@ class EscapeClassification(unittest.TestCase):
                            ("W-001-middleware-stage",
                             "unregistered-method-group-receiver-escape-b")):
             reached.add(PPW.classify_escape(seed_source(pair, role))[0])
-        reached.add(PPW.classify_escape(fixture_source("alias-of-this.calr"))[0])
-        reached.add(PPW.classify_escape(fixture_source("inherited.calr"))[0])
+        reached.add(PPW.classify_escape(fixture_source("alias-of-this.calr.txt"))[0])
+        reached.add(PPW.classify_escape(fixture_source("inherited.calr.txt"))[0])
         reached.add("other")     # the analyzer's fallback, exercised below
         self.assertEqual(sorted(reached), sorted(PPW.ESCAPE_CATEGORIES))
 
@@ -847,6 +1192,15 @@ class Ledger(unittest.TestCase):
         self.assertNotIn("/tmp/", text)
         self.assertNotIn(BENCH, text)
 
+    def test_the_ledger_carries_the_disclosed_limitations(self):
+        ledger = json.load(open(self.LEDGER, encoding="utf-8"))
+        self.assertEqual(sorted(d["id"] for d in ledger["disclosedLimitations"]),
+                         ["W-004-arm-B-zero-is-compiler-behaviour",
+                          "silence-signature-required",
+                          "stderr-laundering-invisible-on-arm-A"])
+        self.assertIn("SILENCE signature", ledger["escapeSemantics"])
+        self.assertIn("not effect-observing", ledger["escapeSemantics"])
+
     def test_the_ledger_carries_what_a_1_12_names(self):
         ledger = json.load(open(self.LEDGER, encoding="utf-8"))
         for field in ("schemaVersion", "measuredCommit", "epoch", "pairs", "legBPairsFromPins",
@@ -930,7 +1284,15 @@ class HelpStatesTheRegisteredRules(unittest.TestCase):
                        "INERT BY CONSTRUCTION",
                        "OWN-GOAL CLAUSE",
                        "this-qualified / property / inherited / alias-of-this /",
-                       "SHAPE-REALIZED INDICATOR"):
+                       "SHAPE-REALIZED INDICATOR",
+                       "THE DRY RUN SIZES N AND NEVER MOVES THE BAR",
+                       "EMITS NO VERDICT AT ALL",
+                       "UPPER confidence bound",
+                       "no fallback to a default denominator",
+                       "`ppL5` / `ppL6` / `ppW5`",
+                       "AGGREGATE Failed: count",
+                       "SILENCE signature",
+                       "silent-but-WRONG"):
             self.assertIn(phrase, doc, phrase)
 
 

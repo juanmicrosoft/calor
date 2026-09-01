@@ -212,6 +212,53 @@ public class EffectRowsBenefitLedgerTests
         Assert.Contains("BUILT", semantics, StringComparison.Ordinal);
         Assert.Contains("did not build at declared-done", semantics, StringComparison.Ordinal);
         Assert.Contains("INVERTS", semantics, StringComparison.Ordinal);
+        // `escapedBugs` is the AGGREGATE Failed: count for the whole suite, so it also
+        // counts failures of tests that are not effect-observing; and the failure must
+        // carry the SILENCE signature, because two pairs' effect-observing tests assert
+        // the return value first.
+        Assert.Contains("not effect-observing", semantics, StringComparison.Ordinal);
+        Assert.Contains("SILENCE signature", semantics, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The limitations measured on the instrument and DISCLOSED rather than
+    /// fixed, each with its DIRECTION — a limitation whose sign is unstated is
+    /// not a disclosure. The stderr-laundering channel removes escapes from
+    /// arm A only, so it biases against this workstream's own hypothesis and
+    /// cannot manufacture a HIT.
+    /// </summary>
+    [Fact]
+    public void LedgerPublishesEachDisclosedLimitationWithItsDirection()
+    {
+        using var document = JsonDocument.Parse(Committed());
+        var limitations = document.RootElement.GetProperty("disclosedLimitations")
+            .EnumerateArray().ToList();
+        Assert.Equal(
+            new[]
+            {
+                "W-004-arm-B-zero-is-compiler-behaviour",
+                "silence-signature-required",
+                "stderr-laundering-invisible-on-arm-A",
+            },
+            limitations.Select(l => l.GetProperty("id").GetString()!).Order(StringComparer.Ordinal));
+
+        foreach (var limitation in limitations)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(limitation.GetProperty("detail").GetString()));
+            Assert.False(string.IsNullOrWhiteSpace(limitation.GetProperty("direction").GetString()));
+        }
+
+        var stderr = limitations.Single(
+            l => l.GetProperty("id").GetString() == "stderr-laundering-invisible-on-arm-A");
+        Assert.Contains("ARM A ONLY", stderr.GetProperty("direction").GetString()!, StringComparison.Ordinal);
+        Assert.Contains("cannot manufacture a HIT", stderr.GetProperty("direction").GetString()!, StringComparison.Ordinal);
+
+        // W-004's arm-B zero is the compiler working, not test blindness, and its
+        // `unregistered-this-qualified-escape-b` seed is a CHARGED CONTROL — unlike
+        // the identically-named seeds on W-001 and W-006, which do escape.
+        var w004 = limitations.Single(
+            l => l.GetProperty("id").GetString() == "W-004-arm-B-zero-is-compiler-behaviour");
+        Assert.Contains("CHARGED CONTROL", w004.GetProperty("direction").GetString()!, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------- the mutations
@@ -233,13 +280,17 @@ public class EffectRowsBenefitLedgerTests
 
         Directory.Delete(Path.Combine(pairs, "W-006-map-doubler"), recursive: true);
         var mutated = Path.Combine(tmp, "mutated.json");
-        var (exit, _) = RunScript("--ledger", "--pairs-root", pairs, "--out", mutated);
-        // Dropping a pair either fails the recomputation outright or changes its bytes;
-        // both are red, and neither can be mistaken for the committed ledger.
-        if (exit == 0)
-        {
-            Assert.NotEqual(Committed(), File.ReadAllText(mutated).Replace("\r\n", "\n", StringComparison.Ordinal));
-        }
+        var (exit, log) = RunScript("--ledger", "--pairs-root", pairs, "--out", mutated);
+
+        // Dropping a pair either fails the recomputation outright or changes its bytes.
+        // Both are red; what may never happen is a clean run that still reproduces the
+        // committed ledger, which is what "dropping a pair fails the test" forbids.
+        var reproduced = exit == 0
+            && File.Exists(mutated)
+            && File.ReadAllText(mutated).Replace("\r\n", "\n", StringComparison.Ordinal) == Committed();
+        Assert.False(reproduced,
+            "the ledger reproduced its committed bytes with W-006-map-doubler deleted — gate 10's "
+            + "pin (\"dropping a pair fails the test\") is not observed. Recomputation log:\n" + log);
     }
 
     /// <summary>
@@ -277,7 +328,7 @@ public class EffectRowsBenefitLedgerTests
     /// verdict is NOT-ADJUDICATED with the reason recorded — the PP-E1 pattern
     /// (a ledger may not carry a verdict its own numbers do not imply).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void BeforeTheEpochRunsTheVerdictIsNotAdjudicated()
     {
         Skip.If(Directory.Exists(Rel(EpochRelativePath)),

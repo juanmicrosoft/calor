@@ -21,8 +21,11 @@ All notable changes to this project will be documented in this file.
   the rest and is easy to get backwards: a "sneaked-past side effect" only counts on a
   workspace that actually **built**. Runs that never compiled are reported in their own
   separate bucket, because counting them as failures would make the stricter compiler look
-  worse precisely for being strict. Nothing here changes the compiler or any program you
-  write — it is measurement plumbing. (v0.16 W2, gate 10)
+  worse precisely for being strict. The script also refuses to declare a winner from the
+  cheap practice round: a practice run's only job is to work out how many runs the real
+  experiment needs, so it reports that number and stays silent about who won. Nothing here
+  changes the compiler or any program you write — it is measurement plumbing.
+  (v0.16 W2, gate 10)
 
 - **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
   Effect checking runs in loops that have a safety limit, so a tangle of functions that

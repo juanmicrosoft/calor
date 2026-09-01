@@ -5,8 +5,8 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7984,
-      "expectedSkipped": 3
+      "expectedTotal": 7995,
+      "expectedSkipped": 4
     },
     {
       "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj",
@@ -122,6 +122,15 @@
     {
       "_comment": "counts are per Skip.If/Skip.IfNot CALL SITE (check_test_quality.py regex-counts occurrences in test sources), not per test: EpochTurnAttributionTests routes four SkippableFacts through one Skip.If inside RunScript",
       "reason": "python3 not on PATH",
+      "count": 2
+    },
+    {
+      "_comment": "PP-W-rows' ledger pin (A-1.12, gate 10) has an epoch-conditional pair: the not-run assertions skip once epochs/w-rows-001 is archived, and the per-cell assertions skip until it is. Exactly one of the two runs at any commit.",
+      "reason": "epoch w-rows-001 has been archived; the run assertions below cover it",
+      "count": 1
+    },
+    {
+      "reason": "epoch w-rows-001 not archived yet",
       "count": 1
     },
     {

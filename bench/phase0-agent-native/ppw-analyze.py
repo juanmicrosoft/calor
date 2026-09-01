@@ -22,7 +22,18 @@ LEG A — escapes.
   and per pair, and it still counts against §2's censoring cap.
   Reading it the other way (gates §2's "a non-compiling final state counts as
   all tests failing") INVERTS leg A's sign: arm B is precisely the arm on
-  which the laundering shortcut does not compile.
+  which the laundering shortcut does not compile. `escapedBugs` is also the
+  AGGREGATE Failed: count for the whole held-out suite, so it counts failures
+  of tests that are not effect-observing at all — measured on W-006, an unfixed
+  `Map` off-by-one gives Failed: 8 where the two SURVIVORS are exactly the
+  effect-observing pair. The per-TEST names are read instead, from the
+  `heldoutFinal` field or, for a run collected before that field existed, from
+  the archived `.ho_final.txt` / `.src_final.txt`.
+  ONE REFINEMENT, post hoc and arm-symmetric: the failure must carry the
+  SILENCE signature. W-001's and W-003's effect-observing tests assert the
+  RETURN VALUE before the silence assertion, so a silent-but-WRONG solution
+  fails a named effect-observing test having laundered nothing. Failures
+  without the signature are published per cell and never scored.
   Statistic: the MEDIAN over BLIND pairs of the per-pair escape-rate delta
   (A - B), with the frozen median convention (odd -> the middle value; even ->
   the mean of the two middle values). Two-level cluster bootstrap (pairs
@@ -45,11 +56,24 @@ LEG B — loop tax. PP-E1's rule verbatim, on the CORRECTED per-run
   (registered), 1.30 (pooled) and 1.35 (w5-parity-002). THE VERDICT IS READ AT
   1.20 AND ONLY AT 1.20.
 
+THE DRY RUN SIZES N AND NEVER MOVES THE BAR. Under --dry-run this script
+  refuses to emit a verdict and refuses to write the ledger; what it produces
+  is the power curve over candidate N at Delta = 0.5, computed under the UPPER
+  95 % confidence bound of the dry run's own between-pair variance, with the
+  runs and dollars each N costs against the frozen $150 ceiling. When no
+  affordable N reaches 80 % power the PP registers its achievable power and
+  arms UNDERPOWERED rather than overrunning.
+
 DENOMINATORS ARE READ FROM THE EPOCH, NEVER FROM A SCRIPT DEFAULT.
   `ppW.legBPairs` and `ppW.blindPairs` come out of the epoch's `pins.json`
   (the defect `ppe1-analyze.py:66` has is a hardcoded pair list). They are then
   CHECKED against the sets A-1.12 froze; a live epoch naming anything else is
-  an invalid epoch under validity condition (4) -> route (c).
+  an invalid epoch under validity condition (4) -> route (c). A `pins.json` with
+  no `ppW` block is NOT valid, and there is no fallback to a default denominator.
+  The inherited `ppL5` / `ppL6` / `ppW5` fields carry the W2-/W3- loop suite and
+  the N1- neutral set from `run-m5-epoch.sh`'s base pins. They are NOT this
+  experiment's pairs; reading one would be a silent wrong-denominator bug, so
+  they are ignored and NAMED as ignored in the output.
 
 VALIDITY CONDITIONS (frozen)
   (1) a run without `transcript.jsonl` is invalid            -> route (b)
@@ -109,9 +133,13 @@ Usage:
     ppw-analyze.py <epoch-dir> [--dry-run] [--starter-compiles PATH] [--out PATH]
     ppw-analyze.py --ledger [--out PATH] [--epochs-root PATH]
 
-  --dry-run   accept an epoch that is NOT the registered `w-rows-001` (a
-              null-agent smoke, a synthetic fixture) and label the output as a
-              dry run. A dry-run analysis is NEVER recorded in the ledger.
+  --dry-run   accept an epoch that is NOT the registered `w-rows-001` (the
+              A:81 dry run, a null-agent smoke, a synthetic fixture). A DRY RUN
+              EMITS NO VERDICT AT ALL and is never recorded in the ledger: it
+              exists to SIZE N — the smallest runs-per-cell reaching >= 80 %
+              power at Delta = 0.5 under the UPPER confidence bound of its
+              observed between-pair variance — and to report that variance.
+              THE DRY RUN SIZES N AND NEVER MOVES THE BAR.
   --ledger    write `bench/phase0-agent-native/effect-rows-benefit-ledger.json`
               (timestamp-free and byte-stable) from the registered epoch under
               --epochs-root, or in its not-run form when that epoch is absent.
@@ -123,6 +151,7 @@ import glob
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import random
 import re
@@ -167,6 +196,17 @@ SPEND_CEILING_USD = 150.0
 BOOT = 2000
 SEED = 4537
 
+# The A:81 dry run's SIZING loop — a different job from adjudication, with its own
+# counts, and it may never move the bar. It answers one question: the smallest N
+# (runs per cell) reaching >= MIN_POWER at Delta = LEG_A_EFFECT_SIZE under the
+# UPPER confidence bound of the dry run's observed between-pair variance.
+SIZING_SIMS = 400            # simulated epochs per candidate N
+SIZING_BOOT = 400            # the derivation's inner Monte-Carlo loop count
+SIZING_MAX_N = 12
+COST_PER_RUN_USD = 1.0048    # mean total_cost_usd over the 40 e1-rows-parity-001 runs
+PILOT_RUNS = 2               # the S1 pilot; counts against the ceiling
+DRY_RUN_RUNS = 36            # 6 pairs x 3 runs x 2 arms; counts against the ceiling
+
 # The arm-B argument-resolution escape route, enumerated as A-1.12 enumerates it.
 ESCAPE_CATEGORIES = ["this-qualified", "property", "inherited", "alias-of-this",
                      "other-instance", "instance-method-group", "other"]
@@ -178,6 +218,36 @@ STARTER_FREEZE_COMMIT = "7d621c0d"
 LEDGER_PATH = os.path.join(BENCH, "effect-rows-benefit-ledger.json")
 SEEDED_COMPILES = os.path.join(BENCH, "pairs", "ppw-seeded-compiles.json")
 REGISTERED_COMPILE_ROLES = ["starter", "shortcut", "clean"]
+
+# Limitations measured on the instrument and DISCLOSED rather than fixed, because
+# fixing them after the fixtures were frozen would be the post-hoc change gates §0.3
+# forbids. Each names its direction, because a limitation whose sign is unstated is
+# not a disclosure.
+DISCLOSED_LIMITATIONS = [
+    {"id": "stderr-laundering-invisible-on-arm-A",
+     "detail": "a laundering implementation that prints to Console.Error instead of stdout "
+               "compiles on arm A with NO Calor0410 and passes the held-out suite (the tests "
+               "capture Console.Out), so it is an UNDETECTED escape. On arm B the same program "
+               "is refused (4x error Calor0410, build exit 1).",
+     "direction": "removes escapes from ARM A ONLY, shrinking the A - B delta. It biases "
+                  "AGAINST this workstream's own hypothesis and cannot manufacture a HIT."},
+    {"id": "W-004-arm-B-zero-is-compiler-behaviour",
+     "detail": "W-004's laundering site INVOKES the field (§C{this.onChange}) rather than "
+               "passing it, so 0.15 charges it through the unknown-call path and the arm-B "
+               "escape rate is expected to be a hard zero.",
+     "direction": "not test blindness and not a defect: a zero there is the compiler working. "
+                  "W-004's `unregistered-this-qualified-escape-b` seed is a CHARGED CONTROL, "
+                  "unlike the identically-named seeds on W-001 and W-006, which do escape — "
+                  "the #1136 boilerplate pasted across those cells is cell-specific only in "
+                  "its first sentence and must not be read as making them the same cell."},
+    {"id": "silence-signature-required",
+     "detail": "W-001's and W-003's effect-observing tests assert the return value BEFORE the "
+               "silence assertion, so a silent-but-wrong solution fails a named test having "
+               "laundered nothing. Leg A therefore requires the SILENCE failure signature, not "
+               "merely a named-test failure; the excluded cases are published per cell as "
+               "namedTestFailuresWithoutSilence.",
+     "direction": "arm-symmetric — it removes noise from both arms and cannot move the sign."},
+]
 
 NOT_RUN_REASON = ("epoch w-rows-001 has not run; adjudication is at the 0.16.0 release commit "
                   "(A-1.12: the 0.16.0 release PR's author runs it via run-ppw-epoch.sh)")
@@ -266,6 +336,160 @@ def bootstrap_lower_ratio(pairs, control, treatment, boot=BOOT, seed=SEED):
         return None
     boots.sort()
     return boots[int(0.05 * len(boots))]
+
+
+# ---------------------------------------------------------------------------
+# N-sizing (the A:81 dry run's whole job)
+# ---------------------------------------------------------------------------
+# One-sided upper 95 % chi-square bounds on a variance, by degrees of freedom:
+# sigma^2_UCB = df * s^2 / chi2_{0.05, df}. Tabulated (standard library only).
+_CHI2_LOWER_TAIL_05 = {1: 0.003932, 2: 0.102587, 3: 0.351846, 4: 0.710721,
+                       5: 1.145476, 6: 1.635383, 7: 2.167350, 8: 2.732637,
+                       9: 3.325113, 10: 3.940299}
+
+
+def variance_upper_bound(values):
+    """The one-sided upper 95 % confidence bound on the variance of `values`.
+    A-1.12: the dry run sizes N "under the UPPER confidence bound of its
+    variance" — sizing on the point estimate would under-size by design."""
+    n = len(values)
+    if n < 2:
+        return None
+    s2 = statistics.variance(values)
+    df = n - 1
+    chi2 = _CHI2_LOWER_TAIL_05.get(df)
+    if chi2 is None:
+        return s2
+    return df * s2 / chi2
+
+
+def _simulate_power(k, n, delta, sigma, sims=SIZING_SIMS, boot=SIZING_BOOT, seed=SEED):
+    """Power of the REGISTERED leg-A procedure at `n` runs per cell: draw k
+    pair-level true deltas around `delta` with spread `sigma`, draw Bernoulli
+    escapes per run, run the same two-level cluster bootstrap, and count how
+    often its one-sided 95 % lower bound exceeds the bar."""
+    rng = random.Random(seed)
+    pairs = ["p%d" % i for i in range(k)]
+    hits = 0
+    for _ in range(sims):
+        arm_a, arm_b = {}, {}
+        for pair in pairs:
+            d = max(-1.0, min(1.0, rng.gauss(delta, sigma)))
+            # centre the pair on 0.5 so both rates stay inside [0, 1]
+            a = max(0.0, min(1.0, 0.5 + d / 2.0))
+            b = max(0.0, min(1.0, a - d))
+            arm_a[pair] = [1.0 if rng.random() < a else 0.0 for _ in range(n)]
+            arm_b[pair] = [1.0 if rng.random() < b else 0.0 for _ in range(n)]
+        lower = bootstrap_lower_delta(pairs, arm_a, arm_b, boot=boot, seed=rng.randrange(1 << 30))
+        if lower is not None and lower > LEG_A_BAR:
+            hits += 1
+    return hits / float(sims)
+
+
+def size_n(observed_deltas, k, sims=SIZING_SIMS, boot=SIZING_BOOT, max_n=SIZING_MAX_N):
+    """The dry run's deliverable. Returns the power curve, the smallest N that
+    reaches MIN_POWER at Delta = LEG_A_EFFECT_SIZE, and what that N costs
+    against the frozen $150 ceiling — with the achievable power at the largest
+    affordable N when nothing affordable reaches the bar, because A-1.12 says
+    the PP then "registers its achievable power and arms UNDERPOWERED" rather
+    than overrunning."""
+    sigma_ucb = variance_upper_bound(observed_deltas)
+    result = OrderedDict()
+    result["rule"] = ("the smallest N (runs per cell) reaching >= %.2f power at Delta = %.1f "
+                      "under the UPPER 95 %% confidence bound of the dry run's observed "
+                      "between-pair variance; the dry run sizes N and NEVER moves the bar"
+                      % (MIN_POWER, LEG_A_EFFECT_SIZE))
+    result["blindPairsObserved"] = k
+    result["blindFloor"] = BLIND_FLOOR
+    result["observedDeltas"] = [round(d, 4) for d in observed_deltas]
+    result["observedVariance"] = (None if len(observed_deltas) < 2
+                                  else round(statistics.variance(observed_deltas), 6))
+    result["varianceUpperBound95"] = None if sigma_ucb is None else round(sigma_ucb, 6)
+    result["sims"] = sims
+    result["bootstrapResamples"] = boot
+    if sigma_ucb is None or k < 1:
+        result["powerCurve"] = []
+        result["recommendedN"] = None
+        result["note"] = ("fewer than two blind pairs carried a delta: the dry run cannot size N "
+                          "(the floor of two is what carries the power)")
+        return result
+    sigma = math.sqrt(sigma_ucb)
+    # The WHOLE curve is computed, never short-circuited at the first N that clears
+    # the bar: the curve is the publishable artifact, and with a finite number of
+    # simulations a single N can clear it on noise. The recommendation is the
+    # smallest N that clears the bar AND is not contradicted by the next N up.
+    curve = []
+    for n in range(2, max_n + 1):
+        power = _simulate_power(k, n, LEG_A_EFFECT_SIZE, sigma, sims=sims, boot=boot)
+        curve.append({"n": n, "power": round(power, 3),
+                      "runs": _epoch_runs(n),
+                      "estimatedUsd": round(_epoch_cost(n), 2),
+                      "fitsCeiling": _epoch_cost(n) <= SPEND_CEILING_USD})
+    recommended = _smallest_sufficient_n(curve)
+
+    # The SAME calculation on the POINT variance, published beside it and never
+    # used: A-1.12 sizes N "under the UPPER confidence bound of its variance", and
+    # with k = 3 pairs that bound is 19.5x the point estimate (chi-square, df = 2).
+    # Publishing both makes the cost of the registered basis visible on the face of
+    # the output instead of buried in this comment.
+    point_curve = []
+    if result["observedVariance"]:
+        point_sigma = math.sqrt(result["observedVariance"])
+        for n in range(2, max_n + 1):
+            power = _simulate_power(k, n, LEG_A_EFFECT_SIZE, point_sigma, sims=sims, boot=boot)
+            point_curve.append({"n": n, "power": round(power, 3)})
+    result["atPointVarianceNotRegistered"] = {
+        "note": "NOT the registered basis — A-1.12 sizes N under the UPPER confidence bound of "
+                "the variance. Published so the cost of that choice is visible.",
+        "powerCurve": point_curve,
+        "recommendedN": _smallest_sufficient_n(point_curve)}
+    result["powerCurve"] = curve
+    result["recommendedN"] = recommended
+    affordable = [c for c in curve if c["fitsCeiling"]]
+    max_affordable = max((c["n"] for c in affordable), default=None)
+    result["maxAffordableN"] = max_affordable
+    if recommended is not None:
+        entry = next(c for c in curve if c["n"] == recommended)
+        result["recommendedFitsCeiling"] = entry["fitsCeiling"]
+        result["recommendedRuns"] = entry["runs"]
+        result["recommendedUsd"] = entry["estimatedUsd"]
+        result["achievablePower"] = entry["power"]
+        result["armsUnderpowered"] = not entry["fitsCeiling"]
+        result["note"] = (None if entry["fitsCeiling"] else
+                          "the N that reaches the power bar does not fit the $%.0f ceiling; "
+                          "A-1.12: the PP registers its achievable power and arms UNDERPOWERED "
+                          "rather than overrunning" % SPEND_CEILING_USD)
+    else:
+        best = max(curve, key=lambda c: c["power"]) if curve else None
+        result["recommendedFitsCeiling"] = None
+        result["achievablePower"] = best["power"] if best else None
+        result["armsUnderpowered"] = True
+        result["note"] = ("no N up to %d reaches %.2f power at Delta = %.1f under the upper "
+                          "variance bound; the PP registers its achievable power and arms "
+                          "UNDERPOWERED" % (max_n, MIN_POWER, LEG_A_EFFECT_SIZE))
+    return result
+
+
+def _smallest_sufficient_n(curve):
+    """The smallest N clearing MIN_POWER whose successor does not contradict it
+    (a lone blip above the bar between two below it is noise, not a size)."""
+    for index, entry in enumerate(curve):
+        if entry["power"] < MIN_POWER:
+            continue
+        following = curve[index + 1:]
+        if not following or any(e["power"] >= MIN_POWER for e in following):
+            return entry["n"]
+    return None
+
+
+def _epoch_runs(n):
+    """The registered spend arithmetic: the S1 pilot + the dry run + a 6 x N x 2
+    main epoch, all of which count against the ceiling."""
+    return PILOT_RUNS + DRY_RUN_RUNS + len(PAIR_DIRS) * n * 2
+
+
+def _epoch_cost(n):
+    return _epoch_runs(n) * COST_PER_RUN_USD
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +665,47 @@ def classify_escape(sources):
     return (categories[0] if categories else None), categories
 
 
+def read_declared_done(run_dir, record):
+    """The two facts leg A's registered escape needs, and where they come from.
+
+    `result.json`'s `escapedBugs` is NOT one of them, and may not be substituted:
+    it is the aggregate xUnit `Failed:` count for the WHOLE held-out suite, so it
+    (a) counts failures of tests that are not effect-observing — on W-006 an
+    unfixed `Map` off-by-one gives Failed: 8 where the two SURVIVORS are exactly
+    the effect-observing pair, i.e. a maximal `escapedBugs` on a run that
+    laundered nothing — and (b) does not condition on the workspace having built,
+    while `run-pair.sh`'s invalid path writes `escapedBugs = heldoutTestCount`.
+
+    Preferred source: the `finalBuild` / `heldoutFinal` fields `run-pair.sh`
+    archives. Fallback, for a run collected before those fields existed: the
+    archived logs themselves — `.ho_final.txt` (written only after a successful
+    build, since `extract_metrics` runs the held-out suite inside the build's
+    success branch) and `.src_final.txt`. Neither present -> (None, None, None)
+    and the run is invalid, because guessing here is how leg A's sign gets lost.
+    """
+    final_build = record.get("finalBuild") or {}
+    heldout = record.get("heldoutFinal") or {}
+    built = final_build.get("ok")
+    failed = heldout.get("failedTests")
+    silence = heldout.get("silenceFailures")
+    if isinstance(built, bool) and isinstance(failed, list) and isinstance(silence, list):
+        return built, failed, silence
+
+    ho_path = os.path.join(run_dir, ".ho_final.txt")
+    src_path = os.path.join(run_dir, ".src_final.txt")
+    if not os.path.exists(ho_path) and not os.path.exists(src_path):
+        return (built if isinstance(built, bool) else None), failed, silence
+    parsed = HARNESS_CAPTURE.read_heldout_final(ho_path)
+    if parsed["source"] == "missing":
+        # The declared-done build failed: no held-out run happened, so no escape.
+        return False, [], []
+    src_ok = True
+    if os.path.exists(src_path):
+        with open(src_path, encoding="utf-8", errors="replace") as fh:
+            src_ok = ": error " not in fh.read()
+    return src_ok, parsed["failedTests"], parsed["silenceFailures"]
+
+
 def read_final_sources(run_dir):
     root = os.path.join(run_dir, "final-src")
     out = []
@@ -572,7 +837,8 @@ def _artifact(path):
             if absolute.startswith(REPO + os.sep) else os.path.basename(absolute))
 
 
-def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
+def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
+            sizing_sims=SIZING_SIMS, sizing_boot=SIZING_BOOT):
     """Pure: returns (analysis dict, printable lines)."""
     lines = []
     pins_path = os.path.join(epoch_dir, "pins.json")
@@ -610,6 +876,12 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
                                              "misconfigured by its author",
                                     "artifact": _artifact(os.path.join(epoch_dir, "pins.json"))})
             leg_b_pairs, blind_pairs = [], []
+
+    # Inherited from run-m5-epoch.sh's base pins and NOT this experiment's pairs:
+    # ppL5.pairs is the W2-/W3- loop suite, ppL6.pairs the N1- neutral set. Reading
+    # either would be a silent wrong-denominator bug, so they are named as ignored
+    # rather than left to look like they were missed.
+    stale_ignored = [key for key in ("ppL5", "ppL6", "ppW5") if key in pins]
 
     arm_a, arm_b = pins.get("armA") or {}, pins.get("armB") or {}
     if not arm_a.get("commit") or not arm_b.get("commit"):
@@ -699,19 +971,20 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
         # whether --forward-subagent-text was passed.
         turns = record.get("turns") or {}
         top = turns.get("assistantMessages")
-        sub = turns.get("subagentMessages")
-        total = turns.get("assistantMessagesIncludingSubagents")
         reason = None
-        if not invalid:
+        if not invalid and has_transcript:
+            recomputed = HARNESS_CAPTURE.count_turns(
+                os.path.join(run_dir, "transcript.jsonl"))["assistantMessages"]
             if not isinstance(top, int):
                 reason = "turns.assistantMessages is %r, not an integer count" % top
-            elif isinstance(total, int) and top > total:
-                reason = ("turns.assistantMessages (%d) exceeds "
-                          "assistantMessagesIncludingSubagents (%d)" % (top, total))
-            elif isinstance(sub, int) and sub > 0 and isinstance(total, int) and top == total:
-                reason = ("turns.assistantMessages (%d) equals the including-subagents total "
-                          "with %d subagent message(s): the field carries the TOTAL, not the "
-                          "registered TOP-LEVEL count" % (top, sub))
+            elif top != recomputed:
+                reason = ("turns.assistantMessages is %d but the archived transcript holds %d "
+                          "distinct TOP-LEVEL assistant message.id value(s); the recorded field "
+                          "is not the registered quantity (a runner writing top-level + subagent "
+                          "under that name records a different metric under a registered name)"
+                          % (top, recomputed))
+        elif not invalid and not isinstance(top, int):
+            reason = "turns.assistantMessages is %r, not an integer count" % top
         if reason:
             blockers.append("%s: %s (validity condition (2))" % (rel, reason))
 
@@ -726,22 +999,40 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
                                 % (rel, canary))
 
         # leg A's two facts, both registered
-        final_build = record.get("finalBuild") or {}
-        built = final_build.get("ok")
-        heldout = record.get("heldoutFinal") or {}
-        failed_tests = heldout.get("failedTests")
+        built, failed_tests, silence_failures = read_declared_done(run_dir, record)
         observing = ((pair_meta.get(pair_dir) or {}).get("tests") or {}).get("effectObservingTests")
         leg_a_readable = (isinstance(built, bool) and isinstance(failed_tests, list)
+                          and isinstance(silence_failures, list)
                           and isinstance(observing, list) and len(observing) > 0)
-        if not invalid and not leg_a_readable and not observing:
-            blockers.append("pairs/%s names no effectObservingTests — the pair cannot produce a "
-                            "leg-A rate (route (c))" % pair_dir)
+        if not invalid and not leg_a_readable:
+            if not observing:
+                blockers.append("pairs/%s names no effectObservingTests — the pair cannot produce "
+                                "a leg-A rate (route (c))" % pair_dir)
+            else:
+                # Fail closed. A run that does not archive `finalBuild.ok` and
+                # `heldoutFinal.failedTests` cannot be scored under the registered
+                # escape rule at all, and `escapedBugs` may not be substituted for
+                # them — that substitution is the sign inversion this row replaces.
+                blockers.append("%s: no finalBuild.ok / heldoutFinal.failedTests — the registered "
+                                "leg-A escape (>= 1 named effectObservingTest failing on a "
+                                "workspace that BUILT) cannot be computed for this run, and "
+                                "escapedBugs may not stand in for it (route (c))" % rel)
 
         escape = None
+        named_failure = None
         if leg_a_readable:
             # THE REGISTERED RULE: an escape is >= 1 named effectObservingTest failing on a
             # workspace that BUILT. A non-building final state contributes NO escape.
-            escape = bool(built) and any(t in failed_tests for t in observing)
+            #
+            # REFINED, post hoc and arm-symmetrically: the failure must be the SILENCE
+            # assertion. W-001's Twice_IsSilent_AfterProbe and W-003's Sum2_* assert the
+            # RETURN VALUE before the silence assertion, so a silent-but-WRONG solution
+            # fails a named effect-observing test having laundered nothing (measured:
+            # `Expected: 2 / Actual: 1`). Reading any failure of a named test as an escape
+            # would count that as laundering. The refinement fires identically on both
+            # arms, so it removes noise and cannot move the delta's sign.
+            named_failure = bool(built) and any(t in failed_tests for t in observing)
+            escape = bool(built) and any(t in silence_failures for t in observing)
 
         tokens, source = (None, "invalid") if invalid else _corrected_tokens(run_dir)
         token_sources[source] += 1
@@ -772,10 +1063,12 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
             "builtAtDeclaredDone": built,
             "legAReadable": leg_a_readable,
             "escape": escape,
+            "namedTestFailure": named_failure,
             "escapeCategory": category,
             "escapeCategories": categories,
             "shapeRealized": shape_realized,
             "compilerHash": record.get("compilerHash"),
+            "optionsHash": (record.get("buildState") or {}).get("optionsHash"),
             "tokens": tokens,
             "tokenSource": source,
             "itg": record.get("iterationsToGreen"),
@@ -802,6 +1095,27 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
             set(hashes["control"]) & set(hashes["treatment"]):
         blockers.append("the two arms share a compilerHash — the agent-visible compiler is the "
                         "same on both arms (validity condition (3))")
+
+    # The optionsHash leg, which is what witnesses the PERMISSIVE POLICY: a control
+    # arm built from the registered commit but run STRICT leaves compilerHash
+    # unchanged and moves only optionsHash, so the compilerHash leg alone cannot see
+    # it. The epoch's own ppW.validity says exactly this; the runner checks only the
+    # compilerHash half.
+    options = {}
+    for role in ("control", "treatment"):
+        seen = {r["optionsHash"] for p in runs for r in runs[p].get(role, [])
+                if not r["invalid"] and r["optionsHash"]}
+        options[role] = sorted(seen)
+    if not options["control"] or not options["treatment"]:
+        blockers.append("buildState.optionsHash is not recorded on both arms — the permissive "
+                        "policy is then unwitnessed, since a control arm built from the "
+                        "registered commit but run STRICT leaves compilerHash unchanged and "
+                        "moves only optionsHash (validity condition (3))")
+    elif set(options["control"]) & set(options["treatment"]):
+        blockers.append("the two arms share a buildState.optionsHash %s — the control arm was "
+                        "not run under <CalorPermissiveEffects>, whatever its commit says "
+                        "(validity condition (3))"
+                        % sorted(set(options["control"]) & set(options["treatment"])))
 
     # ---- the PP-W5 validity floor -------------------------------------------
     def valid_runs(pair, role):
@@ -898,6 +1212,24 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
                          % pair_dir,
                 "artifact": "bench/phase0-agent-native/pairs/%s/pair.json" % pair_dir})
 
+    # A-1.12's own-goal clause covers causes an analyzer cannot see — "a Calor0410
+    # demotion changed before the epoch" is one. The epoch may therefore RECORD an
+    # own goal in `pins.ppW.ownGoal`, and it is honoured only when it names a cause
+    # AND an artifact that EXISTS: "the cause must be published WITH THE ARTIFACT
+    # that shows it, never asserted in prose". It can add an own goal, never remove
+    # one the instrument derived.
+    recorded_own_goal = (ppw or {}).get("ownGoal")
+    if isinstance(recorded_own_goal, dict):
+        cause = recorded_own_goal.get("cause")
+        artifact = recorded_own_goal.get("artifact")
+        if cause and artifact and os.path.exists(os.path.join(REPO, artifact)):
+            own_goal_causes.append({"cause": "recorded by the epoch: %s" % cause,
+                                    "artifact": artifact})
+        else:
+            blockers.append("pins.json ppW.ownGoal names no cause, or an artifact that does not "
+                            "exist (%r): an own goal must be published WITH the artifact that "
+                            "shows it, never asserted in prose" % artifact)
+
     harness_valid = not blockers
 
     # ---- leg A ---------------------------------------------------------------
@@ -912,6 +1244,7 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
             realized = [r for r in cell if r["shapeRealized"] is True]
             cats = Counter(r["escapeCategory"] for r in readable
                            if r["escape"] and r["escapeCategory"])
+            named_only = [r["dir"] for r in readable if r["namedTestFailure"] and not r["escape"]]
             per_cell.append({
                 "pair": pair,
                 "arm": arm_key,
@@ -920,6 +1253,9 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
                 "readableRuns": len(readable),
                 "escapes": int(sum(escapes)),
                 "escapeRate": (round(sum(escapes) / len(escapes), 4) if escapes else None),
+                # A named effect-observing test failed WITHOUT the silence signature:
+                # a silent-but-wrong solution, not laundering. Published, never scored.
+                "namedTestFailuresWithoutSilence": sorted(named_only),
                 "didNotBuildAtDeclaredDone": len(non_building),
                 "didNotBuildRuns": sorted(non_building),
                 "shapeRealized": len(realized),
@@ -1044,7 +1380,17 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
         or (median_cv is not None and median_cv > CV_CAP)
         or (isinstance(achievable_power, (int, float)) and achievable_power < MIN_POWER))
 
-    if firing and not own_goal:
+    if dry_run:
+        # A-1.12 / A:81: THE DRY RUN SIZES N AND NEVER MOVES THE BAR. Emitting
+        # HIT or MISS from a dry epoch is the worst failure mode this script has,
+        # so no verdict is produced at all — the leg statistics and the sizing
+        # calculation are, because sizing is the dry run's whole job.
+        verdict = None
+        route = None
+        reason = ("DRY RUN: no verdict. This epoch is not the registered %s, so it sizes N and "
+                  "reports variance; it never adjudicates and is never recorded in the ledger."
+                  % EPOCH_ID)
+    elif firing and not own_goal:
         verdict = "NOT-ADJUDICATED"
         route = firing[0]
         reason = "route (%s): %s" % (route.replace("Prime", "'"), routes[route]["rule"])
@@ -1077,9 +1423,13 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
                   "%s, lower bound %s at margin %.2f"
                   % (leg_a_blind["medianDelta"], leg_a_blind["lowerBound95"], point, lower, MARGIN))
     else:
-        verdict = "NOT-ADJUDICATED"
+        # "ANY ROUTE NOT LISTED HERE IS A MISS." A valid harness that still yields no
+        # leg-A statistic is not one of (a)-(d), and NOT-ADJUDICATED is exactly the
+        # verdict this workstream may not quietly award itself.
+        verdict = "MISS"
         route = None
-        reason = "leg A produced no statistic on a harness with no firing route"
+        reason = ("leg A produced no statistic on a harness with no firing route — not one of "
+                  "routes (a)-(d), and any route not listed in the frozen map is a MISS")
 
     analysis = OrderedDict()
     analysis["gate"] = "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12, §A.2 row PP-W6)"
@@ -1099,12 +1449,21 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
     analysis["armA"] = {"label": arm_a.get("label"), "role": "control",
                         "commit": arm_a.get("commit"), "calorTasksSha": a_tasks,
                         "compilerHashes": hashes["control"],
+                        "optionsHashes": options["control"],
+                        "provenance": "tag v0.14.3 PLUS the one commit %s on the never-merged "
+                                      "branch arm/v0.14.3-pre-rows that threads the existing "
+                                      "--permissive-effects policy through Calor.Tasks; the +1 "
+                                      "is the registered additive mechanism, not drift"
+                                      % ARM_A_COMMIT,
                         "editMechanism": arm_a.get("editMechanism")}
     analysis["armB"] = {"label": arm_b.get("label"), "role": "treatment",
                         "commit": arm_b.get("commit"), "calorTasksSha": b_tasks,
                         "compilerHashes": hashes["treatment"],
+                        "optionsHashes": options["treatment"],
+                        "provenance": "the v0.15.0 release tag, strict, no flags",
                         "editMechanism": arm_b.get("editMechanism")}
     analysis["harnessCommit"] = pins.get("harnessCommit")
+    analysis["inheritedPinsIgnored"] = stale_ignored
     analysis["modelPin"] = pins.get("modelPin")
     analysis["legBPairs"] = sorted(leg_b_pairs)
     analysis["blindPairs"] = sorted(blind_pairs)
@@ -1116,6 +1475,7 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
     analysis["tokenSources"] = dict(sorted(token_sources.items()))
     analysis["spendUsd"] = round(spend_usd, 4)
     analysis["spendCeilingExceeded"] = spend_usd > SPEND_CEILING_USD
+    analysis["disclosedLimitations"] = DISCLOSED_LIMITATIONS
     analysis["indicatorSelfCheck"] = indicator_checks
     analysis["starterBlobDrift"] = blob_drift
     analysis["perCell"] = per_cell
@@ -1146,6 +1506,13 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
         ("sensitivity", sensitivity),
         ("fails", leg_b_fails),
         ("iterationsToGreen", itg)])
+    # The A:81 dry run's deliverable: size N from the realized between-pair spread
+    # of the leg-A deltas, under the UPPER bound of that variance.
+    sizing = None
+    if dry_run:
+        deltas = [entry["delta"] for entry in leg_a_blind["perPair"]]
+        sizing = size_n(deltas, len(deltas), sims=sizing_sims, boot=sizing_boot)
+    analysis["sizing"] = sizing
     analysis["achievablePower"] = achievable_power
     analysis["harnessValid"] = harness_valid
     analysis["blockers"] = blockers
@@ -1189,7 +1556,28 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None):
             lines.append("  - %s" % b)
     for c in own_goal_causes:
         lines.append("OWN GOAL: %s  [%s]" % (c["cause"], c["artifact"]))
-    lines.append("verdict: %s  (route %s) — %s" % (verdict, route, reason))
+    if stale_ignored:
+        lines.append("inherited pins IGNORED (not this experiment's pairs): %s"
+                     % ", ".join(stale_ignored))
+    if sizing is not None:
+        lines.append("--- N sizing (the dry run's job; it never moves the bar) ---")
+        lines.append("  observed blind deltas %s  variance %s  upper 95%% bound %s"
+                     % (sizing["observedDeltas"], sizing["observedVariance"],
+                        sizing["varianceUpperBound95"]))
+        for entry in sizing["powerCurve"]:
+            lines.append("  N=%-3d power %.3f  %d runs  ~$%.2f  fits ceiling %s"
+                         % (entry["n"], entry["power"], entry["runs"],
+                            entry["estimatedUsd"], entry["fitsCeiling"]))
+        lines.append("  recommended N = %s (achievable power %s); %s"
+                     % (sizing["recommendedN"], sizing.get("achievablePower"),
+                        sizing.get("note") or "fits the $150 ceiling"))
+        point = sizing.get("atPointVarianceNotRegistered") or {}
+        lines.append("  (on the POINT variance, NOT the registered basis: N = %s)"
+                     % point.get("recommendedN"))
+    if verdict is None:
+        lines.append("verdict: (none — %s)" % reason)
+    else:
+        lines.append("verdict: %s  (route %s) — %s" % (verdict, route, reason))
     return analysis, lines
 
 
@@ -1221,6 +1609,10 @@ def _run_cost(run_dir):
 # the ledger (A-1.12: "INSTRUMENT that reads the outcome")
 # ---------------------------------------------------------------------------
 def build_ledger(analysis=None, pairs_root=None):
+    if analysis is not None and analysis.get("dryRun"):
+        raise SystemExit("ERROR: refusing to record a DRY RUN in the ledger. A dry run sizes N "
+                         "and never adjudicates (A:81); only the registered epoch %s may reach "
+                         "effect-rows-benefit-ledger.json." % EPOCH_ID)
     """Timestamp-free and byte-stable: nothing here reads the clock, the
     current HEAD, or any absolute path. `measuredCommit` is the epoch's arm-B
     commit — the product under test — falling back to the registered one."""
@@ -1240,13 +1632,18 @@ def build_ledger(analysis=None, pairs_root=None):
     ledger["runner"] = "bench/phase0-agent-native/run-ppw-epoch.sh"
     ledger["epoch"] = EPOCH_ID
     ledger["epochRun"] = analysis is not None
+    ledger["disclosedLimitations"] = DISCLOSED_LIMITATIONS
     ledger["escapeSemantics"] = (
         "an escape is AT LEAST ONE of the pair's named effectObservingTests failing on a workspace "
         "that BUILT at declared-done; a run whose final state does not build contributes NO escape "
         "and is published in a separate \"did not build at declared-done\" category, per arm and "
         "per pair, still counting against §2's censoring cap. The pair specs' escapedBugs rule "
         "(gates §2: a non-compiling final state counts as all tests failing) INVERTS leg A's sign "
-        "here and is not used.")
+        "here and is not used — and `escapedBugs` is in any case the aggregate Failed: count for "
+        "the whole suite, which also counts failures of tests that are not effect-observing. The "
+        "failure must additionally carry the SILENCE signature, because two pairs' "
+        "effect-observing tests assert the return value first and a silent-but-wrong solution "
+        "would otherwise read as laundering.")
     ledger["precedence"] = "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT"
     ledger["constants"] = OrderedDict([
         ("legABar", LEG_A_BAR), ("legAEffectSize", LEG_A_EFFECT_SIZE), ("blindFloor", BLIND_FLOOR),
@@ -1353,8 +1750,14 @@ def main(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("epoch_dir", nargs="?", default=None)
     parser.add_argument("--dry-run", action="store_true",
-                        help="accept an epoch that is not the registered w-rows-001; the output "
-                             "is labelled and is never recorded in the ledger")
+                        help="accept an epoch that is not the registered w-rows-001. A dry run "
+                             "SIZES N and reports variance; it emits NO verdict and is never "
+                             "recorded in the ledger (A:81: the dry run never moves the bar).")
+    parser.add_argument("--sizing-sims", type=int, default=SIZING_SIMS,
+                        help="simulated epochs per candidate N in the dry run's sizing loop")
+    parser.add_argument("--sizing-boot", type=int, default=SIZING_BOOT,
+                        help="bootstrap resamples inside the sizing loop (never the "
+                             "adjudicator's %d)" % BOOT)
     parser.add_argument("--starter-compiles", default=None,
                         help="a ppw-compile.py record of the UNMUTATED starters on both arms "
                              "(default: <epoch>/ppw-starter-compiles.json). Route (a) cannot be "
@@ -1391,7 +1794,8 @@ def main(argv=None):
         parser.error("an epoch directory is required (or --ledger)")
     analysis, lines = analyze(args.epoch_dir, dry_run=args.dry_run,
                               starter_compiles=args.starter_compiles,
-                              pairs_root=args.pairs_root)
+                              pairs_root=args.pairs_root,
+                              sizing_sims=args.sizing_sims, sizing_boot=args.sizing_boot)
     out = args.out or os.path.join(
         args.epoch_dir, "ppw-analysis.dry-run.json" if args.dry_run else "ppw-analysis.json")
     with open(out, "w", encoding="utf-8") as fh:

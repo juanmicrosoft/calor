@@ -1,0 +1,26 @@
+{
+  "name": "leg-a-read-from-the-archived-logs",
+  "why": "THE FALLBACK PATH, which the live dry epoch needs. Every run here omits `finalBuild` and `heldoutFinal` from result.json — the shape of a run collected before those fields existed — leaving only the archived `.ho_final.txt` and `.src_final.txt` that `run-pair.sh` has always written. The analyzer must recover both facts from those logs and adjudicate identically to the `hit` case, because this is an analysis-layer fix and no data is lost. If it instead fell back to `escapedBugs`, or failed closed on an epoch that HAS the evidence, the whole dry run would be unreadable.",
+  "expect": {
+    "verdict": "HIT",
+    "route": null,
+    "legAMeetsBar": true,
+    "legBFails": false
+  },
+  "runsPerArm": 4,
+  "defaultCell": {"logsOnly": true},
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {"escapes": 4, "logsOnly": true},
+      "B": {"escapes": 0, "logsOnly": true}
+    },
+    "W-004-counter-peek": {
+      "A": {"escapes": 4, "logsOnly": true},
+      "B": {"escapes": 0, "logsOnly": true}
+    },
+    "W-006-map-doubler": {
+      "A": {"escapes": 4, "logsOnly": true},
+      "B": {"escapes": 0, "logsOnly": true}
+    }
+  }
+}

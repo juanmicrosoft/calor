@@ -1168,9 +1168,12 @@ extract_metrics() {
     fi
 
     # A-1.12 leg A, archived per run: did the declared-done state BUILD, and
-    # WHICH held-out tests failed (the escape is >= 1 named effectObservingTest
-    # failing on a workspace that BUILT — a per-test fact `escapedBugs` cannot
-    # carry). `.ho_final.txt` exists only when the build succeeded.
+    # WHICH held-out tests failed, split by whether the failure was the SILENCE
+    # assertion. `escapedBugs` cannot carry either fact: it is the aggregate
+    # Failed: count for the whole suite, so it counts failures of tests that are
+    # not effect-observing, and it does not condition on the build.
+    # `.ho_final.txt` exists only when the build succeeded, and is archived
+    # beside these fields so an analyzer can always recompute them.
     local final_build heldout_final
     final_build=$(jq -n --argjson ok "$([[ $final_build_ok -eq 1 ]] && echo true || echo false)" \
         '{ok: $ok, log: ".src_final.txt"}')

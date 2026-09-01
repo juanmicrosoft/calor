@@ -418,6 +418,18 @@ echo "arm compilers verified distinct: A ${a_hashes:0:12} vs B ${b_hashes:0:12}"
 
 echo "--- collection complete; verify the registered leg-B denominator was stamped ---"
 python3 "$HARNESS_CAPTURE" leg-b-pairs "$OUT/pins.json"
+
+# Route (a) of the frozen outcome map: every UNMUTATED starter must reproduce the
+# multiset A-1.12 froze for it, ON ITS ARM, severity and exit included. That is a
+# re-execution, not a citation, so the epoch records its own starter compiles with
+# the two arm products it actually ran — ppw-analyze.py refuses to adjudicate
+# without them (an adjudication that never re-checked the starters is not one).
+echo "--- recording route (a)'s starter compiles on both arms ---"
+python3 "$SCRIPT_DIR/ppw-compile.py" \
+    --arm-a-dll "$ARM_A_DLL" --arm-b-dll "$ARM_B_DLL" \
+    --arm-a-commit "$ARM_A_COMMIT" --arm-b-commit "$ARM_B_COMMIT" \
+    --out "$OUT/ppw-starter-compiles.json" \
+    || echo "WARNING: starter compiles not recorded — ppw-analyze.py will refuse route (a)" >&2
 if [[ -f "$SCRIPT_DIR/ppw-analyze.py" ]]; then
     echo "--- adjudicating (ppw-analyze.py) ---"
     ANALYZE_FLAGS=()

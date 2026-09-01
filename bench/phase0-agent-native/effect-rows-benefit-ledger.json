@@ -9,7 +9,24 @@
   "runner": "bench/phase0-agent-native/run-ppw-epoch.sh",
   "epoch": "w-rows-001",
   "epochRun": false,
-  "escapeSemantics": "an escape is AT LEAST ONE of the pair's named effectObservingTests failing on a workspace that BUILT at declared-done; a run whose final state does not build contributes NO escape and is published in a separate \"did not build at declared-done\" category, per arm and per pair, still counting against §2's censoring cap. The pair specs' escapedBugs rule (gates §2: a non-compiling final state counts as all tests failing) INVERTS leg A's sign here and is not used.",
+  "disclosedLimitations": [
+    {
+      "id": "stderr-laundering-invisible-on-arm-A",
+      "detail": "a laundering implementation that prints to Console.Error instead of stdout compiles on arm A with NO Calor0410 and passes the held-out suite (the tests capture Console.Out), so it is an UNDETECTED escape. On arm B the same program is refused (4x error Calor0410, build exit 1).",
+      "direction": "removes escapes from ARM A ONLY, shrinking the A - B delta. It biases AGAINST this workstream's own hypothesis and cannot manufacture a HIT."
+    },
+    {
+      "id": "W-004-arm-B-zero-is-compiler-behaviour",
+      "detail": "W-004's laundering site INVOKES the field (§C{this.onChange}) rather than passing it, so 0.15 charges it through the unknown-call path and the arm-B escape rate is expected to be a hard zero.",
+      "direction": "not test blindness and not a defect: a zero there is the compiler working. W-004's `unregistered-this-qualified-escape-b` seed is a CHARGED CONTROL, unlike the identically-named seeds on W-001 and W-006, which do escape — the #1136 boilerplate pasted across those cells is cell-specific only in its first sentence and must not be read as making them the same cell."
+    },
+    {
+      "id": "silence-signature-required",
+      "detail": "W-001's and W-003's effect-observing tests assert the return value BEFORE the silence assertion, so a silent-but-wrong solution fails a named test having laundered nothing. Leg A therefore requires the SILENCE failure signature, not merely a named-test failure; the excluded cases are published per cell as namedTestFailuresWithoutSilence.",
+      "direction": "arm-symmetric — it removes noise from both arms and cannot move the sign."
+    }
+  ],
+  "escapeSemantics": "an escape is AT LEAST ONE of the pair's named effectObservingTests failing on a workspace that BUILT at declared-done; a run whose final state does not build contributes NO escape and is published in a separate \"did not build at declared-done\" category, per arm and per pair, still counting against §2's censoring cap. The pair specs' escapedBugs rule (gates §2: a non-compiling final state counts as all tests failing) INVERTS leg A's sign here and is not used — and `escapedBugs` is in any case the aggregate Failed: count for the whole suite, which also counts failures of tests that are not effect-observing. The failure must additionally carry the SILENCE signature, because two pairs' effect-observing tests assert the return value first and a silent-but-wrong solution would otherwise read as laundering.",
   "precedence": "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
   "constants": {
     "legABar": 0.0,
