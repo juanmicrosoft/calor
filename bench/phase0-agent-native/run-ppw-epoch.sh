@@ -46,7 +46,8 @@
 #   CLAUDE_MODEL=<pinned model> bench/phase0-agent-native/run-ppw-epoch.sh \
 #       --arm-a-repo-root <v0.14.3 checkout, built Release> \
 #       --arm-b-repo-root <v0.15.0 checkout, built Release> \
-#       [--epoch w-rows-001] [--runs 8] [--leg-b-pairs "W-001 W-002 W-003 W-004 W-006"] \
+#       [--epoch w-rows-001] [--runs 8] [--pairs "W-004 W-005 W-006"] \
+#       [--leg-b-pairs "W-001 W-002 W-003 W-004 W-006"] \
 #       [--blind-pairs "W-001 W-004 W-006"] [--null-agent] --confirm-paid-epoch
 #
 # Build each arm's PRODUCT first, in its own checkout (never the harness
@@ -86,6 +87,7 @@ KIND="pp-w-rows"
 PAIRS=(W-001 W-002 W-003 W-004 W-005 W-006)
 LEG_B_PAIRS="W-001 W-002 W-003 W-004 W-006"
 BLIND_PAIRS="W-001 W-004 W-006"
+PAIRS_OVERRIDDEN=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -93,6 +95,7 @@ while [[ $# -gt 0 ]]; do
         --runs) RUNS="$2"; shift 2 ;;
         --arm-a-repo-root) ARM_A_ROOT="$2"; shift 2 ;;
         --arm-b-repo-root) ARM_B_ROOT="$2"; shift 2 ;;
+        --pairs) read -r -a PAIRS <<< "$2"; PAIRS_OVERRIDDEN=1; shift 2 ;;
         --leg-b-pairs) LEG_B_PAIRS="$2"; shift 2 ;;
         --blind-pairs) BLIND_PAIRS="$2"; shift 2 ;;
         --null-agent) NULL_FLAG="--null-agent"; shift ;;
@@ -115,6 +118,16 @@ if [[ -n "$NULL_FLAG" && "$EPOCH" != .* ]]; then
     EPOCH=".null-${EPOCH#.}"
     EPOCH="${EPOCH%-null}"
     echo "NOTE: --null-agent writes to the dot-prefixed epoch '$EPOCH' (scratch; invisible to the archive instruments, and never a live epoch id)"
+fi
+
+# A SUBSET IS A DRY-RUN AFFORDANCE ONLY. The registered epoch's denominator is the
+# six pairs A-1.12 froze; running fewer under that id would publish a ledger whose
+# `pairs` field is a promise the collection did not keep. A dry epoch may run a
+# subset — that is how a collection an API refusal truncated gets completed — and
+# ppw-analyze.py --dry-run emits no verdict for one either way.
+if [[ $PAIRS_OVERRIDDEN -eq 1 && "$EPOCH" == "w-rows-001" ]]; then
+    echo "ERROR: --pairs may not narrow the registered epoch w-rows-001. A-1.12 freezes its six pairs; a subset is a dry epoch, run under its own id." >&2
+    exit 2
 fi
 
 [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {

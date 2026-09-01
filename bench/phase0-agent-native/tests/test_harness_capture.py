@@ -779,6 +779,27 @@ class EpochGuards(unittest.TestCase):
         attribution = _read(os.path.join(BENCH, "ppe1-turn-attribution.py"))
         self.assertIn('if name.startswith("."):', attribution)
 
+    def test_pairs_may_not_narrow_the_registered_epoch(self):
+        """A subset is how a dry collection an API refusal truncated gets
+        completed (w-rows-dry-001 lost 17 of 36 runs to the weekly usage limit).
+        It is never the registered epoch's denominator: A-1.12 freezes six pairs,
+        and a ledger whose `pairs` field promises six over a collection that ran
+        three is the wrong-denominator bug the whole ppW block exists to prevent.
+        The guard fires BEFORE the arm checks, so it cannot be reached past."""
+        src = _read(RUN_PPW)
+        self.assertIn("--pairs may not narrow the registered epoch", src)
+        self.assertLess(src.index("--pairs may not narrow the registered epoch"),
+                        src.index('[[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]]'))
+        out = run(["bash", RUN_PPW, "--epoch", "w-rows-001", "--pairs", "W-004 W-006",
+                   "--arm-a-repo-root", "/nonexistent", "--arm-b-repo-root", "/nonexistent"])
+        self.assertEqual(out.returncode, 2, out.stdout + out.stderr)
+        self.assertIn("may not narrow the registered epoch", out.stderr)
+        # ... and a dry epoch id takes the same subset without complaint, failing
+        # later on the arm pin like any other run.
+        out = run(["bash", RUN_PPW, "--epoch", "w-rows-dry-002", "--pairs", "W-004 W-006",
+                   "--arm-a-repo-root", "/nonexistent", "--arm-b-repo-root", "/nonexistent"])
+        self.assertNotIn("may not narrow the registered epoch", out.stderr)
+
     def test_one_build_server_shutdown_before_the_first_run(self):
         src = _read(RUN_PPW)
         self.assertIn("dotnet build-server shutdown", src)
