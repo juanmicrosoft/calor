@@ -1,0 +1,1146 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "bench/phase0-agent-native/ppw-compile.py",
+  "roadmap": "docs/plans/roadmap-v0.16.md §4.1 PP-W-rows; §2.3 S3 (c)",
+  "starterFreezeCommit": "7d621c0d",
+  "invocation": "dotnet <calor.dll> -i <src> -o <scratch> [flags]; LC_ALL=C; sources passed repo-relative from the repo root; diagnostics sorted by (line, column, code, severity, text)",
+  "arms": {
+    "A": {
+      "label": "calor+v0.14.3 --permissive-effects (pre-rows control arm)",
+      "compilerCommit": "283ec9f9964ddd5b21da15b646a0dd77d53de99e",
+      "flags": [
+        "--permissive-effects"
+      ],
+      "controlArmKind": "pre-rows"
+    },
+    "B": {
+      "label": "calor+v0.15.0 strict (tag v0.15.0; src/ equals 7d621c0d)",
+      "compilerCommit": "3bb2601e3ff83597ddf2f27dcc334b6399ab97ea",
+      "flags": []
+    }
+  },
+  "legBPairs": [
+    "W-001-middleware-stage",
+    "W-002-map-and-report",
+    "W-003-match-fallback",
+    "W-004-counter-peek",
+    "W-006-map-doubler"
+  ],
+  "blindPairs": [
+    "W-001-middleware-stage",
+    "W-004-counter-peek",
+    "W-006-map-doubler"
+  ],
+  "compiles": [
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "starter",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/starter-a/A3-middleware.calr",
+      "blobSha": "2d351d101f5972cf1f5c4cb5640be3bd2870974f",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 4,
+          "column": 19,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 5,
+          "column": 20,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "starter",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/starter-b/A3-middleware.calr",
+      "blobSha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "shortcut",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/shortcut-a/A3-middleware.calr",
+      "blobSha": "e51c9d1581e3233944fc68b7836e26af11db4be7",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 4,
+          "column": 19,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 5,
+          "column": 20,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "shortcut",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/shortcut-b/A3-middleware.calr",
+      "blobSha": "7dd181a13569d80bde2c90c02f9cf24c00a12df0",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 26,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "clean",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/clean-a/A3-middleware.calr",
+      "blobSha": "934305d53486e111d7a117b931c3a2315edb3883",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 4,
+          "column": 19,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 5,
+          "column": 20,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "clean",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/clean-b/A3-middleware.calr",
+      "blobSha": "036e49ab1c4bb801f6f3cfacf762e6182fcfeec3",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "sibling-W-001s",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/sibling-w001s-a/A3-middleware.calr",
+      "blobSha": "e54dfebafc7fd78f96e61ac494aa4b3600abcff4",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 3,
+      "diagnostics": [
+        {
+          "line": 4,
+          "column": 19,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 5,
+          "column": 20,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'g' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 23,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "warning",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "sibling-W-001s",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/sibling-w001s-b/A3-middleware.calr",
+      "blobSha": "40e80a8a45f5446695e6118a0012f5fb7c995525",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 23,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-this-qualified-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-this-qualified-escape-b/A3-middleware.calr",
+      "blobSha": "9574a91501a44fdd7de60bf9788997080225ab88",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 27,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-property-backed-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-property-backed-escape-b/A3-middleware.calr",
+      "blobSha": "0327990fe76d56a33e41e533491cb74fb718eca8",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 27,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-resolvable-alias-control",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-resolvable-alias-control-b/A3-middleware.calr",
+      "blobSha": "3607c5302bf2dd25ecaa5335b58a9625f989bec3",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 26,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-other-receiver-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-other-receiver-escape-b/A3-middleware.calr",
+      "blobSha": "2149349906373a1b90486a66bc171e5abf4f9b58",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 30,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'TwiceOf' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-001-middleware-stage",
+      "role": "unregistered-method-group-receiver-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-001-middleware-stage/seeded/unregistered-method-group-receiver-escape-b/A3-middleware.calr",
+      "blobSha": "ced90553aa38ad95e0d06274240c1225b687cf87",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 30,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. The instantiated row of 'RunTwice' is Unknown here, so nothing is charged to 'TwiceOf' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "starter",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/starter-a/A3-map.calr",
+      "blobSha": "9f108655fcc376a721efd3e4b1be187aeb4da5e4",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 7,
+          "column": 22,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'f' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "starter",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/starter-b/A3-map.calr",
+      "blobSha": "0885b3dd40fcff28c51de72860d47a32db60bf8c",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "shortcut",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/seeded/shortcut-a/A3-map.calr",
+      "blobSha": "7b39de68e2402aea3fd12d7c19668b099c0a0185",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 3,
+      "diagnostics": [
+        {
+          "line": 7,
+          "column": 22,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'f' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 28,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "warning",
+          "text": "Function 'MapAndReport' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 37,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "warning",
+          "text": "Function 'Total' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "shortcut",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/seeded/shortcut-b/A3-map.calr",
+      "blobSha": "46e1ee280d59ca9b216ddbdfc5837ab6c96507cd",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 28,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'MapAndReport' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 37,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Total' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "clean",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/seeded/clean-a/A3-map.calr",
+      "blobSha": "f731efe297dacea0eb33095c8551f0875b9faa6e",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 7,
+          "column": 22,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'f' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "clean",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/seeded/clean-b/A3-map.calr",
+      "blobSha": "5932ee938a91a06ae3c81589de94fb94b54d9646",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-002-map-and-report",
+      "role": "unregistered-rowless-lambda-control",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-002-map-and-report/seeded/unregistered-rowless-lambda-control-b/A3-map.calr",
+      "blobSha": "b11eff5bd20bc0f31cc529a43d64dc64175524dd",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 28,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'MapAndReport' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 37,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Total' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "starter",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/starter-a/A3-match.calr",
+      "blobSha": "1f36ea6e36ac331679d4672b17294cd100a5c25e",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 5,
+          "column": 10,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onSome' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 6,
+          "column": 8,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onNone' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "starter",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/starter-b/A3-match.calr",
+      "blobSha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "shortcut",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/shortcut-a/A3-match.calr",
+      "blobSha": "c638ed58d4109d558b76e086080ed4407a2dc8a1",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 4,
+      "diagnostics": [
+        {
+          "line": 5,
+          "column": 10,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onSome' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 6,
+          "column": 8,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onNone' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 30,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "warning",
+          "text": "Function 'Fallback' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 38,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "warning",
+          "text": "Function 'Sum2' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "shortcut",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/shortcut-b/A3-match.calr",
+      "blobSha": "5a40e2580caad32438e30e519ed0c89063573285",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 30,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Fallback' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 38,
+          "column": 5,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Sum2' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "clean",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/clean-a/A3-match.calr",
+      "blobSha": "c5adea68622e79482de29c8ea54a594547600f35",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 5,
+          "column": 10,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onSome' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 6,
+          "column": 8,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onNone' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "clean",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/clean-b/A3-match.calr",
+      "blobSha": "4649792244e2dab82ca06bcfd4989bf6b52b2ddf",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "unregistered-fourth-blind-cell",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/unregistered-fourth-blind-cell-a/A3-match.calr",
+      "blobSha": "5016a15899ec8461e197b2795af76efe970416ef",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 5,
+          "column": 10,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onSome' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 6,
+          "column": 8,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onNone' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "unregistered-fourth-blind-cell",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/unregistered-fourth-blind-cell-b/A3-match.calr",
+      "blobSha": "5921eb36cce8e03147d73aa75ec2a0545a90c036",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 36,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "unregistered-calor1002-confound",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/unregistered-calor1002-confound-a/A3-match.calr",
+      "blobSha": "afabb5038a9e4dd6d1cebb8a122c9a8d893915d8",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 4,
+      "diagnostics": [
+        {
+          "line": 5,
+          "column": 10,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onSome' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 6,
+          "column": 8,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onNone' (type 'Func<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 35,
+          "column": 82,
+          "code": "Calor1002",
+          "severity": "error",
+          "text": "Generated C# failed compilation (CS0103): The name 'Zero' does not exist in the current context"
+        },
+        {
+          "line": 35,
+          "column": 152,
+          "code": "Calor1002",
+          "severity": "error",
+          "text": "Generated C# failed compilation (CS0103): The name 'Zero' does not exist in the current context"
+        }
+      ]
+    },
+    {
+      "pair": "W-003-match-fallback",
+      "role": "unregistered-calor1002-confound",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-003-match-fallback/seeded/unregistered-calor1002-confound-b/A3-match.calr",
+      "blobSha": "e8c02fb9116a87ce2842d8fe5c77902591a9014a",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 35,
+          "column": 82,
+          "code": "Calor1002",
+          "severity": "error",
+          "text": "Generated C# failed compilation (CS0103): The name 'Zero' does not exist in the current context"
+        },
+        {
+          "line": 35,
+          "column": 152,
+          "code": "Calor1002",
+          "severity": "error",
+          "text": "Generated C# failed compilation (CS0103): The name 'Zero' does not exist in the current context"
+        }
+      ]
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "starter",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/starter-a/A3-callback.calr",
+      "blobSha": "f2dca4a6a71e28266e27ccfd56e4d2a06bc5fd79",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 6,
+          "column": 7,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "starter",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/starter-b/A3-callback.calr",
+      "blobSha": "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "shortcut",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/seeded/shortcut-a/A3-callback.calr",
+      "blobSha": "6eff6da0b813c1a930f5bcf65368f244c03bc93f",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 15,
+          "column": 7,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        },
+        {
+          "line": 19,
+          "column": 7,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "shortcut",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/seeded/shortcut-b/A3-callback.calr",
+      "blobSha": "600a731ab9b9560c97ecfc177cabb1b7ede392aa",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 17,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Peek' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "clean",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/seeded/clean-a/A3-callback.calr",
+      "blobSha": "3c446339b56f7bfccf2d15b31e8c839a961bce81",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 15,
+          "column": 7,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'onChange' (type 'Action<i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "clean",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/seeded/clean-b/A3-callback.calr",
+      "blobSha": "e5dfe0dba96b39d15db670d7502b79ceaacda675",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-004-counter-peek",
+      "role": "unregistered-this-qualified-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-004-counter-peek/seeded/unregistered-this-qualified-escape-b/A3-callback.calr",
+      "blobSha": "ad574fd0a25c6bccd85d5cd80105faa439b3e892",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 17,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Peek' uses effect 'unknown' but does not declare it"
+        },
+        {
+          "line": 19,
+          "column": 7,
+          "code": "Calor0411",
+          "severity": "warning",
+          "text": "Unknown external call to 'this.onChange'. Add effect declaration in a .calor-effects.json manifest."
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "starter",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/starter-a/A2.calr",
+      "blobSha": "d49d00178aff477288e5e0527e39834865820761",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 25,
+          "column": 27,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "starter",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/starter-b/A2.calr",
+      "blobSha": "93ecdf1605c4e220313c1dd76b3291d3a79bb705",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 3,
+      "diagnostics": [
+        {
+          "line": 23,
+          "column": 9,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Handle' uses effect 'unknown' but does not declare it"
+        },
+        {
+          "line": 26,
+          "column": 24,
+          "code": "Calor0411",
+          "severity": "warning",
+          "text": "Unknown external call to '_chainProcess010.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest."
+        },
+        {
+          "line": 28,
+          "column": 19,
+          "code": "Calor0411",
+          "severity": "warning",
+          "text": "Unknown external call to '_chainNext011.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest."
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "shortcut",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/seeded/shortcut-a/A2.calr",
+      "blobSha": "b04bed249b4753577e270f38e7b94e944d258347",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 21,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "warning",
+          "text": "Function 'Handle' uses effect 'cw' but does not declare it"
+        },
+        {
+          "line": 26,
+          "column": 27,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "shortcut",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/seeded/shortcut-b/A2.calr",
+      "blobSha": "02d700fde52f300ce05d2fe2090357be70a88c86",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 3,
+      "diagnostics": [
+        {
+          "line": 23,
+          "column": 9,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Handle' uses effect 'unknown' but does not declare it"
+        },
+        {
+          "line": 27,
+          "column": 24,
+          "code": "Calor0411",
+          "severity": "warning",
+          "text": "Unknown external call to '_chainProcess010.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest."
+        },
+        {
+          "line": 29,
+          "column": 19,
+          "code": "Calor0411",
+          "severity": "warning",
+          "text": "Unknown external call to '_chainNext011.ConfigureAwait'. Add effect declaration in a .calor-effects.json manifest."
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "shortcut-b-repaired",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/seeded/shortcut-b-repaired/A2.calr",
+      "blobSha": "bd1df74748dd583e255823adb6987c1a315a6010",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 23,
+          "column": 9,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Handle' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "clean",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/seeded/clean-a/A2.calr",
+      "blobSha": "3ad66737a741e9046834eb28826efa8390d8b655",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 28,
+          "column": 27,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of value 'next' (declared type 'RequestHandlerDelegate<TResponse>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-005-pipeline-trace",
+      "role": "clean",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-005-pipeline-trace/seeded/clean-b/A2.calr",
+      "blobSha": "21cda114f66a65d4ff520cc7042982a373d2e47c",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "starter",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/starter-a/A3-map.calr",
+      "blobSha": "9f108655fcc376a721efd3e4b1be187aeb4da5e4",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 7,
+          "column": 22,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'f' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "starter",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/starter-b/A3-map.calr",
+      "blobSha": "0885b3dd40fcff28c51de72860d47a32db60bf8c",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "shortcut",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/shortcut-a/A3-map.calr",
+      "blobSha": "468caf0e6bda5aae7012f84127eea723f4e0d463",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 7,
+          "column": 22,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'f' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "shortcut",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/shortcut-b/A3-map.calr",
+      "blobSha": "559bdf7ace705498c48eaebf030aa22b4963e7dc",
+      "exitCode": 1,
+      "emitted": false,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 38,
+          "column": 7,
+          "code": "Calor0410",
+          "severity": "error",
+          "text": "Function 'Twice' uses effect 'cw' but does not declare it"
+        }
+      ]
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "clean",
+      "arm": "A",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/clean-a/A3-map.calr",
+      "blobSha": "70d900c1a6117041019d18b4149d9de865085a28",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 1,
+      "diagnostics": [
+        {
+          "line": 7,
+          "column": 22,
+          "code": "Calor0418",
+          "severity": "warning",
+          "text": "Invocation of function-typed value 'f' (type 'Func<i32,i32>') is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver)."
+        }
+      ]
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "clean",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/clean-b/A3-map.calr",
+      "blobSha": "87fa4f4b71111ef343a9e4e154c1d0e41568d384",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 0,
+      "diagnostics": []
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "unregistered-this-qualified-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/unregistered-this-qualified-escape-b/A3-map.calr",
+      "blobSha": "40c759ae3940de323ab85b6e3b23e13d214780b2",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 2,
+      "diagnostics": [
+        {
+          "line": 39,
+          "column": 16,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        },
+        {
+          "line": 40,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    },
+    {
+      "pair": "W-006-map-doubler",
+      "role": "unregistered-property-backed-escape",
+      "arm": "B",
+      "path": "bench/phase0-agent-native/pairs/W-006-map-doubler/seeded/unregistered-property-backed-escape-b/A3-map.calr",
+      "blobSha": "9a35a1ebf34cb2d6a59f86eb32b2959991ebe410",
+      "exitCode": 0,
+      "emitted": true,
+      "diagnosticCount": 3,
+      "diagnostics": [
+        {
+          "line": 40,
+          "column": 16,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        },
+        {
+          "line": 41,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        },
+        {
+          "line": 45,
+          "column": 10,
+          "code": "Calor0425",
+          "severity": "warning",
+          "text": "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Loud' for it. State a row on the argument's declaration, or compile with --permissive-effects."
+        }
+      ]
+    }
+  ]
+}

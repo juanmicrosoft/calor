@@ -1,0 +1,11 @@
+/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/A3-map.calr(43,10): Calor warning Calor0425: Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects. [/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/Src.csproj]
+/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/A3-map.calr(43,21): Calor warning Calor0425: Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects. [/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/Src.csproj]
+
+Build succeeded.
+
+/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/A3-map.calr(43,10): Calor warning Calor0425: Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects. [/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/Src.csproj]
+/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/A3-map.calr(43,21): Calor warning Calor0425: Effect variable 'e' of 'Map' instantiates to Unknown at this call site: argument 2 of 'Map' is not a function value this pass can name. The instantiated row of 'Map' is Unknown here, so nothing is charged to 'Twice' for it. State a row on the argument's declaration, or compile with --permissive-effects. [/private/var/folders/bj/wc9hty_x3gq24qdwdvjc6wt40000gn/T/p0-W-006-map-doubler-calor-S02yr5/src/Src.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.83

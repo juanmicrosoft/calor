@@ -1,0 +1,16 @@
+§M{m001:CallbackAfter}
+  §CL{c001:Counter:pub}
+    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §FLD{i32:total:pri} 0
+    §CTOR{ctor002:pub}
+      §ASSIGN onChange Emit
+    §MT{mt005:Emit:pri} (i32:value) -> void
+      §E{cw}
+      §P value
+    §MT{mt001:Bump:pub} (i32:n) -> void
+      §E{cw, mut}
+      §ASSIGN total (+ total n)
+      §C{onChange} §A total §/C
+    §MT{mt004:Peek:pub} (i32:n) -> i32
+      §E{}
+      §R (+ total n)

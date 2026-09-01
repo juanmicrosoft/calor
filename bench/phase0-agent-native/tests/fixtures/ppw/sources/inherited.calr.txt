@@ -1,0 +1,18 @@
+§M{m001:MiddlewareAfter}
+  §F{f001:RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
+    §E{e}
+    §B{first:i32} §C{g}
+    §R first
+
+  §F{f002:Beat:pub} () -> i32
+    §E{cw}
+    §P "beat"
+    §R INT:1
+
+  §CL{c000:BehaviorBase:pub}
+    §FLD{Func<i32>:stageBase:pro} §E{cw}
+
+  §CL{c001:RetryBehavior:BehaviorBase:pub}
+    §MT{mt003:Twice:pub} () -> i32
+      §E{}
+      §R §C{RunTwice} §A stageBase §/C

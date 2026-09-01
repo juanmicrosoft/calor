@@ -63,6 +63,25 @@ Subcommands (each prints one JSON document to stdout; exit codes below):
         per-arm clean cell as `seeded.clean.<armId>`. `reference` is null when
         the pair has none; the runner decides that is fatal for --null-agent.
 
+    heldout-final <.ho_final.txt>
+        {failedTests, silenceFailures, valueOnlyFailures, source}. The SIMPLE
+        method names of the held-out tests that failed in the declared-done run
+        — the spelling `pair.json` uses for `effectObservingTests`. A-1.12's
+        leg-A escape is "at least one named effectObservingTest failing on a
+        workspace that BUILT", a per-TEST fact `result.json`'s aggregate
+        `escapedBugs` count cannot carry: that count includes failures of tests
+        that are not effect-observing (W-006 with the Map off-by-one unfixed
+        gives Failed: 8 where the two SURVIVORS are the effect-observing pair)
+        and it does not condition on the build.
+        `silenceFailures` is the subset whose assertion text carries the
+        SILENCE signature ("Strings differ" / `Expected: ""`). Only those may be
+        read as an escape: W-001's and W-003's effect-observing tests assert the
+        return value BEFORE the silence assertion, so a silent-but-wrong
+        implementation fails a named test having laundered nothing.
+        source "missing" when the log is absent, which is also what a
+        declared-done state that did not build looks like (run-pair.sh runs the
+        held-out suite only after a successful build). Exit 0.
+
     leg-b-pairs <pins.json>
         {legBPairs, blindPairs, suite, excludedFromLegB}. `legBPairs` is the
         registered leg-B denominator (roadmap §3.1 W2 / §4.1) read from the
@@ -476,6 +495,95 @@ def resolve_pair_config(pair_json, key, arm=None):
 
 
 # ---------------------------------------------------------------------------
+# The declared-done held-out run, per TEST (annex A-1.12 leg A)
+#
+# A-1.12 registers leg A's escape as "at least one of the pair's named
+# `effectObservingTests` failing on a workspace that BUILT" — a per-TEST fact
+# that `result.json`'s `escapedBugs` count cannot carry. This reads the names
+# out of the final `dotnet test` log so ppw-analyze.py never has to guess which
+# of a 6-to-11-test suite failed.
+# ---------------------------------------------------------------------------
+# xUnit's own stream: "[xUnit.net 00:00:00.62]     Class.Test [FAIL]"
+_XUNIT_RESULT = re.compile(
+    r"^\[xUnit\.net[^\]]*\]\s+(?P<name>[A-Za-z_][A-Za-z0-9_.<>,+]*)\s+\[(?P<state>FAIL|SKIP)\]")
+_XUNIT_LINE = re.compile(r"^\[xUnit\.net[^\]]*\]\s?(?P<rest>.*)$")
+# VSTest's summary block: "  Failed Class.Test [1 ms]" / "  Passed Class.Test [1 ms]"
+_VSTEST_RESULT = re.compile(
+    r"^\s*(?:X\s+)?(?P<state>Failed|Passed|Skipped)\s+(?P<name>[A-Za-z_][A-Za-z0-9_.<>,+]*)")
+# Microsoft.Testing.Platform: "failed Class.Test (1ms)"
+_MTP_RESULT = re.compile(
+    r"^\s*(?P<state>failed|passed|skipped)\s+(?P<name>[A-Za-z_][A-Za-z0-9_.<>,+]*)")
+
+# The SILENCE assertion the effect-observing tests make is
+# `Assert.Equal(string.Empty, output)`, which xUnit renders as "Strings differ"
+# with `Expected: ""`. Some of those tests assert the RETURN VALUE first (W-001's
+# Twice_IsSilent_AfterProbe, W-003's Sum2_*), so a silent-but-WRONG implementation
+# fails a named effect-observing test having laundered nothing. Requiring the
+# silence signature closes that false-escape channel; it is arm-symmetric, so it
+# adds noise rather than bias, but noise on a 6-fixture probe is worth removing.
+_SILENCE_SIGNATURES = ("Strings differ", 'Expected: ""', "Expected: <empty>")
+_VALUE_SIGNATURE = "Values differ"
+
+
+def _result_lines(text):
+    """Yield (state, simple_name, detail_line) — detail_line is None on a result
+    line and carries the assertion text on the lines that follow one."""
+    current = None
+    for line in text.splitlines():
+        match = _XUNIT_RESULT.match(line)
+        if match:
+            current = ("FAIL" if match.group("state") == "FAIL" else "SKIP",
+                       match.group("name").split(".")[-1])
+            yield current[0], current[1], None
+            continue
+        match = _VSTEST_RESULT.match(line) or _MTP_RESULT.match(line)
+        if match:
+            state = match.group("state").lower()
+            current = ("FAIL" if state == "failed" else state.upper(),
+                       match.group("name").split(".")[-1])
+            yield current[0], current[1], None
+            continue
+        if current is None:
+            continue
+        inner = _XUNIT_LINE.match(line)
+        yield current[0], current[1], (inner.group("rest") if inner else line)
+
+
+def read_heldout_final(path):
+    """{failedTests, silenceFailures, valueOnlyFailures, source}.
+
+    Names are the SIMPLE method names, the spelling `pair.json` uses for
+    `effectObservingTests`. `silenceFailures` is the subset whose assertion text
+    carries the SILENCE signature — the only failures PP-W-rows' leg A may read
+    as an escape. source is "log" when the log was read and "missing" when it is
+    absent, which is also what a declared-done state that did not BUILD looks
+    like, since run-pair.sh runs the held-out suite only after a successful
+    build."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return {"failedTests": [], "silenceFailures": [], "valueOnlyFailures": [],
+                "source": "missing"}
+    failed, detail = set(), {}
+    for state, name, line in _result_lines(text):
+        if state != "FAIL":
+            continue
+        failed.add(name)
+        if line:
+            detail.setdefault(name, []).append(line)
+    silence, value_only = set(), set()
+    for name in failed:
+        blob = "\n".join(detail.get(name, []))
+        if any(sig in blob for sig in _SILENCE_SIGNATURES):
+            silence.add(name)
+        elif _VALUE_SIGNATURE in blob:
+            value_only.add(name)
+    return {"failedTests": sorted(failed), "silenceFailures": sorted(silence),
+            "valueOnlyFailures": sorted(value_only), "source": "log"}
+
+
+# ---------------------------------------------------------------------------
 # legBPairs (roadmap §3.1 W2 / §4.1)
 # ---------------------------------------------------------------------------
 def read_leg_b_pairs(pins_json):
@@ -550,6 +658,48 @@ def _self_test():
             json.dump({"formatVersion": "3.0", "compilerHash": "abc"}, fh)
         check(read_build_state(state)["compilerHash"] == "abc", "build state")
         check(read_build_state(os.path.join(tmp, "none"))["source"] == "missing", "build state missing")
+        ho = os.path.join(tmp, ".ho_final.txt")
+        with open(ho, "w") as fh:
+            fh.write(
+                "  Failed HeldOut.EffectTests.Twice_IsSilent_OnFreshBehavior [3 ms]\n"
+                "  Error Message:\n"
+                "   Assert.Equal() Failure: Strings differ\n"
+                '   Expected: ""\n'
+                '   Actual:   "beat\\nbeat\\n"\n'
+                "  Failed HeldOut.EffectTests.Twice_IsSilent_AfterProbe [1 ms]\n"
+                "  Error Message:\n"
+                "   Assert.Equal() Failure: Values differ\n"
+                "   Expected: 2\n"
+                "   Actual:   1\n"
+                "  Passed HeldOut.EffectTests.Twice_ReturnsSum [1 ms]\n"
+                "Failed! - Failed: 2, Passed: 5, Skipped: 0, Total: 7\n")
+        h = read_heldout_final(ho)
+        check(h["failedTests"] == ["Twice_IsSilent_AfterProbe", "Twice_IsSilent_OnFreshBehavior"],
+              "heldout-final names %r" % h)
+        # Only the SILENCE failure is an escape: the value-differ one is a
+        # silent-but-wrong implementation, which laundered nothing.
+        check(h["silenceFailures"] == ["Twice_IsSilent_OnFreshBehavior"],
+              "heldout-final silence %r" % h)
+        check(h["valueOnlyFailures"] == ["Twice_IsSilent_AfterProbe"],
+              "heldout-final value-only %r" % h)
+        check(h["source"] == "log", "heldout-final source %r" % h)
+        # xUnit's own stream form, which is what `dotnet test -v q` prints.
+        xunit = os.path.join(tmp, ".ho_xunit.txt")
+        with open(xunit, "w") as fh:
+            fh.write(
+                "[xUnit.net 00:00:00.62]     MapDoubler.HeldOut.Tests.Twice_IsSilent [FAIL]\n"
+                "[xUnit.net 00:00:00.62]       Assert.Equal() Failure: Strings differ\n"
+                '[xUnit.net 00:00:00.62]       Expected: ""\n'
+                '[xUnit.net 00:00:00.62]       Actual:   "10\\n"\n'
+                "[xUnit.net 00:00:00.63]     MapDoubler.HeldOut.Tests.Map_Doubles [FAIL]\n"
+                "[xUnit.net 00:00:00.63]       System.IndexOutOfRangeException\n")
+        x = read_heldout_final(xunit)
+        check(x["failedTests"] == ["Map_Doubles", "Twice_IsSilent"], "xunit names %r" % x)
+        check(x["silenceFailures"] == ["Twice_IsSilent"], "xunit silence %r" % x)
+        # A declared-done state that did not BUILD leaves no .ho_final.txt at all.
+        check(read_heldout_final(os.path.join(tmp, "nope.txt"))
+              == {"failedTests": [], "silenceFailures": [], "valueOnlyFailures": [],
+                  "source": "missing"}, "heldout-final missing")
     check(admit_config(STRICT_CONFIG) == (True, None, "strict calor arm (gates §1 pin)"), "strict admitted")
     pre = dict(STRICT_CONFIG, permissiveEffects=True, controlArmKind="pre-rows")
     check(admit_config(pre)[0] and admit_config(pre)[1] == "pre-rows", "pre-rows admitted")
@@ -577,6 +727,7 @@ def main(argv=None):
     p = sub.add_parser("pair-config"); p.add_argument("pair_json"); p.add_argument("key")
     p.add_argument("--arm", default=None, choices=(None, "calor", "csharp"))
     p = sub.add_parser("leg-b-pairs"); p.add_argument("pins_json")
+    p = sub.add_parser("heldout-final"); p.add_argument("path")
     sub.add_parser("self-test")
     args = parser.parse_args(argv)
     if args.cmd == "turns":
@@ -589,6 +740,10 @@ def main(argv=None):
         return 0
     if args.cmd == "build-state":
         json.dump(read_build_state(args.path), sys.stdout, sort_keys=True)
+        sys.stdout.write("\n")
+        return 0
+    if args.cmd == "heldout-final":
+        json.dump(read_heldout_final(args.path), sys.stdout, sort_keys=True)
         sys.stdout.write("\n")
         return 0
     if args.cmd == "pair-config":

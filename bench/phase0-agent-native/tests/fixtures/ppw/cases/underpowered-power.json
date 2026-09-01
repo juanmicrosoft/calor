@@ -1,0 +1,41 @@
+{
+  "name": "underpowered-power",
+  "why": "leg A at bar and leg B clean, but the dry run registered an achievable power below 80 % at Delta = 0.5 \u2014 A-1.12's third UNDERPOWERED branch.",
+  "expect": {
+    "verdict": "UNDERPOWERED",
+    "route": null,
+    "legAMeetsBar": true
+  },
+  "runsPerArm": 4,
+  "pins": {
+    "ppW": {
+      "achievablePower": 0.6
+    }
+  },
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

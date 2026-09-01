@@ -1,0 +1,99 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "1fb60f7c041c33c0ed554ade45492f9949ea1b9e7d171835989ba268be9c0ee9",
+  "optionsHash": "258e936522d5e4d56f1f07c1a3304bc83d7afdbb15e5707ad4fc19f43eb36830",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A2.calr": {
+      "contentHash": "2b38a8b862d4917a56fcb985657b406ada6b0d9ebb9383ae5661ab6ee1c9d824",
+      "lastModified": "2026-09-01T16:38:03.8113209Z",
+      "fileSize": 1614,
+      "effectSummary": {
+        "moduleName": "MediatR.Pipeline",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Handle",
+            "className": "RequestPreProcessorBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 23,
+            "declarationColumn": 7
+          },
+          {
+            "name": "Process",
+            "className": "TracePreProcessor",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 32,
+            "declarationColumn": 7
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Handle",
+          "Process"
+        ],
+        "callers": [
+          {
+            "callerName": "RequestPreProcessorBehavior.Handle",
+            "diagnosticLine": 24,
+            "diagnosticColumn": 9,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "processor.Process",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "TracePreProcessor.Process",
+            "diagnosticLine": 33,
+            "diagnosticColumn": 9,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Console.WriteLine",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "1d0b9b2d42227d0fa55a83fb5c64c093102768f2787aae133aecc8cbf29cda33",
+      "diagnostics": [
+        {
+          "code": "Calor0419",
+          "severity": "warning",
+          "message": "Effects of \u0027Handle\u0027 are ASSUMED, not verified: contains a raw C# interop expression (\u00A7CS). The declared effect set is accepted as an assumption, not a proof; narrow the interop surface or add manifest coverage to restore verification.",
+          "line": 24,
+          "column": 9
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+  "optionsHash": "357fe0ed837849fa67df33af5e9870f8760c98432e92756d9dbd44c66ff5d45f",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-callback.calr": {
+      "contentHash": "af9898889261aba47162bd29ea90fbddf680c27188f14a866448a9a7870af3c6",
+      "lastModified": "2026-09-01T15:38:48.3892771Z",
+      "fileSize": 376,
+      "effectSummary": {
+        "moduleName": "CallbackAfter",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Bump",
+            "className": "Counter",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 6,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Peek",
+            "className": "Counter",
+            "hasEffectDeclaration": false,
+            "declaredEffects": [],
+            "declarationLine": 11,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Bump",
+          "Peek"
+        ],
+        "callers": [
+          {
+            "callerId": "Counter.mt001",
+            "displayName": "Counter.Bump",
+            "diagnosticLine": 7,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "onChange",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "ba09a413fefa174d643bce308e5cdd9032be29f88cadc806710e55a0b8cc7aae",
+      "diagnostics": []
+    }
+  }
+}

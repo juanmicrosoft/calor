@@ -1,0 +1,25 @@
+{
+  "name": "silent-but-wrong-is-not-an-escape",
+  "why": "THE FALSE-ESCAPE CHANNEL, closed. W-001's Twice_IsSilent_AfterProbe and W-003's Sum2_* assert the RETURN VALUE before the silence assertion, so a silent-but-wrong solution — one that returns 1 instead of 2 and prints nothing — fails a named effect-observing test having laundered no effect at all (measured: `Expected: 2 / Actual: 1`). Here arm A's blind runs fail a named test WITHOUT the silence signature. Reading any failure of a named test as an escape would score a full arm-A escape rate and hand the probe a HIT it did not earn; requiring the silence signature scores zero, so leg A is below its bar and the verdict is a MISS. The excluded runs are published per cell as namedTestFailuresWithoutSilence rather than dropped.",
+  "expect": {
+    "verdict": "MISS",
+    "route": null,
+    "legAMeetsBar": false
+  },
+  "runsPerArm": 4,
+  "defaultCell": {"escapes": 0},
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {"escapes": 0, "namedOnlyFailures": 4},
+      "B": {"escapes": 0}
+    },
+    "W-004-counter-peek": {
+      "A": {"escapes": 0, "namedOnlyFailures": 4},
+      "B": {"escapes": 0}
+    },
+    "W-006-map-doubler": {
+      "A": {"escapes": 0, "namedOnlyFailures": 4},
+      "B": {"escapes": 0}
+    }
+  }
+}

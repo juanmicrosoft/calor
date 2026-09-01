@@ -267,7 +267,18 @@ power and arms UNDERPOWERED.
   sibling; `ppe1-margin-derivation.py` (population flag). *Pin:* a run without `transcript.jsonl` is `invalid`;
   `turns.assistantMessages` is recorded in `result.json`. *Discriminating:* delete the archive
   step → the first 0.16 epoch run is invalid → PP-W-rows route (b).
-- **W2 — PP-W-rows** run and adjudicated at the 0.16.0 release commit (§4.1). *Touches:*
+- **W2 — PP-W-rows** run and adjudicated at the 0.16.0 release commit (§4.1). **OUTCOME
+  (2026-09-01): UNDERPOWERED, on A-1.12's own registered off-ramp — the registered epoch
+  `w-rows-001` was never run and will not be.** The A:81 dry run (`w-rows-dry-001`, truncated at
+  19 of 36 by the weekly usage limit, + `w-rows-dry-002`, the three pairs it never reached) sized
+  the experiment at **N = 9 runs per cell** for 0.80 power at Δ = 0.5 — ~$287 against the frozen
+  $150 ceiling — where the largest affordable N is **3**, at power **0.48**. A-1.12: "the PP
+  registers its achievable power and arms UNDERPOWERED rather than overrunning." The claim is
+  **neither supported nor refuted**; `legA` and `legB` are null in the ledger because no
+  registered run exists to compute them from. Published beside it, as evidence about these six
+  fixtures and not about rows: **zero escapes on both arms across 28 valid runs** with the
+  registered shape realized in 13 of them, and a leg-B point of **1.1175** — below the registered
+  1.20 margin. Full reading: `2026-09-01-ppw-rows-dry-run.md`. *Touches:*
   `pairs/W-*`, `ppw-analyze.py` — which, unlike `ppe1-analyze.py:66` (a hardcoded pair list with
   no per-pair exclusion; `:189` is harness-invalid disclosure only), reads a **`legBPairs`** field
   from the epoch's `pins.json` so W-005's exclusion from leg B is frozen at A-1.12 rather than a
@@ -518,7 +529,10 @@ indicator; register-then-merge enforced by A-1.10.
    — then the floor is re-registered from K1's number with the artifact. *Pin:* revert the
    converter fix → `ExcludedParseFailed` rises → red; restore the raw-bag guard →
    `ModulesEnforced` drops to 99 → red. Two-sided as gate 6.
-10. **PP-W-rows** (registered in the annex under the §A.2 key **`PP-W6`** — the freeze guard keys
+10. **PP-W-rows — MET as UNDERPOWERED (2026-09-01).** The instrument exists, is pinned, and
+    produced the registered off-ramp rather than a verdict the evidence could not carry; see §3.1
+    W2. The gate as written below is what it was measured against.
+    (registered in the annex under the §A.2 key **`PP-W6`** — the freeze guard keys
     a frozen row on an ASCII `PP-<LETTERS><DIGITS>` id and rejects a cell reading `PP-W-rows`
     outright; one proof point, two spellings, and there is no wedge category `W6`).
     *Instrument:* `effect-rows-benefit-ledger.json` + exact-equality test +

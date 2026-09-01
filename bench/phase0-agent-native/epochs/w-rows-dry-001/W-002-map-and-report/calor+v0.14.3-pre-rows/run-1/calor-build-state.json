@@ -1,0 +1,263 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "50a4deb963ea03d1a4abc0059854b4df04719046e94099f517a231f92f5a13e4",
+  "optionsHash": "07ddabdb858a951a27a0645821ae947eaed11f185e5e789e338f391a96a3ee46",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-map.calr": {
+      "contentHash": "6766236495cfe707e192acd5e53aa7fd096af71280f64ad66cd71fe0dfb2cdc1",
+      "lastModified": "2026-08-28T11:14:22.5388867Z",
+      "fileSize": 1071,
+      "effectSummary": {
+        "moduleName": "MapAfter",
+        "publicFunctions": [
+          {
+            "name": "Map",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Double",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 11,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Announce",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 15,
+            "declarationColumn": 3
+          },
+          {
+            "name": "UsePure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 20,
+            "declarationColumn": 3
+          },
+          {
+            "name": "UseImpure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 24,
+            "declarationColumn": 3
+          },
+          {
+            "name": "MapAndReport",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 32,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Total",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 36,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [],
+        "internalFunctionNames": [
+          "Map",
+          "Double",
+          "Announce",
+          "UsePure",
+          "UseImpure",
+          "DoubleReport",
+          "MapAndReport",
+          "Total"
+        ],
+        "internalMethodNames": [],
+        "callers": [
+          {
+            "callerName": "Map",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "f",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "UsePure",
+            "diagnosticLine": 21,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "UseImpure",
+            "diagnosticLine": 25,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "DoubleReport",
+            "diagnosticLine": 29,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Announce",
+                "isConstructor": false
+              },
+              {
+                "target": "Double",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "MapAndReport",
+            "diagnosticLine": 33,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "Memory",
+                "value": "allocation"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              },
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Map",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "769da7daf67826fe3e8297b05c48c9cd9ebd25391e3e50c3615e81aca165ff43",
+      "diagnostics": [
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027f\u0027 (type \u0027Func\u003Ci32,i32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 8,
+          "column": 22
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "pair": "W-006-map-doubler",
+  "arm": "calor+v0.15.0",
+  "run": 2,
+  "taskSuccess": false,
+  "escapedBugs": 10,
+  "heldoutPassed": 0,
+  "iterations": 0,
+  "iterationsToGreen": 11,
+  "censored": true,
+  "invalid": true,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armB/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armB",
+  "editMechanism": "raw",
+  "compilerHash": null,
+  "buildState": {
+    "compilerHash": null,
+    "source": "invalid",
+    "archivedFrom": "none",
+    "file": null
+  },
+  "armConfigKey": "calor",
+  "controlArmKind": null,
+  "permissiveEffects": false,
+  "fixture": "starter-b",
+  "templateSource": "arm-repo-root",
+  "armCanary": "strict-ok",
+  "reference": "seeded/clean-b",
+  "referenceSource": "seeded-clean-declared",
+  "turns": {
+    "assistantMessages": null,
+    "subagentMessages": null,
+    "assistantMessagesIncludingSubagents": null,
+    "numTurns": null,
+    "source": "invalid",
+    "transcript": "transcript.jsonl"
+  },
+  "agentBuilds": {
+    "count": 0,
+    "file": null
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0
+  },
+  "tokenUsage": {
+    "source": "invalid"
+  },
+  "nullAgent": false
+}

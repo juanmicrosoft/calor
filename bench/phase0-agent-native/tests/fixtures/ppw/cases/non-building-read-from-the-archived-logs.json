@@ -1,0 +1,25 @@
+{
+  "name": "non-building-read-from-the-archived-logs",
+  "why": "THE BUILD GATE, on the FALLBACK path. Arm B's declared-done state does not build on any blind run, and the runs carry no `finalBuild` field — the live dry epoch's shape — so the build fact has to come from the archived logs alone. `run-pair.sh` runs the held-out suite only inside the build's success branch, so a missing `.ho_final.txt` IS the non-building signature. An analyzer that read that as \"built, nothing failed\" would publish zero runs in the \"did not build at declared-done\" category and lose the one number that tells an adjudicator why arm B's escape rate is zero: the compiler refused the laundering. The escape rate is 0 either way, which is exactly why this needs its own fixture.",
+  "expect": {
+    "verdict": "HIT",
+    "route": null,
+    "legAMeetsBar": true
+  },
+  "runsPerArm": 4,
+  "defaultCell": {"logsOnly": true},
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {"escapes": 4, "logsOnly": true},
+      "B": {"escapes": 0, "notBuilt": 4, "logsOnly": true}
+    },
+    "W-004-counter-peek": {
+      "A": {"escapes": 4, "logsOnly": true},
+      "B": {"escapes": 0, "notBuilt": 4, "logsOnly": true}
+    },
+    "W-006-map-doubler": {
+      "A": {"escapes": 4, "logsOnly": true},
+      "B": {"escapes": 0, "notBuilt": 4, "logsOnly": true}
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+  "optionsHash": "d878ac031e092dcdb00fd5236a99e155ad27df151f9b77002683a1eaf63ec782",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A2.calr": {
+      "contentHash": "56eaa5628a57d5cab8510c635a89fdb15999f02b44283835f4da22eb8bc5c8ff",
+      "lastModified": "2026-09-01T16:31:33.1168279Z",
+      "fileSize": 1675,
+      "effectSummary": {
+        "moduleName": "MediatR.Pipeline",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Handle",
+            "className": "RequestPreProcessorBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 22,
+            "declarationColumn": 7
+          },
+          {
+            "name": "Process",
+            "className": "TracePreProcessor",
+            "hasEffectDeclaration": false,
+            "declaredEffects": [],
+            "declarationLine": 33,
+            "declarationColumn": 7
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Handle",
+          "Process"
+        ],
+        "callers": [
+          {
+            "callerId": "RequestPreProcessorBehavior.m008",
+            "displayName": "RequestPreProcessorBehavior.Handle",
+            "diagnosticLine": 23,
+            "diagnosticColumn": 9,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "processor.Process",
+                "isConstructor": false
+              },
+              {
+                "target": "next",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "447e8136354455eb4fbedf03a88fb2b5cbd08df83da62925bcb9a13591416d7c",
+      "diagnostics": [
+        {
+          "code": "Calor0419",
+          "severity": "warning",
+          "message": "Effects of \u0027Process\u0027 are ASSUMED, not verified: contains a raw C# interop statement (\u00A7CSHARP). The declared effect set is accepted as an assumption, not a proof; narrow the interop surface or add manifest coverage to restore verification.",
+          "line": 33,
+          "column": 7
+        }
+      ]
+    }
+  }
+}

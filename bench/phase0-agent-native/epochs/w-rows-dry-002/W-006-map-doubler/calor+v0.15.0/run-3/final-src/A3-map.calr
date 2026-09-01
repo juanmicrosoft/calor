@@ -1,0 +1,43 @@
+§M{m001:MapAfter}
+  §F{f001:Map:pub}<eff e> ([i32]:xs, Func<i32,i32>:f §E{e}) -> [i32]
+    §E{e, alloc, mut}
+    §B{n:i32} (len xs)
+    §B{~out:[i32]} §ARR{i32} n
+    §L{l1:i:0:(- n INT:1):1}
+      §SETIDX{out} i §C{f} §A §IDX xs i §/C
+    §R out
+
+  §F{f002:Double:pub} (i32:x) -> i32
+    §E{}
+    §R (* x INT:2)
+
+  §F{f003:Announce:pub} (i32:x) -> i32
+    §E{cw}
+    §P x
+    §R x
+
+  §F{f004:UsePure:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut}
+    §R §C{Map} §A xs §A Double §/C
+
+  §F{f005:UseImpure:pub} ([i32]:xs) -> [i32]
+    §E{alloc, mut, cw}
+    §R §C{Map} §A xs §A Announce §/C
+
+  §F{f006:LoudStep:pub} (i32:x) -> i32
+    §E{cw}
+    §R §C{Announce} §A §C{Double} §A x §/C §/C
+
+  §CL{c001:Doubler:pub}
+    §FLD{Func<i32,i32>:_stage:priv}
+
+    §CTOR{ctor1:pub} ()
+      §ASSIGN this._stage MapAfterModule.Double
+
+    §MT{mt1:Loud:pub} ([i32]:xs) -> [i32]
+      §E{cw, alloc, mut}
+      §R §C{Map} §A xs §A MapAfterModule.LoudStep §/C
+
+    §MT{mt2:Twice:pub} ([i32]:xs) -> [i32]
+      §E{alloc, mut}
+      §R §C{Map} §A §C{Map} §A xs §A this._stage §/C §A this._stage §/C

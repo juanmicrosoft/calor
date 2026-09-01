@@ -1,0 +1,79 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "b58633800ff84323f42c4651f958435a1807e4cc7065674b5082638fffabc553",
+  "optionsHash": "ba786e47e51a7fb704bb31187f95de062bbce4bee610f6422a11a647fe398b20",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-callback.calr": {
+      "contentHash": "276ea0b9c2aa7d9fd8f04fbd357c0f43325bb8b79c9be0ee7868028f31317d3b",
+      "lastModified": "2026-09-01T15:11:02.6520203Z",
+      "fileSize": 450,
+      "effectSummary": {
+        "moduleName": "CallbackAfter",
+        "publicFunctions": [],
+        "publicMethods": [
+          {
+            "name": "Bump",
+            "className": "Counter",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "declarationLine": 10,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Peek",
+            "className": "Counter",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 14,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [],
+        "internalMethodNames": [
+          "Emit",
+          "Bump",
+          "Peek"
+        ],
+        "callers": [
+          {
+            "callerId": "Counter.mt001",
+            "displayName": "Counter.Bump",
+            "diagnosticLine": 11,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              },
+              {
+                "kind": "Mutation",
+                "value": "heap_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "onChange",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "a6d30d53425b867cd6e53fd612b150c2284352161ca2e3099ba8aaa630a1bbc1",
+      "diagnostics": []
+    }
+  }
+}

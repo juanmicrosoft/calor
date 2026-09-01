@@ -1,0 +1,39 @@
+{
+  "name": "non-building-runs-contribute-no-escape",
+  "why": "THE SIGN OF LEG A. Arm B's declared-done state does not build on any run \u2014 the shape arm B's shortcut takes \u2014 and its escapedBugs is therefore the FULL held-out count under gates \u00a72's rule. A-1.12 replaces that rule: those runs contribute NO escape and are published in their own \"did not build at declared-done\" category. Reading escapedBugs here would score arm B 11 escapes against arm A's 2 and invert the sign of the whole probe.",
+  "expect": {
+    "verdict": "HIT",
+    "route": null,
+    "legAMeetsBar": true
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0,
+        "notBuilt": 4
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0,
+        "notBuilt": 4
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0,
+        "notBuilt": 4
+      }
+    }
+  }
+}

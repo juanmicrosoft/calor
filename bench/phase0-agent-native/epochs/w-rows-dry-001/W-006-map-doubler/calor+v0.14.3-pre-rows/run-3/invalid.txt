@@ -1,0 +1,3 @@
+2026-08-28T12:08:57Z attempt=0 agent_rc=1: agent exit code 1 with empty journal.jsonl
+2026-08-28T12:09:02Z attempt=1 agent_rc=1: agent exit code 1 with empty journal.jsonl
+2026-08-28T12:09:07Z attempt=2 agent_rc=1: agent exit code 1 with empty journal.jsonl

@@ -1,0 +1,36 @@
+{
+  "name": "not-adjudicated-b",
+  "why": "route (b): a run without W1's transcript.jsonl. Validity condition (1) makes it invalid, and route (b) reads it.",
+  "expect": {
+    "verdict": "NOT-ADJUDICATED",
+    "route": "b"
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 3,
+        "noTranscript": 1
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

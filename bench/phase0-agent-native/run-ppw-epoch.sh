@@ -46,7 +46,8 @@
 #   CLAUDE_MODEL=<pinned model> bench/phase0-agent-native/run-ppw-epoch.sh \
 #       --arm-a-repo-root <v0.14.3 checkout, built Release> \
 #       --arm-b-repo-root <v0.15.0 checkout, built Release> \
-#       [--epoch w-rows-001] [--runs 8] [--leg-b-pairs "W-001 W-002 W-003 W-004 W-006"] \
+#       [--epoch w-rows-001] [--runs 8] [--pairs "W-004 W-005 W-006"] \
+#       [--leg-b-pairs "W-001 W-002 W-003 W-004 W-006"] \
 #       [--blind-pairs "W-001 W-004 W-006"] [--null-agent] --confirm-paid-epoch
 #
 # Build each arm's PRODUCT first, in its own checkout (never the harness
@@ -86,6 +87,7 @@ KIND="pp-w-rows"
 PAIRS=(W-001 W-002 W-003 W-004 W-005 W-006)
 LEG_B_PAIRS="W-001 W-002 W-003 W-004 W-006"
 BLIND_PAIRS="W-001 W-004 W-006"
+PAIRS_OVERRIDDEN=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -93,6 +95,7 @@ while [[ $# -gt 0 ]]; do
         --runs) RUNS="$2"; shift 2 ;;
         --arm-a-repo-root) ARM_A_ROOT="$2"; shift 2 ;;
         --arm-b-repo-root) ARM_B_ROOT="$2"; shift 2 ;;
+        --pairs) read -r -a PAIRS <<< "$2"; PAIRS_OVERRIDDEN=1; shift 2 ;;
         --leg-b-pairs) LEG_B_PAIRS="$2"; shift 2 ;;
         --blind-pairs) BLIND_PAIRS="$2"; shift 2 ;;
         --null-agent) NULL_FLAG="--null-agent"; shift ;;
@@ -115,6 +118,16 @@ if [[ -n "$NULL_FLAG" && "$EPOCH" != .* ]]; then
     EPOCH=".null-${EPOCH#.}"
     EPOCH="${EPOCH%-null}"
     echo "NOTE: --null-agent writes to the dot-prefixed epoch '$EPOCH' (scratch; invisible to the archive instruments, and never a live epoch id)"
+fi
+
+# A SUBSET IS A DRY-RUN AFFORDANCE ONLY. The registered epoch's denominator is the
+# six pairs A-1.12 froze; running fewer under that id would publish a ledger whose
+# `pairs` field is a promise the collection did not keep. A dry epoch may run a
+# subset — that is how a collection an API refusal truncated gets completed — and
+# ppw-analyze.py --dry-run emits no verdict for one either way.
+if [[ $PAIRS_OVERRIDDEN -eq 1 && "$EPOCH" == "w-rows-001" ]]; then
+    echo "ERROR: --pairs may not narrow the registered epoch w-rows-001. A-1.12 freezes its six pairs; a subset is a dry epoch, run under its own id." >&2
+    exit 2
 fi
 
 [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {
@@ -346,11 +359,15 @@ fi
 stamp_pins() {
     [[ -f "$OUT/pins.json" ]] || return 0
     jq --argjson pairs "$(printf '%s\n' "${PAIRS[@]}" | jq -R . | jq -s .)" \
+       --arg harness_commit "$(git -C "$REPO_ROOT" rev-parse HEAD)" \
+       --arg harness_dirty "$(git -C "$REPO_ROOT" status --porcelain -- "$SCRIPT_DIR" | wc -l | tr -d ' ')" \
        --argjson legb "$(printf '%s\n' $LEG_B_PAIRS | jq -R . | jq -s .)" \
        --argjson blind "$(printf '%s\n' $BLIND_PAIRS | jq -R . | jq -s .)" \
        --arg a_cfg "$ARM_A_CONFIG" --arg b_cfg "$ARM_B_CONFIG" \
        --arg a_dirty "${ARM_A_DIRTY:-0}" --arg b_dirty "${ARM_B_DIRTY:-0}" \
-       '. + {ppW: {gate: "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12)",
+       '. + {harnessCommit: $harness_commit,
+             harnessDirtyFiles: ($harness_dirty|tonumber),
+             ppW: {gate: "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12)",
                    legA: {metric: "median over blind pairs of the per-pair escape-rate delta (A - B)", bar: "one-sided 95% lower bound > 0", effectSize: 0.5, blindFloor: 2},
                    legB: {metric: "output-tokens-to-green (token-usage.py corrected, A-1.9.1)", lowerBoundGate: 1.0,
                           marginRule: "the 0.05 grid line above (null p95 + Monte-Carlo half-width); population and number per ppw-margin-derivation.txt / A-1.12",
@@ -418,6 +435,18 @@ echo "arm compilers verified distinct: A ${a_hashes:0:12} vs B ${b_hashes:0:12}"
 
 echo "--- collection complete; verify the registered leg-B denominator was stamped ---"
 python3 "$HARNESS_CAPTURE" leg-b-pairs "$OUT/pins.json"
+
+# Route (a) of the frozen outcome map: every UNMUTATED starter must reproduce the
+# multiset A-1.12 froze for it, ON ITS ARM, severity and exit included. That is a
+# re-execution, not a citation, so the epoch records its own starter compiles with
+# the two arm products it actually ran — ppw-analyze.py refuses to adjudicate
+# without them (an adjudication that never re-checked the starters is not one).
+echo "--- recording route (a)'s starter compiles on both arms ---"
+python3 "$SCRIPT_DIR/ppw-compile.py" \
+    --arm-a-dll "$ARM_A_DLL" --arm-b-dll "$ARM_B_DLL" \
+    --arm-a-commit "$ARM_A_COMMIT" --arm-b-commit "$ARM_B_COMMIT" \
+    --out "$OUT/ppw-starter-compiles.json" \
+    || echo "WARNING: starter compiles not recorded — ppw-analyze.py will refuse route (a)" >&2
 if [[ -f "$SCRIPT_DIR/ppw-analyze.py" ]]; then
     echo "--- adjudicating (ppw-analyze.py) ---"
     ANALYZE_FLAGS=()

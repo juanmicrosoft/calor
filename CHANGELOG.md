@@ -6,6 +6,65 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **The scorecard for the "do effect rows actually help?" experiment now exists, and it is
+  written down before the experiment runs.** We are about to pay for a set of coding runs
+  that ask a simple question: given the same task, does an agent working with the newer,
+  stricter compiler sneak fewer hidden side effects past it than an agent working with the
+  older, more permissive one — and does the stricter compiler cost noticeably more work to
+  get to green? A new script, `bench/phase0-agent-native/ppw-analyze.py`, reads the finished
+  runs and produces the answer, and a new file,
+  `bench/phase0-agent-native/effect-rows-benefit-ledger.json`, records it. Both were built
+  *before* any run happened, so the rules cannot be bent once the numbers are in: the script
+  is a transcription of the rules already frozen in the project's registration document, a
+  test recomputes the record from scratch and compares it byte for byte, and the script
+  refuses to score a run at all if the recording is incomplete. One rule matters more than
+  the rest and is easy to get backwards: a "sneaked-past side effect" only counts on a
+  workspace that actually **built**. Runs that never compiled are reported in their own
+  separate bucket, because counting them as failures would make the stricter compiler look
+  worse precisely for being strict. The script also refuses to declare a winner from the
+  cheap practice round: a practice run's only job is to work out how many runs the real
+  experiment needs, so it reports that number and stays silent about who won. Nothing here
+  changes the compiler or any program you write — it is measurement plumbing.
+  (v0.16 W2, gate 10)
+
+- **We did a cheap practice round of that experiment, and it found three things wrong with
+  our own measuring equipment.** The practice round ran real coding tasks against both
+  compilers. Before it could tell us anything about the compilers, it told us that the
+  scoring script and the script that runs the experiment disagreed with each other in three
+  ways, each of which would have wasted the whole paid experiment: they spelled the task
+  names differently, so the scorer thought there were no tasks at all; the safety check that
+  proves each compiler is really set up the way it claims writes down one of two different
+  words depending on which compiler it checked, and the scorer only accepted a third word,
+  so it threw away every run of one of them; and the record of which version of the test
+  equipment was used was never written down. All three are fixed, and the scorer now also
+  catches the case where the two compilers were accidentally swapped. The practice round
+  itself is saved in the repository — every run, including its full transcript — so anyone
+  can rerun the scoring and get the same numbers. It is a practice round, so it declares no
+  winner. Full write-up: `docs/plans/2026-09-01-ppw-rows-dry-run.md`. (v0.16 W2)
+
+- **The benchmark's per-turn recording is now proven on real runs.** The recording added
+  earlier this release saves a full transcript of everything the agent did on each turn. The
+  practice round is the first set of runs to carry those transcripts, so the table that
+  counts what an agent did on each turn — files read, searches, builds, edits — has real
+  numbers behind it for the first time. (v0.16 W1/W4)
+
+- **The practice round finished, and it says the real experiment would be too small to
+  settle anything.** A second practice round covered the three tasks the usage limit cut
+  short, so all six now have results. The practice round's job is to work out how many runs
+  the real experiment needs, and the answer is **nine runs per task per compiler** — roughly
+  twice what the budget we fixed in advance can pay for, which affords three. Three runs
+  would give the experiment a *48 %* chance of detecting the effect even if the effect is
+  real, so by the rule we wrote down before starting, the experiment is recorded as
+  **underpowered** rather than being run anyway and reported as if it had settled the
+  question. Two other things worth saying plainly: across all 28 usable runs, **not one**
+  agent on either compiler hid a side effect where the tests could catch it — the thing
+  being measured did not happen at all — and the stricter compiler cost about 12 % more
+  work to reach a green build, below the threshold we had registered as "noticeable".
+  Neither is a result about effect rows yet; both are results about these six tasks.
+  The scorecard now says exactly that, in the place we promised to write the answer:
+  **underpowered — the claim is neither supported nor refuted.** The next release can
+  revisit it with tasks that actually tempt an agent into cheating. (v0.16 W2)
+
 - **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
   Effect checking runs in loops that have a safety limit, so a tangle of functions that
   call each other cannot make the compiler spin forever. Before, hitting that limit in the

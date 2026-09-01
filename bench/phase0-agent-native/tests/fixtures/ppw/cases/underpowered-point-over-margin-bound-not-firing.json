@@ -1,0 +1,34 @@
+{
+  "name": "underpowered-point-over-margin-bound-not-firing",
+  "why": "THE CONJUNCTION. Leg B fails iff BOTH the one-sided 95 % lower bound exceeds 1.0 AND the point exceeds the 1.20 margin. Here the point is 1.30 — over the margin — but the per-pair ratios are spread widely enough that the cluster bootstrap's lower bound sits at 0.5, so the bound leg does not fire. A-1.12's first UNDERPOWERED branch reads exactly this shape, and the UNDERPOWERED branch exists so a point-only exceedance is not adjudicated as a clean miss. An implementation that failed leg B on the point alone would call this a MISS.",
+  "expect": {
+    "verdict": "UNDERPOWERED",
+    "route": null,
+    "legAMeetsBar": true,
+    "legBFails": false
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 500}
+    },
+    "W-002-map-and-report": {
+      "A": {"escapes": 0, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 800}
+    },
+    "W-003-match-fallback": {
+      "A": {"escapes": 0, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 1300}
+    },
+    "W-004-counter-peek": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 2000}
+    },
+    "W-006-map-doubler": {
+      "A": {"escapes": 4, "tokens": 1000},
+      "B": {"escapes": 0, "tokens": 2500}
+    }
+  },
+  "defaultCell": {"tokens": 1000}
+}

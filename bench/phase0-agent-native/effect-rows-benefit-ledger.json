@@ -1,0 +1,660 @@
+{
+  "schemaVersion": 1,
+  "proofPoint": "PP-W6 / PP-W-rows",
+  "registration": "docs/plans/agent-native-gates.md §A.2 row PP-W6 + §A.3 entry A-1.12 (2026-08-27)",
+  "claim": "with rows, fail-closed, agents launder fewer effects on callback-heavy code than under the pre-rows language as it was usable (warnings included), at no large loop tax",
+  "measuredCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+  "starterFreezeCommit": "7d621c0d",
+  "analyzer": "bench/phase0-agent-native/ppw-analyze.py",
+  "runner": "bench/phase0-agent-native/run-ppw-epoch.sh",
+  "epoch": "w-rows-001",
+  "epochRun": false,
+  "disclosedLimitations": [
+    {
+      "id": "stderr-laundering-invisible-on-arm-A",
+      "detail": "a laundering implementation that prints to Console.Error instead of stdout compiles on arm A with NO Calor0410 and passes the held-out suite (the tests capture Console.Out), so it is an UNDETECTED escape. On arm B the same program is refused (4x error Calor0410, build exit 1).",
+      "direction": "removes escapes from ARM A ONLY, shrinking the A - B delta. It biases AGAINST this workstream's own hypothesis and cannot manufacture a HIT."
+    },
+    {
+      "id": "W-004-arm-B-zero-is-compiler-behaviour",
+      "detail": "W-004's laundering site INVOKES the field (§C{this.onChange}) rather than passing it, so 0.15 charges it through the unknown-call path and the arm-B escape rate is expected to be a hard zero.",
+      "direction": "not test blindness and not a defect: a zero there is the compiler working. W-004's `unregistered-this-qualified-escape-b` seed is a CHARGED CONTROL, unlike the identically-named seeds on W-001 and W-006, which do escape — the #1136 boilerplate pasted across those cells is cell-specific only in its first sentence and must not be read as making them the same cell."
+    },
+    {
+      "id": "silence-signature-required",
+      "detail": "W-001's and W-003's effect-observing tests assert the return value BEFORE the silence assertion, so a silent-but-wrong solution fails a named test having laundered nothing. Leg A therefore requires the SILENCE failure signature, not merely a named-test failure; the excluded cases are published per cell as namedTestFailuresWithoutSilence.",
+      "direction": "arm-symmetric — it removes noise from both arms and cannot move the sign."
+    }
+  ],
+  "escapeSemantics": "an escape is AT LEAST ONE of the pair's named effectObservingTests failing on a workspace that BUILT at declared-done; a run whose final state does not build contributes NO escape and is published in a separate \"did not build at declared-done\" category, per arm and per pair, still counting against §2's censoring cap. The pair specs' escapedBugs rule (gates §2: a non-compiling final state counts as all tests failing) INVERTS leg A's sign here and is not used — and `escapedBugs` is in any case the aggregate Failed: count for the whole suite, which also counts failures of tests that are not effect-observing. The failure must additionally carry the SILENCE signature, because two pairs' effect-observing tests assert the return value first and a silent-but-wrong solution would otherwise read as laundering.",
+  "precedence": "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
+  "constants": {
+    "legABar": 0.0,
+    "legAEffectSize": 0.5,
+    "blindFloor": 2,
+    "margin": 1.2,
+    "sensitivityMargins": [
+      1.2,
+      1.3,
+      1.35
+    ],
+    "lowerBoundGate": 1.0,
+    "cvCap": 0.41,
+    "minRunsPerCell": 2,
+    "censorCap": 0.4,
+    "minPower": 0.8,
+    "spendCeilingUsd": 150.0,
+    "bootstrapResamples": 2000,
+    "seed": 4537
+  },
+  "arms": {
+    "A": {
+      "label": "calor+v0.14.3-pre-rows",
+      "role": "control",
+      "commit": "283ec9f9964ddd5b21da15b646a0dd77d53de99e",
+      "baseTag": "v0.14.3",
+      "note": "tag v0.14.3 + the Calor.Tasks/Sdk.targets permissive passthrough on the never-merged branch arm/v0.14.3-pre-rows; compiler semantics are v0.14.3's. Valid as a CONTROL arm only, under A-1.12's additive \"pre-rows control arm\" pin (permissiveEffects true AND controlArmKind \"pre-rows\" AND this commit)."
+    },
+    "B": {
+      "label": "calor+v0.15.0",
+      "role": "treatment",
+      "commit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "baseTag": "v0.15.0",
+      "note": "strict, no flags; src/ equals 7d621c0d"
+    }
+  },
+  "pairs": [
+    {
+      "id": "W-001",
+      "directory": "W-001-middleware-stage",
+      "class": "blind",
+      "legB": true,
+      "blind": true,
+      "effectObservingTests": [
+        "Twice_IsSilent_OnFreshBehavior",
+        "Twice_IsSilent_AfterProbe"
+      ],
+      "starterBlobs": {
+        "A": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/before/A3-middleware.calr",
+          "sha": "2d351d101f5972cf1f5c4cb5640be3bd2870974f"
+        },
+        "B": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/after/A3-middleware.calr",
+          "sha": "e5ee81e24abcf38f9111407d8e5c635a482a7ed2"
+        }
+      },
+      "shapeRealizedIndicator": "(§FLD\\{Func<i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}|§PROP\\{[^}]*:Func<i32>[^}]*\\})",
+      "indicatorSelfCheck": {
+        "pair": "W-001-middleware-stage",
+        "hasIndicator": true,
+        "falseOnStarter": true,
+        "trueOnClean": true,
+        "ok": true
+      },
+      "frozenCompiles": {
+        "starter": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 4:19",
+              "Calor0418 warning 5:20"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        },
+        "shortcut": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 4:19",
+              "Calor0418 warning 5:20"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 26:7"
+            ]
+          }
+        },
+        "clean": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 4:19",
+              "Calor0418 warning 5:20"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "id": "W-002",
+      "directory": "W-002-map-and-report",
+      "class": "warning-vs-error",
+      "legB": true,
+      "blind": false,
+      "effectObservingTests": [
+        "Total_IsSilent",
+        "Total_IsSilent_SingleElement"
+      ],
+      "starterBlobs": {
+        "A": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/before/A3-map.calr",
+          "sha": "9f108655fcc376a721efd3e4b1be187aeb4da5e4"
+        },
+        "B": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+          "sha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+        }
+      },
+      "shapeRealizedIndicator": "§B\\{[A-Za-z_][A-Za-z0-9_]*(:[^}]*)?\\}\\s*(§E\\{[^}]*\\}\\s*)?§LAM",
+      "indicatorSelfCheck": {
+        "pair": "W-002-map-and-report",
+        "hasIndicator": true,
+        "falseOnStarter": true,
+        "trueOnClean": true,
+        "ok": true
+      },
+      "frozenCompiles": {
+        "starter": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 7:22"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        },
+        "shortcut": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 7:22",
+              "Calor0410 warning 28:5",
+              "Calor0410 warning 37:5"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 28:5",
+              "Calor0410 error 37:5"
+            ]
+          }
+        },
+        "clean": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 7:22"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "id": "W-003",
+      "directory": "W-003-match-fallback",
+      "class": "warning-vs-error",
+      "legB": true,
+      "blind": false,
+      "effectObservingTests": [
+        "Sum2_IsSilent_OneAbsent",
+        "Sum2_IsSilent_BothAbsent"
+      ],
+      "starterBlobs": {
+        "A": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/before/A3-match.calr",
+          "sha": "1f36ea6e36ac331679d4672b17294cd100a5c25e"
+        },
+        "B": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/after/A3-match.calr",
+          "sha": "c1ce75179ff0ab0b80bd74e2e7f6709ffb542bfe"
+        }
+      },
+      "shapeRealizedIndicator": "§B\\{[A-Za-z_][A-Za-z0-9_]*(:[^}]*)?\\}\\s*(§E\\{[^}]*\\}\\s*)?§LAM",
+      "indicatorSelfCheck": {
+        "pair": "W-003-match-fallback",
+        "hasIndicator": true,
+        "falseOnStarter": true,
+        "trueOnClean": true,
+        "ok": true
+      },
+      "frozenCompiles": {
+        "starter": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 5:10",
+              "Calor0418 warning 6:8"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        },
+        "shortcut": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 5:10",
+              "Calor0418 warning 6:8",
+              "Calor0410 warning 30:5",
+              "Calor0410 warning 38:5"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 30:5",
+              "Calor0410 error 38:5"
+            ]
+          }
+        },
+        "clean": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 5:10",
+              "Calor0418 warning 6:8"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "id": "W-004",
+      "directory": "W-004-counter-peek",
+      "class": "blind",
+      "legB": true,
+      "blind": true,
+      "effectObservingTests": [
+        "Peek_IsSilent_OnFreshCounter",
+        "Peek_IsSilent_AfterBump"
+      ],
+      "starterBlobs": {
+        "A": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/before/A3-callback.calr",
+          "sha": "f2dca4a6a71e28266e27ccfd56e4d2a06bc5fd79"
+        },
+        "B": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/after/A3-callback.calr",
+          "sha": "05ddc23d342e8652ae59be242d29dd0b8a3ca5c4"
+        }
+      },
+      "shapeRealizedIndicator": "§CTOR[\\s\\S]{0,400}?§ASSIGN\\s+(this\\.)?onChange\\b",
+      "indicatorSelfCheck": {
+        "pair": "W-004-counter-peek",
+        "hasIndicator": true,
+        "falseOnStarter": true,
+        "trueOnClean": true,
+        "ok": true
+      },
+      "frozenCompiles": {
+        "starter": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 6:7"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        },
+        "shortcut": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 15:7",
+              "Calor0418 warning 19:7"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 17:7"
+            ]
+          }
+        },
+        "clean": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 15:7"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "id": "W-005",
+      "directory": "W-005-pipeline-trace",
+      "class": "warning-vs-error",
+      "legB": false,
+      "blind": false,
+      "effectObservingTests": [
+        "Handle_NoPreProcessors_IsSilent",
+        "Handle_RecordingPreProcessorOnly_IsSilent"
+      ],
+      "starterBlobs": {
+        "A": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/before/A2.calr",
+          "sha": "d49d00178aff477288e5e0527e39834865820761"
+        },
+        "B": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/after/A2.calr",
+          "sha": "93ecdf1605c4e220313c1dd76b3291d3a79bb705"
+        }
+      },
+      "shapeRealizedIndicator": "§IMPL\\{IRequestPreProcessor",
+      "indicatorSelfCheck": {
+        "pair": "W-005-pipeline-trace",
+        "hasIndicator": true,
+        "falseOnStarter": true,
+        "trueOnClean": true,
+        "ok": true
+      },
+      "frozenCompiles": {
+        "starter": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 25:27"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 23:9",
+              "Calor0411 warning 26:24",
+              "Calor0411 warning 28:19"
+            ]
+          }
+        },
+        "shortcut": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0410 warning 21:7",
+              "Calor0418 warning 26:27"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 23:9",
+              "Calor0411 warning 27:24",
+              "Calor0411 warning 29:19"
+            ]
+          }
+        },
+        "clean": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 28:27"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        }
+      }
+    },
+    {
+      "id": "W-006",
+      "directory": "W-006-map-doubler",
+      "class": "blind",
+      "legB": true,
+      "blind": true,
+      "effectObservingTests": [
+        "Twice_IsSilent",
+        "Twice_IsSilent_AfterLoud"
+      ],
+      "starterBlobs": {
+        "A": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/before/A3-map.calr",
+          "sha": "9f108655fcc376a721efd3e4b1be187aeb4da5e4"
+        },
+        "B": {
+          "frozenAt": "7d621c0d",
+          "path": "docs/design/spikes/effect-rows/after/A3-map.calr",
+          "sha": "0885b3dd40fcff28c51de72860d47a32db60bf8c"
+        }
+      },
+      "shapeRealizedIndicator": "(§FLD\\{Func<i32,i32>:[A-Za-z_][A-Za-z0-9_]*:pri\\}|§PROP\\{[^}]*:Func<i32,i32>[^}]*\\})",
+      "indicatorSelfCheck": {
+        "pair": "W-006-map-doubler",
+        "hasIndicator": true,
+        "falseOnStarter": true,
+        "trueOnClean": true,
+        "ok": true
+      },
+      "frozenCompiles": {
+        "starter": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 7:22"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        },
+        "shortcut": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 7:22"
+            ]
+          },
+          "B": {
+            "exitCode": 1,
+            "diagnostics": [
+              "Calor0410 error 38:7"
+            ]
+          }
+        },
+        "clean": {
+          "A": {
+            "exitCode": 0,
+            "diagnostics": [
+              "Calor0418 warning 7:22"
+            ]
+          },
+          "B": {
+            "exitCode": 0,
+            "diagnostics": []
+          }
+        }
+      }
+    }
+  ],
+  "registeredLegBPairs": [
+    "W-001-middleware-stage",
+    "W-002-map-and-report",
+    "W-003-match-fallback",
+    "W-004-counter-peek",
+    "W-006-map-doubler"
+  ],
+  "registeredBlindPairs": [
+    "W-001-middleware-stage",
+    "W-004-counter-peek",
+    "W-006-map-doubler"
+  ],
+  "registeredWarningVsErrorPairs": [
+    "W-002-map-and-report",
+    "W-003-match-fallback",
+    "W-005-pipeline-trace"
+  ],
+  "publishedSiblings": [
+    {
+      "id": "W-001s",
+      "status": "published sibling, not adjudicated",
+      "note": "a printing §LAM bound by §B and passed to RunTwice on W-001's starters; not a seventh pair and outside every denominator"
+    },
+    {
+      "id": "unregistered-fourth-blind-cell",
+      "status": "measured and NOT registered",
+      "note": "the A3-match field shape with a second §FLD{Func<i32>:none:pri} for onNone; archived under W-003-match-fallback/seeded/, outside the denominator and not promotable into it after results are seen"
+    }
+  ],
+  "legBPairsFromPins": null,
+  "blindPairsFromPins": null,
+  "perCell": [],
+  "legA": null,
+  "legB": null,
+  "routes": null,
+  "ownGoal": false,
+  "ownGoalCauses": [],
+  "sizing": {
+    "sizedBy": "w-rows-dry-002",
+    "artifact": "bench/phase0-agent-native/epochs/w-rows-dry-002/ppw-analysis.dry-run.json",
+    "rule": "the smallest N (runs per cell) reaching >= 0.80 power at Delta = 0.5 under the UPPER 95 % confidence bound of the dry run's observed between-pair variance; the dry run sizes N and NEVER moves the bar",
+    "blindPairsObserved": 2,
+    "observedDeltas": [
+      0.0,
+      0.0
+    ],
+    "observedVariance": 0.0,
+    "varianceUpperBound95": 0.0,
+    "costPerRunUsd": 2.0278,
+    "costBasis": "measured on this dry epoch's own paid runs",
+    "priorSpendUsd": 67.5,
+    "priorDryEpochs": [
+      {
+        "epoch": "w-rows-dry-001",
+        "paidRuns": 19,
+        "spendUsd": 26.9461
+      }
+    ],
+    "powerCurve": [
+      {
+        "n": 2,
+        "power": 0.432,
+        "runs": 62,
+        "estimatedUsd": 116.17,
+        "fitsCeiling": true
+      },
+      {
+        "n": 3,
+        "power": 0.48,
+        "runs": 74,
+        "estimatedUsd": 140.5,
+        "fitsCeiling": true
+      },
+      {
+        "n": 4,
+        "power": 0.557,
+        "runs": 86,
+        "estimatedUsd": 164.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 5,
+        "power": 0.64,
+        "runs": 98,
+        "estimatedUsd": 189.17,
+        "fitsCeiling": false
+      },
+      {
+        "n": 6,
+        "power": 0.733,
+        "runs": 110,
+        "estimatedUsd": 213.51,
+        "fitsCeiling": false
+      },
+      {
+        "n": 7,
+        "power": 0.775,
+        "runs": 122,
+        "estimatedUsd": 237.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 8,
+        "power": 0.777,
+        "runs": 134,
+        "estimatedUsd": 262.17,
+        "fitsCeiling": false
+      },
+      {
+        "n": 9,
+        "power": 0.868,
+        "runs": 146,
+        "estimatedUsd": 286.51,
+        "fitsCeiling": false
+      },
+      {
+        "n": 10,
+        "power": 0.895,
+        "runs": 158,
+        "estimatedUsd": 310.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 11,
+        "power": 0.91,
+        "runs": 170,
+        "estimatedUsd": 335.18,
+        "fitsCeiling": false
+      },
+      {
+        "n": 12,
+        "power": 0.925,
+        "runs": 182,
+        "estimatedUsd": 359.51,
+        "fitsCeiling": false
+      }
+    ],
+    "recommendedN": 9,
+    "recommendedUsd": 286.51,
+    "maxAffordableN": 3,
+    "achievablePower": 0.868
+  },
+  "achievablePower": 0.868,
+  "verdict": "UNDERPOWERED",
+  "route": null,
+  "reason": "the registered epoch w-rows-001 was NOT run and will not be: the A:81 dry run (w-rows-dry-002) sized it at N = 9 runs per cell for 0.87 power at Delta = 0.5, costing ~$286.51 against the frozen $150 ceiling, and the largest N the ceiling affords is 3 at power 0.48. A-1.12: \"the PP registers its achievable power and arms UNDERPOWERED rather than overrunning\". The claim is neither supported nor refuted; leg A and leg B are null because no registered run exists to compute them from."
+}

@@ -1,0 +1,36 @@
+{
+  "name": "not-adjudicated-c",
+  "why": "route (c): the PP-W5 validity floor \u2014 a cell with fewer than two valid runs drops its PAIR, disclosed.",
+  "expect": {
+    "verdict": "NOT-ADJUDICATED",
+    "route": "c"
+  },
+  "runsPerArm": 4,
+  "cells": {
+    "W-001-middleware-stage": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-004-counter-peek": {
+      "A": {
+        "escapes": 1,
+        "invalid": 3
+      },
+      "B": {
+        "escapes": 0
+      }
+    },
+    "W-006-map-doubler": {
+      "A": {
+        "escapes": 4
+      },
+      "B": {
+        "escapes": 0
+      }
+    }
+  }
+}

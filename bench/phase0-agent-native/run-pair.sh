@@ -1150,6 +1150,11 @@ extract_metrics() {
     touch "$journal"
 
     # Final silent held-out run = declared-done state (non-compiling = all fail)
+    # NOTE (A-1.12): `escapedBugs` keeps gates §2's meaning — a non-compiling
+    # final state counts as ALL tests failing. PP-W-rows must NOT read it that
+    # way (it inverts leg A's sign against the arm whose compiler refuses the
+    # laundering), so `finalBuild.ok` and `heldoutFinal.failedTests` are archived
+    # BESIDE it and are what ppw-analyze.py reads.
     local final_pass=0 final_fail=$HELDOUT_TEST_COUNT final_build_ok=0
     if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
         final_build_ok=1
@@ -1161,6 +1166,19 @@ extract_metrics() {
             final_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         fi
     fi
+
+    # A-1.12 leg A, archived per run: did the declared-done state BUILD, and
+    # WHICH held-out tests failed, split by whether the failure was the SILENCE
+    # assertion. `escapedBugs` cannot carry either fact: it is the aggregate
+    # Failed: count for the whole suite, so it counts failures of tests that are
+    # not effect-observing, and it does not condition on the build.
+    # `.ho_final.txt` exists only when the build succeeded, and is archived
+    # beside these fields so an analyzer can always recompute them.
+    local final_build heldout_final
+    final_build=$(jq -n --argjson ok "$([[ $final_build_ok -eq 1 ]] && echo true || echo false)" \
+        '{ok: $ok, log: ".src_final.txt"}')
+    heldout_final="$(python3 "$HARNESS_CAPTURE" heldout-final "$ws_out/.ho_final.txt" 2>/dev/null)" \
+        || heldout_final='{"failedTests":[],"source":"helper-error"}'
 
     # Iterations = journaled build/test invocations with edited=true
     local iterations iters_to_green censored
@@ -1312,8 +1330,10 @@ extract_metrics() {
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
         --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
         --arg reference "$REFERENCE_DIR" --arg reference_source "$REFERENCE_SOURCE" \
+        --argjson final_build "$final_build" --argjson heldout_final "$heldout_final" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
+          finalBuild:$final_build, heldoutFinal:$heldout_final,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
           invalid:false,
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
@@ -1353,6 +1373,8 @@ write_invalid_result() {
         --argjson has_transcript "$([[ -s "$ws_out/transcript.jsonl" ]] && echo true || echo false)" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
+          finalBuild:{ok:null, log:null},
+          heldoutFinal:{failedTests:[], silenceFailures:[], source:"invalid"},
           iterations:0, iterationsToGreen:$itg, censored:true,
           invalid:true, defect:null,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
