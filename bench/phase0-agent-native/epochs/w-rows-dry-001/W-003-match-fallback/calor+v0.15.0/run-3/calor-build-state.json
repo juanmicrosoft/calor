@@ -1,0 +1,213 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "0cfb01141854d9078e16a3bf639593077bc6afca353c6b5a36aceeb251e837b7",
+  "optionsHash": "4ae7c97ba737ee505838719e9898ec7aed37b7fd24065a357f9602ce13b29c7e",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-match.calr": {
+      "contentHash": "51d060575b3c937c08beb2c46d4a3e43f6487d595ffbad0493056743289da942",
+      "lastModified": "2026-08-28T11:54:25.9624494Z",
+      "fileSize": 1077,
+      "effectSummary": {
+        "moduleName": "MatchAfter",
+        "publicFunctions": [
+          {
+            "name": "MatchOption",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Identity",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 8,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Zero",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 12,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Shout",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 16,
+            "declarationColumn": 3
+          },
+          {
+            "name": "BothPure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 21,
+            "declarationColumn": 3
+          },
+          {
+            "name": "OneImpure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 25,
+            "declarationColumn": 3
+          },
+          {
+            "name": "TakeFallback",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 29,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Fallback",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 34,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Sum2",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 38,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [],
+        "internalFunctionNames": [
+          "MatchOption",
+          "Identity",
+          "Zero",
+          "Shout",
+          "BothPure",
+          "OneImpure",
+          "TakeFallback",
+          "Fallback",
+          "Sum2"
+        ],
+        "internalMethodNames": [],
+        "callers": [
+          {
+            "callerId": "f001",
+            "displayName": "MatchOption",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "onSome",
+                "isConstructor": false
+              },
+              {
+                "target": "onNone",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f005",
+            "displayName": "BothPure",
+            "diagnosticLine": 22,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f006",
+            "displayName": "OneImpure",
+            "diagnosticLine": 26,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f008",
+            "displayName": "Fallback",
+            "diagnosticLine": 35,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "f009",
+            "displayName": "Sum2",
+            "diagnosticLine": 39,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "BothPure",
+                "isConstructor": false
+              },
+              {
+                "target": "BothPure",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "48566672da2c565f91842022c92f8f26f4b9892108785890f291479dadd4d866",
+      "diagnostics": []
+    }
+  }
+}

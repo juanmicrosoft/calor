@@ -1,0 +1,151 @@
+{
+  "formatVersion": "4.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "0cfb01141854d9078e16a3bf639593077bc6afca353c6b5a36aceeb251e837b7",
+  "optionsHash": "51f5545352fa01c968c1138a79ce85cfe45b370b4aaa298dc65a3e04d7cd85db",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-middleware.calr": {
+      "contentHash": "faa41b3b62d4fb18fc6acc41b87d79fa8efe21d34262c546f05357139770bb09",
+      "lastModified": "2026-08-28T10:51:47.5839068Z",
+      "fileSize": 907,
+      "effectSummary": {
+        "moduleName": "MiddlewareAfter",
+        "publicFunctions": [
+          {
+            "name": "RunTwice",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Beat",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 8,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [
+          {
+            "name": "Handle",
+            "className": "RetryBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 22,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Probe",
+            "className": "RetryBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 25,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Twice",
+            "className": "RetryBehavior",
+            "hasEffectDeclaration": false,
+            "declaredEffects": [],
+            "declarationLine": 29,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [
+          "RunTwice",
+          "Beat"
+        ],
+        "internalMethodNames": [
+          "Handle",
+          "Probe",
+          "Twice"
+        ],
+        "callers": [
+          {
+            "callerId": "f001",
+            "displayName": "RunTwice",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "g",
+                "isConstructor": false
+              },
+              {
+                "target": "g",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "RetryBehavior.mt002",
+            "displayName": "RetryBehavior.Handle",
+            "diagnosticLine": 23,
+            "diagnosticColumn": 7,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "RunTwice",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "RetryBehavior.mt003",
+            "displayName": "RetryBehavior.Probe",
+            "diagnosticLine": 26,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Beat",
+                "isConstructor": false
+              },
+              {
+                "target": "RunTwice",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerId": "RetryBehavior.mt004",
+            "displayName": "RetryBehavior.Twice",
+            "diagnosticLine": 29,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "RunTwice",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "b002fb0ce646e217e139ca4ff98369767deffd6eb1a8edf7b0420b14e9e8518c",
+      "diagnostics": []
+    }
+  }
+}

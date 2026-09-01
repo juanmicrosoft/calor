@@ -1,0 +1,88 @@
+{
+  "pair": "W-001-middleware-stage",
+  "arm": "calor+v0.15.0",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 7,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 3125,
+  "envelopeValidAll": false,
+  "mcpWrites": null,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armB/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armB",
+  "editMechanism": "raw",
+  "compilerHash": "0cfb01141854d9078e16a3bf639593077bc6afca353c6b5a36aceeb251e837b7",
+  "buildState": {
+    "compilerHash": "0cfb01141854d9078e16a3bf639593077bc6afca353c6b5a36aceeb251e837b7",
+    "compilerSemanticsVersion": "calor-compile-semantics-v1",
+    "formatVersion": "4.0",
+    "manifestHash": "",
+    "optionsHash": "51f5545352fa01c968c1138a79ce85cfe45b370b4aaa298dc65a3e04d7cd85db",
+    "source": "file",
+    "archivedFrom": "agent-workspace",
+    "file": "calor-build-state.json"
+  },
+  "armConfigKey": "calor",
+  "controlArmKind": null,
+  "permissiveEffects": false,
+  "fixture": "starter-b",
+  "templateSource": "arm-repo-root",
+  "armCanary": "strict-ok",
+  "reference": "seeded/clean-b",
+  "referenceSource": "seeded-clean-declared",
+  "turns": {
+    "assistantEvents": 106,
+    "assistantEventsWithoutId": 0,
+    "assistantMessages": 27,
+    "assistantMessagesIncludingSubagents": 37,
+    "eventTypes": {
+      "assistant": 106,
+      "rate_limit_event": 5,
+      "result": 1,
+      "system": 142,
+      "user": 54
+    },
+    "events": 308,
+    "resultEvents": 1,
+    "source": "transcript",
+    "subagentMessages": 10,
+    "numTurns": 29,
+    "transcript": "transcript.jsonl"
+  },
+  "agentBuilds": {
+    "count": 4,
+    "file": "agent-builds.jsonl"
+  },
+  "tokens": {
+    "input": 74,
+    "output": 33816
+  },
+  "tokenUsage": {
+    "cache_creation_input_tokens_corrected": 160355,
+    "cache_creation_input_tokens_naive": 62594,
+    "cache_read_input_tokens_corrected": 1603172,
+    "cache_read_input_tokens_naive": 1076874,
+    "input_tokens_corrected": 74,
+    "input_tokens_naive": 54,
+    "models_counted": [
+      "claude-opus-4-8"
+    ],
+    "models_excluded": {
+      "claude-haiku-4-5-20251001": 13
+    },
+    "num_turns": 29,
+    "origin_kind": null,
+    "output_tokens_all_models": 33829,
+    "output_tokens_corrected": 33816,
+    "output_tokens_naive": 18711,
+    "source": "modelUsage",
+    "undercount_flagged": true,
+    "undercount_ratio": 1.8073
+  },
+  "nullAgent": false
+}

@@ -1,0 +1,35 @@
+{
+  "version": "2.0",
+  "diagnostics": [
+    {
+      "code": "Calor0418",
+      "message": "Invocation of function-typed value \u0027g\u0027 (type \u0027Func\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+      "severity": "error",
+      "location": {
+        "file": "/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/phase0-agent-native/epochs/w-rows-smoke-null/W-001-middleware-stage/calor\u002Bv0.14.3-pre-rows/run-1/.envelope-src/A3-middleware.calr",
+        "line": 4,
+        "column": 19,
+        "length": 5
+      },
+      "declarationId": "f001"
+    },
+    {
+      "code": "Calor0418",
+      "message": "Invocation of function-typed value \u0027g\u0027 (type \u0027Func\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+      "severity": "error",
+      "location": {
+        "file": "/Users/juanrivera/sources/repos/juanmicrosoft/calor-2/bench/phase0-agent-native/epochs/w-rows-smoke-null/W-001-middleware-stage/calor\u002Bv0.14.3-pre-rows/run-1/.envelope-src/A3-middleware.calr",
+        "line": 5,
+        "column": 20,
+        "length": 5
+      },
+      "declarationId": "f001"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "errors": 2,
+    "warnings": 0,
+    "info": 0
+  }
+}

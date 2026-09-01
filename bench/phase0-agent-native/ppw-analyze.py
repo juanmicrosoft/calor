@@ -176,6 +176,22 @@ PAIR_DIRS = OrderedDict([
     ("W-005", "W-005-pipeline-trace"),
     ("W-006", "W-006-map-doubler"),
 ])
+# A-1.12 registers BOTH spellings of every pair — the short id `W-001` and the
+# directory `W-001-middleware-stage` — "so the two can never drift". The epoch
+# runner stamps pins.json from `run-m5-epoch.sh`'s pair ids, which are the SHORT
+# ones (`run-ppw-epoch.sh` passes `--pairs "W-001 …"` and the collector globs
+# `*/W-001-*/`), while everything downstream of here keys on the directory. Both
+# are accepted and mapped to the directory; anything that is neither spelling is
+# a wrong denominator, never a near-miss to be guessed at.
+def normalize_pair(value):
+    """Directory name for either registered spelling of a pair id, else None."""
+    if value in PAIR_DIRS:
+        return PAIR_DIRS[value]
+    if value in PAIR_DIRS.values():
+        return value
+    return None
+
+
 REGISTERED_BLIND = ["W-001-middleware-stage", "W-004-counter-peek", "W-006-map-doubler"]
 REGISTERED_LEG_B = ["W-001-middleware-stage", "W-002-map-and-report", "W-003-match-fallback",
                     "W-004-counter-peek", "W-006-map-doubler"]
@@ -386,7 +402,8 @@ def _simulate_power(k, n, delta, sigma, sims=SIZING_SIMS, boot=SIZING_BOOT, seed
     return hits / float(sims)
 
 
-def size_n(observed_deltas, k, sims=SIZING_SIMS, boot=SIZING_BOOT, max_n=SIZING_MAX_N):
+def size_n(observed_deltas, k, sims=SIZING_SIMS, boot=SIZING_BOOT, max_n=SIZING_MAX_N,
+           cost_per_run=None, prior_usd=None):
     """The dry run's deliverable. Returns the power curve, the smallest N that
     reaches MIN_POWER at Delta = LEG_A_EFFECT_SIZE, and what that N costs
     against the frozen $150 ceiling — with the achievable power at the largest
@@ -394,7 +411,16 @@ def size_n(observed_deltas, k, sims=SIZING_SIMS, boot=SIZING_BOOT, max_n=SIZING_
     the PP then "registers its achievable power and arms UNDERPOWERED" rather
     than overrunning."""
     sigma_ucb = variance_upper_bound(observed_deltas)
+    measured_cost = cost_per_run is not None
+    if cost_per_run is None:
+        cost_per_run = COST_PER_RUN_USD
     result = OrderedDict()
+    result["costPerRunUsd"] = round(cost_per_run, 4)
+    result["costBasis"] = ("measured on this dry epoch's own paid runs"
+                           if measured_cost else
+                           "e1-rows-parity-001 (A-1.12's pre-registered estimate); this epoch "
+                           "reported no paid run to measure")
+    result["priorSpendUsd"] = (None if prior_usd is None else round(prior_usd, 2))
     result["rule"] = ("the smallest N (runs per cell) reaching >= %.2f power at Delta = %.1f "
                       "under the UPPER 95 %% confidence bound of the dry run's observed "
                       "between-pair variance; the dry run sizes N and NEVER moves the bar"
@@ -421,10 +447,11 @@ def size_n(observed_deltas, k, sims=SIZING_SIMS, boot=SIZING_BOOT, max_n=SIZING_
     curve = []
     for n in range(2, max_n + 1):
         power = _simulate_power(k, n, LEG_A_EFFECT_SIZE, sigma, sims=sims, boot=boot)
+        cost = _epoch_cost(n, cost_per_run, prior_usd)
         curve.append({"n": n, "power": round(power, 3),
                       "runs": _epoch_runs(n),
-                      "estimatedUsd": round(_epoch_cost(n), 2),
-                      "fitsCeiling": _epoch_cost(n) <= SPEND_CEILING_USD})
+                      "estimatedUsd": round(cost, 2),
+                      "fitsCeiling": cost <= SPEND_CEILING_USD})
     recommended = _smallest_sufficient_n(curve)
 
     # The SAME calculation on the POINT variance, published beside it and never
@@ -488,8 +515,16 @@ def _epoch_runs(n):
     return PILOT_RUNS + DRY_RUN_RUNS + len(PAIR_DIRS) * n * 2
 
 
-def _epoch_cost(n):
-    return _epoch_runs(n) * COST_PER_RUN_USD
+def _epoch_cost(n, cost_per_run=COST_PER_RUN_USD, prior_usd=None):
+    """Dollars against the frozen ceiling. A-1.12 pre-registered the arithmetic
+    on the e1-rows-parity-001 per-run cost while saying in the same breath that
+    "the per-run cost is unmeasured until the dry run reports it" — so when a dry
+    epoch has reported one, the MEASURED cost is what sizes the ceiling, and what
+    was actually spent replaces the modelled prior. Neither moves the bar; both
+    move the affordable N, which is the number the dry run exists to produce."""
+    if prior_usd is None:
+        prior_usd = (PILOT_RUNS + DRY_RUN_RUNS) * cost_per_run
+    return prior_usd + len(PAIR_DIRS) * n * 2 * cost_per_run
 
 
 # ---------------------------------------------------------------------------
@@ -870,6 +905,14 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
         try:
             read = HARNESS_CAPTURE.read_leg_b_pairs(pins_path)
             leg_b_pairs, blind_pairs = read["legBPairs"], read["blindPairs"]
+            unknown = sorted({p for p in leg_b_pairs + blind_pairs
+                              if normalize_pair(p) is None})
+            if unknown:
+                blockers.append("pins.json ppW names pair id(s) %s that are neither registered "
+                                "spelling (short id or directory) — the denominator cannot be "
+                                "resolved and is never guessed" % unknown)
+            leg_b_pairs = [normalize_pair(p) for p in leg_b_pairs if normalize_pair(p)]
+            blind_pairs = [normalize_pair(p) for p in blind_pairs if normalize_pair(p)]
         except (ValueError, KeyError) as exc:
             blockers.append("pins.json ppW block is malformed: %s" % exc)
             own_goal_causes.append({"cause": "the epoch's ppW block is malformed — a harness "
@@ -937,6 +980,7 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
     missing_transcript = []
     token_sources = Counter()
     spend_usd = 0.0
+    paid_runs = 0        # runs that actually billed — the denominator of the measured per-run cost
     for path in sorted(glob.glob(os.path.join(epoch_dir, "*", "*", "run-*", "result.json"))):
         run_dir = os.path.dirname(path)
         with open(path, encoding="utf-8") as fh:
@@ -988,15 +1032,29 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
         if reason:
             blockers.append("%s: %s (validity condition (2))" % (rel, reason))
 
-        # the pre-rows arm canary, archived in result.json
+        # The per-arm canary verdict, archived in result.json by `run-pair.sh`'s
+        # `arm_canary`. BOTH arms are canaried and the two verdicts are DIFFERENT
+        # strings, because they prove opposite facts about the same laundering
+        # program: the control arm proves its Calor.Tasks honours
+        # <CalorPermissiveEffects> (`warning Calor0410`, build succeeds ->
+        # "permissive-ok"), the treatment arm proves its own rejects the same
+        # program (`error Calor0410`, build fails -> "strict-ok"). An arm carrying
+        # the OTHER arm's verdict is the arm swap this check exists to catch.
+        # "skipped" is reachable only for a --null-agent run into a '-null'
+        # directory and can never appear in an epoch that adjudicates.
         canary = record.get("armCanary")
-        canary_ok = True
-        if record.get("controlArmKind") == "pre-rows":
-            canary_ok = (canary == "ok")
-            if not invalid and not canary_ok:
-                blockers.append("%s: the pre-rows control arm's canary verdict is %r, not \"ok\" "
-                                "— the arm's Calor.Tasks does not honour <CalorPermissiveEffects>"
-                                % (rel, canary))
+        expected_canary = ("permissive-ok" if record.get("controlArmKind") == "pre-rows"
+                           else "strict-ok")
+        canary_ok = (canary == expected_canary)
+        if not invalid and not canary_ok:
+            blockers.append("%s: the %s arm's canary verdict is %r, not %r — %s"
+                            % (rel,
+                               "pre-rows control" if expected_canary == "permissive-ok"
+                               else "strict treatment",
+                               canary, expected_canary,
+                               "the arm's Calor.Tasks does not honour <CalorPermissiveEffects>"
+                               if expected_canary == "permissive-ok"
+                               else "the arm's Calor.Tasks did not reject a laundered effect"))
 
         # leg A's two facts, both registered
         built, failed_tests, silence_failures = read_declared_done(run_dir, record)
@@ -1037,8 +1095,9 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
         tokens, source = (None, "invalid") if invalid else _corrected_tokens(run_dir)
         token_sources[source] += 1
         cost = _run_cost(run_dir)
-        if cost is not None:
+        if cost:
             spend_usd += cost
+            paid_runs += 1
 
         category, categories = (None, [])
         if escape and role == "treatment":
@@ -1474,6 +1533,12 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
     analysis["censored"] = censored
     analysis["tokenSources"] = dict(sorted(token_sources.items()))
     analysis["spendUsd"] = round(spend_usd, 4)
+    # Runs that actually billed. It is NOT len(runs): a run the API refused (the
+    # weekly usage limit that truncated w-rows-dry-001 at 19 of 36) archives a
+    # result.json with total_cost_usd 0, and dividing the spend by the planned run
+    # count would under-state the per-run cost by that fraction.
+    analysis["paidRuns"] = paid_runs
+    analysis["measuredCostPerRunUsd"] = (round(spend_usd / paid_runs, 4) if paid_runs else None)
     analysis["spendCeilingExceeded"] = spend_usd > SPEND_CEILING_USD
     analysis["disclosedLimitations"] = DISCLOSED_LIMITATIONS
     analysis["indicatorSelfCheck"] = indicator_checks
@@ -1511,7 +1576,16 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
     sizing = None
     if dry_run:
         deltas = [entry["delta"] for entry in leg_a_blind["perPair"]]
-        sizing = size_n(deltas, len(deltas), sims=sizing_sims, boot=sizing_boot)
+        # The dry run's OTHER deliverable: the per-run cost, which A-1.12 pinned
+        # from e1-rows-parity-001 while stating it was "unmeasured until the dry
+        # run reports it". `paid_runs` counts the runs that actually billed, so a
+        # dry epoch truncated part-way (a usage limit, an aborted collector) sizes
+        # from what it spent rather than from the run count it planned.
+        measured_cost = (spend_usd / paid_runs) if paid_runs else None
+        sizing = size_n(deltas, len(deltas), sims=sizing_sims, boot=sizing_boot,
+                        cost_per_run=measured_cost,
+                        prior_usd=(None if measured_cost is None
+                                   else spend_usd + PILOT_RUNS * measured_cost))
     analysis["sizing"] = sizing
     analysis["achievablePower"] = achievable_power
     analysis["harnessValid"] = harness_valid

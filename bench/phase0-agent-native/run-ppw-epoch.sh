@@ -346,11 +346,15 @@ fi
 stamp_pins() {
     [[ -f "$OUT/pins.json" ]] || return 0
     jq --argjson pairs "$(printf '%s\n' "${PAIRS[@]}" | jq -R . | jq -s .)" \
+       --arg harness_commit "$(git -C "$REPO_ROOT" rev-parse HEAD)" \
+       --arg harness_dirty "$(git -C "$REPO_ROOT" status --porcelain -- "$SCRIPT_DIR" | wc -l | tr -d ' ')" \
        --argjson legb "$(printf '%s\n' $LEG_B_PAIRS | jq -R . | jq -s .)" \
        --argjson blind "$(printf '%s\n' $BLIND_PAIRS | jq -R . | jq -s .)" \
        --arg a_cfg "$ARM_A_CONFIG" --arg b_cfg "$ARM_B_CONFIG" \
        --arg a_dirty "${ARM_A_DIRTY:-0}" --arg b_dirty "${ARM_B_DIRTY:-0}" \
-       '. + {ppW: {gate: "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12)",
+       '. + {harnessCommit: $harness_commit,
+             harnessDirtyFiles: ($harness_dirty|tonumber),
+             ppW: {gate: "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12)",
                    legA: {metric: "median over blind pairs of the per-pair escape-rate delta (A - B)", bar: "one-sided 95% lower bound > 0", effectSize: 0.5, blindFloor: 2},
                    legB: {metric: "output-tokens-to-green (token-usage.py corrected, A-1.9.1)", lowerBoundGate: 1.0,
                           marginRule: "the 0.05 grid line above (null p95 + Monte-Carlo half-width); population and number per ppw-margin-derivation.txt / A-1.12",

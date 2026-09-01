@@ -1,0 +1,223 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "50a4deb963ea03d1a4abc0059854b4df04719046e94099f517a231f92f5a13e4",
+  "optionsHash": "a9825588b1015828513041804eb573642028fbae36f145112a8f68dd65aba8e7",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-match.calr": {
+      "contentHash": "f5d0380812a212dfce9dc208a21a8d3095fe9cc0574cab7d1bfc44d092264ea4",
+      "lastModified": "2026-08-28T11:46:11.6658006Z",
+      "fileSize": 1097,
+      "effectSummary": {
+        "moduleName": "MatchAfter",
+        "publicFunctions": [
+          {
+            "name": "MatchOption",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Identity",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 8,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Zero",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 12,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Shout",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 16,
+            "declarationColumn": 3
+          },
+          {
+            "name": "BothPure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 21,
+            "declarationColumn": 3
+          },
+          {
+            "name": "OneImpure",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 25,
+            "declarationColumn": 3
+          },
+          {
+            "name": "FallbackStep",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 29,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Fallback",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 34,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Sum2",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 38,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [],
+        "internalFunctionNames": [
+          "MatchOption",
+          "Identity",
+          "Zero",
+          "Shout",
+          "BothPure",
+          "OneImpure",
+          "FallbackStep",
+          "Fallback",
+          "Sum2"
+        ],
+        "internalMethodNames": [],
+        "callers": [
+          {
+            "callerName": "MatchOption",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "onSome",
+                "isConstructor": false
+              },
+              {
+                "target": "onNone",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "BothPure",
+            "diagnosticLine": 22,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "OneImpure",
+            "diagnosticLine": 26,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "Fallback",
+            "diagnosticLine": 35,
+            "diagnosticColumn": 5,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "Sum2",
+            "diagnosticLine": 39,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              },
+              {
+                "target": "MatchOption",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "cc6940fba26f914d3584b17d4964eba6bdd0a553bf660e0163ce675f079d0a68",
+      "diagnostics": [
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027onSome\u0027 (type \u0027Func\u003Ci32,i32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 5,
+          "column": 10
+        },
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027onNone\u0027 (type \u0027Func\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 6,
+          "column": 8
+        }
+      ]
+    }
+  }
+}

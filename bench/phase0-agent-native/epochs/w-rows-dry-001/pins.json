@@ -1,0 +1,119 @@
+{
+  "epochId": "w-rows-dry-001",
+  "kind": "pp-w-rows",
+  "modelPin": "claude-opus-4-8",
+  "agentVersion": "2.1.248 (Claude Code)",
+  "startedAt": "2026-08-28T10:40:44Z",
+  "mode": "live",
+  "runsPerArm": 3,
+  "suiteDirtyFiles": 1,
+  "armA": {
+    "label": "calor+v0.14.3-pre-rows",
+    "role": "control (v0.14.3 release tag, pre-rows arm: permissive effects)",
+    "commit": "283ec9f9964ddd5b21da15b646a0dd77d53de99e",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armA/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armA",
+    "calorTasksSha": "52c162cc467b41bf8b58f76afd9ca8bdd6f18a30",
+    "armConfig": "calor-pre-rows"
+  },
+  "armB": {
+    "label": "calor+v0.15.0",
+    "role": "treatment (v0.15.0 release tag, strict)",
+    "commit": "3bb2601e3ff83597ddf2f27dcc334b6399ab97ea",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armB/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor-2/aa28e0c7-7f6a-471a-bcba-c072bdec656b/scratchpad/armB",
+    "calorTasksSha": "c2790641e1389981c9ac40b0499510b4dc8b2ec4",
+    "armConfig": "calor"
+  },
+  "ppL5": {
+    "metric": "tokens-to-green",
+    "threshold": 0.85,
+    "note": ">=15% median paired-ratio reduction, one-sided cluster bootstrap a=0.05 (gates Annex A)",
+    "pairs": [
+      "W2-001",
+      "W2-002",
+      "W2-003",
+      "W2-004",
+      "W2-005",
+      "W3-001",
+      "W3-002",
+      "W3-003",
+      "W3-004"
+    ]
+  },
+  "ppL6": {
+    "check": "neutral iterations-to-green parity + config invariance",
+    "pairs": [
+      "N1-001",
+      "N1-002",
+      "N1-003",
+      "N1-005"
+    ]
+  },
+  "ppW5": null,
+  "suite": [
+    "W-001",
+    "W-002",
+    "W-003",
+    "W-004",
+    "W-005",
+    "W-006"
+  ],
+  "telemetrySchema": "loop-telemetry/2",
+  "ppW": {
+    "gate": "PP-W-rows (roadmap v0.16 §4.1; annex A-1.12)",
+    "legA": {
+      "metric": "median over blind pairs of the per-pair escape-rate delta (A - B)",
+      "bar": "one-sided 95% lower bound > 0",
+      "effectSize": 0.5,
+      "blindFloor": 2
+    },
+    "legB": {
+      "metric": "output-tokens-to-green (token-usage.py corrected, A-1.9.1)",
+      "lowerBoundGate": 1.0,
+      "marginRule": "the 0.05 grid line above (null p95 + Monte-Carlo half-width); population and number per ppw-margin-derivation.txt / A-1.12",
+      "note": "FAILS iff BOTH the one-sided 95% cluster-bootstrap LOWER bound of the median paired ratio (arm B / arm A) exceeds 1.0 AND the point exceeds the registered margin"
+    },
+    "pairs": [
+      "W-001",
+      "W-002",
+      "W-003",
+      "W-004",
+      "W-005",
+      "W-006"
+    ],
+    "legBPairs": [
+      "W-001",
+      "W-002",
+      "W-003",
+      "W-004",
+      "W-006"
+    ],
+    "blindPairs": [
+      "W-001",
+      "W-004",
+      "W-006"
+    ],
+    "excludedFromLegB": [
+      "W-005"
+    ],
+    "controlArm": {
+      "armConfig": "calor-pre-rows",
+      "controlArmKind": "pre-rows",
+      "permissiveEffects": true
+    },
+    "armDirtyFiles": {
+      "armA": 0,
+      "armB": 0
+    },
+    "treatmentArm": {
+      "armConfig": "calor",
+      "controlArmKind": null,
+      "permissiveEffects": false
+    },
+    "validity": "every run must archive transcript.jsonl (W1, gate 8); both arms must record distinct compilerHash values (#1094, witnessing different compilers) AND arm A's buildState.optionsHash must differ from arm B's, which is what witnesses the permissive policy — a control arm built from the right commit but run STRICT leaves compilerHash unchanged and moves only optionsHash",
+    "runner": "bench/phase0-agent-native/run-ppw-epoch.sh"
+  }
+}

@@ -1,0 +1,42 @@
+§M{m001:MatchAfter}
+  §F{f001:MatchOption:pub} (bool:hasValue, i32:value, Func<i32,i32>:onSome, Func<i32>:onNone) -> i32
+    §E{}
+    §IF{if1} hasValue
+      §R §C{onSome} §A value §/C
+    §R §C{onNone} §/C
+
+  §F{f002:Identity:pub} (i32:x) -> i32
+    §E{}
+    §R x
+
+  §F{f003:Zero:pub} () -> i32
+    §E{}
+    §R INT:0
+
+  §F{f004:Shout:pub} (i32:x) -> i32
+    §E{cw}
+    §P x
+    §R x
+
+  §F{f005:BothPure:pub} (bool:h, i32:v) -> i32
+    §E{}
+    §R §C{MatchOption} §A h §A v §A Identity §A Zero §/C
+
+  §F{f006:OneImpure:pub} (bool:h, i32:v) -> i32
+    §E{cw}
+    §R §C{MatchOption} §A h §A v §A Shout §A Zero §/C
+
+  §F{f007:FallbackStep:pub} () -> i32
+    §E{cw}
+    §P "fallback"
+    §R INT:0
+
+  §F{f008:Fallback:pub} (bool:h, i32:v) -> i32
+    §E{cw}
+    §R §C{MatchOption} §A h §A v §A Identity §A FallbackStep §/C
+
+  §F{f009:Sum2:pub} (bool:h1, i32:v1, bool:h2, i32:v2) -> i32
+    §E{}
+    §B{a} §C{MatchOption} §A h1 §A v1 §A Identity §A Zero §/C
+    §B{b} §C{MatchOption} §A h2 §A v2 §A Identity §A Zero §/C
+    §R (+ a b)

@@ -1,0 +1,162 @@
+{
+  "formatVersion": "3.0",
+  "compilerSemanticsVersion": "calor-compile-semantics-v1",
+  "crossModuleMapHash": null,
+  "compilerHash": "50a4deb963ea03d1a4abc0059854b4df04719046e94099f517a231f92f5a13e4",
+  "optionsHash": "fbcab6a1dd2becef0eb3b18ca795facd323e4e5ffbea0ba64d7a505a33d4872e",
+  "manifestHash": "",
+  "outputDirectory": "obj/calor",
+  "files": {
+    "A3-middleware.calr": {
+      "contentHash": "62cb2222888d4163338af680674b71f73e1f68f17ddb03a4bb85f3c0d738307e",
+      "lastModified": "2026-08-28T10:55:31.9207757Z",
+      "fileSize": 879,
+      "effectSummary": {
+        "moduleName": "MiddlewareAfter",
+        "publicFunctions": [
+          {
+            "name": "RunTwice",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 2,
+            "declarationColumn": 3
+          },
+          {
+            "name": "Beat",
+            "className": null,
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 8,
+            "declarationColumn": 3
+          }
+        ],
+        "publicMethods": [
+          {
+            "name": "Handle",
+            "className": "RetryBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 24,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Probe",
+            "className": "RetryBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "declarationLine": 28,
+            "declarationColumn": 5
+          },
+          {
+            "name": "Twice",
+            "className": "RetryBehavior",
+            "hasEffectDeclaration": true,
+            "declaredEffects": [],
+            "declarationLine": 35,
+            "declarationColumn": 5
+          }
+        ],
+        "internalFunctionNames": [
+          "RunTwice",
+          "Beat"
+        ],
+        "internalMethodNames": [
+          "Handle",
+          "Probe",
+          "Twice"
+        ],
+        "callers": [
+          {
+            "callerName": "RunTwice",
+            "diagnosticLine": 3,
+            "diagnosticColumn": 5,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "g",
+                "isConstructor": false
+              },
+              {
+                "target": "g",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "RetryBehavior.Handle",
+            "diagnosticLine": 25,
+            "diagnosticColumn": 7,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "RunTwice",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "RetryBehavior.Probe",
+            "diagnosticLine": 29,
+            "diagnosticColumn": 7,
+            "declaredEffects": [
+              {
+                "kind": "IO",
+                "value": "console_write"
+              }
+            ],
+            "calls": [
+              {
+                "target": "Beat",
+                "isConstructor": false
+              },
+              {
+                "target": "RunTwice",
+                "isConstructor": false
+              }
+            ]
+          },
+          {
+            "callerName": "RetryBehavior.Twice",
+            "diagnosticLine": 36,
+            "diagnosticColumn": 7,
+            "declaredEffects": [],
+            "calls": [
+              {
+                "target": "RunTwice",
+                "isConstructor": false
+              }
+            ]
+          }
+        ]
+      },
+      "outputContentHash": "5fa64d862766a0e427c2d6ce5b5986d33838a19ffb357caa065cca6f626c2c9f",
+      "diagnostics": [
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027g\u0027 (type \u0027Func\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 4,
+          "column": 19
+        },
+        {
+          "code": "Calor0418",
+          "severity": "warning",
+          "message": "Invocation of function-typed value \u0027g\u0027 (type \u0027Func\u003Ci32\u003E\u0027) is an error under effect enforcement: function-typed values carry no effect contract, so the call cannot be charged. Wrap the call in \u00A7CSHARP interop (surfaced as an assumption via Calor0419) or compile with --permissive-effects (an explicit waiver).",
+          "line": 5,
+          "column": 20
+        }
+      ]
+    }
+  }
+}

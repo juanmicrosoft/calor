@@ -43,7 +43,8 @@ Cell fields (all optional):
     logsOnly       omit `finalBuild` / `heldoutFinal` from result.json, leaving
                    only the archived `.ho_final.txt` / `.src_final.txt` — the
                    shape of a run collected before those fields existed
-    canary         the armCanary verdict to archive (default "ok" on arm A)
+    canary         the armCanary verdict to archive (default "permissive-ok" on
+                   arm A, "strict-ok" on arm B — `run-pair.sh`'s two verdicts)
     compilerHash   override the arm's compilerHash (validity condition (3))
     optionsHash    override the arm's buildState.optionsHash — what witnesses the
                    permissive policy, since a control arm run STRICT leaves
@@ -336,7 +337,11 @@ def _write_cell(epoch, pair_dir, label, repo_root, compiler_hash, arm_key, arm_l
                               "valueOnlyFailures": sorted(set(failed) - set(silence)),
                               "source": "missing" if is_not_built else "log"}
                              if record_fields else None),
-            "armCanary": spec.get("canary", "ok" if arm_letter == "a" else "not-applicable"),
+            # `run-pair.sh`'s two verdicts, one per arm and deliberately different
+            # strings: the control arm proves it honours <CalorPermissiveEffects>,
+            # the treatment arm proves it rejects the same laundering program.
+            "armCanary": spec.get("canary",
+                                  "permissive-ok" if arm_letter == "a" else "strict-ok"),
             "armRepoRoot": repo_root,
             "editMechanism": "raw",
             "compilerHash": None if is_invalid else spec.get("compilerHash", compiler_hash),

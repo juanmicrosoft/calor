@@ -27,6 +27,27 @@ All notable changes to this project will be documented in this file.
   changes the compiler or any program you write — it is measurement plumbing.
   (v0.16 W2, gate 10)
 
+- **We did a cheap practice round of that experiment, and it found three things wrong with
+  our own measuring equipment.** The practice round ran real coding tasks against both
+  compilers. Before it could tell us anything about the compilers, it told us that the
+  scoring script and the script that runs the experiment disagreed with each other in three
+  ways, each of which would have wasted the whole paid experiment: they spelled the task
+  names differently, so the scorer thought there were no tasks at all; the safety check that
+  proves each compiler is really set up the way it claims writes down one of two different
+  words depending on which compiler it checked, and the scorer only accepted a third word,
+  so it threw away every run of one of them; and the record of which version of the test
+  equipment was used was never written down. All three are fixed, and the scorer now also
+  catches the case where the two compilers were accidentally swapped. The practice round
+  itself is saved in the repository — every run, including its full transcript — so anyone
+  can rerun the scoring and get the same numbers. It is a practice round, so it declares no
+  winner. Full write-up: `docs/plans/2026-09-01-ppw-rows-dry-run.md`. (v0.16 W2)
+
+- **The benchmark's per-turn recording is now proven on real runs.** The recording added
+  earlier this release saves a full transcript of everything the agent did on each turn. The
+  practice round is the first set of runs to carry those transcripts, so the table that
+  counts what an agent did on each turn — files read, searches, builds, edits — has real
+  numbers behind it for the first time. (v0.16 W1/W4)
+
 - **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
   Effect checking runs in loops that have a safety limit, so a tangle of functions that
   call each other cannot make the compiler spin forever. Before, hitting that limit in the

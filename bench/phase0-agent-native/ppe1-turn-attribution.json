@@ -11,7 +11,7 @@
     "pooledMeanDifference": "mean(all treatment runs) - mean(all control runs); exact over every within-pair relabelling",
     "medianOverPairsOfPairedMeanDelta": "median over pairs of (mean treatment - mean control); even pair count -> mean of the two middle deltas; Monte Carlo, 100000 label-vector shuffles per metric, seed 4537"
   },
-  "entries": 27,
+  "entries": 29,
   "analyzedEpochs": [
     "e1-rows-parity-001",
     "w5-parity-001",
@@ -19,7 +19,7 @@
   ],
   "analyzedRuns": 120,
   "skippedRunsWithinAnalyzedEpochs": 0,
-  "shapeEligibleRunsNotAttributed": 553,
+  "shapeEligibleRunsNotAttributed": 589,
   "skipped": [
     {
       "epoch": "a15-freeze",
@@ -114,6 +114,16 @@
     {
       "epoch": "s1-supply-002",
       "reason": "no pins.json (not a harness epoch)",
+      "shapeEligibleRuns": 0
+    },
+    {
+      "epoch": "w-rows-dry-001",
+      "reason": "pins.json kind='pp-w-rows' is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
+      "shapeEligibleRuns": 36
+    },
+    {
+      "epoch": "w-rows-smoke-null",
+      "reason": "pins.json kind='pp-w-rows' is not a PP-E1/W5 epoch kind ['pp-e1-rows-parity', 'pp-w5-parity']",
       "shapeEligibleRuns": 0
     },
     {

@@ -22,6 +22,7 @@ Run:  python3 -m unittest discover -s bench/phase0-agent-native/tests
 """
 
 import copy
+import glob
 import importlib.util
 import json
 import os
@@ -751,6 +752,57 @@ class ValidityConditions(unittest.TestCase):
         self.assertEqual(analysis["route"], "c")
         self.assertTrue(any("canary verdict" in b for b in analysis["blockers"]))
 
+    def test_the_strict_arm_canary_verdict_is_honoured_too(self):
+        """Both arms are canaried and their verdicts are DIFFERENT strings, so a
+        check that accepts one everywhere cannot see an arm swap. `strict-ok` on
+        the control arm means its Calor.Tasks rejected the laundering program —
+        that arm is not the pre-rows control it claims to be."""
+        def swap(record, root):
+            record["armCanary"] = ("strict-ok" if record.get("controlArmKind") == "pre-rows"
+                                   else "permissive-ok")
+        analysis, _ = PPW.analyze(self.build(mutate_runs=swap))
+        self.assertEqual(analysis["route"], "c")
+        blockers = [b for b in analysis["blockers"] if "canary verdict" in b]
+        self.assertTrue(any("permissive-ok" in b for b in blockers), blockers)
+        self.assertTrue(any("strict-ok" in b for b in blockers), blockers)
+
+    def test_a_skipped_canary_cannot_adjudicate(self):
+        """`skipped` is reachable only for a --null-agent run into a '-null'
+        directory; an epoch that adjudicates may never carry it."""
+        def skip(record, root):
+            record["armCanary"] = "skipped"
+        analysis, _ = PPW.analyze(self.build(mutate_runs=skip))
+        self.assertEqual(analysis["route"], "c")
+        self.assertTrue(any("canary verdict" in b for b in analysis["blockers"]))
+
+    def test_either_registered_pair_spelling_is_read(self):
+        """A-1.12 registers the short id and the directory "so the two can never
+        drift", and the epoch runner stamps pins.json with the SHORT ids
+        (`run-ppw-epoch.sh` passes `--pairs "W-001 …"`, which is also what lands
+        in `suite`). Reading only the directory spelling silently empties the
+        denominator: every pair drops, and the epoch reads as an own goal on a
+        harness that was fine. Measured on w-rows-dry-001, whose pins carry the
+        short ids."""
+        def to_short(pins):
+            short = lambda ids: ["-".join(p.split("-")[:2]) for p in ids]
+            pins["suite"] = short(pins["suite"])
+            for key in ("pairs", "legBPairs", "blindPairs"):
+                pins["ppW"][key] = short(pins["ppW"][key])
+        short = PPW.analyze(self.build("hit", mutate_pins=to_short))[0]
+        full = PPW.analyze(self.build("hit"))[0]
+        self.assertEqual(short["verdict"], full["verdict"])
+        self.assertEqual(short["legA"]["blind"], full["legA"]["blind"])
+        self.assertEqual(short["pairsSurviving"], full["pairsSurviving"])
+
+    def test_an_unregistered_pair_spelling_is_never_guessed(self):
+        def to_bogus(pins):
+            pins["ppW"]["blindPairs"] = ["W-001-middleware", "W-004-counter-peek",
+                                         "W-006-map-doubler"]
+        analysis = PPW.analyze(self.build("hit", mutate_pins=to_bogus))[0]
+        self.assertEqual(analysis["route"], "c")
+        self.assertTrue(any("neither registered spelling" in b
+                            for b in analysis["blockers"]), analysis["blockers"])
+
     def test_a_null_agent_run_cannot_adjudicate(self):
         def null(record, root):
             record["nullAgent"] = True
@@ -918,6 +970,58 @@ class DryRunSizesNAndNeverMovesTheBar(unittest.TestCase):
         sizing = PPW.size_n([0.5], 1, sims=10, boot=50)
         self.assertIsNone(sizing["recommendedN"])
         self.assertIn("floor of two", sizing["note"])
+
+    def test_the_affordable_n_is_priced_on_the_dry_run_s_own_measured_cost(self):
+        """A-1.12 pinned the spend arithmetic on e1-rows-parity-001's per-run cost
+        and said in the same breath that "the per-run cost is unmeasured until the
+        dry run reports it". Pricing the ceiling on the stale estimate when a
+        measured one exists is how an epoch is authorized for a number it cannot
+        hold: w-rows-dry-001 measured $1.42 a run against the $1.0048 estimate,
+        which is 2 pairs' worth of runs at the ceiling."""
+        cheap = PPW.size_n([0.5, 0.4], 2, sims=10, boot=50, cost_per_run=1.0048)
+        dear = PPW.size_n([0.5, 0.4], 2, sims=10, boot=50, cost_per_run=1.42,
+                          prior_usd=30.0)
+        self.assertEqual(cheap["costBasis"][:8], "measured")
+        self.assertEqual(dear["costPerRunUsd"], 1.42)
+        self.assertEqual(dear["priorSpendUsd"], 30.0)
+        # Same power curve, strictly dearer epochs, and the ceiling bites sooner.
+        for lo, hi in zip(cheap["powerCurve"], dear["powerCurve"]):
+            self.assertEqual(lo["n"], hi["n"])
+            self.assertGreater(hi["estimatedUsd"], lo["estimatedUsd"])
+        self.assertLessEqual(dear["maxAffordableN"], cheap["maxAffordableN"])
+
+    def test_the_stale_estimate_is_named_as_the_basis_when_nothing_was_measured(self):
+        sizing = PPW.size_n([0.5, 0.4], 2, sims=10, boot=50)
+        self.assertEqual(sizing["costPerRunUsd"], PPW.COST_PER_RUN_USD)
+        self.assertIn("e1-rows-parity-001", sizing["costBasis"])
+
+    def test_the_measured_cost_divides_by_the_runs_that_actually_billed(self):
+        """The weekly usage limit truncated w-rows-dry-001 at 19 of 36 runs, and
+        the 17 refused ones archive `total_cost_usd` 0. Dividing the spend by the
+        run COUNT would report $0.75 a run for an epoch that spent $1.42, and the
+        affordable N would be sized on a cost nobody paid."""
+        epoch = self.epoch()
+        whole = PPW.analyze(epoch, dry_run=True, sizing_sims=10, sizing_boot=50)[0]
+        self.assertGreater(whole["paidRuns"], 0)
+        self.assertAlmostEqual(whole["measuredCostPerRunUsd"],
+                               whole["spendUsd"] / whole["paidRuns"], places=3)
+
+        # Refuse one run the way the API refused seventeen: the envelope is
+        # archived, the cost is zero. The per-run cost must not move.
+        refused = sorted(glob.glob(os.path.join(epoch, "*", "*", "run-*", "agent.json")))[0]
+        envelope = json.load(open(refused, encoding="utf-8"))
+        envelope["total_cost_usd"] = 0
+        json.dump(envelope, open(refused, "w", encoding="utf-8"))
+        after = PPW.analyze(epoch, dry_run=True, sizing_sims=10, sizing_boot=50)[0]
+        self.assertEqual(after["paidRuns"], whole["paidRuns"] - 1)
+        self.assertAlmostEqual(after["measuredCostPerRunUsd"],
+                               whole["measuredCostPerRunUsd"], places=6)
+
+    def epoch(self):
+        case = ppw_epoch.load_case("hit")
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        return ppw_epoch.build(case, tmp)
 
 
 class ShapeRealizedIndicator(unittest.TestCase):
