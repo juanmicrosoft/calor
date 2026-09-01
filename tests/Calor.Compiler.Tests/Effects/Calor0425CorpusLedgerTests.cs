@@ -121,7 +121,10 @@ public class Calor0425CorpusLedgerTests
     // v0.16 K1: schema 3 = schema 2 + BindRule + FloorRule + the raw-bag
     // denominator kept beside the production one + the exclusion split that the
     // widened denominator made worth separating (effect-pass faults).
-    private const int SchemaVersion = 3;
+    // v0.17 R1: schema 4 = schema 3 + the bind-failure histogram and its module
+    // list (roadmap-v0.17 §3.1 R1, gate 13) + the Calor0411 count over the
+    // enforced set, which the IL-rows trigger was being read without.
+    private const int SchemaVersion = 4;
 
     /// <summary>
     /// v0.16 K1 — the rule the denominator is measured under, written into the
@@ -884,6 +887,11 @@ public class Calor0425CorpusLedgerTests
         int externalBase = 0, invocationRowless = 0, invocationUndetermined = 0, invocationAssumed = 0;
         // F7 — WHY a module was excluded, not just how many were.
         int excludedConversionFailed = 0, excludedParseFailed = 0, excludedBindFailed = 0;
+        // v0.17 R1 (schema 4): the bind-failure histogram, the modules behind it,
+        // and the Calor0411 denominator. See the sites where each is filled.
+        var bindFailureCauses = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var bindFailureModules = new List<string>();
+        int calor0411Sites = 0, calor0411Modules = 0;
         // v0.16 K1 (schema 3). `excludedEffectPassFaulted` was folded into
         // `excludedBindFailed` under schema 2, which was tolerable when the bind
         // guard kept the pass away from anything hard; under the production rule
@@ -969,6 +977,20 @@ public class Calor0425CorpusLedgerTests
             {
                 notMeasured++;
                 excludedBindFailed++;
+
+                // v0.17 R1 (schema 4). The 60 modules that stop here were a COUNT
+                // and nothing else, in any committed ledger, which is why
+                // roadmap-v0.17 §3.1 R2 cannot be scoped without this: R2 fixes
+                // "the largest cluster R1 names", and until now nothing named one.
+                // The cause is the FIRST propagated error, because that is the one
+                // the shipping compiler stops on (`Program.cs:829-833`) and so the
+                // only one a user sees; counting every error in the bag would
+                // weight a module by how many follow-on errors it happened to
+                // cascade into.
+                var stopCode = propagatedDiagnostics.Errors[0].Code.ToString();
+                bindFailureCauses[stopCode] = bindFailureCauses.GetValueOrDefault(stopCode) + 1;
+                bindFailureModules.Add(
+                    $"{stopCode} {Path.GetRelativePath(srcRoot, file)}");
                 continue;
             }
 
@@ -1017,6 +1039,23 @@ public class Calor0425CorpusLedgerTests
             enforced++;
             if (!rawBagRejects)
                 enforcedRawBagRule++;
+
+            // v0.17 R1 (schema 4) — the denominator the IL-rows trigger was being
+            // read WITHOUT. This ledger's own class comment records that §13.4's
+            // "unresolved receiver" never reaches Calor0425: the bare-target guard
+            // sends it out as Calor0411 through the unknown-call chain. No
+            // committed ledger counted that, so "UnknownSource +
+            // InvocationUndetermined = 0" was a statement about the sites that
+            // reach THIS code, with an adjacent class unmeasured by construction
+            // (roadmap-v0.17 §0.3, finding M1). Counted here over exactly the
+            // enforced set, so the two are readable against one denominator.
+            var unknownCalls = effectDiagnostics
+                .Count(d => d.Code == DiagnosticCode.UnknownExternalCall);
+            if (unknownCalls > 0)
+            {
+                calor0411Sites += unknownCalls;
+                calor0411Modules++;
+            }
 
             // ANTI-VACUITY WITNESS (schema 2): the invocation-bucket Calor0425s
             // counted below. Pre-E4 this was the Calor0418 count, which E4 drove
@@ -1085,7 +1124,8 @@ public class Calor0425CorpusLedgerTests
             externalBase, invocationRowless, invocationUndetermined, invocationAssumed,
             invocationRowless + invocationUndetermined + invocationAssumed,
             excludedConversionFailed, excludedParseFailed, excludedBindFailed,
-            excludedEffectPassFaulted, enforcedRawBagRule, rawBagBindFailed);
+            excludedEffectPassFaulted, enforcedRawBagRule, rawBagBindFailed,
+            bindFailureCauses, bindFailureModules, calor0411Sites, calor0411Modules);
     }
 
     /// <summary>
@@ -1195,7 +1235,26 @@ public class Calor0425CorpusLedgerTests
         /// <summary>v0.16 K1 (schema 3). Modules that parsed but whose RAW binder
         /// bag has errors — schema 2's exclusion count, kept so the size of the
         /// correction is readable from the ledger alone.</summary>
-        int RawBagBindFailed);
+        int RawBagBindFailed,
+        /// <summary>v0.17 R1 (schema 4) — <c>ExcludedBindFailed</c> broken out by
+        /// the diagnostic the shipping compiler STOPS on, which is the first
+        /// propagated error. These counts sum to <c>ExcludedBindFailed</c>
+        /// (gate 13), and the largest entry across all subjects is the cluster
+        /// roadmap-v0.17 §3.1 R2 is scoped against. Before this, the 60 modules
+        /// were a count with no causes anywhere in the tree.</summary>
+        SortedDictionary<string, int> BindFailureCauses,
+        /// <summary>v0.17 R1 (schema 4). Each excluded module as
+        /// "<c>Code path</c>", so the cluster R2 targets can be opened rather
+        /// than trusted.</summary>
+        List<string> BindFailureModules,
+        /// <summary>v0.17 R1 (schema 4) — Calor0411 over the ENFORCED set. The
+        /// unresolved-receiver class never reaches Calor0425 (see the class
+        /// comment): the bare-target guard sends it out through the unknown-call
+        /// chain instead. The IL-rows trigger reads
+        /// <c>UnknownSource + InvocationUndetermined</c>, so without this it was
+        /// being read against a partial denominator.</summary>
+        int Calor0411Sites,
+        int Calor0411Modules);
 
     /// <summary>v0.16 K1 — one per-subject leg of gate 9's <c>ModulesEnforced</c>
     /// floor.</summary>
