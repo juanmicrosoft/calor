@@ -1,9 +1,11 @@
 # Roadmap — v0.17 "Reach, and the Rows We Shipped"
 
 **Date:** 2026-09-01
-**Status:** **Draft v1** — no adversarial round has run against it. §10 is empty on purpose; the
-v0.16 roadmap reached Draft v4 through three rounds, and this document should not be treated as
-comparable until it has had at least as many.
+**Status:** **Draft v2** — one adversarial round (§10), three lenses, eleven findings, all
+applied. Two Majors were plan/process and one was measurement; the round was **self-conducted**,
+which is stated as a limitation in §10 rather than hidden. The v0.16 roadmap reached Draft v4
+through three rounds; **rounds 2 and 3 are still owed** and this document is not comparable until
+they have run.
 **Written against:** `cb68afcf` (main after PR #1140), with PP-W-rows adjudicated in PR #1145.
 `Directory.Build.props:3` reads `0.15.0`; **v0.16.0 has not been released**, and every number
 below is measured at the 0.16 branch cut, not after it.
@@ -70,6 +72,19 @@ and none fires (measured 2026-09-01 against the committed ledgers):
 *Sources:* `calor0425-corpus-ledger.json` (schema 3, `bindRule: "propagated"`),
 `higher-order-demand-ledger.json`, `metadata-binding-corpus-ledger.json`.
 
+**The instrument has a blind spot, and the first trigger sits inside it.** The Calor0425 ledger's
+own documentation says so: *"§13.4's 'unresolved receiver' is NOT a bucket, and honestly so: an
+invoked value whose type came from an unresolved receiver never reaches Calor0425 — the bare-target
+guard sends it through the unknown-call chain as **Calor0411**"*
+(`Calor0425CorpusLedgerTests.cs:57-60`). **No committed ledger counts Calor0411 over the corpus.**
+So "`UnknownSource + InvocationUndetermined` = 0" is a statement about the sites that reach
+Calor0425, and an adjacent class of unresolved-callee demand is unmeasured **by construction**. The
+two named fields do still mean what the trigger's author meant — the ledger defines
+`InvocationUndetermined` as *"§13.4's 'BCL-returned delegate'"* verbatim — so the trigger is
+correctly *specified*; what is missing is a denominator beside it. **R1 adds the Calor0411 corpus
+count**, so the next reading of this trigger is against a measured whole rather than a measured
+part.
+
 **The reading this document refuses to take on its own.** "Zero demand" and "the denominator is too
 small to contain the demand" are not distinguishable from these numbers. Every trigger is counted
 over code the compiler successfully binds and enforces; §0.4 is the measure of how much real code
@@ -82,11 +97,11 @@ Measured over the three A-1.5.3 conversion subjects at their pinned submodule co
 
 | Instrument | Value | Source |
 |---|---|---|
-| Modules parsed | **364 of 364** — `ExcludedParseFailed` **0** on every subject | `calor0270-corpus-ledger.json` (`AggregateModulesBound` 364); `calor0425-corpus-ledger.json` |
+| Modules parsed | **364 of 364** — `ExcludedParseFailed` **0** on every subject | `calor0425-corpus-ledger.json` (the authority: `ExcludedParseFailed` per subject). The Calor0270 ledger's `AggregateModulesBound` = 364 agrees, but its field is named *Bound* while its `BindRule` is `"parsed"`; it is corroboration, not the source |
 | Modules reaching the effect pass (`ModulesEnforced`, propagated rule) | **304** — MediatR 31, serilog 88, FluentValidation 185 | `calor0425-corpus-ledger.json` |
 | Modules stopping at binding (`ExcludedBindFailed`) | **60** — MediatR 5, serilog 24, FluentValidation 31 | same |
 | Calor0425 emitted | 90 diagnostics over 40 of 304 modules | same |
-| Calor0425 dominant cause | `ExternalBase` **53** (serilog 13, FV 40); `RowlessDestination` 11, all of them `RowlessInvoked` | same |
+| Calor0425 dominant cause | `ExternalBase` **53 of 90 = 59 %** (serilog 13, FV 40); `RowlessDestination` 11, all `RowlessInvoked`; `InvocationRowless` 26 | same |
 | Calor0270 (SignatureUnresolved), raw-bag rule | 315 over 39 of 364 | `calor0270-corpus-ledger.json` |
 | Metadata resolution (gate 6) | **817 / 1248 = 65.46 %** — MediatR **129/226 = 57.08 %**, serilog 104/113 = 92.04 %, FV 584/909 = 64.25 % | `metadata-binding-corpus-ledger.json` |
 | Higher-order demand | D-A **2**; D-B **3121** over 364 files (2676 lambdas, 311 delegate-typed declarations, 132 delegate invocations) | `higher-order-demand-ledger.json` |
@@ -99,6 +114,15 @@ move is everything after parsing: **60 modules still stop at binding**, and meta
 **unchanged at 65.46 %** — the same 817/1248 gate 6 has read since 0.14. The reach frontier moved
 from the parser to the binder, and nobody has measured what is behind it: the 60 modules' failure
 causes are **not broken out by code in any committed ledger**. §3.1 R1 is that measurement.
+
+**`ExternalBase` is the largest row-adjacent number in the tree, and no release has assigned it.**
+53 of the 90 Calor0425 diagnostics — **59 %** — are an override or interface implementation
+reaching an external base (`Calor0425CorpusLedgerTests.cs:43-46`). It is *not* the
+BCL-returned-delegate class the IL-rows trigger names: E3b's 0419 → 0425 retirement re-bucketed
+schema 1's four `UnknownSource` entries into it, and the ledger records that the old ELSE arm
+"mislabelled them". It has no trigger, no venue, and no residual row in R:§6. **§6 gives it one**,
+and R1 reports it per subject beside the binding causes — a cause holding the majority of a gate's
+diagnostics may not stay unassigned across two releases.
 
 **The gap between D-A = 2 and D-B = 3121** is the reach problem stated in one line: real C# is full
 of higher-order code (3121 sites over 364 files), Calor-native code has two, and the converter
@@ -118,8 +142,10 @@ cluster (#948, #959, #884, #859, #1135), and the 3.5.1 null-state slice.
 
 ## 1. Theme — two halves, and why they are one release
 
-**Reach is the MUST tier. Rows soundness is the SHOULD tier.** They are in the same release
-because each is the other's precondition for meaning anything.
+**Reach is the MUST tier; rows soundness contributes one MUST (S1) and the rest as SHOULD.**
+*(Draft v1 tiered all of rows soundness SHOULD while §1's claim depended on it; review round 1
+finding M3 corrected that, §10.)* They are in the same release because each is the other's
+precondition for meaning anything.
 
 - **Reach without rows soundness** produces a bigger denominator over which a leaky charge rule
   still fails to charge. The triggers in §0.3 would keep reading zero for a reason that has
@@ -148,8 +174,9 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   "documented empirical defect in the protocol" that rule requires — and it belongs to a release
   that can afford the collection. **0.18, with the fixture redesign registered before it.** Also:
   re-running it against a compiler that leaks five of twelve shapes would repeat the confound.
-- **IL-derived rows.** Trigger reads 0 (§0.3). Re-registered in §6 against the *enlarged*
-  denominator R1 produces, which is the honest way to ask the question again.
+- **IL-derived rows.** Trigger reads 0 (§0.3) — against a denominator R1 shows is partial.
+  Re-registered in §3.4 against the enforced set **R2** enlarges and the Calor0411 count **R1**
+  adds; R1 measures, R2 moves, and the question is only honestly re-asked once both have.
 - **Async rows.** Awaiting the maintainer's written adjudication, which A-1.12 made due at the
   0.16 branch cut and which has not been given (§9).
 
@@ -164,8 +191,13 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   Calor0425 corpus ledger (schema 4) with a per-subject, per-code breakdown of
   `ExcludedBindFailed`, published with the module names, and names the **largest single cluster**.
   R:§0.4 measured 49 stops as Calor0208 29 / 0250 13 / 0201 7 under the shipped rule over a
-  364-file denominator; that breakdown predates W3(a) and is not the current 60. *Touches:*
-  `Calor0425CorpusLedgerTests.cs`, `calor0425-corpus-ledger.json`, `CHANGELOG.md`.
+  364-file denominator; that breakdown predates W3(a) and is not the current 60.
+  **Two additions from review round 1, both denominators the plan was reading without:**
+  (i) the **Calor0411 corpus count**, because the unresolved-receiver class never reaches the
+  Calor0425 ledger and the IL-rows trigger is currently read against a partial whole (§0.3);
+  (ii) **`ExternalBase` per subject**, because it holds 59 % of the gate's diagnostics and no
+  release has assigned it (§0.4, §6). *Touches:* `Calor0425CorpusLedgerTests.cs`,
+  `calor0425-corpus-ledger.json`, `CHANGELOG.md`.
   *Discriminating:* drop the breakdown and gate 13 (§5) has no denominator to floor.
 - **R2 — Fix the largest binding cluster R1 names.** Scoped by measurement, not by guess: R1 runs
   first and its answer picks the target. The pre-registered acceptance is a **move in
@@ -189,13 +221,21 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   measurable end-to-end today* precisely because of #1137.
   *Discriminating:* each lands with the fixture that reproduced it.
 
-**Cut line 1.** If R3 overruns, it defers to 0.17.x **with** gate 6 restated as regression-only for
-this release, named in the release notes — not silently re-tiered. R1 may not be cut: it is the
-measurement every other reach claim is floored against.
+**Cut line 1.** If R3 overruns, it defers to 0.17.x **with** gate 6's movement leg restated as
+regression-only for this release, named in the release notes — not silently re-tiered. R1 may not
+be cut: it is the measurement every other reach claim is floored against.
 
-### 3.2 SHOULD — rows soundness
+**Cut line 3 — R2 measured, attempted, and immovable.** Draft v1 defined no outcome for the case
+where R1 names a cluster and R2 cannot move it inside the release; a MUST with no failure route is
+a MUST that will be quietly redefined. The registered route: R2 publishes **what it attempted and
+what the cluster cost**, `ModulesEnforced` stays at its floor, **PP-R1 reads MISS on leg 1** — not
+NOT-ADJUDICATED, because the instrument worked and the answer was no — and the cluster is
+re-registered in §6 with its measured size as the trigger for the next release. An intractable
+cluster is a finding, not an excuse.
 
-- **S1 — #1136's fix set, entire.** The issue is explicit that a partial fix is worse than none:
+### 3.2 MUST — rows soundness
+
+- **S1 — #1136's fix set, entire. MUST.** The issue is explicit that a partial fix is worse than none:
   *"Fixing only fields leaves properties laundering silently."* The registered fix set is
   **{allow a row on `§PROP`} ∪ {fail closed}** —
   (a) `§PROP` gains an effects row (parser `Parser.ParseProperty`, `Ast/PropertyNodes.cs`, the
@@ -208,9 +248,18 @@ measurement every other reach claim is floored against.
   fixtures already committed under `pairs/W-00*/seeded/` with their multisets in
   `ppw-seeded-compiles.json`. *Discriminating:* revert either half and the shape table goes red on
   the half that was reverted — which is why the table, not a summary, is the pin (§4.2).
-  **Why SHOULD and not MUST:** (b) is a fail-closed change to a shipped diagnostic and will
-  produce new errors on converted code whose size is unknown until R1/R2 enlarge the denominator;
-  it is sequenced behind them deliberately, and a SHOULD that slips is named in the release notes.
+  **Why MUST, corrected in review round 1:** Draft v1 tiered this SHOULD while §1 registered
+  *"every argument shape in #1136's table is either charged or refused"* as half the release
+  claim. A claim a release makes must be backed by a MUST — otherwise a slipped SHOULD makes §1
+  false and leaves PP-S1 (§4.2) with nothing to adjudicate and no route for it. The concern that
+  motivated the SHOULD is real and is handled by sequencing instead: (b) is a fail-closed change to
+  a shipped diagnostic and will produce new errors on converted code whose size is unknown until
+  R1 measures it, so **S1 lands after R1 and reports the new-error count per subject in its own
+  PR**. *Cut line 2:* if that count is large enough that S1 cannot land inside the release, S1
+  slips **with §1's claim scoped down in the same commit** — the claim and the tier move together
+  or neither moves.
+
+### 3.3 SHOULD
 - **S2 — W7 carried: `FunctionBoundType.Row` end-to-end** (R:710-720; D:2700-2708) and
   lambda-parameter rows (lambda parameters invoked in-lambda → Calor0411). Row-family; the reader
   S1(a) needs for `§PROP` overlaps it.
@@ -219,7 +268,7 @@ measurement every other reach claim is floored against.
 - **S4 — W6 carried: Calor0422/0423** ("effect contract unavailable"), re-read against R1's
   breakdown rather than against the pre-W3(a) numbers.
 
-### 3.3 DEFERRED — frozen residual, triggers re-registered against the enlarged denominator
+### 3.4 DEFERRED — frozen residual, triggers re-registered against the enlarged denominator
 
 IL-derived rows for BCL-returned delegates (*trigger:* `UnknownSource + InvocationUndetermined` >
 10 over **R2's** enforced set, re-measured at the 0.17 branch cut — 0 over 304 today); Calor0419
@@ -242,11 +291,24 @@ subject falling on either.
 *Instrument:* the schema-4 Calor0425 corpus ledger (R1) and the metadata ledger, both already
 exact-equality tested. *Denominator:* 364 subject modules / 1248 metadata candidates at the pinned
 submodule SHAs. *Freeze:* this document, before R2 or R3 merges.
-*Pre-registered floors:* `ModulesEnforced` ≥ 304 aggregate and per subject (MediatR ≥ 31,
-serilog ≥ 88, FluentValidation ≥ 185) — **exact floors, not the 0.16 slack floors**, because the
-measurement is now the baseline; gate 6 ≥ 65.46 % aggregate and no subject below its own current
-figure. *Outcome map:* HIT (both move, nothing falls) / MISS (either fails to move) /
-NOT-ADJUDICATED (a submodule SHA moves, or a ledger's bind rule changes mid-release).
+*Pre-registered floors — regression:* `ModulesEnforced` ≥ 304 aggregate; per subject MediatR ≥ 31
+and serilog ≥ 88 **exact**, FluentValidation ≥ 179 — this keeps gate 9's own stated precedent
+(*"the per-subject MediatR/serilog floors are EXACT and the slack sits in FluentValidation"*,
+`calor0425-corpus-ledger.json` `FloorRule.Note`), which Draft v1 dropped without saying why. A
+reclassification of one or two modules in the largest subject is not a regression, and an
+all-exact floor would red the gate on one.
+
+***Effect size — the number Draft v1 did not register, and where it comes from.*** "Exceeds 304"
+makes a one-module improvement a HIT while §1 claims *materially more*, which is not a proof point.
+The honest size cannot be written today: it is a fraction of the largest binding cluster, and that
+cluster is what R1 exists to name. **PP-R1's effect size is therefore registered by R1's PR, before
+R2 merges, as a number derived from R1's breakdown** — a deferred registration with a named
+deadline and a named deriver, not an open field. Until R1 lands, PP-R1 has no HIT.
+*Outcome map:* HIT (both legs move by at least their registered sizes, nothing falls) /
+MISS (either fails to move) / **UNDERPOWERED** (R1's breakdown shows the largest cluster is smaller
+than the registered size demands, i.e. the corpus cannot supply the effect — registered here so the
+release cannot discover it after the fact) / NOT-ADJUDICATED (a submodule SHA moves, a ledger's
+bind rule changes mid-release, or R1's effect size was never registered).
 *Discriminating:* revert R2 and `ModulesEnforced` returns to 304 → MISS.
 
 ### 4.2 PP-S1 — "no argument shape launders silently"
@@ -255,9 +317,12 @@ NOT-ADJUDICATED (a submodule SHA moves, or a ledger's bind rule changes mid-rele
 (`Calor0410`) or **refused**, and none produces an uncharged `warning Calor0425` at exit 0.
 *Instrument:* a table-driven test over the fixtures #1136 already committed under
 `bench/phase0-agent-native/pairs/W-00*/seeded/`, with the frozen multisets in
-`ppw-seeded-compiles.json` as the before-state. *Denominator:* twelve shapes, named individually —
-five currently escaping, seven currently charged; the seven are the **controls** and must not
-change. *Freeze:* #1136's table, which A-1.12 already registered as a confound and which is
+`ppw-seeded-compiles.json` as the before-state. *Denominator:* **exactly the twelve shapes in #1136's
+table**, named individually — five currently escaping, seven currently charged; the seven are the
+**controls** and must not change. The issue's two *disclosure* shapes (inherited field unqualified;
+module-qualified module function from inside a class body) are **outside the twelve** and are
+reported, never scored — stated because an ambiguous denominator is the failure these gates exist
+to prevent. *Freeze:* #1136's table, which A-1.12 already registered as a confound and which is
 therefore frozen prose, not something this release may edit.
 *Two disclosures carried from the issue, not treated as failures:* "inherited field, unqualified"
 is not cleanly measurable end-to-end until #1137 lands (R4), and a module-qualified module function
@@ -280,7 +345,10 @@ can reproduce them on a laptop.
 floor 25), 3 (surface agreement — the MCP leg now exists; the CLI-process and `Calor.Sdk` legs are
 **still unbuilt**, issue #1116, and gate 3 claims only the legs it has), 4 (PP-E1 regression pin:
 leg A 10/10 with a clean control on every 0.17 commit), 5 (corpus compatibility, leg (a) only —
-leg (b) unbuilt), 6 (**resolution floor, re-set: ≥ 65.46 % aggregate, two-sided per subject**),
+leg (b) unbuilt), 6 (**resolution floor — two legs, because a floor at today's value cannot gate a MUST whose
+content is "must move": (i) regression, ≥ 65.46 % aggregate and no subject below its own current
+figure, two-sided as it has always been; (ii) movement, the aggregate strictly above 65.46 % at the
+release commit, which is PP-R1's leg 2 and reds gate 6 if R3 lands as a no-op**),
 7 (index/query goldens including E7's leg), 8 (harness capture), 9 (**conversion denominator,
 re-set on the measurement: `ExcludedParseFailed` = 0 and `ModulesEnforced` ≥ 304, exact per
 subject**), 11 (non-convergence coverage — Calor0406 at both caps), 12 (turn attribution over
@@ -312,6 +380,8 @@ regression pin only — its bytes must not change without a registered cause.
 | Index folds cross-module charges; interface methods unindexed; index-build cost unmeasured | e5:256-275 | — | 0.17 SHOULD S3 |
 | Calor0422/0423 (effect contract unavailable) | N:S2.2; R1's breakdown | — | 0.17 SHOULD S4 |
 | Calor0410 demoted under `--permissive-effects` | e4:246-248 | PP-W-rows is closed, so the freeze that protected it has lapsed | **re-adjudicate in 0.17** — the arm it was frozen for no longer exists |
+| **`ExternalBase` — 53 of 90 Calor0425 diagnostics (59 %), an override or interface implementation reaching an external base** | §0.4; `Calor0425CorpusLedgerTests.cs:43-46` | **none until now** — carried unassigned through 0.15 and 0.16 | **0.17: R1 reports it per subject; a venue is registered in the 0.17 release notes from that breakdown.** Not the IL-rows class, so IL rows' trigger does not cover it |
+| **Calor0411 over the corpus is uncounted** — the unresolved-receiver class never reaches the Calor0425 ledger by construction | `Calor0425CorpusLedgerTests.cs:57-60` | — | **0.17 R1**, unconditional: the IL-rows trigger cannot be read again against a partial denominator |
 | `ρ_body` under-approximation on an escaping lambda | e4:230-234 | a fixture measured silent | DEFERRED |
 | `§FLD`/`§B` rows not index positions; hover declared-only | e5:168-175 | — | 0.17.x |
 | Solution-level manifests not consulted by the index | e5:256-258 | a corpus solution with manifests | 0.17.x |
@@ -340,7 +410,8 @@ regression pin only — its bytes must not change without a registered cause.
 | #1084, #847, #922, #845 | demand-driven |
 | #1011 (R1–R14), #1030, #1031, #1032, #1042 | continuous |
 | #673, #709, #711 | adoption work, not release-gated |
-| #1094, #903, #1097, #1104 | **closed by 0.16** (W1, W3(a), W3(b), W3(c)) |
+| #903, #1097, #1104 | **closed by 0.16** (W3(a), W3(b), W3(c)) — verified closed on GitHub |
+| #1094 | W1 shipped its content (PR #1119 archives `.calor-build-state.json` per run) but **the issue is still OPEN** — close it with the 0.16.0 release, or say why it is not done |
 
 ---
 
@@ -380,16 +451,48 @@ listed here as questions, not as assumptions:
    #959 / #948 shape. Recorded here as an observation, not as an adjudication; the flake rate §9.2
    asks for is what would tell them apart.
 
-A fourth is created by this draft: **the `--permissive-effects` demotion of Calor0410** (§6) was
-frozen through the 0.16.0 release commit specifically because PP-W-rows' arm A depended on it.
-That proof point is closed. The freeze has lapsed and the demotion needs a decision on its own
-merits.
+A fourth is **not** created by this draft, and Draft v1's first version of it was wrong. The
+**`--permissive-effects` demotion of Calor0410** (§6) is frozen **through the 0.16.0 release
+commit** (R:§6), which has not happened. PP-W-rows' arm A was the *rationale* for that freeze, not
+its end condition; reading the proof point's closure as releasing the freeze early is precisely the
+post-hoc loosening the freeze discipline exists to prevent. It becomes due **after 0.16.0 ships**,
+and is listed here only so it is not forgotten then.
 
 ---
 
 ## 10. Adversarial review
 
-**None run.** Draft v1. The v0.16 roadmap took three rounds — engineering, measurement, and
-plan/process lenses — and every finding was applied or declined in its own §10. This document is
-not comparable to that one until the same has happened, and the numbers in §0 should be
-re-verified by the first reviewer against the ledgers rather than taken from this table.
+### Round 1 — 2026-09-01, three lenses, on Draft v1
+
+**Conducted by the same agent that wrote Draft v1**, which is a real limitation and is stated
+rather than hidden: a self-review cannot find an error whose cause is a misunderstanding the
+reviewer shares. Every finding below was checked against the tree — the ledgers, the test sources,
+the GitHub issue states — not against the prose. **Rounds 2 and 3 are still owed**, and the
+document is Draft v2, not final.
+
+**Verdict:** MEASUREMENT — *needs-fixes*, one Major. PLAN/PROCESS — *needs-fixes*, two Majors.
+ENGINEERING — *approve with fixes*. All eleven findings **applied**; none declined.
+
+| # | Lens | Finding | Disposition |
+|---|---|---|---|
+| **M1** | measurement | **The instrument has a blind spot the draft read straight past.** `Calor0425CorpusLedgerTests.cs:57-60` states that the unresolved-receiver class *never reaches Calor0425* — it goes out as **Calor0411** — and **no committed ledger counts Calor0411 over the corpus**. "Every trigger reads zero" was therefore partly a statement about where the instrument looks. *The attack that failed:* the trigger's named fields were checked against their definitions and **do** still mean what its author meant (`InvocationUndetermined` is defined as "§13.4's 'BCL-returned delegate'" verbatim), so the trigger is correctly specified — only its denominator is partial. | **Applied.** §0.3 discloses it; **R1 adds the Calor0411 corpus count**; §6 carries it unconditionally; §2 and §3.3 reworded (n11). |
+| **M2** | process | **The draft released a frozen rule early.** §6 and §9 claimed the `--permissive-effects` Calor0410 freeze "has lapsed" because PP-W-rows closed. R:§6 freezes it **through the 0.16.0 release commit**, which has not happened; PP-W-rows' arm A was the freeze's *rationale*, not its end condition. Releasing a freeze because its rationale weakened is exactly the post-hoc loosening the discipline exists to prevent — and the draft did it to itself, unprompted, in its first hour. | **Applied.** §6's trigger restated to the real end condition; §9's "fourth adjudication" withdrawn and corrected in place, with the error left visible. |
+| **M3** | plan | **A release claim backed by a SHOULD.** §1 registers *"every argument shape in #1136's table is either charged or refused"* as half the release claim while §3.2 tiered S1 as SHOULD. A slipped SHOULD would make §1 false and leave PP-S1 with nothing to adjudicate and no route for it. | **Applied.** S1 promoted to **MUST**. The real concern behind the SHOULD (unknown new-error volume) is handled by sequencing S1 behind R1 and reporting the count per subject, plus **cut line 2**: if S1 slips, §1's claim is scoped down *in the same commit*. |
+| m4 | measurement | **PP-R1 had no effect size.** "Exceeds 304" makes a one-module improvement a HIT while §1 claims *materially more*. PP-E1 and PP-W-rows both registered Δ and power; this did not. | **Applied.** The size cannot honestly be written before R1 names the cluster, so it is a **deferred registration with a named deadline and deriver** — R1's PR, before R2 merges — and **PP-R1 has no HIT until it lands**. An `UNDERPOWERED` outcome is added for "the corpus cannot supply the effect", so the release cannot discover that after the fact. |
+| m5 | measurement | **Exact floors on all three subjects dropped gate 9's own slack precedent** (`FloorRule.Note`: *"the per-subject MediatR/serilog floors are EXACT and the slack sits in FluentValidation"*) with no stated reason. One reclassified module in the largest subject would red the gate. | **Applied.** MediatR ≥ 31 and serilog ≥ 88 exact; FluentValidation ≥ 179. |
+| m6 | plan | **R2 had no failure route.** No outcome was defined for "R1 named the cluster, R2 could not move it". A MUST with no failure route is a MUST that gets quietly redefined. | **Applied.** **Cut line 3**: R2 publishes what it attempted and what the cluster cost, PP-R1 reads **MISS** on leg 1 — not NOT-ADJUDICATED, the instrument worked and the answer was no — and the cluster is re-registered with its measured size. |
+| m7 | measurement | **Gate 6 as restated could not gate its own MUST.** "≥ 65.46 %" is the current value, so the gate was regression-only while R3's content is "must move". | **Applied.** Gate 6 split into a regression leg and a **movement leg**; R3 landing as a no-op now reds the gate. |
+| m8 | measurement | **The largest row-adjacent number in the tree was unassigned.** `ExternalBase` holds **53 of 90** Calor0425 diagnostics (59 %) and has carried through 0.15 and 0.16 with no trigger, no venue and no residual row. It is *not* the IL-rows class — E3b re-bucketed schema 1's four `UnknownSource` entries into it — so IL rows' trigger does not cover it. | **Applied.** §0.4 states the share and the distinction; R1 reports it per subject; §6 gives it a row and the 0.17 release notes a venue. |
+| n9 | fact | §7 listed **#1094 as "closed by 0.16"**. It is **OPEN** (verified on GitHub). W1 shipped its content in PR #1119. | **Applied.** Its own row: close it with the release, or say why it is not done. |
+| n10 | measurement | §4.2's "twelve shapes" did not say the issue's two *disclosure* shapes are **outside** the twelve. An ambiguous denominator is the failure these gates exist to prevent. | **Applied.** Denominator stated as *exactly* the twelve; the two disclosures reported, never scored. |
+| n11 | consistency | §2 re-registered IL rows against "the enlarged denominator **R1** produces"; §3.3 said "**R2's** enforced set". R1 measures; R2 moves. | **Applied.** Both now say R1 measures and R2 enlarges, and name the Calor0411 count from M1. |
+| n12 | sourcing | §0.4 sourced "modules parsed" to the Calor0270 ledger's `AggregateModulesBound`, a field named *Bound* on a ledger whose `BindRule` is `"parsed"`. | **Applied.** The Calor0425 ledger's `ExcludedParseFailed` is named as the authority; Calor0270 is corroboration. |
+
+### What round 1 did not do
+
+It did not re-derive the four trigger numbers independently — it re-read the same ledgers the draft
+read. A reviewer who has not seen this session should recompute `UnknownSource`,
+`InvocationUndetermined`, `calor0419FunctionTyped`, `RowlessNeverInvoked` and gate 6 from the
+committed JSON before relying on §0.3. It also did not attack §8 or the tier boundary between R3
+and R4, and it found nothing in §3.1 R4 — which for a batch of four issues is more likely to mean
+the lens missed something than that the batch is clean.
