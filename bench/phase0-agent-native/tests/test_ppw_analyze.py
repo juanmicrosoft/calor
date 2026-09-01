@@ -1313,15 +1313,25 @@ class EscapeClassification(unittest.TestCase):
 
 class Ledger(unittest.TestCase):
     LEDGER = os.path.join(BENCH, "effect-rows-benefit-ledger.json")
+    # The dry epoch that sized `w-rows-001` past its ceiling. A-1.12's off-ramp is
+    # taken FROM it, explicitly — `build_ledger(None)` alone still writes the
+    # not-run form, which `test_the_off_ramp_is_never_a_default` pins.
+    SIZED_BY = "w-rows-dry-002"
+
+    def committed_ledger(self, pairs_root=None):
+        """The committed ledger's own recomputation: the off-ramp, taken as the
+        release took it."""
+        epoch = os.path.join(BENCH, "epochs", self.SIZED_BY)
+        return PPW.serialize(PPW.build_ledger(
+            None, pairs_root=pairs_root,
+            underpowered=PPW.underpowered_from_sizing(epoch), sized_by=self.SIZED_BY))
 
     def test_the_committed_ledger_is_the_current_recomputation(self):
         committed = open(self.LEDGER, encoding="utf-8").read()
-        self.assertEqual(committed, PPW.serialize(PPW.build_ledger(None)))
+        self.assertEqual(committed, self.committed_ledger())
 
     def test_the_ledger_is_byte_stable_on_re_run(self):
-        first = PPW.serialize(PPW.build_ledger(None))
-        second = PPW.serialize(PPW.build_ledger(None))
-        self.assertEqual(first, second)
+        self.assertEqual(self.committed_ledger(), self.committed_ledger())
 
     def test_the_ledger_is_timestamp_free_and_path_free(self):
         text = open(self.LEDGER, encoding="utf-8").read()
@@ -1356,18 +1366,66 @@ class Ledger(unittest.TestCase):
             self.assertIn("clean", pair["frozenCompiles"])
         self.assertEqual(ledger["precedence"], "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT")
 
-    def test_before_the_epoch_runs_the_verdict_is_not_adjudicated(self):
+    def test_the_committed_ledger_records_the_sizing_off_ramp(self):
+        """A-1.12: "the PP registers its achievable power and arms UNDERPOWERED
+        rather than overrunning". The registered epoch never ran, so the ledger
+        carries the SIZE and nothing else — legA, legB and perCell stay empty,
+        because copying the dry collections' per-cell numbers into them is the
+        one thing this script refuses everywhere else."""
         ledger = json.load(open(self.LEDGER, encoding="utf-8"))
         self.assertIs(ledger["epochRun"], False)
+        self.assertEqual(ledger["verdict"], "UNDERPOWERED")
+        self.assertIsNone(ledger["route"])
+        self.assertIsNone(ledger["legA"])
+        self.assertIsNone(ledger["legB"])
+        self.assertEqual(ledger["perCell"], [])
+        self.assertIn("was NOT run and will not be", ledger["reason"])
+        self.assertIn("neither supported nor refuted", ledger["reason"])
+
+        sizing = ledger["sizing"]
+        self.assertEqual(sizing["sizedBy"], self.SIZED_BY)
+        self.assertGreater(sizing["recommendedN"], sizing["maxAffordableN"])
+        self.assertGreaterEqual(ledger["achievablePower"], ledger["constants"]["minPower"])
+        self.assertGreater(sizing["recommendedUsd"], ledger["constants"]["spendCeilingUsd"])
+        # prior spend is cumulative over the proof point, not just the sizing epoch
+        self.assertIn("w-rows-dry-001", [e["epoch"] for e in sizing["priorDryEpochs"]])
+
+    def test_the_off_ramp_is_never_a_default(self):
+        """Without the flag the ledger is the NOT-RUN form. An off-ramp a script
+        can take on its own is an experiment that can decline itself."""
+        ledger = PPW.build_ledger(None)
         self.assertEqual(ledger["verdict"], "NOT-ADJUDICATED")
         self.assertIn("has not run", ledger["reason"])
+        self.assertNotIn("sizing", ledger)
+
+    def test_the_off_ramp_refuses_an_epoch_that_did_not_arm_it(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        path = os.path.join(tmp, "ppw-analysis.dry-run.json")
+
+        json.dump({"dryRun": True, "sizing": {"recommendedN": 2, "armsUnderpowered": False}},
+                  open(path, "w", encoding="utf-8"))
+        with self.assertRaises(SystemExit) as caught:
+            PPW.underpowered_from_sizing(tmp)
+        self.assertIn("does not arm UNDERPOWERED", str(caught.exception))
+
+        json.dump({"dryRun": False, "sizing": {"recommendedN": 9, "armsUnderpowered": True}},
+                  open(path, "w", encoding="utf-8"))
+        with self.assertRaises(SystemExit) as caught:
+            PPW.underpowered_from_sizing(tmp)
+        self.assertIn("is not a dry-run analysis", str(caught.exception))
+
+        os.remove(path)
+        with self.assertRaises(SystemExit) as caught:
+            PPW.underpowered_from_sizing(tmp)
+        self.assertIn("no readable dry-run analysis", str(caught.exception))
 
     def test_dropping_a_pair_changes_the_ledger(self):
         """Gate 10's pin: "dropping a pair fails the test"."""
         original = dict(PPW.PAIR_DIRS)
         try:
             PPW.PAIR_DIRS.pop("W-006")
-            mutated = PPW.serialize(PPW.build_ledger(None))
+            mutated = self.committed_ledger()
         finally:
             PPW.PAIR_DIRS.clear()
             PPW.PAIR_DIRS.update(original)
@@ -1384,11 +1442,11 @@ class Ledger(unittest.TestCase):
                     and cell["arm"] == "B":
                 cell["exitCode"] = 0
         json.dump(data, open(path, "w", encoding="utf-8"))
-        mutated = PPW.serialize(PPW.build_ledger(None, pairs_root=pairs_root))
+        mutated = self.committed_ledger(pairs_root=pairs_root)
         self.assertNotEqual(mutated, open(self.LEDGER, encoding="utf-8").read())
         # the control: the same scratch tree, unedited, reproduces the bytes
         clean = ppw_epoch.scratch_pairs(os.path.join(tmp, "clean"))
-        self.assertEqual(PPW.serialize(PPW.build_ledger(None, pairs_root=clean)),
+        self.assertEqual(self.committed_ledger(pairs_root=clean),
                          open(self.LEDGER, encoding="utf-8").read())
 
     def test_a_run_epoch_fills_the_ledger_with_the_verdict(self):

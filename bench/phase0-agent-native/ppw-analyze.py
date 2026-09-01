@@ -1727,7 +1727,38 @@ def _run_cost(run_dir):
 # ---------------------------------------------------------------------------
 # the ledger (A-1.12: "INSTRUMENT that reads the outcome")
 # ---------------------------------------------------------------------------
-def build_ledger(analysis=None, pairs_root=None):
+def underpowered_from_sizing(dry_epoch_dir):
+    """A-1.12's registered off-ramp, read off a dry epoch's own sizing block.
+
+    The row says it in as many words: "if the dry run demands N > 9 for 80 %
+    power at Delta = 0.5, the PP **registers its achievable power and arms
+    UNDERPOWERED** rather than overrunning." That is an outcome the dry run is
+    ALLOWED to produce — the one thing it may hand the ledger — and it is not
+    an adjudication of the claim: the registered epoch never runs, `legA` and
+    `legB` stay null, and no dry per-cell number is copied anywhere near them.
+    What is recorded is the SIZE, and the fact that the size does not fit.
+
+    Returns the sizing block, or raises if the epoch does not arm the off-ramp.
+    """
+    analysis_path = os.path.join(dry_epoch_dir, "ppw-analysis.dry-run.json")
+    try:
+        with open(analysis_path, encoding="utf-8") as fh:
+            analysis = json.load(fh)
+    except (OSError, ValueError) as exc:
+        raise SystemExit("ERROR: no readable dry-run analysis at %s (%s). Produce it with "
+                         "`ppw-analyze.py <epoch> --dry-run` first." % (analysis_path, exc))
+    if not analysis.get("dryRun"):
+        raise SystemExit("ERROR: %s is not a dry-run analysis. The off-ramp is sized by a DRY "
+                         "epoch; a live epoch adjudicates on its own terms." % analysis_path)
+    sizing = analysis.get("sizing") or {}
+    if not sizing.get("armsUnderpowered"):
+        raise SystemExit("ERROR: %s does not arm UNDERPOWERED (recommendedN %r fits the ceiling, "
+                         "or sizing did not run). The off-ramp may not be taken on an epoch that "
+                         "did not register it." % (analysis_path, sizing.get("recommendedN")))
+    return sizing
+
+
+def build_ledger(analysis=None, pairs_root=None, underpowered=None, sized_by=None):
     if analysis is not None and analysis.get("dryRun"):
         raise SystemExit("ERROR: refusing to record a DRY RUN in the ledger. A dry run sizes N "
                          "and never adjudicates (A:81); only the registered epoch %s may reach "
@@ -1821,14 +1852,56 @@ def build_ledger(analysis=None, pairs_root=None):
         ledger["legBPairsFromPins"] = None
         ledger["blindPairsFromPins"] = None
         ledger["perCell"] = []
+        # legA and legB stay NULL under the off-ramp too. The registered epoch never
+        # ran, so the proof point has no leg statistics; the dry collections' own
+        # per-cell numbers live in their epochs and in the note, and copying them
+        # here would be exactly the "dry run recorded in the ledger" this script
+        # refuses everywhere else.
         ledger["legA"] = None
         ledger["legB"] = None
         ledger["routes"] = None
         ledger["ownGoal"] = False
         ledger["ownGoalCauses"] = []
-        ledger["verdict"] = "NOT-ADJUDICATED"
+        if underpowered is None:
+            ledger["verdict"] = "NOT-ADJUDICATED"
+            ledger["route"] = None
+            ledger["reason"] = NOT_RUN_REASON
+            return ledger
+        ledger["sizing"] = OrderedDict([
+            ("sizedBy", sized_by),
+            ("artifact", os.path.join("bench/phase0-agent-native/epochs", sized_by or "",
+                                      "ppw-analysis.dry-run.json") if sized_by else None),
+            ("rule", underpowered.get("rule")),
+            ("blindPairsObserved", underpowered.get("blindPairsObserved")),
+            ("observedDeltas", underpowered.get("observedDeltas")),
+            ("observedVariance", underpowered.get("observedVariance")),
+            ("varianceUpperBound95", underpowered.get("varianceUpperBound95")),
+            ("costPerRunUsd", underpowered.get("costPerRunUsd")),
+            ("costBasis", underpowered.get("costBasis")),
+            ("priorSpendUsd", underpowered.get("priorSpendUsd")),
+            ("priorDryEpochs", underpowered.get("priorDryEpochs")),
+            ("powerCurve", underpowered.get("powerCurve")),
+            ("recommendedN", underpowered.get("recommendedN")),
+            ("recommendedUsd", underpowered.get("recommendedUsd")),
+            ("maxAffordableN", underpowered.get("maxAffordableN")),
+            ("achievablePower", underpowered.get("achievablePower"))])
+        ledger["achievablePower"] = underpowered.get("achievablePower")
+        ledger["verdict"] = "UNDERPOWERED"
         ledger["route"] = None
-        ledger["reason"] = NOT_RUN_REASON
+        affordable = [c for c in (underpowered.get("powerCurve") or []) if c.get("fitsCeiling")]
+        at_ceiling = max(affordable, key=lambda c: c["n"], default=None)
+        ledger["reason"] = (
+            "the registered epoch %s was NOT run and will not be: the A:81 dry run (%s) sized it "
+            "at N = %s runs per cell for %.2f power at Delta = %.1f, costing ~$%.2f against the "
+            "frozen $%.0f ceiling, and the largest N the ceiling affords is %s at power %.2f. "
+            "A-1.12: \"the PP registers its achievable power and arms UNDERPOWERED rather than "
+            "overrunning\". The claim is neither supported nor refuted; leg A and leg B are null "
+            "because no registered run exists to compute them from."
+            % (EPOCH_ID, sized_by, underpowered.get("recommendedN"),
+               underpowered.get("achievablePower") or 0.0, LEG_A_EFFECT_SIZE,
+               underpowered.get("recommendedUsd") or 0.0, SPEND_CEILING_USD,
+               at_ceiling["n"] if at_ceiling else None,
+               at_ceiling["power"] if at_ceiling else 0.0))
         return ledger
 
     ledger["legBPairsFromPins"] = analysis["legBPairs"]
@@ -1888,6 +1961,12 @@ def main(argv=None):
     parser.add_argument("--pairs-root", default=None,
                         help="where the six W-00x pair directories live (default: "
                              "bench/phase0-agent-native/pairs); a mutation lane sets it")
+    parser.add_argument("--underpowered-from", default=None, metavar="DRY_EPOCH",
+                        help="with --ledger: take A-1.12's registered off-ramp — record "
+                             "UNDERPOWERED because this DRY epoch sized the registered epoch "
+                             "beyond the frozen ceiling. Refused unless that epoch's own sizing "
+                             "block arms it, and refused outright once the registered epoch has "
+                             "run (a collection adjudicates on its own terms).")
     parser.add_argument("--out", default=None)
     args = parser.parse_args(argv)
 
@@ -1903,9 +1982,22 @@ def main(argv=None):
         else:
             print("epoch %s not present under %s — writing the not-run ledger (%s)"
                   % (EPOCH_ID, args.epochs_root, NOT_RUN_REASON))
+        underpowered, sized_by = None, None
+        if args.underpowered_from:
+            if analysis is not None:
+                raise SystemExit("ERROR: %s has run. A collection adjudicates on its own terms; "
+                                 "the sizing off-ramp is for an epoch that never runs."
+                                 % EPOCH_ID)
+            sized_by = os.path.basename(os.path.abspath(args.underpowered_from))
+            underpowered = underpowered_from_sizing(args.underpowered_from)
+            print("A-1.12 off-ramp: %s sized N = %s (power %.2f) against the $%.0f ceiling — "
+                  "recording UNDERPOWERED"
+                  % (sized_by, underpowered.get("recommendedN"),
+                     underpowered.get("achievablePower") or 0.0, SPEND_CEILING_USD))
         out = args.out or LEDGER_PATH
         with open(out, "w", encoding="utf-8") as fh:
-            fh.write(serialize(build_ledger(analysis, pairs_root=args.pairs_root)))
+            fh.write(serialize(build_ledger(analysis, pairs_root=args.pairs_root,
+                                            underpowered=underpowered, sized_by=sized_by)))
         print("wrote %s" % out)
         return 0
 

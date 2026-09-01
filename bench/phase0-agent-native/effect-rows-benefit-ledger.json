@@ -548,7 +548,113 @@
   "routes": null,
   "ownGoal": false,
   "ownGoalCauses": [],
-  "verdict": "NOT-ADJUDICATED",
+  "sizing": {
+    "sizedBy": "w-rows-dry-002",
+    "artifact": "bench/phase0-agent-native/epochs/w-rows-dry-002/ppw-analysis.dry-run.json",
+    "rule": "the smallest N (runs per cell) reaching >= 0.80 power at Delta = 0.5 under the UPPER 95 % confidence bound of the dry run's observed between-pair variance; the dry run sizes N and NEVER moves the bar",
+    "blindPairsObserved": 2,
+    "observedDeltas": [
+      0.0,
+      0.0
+    ],
+    "observedVariance": 0.0,
+    "varianceUpperBound95": 0.0,
+    "costPerRunUsd": 2.0278,
+    "costBasis": "measured on this dry epoch's own paid runs",
+    "priorSpendUsd": 67.5,
+    "priorDryEpochs": [
+      {
+        "epoch": "w-rows-dry-001",
+        "paidRuns": 19,
+        "spendUsd": 26.9461
+      }
+    ],
+    "powerCurve": [
+      {
+        "n": 2,
+        "power": 0.432,
+        "runs": 62,
+        "estimatedUsd": 116.17,
+        "fitsCeiling": true
+      },
+      {
+        "n": 3,
+        "power": 0.48,
+        "runs": 74,
+        "estimatedUsd": 140.5,
+        "fitsCeiling": true
+      },
+      {
+        "n": 4,
+        "power": 0.557,
+        "runs": 86,
+        "estimatedUsd": 164.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 5,
+        "power": 0.64,
+        "runs": 98,
+        "estimatedUsd": 189.17,
+        "fitsCeiling": false
+      },
+      {
+        "n": 6,
+        "power": 0.733,
+        "runs": 110,
+        "estimatedUsd": 213.51,
+        "fitsCeiling": false
+      },
+      {
+        "n": 7,
+        "power": 0.775,
+        "runs": 122,
+        "estimatedUsd": 237.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 8,
+        "power": 0.777,
+        "runs": 134,
+        "estimatedUsd": 262.17,
+        "fitsCeiling": false
+      },
+      {
+        "n": 9,
+        "power": 0.868,
+        "runs": 146,
+        "estimatedUsd": 286.51,
+        "fitsCeiling": false
+      },
+      {
+        "n": 10,
+        "power": 0.895,
+        "runs": 158,
+        "estimatedUsd": 310.84,
+        "fitsCeiling": false
+      },
+      {
+        "n": 11,
+        "power": 0.91,
+        "runs": 170,
+        "estimatedUsd": 335.18,
+        "fitsCeiling": false
+      },
+      {
+        "n": 12,
+        "power": 0.925,
+        "runs": 182,
+        "estimatedUsd": 359.51,
+        "fitsCeiling": false
+      }
+    ],
+    "recommendedN": 9,
+    "recommendedUsd": 286.51,
+    "maxAffordableN": 3,
+    "achievablePower": 0.868
+  },
+  "achievablePower": 0.868,
+  "verdict": "UNDERPOWERED",
   "route": null,
-  "reason": "epoch w-rows-001 has not run; adjudication is at the 0.16.0 release commit (A-1.12: the 0.16.0 release PR's author runs it via run-ppw-epoch.sh)"
+  "reason": "the registered epoch w-rows-001 was NOT run and will not be: the A:81 dry run (w-rows-dry-002) sized it at N = 9 runs per cell for 0.87 power at Delta = 0.5, costing ~$286.51 against the frozen $150 ceiling, and the largest N the ceiling affords is 3 at power 0.48. A-1.12: \"the PP registers its achievable power and arms UNDERPOWERED rather than overrunning\". The claim is neither supported nor refuted; leg A and leg B are null because no registered run exists to compute them from."
 }

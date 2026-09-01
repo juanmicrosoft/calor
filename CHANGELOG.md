@@ -61,7 +61,9 @@ All notable changes to this project will be documented in this file.
   being measured did not happen at all — and the stricter compiler cost about 12 % more
   work to reach a green build, below the threshold we had registered as "noticeable".
   Neither is a result about effect rows yet; both are results about these six tasks.
-  (v0.16 W2)
+  The scorecard now says exactly that, in the place we promised to write the answer:
+  **underpowered — the claim is neither supported nor refuted.** The next release can
+  revisit it with tasks that actually tempt an agent into cheating. (v0.16 W2)
 
 - **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
   Effect checking runs in loops that have a safety limit, so a tangle of functions that

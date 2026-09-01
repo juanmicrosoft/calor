@@ -48,6 +48,16 @@ public class EffectRowsBenefitLedgerTests
 {
     private const string ScriptRelativePath = "bench/phase0-agent-native/ppw-analyze.py";
     private const string LedgerRelativePath = "bench/phase0-agent-native/effect-rows-benefit-ledger.json";
+
+    /// <summary>
+    /// The dry epoch that SIZED the registered one out of its ceiling. A-1.12's
+    /// off-ramp — "the PP registers its achievable power and arms UNDERPOWERED
+    /// rather than overrunning" — is taken from this epoch's sizing block, and
+    /// the flag is what makes the recomputation reproduce the committed bytes.
+    /// Remove it and the ledger falls back to the not-run form, which is the
+    /// point: the off-ramp is explicit, never a script default.
+    /// </summary>
+    private const string SizingEpochRelativePath = "bench/phase0-agent-native/epochs/w-rows-dry-002";
     private const string PairsRelativePath = "bench/phase0-agent-native/pairs";
     private const string EpochRelativePath = "bench/phase0-agent-native/epochs/w-rows-001";
 
@@ -79,7 +89,7 @@ public class EffectRowsBenefitLedgerTests
     {
         var tmp = NewScratch("calor-ppw-ledger-");
         var outPath = Path.Combine(tmp, "recomputed.json");
-        var (exit, log) = RunScript("--ledger", "--out", outPath);
+        var (exit, log) = RunScript("--ledger", "--underpowered-from", Rel(SizingEpochRelativePath), "--out", outPath);
         Assert.True(exit == 0, "ppw-analyze.py --ledger failed:\n" + log);
 
         var recomputed = File.ReadAllText(outPath).Replace("\r\n", "\n", StringComparison.Ordinal);
@@ -97,8 +107,8 @@ public class EffectRowsBenefitLedgerTests
         var tmp = NewScratch("calor-ppw-stable-");
         var first = Path.Combine(tmp, "a.json");
         var second = Path.Combine(tmp, "b.json");
-        Assert.Equal(0, RunScript("--ledger", "--out", first).Exit);
-        Assert.Equal(0, RunScript("--ledger", "--out", second).Exit);
+        Assert.Equal(0, RunScript("--ledger", "--underpowered-from", Rel(SizingEpochRelativePath), "--out", first).Exit);
+        Assert.Equal(0, RunScript("--ledger", "--underpowered-from", Rel(SizingEpochRelativePath), "--out", second).Exit);
         Assert.Equal(File.ReadAllText(first), File.ReadAllText(second));
 
         var text = Committed();
@@ -275,12 +285,12 @@ public class EffectRowsBenefitLedgerTests
         var pairs = CopyPairs(tmp);
 
         var control = Path.Combine(tmp, "control.json");
-        Assert.Equal(0, RunScript("--ledger", "--pairs-root", pairs, "--out", control).Exit);
+        Assert.Equal(0, RunScript("--ledger", "--underpowered-from", Rel(SizingEpochRelativePath), "--pairs-root", pairs, "--out", control).Exit);
         Assert.Equal(Committed(), File.ReadAllText(control).Replace("\r\n", "\n", StringComparison.Ordinal));
 
         Directory.Delete(Path.Combine(pairs, "W-006-map-doubler"), recursive: true);
         var mutated = Path.Combine(tmp, "mutated.json");
-        var (exit, log) = RunScript("--ledger", "--pairs-root", pairs, "--out", mutated);
+        var (exit, log) = RunScript("--ledger", "--underpowered-from", Rel(SizingEpochRelativePath), "--pairs-root", pairs, "--out", mutated);
 
         // Dropping a pair either fails the recomputation outright or changes its bytes.
         // Both are red; what may never happen is a clean run that still reproduces the
@@ -317,19 +327,24 @@ public class EffectRowsBenefitLedgerTests
 
         File.WriteAllText(compilesPath, text.Replace("\"exitCode\": 1", "\"exitCode\": 0", StringComparison.Ordinal));
         var mutated = Path.Combine(tmp, "mutated.json");
-        Assert.Equal(0, RunScript("--ledger", "--pairs-root", pairs, "--out", mutated).Exit);
+        Assert.Equal(0, RunScript("--ledger", "--underpowered-from", Rel(SizingEpochRelativePath), "--pairs-root", pairs, "--out", mutated).Exit);
         Assert.NotEqual(Committed(), File.ReadAllText(mutated).Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 
     // ------------------------------------------------------------- the epoch half
 
     /// <summary>
-    /// Until the 0.16.0 release PR's author runs the epoch, the ledger's
-    /// verdict is NOT-ADJUDICATED with the reason recorded — the PP-E1 pattern
-    /// (a ledger may not carry a verdict its own numbers do not imply).
+    /// The registered epoch never ran, and will not: the A:81 dry run sized it
+    /// past the frozen ceiling, so A-1.12's own off-ramp applies — "the PP
+    /// registers its achievable power and arms UNDERPOWERED rather than
+    /// overrunning". What the ledger may carry in that state is the SIZE and
+    /// nothing else: <c>legA</c> and <c>legB</c> stay null and <c>perCell</c>
+    /// stays empty, because no registered run exists to compute them from, and
+    /// copying the dry collections' own per-cell numbers here would be the
+    /// "dry run recorded in the ledger" the analyzer refuses everywhere else.
     /// </summary>
     [SkippableFact]
-    public void BeforeTheEpochRunsTheVerdictIsNotAdjudicated()
+    public void BeforeTheEpochRunsTheSizingOffRampRecordsUnderpowered()
     {
         Skip.If(Directory.Exists(Rel(EpochRelativePath)),
             "epoch w-rows-001 has been archived; the run assertions below cover it");
@@ -337,11 +352,69 @@ public class EffectRowsBenefitLedgerTests
         using var document = JsonDocument.Parse(Committed());
         var root = document.RootElement;
         Assert.False(root.GetProperty("epochRun").GetBoolean());
-        Assert.Equal("NOT-ADJUDICATED", root.GetProperty("verdict").GetString());
-        Assert.Contains("has not run", root.GetProperty("reason").GetString()!, StringComparison.Ordinal);
+        Assert.Equal("UNDERPOWERED", root.GetProperty("verdict").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("route").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("legA").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("legB").ValueKind);
         Assert.Equal(0, root.GetProperty("perCell").GetArrayLength());
+
+        var reason = root.GetProperty("reason").GetString()!;
+        Assert.Contains("was NOT run and will not be", reason, StringComparison.Ordinal);
+        Assert.Contains("UNDERPOWERED rather than", reason, StringComparison.Ordinal);
+        Assert.Contains("neither supported nor refuted", reason, StringComparison.Ordinal);
+
+        // The size is the whole content of this state, so it is asserted as a size:
+        // what 80 % power demands, what the ceiling affords, and the gap between them.
+        var sizing = root.GetProperty("sizing");
+        var required = sizing.GetProperty("recommendedN").GetInt32();
+        var affordable = sizing.GetProperty("maxAffordableN").GetInt32();
+        Assert.True(required > affordable,
+            $"the off-ramp is only reachable when the required N ({required}) exceeds the "
+            + $"affordable N ({affordable}); at or below it, the epoch runs.");
+        Assert.True(root.GetProperty("achievablePower").GetDouble()
+                    >= document.RootElement.GetProperty("constants").GetProperty("minPower").GetDouble(),
+            "recommendedN is by definition the N that REACHES the power bar; what fails is the "
+            + "ceiling, not the power.");
+        Assert.True(sizing.GetProperty("recommendedUsd").GetDouble()
+                    > root.GetProperty("constants").GetProperty("spendCeilingUsd").GetDouble(),
+            "an off-ramp taken while the recommended N still fits the ceiling would be a "
+            + "workstream declining a test it could afford.");
+        Assert.Equal("w-rows-dry-002", sizing.GetProperty("sizedBy").GetString());
+
+        // Prior spend is cumulative over the proof point — every dry collection, not
+        // just the one that sized it. Forgetting the first cost a whole N step.
+        Assert.Contains("w-rows-dry-001",
+            sizing.GetProperty("priorDryEpochs").EnumerateArray()
+                .Select(e => e.GetProperty("epoch").GetString()!));
+    }
+
+    /// <summary>
+    /// The off-ramp is explicit and guarded: it may not be taken from an epoch
+    /// whose own sizing did not arm it. Without that, "we could not afford it"
+    /// would be a sentence any epoch could be made to say.
+    /// </summary>
+    [SkippableFact]
+    public void TheOffRampIsRefusedByAnEpochThatDidNotArmIt()
+    {
+        var tmp = NewScratch("calor-ppw-offramp-");
+        var epoch = Path.Combine(tmp, "w-rows-dry-fake");
+        Directory.CreateDirectory(epoch);
+
+        // A dry-run analysis whose sizing fits the ceiling: nothing to decline.
+        File.WriteAllText(Path.Combine(epoch, "ppw-analysis.dry-run.json"),
+            """{"dryRun": true, "sizing": {"recommendedN": 2, "armsUnderpowered": false}}""");
+        var outPath = Path.Combine(tmp, "out.json");
+        var (exit, log) = RunScript("--ledger", "--underpowered-from", epoch, "--out", outPath);
+        Assert.True(exit != 0, "the off-ramp was taken from an epoch that did not arm it:\n" + log);
+        Assert.Contains("does not arm UNDERPOWERED", log, StringComparison.Ordinal);
+        Assert.False(File.Exists(outPath), "a refused off-ramp must not write a ledger");
+
+        // And it is a DRY epoch's answer: a live collection adjudicates on its own terms.
+        File.WriteAllText(Path.Combine(epoch, "ppw-analysis.dry-run.json"),
+            """{"dryRun": false, "sizing": {"recommendedN": 9, "armsUnderpowered": true}}""");
+        (exit, log) = RunScript("--ledger", "--underpowered-from", epoch, "--out", outPath);
+        Assert.True(exit != 0, "a non-dry analysis armed the off-ramp:\n" + log);
+        Assert.Contains("is not a dry-run analysis", log, StringComparison.Ordinal);
     }
 
     /// <summary>

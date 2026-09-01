@@ -190,7 +190,39 @@ epoch as registered:
 - **Leg B's point estimate is 1.1175, below the registered margin.** No large loop tax on this
   evidence.
 
-None of this is a verdict, and none of it changes anything A-1.12 froze. What it changes is the
-question in front of the maintainer: whether to spend the remaining allowance on a collection the
-instrument has already priced at 0.48 power, or to adjudicate PP-W-rows on the registered
-UNDERPOWERED route and name W2 in the release notes as roadmap cut line 1 requires.
+## 6. Decision, taken 2026-09-01: the registered off-ramp
+
+**PP-W-rows is recorded UNDERPOWERED. `w-rows-001` was never run and will not be.**
+
+A-1.12 wrote the off-ramp before any of this was known — "if the dry run demands N > 9 for 80 %
+power at Δ = 0.5, the PP registers its achievable power and arms UNDERPOWERED rather than
+overrunning" — and the dry run demanded exactly that. Taking it costs nothing further and is the
+only reading the evidence supports: a collection at the affordable N = 3 would carry 0.48 power,
+so a null result from it could not be told apart from a real effect the design was too small to
+see.
+
+The ledger (`effect-rows-benefit-ledger.json`) records the state and nothing more:
+`epochRun: false`, `verdict: "UNDERPOWERED"`, `route: null`, **`legA` and `legB` null**, `perCell`
+empty — because no registered run exists to compute them from, and copying these dry collections'
+per-cell numbers into those fields would be precisely the "dry run recorded in the ledger" the
+analyzer refuses everywhere else. What it does carry is the SIZE: the power curve, the required
+N, the affordable N, the measured per-run cost, and the cumulative prior spend across both dry
+epochs. Written by `ppw-analyze.py --ledger --underpowered-from <dry epoch>`, which refuses the
+flag unless that epoch's own sizing block arms it and refuses it outright once `w-rows-001` has
+run.
+
+**What is claimed, and what is not.** The claim — *"with rows, fail-closed, agents launder fewer
+effects on callback-heavy code … at no large loop tax"* — is **neither supported nor refuted**.
+Two findings are published beside the verdict as facts about **these six fixtures**, not about
+effect rows:
+
+- **Zero escapes, both arms, every cell, 28 valid runs**, with the registered shape realized in 13
+  of them. The quantity leg A measures did not occur on either compiler.
+- **Leg B point 1.1175** (bound 0.8634, CV 0.2520) — below the registered 1.20 margin. No large
+  loop tax on this evidence.
+
+**Carried to 0.16.x / 0.17.** The fixtures are the thing to fix: six tasks that agents complete
+honestly cannot measure whether a compiler stops dishonesty. Re-registering a task set that
+actually creates laundering pressure is a supersession under A:90-92 — the ~20 % first-collection
+realization rate and the 28-run zero are the "documented empirical defect in the protocol" that
+rule requires — and it belongs to a release that can afford the collection, not to 0.16.0.
