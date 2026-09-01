@@ -1,18 +1,21 @@
 # Roadmap — v0.17 "Reach, and the Rows We Shipped"
 
 **Date:** 2026-09-01
-**Status:** **Draft v2** — one adversarial round (§10), three lenses, eleven findings, all
-applied. Two Majors were plan/process and one was measurement; the round was **self-conducted**,
-which is stated as a limitation in §10 rather than hidden. The v0.16 roadmap reached Draft v4
-through three rounds; **rounds 2 and 3 are still owed** and this document is not comparable until
-they have run.
+**Status:** **Draft v3** — two adversarial rounds (§10). Round 1: self-conducted, twelve findings,
+all applied. **Round 2: independent (cloud multi-agent), and it found that two of round 1's twelve
+"Applied" dispositions were only half-applied** — which is the finding a self-review structurally
+cannot make. Nine round-2 findings applied, two recorded as stale-base artifacts with evidence.
+The v0.16 roadmap reached Draft v4 through three rounds; **round 3 is still owed.**
 **Written against:** `cb68afcf` (main after PR #1140), with PP-W-rows adjudicated in PR #1145.
 `Directory.Build.props:3` reads `0.15.0`; **v0.16.0 has not been released**, and every number
 below is measured at the 0.16 branch cut, not after it.
-**Governing inputs:** `roadmap-v0.16.md` (*R:*), `2026-09-01-ppw-rows-dry-run.md` (*W:*),
-`docs/design/effect-rows-in-the-type-system.md` (*D:*), `docs/plans/agent-native-gates.md` (*A:*,
-read-only), issue #1136's measured table, the four corpus ledgers under
-`bench/phase0-agent-native/`, and the open issue list on 2026-09-01.
+**Governing inputs:** `roadmap-v0.16.md` (*R:*), **`roadmap-v0.13-v0.15.md` (*R15:*)** — v0.16's
+own *R:*, which is why several ranges copied from it resolve there and not against *R:* —
+`2026-09-01-ppw-rows-dry-run.md` (*W:*), `docs/design/effect-rows-in-the-type-system.md` (*D:*),
+`docs/plans/agent-native-gates.md` (*A:*, read-only), **`2026-08-27-v0.15-e4-notes.md` (*e4:*) and
+`-e5-notes.md` (*e5:*), `2026-08-27-v0.16-s1-s2-measurement-notes.md` (*N:*)**, issue #1136's
+measured table, the four corpus ledgers under `bench/phase0-agent-native/`, and the open issue list
+on 2026-09-01.
 
 ---
 
@@ -26,7 +29,7 @@ the #1104 recursion bound), W4 (turn attribution), W5 (Calor0406 at both caps, `
 at `ProcessScc`), `CalorPermissiveEffects` through `Calor.Tasks`, and the kickoff sweep (ES-08
 registered, #982/#981/#976/#949 dispositioned).
 
-**Not built, carried again:** gate 5 leg (b)'s `compile-all-committed-calr` job (R:938-940) and
+**Not built, carried again:** gate 5 leg (b)'s `compile-all-committed-calr` job (R15:996) and
 gate 3's CLI-process and `Calor.Sdk` legs (issue #1116). **0.16's SHOULD tier did not ship:** W6
 (the Calor0422/0423 and Calor0208 losses), W7 (`FunctionBoundType.Row` end-to-end), W8 (index
 parity with `calor build`).
@@ -104,7 +107,7 @@ Measured over the three A-1.5.3 conversion subjects at their pinned submodule co
 | Calor0425 dominant cause | `ExternalBase` **53 of 90 = 59 %** (serilog 13, FV 40); `RowlessDestination` 11, all `RowlessInvoked`; `InvocationRowless` 26 | same |
 | Calor0270 (SignatureUnresolved), raw-bag rule | 315 over 39 of 364 | `calor0270-corpus-ledger.json` |
 | Metadata resolution (gate 6) | **817 / 1248 = 65.46 %** — MediatR **129/226 = 57.08 %**, serilog 104/113 = 92.04 %, FV 584/909 = 64.25 % | `metadata-binding-corpus-ledger.json` |
-| Higher-order demand | D-A **2**; D-B **3121** over 364 files (2676 lambdas, 311 delegate-typed declarations, 132 delegate invocations) | `higher-order-demand-ledger.json` |
+| Higher-order demand | D-A **2**; D-B **3121** over 364 files (2676 lambdas, 311 delegate-typed declarations, 132 delegate invocations, **2 delegate declarations**) | `higher-order-demand-ledger.json` |
 | Resolver keys | 265 bound / 814 string | `effect-resolver-key-ledger.json` |
 
 **Two numbers carry this release.** W3(a) took parse failures to **zero** — gate 9's floor was
@@ -225,7 +228,7 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
 regression-only for this release, named in the release notes — not silently re-tiered. R1 may not
 be cut: it is the measurement every other reach claim is floored against.
 
-**Cut line 3 — R2 measured, attempted, and immovable.** Draft v1 defined no outcome for the case
+**Cut line 2 — R2 measured, attempted, and immovable.** Draft v1 defined no outcome for the case
 where R1 names a cluster and R2 cannot move it inside the release; a MUST with no failure route is
 a MUST that will be quietly redefined. The registered route: R2 publishes **what it attempted and
 what the cluster cost**, `ModulesEnforced` stays at its floor, **PP-R1 reads MISS on leg 1** — not
@@ -255,12 +258,12 @@ cluster is a finding, not an excuse.
   motivated the SHOULD is real and is handled by sequencing instead: (b) is a fail-closed change to
   a shipped diagnostic and will produce new errors on converted code whose size is unknown until
   R1 measures it, so **S1 lands after R1 and reports the new-error count per subject in its own
-  PR**. *Cut line 2:* if that count is large enough that S1 cannot land inside the release, S1
+  PR**. *Cut line 3:* if that count is large enough that S1 cannot land inside the release, S1
   slips **with §1's claim scoped down in the same commit** — the claim and the tier move together
   or neither moves.
 
 ### 3.3 SHOULD
-- **S2 — W7 carried: `FunctionBoundType.Row` end-to-end** (R:710-720; D:2700-2708) and
+- **S2 — W7 carried: `FunctionBoundType.Row` end-to-end** (R15:747; D:2700-2708) and
   lambda-parameter rows (lambda parameters invoked in-lambda → Calor0411). Row-family; the reader
   S1(a) needs for `§PROP` overlaps it.
 - **S3 — W8 carried: index parity with `calor build`**, interface members indexed, the index-build
@@ -349,9 +352,10 @@ leg (b) unbuilt), 6 (**resolution floor — two legs, because a floor at today's
 content is "must move": (i) regression, ≥ 65.46 % aggregate and no subject below its own current
 figure, two-sided as it has always been; (ii) movement, the aggregate strictly above 65.46 % at the
 release commit, which is PP-R1's leg 2 and reds gate 6 if R3 lands as a no-op**),
-7 (index/query goldens including E7's leg), 8 (harness capture), 9 (**conversion denominator,
-re-set on the measurement: `ExcludedParseFailed` = 0 and `ModulesEnforced` ≥ 304, exact per
-subject**), 11 (non-convergence coverage — Calor0406 at both caps), 12 (turn attribution over
+7 (index/query goldens including E7's leg), 8 (harness capture), 9 (**conversion denominator, re-set on the measurement:
+`ExcludedParseFailed` = 0, and `ModulesEnforced` ≥ 304 aggregate with MediatR ≥ 31 and serilog ≥ 88
+exact and FluentValidation ≥ 179 — the SAME floors §4.1 registers, because two pre-registered
+floors over one measurement is how a release gets opposite verdicts from its own instruments**), 11 (non-convergence coverage — Calor0406 at both caps), 12 (turn attribution over
 every archived epoch).
 
 **Gate 10 (PP-W-rows) is closed as UNDERPOWERED** and does not gate 0.17; the ledger is a
@@ -373,21 +377,21 @@ regression pin only — its bytes must not change without a registered cause.
 
 | Item | Source | Trigger | Venue |
 |---|---|---|---|
-| Gate 3's CLI-process and `Calor.Sdk` legs unbuilt | R:916-932; #1116 | — | 0.17: unconditional, with gate 3 claiming only its built legs until then |
-| Gate 5 leg (b) never built | R:938-940 | — | 0.17.x; gate 5 claims leg (a) only |
-| `FunctionBoundType.Row` no end-to-end reader | R:710-720; D:2700-2708 | — | 0.17 SHOULD S2 |
+| Gate 3's CLI-process and `Calor.Sdk` legs unbuilt | #1116 (R15's line range drifted; the issue is the durable anchor) | — | 0.17: unconditional, with gate 3 claiming only its built legs until then |
+| Gate 5 leg (b) never built | R15:996 | — | 0.17.x; gate 5 claims leg (a) only |
+| `FunctionBoundType.Row` no end-to-end reader | R15:747; D:2700-2708 | — | 0.17 SHOULD S2 |
 | Lambda params invoked in-lambda → Calor0411 | e4:255-259 | — | 0.17 SHOULD S2 |
 | Index folds cross-module charges; interface methods unindexed; index-build cost unmeasured | e5:256-275 | — | 0.17 SHOULD S3 |
 | Calor0422/0423 (effect contract unavailable) | N:S2.2; R1's breakdown | — | 0.17 SHOULD S4 |
-| Calor0410 demoted under `--permissive-effects` | e4:246-248 | PP-W-rows is closed, so the freeze that protected it has lapsed | **re-adjudicate in 0.17** — the arm it was frozen for no longer exists |
+| Calor0410 demoted under `--permissive-effects` | e4:246-248 | **the 0.16.0 release commit** — R:§6's actual end condition, which has not happened | frozen; re-adjudicated **after 0.16.0 ships**, not before. PP-W-rows' arm A was the freeze's *rationale*, not its end condition, and a frozen rule may not be released early because its rationale weakened (§9) |
 | **`ExternalBase` — 53 of 90 Calor0425 diagnostics (59 %), an override or interface implementation reaching an external base** | §0.4; `Calor0425CorpusLedgerTests.cs:43-46` | **none until now** — carried unassigned through 0.15 and 0.16 | **0.17: R1 reports it per subject; a venue is registered in the 0.17 release notes from that breakdown.** Not the IL-rows class, so IL rows' trigger does not cover it |
 | **Calor0411 over the corpus is uncounted** — the unresolved-receiver class never reaches the Calor0425 ledger by construction | `Calor0425CorpusLedgerTests.cs:57-60` | — | **0.17 R1**, unconditional: the IL-rows trigger cannot be read again against a partial denominator |
 | `ρ_body` under-approximation on an escaping lambda | e4:230-234 | a fixture measured silent | DEFERRED |
 | `§FLD`/`§B` rows not index positions; hover declared-only | e5:168-175 | — | 0.17.x |
 | Solution-level manifests not consulted by the index | e5:256-258 | a corpus solution with manifests | 0.17.x |
 | #965 perf suite kills the CI runner; runs only on the release path | #965 | recurrence on the 0.16.0 release | **release-blocking for 0.17.0 if it recurs**; §9 asks for the 0.16.0 observation, and records an exit-143 kill on the `tests (compiler)` shard (run `33546049628`) that widens the issue beyond the perf suite |
-| Flake cluster #948, #959, #884, #859, #1135 | R:978-984 | flake rate attached at the branch cut | §9 — **overdue**, was due at the 0.16 branch cut |
-| 3.5.1 null-state slice; #845; #970 tri-state; TIER1A not-run | R:978-984 | maintainer | 0.17.x instrument debt |
+| Flake cluster #948, #959, #884, #859, #1135 | R15:1040; R:§7 | flake rate attached at the branch cut | §9 — **overdue**, was due at the 0.16 branch cut |
+| 3.5.1 null-state slice; #845; #970 tri-state; TIER1A not-run | R15:1040 | maintainer | 0.17.x instrument debt |
 | #901 stale benchmark subjects; #929 parser dedent; #943 ref/out call syntax; #906 interpolation invisible to the binder | issue list | — | 0.17.x; #943 is a language addition, not a fix |
 | #1139 `§YIELD` in a property accessor; #1132 `§ARR2D` name mismatch; #1121, #1131, #1134, #1142, #1143, #1144 | issue list | — | 0.17.x housekeeping |
 | PP-W-rows fixture redesign | W:§6 | A:90-92 supersession registered first | **0.18** |
@@ -398,7 +402,7 @@ regression pin only — its bytes must not change without a registered cause.
 
 | Issue | Disposition |
 |---|---|
-| #1136 | **0.17 SHOULD S1** — the fix set entire; a partial fix is refused by the issue itself |
+| #1136 | **0.17 MUST S1** — the fix set entire; a partial fix is refused by the issue itself |
 | #1128, #1137, #1118, #1127 | **0.17 MUST R4**; #1137/#1118 share one root cause and unblock PP-S1's inherited-field shape |
 | #875, #1082 | 0.17 MUST R3, sequenced behind the measurement |
 | #1116 | 0.17 unconditional (gate 3's remaining legs) |
@@ -471,16 +475,18 @@ the GitHub issue states — not against the prose. **Rounds 2 and 3 are still ow
 document is Draft v2, not final.
 
 **Verdict:** MEASUREMENT — *needs-fixes*, one Major. PLAN/PROCESS — *needs-fixes*, two Majors.
-ENGINEERING — *approve with fixes*. All eleven findings **applied**; none declined.
+ENGINEERING — *approve with fixes*. All **twelve** findings **applied**; none declined.
+*(Draft v2 said "eleven" here and in its own status line — the table has always had twelve rows.
+Round 2 caught it; see R2-c below.)*
 
 | # | Lens | Finding | Disposition |
 |---|---|---|---|
 | **M1** | measurement | **The instrument has a blind spot the draft read straight past.** `Calor0425CorpusLedgerTests.cs:57-60` states that the unresolved-receiver class *never reaches Calor0425* — it goes out as **Calor0411** — and **no committed ledger counts Calor0411 over the corpus**. "Every trigger reads zero" was therefore partly a statement about where the instrument looks. *The attack that failed:* the trigger's named fields were checked against their definitions and **do** still mean what its author meant (`InvocationUndetermined` is defined as "§13.4's 'BCL-returned delegate'" verbatim), so the trigger is correctly specified — only its denominator is partial. | **Applied.** §0.3 discloses it; **R1 adds the Calor0411 corpus count**; §6 carries it unconditionally; §2 and §3.3 reworded (n11). |
 | **M2** | process | **The draft released a frozen rule early.** §6 and §9 claimed the `--permissive-effects` Calor0410 freeze "has lapsed" because PP-W-rows closed. R:§6 freezes it **through the 0.16.0 release commit**, which has not happened; PP-W-rows' arm A was the freeze's *rationale*, not its end condition. Releasing a freeze because its rationale weakened is exactly the post-hoc loosening the discipline exists to prevent — and the draft did it to itself, unprompted, in its first hour. | **Applied.** §6's trigger restated to the real end condition; §9's "fourth adjudication" withdrawn and corrected in place, with the error left visible. |
-| **M3** | plan | **A release claim backed by a SHOULD.** §1 registers *"every argument shape in #1136's table is either charged or refused"* as half the release claim while §3.2 tiered S1 as SHOULD. A slipped SHOULD would make §1 false and leave PP-S1 with nothing to adjudicate and no route for it. | **Applied.** S1 promoted to **MUST**. The real concern behind the SHOULD (unknown new-error volume) is handled by sequencing S1 behind R1 and reporting the count per subject, plus **cut line 2**: if S1 slips, §1's claim is scoped down *in the same commit*. |
+| **M3** | plan | **A release claim backed by a SHOULD.** §1 registers *"every argument shape in #1136's table is either charged or refused"* as half the release claim while §3.2 tiered S1 as SHOULD. A slipped SHOULD would make §1 false and leave PP-S1 with nothing to adjudicate and no route for it. | **Applied.** S1 promoted to **MUST**. The real concern behind the SHOULD (unknown new-error volume) is handled by sequencing S1 behind R1 and reporting the count per subject, plus **cut line 3**: if S1 slips, §1's claim is scoped down *in the same commit*. |
 | m4 | measurement | **PP-R1 had no effect size.** "Exceeds 304" makes a one-module improvement a HIT while §1 claims *materially more*. PP-E1 and PP-W-rows both registered Δ and power; this did not. | **Applied.** The size cannot honestly be written before R1 names the cluster, so it is a **deferred registration with a named deadline and deriver** — R1's PR, before R2 merges — and **PP-R1 has no HIT until it lands**. An `UNDERPOWERED` outcome is added for "the corpus cannot supply the effect", so the release cannot discover that after the fact. |
 | m5 | measurement | **Exact floors on all three subjects dropped gate 9's own slack precedent** (`FloorRule.Note`: *"the per-subject MediatR/serilog floors are EXACT and the slack sits in FluentValidation"*) with no stated reason. One reclassified module in the largest subject would red the gate. | **Applied.** MediatR ≥ 31 and serilog ≥ 88 exact; FluentValidation ≥ 179. |
-| m6 | plan | **R2 had no failure route.** No outcome was defined for "R1 named the cluster, R2 could not move it". A MUST with no failure route is a MUST that gets quietly redefined. | **Applied.** **Cut line 3**: R2 publishes what it attempted and what the cluster cost, PP-R1 reads **MISS** on leg 1 — not NOT-ADJUDICATED, the instrument worked and the answer was no — and the cluster is re-registered with its measured size. |
+| m6 | plan | **R2 had no failure route.** No outcome was defined for "R1 named the cluster, R2 could not move it". A MUST with no failure route is a MUST that gets quietly redefined. | **Applied.** **Cut line 2**: R2 publishes what it attempted and what the cluster cost, PP-R1 reads **MISS** on leg 1 — not NOT-ADJUDICATED, the instrument worked and the answer was no — and the cluster is re-registered with its measured size. |
 | m7 | measurement | **Gate 6 as restated could not gate its own MUST.** "≥ 65.46 %" is the current value, so the gate was regression-only while R3's content is "must move". | **Applied.** Gate 6 split into a regression leg and a **movement leg**; R3 landing as a no-op now reds the gate. |
 | m8 | measurement | **The largest row-adjacent number in the tree was unassigned.** `ExternalBase` holds **53 of 90** Calor0425 diagnostics (59 %) and has carried through 0.15 and 0.16 with no trigger, no venue and no residual row. It is *not* the IL-rows class — E3b re-bucketed schema 1's four `UnknownSource` entries into it — so IL rows' trigger does not cover it. | **Applied.** §0.4 states the share and the distinction; R1 reports it per subject; §6 gives it a row and the 0.17 release notes a venue. |
 | n9 | fact | §7 listed **#1094 as "closed by 0.16"**. It is **OPEN** (verified on GitHub). W1 shipped its content in PR #1119. | **Applied.** Its own row: close it with the release, or say why it is not done. |
@@ -496,3 +502,43 @@ read. A reviewer who has not seen this session should recompute `UnknownSource`,
 committed JSON before relying on §0.3. It also did not attack §8 or the tier boundary between R3
 and R4, and it found nothing in §3.1 R4 — which for a batch of four issues is more likely to mean
 the lens missed something than that the batch is clean.
+
+
+### Round 2 — 2026-09-01, independent (cloud multi-agent), on Draft v2
+
+**Not conducted by the author.** Round 1 predicted its own weakest point — *"a self-review cannot
+find an error whose cause is a misunderstanding the reviewer shares"* — and round 2 hit it
+squarely: its central finding is that **two of round 1's twelve "Applied" dispositions were applied
+to only one of the two sites they named**, leaving the document contradicting itself and §10's
+verdict false against the tree. No amount of further self-review would have found that.
+
+Three merged findings, all filed *nit* by severity and none of them cosmetic in effect. **Nine
+sub-findings applied; two recorded as stale-base artifacts.**
+
+| # | Finding | Disposition |
+|---|---|---|
+| **R2-a** | **Round 1's m5 was half-applied.** The FluentValidation slack floor (≥ 179) landed in §4.1 PP-R1 but §5 gate 9 still read *"`ModulesEnforced` ≥ 304, exact per subject"*. Round 2 supplied the splitting measurement: MediatR 36 / serilog 88 / FV 180 / aggregate 304 is a **PP-R1 HIT and a gate 9 RED** — one measurement, two pre-registered floors, opposite verdicts, which is the exact failure pre-registration exists to prevent. | **Applied.** Gate 9 now carries §4.1's floors verbatim, with the reason stated inline. |
+| **R2-b** | **Round 1's M2 was half-applied.** The Calor0410-freeze correction landed in §9 but §6's row still read *"PP-W-rows is closed, so the freeze that protected it has lapsed \| re-adjudicate in 0.17"* — **verbatim the wording M2 flagged as "the post-hoc loosening the discipline exists to prevent"**. The document asserted three inconsistent things about one rule. *Cause, for the record:* the edit script carrying that fix aborted on a later assertion before writing, and the retry covered only §9. | **Applied.** §6's Trigger and Venue now mirror §9's corrected end condition. |
+| **R2-c** | §7 still tiered **#1136 as "SHOULD S1"** after round 1's M3 promoted it to MUST — a third half-applied fix, in the same sweep. And the header and §10 verdict both said **"eleven findings"** where the table has always had **twelve** rows (M1–M3, m4–m8, n9–n12); the wrong count reached the commit message too. | **Applied.** §7 reads MUST; the count is corrected in both places with the error named. |
+| **R2-d** | **Four copied `R:` line ranges do not resolve.** v0.16's *R:* was `roadmap-v0.13-v0.15.md`; Draft v1 redefined *R:* as `roadmap-v0.16.md` and then copied v0.16's citations verbatim. R:938-940 / R:916-932 / R:978-984 point past `roadmap-v0.16.md`'s EOF (767 lines), and R:710-720 resolves to v0.16's **round-2 review table**, not the `FunctionBoundType.Row` claim. | **Applied.** **`R15:` added to Governing Inputs** and each range re-anchored *by grep, not by arithmetic*: `compile-all-committed-calr` → R15:996, `FunctionBoundType.Row` → R15:747, the 3.5.1 row → R15:1040. Gate 3's range is dropped for **#1116**, a durable anchor, because the line range had drifted and a citation nobody can check is worse than none. |
+| **R2-e** | **`e4:`, `e5:` and `N:` are used in §6 but never defined** — v0.16 declared them and Draft v1 dropped them while keeping the citations. | **Applied.** All three added to Governing Inputs. |
+| **R2-f** | §0.4's D-B parenthetical enumerates 2676 + 311 + 132 = **3119** against a stated total of **3121**; the missing 2 is `delegateDeclarations` in the ledger. | **Applied.** The parenthetical now lists all four components. |
+| **R2-g** | Cut lines are defined in prose order **1, 3, 2**, and §10 m6 cites "Cut line 3" for the one in §3.1. | **Applied.** Renumbered to prose order; §10 m6's reference updated with them. |
+| **R2-h** | *"`2026-09-01-ppw-rows-dry-run.md` does not exist in the repo or git history, so every `W:` citation is unresolvable and the N = 9 / \$287 / 28-run-zero / leg-B 1.1175 numbers cannot be reproduced from any committed source."* | **Stale-base artifact, not applied.** The file was merged to `main` in **PR #1145** (`82a7c653`) — `git ls-tree origin/main docs/plans/2026-09-01-ppw-rows-dry-run.md` returns blob `8a4130d3`. The review was launched against a base that predated the merge; this was flagged as a likely artifact *before* the round ran, for exactly this reason. **No change made, and no credit taken:** the finding is correct about its own tree and would have been a Major on it. |
+| **R2-i** | *"`effect-rows-benefit-ledger.json` does not exist — the file with legA/legB fields is `effect-rows-probe-ledger.json`, which is PP-E1 data and non-null, so the present-tense claim is misleading."* | **Stale-base artifact, not applied.** Same cause: merged in PR #1145, `git ls-tree origin/main` returns blob `d25c6e40`, and its `legA` / `legB` are null with `verdict: "UNDERPOWERED"` as §0.2 states. The reviewer's *distinction* is nonetheless correct and worth keeping in view — `effect-rows-probe-ledger.json` is PP-E1's, non-null, and a different instrument. |
+
+**What round 2 changes about how to read round 1.** Round 1's eleven — twelve — findings were
+real and its analysis held up; what failed was **its own application step**, three times out of
+twelve, in a way it then certified as complete. The lesson is narrow and worth keeping: a review
+that both finds and applies its own findings needs a separate pass that re-reads the tree for each
+disposition, or an independent round to do it. Round 3 should verify **every** round-1 and round-2
+disposition against the tree before looking for anything new.
+
+### What round 2 did not do
+
+It did not recompute the four trigger numbers in §0.3 from the committed JSON — the anti-anchoring
+task round 1 named as its own first gap is **still open**. It did not attack §8, the R3/R4 tier
+boundary, or R4's four-issue batch, all of which round 1 also left alone; two rounds have now
+passed over R4 without a finding. And it did not examine the new mechanisms round 1 introduced —
+cut lines 2 and 3, the deferred effect-size registration, PP-R1's `UNDERPOWERED` outcome — which
+remain reviewed by nobody.
