@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-01
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32 (Calor leads)
+- **Metrics**: Calor wins 7 categories, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (Calor)
+  - ErrorDetection: 1.49x (Calor)
+  - TokenEconomics: 1.42x (Calor)
+  - RefactoringStability: 1.38x (Calor)
+  - InformationDensity: 0.98x (C#)
+- **Programs Tested**: 217
+- **Note**: unchanged from 0.14.0-0.15.0. This suite does not exercise effect
+  rows at all (1 of 359 golden files has a function-typed shape, and the
+  conversion tests never run the effect pass), so it is a regression indicator
+  for this release, not a measurement of it.
+
+### Changes
+
+
 ### Added
 
 - **The scorecard for the "do effect rows actually help?" experiment now exists, and it is
