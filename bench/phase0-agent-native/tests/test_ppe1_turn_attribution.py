@@ -107,7 +107,14 @@ class ArchiveAttribution(unittest.TestCase):
         self.assertEqual(by_name["e1a-attribution"]["shapeEligibleRuns"], 180)
         self.assertEqual(by_name["w4-dryrun-001"]["shapeEligibleRuns"], 0)   # bundle-runner shape
         self.assertEqual(by_name["feasibility-dry-001"]["shapeEligibleRuns"], 0)
-        self.assertEqual(self.report["shapeEligibleRunsNotAttributed"], 553)
+        # The PP-W-rows dry collections: `kind: pp-w-rows` is not a PP-E1/W5 kind, so
+        # their runs are COUNTED as shape-eligible and never attributed. They are what
+        # moved this total from 553: 36 (w-rows-dry-001, truncated by the weekly usage
+        # limit at 19 billed) + 18 (w-rows-dry-002, the pairs it never reached) = 54.
+        self.assertEqual(by_name["w-rows-dry-001"]["shapeEligibleRuns"], 36)
+        self.assertEqual(by_name["w-rows-dry-002"]["shapeEligibleRuns"], 18)
+        self.assertEqual(by_name["w-rows-smoke-null"]["shapeEligibleRuns"], 0)
+        self.assertEqual(self.report["shapeEligibleRunsNotAttributed"], 553 + 54)
 
     def test_committed_json_equals_a_fresh_recomputation(self):
         with open(COMMITTED, encoding="utf-8") as fh:
