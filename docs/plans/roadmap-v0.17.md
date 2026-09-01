@@ -480,12 +480,17 @@ listed here as questions, not as assumptions:
    **exit 143** — `##[error]The runner has received a shutdown signal` — after 10m33s with **zero
    test failures** in its log (every result line reads `Passed`). That is the exit-143 signature
    #965 names, on a *different* shard from the perf suite, which widens the issue rather than
-   confirming it: whatever kills the runner is not specific to `Calor.Performance.Tests`. **It did
-   not reproduce**: re-running the same job on the same tree went green. So the two behaviours are
-   distinct and should not be filed together — #965 claims a *reproducible* kill of the perf
-   suite, and this was an *intermittent* kill of a shard that passes on retry, which is the
-   #959 / #948 shape. Recorded here as an observation, not as an adjudication; the flake rate §9.2
-   asks for is what would tell them apart.
+   confirming it: whatever kills the runner is not specific to `Calor.Performance.Tests`. It did
+   **not** reproduce on retry — the same job on the same tree went green. **But it then happened a
+   second time the same day**, on the *release* PR #1147 (run `33565838496`, `tests (compiler)`
+   again, killed at 8m26s with **7,040 passing result lines and zero test failures**). So the
+   honest reading has moved once already and is now: **two exit-143 kills of the same shard, on
+   two different trees, within one day, each passing on retry.** That is still the *intermittent*
+   shape (#959 / #948) rather than #965's *reproducible* kill of the perf suite — the two remain
+   distinct and should not be filed together — but a rate of two in a day on a release-path shard
+   is not the rare flake the first observation suggested. **This is exactly why §9.2's flake rate
+   is the deliverable**: two data points already moved the reading twice, and no one is counting.
+   Recorded as an observation, not an adjudication.
 
 A fourth is **not** created by this draft, and Draft v1's first version of it was wrong. The
 **`--permissive-effects` demotion of Calor0410** (§6) is frozen **through the 0.16.0 release
