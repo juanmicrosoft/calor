@@ -221,7 +221,9 @@ internal sealed class MetadataContext : IDisposable
         // write these calls, and lets Roslyn's overload resolution do the
         // right thing when both instance and static overloads coexist
         // (rare in BCL but possible).
-        var methodGroup = receiverType.GetMembers(methodName).OfType<IMethodSymbol>().ToArray();
+        // v0.17 R3 — the group is taken over the receiver's whole inheritance
+        // surface, not its own declarations alone. See MetadataMemberLookup.
+        var methodGroup = MetadataMemberLookup.MethodGroup(_hostCompilation, receiverType, methodName);
         var hasStatic = methodGroup.Any(m => m.IsStatic);
         var hasInstance = methodGroup.Any(m => !m.IsStatic);
         string receiverExpr;
@@ -455,3 +457,142 @@ internal sealed class MetadataContext : IDisposable
 /// value / out / ref / in parameters correctly (CS1620 otherwise).
 /// </summary>
 internal readonly record struct MetadataArgument(ITypeSymbol Type, RefKind RefKind = RefKind.None);
+
+/// <summary>
+/// v0.17 R3 — member lookup over the receiver's whole inheritance surface.
+///
+/// <para>Both metadata resolution paths used to compute their method group with
+/// <c>receiverType.GetMembers(name)</c>, which returns only the members
+/// <em>declared</em> on that one type. An empty group short-circuited to
+/// "Receiver 'X' has no member named 'Y'." <em>without ever asking Roslyn</em> —
+/// so every inherited member was reported unresolvable:</para>
+/// <list type="bullet">
+///   <item><description><c>IValidator.GetType()</c> — declared on
+///   <c>System.Object</c>, and an interface has no <c>BaseType</c>.</description></item>
+///   <item><description><c>MethodInfo.Invoke(…)</c>, <c>Task&lt;T&gt;.Wait()</c> —
+///   declared on a base class.</description></item>
+///   <item><description><c>IList&lt;T&gt;.Add(item)</c> — declared on the base
+///   interface <c>ICollection&lt;T&gt;</c>.</description></item>
+///   <item><description><c>TProperty.CompareTo(other)</c> — reached through a
+///   type-parameter constraint.</description></item>
+///   <item><description><c>Severity.ToString()</c> — an enum reaching
+///   <c>System.Enum</c> → <c>ValueType</c> → <c>Object</c>.</description></item>
+/// </list>
+/// <para>The group is now taken over the full lookup surface. Roslyn still does
+/// the overload resolution; this only decides whether it gets asked at all, and
+/// whether the probe is written in static or instance form.</para>
+/// </summary>
+internal static class MetadataMemberLookup
+{
+    /// <summary>
+    /// The methods named <paramref name="methodName"/> visible on
+    /// <paramref name="receiverType"/>, including inherited ones.
+    /// </summary>
+    public static IMethodSymbol[] MethodGroup(
+        Compilation compilation,
+        ITypeSymbol receiverType,
+        string methodName)
+    {
+        var group = new List<IMethodSymbol>();
+        foreach (var type in LookupSurface(compilation, receiverType))
+        {
+            foreach (var member in type.GetMembers(methodName))
+            {
+                if (member is IMethodSymbol method)
+                {
+                    group.Add(method);
+                }
+            }
+        }
+        return group.ToArray();
+    }
+
+    /// <summary>
+    /// The types that actually declare a method named
+    /// <paramref name="methodName"/> reachable from
+    /// <paramref name="receiverType"/>, most-derived first, excluding the
+    /// receiver itself. Used as probe receivers when the receiver's own name
+    /// does not exist in the probe compilation.
+    /// </summary>
+    public static IEnumerable<ITypeSymbol> DeclaringTypes(
+        Compilation compilation,
+        ITypeSymbol receiverType,
+        string methodName)
+    {
+        var seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default)
+        {
+            receiverType,
+        };
+        foreach (var type in LookupSurface(compilation, receiverType))
+        {
+            if (!seen.Add(type)) continue;
+            if (type.GetMembers(methodName).OfType<IMethodSymbol>().Any())
+            {
+                yield return type;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Every type whose members participate in a member lookup on
+    /// <paramref name="receiverType"/>. Ordered most-derived first; deduplicated.
+    /// </summary>
+    private static IEnumerable<ITypeSymbol> LookupSurface(
+        Compilation compilation,
+        ITypeSymbol receiverType)
+    {
+        var seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var surface = new List<ITypeSymbol>();
+
+        void Add(ITypeSymbol? type)
+        {
+            if (type is null || type.TypeKind == TypeKind.Error) return;
+            if (!seen.Add(type)) return;
+            surface.Add(type);
+        }
+
+        void AddWithBases(ITypeSymbol type)
+        {
+            Add(type);
+            for (var b = type.BaseType; b is not null; b = b.BaseType)
+            {
+                Add(b);
+            }
+            foreach (var iface in type.AllInterfaces)
+            {
+                Add(iface);
+            }
+        }
+
+        switch (receiverType)
+        {
+            // A type parameter declares nothing of its own: its members are
+            // whatever its constraints supply, plus System.Object's.
+            case ITypeParameterSymbol typeParameter:
+                foreach (var constraint in typeParameter.ConstraintTypes)
+                {
+                    AddWithBases(constraint);
+                }
+                break;
+
+            // An array's members come from System.Array and the generic
+            // collection interfaces the runtime grafts onto it.
+            case IArrayTypeSymbol array:
+                Add(compilation.GetSpecialType(SpecialType.System_Array));
+                foreach (var iface in array.AllInterfaces)
+                {
+                    Add(iface);
+                }
+                break;
+
+            default:
+                AddWithBases(receiverType);
+                break;
+        }
+
+        // Every receiver bottoms out at System.Object — interfaces and type
+        // parameters have no BaseType chain that reaches it.
+        Add(compilation.GetSpecialType(SpecialType.System_Object));
+        return surface;
+    }
+}

@@ -376,6 +376,18 @@ public static class TypeIdentity
     };
 
     /// <summary>
+    /// v0.17 R2, round-4 finding — is <paramref name="canonical"/> one of the
+    /// built-in spellings <see cref="Canonicalize(string)"/> produces? The
+    /// binder used to answer this by asking whether every letter was upper
+    /// case, which is false for every decorated form (<c>FLOAT[bits=32]</c>,
+    /// <c>INT[bits=8][signed=true]</c>). Callers pass the head with array,
+    /// pointer and nullable decorators already stripped.
+    /// </summary>
+    public static bool IsBuiltinCanonicalName(string canonical) =>
+        ProvablyNonFunctionCanonicalNames.Contains(canonical)
+        || string.Equals(canonical, "OPTION", StringComparison.Ordinal);
+
+    /// <summary>
     /// v0.15 E3 slice a, review round 1 (F2) — "is this type PROVABLY not a
     /// function type?", the conservative complement of
     /// <see cref="IsFunctionTypeName"/>.
@@ -1680,6 +1692,16 @@ public sealed class Scope
                     .Select(item => item.index)
                     .DefaultIfEmpty(-1)
                     .First();
+
+                // v0.17 R4(d) / #1127. A named argument matching NO parameter
+                // leaves parameterIndex at -1, and when the candidate has no
+                // `params` parameter `paramsIndex` is -1 too — so the equality
+                // below holds and `assigned[-1]` throws
+                // IndexOutOfRangeException, taking down the binder on input that
+                // is merely wrong. The candidate simply does not accept this
+                // call: no parameter bears that name.
+                if (parameterIndex < 0)
+                    yield break;
 
                 if (parameterIndex == paramsIndex)
                 {

@@ -171,4 +171,44 @@ public class BinderOverloadSetTests
             diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
     }
+
+    /// <summary>
+    /// v0.17 R4(d) / #1127 — a named argument matching NO parameter used to take
+    /// the binder down. <c>parameterIndex</c> is -1 when the name matches
+    /// nothing; for a candidate with no <c>params</c> parameter
+    /// <c>paramsIndex</c> is -1 as well, so the equality guard held and
+    /// <c>assigned[-1]</c> threw IndexOutOfRangeException — surfaced as an
+    /// AnalysisICE (Calor0932) that abandoned the rest of the enclosing member.
+    /// <para>The call is simply not applicable to that candidate: no parameter
+    /// bears the name. It must be reported, not crashed on. This was the last
+    /// residual ICE over the A-1.5.3 conversion corpus.</para>
+    /// </summary>
+    [Fact]
+    public void NamedArgumentMatchingNoParameter_IsReported_NotAnIce()
+    {
+        var target = Func("f001", "Only", "i32", [("i32", "value")],
+            new ReturnStatementNode(S, new IntLiteralNode(S, 0)));
+        var caller = Func("f002", "Caller", "i32", Array.Empty<(string, string)>(),
+            new ReturnStatementNode(
+                S,
+                new CallExpressionNode(
+                    S,
+                    "Only",
+                    [new IntLiteralNode(S, 1)],
+                    new string?[] { "noSuchParameter" })));
+        foreach (var function in new[] { target, caller })
+        {
+            function.NamespaceIdentity = "Alpha";
+            function.NamespaceScopeId = "ns1";
+        }
+
+        var (_, diagnostics) = Bind(target, caller);
+
+        Assert.DoesNotContain(
+            diagnostics,
+            d => string.Equals(d.Code, DiagnosticCode.AnalysisICE, StringComparison.Ordinal));
+        Assert.Contains(
+            diagnostics,
+            d => string.Equals(d.Code, DiagnosticCode.NoMatchingOverload, StringComparison.Ordinal));
+    }
 }

@@ -1345,8 +1345,14 @@ public sealed class EffectEnforcementPass
         Binding.BoundTypes.EffectRow row,
         IReadOnlyDictionary<string, string> provenance)
     {
-        if (row.IsUnknown) return;
-
+        // v0.17 S1 / #1136 — an Unknown instantiated row used to RETURN HERE,
+        // charging nothing. That is the second half of the escape: the call site
+        // reported Calor0425 as a warning, this dropped the charge, and the
+        // build exited 0 with a `§E{}` method invoking a `§E{cw}` member through
+        // a row-polymorphic callee. Unknown is not "no effects" — it is "any
+        // effects", so it is charged, and the caller reports Calor0410 unless it
+        // declares it. `--permissive-effects` still demotes that to a warning,
+        // which is the escape hatch conversion work relies on.
         var charged = row.ToEffectSet();
         var before = _computedEffects.GetValueOrDefault(functionId, EffectSet.Empty);
         var after = before.Union(charged);
@@ -1678,6 +1684,19 @@ public sealed class EffectEnforcementPass
                     if (IsFieldFunctionTyped(owner, field))
                         _scope[field.Name] = PolyRow.From(field.Row);
                 }
+
+                // v0.17 S1 / #1136 — properties, on the same footing as fields.
+                // A `§PROP` could not carry a row until this release, so a read
+                // of one was Unknown BY CONSTRUCTION and #1136 measured it
+                // escaping. Parsing the row is only half the fix: the pass has to
+                // resolve the read to it, or the author states a row the compiler
+                // then ignores — which is worse than rejecting it, because the
+                // declaration would look like it worked.
+                foreach (var property in owner.Properties)
+                {
+                    if (IsFunctionTyped(property.TypeName))
+                        _scope[property.Name] = PolyRow.From(property.Row);
+                }
             }
 
             // Slice b keeps effect-POLYMORPHIC parameters in scope rather than
@@ -1969,11 +1988,17 @@ public sealed class EffectEnforcementPass
         ///
         /// <para>A variable the arguments could not determine makes the
         /// instantiated row Unknown, which is Calor0425 at the CALL SITE — §10.3's
-        /// second message. Nothing is charged for such a variable — E3b's
-        /// disclosed deviation from §10.3's sample, kept as is. E4 (which charges
-        /// an INVOKED Unknown row fail-closed) did not revisit this cell: the
-        /// author of the caller cannot repair an argument's missing row from the
-        /// call site, and the Calor0425 here already names which argument.</para>
+        /// second message — and the caller is CHARGED Unknown for it.</para>
+        ///
+        /// <para>v0.17 S1 / #1136 reversed the earlier rule here. Through v0.16
+        /// nothing was charged for such a variable (E3b's disclosed deviation
+        /// from §10.3's sample, which E4 did not revisit), so an undetermined
+        /// effect variable simply vanished and a `§E{}` method could invoke a
+        /// `§E{cw}` member through a row-polymorphic callee with the build
+        /// exiting 0. #1136 measured five argument spellings that reach this
+        /// path. The pass now charges what it actually knows — Unknown — and the
+        /// caller reports Calor0410 unless it declares the effect. See the
+        /// comment on the fail-closed branch below for the full record.</para>
         /// </summary>
         private void InstantiateAndCharge(
             FunctionNode callee,
@@ -1993,13 +2018,31 @@ public sealed class EffectEnforcementPass
                     var reason = ordinal >= 0 && ordinal < undetermined.Length
                         ? undetermined[ordinal]
                         : null;
+                    // v0.17 S1 / #1136 — FAIL CLOSED. This used to report and then
+                    // `continue`, charging NOTHING: an effect variable the
+                    // arguments could not determine simply vanished, so a
+                    // `§E{}` method could invoke a `§E{cw}` member through a
+                    // row-polymorphic callee and the build exited 0. #1136
+                    // measured five argument spellings that reach here — a field
+                    // via `this.`, a `§PROP` by simple name, an alias of `this`,
+                    // another instance's field, and an instance method group —
+                    // and the held-out suites confirmed the effect escaping at
+                    // runtime.
+                    //
+                    // Unknown is what the pass actually knows, so Unknown is what
+                    // it charges. The caller then reports Calor0410 unless it
+                    // declares the effect, which is the same treatment the
+                    // unknown-call path has always given an unresolvable callee.
+                    // `--permissive-effects` still relaxes it, so conversion work
+                    // has the same escape hatch it had before.
                     _pass.ReportRowUnknown(
                         callSpan,
                         $"Effect variable '{name}' of '{callee.Name}' instantiates to Unknown at this "
-                        + $"call site: {reason ?? $"no parameter of '{callee.Name}' binds it"}. The "
-                        + $"instantiated row of '{callee.Name}' is Unknown here, so nothing is charged "
-                        + $"to '{_function.Name}' for it. State a row on the argument's declaration, or "
-                        + "compile with --permissive-effects.");
+                        + $"call site: {reason ?? $"no parameter of '{callee.Name}' binds it"}. "
+                        + $"'{_function.Name}' is charged Unknown for it, because a row this pass "
+                        + "cannot determine may carry any effect. State a row on the argument's "
+                        + "declaration, or compile with --permissive-effects.");
+                    instantiated = PolyRow.Join(instantiated, PolyRow.Unknown);
                     continue;
                 }
 

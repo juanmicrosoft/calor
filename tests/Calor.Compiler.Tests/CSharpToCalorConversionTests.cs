@@ -2416,15 +2416,14 @@ public class CSharpToCalorConversionTests
         Assert.DoesNotContain(":?", conversionResult.CalorSource);
 
         // Calor -> C#. EnforceEffects = false like the sibling round-trip tests.
-        // With effects on, the blocker is `error Calor0410: Function 'Run' uses
-        // effect 'unknown' but does not declare it` (review M5): the converter
-        // writes §E{alloc} on Run while emitting LINQ calls it cannot classify,
-        // so the inferred row is 'unknown' and does not fit the declared one.
-        // The Calor0411 warnings on those calls are the cause, not the failure.
-        // That converter-reach gap is filed separately; this test is about the
-        // lambda shape surviving the round trip. Before #1097 the effect pass
-        // never ran here at all — the "?" parameter type ICE'd the binder and
-        // abandoned the member, which is what kept the errors invisible.
+        // v0.17 R4(a) fixed #1128 for code the SEMANTIC MODEL can resolve, and
+        // this fixture deliberately has no `using System.Linq` (see the #1097
+        // note above), so Roslyn cannot type `numbers.Where` and there is no type
+        // for the converter to write down. Nothing recovers a chain whose first
+        // link is unresolvable, so enforcement stays off HERE while
+        // `Convert_LinqChain_WithUsing_CompilesWithEffectsEnforced` covers the
+        // case the fix actually addresses. Keeping this one off is a scope
+        // statement, not a workaround.
         var compilationResult = Program.Compile(
             conversionResult.CalorSource!,
             null,
@@ -2432,6 +2431,69 @@ public class CSharpToCalorConversionTests
         Assert.False(compilationResult.HasErrors,
             $"Lambda roundtrip failed:\nCalor:\n{conversionResult.CalorSource}\nErrors:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
         Assert.DoesNotContain(compilationResult.Diagnostics, d => d.Code == DiagnosticCode.AnalysisICE);
+    }
+
+    /// <summary>
+    /// v0.17 R4(a) / #1128 — a converted LINQ chain compiles WITH EFFECTS
+    /// ENFORCED. The reported failure was `error Calor0410: Function 'Run' uses
+    /// effect 'unknown' but does not declare it`: the converter wrote
+    /// <c>§E{alloc}</c> on Run while emitting LINQ calls the pass could not
+    /// classify.
+    /// <para>#1128 proposed shipping manifest coverage for LINQ. That coverage
+    /// ALREADY EXISTED — <c>System.Linq.Enumerable</c>, <c>extensionProvider</c>,
+    /// every operator — so the suggested fix would have changed nothing. The gap
+    /// was the TYPE CHAIN, in two links: <c>var evens = numbers.Where(…)</c> was
+    /// emitted as an untyped <c>§B{evens}</c> so the next call had no receiver
+    /// type, and even once typed, <c>Seq&lt;T&gt;</c> and
+    /// <c>IOrderedEnumerable&lt;T&gt;</c> were absent from the
+    /// extension-receiver shapes. Either half alone leaves this red.</para>
+    /// <para>The <c>using</c> matters and is the difference from
+    /// <c>Convert_LambdaHeavy_FullRoundtrip</c>: without it Roslyn cannot resolve
+    /// the calls, so there is no type to write down and nothing to recover.</para>
+    /// </summary>
+    [Fact]
+    public void Convert_LinqChain_WithUsing_CompilesWithEffectsEnforced()
+    {
+        var csharpSource = """
+            using System.Linq;
+
+            public class LinqDemo
+            {
+                public void Run()
+                {
+                    var numbers = new int[] { 5, 4, 1, 3, 9, 8, 6, 7, 2, 0 };
+                    var evens = numbers.Where(n => n % 2 == 0);
+                    var sorted = evens.OrderBy(n => n);
+                    var doubled = sorted.Select(n => n * 2);
+                }
+            }
+            """;
+
+        var conversionResult = _converter.Convert(csharpSource);
+        Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
+        Assert.NotNull(conversionResult.CalorSource);
+
+        var compilationResult = Program.Compile(
+            conversionResult.CalorSource!,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
+
+        Assert.False(
+            compilationResult.HasErrors,
+            "converted LINQ must compile with effects enforced:\n"
+            + string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
+        Assert.DoesNotContain(
+            compilationResult.Diagnostics,
+            d => d.Code == DiagnosticCode.UnknownExternalCall);
+
+        // Calor0419 REMAINS, and should: the manifest says the LINQ operators are
+        // pure but cannot verify what the lambdas handed to them do, so the row is
+        // an assumption rather than a proof. That is the designed outcome, not the
+        // defect #1128 reported, and asserting it keeps a future "fix" from
+        // silencing an honest warning.
+        Assert.Contains(
+            compilationResult.Diagnostics,
+            d => d.Code == DiagnosticCode.AssumedEffects);
     }
 
     [Fact]
