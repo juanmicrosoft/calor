@@ -205,7 +205,22 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   release has assigned it (§0.4, §6). *Touches:* `Calor0425CorpusLedgerTests.cs`,
   `calor0425-corpus-ledger.json`, `CHANGELOG.md`.
   *Discriminating:* drop the breakdown and gate 13 (§5) has no denominator to floor.
-- **R2 — Fix the largest binding cluster R1 names.** Scoped by measurement, not by guess: R1 runs
+- **R2 — Fix the largest binding cluster R1 names. OUTCOME (2026-09-02): the
+  cluster moved, and PP-R1 leg 1 reads MISS on the frozen rule.** R1 named
+  Calor0208 at 40 modules, so §4.1's pre-registered rule — half the cluster,
+  never fewer than 10 — set the target at **20**. R2 recovered **15**:
+  `ModulesEnforced` **304 → 319**, `ExcludedBindFailed` **60 → 45**, the
+  Calor0208 cluster **40 → 23**. Fifteen is short of twenty; the rule was frozen
+  before the measurement existed and is not R2's to move, so this is a **MISS**,
+  published with what it cost rather than re-scoped. *The 17-vs-15 gap* is the
+  multi-cause effect `BindFailureMultiCause` exists to expose: two modules
+  stopped failing on Calor0208 and began failing on Calor0201 (9 → 11).
+  **The residual has no dominant cause** — each of the 17 remaining is a
+  distinct fix (`GetType()` inferred as `OBJECT`, `params` arrays,
+  `OPTION<STRING>` vs `STRING`, a generic method group). There is no second
+  cluster for one fix to aim at, which is the finding the next release
+  inherits.
+- **R2 — the change itself.** Scoped by measurement, not by guess: R1 runs
   first and its answer picks the target. The pre-registered acceptance is a **move in
   `ModulesEnforced`**, published per subject against gate 9's existing floors (250 aggregate;
   MediatR ≥ 29, serilog ≥ 84, FluentValidation ≥ 137). *Sequencing pin:* R2's PR asserts that the

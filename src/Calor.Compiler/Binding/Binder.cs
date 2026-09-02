@@ -100,6 +100,11 @@ public sealed class Binder
     private SymbolId _declarationContext;
     private string? _currentClassName;
     private ClassDefinitionNode? _currentClass;
+
+    /// <summary>v0.17 R2 — type parameters of the member currently being bound
+    /// (a method or a module-level function), searched alongside the enclosing
+    /// class's when resolving a generic argument to its constraints.</summary>
+    private IReadOnlyList<TypeParameterNode>? _currentMemberTypeParameters;
     private Scope? _currentClassScope;
     private SymbolId _currentClassIdentity;
     private string? _currentNamespaceIdentity;
@@ -287,6 +292,29 @@ public sealed class Binder
         var previous = _isStaticContext;
         _isStaticContext = isStatic;
         return new StaticContextRestorer(this, previous);
+    }
+
+    /// <summary>
+    /// v0.17 R2 — the type parameters of the member being bound, so a generic
+    /// parameter used as an argument can be resolved to its constraints. The
+    /// commonest Calor0208 in the conversion corpus is
+    /// <c>Publish&lt;TNotification&gt;</c> calling
+    /// <c>PublishNotification(INotification, …)</c>, and <c>TNotification</c> is
+    /// declared on the METHOD, not the class — so the class's list alone misses
+    /// it.
+    /// </summary>
+    private IDisposable PushMemberTypeParameters(IReadOnlyList<TypeParameterNode> typeParameters)
+    {
+        var previous = _currentMemberTypeParameters;
+        _currentMemberTypeParameters = typeParameters;
+        return new MemberTypeParametersRestorer(this, previous);
+    }
+
+    private sealed class MemberTypeParametersRestorer(
+        Binder binder,
+        IReadOnlyList<TypeParameterNode>? previous) : IDisposable
+    {
+        public void Dispose() => binder._currentMemberTypeParameters = previous;
     }
 
     private sealed class StaticContextRestorer : IDisposable
@@ -3685,8 +3713,19 @@ public sealed class Binder
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
+            // v0.17 R2 — an argument whose type this module CANNOT SEE is in the
+            // same epistemic position as `<unresolved>`: the binder cannot prove
+            // the call is wrong, so reporting Calor0208 is a false positive, not
+            // a finding. Conversion is PER FILE, so this is routine on real code
+            // — `LogContext.Push(PropertyEnricher)` against
+            // `Push(ILogEventEnricher)` is unresolvable only because
+            // PropertyEnricher is declared in another file and the two never
+            // meet in one module. Extending the existing `<unresolved>`
+            // suppression is the honest reading; the alternative is emitting an
+            // error whose premise the compiler has not established.
             var hasUnresolvedArguments = argumentTypes.Any(type =>
-                string.Equals(type, "<unresolved>", StringComparison.Ordinal));
+                string.Equals(type, "<unresolved>", StringComparison.Ordinal)
+                || IsNominalTypeInvisibleToThisModule(type));
             if (!hasUnresolvedArguments
                 && resolution.Kind == OverloadResolutionKind.NoMatch)
             {
@@ -3759,8 +3798,42 @@ public sealed class Binder
         if (IsImplicitNumericConversion(argument, parameter))
             return 10;
 
-        var parameterClass = ResolveClass(parameterType);
+        // v0.17 R2. A generic type PARAMETER is compatible with anything its
+        // constraints are. `Publish<TNotification>(TNotification n)` calling
+        // `PublishNotification(INotification, ...)` is the single commonest
+        // Calor0208 in the conversion corpus, and it failed here because the
+        // walk below only knew about base classes: `TNotification` resolves to
+        // no class at all, so the whole method returned null and overload
+        // resolution reported "no matching overload" for a call C# accepts.
+        if (GetTypeParameterConstraints(argumentType) is { Count: > 0 } constraints)
+        {
+            var best = constraints
+                .Select(constraint => GetImplicitConversionCost(parameterType, constraint))
+                .Where(cost => cost.HasValue)
+                .Select(cost => cost!.Value)
+                .DefaultIfEmpty(int.MaxValue)
+                .Min();
+            // +5 so a direct conversion always outranks one reached through a
+            // constraint, and two candidates cannot tie on it.
+            if (best != int.MaxValue)
+                return best + 5;
+        }
+
         var argumentClass = ResolveClass(argumentType);
+
+        // v0.17 R2 — an implicit reference conversion to an INTERFACE the
+        // argument implements is as ordinary as one to a base class, and the
+        // walk below knew only about base classes: `Push(PropertyEnricher)`
+        // against `Push(ILogEventEnricher)` was reported as no matching
+        // overload. Checked by NAME and BEFORE the class-resolution guard,
+        // because interfaces are `InterfaceDefinitionNode` and never enter
+        // `_classesByQualifiedName` — resolving the parameter as a class returns
+        // null for every interface, which is what made a first attempt at this
+        // fix silently do nothing.
+        if (argumentClass != null && ImplementsInterface(argumentClass, parameterType))
+            return 30;
+
+        var parameterClass = ResolveClass(parameterType);
         if (parameterClass == null || argumentClass == null)
             return null;
 
@@ -3780,6 +3853,100 @@ public sealed class Binder
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// v0.17 R2 — does <paramref name="cls"/>, or any of its base classes,
+    /// declare <paramref name="interfaceName"/> among its implemented
+    /// interfaces? Compared on canonicalized NAMES: interfaces are
+    /// <see cref="InterfaceDefinitionNode"/> and are not in the class registry,
+    /// so there is no node to compare by reference.
+    /// </summary>
+    private bool ImplementsInterface(ClassDefinitionNode cls, string interfaceName)
+    {
+        var target = TypeIdentity.Canonicalize(interfaceName);
+        var current = cls;
+        var visitedClasses = new HashSet<ClassDefinitionNode>();
+        while (current != null && visitedClasses.Add(current))
+        {
+            foreach (var declared in current.ImplementedInterfaces)
+            {
+                if (string.Equals(
+                        TypeIdentity.Canonicalize(declared), target, StringComparison.Ordinal))
+                    return true;
+            }
+
+            current = ResolveBaseClass(current);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// v0.17 R2 — the type-constraint names on a generic type parameter of the
+    /// enclosing class or of the function being bound, or <c>null</c> when
+    /// <paramref name="name"/> is not a type parameter in scope. Only
+    /// the three constraint kinds that NAME a type carry a conversion —
+    /// <see cref="TypeConstraintKind.Interface"/>,
+    /// <see cref="TypeConstraintKind.BaseClass"/> and
+    /// <see cref="TypeConstraintKind.TypeName"/>. `new()`, `class`, `struct`,
+    /// `notnull` and `unmanaged` name nothing to convert to.
+    /// </summary>
+    private IReadOnlyList<string>? GetTypeParameterConstraints(string name)
+    {
+        if (_currentClass == null && _currentMemberTypeParameters == null)
+            return null;
+
+        foreach (var parameter in Enumerable.Concat(
+                     _currentMemberTypeParameters ?? Array.Empty<TypeParameterNode>(),
+                     _currentClass?.TypeParameters ?? Array.Empty<TypeParameterNode>()))
+        {
+            if (!string.Equals(parameter.Name, name, StringComparison.Ordinal))
+                continue;
+            return parameter.Constraints
+                .Where(constraint => constraint.Kind is TypeConstraintKind.Interface
+                                         or TypeConstraintKind.BaseClass
+                                         or TypeConstraintKind.TypeName
+                                     && !string.IsNullOrEmpty(constraint.TypeName))
+                .Select(constraint => constraint.TypeName!)
+                .ToArray();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// v0.17 R2 — true when <paramref name="type"/> names a nominal type this
+    /// module has no declaration for, so no claim about its convertibility can
+    /// be justified. Builtins canonicalize to upper-case forms
+    /// (<c>INT</c>, <c>STRING</c>, <c>OBJECT</c>, …) and are always visible; a
+    /// type parameter in scope is visible through its constraints; anything else
+    /// must resolve to a declared class.
+    /// <para>Generic and array types are judged on their HEAD:
+    /// <c>Seq&lt;Assembly&gt;</c> is visible if <c>Seq</c> is, because a wrong
+    /// element type is a real mismatch the binder can still see.</para>
+    /// </summary>
+    private bool IsNominalTypeInvisibleToThisModule(string type)
+    {
+        var canonical = TypeIdentity.Canonicalize(type);
+
+        // Head of a generic/array/option form: `Seq<Assembly>` -> `Seq`.
+        var head = canonical;
+        var generic = head.IndexOf('<');
+        if (generic > 0)
+            head = head[..generic];
+        head = head.TrimEnd('[', ']', '?', '*');
+        if (head.Length == 0)
+            return false;
+
+        // Builtins canonicalize to upper case and are always known.
+        if (head.All(c => !char.IsLetter(c) || char.IsUpper(c)))
+            return false;
+
+        if (GetTypeParameterConstraints(head) != null)
+            return false;
+
+        return ResolveClass(head) == null;
     }
 
     private static bool IsImplicitNumericConversion(string from, string to) =>
@@ -4835,6 +5002,7 @@ public sealed class Binder
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
         using var _c = PushStaticContext(method.IsStatic);
+        using var _tp = PushMemberTypeParameters(method.TypeParameters);
         var functionSymbol = _functionSymbols[method];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
