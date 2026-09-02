@@ -55,7 +55,19 @@ def read_counts(trx: Path) -> tuple[int, int, int]:
     return total, executed, passed
 
 
-def validate(trx: Path, project: str, manifest_path: Path) -> list[str]:
+def validate(trx: Path, project: str, manifest_path: Path,
+             submodules: bool = False) -> list[str]:
+    """`submodules` selects the skip expectation for the CALLER'S CHECKOUT.
+
+    A corpus-gated test skips when bench/corpus/ is absent and runs when it is
+    present, so `expectedSkipped` is a property of (project x checkout) and not
+    of the project. `.github/workflows/test.yml:375` gives the enforcement shard
+    `submodules: false`; `publish-nuget.yml:72` gives EVERY shard
+    `submodules: recursive`. Applying one number to both is what skipped the
+    v0.16.0 publish (run 33568423848: executed 640, expected 639, with all 640
+    PASSING) — a release-path-only failure no PR could surface, because no PR
+    runs that checkout.
+    """
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     entry = next((item for item in manifest["projects"] if item["path"] == project), None)
     if entry is None:
@@ -67,7 +79,12 @@ def validate(trx: Path, project: str, manifest_path: Path) -> list[str]:
     except (ET.ParseError, ValueError) as error:
         return [f"invalid TRX report {trx}: {error}"]
     expected_total = int(entry["expectedTotal"])
-    expected_skipped = int(entry["expectedSkipped"])
+    # Absent `expectedSkippedWithSubmodules`, a project's skips do not depend on
+    # the corpus and one number is correct for both checkouts.
+    key = ("expectedSkippedWithSubmodules"
+           if submodules and "expectedSkippedWithSubmodules" in entry
+           else "expectedSkipped")
+    expected_skipped = int(entry[key])
     expected_executed = expected_total - expected_skipped
     errors = []
     if total != expected_total:
@@ -105,6 +122,69 @@ def self_test() -> None:
         )
         if not validate(trx, "tests/Example.Tests/Example.Tests.csproj", manifest):
             raise AssertionError("counter-only TRX was accepted")
+
+        # The (project x checkout) skip expectation. A corpus-gated test skips
+        # without submodules and RUNS with them, so the same TRX must be valid
+        # under exactly one of the two flags — and INVALID under the other, or
+        # the flag is decorative. This is the case that skipped the v0.16.0
+        # publish; it is pinned here so it cannot recur silently.
+        project = "tests/Corpus.Tests/Corpus.Tests.csproj"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "projects": [
+                        {
+                            "path": project,
+                            "expectedTotal": 640,
+                            "expectedSkipped": 1,
+                            "expectedSkippedWithSubmodules": 0,
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def write(total: int, executed: int) -> Path:
+            """A TRX with CONCRETE results, because read_counts cross-checks the
+            counters against them — the summary alone is not trusted."""
+            path = root / f"r{executed}.trx"
+            defs = "".join(f'<UnitTest id="t{i}" />' for i in range(total))
+            rows = "".join(
+                f'<UnitTestResult testId="t{i}" '
+                f'outcome="{"Passed" if i < executed else "Skipped"}" />'
+                for i in range(total))
+            path.write_text(
+                f'<TestRun xmlns="urn:test"><Results>{rows}</Results>'
+                f'<TestDefinitions>{defs}</TestDefinitions>'
+                f'<ResultSummary><Counters total="{total}" executed="{executed}" '
+                f'passed="{executed}" /></ResultSummary></TestRun>',
+                encoding="utf-8",
+            )
+            return path
+
+        with_corpus = write(640, 640)     # nothing skipped: submodules present
+        without_corpus = write(640, 639)  # one corpus-gated skip
+
+        if validate(with_corpus, project, manifest, submodules=True):
+            raise AssertionError("submodules checkout rejected its own skip expectation")
+        if not validate(with_corpus, project, manifest, submodules=False):
+            raise AssertionError(
+                "a no-submodules checkout accepted a run with no corpus skip — the flag is "
+                "decorative, which is the defect that skipped the v0.16.0 publish")
+        if validate(without_corpus, project, manifest, submodules=False):
+            raise AssertionError("no-submodules checkout rejected its own skip expectation")
+        if not validate(without_corpus, project, manifest, submodules=True):
+            raise AssertionError("submodules checkout accepted a run that skipped the corpus test")
+
+        # Absent the key, one number governs both checkouts.
+        manifest.write_text(
+            json.dumps({"projects": [{"path": project, "expectedTotal": 640,
+                                      "expectedSkipped": 1}]}),
+            encoding="utf-8",
+        )
+        if validate(without_corpus, project, manifest, submodules=True):
+            raise AssertionError("a project with no corpus-gated skips must ignore --submodules")
     print("TRX inventory negative self-test passed.")
 
 
@@ -114,13 +194,18 @@ def main() -> int:
     parser.add_argument("--project")
     parser.add_argument("--manifest", type=Path, default=Path("eng/test-manifest.json"))
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--submodules", action="store_true",
+        help="the caller checked out bench/corpus/ (submodules: recursive), so corpus-gated "
+             "tests RUN instead of skipping; use expectedSkippedWithSubmodules where the "
+             "manifest declares one")
     args = parser.parse_args()
     if args.self_test:
         self_test()
         return 0
     if args.trx is None or args.project is None:
         parser.error("--trx and --project are required")
-    errors = validate(args.trx, args.project, args.manifest)
+    errors = validate(args.trx, args.project, args.manifest, submodules=args.submodules)
     for error in errors:
         print(f"ERROR: {error}")
     if not errors:
