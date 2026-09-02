@@ -270,7 +270,15 @@ jobs:
 
   quality-ratchets:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 2026-09-02: was 20, and this job runs 17.8-19.9 min (13 consecutive
+    # successful runs sampled). It had no headroom at all, so a run that drifted
+    # a little long was cancelled BY ITS OWN TIMEOUT and reported as an
+    # infrastructure kill — the "all steps success, job cancelled" shape on
+    # #1151 and the cancelled LSP flake gate on #1155. A job cancelled this way
+    # SIGTERMs its children, so `dotnet test` under it exits 143, which is also
+    # part of what #1150 has been chasing. 35 is ~75% headroom over the observed
+    # maximum; the gates themselves are unchanged.
+    timeout-minutes: 35
 
     steps:
       - name: Checkout code
