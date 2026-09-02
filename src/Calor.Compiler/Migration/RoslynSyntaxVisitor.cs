@@ -7495,6 +7495,40 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var isMutable = _reassignedVariables.Contains(name);
 
+        // v0.17 R4(a) / #1128 — a `var` bound to a CALL loses its type, and with
+        // it every member access on the result. `var evens = numbers.Where(…)`
+        // emitted `§B{evens}` untyped, so `evens.OrderBy` had no receiver type to
+        // resolve against and became Calor0411 `unknown`; the converter had
+        // meanwhile written a narrow `§E{alloc}` on the method, and the two
+        // disagreed as Calor0410.
+        //
+        // The manifest was never the gap: `System.Linq.Enumerable` is already
+        // covered with `extensionProvider: true` and every operator. What broke
+        // was the TYPE CHAIN — the first call's result is untyped, so the second
+        // call cannot be resolved even though its entry exists. Roslyn knows the
+        // type here; writing it down restores resolution instead of guessing at
+        // it, which is why this is preferred over #1128's other option of
+        // widening the row the converter asserts.
+        //
+        // Narrow on purpose: only a `var` whose initializer is an INVOCATION, so
+        // ordinary `var x = 1` and `var x = new T()` keep their existing output.
+        if (typeName == null
+            && _semanticModel != null
+            && variable.Initializer?.Value is InvocationExpressionSyntax)
+        {
+            var declared = _semanticModel.GetTypeInfo(node.Declaration.Type).Type;
+            if (declared != null
+                && declared.TypeKind != Microsoft.CodeAnalysis.TypeKind.Error
+                && declared.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Void)
+            {
+                var mapped = TypeMapper.CSharpToCalor(
+                    declared.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat
+                        .MinimallyQualifiedFormat));
+                if (!string.IsNullOrWhiteSpace(mapped) && !mapped.Contains('?'))
+                    typeName = mapped;
+            }
+        }
+
         // Track variable-to-type mapping for effect inference on instance calls
         if (_semanticModel != null)
         {

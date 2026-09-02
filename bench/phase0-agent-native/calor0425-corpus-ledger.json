@@ -70,12 +70,12 @@
         "CompileClean": 62,
         "StoppedInCliOnlyPass": 3,
         "Calor0425Modules": 28,
-        "Calor0425Sites": 69
+        "Calor0425Sites": 71
       }
     ]
   },
-  "MeasuredCommit": "6cfdfca915da396c4f7dfb0f4d0e6d6bbf6b9e5a",
-  "AggregateDiagnostics": 103,
+  "MeasuredCommit": "5d6b8d7449dcffb5fe489466ed11d1194dad8f40",
+  "AggregateDiagnostics": 105,
   "AggregateModulesWithDiagnostics": 45,
   "AggregateModulesEnforced": 319,
   "AggregateModulesExcluded": 45,
@@ -111,7 +111,7 @@
         "Calor0208 MediatR/Pipeline/RequestExceptionProcessorBehavior.cs"
       ],
       "BindFailureMultiCause": 0,
-      "Calor0411Sites": 219,
+      "Calor0411Sites": 210,
       "Calor0411Modules": 11
     },
     {
@@ -161,19 +161,19 @@
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],
       "BindFailureMultiCause": 5,
-      "Calor0411Sites": 522,
+      "Calor0411Sites": 511,
       "Calor0411Modules": 58
     },
     {
       "Subject": "FluentValidation",
-      "Diagnostics": 69,
+      "Diagnostics": 71,
       "ModulesWithDiagnostics": 28,
       "ModulesEnforced": 191,
       "ModulesNotMeasured": 25,
-      "RowlessDestination": 10,
+      "RowlessDestination": 12,
       "UnknownSource": 0,
       "Assumed": 0,
-      "RowlessInvoked": 10,
+      "RowlessInvoked": 12,
       "RowlessNeverInvoked": 0,
       "ExternalBase": 41,
       "InvocationRowless": 18,
@@ -219,7 +219,7 @@
         "Calor0208 FluentValidation/Validators/RegularExpressionValidator.cs"
       ],
       "BindFailureMultiCause": 2,
-      "Calor0411Sites": 7438,
+      "Calor0411Sites": 7414,
       "Calor0411Modules": 113
     }
   ]
