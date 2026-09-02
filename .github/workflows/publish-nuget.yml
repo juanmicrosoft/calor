@@ -114,11 +114,18 @@ jobs:
             --results-directory artifacts/test \
             --verbosity normal 2>&1 | tee test-output.log
 
+      # --submodules because THIS workflow checks out `submodules: recursive` for
+      # every shard (above), unlike test.yml:375 which gives all but `compiler`
+      # `submodules: false`. Corpus-gated tests therefore RUN here and SKIP
+      # there, so the two checkouts need different skip expectations. Omitting
+      # this is what skipped the v0.16.0 publish: run 33568423848 reported
+      # "executed 640, expected 639" on a shard where all 640 tests PASSED.
       - name: Enforce test inventory
         run: >-
           python3 scripts/check_trx.py
           --trx "artifacts/test/${{ matrix.name }}.trx"
           --project "${{ matrix.project }}"
+          --submodules
 
       # Assert the property that matters, not a filename: no Z3-gated test may skip on the
       # commit being released. This regression is invisible by construction otherwise —
