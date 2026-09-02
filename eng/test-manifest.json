@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 7999,
+      "expectedTotal": 8000,
       "expectedSkipped": 4
     },
     {
@@ -21,6 +21,7 @@
       "releaseCritical": true,
       "expectedTotal": 640,
       "expectedSkipped": 1,
+      "corpusDependent": true,
       "expectedSkippedWithSubmodules": 0,
       "note": "expectedSkipped is a property of (project x CHECKOUT), not of the project. EffectInferrerCorpusDepthTests skips without the corpus submodules, so the shard that feeds check_trx.py in .github/workflows/test.yml:375 (matrix name 'enforcement', submodules: false) sees 1 skip, while .github/workflows/publish-nuget.yml:72 checks out submodules: recursive for EVERY shard and sees 0. The pin said 'if that shard ever gains submodules this pin breaks loudly - which is the intended failure mode', and it did exactly that: it blocked the v0.16.0 publish (run 33568423848, executed 640 expected 639, all 640 PASSING). It was right to break, and the bug was applying one number to two checkouts. Callers that check out submodules pass --submodules and get expectedSkippedWithSubmodules."
     },
