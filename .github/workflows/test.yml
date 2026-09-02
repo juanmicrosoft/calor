@@ -397,6 +397,24 @@ jobs:
             exit 1
           fi
 
+      # Issue #1150: this shard has been SIGTERM'd seven times in two days
+      # ("The runner has received a shutdown signal", exit 143) with ZERO test
+      # failures in every log. Three hypotheses were advanced and all three
+      # discarded by evidence — per-job memory pressure (it also hit
+      # release-quality), an Actions quota (the repo is public, so standard
+      # runners are free), and a platform incident (the status feed shows none).
+      # Guessing has cost more than measuring would. `df` and `free` before and
+      # after the run cost ~1 s and settle the resource question directly: if the
+      # disk is near full or memory is exhausted at the point of death, the next
+      # kill's log says so. `if: always()` because the interesting reading is the
+      # one taken when the job is about to die.
+      - name: Runner resource probe (#1150)
+        if: always()
+        run: |
+          echo "--- disk ---"; df -h / /home/runner 2>/dev/null || df -h
+          echo "--- memory ---"; free -m 2>/dev/null || vm_stat
+          echo "--- dotnet build servers ---"; ps -o pid,rss,comm -A 2>/dev/null | sort -k2 -rn | head -12
+
       - name: Enforce test inventory
         run: >-
           python3 scripts/check_trx.py

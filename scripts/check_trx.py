@@ -79,10 +79,24 @@ def validate(trx: Path, project: str, manifest_path: Path,
     except (ET.ParseError, ValueError) as error:
         return [f"invalid TRX report {trx}: {error}"]
     expected_total = int(entry["expectedTotal"])
-    # Absent `expectedSkippedWithSubmodules`, a project's skips do not depend on
-    # the corpus and one number is correct for both checkouts.
+    # A project that declares `corpusDependent` MUST declare both skip counts.
+    # Falling back silently is how this bug class reappears: add a corpus-gated
+    # Skip.IfNot to some project, watch test.yml (submodules: false) fail on the
+    # PR, bump `expectedSkipped` 0 -> 1, go green — and then publish-nuget runs
+    # the same project WITH the corpus, sees 0 skips against an expectation of 1,
+    # and blocks the release. Invisible until release day, which is exactly the
+    # failure #1149 fixed for Calor.Enforcement.Tests. So the manifest declares
+    # the dependency and the checker refuses to guess.
+    corpus_dependent = bool(entry.get("corpusDependent", False))
+    if corpus_dependent and "expectedSkippedWithSubmodules" not in entry:
+        return [f"{project}: corpusDependent is true but expectedSkippedWithSubmodules is "
+                f"missing. A corpus-gated test skips without submodules and RUNS with them, so "
+                f"the two checkouts need two numbers (test.yml:375 vs publish-nuget.yml:72)."]
+    if not corpus_dependent and "expectedSkippedWithSubmodules" in entry:
+        return [f"{project}: declares expectedSkippedWithSubmodules but not corpusDependent. "
+                f"Set corpusDependent: true, or drop the key."]
     key = ("expectedSkippedWithSubmodules"
-           if submodules and "expectedSkippedWithSubmodules" in entry
+           if submodules and corpus_dependent
            else "expectedSkipped")
     expected_skipped = int(entry[key])
     expected_executed = expected_total - expected_skipped
@@ -135,6 +149,7 @@ def self_test() -> None:
                     "projects": [
                         {
                             "path": project,
+                            "corpusDependent": True,
                             "expectedTotal": 640,
                             "expectedSkipped": 1,
                             "expectedSkippedWithSubmodules": 0,
@@ -177,7 +192,7 @@ def self_test() -> None:
         if not validate(without_corpus, project, manifest, submodules=True):
             raise AssertionError("submodules checkout accepted a run that skipped the corpus test")
 
-        # Absent the key, one number governs both checkouts.
+        # Absent the declaration, one number governs both checkouts.
         manifest.write_text(
             json.dumps({"projects": [{"path": project, "expectedTotal": 640,
                                       "expectedSkipped": 1}]}),
@@ -185,6 +200,31 @@ def self_test() -> None:
         )
         if validate(without_corpus, project, manifest, submodules=True):
             raise AssertionError("a project with no corpus-gated skips must ignore --submodules")
+
+        # THE FALLBACK MUST NOT BE SILENT. A project declared corpus-dependent
+        # without the second count is the shape that reappears as a release-only
+        # failure, so it is refused rather than guessed at — and the converse
+        # (the key without the declaration) is refused too, so the two cannot
+        # drift apart.
+        manifest.write_text(
+            json.dumps({"projects": [{"path": project, "corpusDependent": True,
+                                      "expectedTotal": 640, "expectedSkipped": 1}]}),
+            encoding="utf-8",
+        )
+        errors = validate(without_corpus, project, manifest, submodules=True)
+        if not any("expectedSkippedWithSubmodules is missing" in e for e in errors):
+            raise AssertionError(
+                "corpusDependent without the second count was accepted — the silent fallback is "
+                "back, and with it the release-only failure #1149 fixed")
+        manifest.write_text(
+            json.dumps({"projects": [{"path": project, "expectedTotal": 640,
+                                      "expectedSkipped": 1,
+                                      "expectedSkippedWithSubmodules": 0}]}),
+            encoding="utf-8",
+        )
+        if not any("not corpusDependent" in e
+                   for e in validate(without_corpus, project, manifest, submodules=False)):
+            raise AssertionError("the key without the declaration was accepted")
     print("TRX inventory negative self-test passed.")
 
 
