@@ -227,15 +227,22 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   17 would have read as if it had been there all along.)*
 - **The cluster moved again, after R2, and PP-R1 leg 1 still reads MISS.**
   R3's inherited-member lookup and round 4's finding 4 removed six more Calor0208
-  stops — the cluster is now **17** and `ModulesEnforced` is **324**, so the
-  40 → 17 recovery of 23 modules is past the registered target of 20.
+  stops. The cluster is now **17** (40 → 17), and `ModulesEnforced` is **324** —
+  a recovery of **20** from R1's 304, which is numerically the frozen target.
   **That does not convert R2's MISS into a HIT and must never be recorded as
   one.** The frozen rule names *R2* as the thing being measured; R2 recovered 15.
   Work done afterwards by a different change, for a different reason, is a
-  different fact — recorded here as its own line, beside the verdict rather than
-  on top of it. The precedent is v0.16 §0.1 and this release's own R3
-  measurement correction: a number published beside the old one is honest, a
-  number published *instead of* it is not.
+  different fact. And **no rule was ever registered for "the release recovers
+  N"** — writing one now, with 20 already on the board, is review round 3's
+  finding R3-b happening a second time. So the release figure is **not a HIT
+  either**; it is a measured number with no pre-registered rule, reported beside
+  the verdict rather than on top of it. The precedent is v0.16 §0.1 and this
+  release's own R3 measurement correction: a number published beside the old one
+  is honest, a number published *instead of* it is not.
+  *Pinned:* `Calor0425CorpusLedgerTests.R1_NamesTheLargestBindingCluster_AndTheFrozenRuleSizesR2`
+  now holds R2's 15 as a CONSTANT — so later work cannot reach back and turn the
+  MISS into a pass — and pins today's 324 exactly, so a move in either direction
+  regenerates the ledger with the change named.
 - **R2 — the change itself.** Scoped by measurement, not by guess: R1 runs
   first and its answer picks the target. The pre-registered acceptance is a **move in
   `ModulesEnforced`**, published per subject against gate 9's existing floors (250 aggregate;

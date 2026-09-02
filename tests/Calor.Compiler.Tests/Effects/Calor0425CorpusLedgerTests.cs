@@ -1508,17 +1508,38 @@ public class Calor0425CorpusLedgerTests
             $"binding stops total {aggregate.Values.Sum()}, above R1's registered "
             + $"{RegisteredTotalBindStops}.");
 
-        // R2's OUTCOME, as measured: 304 -> 319 enforced is +15 against a target
-        // of 20, so PP-R1 leg 1 reads MISS. Recorded as an assertion so the
-        // shortfall cannot quietly become a pass later.
+        // R2's OUTCOME IS HISTORY AND DOES NOT MOVE. R2 took ModulesEnforced
+        // 304 -> 319: +15 against the frozen target of 20, so PP-R1 leg 1 reads
+        // MISS. Pinned as a constant rather than recomputed, because the whole
+        // point is that later work cannot reach back and turn it into a pass.
         const int EnforcedAtR1 = 304;
-        var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
-        var recovered = enforcedNow - EnforcedAtR1;
-        Assert.True(recovered >= 0, $"ModulesEnforced fell to {enforcedNow} from {EnforcedAtR1}.");
-        Assert.True(recovered < target,
-            $"ModulesEnforced recovered {recovered} modules, reaching the frozen target of {target}. "
+        const int EnforcedAfterR2 = 319;
+        const int RecoveredByR2 = EnforcedAfterR2 - EnforcedAtR1;
+        Assert.True(RecoveredByR2 < target,
+            $"R2 recovered {RecoveredByR2} modules against the frozen target of {target}. "
             + "PP-R1 leg 1 is recorded as a MISS in roadmap-v0.17 §3.1 — update that outcome, this "
             + "assertion, and the release notes together.");
+
+        // WHERE THE RELEASE STANDS NOW, kept separate from that verdict.
+        //
+        // v0.17 R3's inherited-member lookup and round 4's finding 4 removed six
+        // more Calor0208 bind stops, so ModulesEnforced is 324 and the recovery
+        // from R1's 304 is 20 — numerically the frozen target. THIS IS NOT A HIT
+        // AND MUST NOT BE RECORDED AS ONE. The rule frozen in review round 3
+        // measures R2, and no rule was ever registered for "the release
+        // recovers N". A number that meets a target it was not registered
+        // against is not evidence, and writing that rule now — after seeing the
+        // data — is exactly the moving goalpost §10 R3-b forbade. The release
+        // figure is reported beside the verdict, never on top of it.
+        var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
+        Assert.True(enforcedNow >= EnforcedAfterR2,
+            $"ModulesEnforced fell to {enforcedNow}, below the {EnforcedAfterR2} R2 left it at.");
+        const int EnforcedAfterR3AndRound4 = 324;
+        Assert.True(enforcedNow == EnforcedAfterR3AndRound4,
+            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterR3AndRound4} recorded for the "
+            + "R3 + round-4 commit. This is an EXACT pin: a move — in either direction — regenerates "
+            + "the ledger IN THIS PR with the change named, and updates §3.1's outcome record. It "
+            + "does not reopen PP-R1 leg 1, which is closed as a MISS on R2's own 15.");
     }
 
     /// <summary>
