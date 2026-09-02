@@ -1896,6 +1896,9 @@ public sealed class Parser
         Binding,
         /// <summary>Position 8 — a field's row. Nothing binds a variable there.</summary>
         Field,
+        /// <summary>v0.17 S1 / #1136 — a property's row, the field position's
+        /// twin. Nothing binds a variable there either.</summary>
+        Property,
         /// <summary>Position 2 — a lambda literal has no type-parameter list (Z8b).</summary>
         Lambda,
         /// <summary>Position 3 — a delegate declaration has no type-parameter list (Z8).</summary>
@@ -1910,6 +1913,7 @@ public sealed class Parser
         EffectRowPosition.Return => "a return row — a returned function mentioning the caller's effect variable would be rank-2 polymorphism",
         EffectRowPosition.Binding => "a binding's row — a §B binds no effect variable",
         EffectRowPosition.Field => "a field's row — a §FLD binds no effect variable",
+        EffectRowPosition.Property => "a property's row — a §PROP binds no effect variable",
         EffectRowPosition.Lambda => "a lambda literal's row — a §LAM has no type-parameter list to bind one",
         EffectRowPosition.Delegate => "a delegate declaration's row — a §DEL has no type-parameter list to bind one",
         _ => "this position",
@@ -10309,6 +10313,12 @@ public sealed class Parser
         {
             var (getter, setter, initer) = ParseAccessorShorthand(accessorStr, startToken.Span, visibility);
 
+            // v0.17 S1 / #1136 — position 9: the property's row, in the header
+            // group and on the same line, exactly as a §FLD's is. Read BEFORE the
+            // default-value branch for the same reason the field parser does:
+            // otherwise the §E is consumed as an expression.
+            var compactRow = TryParseSameLineRow(EffectRowPosition.Property);
+
             // Parse optional default value
             ExpressionNode? defaultValue = null;
             if (Check(TokenKind.Equals))
@@ -10337,8 +10347,13 @@ public sealed class Parser
                 attrs,
                 csharpAttrs,
                 GetIdentifierSpan(attrs, propertyNameKey, name),
-                attrs.GetSpan(propertyTypeKey));
+                attrs.GetSpan(propertyTypeKey),
+                compactRow);
         }
+
+        // v0.17 S1 / #1136 — position 9 on the block form too, read before the
+        // body so the §E is not taken for an accessor.
+        var blockRow = TryParseSameLineRow(EffectRowPosition.Property);
 
         PropertyAccessorNode? getter2 = null;
         PropertyAccessorNode? setter2 = null;
@@ -10407,7 +10422,8 @@ public sealed class Parser
             attrs,
             csharpAttrs,
             GetIdentifierSpan(attrs, propertyNameKey, name),
-            attrs.GetSpan(propertyTypeKey));
+            attrs.GetSpan(propertyTypeKey),
+            blockRow);
     }
 
     /// <summary>

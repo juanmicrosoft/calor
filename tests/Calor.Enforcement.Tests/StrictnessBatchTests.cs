@@ -1239,20 +1239,40 @@ var x = 1;
                 §R §C{Map} §A INT:1 §A cb §/C
             """);
 
-        // P22 — §10.3's SECOND string. The doc's sample ends "'UseImpure' is
-        // charged Unknown effects"; the shipped tail says what actually happens
-        // instead, because charging an `unknown` effect would raise a Calor0410
-        // the author cannot declare away. The divergence is recorded in the PR
-        // body and in docs/plans/2026-08-26-v0.15-e3b-notes.md.
+        // P22 — §10.3's SECOND string. v0.15 SHIPPED A DIVERGENCE from the design
+        // here: the doc's sample ends "'UseImpure' is charged Unknown effects",
+        // and the shipped tail said the opposite — "nothing is charged" — on the
+        // reasoning that charging `unknown` raises a Calor0410 the author cannot
+        // declare away (docs/plans/2026-08-26-v0.15-e3b-notes.md).
+        //
+        // v0.17 S1 CLOSES THAT DIVERGENCE, because #1136 measured what it cost:
+        // five argument spellings reached this arm, were charged nothing, and let
+        // a `§E{}` method invoke a `§E{cw}` member through a row-polymorphic
+        // callee at exit 0 — confirmed escaping at runtime by the held-out
+        // suites. "Nothing is charged" is not a weaker claim than the design's,
+        // it is the wrong one: Unknown means ANY effect, not none.
+        //
+        // The concern behind the divergence was real and is answered by the
+        // second assertion below rather than by staying silent: the author cannot
+        // declare `unknown`, so the two ways out are to state a row on the
+        // argument — which the message says — or `--permissive-effects`, which
+        // still demotes the Calor0410 and is what conversion work uses.
         var reported = Assert.Single(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown
               && d.Message.StartsWith("Effect variable", StringComparison.Ordinal));
         Assert.Equal(
             "Effect variable 'e' of 'Map' instantiates to Unknown at this call site: the row of "
-            + "argument 'cb' could not be determined. The instantiated row of 'Map' is Unknown "
-            + "here, so nothing is charged to 'Use' for it. State a row on the argument's "
+            + "argument 'cb' could not be determined. 'Use' is charged Unknown for it, because a "
+            + "row this pass cannot determine may carry any effect. State a row on the argument's "
             + "declaration, or compile with --permissive-effects.",
             reported.Message);
+
+        // FAIL CLOSED, asserted as behaviour and not only as prose: the charge
+        // reaches the caller and surfaces.
+        Assert.Contains(
+            result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+              && d.Message.Contains("'Use'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -2045,5 +2065,93 @@ var x = 1;
         Assert.Contains(result.Diagnostics.Warnings, d =>
             d.Code == DiagnosticCode.EffectRowUnknown
             && d.Message.StartsWith("Parameter 'g' of 'RunTwice' is function-typed with no effect row", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// v0.17 S1 / #1136 — the property half of the fix set. A <c>§PROP</c> could
+    /// not carry an effect row AT ALL: <c>§PROP{…} §E{cw}</c> was 4x Calor0100,
+    /// because <c>Parser.ParseProperty</c> never consumed an Effects token. The
+    /// consequence #1136 recorded is that a property read was <c>Unknown</c> BY
+    /// CONSTRUCTION rather than by an inference gap — so the obvious fix
+    /// ("resolve the read to the rowed declaration") was unimplementable for
+    /// properties, and the issue's fix set is a UNION of two changes.
+    /// </summary>
+    [Fact]
+    public void PropertyRow_IsParsedAndHonoured()
+    {
+        var result = TestHarness.Compile("""
+            §M{m001:PropRow}
+              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+                §E{e}
+                §R (+ §C{stage} §/C §C{stage} §/C)
+
+              §CL{c001:Holder:pub}
+                §PROP{p001:Stage:Func<i32>:pub:get,set} §E{cw}
+                §MT{mt001:Twice:pub} () -> i32
+                  §E{cw}
+                  §R §C{RunTwice} §A Stage §/C
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    /// <summary>
+    /// v0.17 S1 — parsing the row is only half of it. If the pass did not RESOLVE
+    /// the read to the declared row, the author would state a row the compiler
+    /// ignored, which is worse than rejecting it: the declaration would look
+    /// like it worked while the effect still escaped as Unknown. Here the caller
+    /// under-declares, and the diagnostic must name <c>cw</c> — the property's
+    /// actual row — not <c>unknown</c>.
+    /// </summary>
+    [Fact]
+    public void PropertyRow_IsResolved_NotMerelyParsed()
+    {
+        var result = TestHarness.Compile("""
+            §M{m001:PropRow}
+              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+                §E{e}
+                §R (+ §C{stage} §/C §C{stage} §/C)
+
+              §CL{c001:Holder:pub}
+                §PROP{p001:Stage:Func<i32>:pub:get,set} §E{cw}
+                §MT{mt001:Twice:pub} () -> i32
+                  §E{}
+                  §R §C{RunTwice} §A Stage §/C
+            """);
+
+        var forbidden = Assert.Single(
+            result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Contains("'cw'", forbidden.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("unknown", forbidden.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// v0.17 S1 / #1136 — the fail-closed half, on the shape the issue measured
+    /// as the most idiomatic escape: an argument the pass cannot name is charged
+    /// Unknown rather than nothing, so the caller must declare it or be refused.
+    /// Before this the same program exited 0 with a <c>warning Calor0425</c>.
+    /// </summary>
+    [Fact]
+    public void UnnameableArgument_IsChargedUnknown_NotSilentlyDropped()
+    {
+        var result = TestHarness.Compile("""
+            §M{m001:FailClosed}
+              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+                §E{e}
+                §R (+ §C{stage} §/C §C{stage} §/C)
+
+              §CL{c001:Holder:pub}
+                §FLD{Func<i32>:stage:pri} §E{cw}
+                §MT{mt001:Twice:pub} () -> i32
+                  §E{}
+                  §R §C{RunTwice} §A this.stage §/C
+            """);
+
+        Assert.Contains(
+            result.Diagnostics,
+            d => d.Code == DiagnosticCode.EffectRowUnknown
+              && d.Message.Contains("is charged Unknown for it", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
     }
 }
