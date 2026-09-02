@@ -1174,17 +1174,29 @@ public class Calor0425CorpusLedgerTests
     private static string Describe(SortedDictionary<string, int>? causes) =>
         causes is null ? "<null>" : string.Join("+", causes.Select(c => $"{c.Key}:{c.Value}"));
 
-    /// <summary>The symmetric difference, because the lists are long and the
-    /// interesting part of a move is which modules entered and left.</summary>
+    /// <summary>
+    /// What moved, described the way the assertion COMPARES. The equality is
+    /// <see cref="Enumerable.SequenceEqual{T}(IEnumerable{T},IEnumerable{T})"/>,
+    /// which is order-sensitive; a set difference is not. Same modules in a
+    /// different order — a platform sort-order change, or a corpus rename that
+    /// only shifts positions — would fail the pin while this printed
+    /// "identical", telling the reader nothing moved. So an order-only
+    /// difference reports the first index where the two disagree.
+    /// </summary>
     private static string DescribeDelta(List<string>? committed, List<string>? measured)
     {
         if (committed is null || measured is null)
             return "<null>";
-        var gone = committed.Except(measured).ToList();
-        var came = measured.Except(committed).ToList();
-        if (gone.Count == 0 && came.Count == 0)
+        var gone = committed.Except(measured, StringComparer.Ordinal).ToList();
+        var came = measured.Except(committed, StringComparer.Ordinal).ToList();
+        if (gone.Count > 0 || came.Count > 0)
+            return $"-[{string.Join("; ", gone)}] +[{string.Join("; ", came)}]";
+        if (committed.SequenceEqual(measured, StringComparer.Ordinal))
             return "identical";
-        return $"-[{string.Join("; ", gone)}] +[{string.Join("; ", came)}]";
+        var i = Enumerable.Range(0, Math.Min(committed.Count, measured.Count))
+            .First(n => !string.Equals(committed[n], measured[n], StringComparison.Ordinal));
+        return $"same members, ORDER differs — first at index {i}: "
+            + $"committed '{committed[i]}' vs measured '{measured[i]}'";
     }
 
     /// <summary>
@@ -1208,6 +1220,26 @@ public class Calor0425CorpusLedgerTests
     }
 
     /// <summary>
+    /// Schema 4's collection members forced a hand-written
+    /// <c>SubjectVolume.Equals</c>, replacing the compiler's member-wise one. It
+    /// is now a hand-maintained list of every member, so schema 5 adds a field,
+    /// someone forgets a line there, and the ledger's central pin SILENTLY STOPS
+    /// DETECTING MOVEMENT in that field — the exact failure the ledger exists to
+    /// prevent, and invisible because the test still passes. This makes adding a
+    /// member fail loudly until the comparison is updated with it.
+    /// </summary>
+    [Fact]
+    public void SubjectVolumeEquality_CoversEveryMember()
+    {
+        var members = typeof(SubjectVolume).GetProperties().Length;
+        Assert.True(members == 26,
+            $"SubjectVolume has {members} members; the hand-written Equals covers 26. Add the new "
+            + "member to Equals(SubjectVolume?) — omitting it makes "
+            + "Calor0425CorpusLedgerMatchesRecomputation blind to that field — then update this "
+            + "count.");
+    }
+
+    /// <summary>
     /// Gate 13 (roadmap-v0.17 §5). The bind-failure histogram must SUM to
     /// <c>ExcludedBindFailed</c> on every subject, and name one module per
     /// exclusion. A cause that does not add up is a red gate, not a rounding
@@ -1215,7 +1247,7 @@ public class Calor0425CorpusLedgerTests
     /// cluster, and one that loses modules would scope it against a smaller
     /// cluster than the corpus holds.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void Gate13_BindFailureCauses_SumToExcludedBindFailed()
     {
         var committed = CommittedLedger();
@@ -1238,7 +1270,7 @@ public class Calor0425CorpusLedgerTests
     /// Both constants are asserted here, so moving one is a diff on a pin rather
     /// than a quiet re-scoping.</para>
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void R1_NamesTheLargestBindingCluster_AndTheFrozenRuleSizesR2()
     {
         var committed = CommittedLedger();
@@ -1282,7 +1314,7 @@ public class Calor0425CorpusLedgerTests
     /// is the next question, not an answered one — asserted here so the count is
     /// never read as "the IL-rows trigger really fires".</para>
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void R1_Calor0411_IsCountedOverTheEnforcedSet()
     {
         var committed = CommittedLedger();
@@ -1304,7 +1336,11 @@ public class Calor0425CorpusLedgerTests
         // The contrast M1 asked for, as an assertion rather than a sentence: the
         // trigger's own fields read zero over exactly this set.
         var trigger = committed.PerSubject.Sum(s => s.UnknownSource + s.InvocationUndetermined);
-        Assert.Equal(0, trigger);
+        Assert.True(trigger == 0,
+            $"UnknownSource + InvocationUndetermined is {trigger}, not 0. This is not a defect — "
+            + "it is the IL-rows demand the roadmap's DEFERRED list is waiting for, and it fires "
+            + "at > 10. Update this pin to the measured value, and re-read the IL-rows trigger "
+            + "against it rather than against the Calor0411 upper bound below.");
         Assert.True(sites > trigger,
             "if this ever inverts, the trigger is measuring the larger class and M1 is closed.");
     }
