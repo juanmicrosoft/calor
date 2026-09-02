@@ -471,8 +471,24 @@ listed here as questions, not as assumptions:
    maintainer in writing at the 0.16 branch cut". Overdue. This draft holds them DEFERRED, which
    is a placeholder, not the adjudication.
 2. **The flake rate** for #859 / #884 / #959 / #948 / #1135, "attached at the 0.16 branch cut".
-   No rate has been measured or attached. Until it is, "0.17.x instrument debt" in §6 is a venue
-   without a size.
+   No rate had been measured. **Three data points now exist for one member of the cluster**, all
+   collected while shipping 0.16.0, and they have a shape:
+
+   | # | PR / run | shard | duration | test failures | outcome |
+   |---|---|---|---|---|---|
+   | 1 | #1145 · `33546049628` | `tests (compiler)` | 10m33s | **0** of 7,633 | green on retry |
+   | 2 | #1147 · `33565838496` | `tests (compiler)` | 8m26s | **0** of 7,040 | green on retry |
+   | 3 | #1149 · `33627185993` | `tests (compiler)` | 8m08s | **0** of 6,204 | retried |
+
+   Every one is `##[error]The runner has received a shutdown signal` / **exit 143**, and every one
+   passes on retry. **It is not test-specific**: the three died after different tests, at three
+   different counts, with no failure anywhere in any log. Consistently 8–10½ minutes in, on a
+   shard that carries the corpus submodules (`test.yml:375` gives `compiler` `recursive`).
+   That profile — non-deterministic termination point, no failing test, always green on retry — is
+   **resource exhaustion on the runner**, not a product defect, and it is distinct from #965's
+   *reproducible* kill of the perf suite. **Three in two days on a release-critical shard is a
+   rate, not a rumour**, and it is the argument for making this a measured deliverable rather than
+   a §6 row: nobody was counting until a release forced it.
 3. **#965** — whether the perf suite killed the CI runner on the 0.16.0 release path. R:§7 makes
    it release-blocking for the *next* release if it recurs; the observation has to come from the
    0.16.0 release itself, which has not happened. **A first data point arrived while this draft
