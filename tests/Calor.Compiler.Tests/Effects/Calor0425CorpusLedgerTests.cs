@@ -1129,6 +1129,99 @@ public class Calor0425CorpusLedgerTests
     }
 
     /// <summary>
+    /// Gate 13 (roadmap-v0.17 §5). The bind-failure histogram must SUM to
+    /// <c>ExcludedBindFailed</c> on every subject, and name one module per
+    /// exclusion. A cause that does not add up is a red gate, not a rounding
+    /// note: the histogram exists so §3.1 R2 can be scoped against a real
+    /// cluster, and one that loses modules would scope it against a smaller
+    /// cluster than the corpus holds.
+    /// </summary>
+    [SkippableFact]
+    public void Gate13_BindFailureCauses_SumToExcludedBindFailed()
+    {
+        var committed = CommittedLedger();
+        foreach (var subject in committed.PerSubject)
+        {
+            Assert.Equal(subject.ExcludedBindFailed, subject.BindFailureCauses.Values.Sum());
+            Assert.Equal(subject.ExcludedBindFailed, subject.BindFailureModules.Count);
+        }
+    }
+
+    /// <summary>
+    /// v0.17 R1's deliverable to §3.1 R2: the largest binding cluster, named.
+    /// <para>The RULE this feeds is frozen in roadmap-v0.17 §4.1 and was written
+    /// BEFORE this measurement existed — R2 recovers at least half the largest
+    /// cluster and never fewer than 10 modules. R1 supplies the cluster's SIZE
+    /// and may not choose the fraction or the floor (review round 3, finding
+    /// R3-b: deferring the whole effect size to R1 would have let whoever writes
+    /// R1's PR pick the target with the breakdown already in front of them).
+    /// Both constants are asserted here, so moving one is a diff on a pin rather
+    /// than a quiet re-scoping.</para>
+    /// </summary>
+    [SkippableFact]
+    public void R1_NamesTheLargestBindingCluster_AndTheFrozenRuleSizesR2()
+    {
+        var committed = CommittedLedger();
+        var aggregate = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        foreach (var subject in committed.PerSubject)
+            foreach (var cause in subject.BindFailureCauses)
+                aggregate[cause.Key] = aggregate.GetValueOrDefault(cause.Key) + cause.Value;
+
+        var largest = aggregate.MaxBy(entry => entry.Value);
+        Assert.Equal("Calor0208", largest.Key);
+        Assert.Equal(40, largest.Value);
+        Assert.Equal(60, aggregate.Values.Sum());
+
+        // The frozen rule, applied. Neither constant is R1's to move.
+        const double RecoverAtLeastFraction = 0.5;
+        const int NeverFewerThan = 10;
+        var target = Math.Max(
+            (int)Math.Ceiling(largest.Value * RecoverAtLeastFraction), NeverFewerThan);
+        Assert.Equal(20, target);
+
+        // PP-R1 may read UNDERPOWERED on ONE condition: the corpus cannot supply
+        // the effect under a rule fixed before the data was seen. It can.
+        Assert.True(largest.Value >= NeverFewerThan,
+            "the largest cluster is below the frozen floor, which is the only condition under "
+            + "which PP-R1 may read UNDERPOWERED (roadmap-v0.17 §4.1).");
+    }
+
+    /// <summary>
+    /// v0.17 R1 / review round 1 finding M1 — the denominator the IL-rows trigger
+    /// was being read without.
+    /// <para>This class's own comment records that §13.4's "unresolved receiver"
+    /// never reaches Calor0425: the bare-target guard sends it out as Calor0411
+    /// through the unknown-call chain. The trigger reads
+    /// <c>UnknownSource + InvocationUndetermined</c> over the enforced set, so a
+    /// zero there said nothing about the adjacent class until that class was
+    /// counted over the SAME set.</para>
+    /// <para><b>What this number is not.</b> Calor0411 is every unknown external
+    /// call, not only the delegate-returning ones the IL-rows item is about, so
+    /// it is an UPPER BOUND on that demand and not a measure of it. Splitting it
+    /// is the next question, not an answered one — asserted here so the count is
+    /// never read as "the IL-rows trigger really fires".</para>
+    /// </summary>
+    [SkippableFact]
+    public void R1_Calor0411_IsCountedOverTheEnforcedSet()
+    {
+        var committed = CommittedLedger();
+        var sites = committed.PerSubject.Sum(s => s.Calor0411Sites);
+        var modules = committed.PerSubject.Sum(s => s.Calor0411Modules);
+        var enforced = committed.PerSubject.Sum(s => s.ModulesEnforced);
+
+        Assert.True(sites > 0, "Calor0411 is uncounted again — M1's whole point.");
+        Assert.True(modules <= enforced,
+            $"Calor0411 is counted over the ENFORCED set, so {modules} may not exceed {enforced}.");
+
+        // The contrast M1 asked for, as an assertion rather than a sentence: the
+        // trigger's own fields read zero over exactly this set.
+        var trigger = committed.PerSubject.Sum(s => s.UnknownSource + s.InvocationUndetermined);
+        Assert.Equal(0, trigger);
+        Assert.True(sites > trigger,
+            "if this ever inverts, the trigger is measuring the larger class and M1 is closed.");
+    }
+
+    /// <summary>
     /// v0.16 K1's manifest rule, in one place so the ledger walk and the
     /// scratch-cwd pin cannot drift apart: built-in manifests only. A hermetic
     /// <see cref="Compiler.Effects.Manifests.ManifestLoader"/> keeps
@@ -1254,7 +1347,46 @@ public class Calor0425CorpusLedgerTests
         /// <c>UnknownSource + InvocationUndetermined</c>, so without this it was
         /// being read against a partial denominator.</summary>
         int Calor0411Sites,
-        int Calor0411Modules);
+        int Calor0411Modules)
+    {
+        /// <summary>
+        /// Schema 4 added two COLLECTION members, and a positional record's
+        /// synthesized equality compares members with
+        /// <see cref="EqualityComparer{T}.Default"/> — which for
+        /// <see cref="List{T}"/> and <see cref="SortedDictionary{TKey,TValue}"/>
+        /// is REFERENCE equality. Without this override the committed-vs-measured
+        /// comparison in
+        /// <c>Calor0425CorpusLedgerMatchesRecomputation</c> compares two distinct
+        /// instances and is unequal on every run, turning the ledger's central
+        /// pin into a permanent red that says "volume moved" when nothing did.
+        /// Caught by that test on the first run of schema 4.
+        /// </summary>
+        public bool Equals(SubjectVolume? other) =>
+            other is not null
+            && (Subject, Diagnostics, ModulesWithDiagnostics, ModulesEnforced, ModulesNotMeasured)
+               == (other.Subject, other.Diagnostics, other.ModulesWithDiagnostics,
+                   other.ModulesEnforced, other.ModulesNotMeasured)
+            && (RowlessDestination, UnknownSource, Assumed, RowlessInvoked, RowlessNeverInvoked)
+               == (other.RowlessDestination, other.UnknownSource, other.Assumed,
+                   other.RowlessInvoked, other.RowlessNeverInvoked)
+            && (ExternalBase, InvocationRowless, InvocationUndetermined, InvocationAssumed,
+                InvocationWitness)
+               == (other.ExternalBase, other.InvocationRowless, other.InvocationUndetermined,
+                   other.InvocationAssumed, other.InvocationWitness)
+            && (ExcludedConversionFailed, ExcludedParseFailed, ExcludedBindFailed,
+                ExcludedEffectPassFaulted)
+               == (other.ExcludedConversionFailed, other.ExcludedParseFailed,
+                   other.ExcludedBindFailed, other.ExcludedEffectPassFaulted)
+            && (ModulesEnforcedRawBagRule, RawBagBindFailed, Calor0411Sites, Calor0411Modules)
+               == (other.ModulesEnforcedRawBagRule, other.RawBagBindFailed, other.Calor0411Sites,
+                   other.Calor0411Modules)
+            && BindFailureCauses.SequenceEqual(other.BindFailureCauses)
+            && BindFailureModules.SequenceEqual(other.BindFailureModules);
+
+        public override int GetHashCode() =>
+            HashCode.Combine(Subject, Diagnostics, ModulesEnforced, ExcludedBindFailed,
+                Calor0411Sites, BindFailureCauses.Count, BindFailureModules.Count);
+    }
 
     /// <summary>v0.16 K1 — one per-subject leg of gate 9's <c>ModulesEnforced</c>
     /// floor.</summary>
