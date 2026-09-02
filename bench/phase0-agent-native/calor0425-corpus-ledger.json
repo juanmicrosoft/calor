@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 4,
-  "Scope": "Calor0425 (EffectRowUnknown) emitted by EffectEnforcementPass over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols, then enforced with UnknownCallPolicy.Strict and no --permissive-effects; the pass runs over every module the SHIPPING COMPILER reaches \u2014 binder diagnostics are filtered through BindingDiagnosticPolicy.PropagateCompilationErrors into a fresh bag before the stop, exactly as Program.cs:820/829-833 does (v0.16 K1, schema 3), NOT gated on the raw binder bag as schema 2 was; modules that fail conversion, whose converted output fails to parse, that stop at a propagated binding error, or whose effect pass throws are excluded from the denominator and counted separately. Manifests are BUILT-IN ONLY \u2014 deliberately hermetic, and therefore STRICTER than the CLI leg, which still reads ~/.calor/manifests: the pass is constructed with no project directory (so no .calor-effects.json beside the input can be read, which is the channel the CLI leg closes by keeping its converted-module directory manifest-free) and the loader is built with loadUserLevelManifests:false (so the machine cannot move the number). The invoked / never-invoked split of the row-less destinations is a TEXTUAL probe over the converted module covering \u00A7C{name} calls and the (?. name \u0022Invoke\u0022) interop form; a delegate reached through a field chain or an alias is invisible to it, so RowlessNeverInvoked is an UPPER bound and RowlessInvoked a lower one. Causes are the ones the FIVE MONOMORPHIC SITES of design-doc \u00A76.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of sites 4/5 and the three verdicts an INVOCATION of a function-typed value can draw \u2014 row-less declaration, undetermined source (a BCL-returned or row-less-returned value), and an Assumed row; \u00A713.4\u0027s unresolved-receiver cause is Calor0411\u0027s, not this ledger\u0027s",
+  "Scope": "Calor0425 (EffectRowUnknown) emitted by EffectEnforcementPass over the three A-1.5.3 conversion subjects at their pinned submodule commits, converted in-process with Lossy/SelectActiveBranchLossy and genuinely empty default preprocessor symbols, then enforced with UnknownCallPolicy.Strict and no --permissive-effects; the pass runs over every module the SHIPPING COMPILER reaches \u2014 binder diagnostics are filtered through BindingDiagnosticPolicy.PropagateCompilationErrors into a fresh bag before the stop, exactly as Program.cs:820/829-833 does (v0.16 K1, schema 3), NOT gated on the raw binder bag as schema 2 was; modules that fail conversion, whose converted output fails to parse, that stop at a propagated binding error, or whose effect pass throws are excluded from the denominator and counted separately. SCHEMA 4 (v0.17 R1) adds two things its numbers cannot be read without. BindFailureCauses/BindFailureModules break the propagated bind stops out by the FIRST propagated error \u2014 the one the compiler stops on \u2014 and BindFailureMultiCause counts the modules carrying more than one, because a module attributed to the largest cluster that also stops elsewhere cannot be recovered by fixing that cluster alone. Calor0411Sites/Calor0411Modules count UnknownExternalCall over the SAME enforced set, because the unresolved-receiver class never reaches Calor0425 \u2014 the bare-target guard sends it through the unknown-call chain \u2014 so a trigger reading UnknownSource \u002B InvocationUndetermined was being read against a partial denominator. Calor0411 is EVERY unknown external call, not only the delegate-returning ones that trigger concerns, so it is an UPPER BOUND on that demand and not a measure of it. Manifests are BUILT-IN ONLY \u2014 deliberately hermetic, and therefore STRICTER than the CLI leg, which still reads ~/.calor/manifests: the pass is constructed with no project directory (so no .calor-effects.json beside the input can be read, which is the channel the CLI leg closes by keeping its converted-module directory manifest-free) and the loader is built with loadUserLevelManifests:false (so the machine cannot move the number). The invoked / never-invoked split of the row-less destinations is a TEXTUAL probe over the converted module covering \u00A7C{name} calls and the (?. name \u0022Invoke\u0022) interop form; a delegate reached through a field chain or an alias is invisible to it, so RowlessNeverInvoked is an UPPER bound and RowlessInvoked a lower one. Causes are the ones the FIVE MONOMORPHIC SITES of design-doc \u00A76.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of sites 4/5 and the three verdicts an INVOCATION of a function-typed value can draw \u2014 row-less declaration, undetermined source (a BCL-returned or row-less-returned value), and an Assumed row; \u00A713.4\u0027s unresolved-receiver cause is Calor0411\u0027s, not this ledger\u0027s",
   "BindRule": "propagated",
   "FloorRule": {
     "Gate": "roadmap-v0.16.md \u00A75 gate 9 \u2014 conversion denominator, re-set on the production rule",
@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "82a7c653cbf1ea2f6231e38cc328c74a34e6589b",
+  "MeasuredCommit": "2ab2a1628e57260d025153eafeeb55c78f889522",
   "AggregateDiagnostics": 90,
   "AggregateModulesWithDiagnostics": 40,
   "AggregateModulesEnforced": 304,
@@ -112,6 +112,7 @@
         "Calor0208 MediatR/Pipeline/RequestExceptionProcessorBehavior.cs",
         "Calor0208 MediatR/Registration/ServiceRegistrar.cs"
       ],
+      "BindFailureMultiCause": 0,
       "Calor0411Sites": 36,
       "Calor0411Modules": 9
     },
@@ -168,6 +169,7 @@
         "Calor0208 Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs",
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],
+      "BindFailureMultiCause": 5,
       "Calor0411Sites": 369,
       "Calor0411Modules": 51
     },
@@ -231,6 +233,7 @@
         "Calor0201 FluentValidation/Validators/RangeValidator.cs",
         "Calor0208 FluentValidation/Validators/RegularExpressionValidator.cs"
       ],
+      "BindFailureMultiCause": 5,
       "Calor0411Sites": 7138,
       "Calor0411Modules": 107
     }
