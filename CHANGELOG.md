@@ -6,26 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **We can now say WHY the compiler gives up on the code it gives up on.** When we
-  convert real C# projects to Calor and run the effect checks over them, 60 of the
-  modules never get that far — they stop earlier, at the step that works out what
-  every name refers to. Until now that was a bare count: sixty, cause unknown. We
-  now record which error stopped each one, and which file it was, so the biggest
-  group can be found and fixed rather than guessed at. It turns out one error
+- **The compiler now records why it stops on the code it cannot process.** When we
+  convert real C# projects to Calor, 60 modules fail during name binding and never
+  reach the effect checks. Until now that was a bare count: sixty, cause unknown.
+  We now record which diagnostic stopped each module, and in which file, so the
+  biggest group can be found and fixed rather than guessed at. One diagnostic
   accounts for two thirds of them. We also count the modules that stop for **more
-  than one** reason — ten of the sixty — because those cannot be rescued by fixing
-  a single cause, and a plan that ignored them would promise more than it could
+  than one** reason — ten of the sixty — because fixing a single cause cannot
+  rescue those, and a plan that ignored them would promise more than it could
   deliver.
-- **A number we had been reading with half the picture missing.** We track how often
-  the compiler meets a function value it cannot identify, to decide whether a
-  bigger feature is worth building. That count read zero. It turns out the check
-  was looking in the one place that particular problem never appears — a different
-  message is used for it, and nobody was counting that one. Counted over exactly
-  the same set of files, it is **7,543 occurrences across 167 of 304 modules**.
-  This does **not** mean the feature is now justified: that message covers every
-  unrecognised external call, not just the narrow case in question, so it is a
-  ceiling on the demand and not a measurement of it. Both the test and the saved
-  record say so plainly, so the number cannot later be quoted as more than it is.
+- **A demand count we had been reading from the wrong diagnostic.** We track how
+  often the compiler meets a function value it cannot identify, to decide whether a
+  bigger feature is worth building. That count read zero — because the check watched
+  a diagnostic this case never emits. A different diagnostic reports it, and nobody
+  was counting that one. Over exactly the same set of files, the count is **7,543
+  occurrences across 167 of 304 modules**. This does **not** mean the feature is now
+  justified: that diagnostic covers every unresolved external call, not just the
+  narrow case in question, so it is a ceiling on the demand and not a measurement of
+  it. Both the test and the saved record say so plainly, so the number cannot later
+  be quoted as more than it is.
 
 ## [0.16.0] - 2026-09-01
 
@@ -49,47 +48,44 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **The scorecard for the "do effect rows actually help?" experiment now exists, and it is
-  written down before the experiment runs.** We are about to pay for a set of coding runs
-  that ask a simple question: given the same task, does an agent working with the newer,
-  stricter compiler sneak fewer hidden side effects past it than an agent working with the
-  older, more permissive one — and does the stricter compiler cost noticeably more work to
-  get to green? A new script, `bench/phase0-agent-native/ppw-analyze.py`, reads the finished
-  runs and produces the answer, and a new file,
-  `bench/phase0-agent-native/effect-rows-benefit-ledger.json`, records it. Both were built
-  *before* any run happened, so the rules cannot be bent once the numbers are in: the script
-  is a transcription of the rules already frozen in the project's registration document, a
-  test recomputes the record from scratch and compares it byte for byte, and the script
-  refuses to score a run at all if the recording is incomplete. One rule matters more than
-  the rest and is easy to get backwards: a "sneaked-past side effect" only counts on a
-  workspace that actually **built**. Runs that never compiled are reported in their own
-  separate bucket, because counting them as failures would make the stricter compiler look
-  worse precisely for being strict. The script also refuses to declare a winner from the
-  cheap practice round: a practice run's only job is to work out how many runs the real
-  experiment needs, so it reports that number and stays silent about who won. Nothing here
-  changes the compiler or any program you write — it is measurement plumbing.
-  (v0.16 W2, gate 10)
+- **The scorecard for the "do effect rows actually help?" experiment now exists, and it was
+  written down before the experiment ran.** We are about to pay for a set of coding runs
+  that ask one question: given the same task, does an agent using the newer, stricter
+  compiler sneak fewer hidden side effects past it than an agent using the older, more
+  permissive one — and does the stricter compiler cost noticeably more work to reach a green
+  build? A new script, `bench/phase0-agent-native/ppw-analyze.py`, scores the finished runs;
+  a new ledger, `bench/phase0-agent-native/effect-rows-benefit-ledger.json`, records the
+  answer. Both were built *before* any run happened, so the rules cannot be bent once the
+  numbers are in: the script transcribes rules already frozen in the project's registration
+  document, a test recomputes the ledger from scratch and compares it byte for byte, and the
+  script refuses to score a run at all if the recording is incomplete. One rule matters more
+  than the rest and is easy to get backwards: a "sneaked-past side effect" only counts on a
+  workspace that actually **built**. Runs that never compiled go in their own separate
+  bucket, because counting them as failures would make the stricter compiler look worse
+  precisely for being strict. The script also refuses to declare a winner from the cheap
+  practice round: a practice run's only job is to work out how many runs the real experiment
+  needs, so it reports that number and stays silent about who won. Nothing here changes the
+  compiler or any program you write — it is measurement plumbing. (v0.16 W2, gate 10)
 
-- **We did a cheap practice round of that experiment, and it found three things wrong with
-  our own measuring equipment.** The practice round ran real coding tasks against both
-  compilers. Before it could tell us anything about the compilers, it told us that the
-  scoring script and the script that runs the experiment disagreed with each other in three
-  ways, each of which would have wasted the whole paid experiment: they spelled the task
-  names differently, so the scorer thought there were no tasks at all; the safety check that
-  proves each compiler is really set up the way it claims writes down one of two different
-  words depending on which compiler it checked, and the scorer only accepted a third word,
-  so it threw away every run of one of them; and the record of which version of the test
-  equipment was used was never written down. All three are fixed, and the scorer now also
-  catches the case where the two compilers were accidentally swapped. The practice round
-  itself is saved in the repository — every run, including its full transcript — so anyone
-  can rerun the scoring and get the same numbers. It is a practice round, so it declares no
+- **We did a cheap practice round of that experiment, and it found three defects in our own
+  measuring equipment.** The practice round ran real coding tasks against both compilers.
+  Before it could tell us anything about the compilers, it told us that the scoring script
+  and the harness that runs the experiment disagreed in three ways, each of which would have
+  wasted the whole paid experiment: they spelled the task names differently, so the scorer
+  saw no tasks at all; the safety check that proves each compiler is configured as claimed
+  writes one of two different words depending on which compiler it checked, and the scorer
+  accepted only a third word, so it discarded every run of one arm; and the version of the
+  test equipment was never recorded. All three are fixed, and the scorer now also catches the
+  case where the two compilers were accidentally swapped. The practice round itself is
+  committed to the repository — every run, including its full transcript — so anyone can
+  rerun the scoring and get the same numbers. It is a practice round, so it declares no
   winner. Full write-up: `docs/plans/2026-09-01-ppw-rows-dry-run.md`. (v0.16 W2)
 
 - **The benchmark's per-turn recording is now proven on real runs.** The recording added
-  earlier this release saves a full transcript of everything the agent did on each turn. The
-  practice round is the first set of runs to carry those transcripts, so the table that
-  counts what an agent did on each turn — files read, searches, builds, edits — has real
-  numbers behind it for the first time. (v0.16 W1/W4)
+  earlier this release saves a full transcript of what the agent did on each turn. The
+  practice round is the first set of runs to carry those transcripts, so the per-turn table
+  — files read, searches, builds, edits — has real numbers behind it for the first time.
+  (v0.16 W1/W4)
 
 - **The practice round finished, and it says the real experiment would be too small to
   settle anything.** A second practice round covered the three tasks the usage limit cut
@@ -100,100 +96,97 @@ All notable changes to this project will be documented in this file.
   real, so by the rule we wrote down before starting, the experiment is recorded as
   **underpowered** rather than being run anyway and reported as if it had settled the
   question. Two other things worth saying plainly: across all 28 usable runs, **not one**
-  agent on either compiler hid a side effect where the tests could catch it — the thing
-  being measured did not happen at all — and the stricter compiler cost about 12 % more
-  work to reach a green build, below the threshold we had registered as "noticeable".
-  Neither is a result about effect rows yet; both are results about these six tasks.
-  The scorecard now says exactly that, in the place we promised to write the answer:
-  **underpowered — the claim is neither supported nor refuted.** The next release can
-  revisit it with tasks that actually tempt an agent into cheating. (v0.16 W2)
+  agent on either compiler hid a side effect where the tests could catch it — the behaviour
+  being measured did not occur at all — and the stricter compiler cost about 12 % more work
+  to reach a green build, below the threshold we had registered as "noticeable". Neither is
+  a result about effect rows yet; both are results about these six tasks. The scorecard now
+  says exactly that, in the place we promised to write the answer: **underpowered — the
+  claim is neither supported nor refuted.** The next release can revisit it with tasks that
+  actually tempt an agent into cheating. (v0.16 W2)
 
 - **New error `Calor0406`: the compiler now tells you when effect checking gave up early.**
-  Effect checking runs in loops that have a safety limit, so a tangle of functions that
-  call each other cannot make the compiler spin forever. Before, hitting that limit in the
-  loop that passes an effect up through a chain of callers was not reported at all — the
-  compiler just stopped and said the program was fine. Now both loops report `Calor0406`
-  as an error naming which loop stopped, the limit, and the functions involved, so a
-  result the compiler did not finish is never passed off as a clean build. The limit for
-  a group of functions that call each other now grows with the size of the group, so a
-  big but ordinary group never trips it. The project index (`calor query effects`) says
-  "did not converge" for such a file instead of recording half-finished rows. (v0.16 W5,
-  gate 11)
+  Effect inference runs as fixed-point loops with an iteration limit, so mutually recursive
+  functions cannot make the compiler spin forever. Before, hitting that limit in the loop
+  that propagates an effect up a call chain was not reported at all — the compiler stopped
+  and declared the program fine. Now both loops report `Calor0406` as an error naming which
+  loop stopped, the limit, and the functions involved, so an unfinished analysis is never
+  passed off as a clean build. The limit for a recursive group now grows with the size of
+  the group, so a big but ordinary group never trips it. The project index (`calor query
+  effects`) says "did not converge" for such a file instead of recording half-finished rows.
+  (v0.16 W5, gate 11)
 - **A new "edit script" test, ES-08, checks effect rows across files.** The compiler's
-  build-cache test suite replays small editing sessions and checks that a fresh build
-  and a cached build report exactly the same problems. ES-08 is the first script whose
-  edit changes a shared helper's *effect row* (what side effects a function passed
-  into it is allowed to have). It confirms that callers in files you did not touch get
-  the right new errors, that the project index's effect-row entries move with the
-  edit, and that unrelated files are left alone. This script was supposed to be
-  registered before the effect-row feature merged in 0.15 and was not; the
-  registration record says so.
+  build-cache test suite replays small editing sessions and checks that a clean build and
+  an incremental build report exactly the same diagnostics. ES-08 is the first script whose
+  edit changes a shared helper's *effect row* — the side effects a function passed into it
+  may have. It confirms that callers in untouched files get the right new errors, that the
+  project index's effect-row entries move with the edit, and that unrelated files are left
+  alone. This script was supposed to be registered before the effect-row feature merged in
+  0.15 and was not; the registration record says so.
 - **CI now installs the `calor` command-line tool from a freshly built package** on
-  Windows, Linux and macOS and checks that it can actually prove contracts — and that
-  when the Z3 solver is missing it says so out loud instead of quietly skipping
-  everything. Carried over from PR #982. Note this check is **advisory for now**: like
-  the matching check for the SDK package, it is not on the list of checks that must pass
-  before a change can be merged, so a failure is visible but does not block anything.
+  Windows, Linux and macOS and checks that it can actually prove contracts — and that when
+  the Z3 solver is missing it says so out loud instead of quietly skipping everything.
+  Carried over from PR #982. This check is **advisory for now**: like the matching check for
+  the SDK package, it is not a required status check, so a failure is visible but blocks
+  nothing.
 
-- New MSBuild setting `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot look up is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" messages) and reports "this function does something it did not say it would" (`Calor0410`) as a warning instead of an error, whether the call stays in one file or crosses files. That helps while converting old code. It does **not** relax the checks on effects you wrote down yourself: a callback whose effects do not fit where it is going (`Calor0424`) and an override or interface method that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The setting is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
+- New MSBuild property `CalorPermissiveEffects`. Setting it to `true` in your project file does what the command line's `--permissive-effects` already did: the compiler assumes a call it cannot resolve is harmless, so it stops reporting `Calor0411` and `Calor0425` (the two "I cannot tell what this does" diagnostics) and downgrades `Calor0410` — "this function does something it did not declare" — from error to warning, whether the call stays in one file or crosses files. That helps while migrating old code. It does **not** relax the checks on effects you declared yourself: a callback whose effects do not fit its destination (`Calor0424`) and an override or interface implementation that does **more** than the method it inherits from (`Calor0420`, `Calor0421` — doing less is fine) are still errors. The property is off by default, so nothing changes unless you turn it on — and the first build after you change it rebuilds every file.
 
 - **AI agents can now ask the MCP server about your project's structure.** A new `calor_query`
   tool answers four questions about any function or method: who calls it (`callers`), what it
-  calls (`callees`), what would be affected if it changed (`impact`, and with `effects: true`,
+  calls (`callees`), what a change to it would affect (`impact`, and with `effects: true`,
   which callers would stop compiling if its effects changed), and what effects it declares
-  versus what it actually does (`effects`). The answers come from the same saved project index
-  `calor query` reads, and they match the command line word for word. If the index is out of
-  date the tool rebuilds it first (or refuses, with `noBuild: true`), and every answer says when
-  it might be incomplete and why. Like the file-writing tool, it only works inside the folder
-  the server was started on (`calor mcp --root <project>`), because rebuilding an index writes
-  to disk.
-- `calor query callers`, `callees` and `impact` gained `--json`, so every query facet can
-  now be read by a program, not just `effects`. The text output of every facet is unchanged,
-  character for character. Two additions to the JSON: each answer now says which `facet` it
-  answers (all of them are labelled `query`, so this is how a program tells them apart), and
-  an answer that might be incomplete now carries the `residual` — the list of things the index
-  could not resolve — that the text output has always printed. `calor query effects --json`
-  is where you will notice both, and both are new fields: nothing was removed or renamed.
+  versus what it actually does (`effects`). The answers come from the project index
+  `calor query` reads, and they match the command line word for word. If the index is stale
+  the tool rebuilds it first (or refuses, with `noBuild: true`), and every answer says when it
+  might be incomplete and why. Like the file-writing tool, it only works inside the folder the
+  server was started on (`calor mcp --root <project>`), because rebuilding an index writes to
+  disk.
+- `calor query callers`, `callees` and `impact` gained `--json`, so every query facet is now
+  machine-readable, not just `effects`. The text output of every facet is unchanged, character
+  for character. Two additions to the JSON: each answer now names the `facet` it answers (all
+  of them are labelled `query`, so this is how a program tells them apart), and an answer that
+  might be incomplete now carries the `residual` — the list of things the index could not
+  resolve — that the text output has always printed. `calor query effects --json` is where you
+  will notice both, and both are new fields: nothing was removed or renamed.
 - `calor_compile` (MCP) can compile a folder as one project with `options.crossModule: true`,
   checking effects across files the way `calor -i a.calr -i b.calr` does, and it now returns
   every diagnostic (warnings included) for each file. `options.enforceEffects` and
   `options.requireDocs` match the command line's `--no-enforce-effects` and `--require-docs`.
 - **Benchmarks: a script that explains the "more turns" gap from what was archived.** Our 0.15
-  agent benchmark showed the new compiler's agents taking a few more turns than the old one's, and
-  we could not say why. `bench/phase0-agent-native/ppe1-turn-attribution.py` now recomputes every
-  number behind that finding from the archived runs — turns, tokens, wall-clock, the compiler
-  messages each build produced (none from the new effect checks), and two significance tests — so
-  anyone can rerun it and get the same file byte for byte. It also has a `--transcripts` mode that
-  counts what an agent did on each turn (reads, searches, builds, edits) once the next benchmark
-  saves those transcripts. A test fails if the committed numbers drift or an archived run goes
+  agent benchmark showed the new compiler's agents taking a few more turns than the old one's,
+  and we could not say why. `bench/phase0-agent-native/ppe1-turn-attribution.py` now recomputes
+  every number behind that finding from the archived runs — turns, tokens, wall-clock, the
+  diagnostics each build produced (none from the new effect checks), and two significance tests
+  — so anyone can rerun it and get the same file byte for byte. A `--transcripts` mode counts
+  what an agent did on each turn (reads, searches, builds, edits) once the next benchmark saves
+  those transcripts. A test fails if the committed numbers drift or an archived run goes
   missing.
-- Benchmark: added six programming tasks we will use to find out whether the effect labels added in 0.15 stop an AI agent from hiding a console message inside a function that says it is silent. Each task comes with the same starting program built for the old compiler (0.14.3) and the new one (0.15.0), a plain-language description, hidden tests that catch the message if it escapes, and two worked answers — the tempting shortcut and the honest fix. We also recorded what each compiler says about every one of those answers, so the numbers are fixed before anyone runs the experiment. Nothing is run yet.
-- Found while building the above: on 0.15.0, when you hand a stored callback to another function and the compiler cannot tell exactly which stored callback you meant — you wrote `this.` in front of it, you kept it in a property instead of a field, or it came from a parent class — the compiler stops tracking what that callback is allowed to do. It warns instead of stopping the build, and the hidden message gets through. Reported as issue #1136.
-- Also found: a class that inherits from another class can no longer call the plain functions in its own module by their short name — the generated C# does not compile. Writing the full name works around it. Reported as issue #1137.
+- Benchmark: added six programming tasks that will test whether the effect rows added in 0.15 stop an AI agent from hiding a console message inside a function declared silent. Each task ships the same starting program built for the old compiler (0.14.3) and the new one (0.15.0), a plain-language description, held-out tests that catch the message if it escapes, and two worked solutions — the tempting shortcut and the honest fix. We also recorded what each compiler says about every one of those solutions, so the numbers are fixed before anyone runs the experiment. Nothing is run yet.
+- Found while building the above: on 0.15.0, when you pass a stored callback to another function and the compiler cannot tell which one you meant — you wrote `this.` in front of it, you kept it in a property instead of a field, or it came from a base class — the compiler stops tracking that callback's effect row. It warns instead of failing the build, and the hidden message gets through. Reported as issue #1136.
+- Also found: a derived class can no longer call the plain functions in its own module by their short name — the generated C# does not compile. The fully qualified name works around it. Reported as issue #1137.
 
 ### Changed
 
 - **`Calor0600` is no longer used for effect checking that did not finish.** That code
-  belongs to the API-strictness family; the loop that used to borrow it as a warning now
-  reports `Calor0406` as an error instead. (v0.16 W5)
+  belongs to the API-strictness family; the loop that borrowed it as a warning now reports
+  `Calor0406` as an error instead. (v0.16 W5)
 ### Corrected
 
 - **A number we published in 0.15 was wrong, and here is the right one.** We keep a
-  measurement record in this repository — `bench/phase0-agent-native/calor0425-corpus-ledger.json`,
+  measurement ledger in this repository — `bench/phase0-agent-native/calor0425-corpus-ledger.json`,
   also quoted in our 0.15 planning document — and during 0.15 it said the compiler's
-  "callback effects are unknown here" warning (`Calor0425`) showed up
-  **8 times across 99** of the 364 real-world C# files we convert and check. (The figure
-  was never in these release notes or on the website; it is being corrected here because
-  it is a published number either way.) That 99 was
-  not how many files the compiler actually checks — it was how many files our *measurement*
-  chose to check. The measurement threw away any file the name-resolution step complained
-  about at all, but the real compiler keeps going: most of those complaints are internal
-  notes it never shows you, so it checks the file anyway. Measured the way the compiler
-  really works, it checks **256** of those files, and the warning shows up **67 times
-  across 30** of them. Nothing about the compiler changed — only the yardstick did. Both
-  figures are published side by side so the correction is visible rather than quietly
-  swapped in. The measurement now uses the compiler's own rule, and each of our two
-  measurement records says on its face which rule produced it, so this cannot happen
+  "callback effects are unknown here" warning (`Calor0425`) appeared **8 times across 99**
+  of the 364 real-world C# files we convert and check. (The figure was never in these
+  release notes or on the website; it is being corrected here because it is a published
+  number either way.) That 99 was not how many files the compiler actually checks — it was
+  how many files our *measurement* chose to check. The measurement discarded any file that
+  name binding complained about at all, but the real compiler keeps going: most of those
+  complaints are internal notes it never shows you, so it checks the file anyway. Measured
+  the way the compiler really works, it checks **256** of those files, and the warning
+  appears **67 times across 30** of them. Nothing about the compiler changed — only the
+  yardstick did. Both figures are published side by side so the correction is visible rather
+  than quietly swapped in. The measurement now uses the compiler's own rule, and each of our
+  two measurement ledgers states on its face which rule produced it, so this cannot happen
   silently again.
 
 - Internal benchmark tooling: every agent-harness run now saves the full turn-by-turn transcript, the agent's own build output, and the compiler's build fingerprint next to its result; a run without a transcript no longer counts. The harness also accepts a registered "pre-rows" control arm for the v0.16 rows experiment.
@@ -202,76 +195,72 @@ All notable changes to this project will be documented in this file.
 
 - **`calor query effects` and the `calor_query` tool no longer claim a large group of
   mutually recursive functions "did not converge" when the compiler builds it fine.**
-  Effect checking loops over a group of functions that call each other, with a safety
-  limit on how many rounds it will run. That limit grows with the size of the group, so
-  an ordinary big group never trips it — but the project index was accidentally pinning
-  the limit to a flat 100 rounds, which switched the size-based growth off. The result:
-  a big group that needs more than 100 rounds to settle — a long chain of functions
-  where each one calls its neighbours, 100 members or more — compiled cleanly, yet the
-  index reported `Calor0406` for that file, threw away every effect row in it, and
-  answered "effect inference did not converge" for any function you asked about.
-  The index now uses exactly the same limit the compiler uses, so the two agree.
+  Effect inference iterates over each group of mutually recursive functions, with a limit on
+  how many rounds it will run. That limit grows with the size of the group, so an ordinary
+  big group never trips it — but the project index was pinning the limit to a flat 100
+  rounds, which switched the size-based growth off. The result: a big group needing more than
+  100 rounds to settle — a chain of 100 members or more, each calling its neighbours —
+  compiled cleanly, yet the index reported `Calor0406` for that file, discarded every effect
+  row in it, and answered "effect inference did not converge" for any function you asked
+  about. The index now uses exactly the same limit the compiler uses, so the two agree.
 
-- The compiler no longer crashes on converted code whose local bindings form a cycle
-  (for example, a value whose type depends on itself, which the C# → Calor converter
-  can produce from `out var` arguments). The effect checker now notices when it is
-  asking about a name it is already working out, treats that value's type as unknown,
-  and moves on. This also fixes two `calor mcp` tools — `edit_preview` and
-  `file_write` — which run the same check and could take the whole server down on a
-  file of that shape. There is also
-  a limit on how much work the checker will do to follow one chain of bindings: code
-  that stays under the limit — which is all ordinary code, by a wide margin — is
-  checked exactly as before, and code past it is treated as "type unknown" instead of
-  crashing. (#1104)
-- **No more misleading "generated C# failed" errors next to a real error.** When one
-  file in a project failed to compile, a fresh build used to also blame every file that
-  called into it (Calor1002, "name does not exist"), while a cached rebuild of the same
-  project did not — and `dotnet build` and `calor build` disagreed about it. Now both
-  report only the real error: the compiler skips checking just the generated code that
-  calls into the failed file, and still checks everything else, so a genuine problem in
-  an unrelated file is not hidden. A file whose generated code was skipped this way is
-  not written out or cached, because nothing checked it; the next build checks it.
-  Found while building ES-08.
-- **`calor verify` tells you when nothing was proved.** If the Z3 solver cannot be
-  loaded, the normal text report now says so at the top and again in the summary.
-  Before, that notice only appeared in JSON output, so a broken install looked like
-  "0 proved, everything skipped" with no explanation. Carried over from PR #982.
-- Converting C# to Calor now produces Calor the compiler can read for 59 more real-world
-  files (#903). Before, over the three sample projects we test against (MediatR, Serilog,
-  FluentValidation), 59 of 364 converted files failed to parse: long lambdas that were
-  written at the wrong indent (`Calor0099`), a marker interface with nothing in it followed
-  by the next type (`Calor0100`), a method call split across lines (`Calor0100`), a list of
-  objects with property initializers (`Calor0100`), and an `else if` whose condition needed a
-  temporary (`Calor0117`). All 364 now parse. An empty interface followed by a sibling type
-  is also accepted in hand-written Calor, as long as the next type starts in the same
-  column as the interface; a type indented underneath one is still an error, because
-  interfaces cannot contain types.
-- Converting a lambda whose parameter type could not be worked out no longer writes `?` as
-  the type (#1097). The compiler could not read `?` and gave up on the rest of that method
-  with an internal error (`Calor0932`); it now treats the parameter like any other untyped
-  lambda parameter, and when the lambda is handed to a written `Func<...>` or `Action<...>`
-  it now reads the parameter type from there. Over the same three projects this removes
-  72 of 73 internal errors.
+- The compiler no longer crashes on converted code whose local bindings form a cycle (for
+  example, a value whose type depends on itself, which the C# → Calor converter can produce
+  from `out var` arguments). The effect checker now detects that it is re-entering a name it
+  is already resolving, treats that value's type as unknown, and moves on. This also fixes
+  two `calor mcp` tools — `edit_preview` and `file_write` — which run the same check and
+  could take the whole server down on a file of that shape. There is also a limit on how far
+  the checker will follow one chain of bindings: code that stays under the limit — which is
+  all ordinary code, by a wide margin — is checked exactly as before, and code past it is
+  treated as "type unknown" instead of crashing. (#1104)
+- **No more misleading "generated C# failed" errors next to a real error.** When one file in
+  a project failed to compile, a clean build used to also blame every file that called into
+  it (Calor1002, "name does not exist"), while an incremental rebuild of the same project did
+  not — and `dotnet build` and `calor build` disagreed about it. Now both report only the real
+  error: the compiler skips checking just the generated code that calls into the failed file,
+  and still checks everything else, so a genuine problem in an unrelated file is not hidden. A
+  file whose generated code was skipped this way is not written out or cached, because nothing
+  checked it; the next build checks it. Found while building ES-08.
+- **`calor verify` tells you when nothing was proved.** If the Z3 solver cannot be loaded,
+  the text report now says so at the top and again in the summary. Before, that notice
+  appeared only in JSON output, so a broken install looked like "0 proved, everything
+  skipped" with no explanation. Carried over from PR #982.
+- Converting C# to Calor now produces Calor the compiler can parse for 59 more real-world
+  files (#903). Before, across the three sample projects we test against (MediatR, Serilog,
+  FluentValidation), 59 of 364 converted files failed to parse: long lambdas emitted at the
+  wrong indent (`Calor0099`), an empty marker interface followed by the next type
+  (`Calor0100`), a method call split across lines (`Calor0100`), a list of objects with
+  property initializers (`Calor0100`), and an `else if` whose condition needed a temporary
+  (`Calor0117`). All 364 now parse. An empty interface followed by a sibling type is also
+  accepted in hand-written Calor, as long as the next type starts in the same column as the
+  interface; a type indented underneath one is still an error, because interfaces cannot
+  contain types.
+- Converting a lambda whose parameter type could not be inferred no longer writes `?` as the
+  type (#1097). The compiler could not parse `?` and abandoned the rest of that method with an
+  internal error (`Calor0932`); it now treats the parameter like any other untyped lambda
+  parameter, and when the lambda is passed to a declared `Func<...>` or `Action<...>` it reads
+  the parameter type from there. Across the same three projects this removes 72 of 73 internal
+  errors.
 
 ## [0.15.0] - 2026-08-27
 
 Calor 0.15 is the "Composable Effects" release. You can now write, on a callback's type,
 what that callback is allowed to do — the same `§E{…}` tag functions have always used,
-placed on the parameter, field, return type or lambda it describes. You can write one
-function that works for both pure and impure callbacks by giving it a placeholder effect
-(`<eff e>`), and the compiler works out what the placeholder means at each call site from
-the callback you actually passed. And the compiler checks all of it: a callback that does
-more than its destination allows is an error (`Calor0424`), one the compiler cannot vouch
-for is a warning (`Calor0425`), and calling a callback charges its effects to the caller.
-So a callback cannot smuggle an effect past the six places the compiler now closes:
-binding a callback to a name, passing one as an argument, returning one, overriding a
-method, implementing an interface, and instantiating a generic placeholder. Not closed
-yet: callbacks reached by reflection or `dynamic`, event-handler `+=`, delegates handed
-back by .NET libraries (warned, not verified), and async rows. The project index knows
-about effects too (`calor query effects`). The proof point we registered in advance came
-out **HIT**, and here is what it cost: on ordinary tasks with no callbacks in them, an AI
-agent used roughly 18 % more output tokens to get the same programs green with the
-stricter compiler — a real cost, and inside the limit we set beforehand.
+placed on the parameter, field, return type or lambda it describes. One function can serve
+both pure and impure callbacks: give it a placeholder effect (`<eff e>`), and the compiler
+resolves the placeholder at each call site from the callback you actually passed. And the
+compiler checks all of it: a callback that does more than its destination allows is an
+error (`Calor0424`), one the compiler cannot verify is a warning (`Calor0425`), and calling
+a callback charges its effects to the caller. So a callback cannot smuggle an effect past
+the six places the compiler now closes: binding a callback to a name, passing one as an
+argument, returning one, overriding a method, implementing an interface, and instantiating
+a generic placeholder. Not closed yet: callbacks reached by reflection or `dynamic`,
+event-handler `+=`, delegates returned by .NET libraries (warned, not verified), and async
+rows. The project index knows about effects too (`calor query effects`). The proof point we
+registered in advance came out **HIT**, and here is what it cost: on ordinary tasks with no
+callbacks in them, an AI agent used roughly 18 % more output tokens to get the same
+programs green with the stricter compiler — a real cost, and inside the limit we set
+beforehand.
 
 ### Benchmark Results (Statistical: 30 runs)
 - **Overall Advantage**: 1.32x (Calor leads)
@@ -339,67 +328,62 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
 
 ### Added
 
-- **We built the scorecard that will judge the new effect-rows feature.** Before any of
-  the effect-rows work was written, we registered a test for it: ten small, deliberate
-  mistakes (a callback allowed to print when its interface says it can't, an effect
-  smuggled through a generic helper, a callback with its effect annotation deleted)
-  planted in five frozen example programs, plus a "nothing else may change" check on the
-  unmodified programs. The compiler has to catch all ten with the exact error we said it
-  would, at the exact place, and stay quiet on the originals. That scorecard now exists as
-  a file the test suite re-checks on every build, and the deterministic half scores
-  **10/10** with the originals clean. The other half — does the stricter compiler make an
-  AI agent spend noticeably more tokens to get a program green? — was a paid experiment
-  whose runner and arithmetic are checked in (and the runner refuses to spend money
-  without an explicit confirmation).
-- **We ran the cost test for the new effect-rows feature, and the scorecard reads HIT.**
-  An AI agent solved the same four small programming tasks five times each against the
-  previous compiler (v0.14.3) and five times each against the new one — 40 runs, every one
-  finishing green. Agents typically needed about 18 % more output tokens to finish the
-  same small tasks with the new compiler. That is a real cost, but it is within the limit
-  we set beforehand (the test only fails when the typical (median) increase is more than
-  35 % *and* the statistics say the increase is clearly above zero; here the lower bound
-  is below zero). One task (the inventory one) was 51 % more expensive on its own; another
-  was cheaper. "HIT" means we did not detect a large slowdown — with 40 runs the test
-  cannot prove there is none, and it says so. The runs, the arithmetic and the verdict are
-  all checked in, and the release re-checks them. The 40 finished programs the agents
-  wrote are archived with the run, so the set of checked-in Calor files grew from 886 to
-  926 and the counters that watch that set were updated to match (the counts that measure
-  the compiler itself did not move).
-- **You can now ask the project index about effects.** `calor query effects Leaky` tells
-  you three things about a function: what it *says* it does (`§E{…}`), what the compiler
-  worked out its body *actually* does, and whether the two agree — with the exact error
-  that fires when they don't. It is the same answer `calor build` gives, read from the
-  same place, so the two can never disagree. If the compiler had to *assume* something
-  (say, because the body contains C# it can't see into), the answer says what it assumed
-  and why. Add `--json` to get the answer as data. There is a "what would break" question
-  too: `calor query impact Log --effects --row fs:w` walks every function that calls
-  `Log`, directly or through others, and tells you which of them would stop compiling if
-  `Log` were allowed to write files. Along the way, two things got fixed: `calor query
-  callers` and `impact` could not see a call written on its own line (`§C{Log} §A x §/C`)
-  — only calls used inside an expression — so they now see both; and the build cache's
-  effect summary used to file functions under their *name*, which squashed two same-named
-  methods in one class into one. It files them by identity now. Both the index and the
-  build cache rebuild once from scratch the first time you run this version; nothing you
-  wrote changes.
-- **Those callback annotations now mean something to the compiler.** You could already
-  write `§I{Func<i32,i32>:transform} §E{cw}` — "this callback may print" — and the
-  compiler would faithfully remember the words. Now the annotation is part of the *type*.
-  Two callbacks with the same shape but different permissions are two different types, the
-  way `i32` and `str` are two different types, and the compiler can tell them apart. With
-  that comes a way to answer *does this one fit into that one?* with **three** answers
-  rather than two: **yes**, **no**, and **cannot tell**. When a callback comes from
-  outside Calor, or from a library the compiler has no information about, the honest
-  answer is "I don't know", and saying "yes" there is how effects quietly escape. So "I
-  don't know" is now a thing the compiler can say, and it never counts as a yes.
+- **We built the scorecard that will judge the new effect-rows feature.** Before any of the
+  effect-rows work was written, we registered a test for it: ten small, deliberate mistakes
+  (a callback allowed to print when its interface forbids it, an effect smuggled through a
+  generic helper, a callback with its effect annotation deleted) planted in five frozen
+  example programs, plus a "nothing else may change" check on the unmodified programs. The
+  compiler must catch all ten with the exact diagnostic we predicted, at the exact place, and
+  stay quiet on the originals. That scorecard now exists as a file the test suite re-checks on
+  every build, and the deterministic half scores **10/10** with the originals clean. The other
+  half — does the stricter compiler make an AI agent spend noticeably more tokens to get a
+  program green? — was a paid experiment whose runner and arithmetic are checked in (and the
+  runner refuses to spend money without an explicit confirmation).
+- **We ran the cost test for the new effect-rows feature, and the scorecard reads HIT.** An
+  AI agent solved the same four small programming tasks five times each against the previous
+  compiler (v0.14.3) and five times each against the new one — 40 runs, every one finishing
+  green. Agents typically needed about 18 % more output tokens to finish the same small tasks
+  with the new compiler. That is a real cost, but it is within the limit we set beforehand
+  (the test fails only when the typical (median) increase is more than 35 % *and* the
+  statistics say the increase is clearly above zero; here the lower bound is below zero). One
+  task (the inventory one) was 51 % more expensive on its own; another was cheaper. "HIT"
+  means we did not detect a large slowdown — with 40 runs the test cannot prove there is
+  none, and it says so. The runs, the arithmetic and the verdict are all checked in, and the
+  release re-checks them. The 40 finished programs the agents wrote are archived with the run,
+  so the set of checked-in Calor files grew from 886 to 926 and the counters that watch that
+  set were updated to match (the counts that measure the compiler itself did not move).
+- **You can now ask the project index about effects.** `calor query effects Leaky` tells you
+  three things about a function: what it *declares* (`§E{…}`), what the compiler inferred its
+  body *actually* does, and whether the two agree — with the exact diagnostic that fires when
+  they don't. It is the same answer `calor build` gives, read from the same place, so the two
+  can never disagree. If the compiler had to *assume* something (say, because the body
+  contains C# it can't see into), the answer says what it assumed and why. Add `--json` to get
+  the answer as data. There is a "what would break" question too:
+  `calor query impact Log --effects --row fs:w` walks every function that calls `Log`,
+  directly or transitively, and tells you which of them would stop compiling if `Log` were
+  allowed to write files. Along the way, two things got fixed: `calor query callers` and
+  `impact` could not see a call written as its own statement (`§C{Log} §A x §/C`) — only calls
+  used inside an expression — so they now see both; and the build cache's effect summary used
+  to key functions by *name*, which collapsed two same-named methods in one class into one. It
+  keys them by identity now. Both the index and the build cache rebuild once from scratch the
+  first time you run this version; nothing you wrote changes.
+- **Those callback annotations now mean something to the compiler.** You could already write
+  `§I{Func<i32,i32>:transform} §E{cw}` — "this callback may print" — and the compiler would
+  faithfully remember the words. Now the annotation is part of the *type*. Two callbacks with
+  the same shape but different permissions are two different types, the way `i32` and `str`
+  are two different types, and the compiler can tell them apart. With that comes a subtyping
+  check with **three** answers rather than two: **yes**, **no**, and **cannot tell**. When a
+  callback comes from outside Calor, or from a library the compiler has no information about,
+  the honest answer is "I don't know", and saying "yes" there is how effects quietly escape.
+  So "I don't know" is now a thing the compiler can say, and it never counts as a yes.
 - **Now the compiler tells you when a callback doesn't fit.** If you pass a callback that
-  prints to something that promised not to print, that is an error: **Calor0424**. It
-  names both sides — what the callback may do, what the destination allows, and exactly
-  which extra permissions are the problem — and it suggests the two fixes: widen the
-  destination's `§E{…}`, or pass a different callback. This is checked in five places:
-  when you bind a callback to a name, when you pass one as an argument, when you return
-  one, when a method overrides another, and when a class implements an interface. When the
-  compiler *can't tell* — because one side carries no annotation at all — you get
-  **Calor0425** instead, as a warning. Same five places. (The sixth place from the
+  prints to something that promised not to print, that is an error: **Calor0424**. It names
+  both sides — what the callback may do, what the destination allows, and exactly which extra
+  permissions are the problem — and it suggests the two fixes: widen the destination's
+  `§E{…}`, or pass a different callback. This is checked in five places: binding a callback to
+  a name, passing one as an argument, returning one, overriding a method, and implementing an
+  interface. When the compiler *can't tell* — because one side carries no annotation at all —
+  you get **Calor0425** instead, as a warning. Same five places. (The sixth place from the
   introduction — a generic effect placeholder — is reported as **Calor0410** on the calling
   function instead; see the `<eff e>` entry below.) "I don't know" and "that's wrong" are
   different answers and now have different codes.
@@ -410,22 +394,22 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
   wrong* isn't.
 - **Write one function that works for pure *and* impure callbacks.** Say you write a `Map`
   that takes a list and a callback. If the callback is pure, `Map` should be pure. If the
-  callback prints, `Map` prints. Before, you had to pick one and be wrong half the time.
-  Now you can write `<eff e>` on the function and use `e` as the callback's permission,
-  and the compiler works out what `e` means **at each call site, from the callback you
-  actually passed**. Pass a pure callback and `Map` is pure; pass a printing one and `Map`
-  prints — and if the calling function didn't say it prints, you get told, with a line
-  explaining exactly where the permission came from. The name you give the placeholder
-  doesn't matter: an interface can call it `e` and the implementing class `f`; the
-  compiler matches them by position, the way it already matches ordinary type parameters.
-  If the compiler can't work out what the placeholder should be — because the callback you
-  passed carries no annotation — it says so (Calor0425) instead of guessing.
+  callback prints, `Map` prints. Before, you had to pick one and be wrong half the time. Now
+  you write `<eff e>` on the function and use `e` as the callback's permission, and the
+  compiler resolves `e` **at each call site, from the callback you actually passed**. Pass a
+  pure callback and `Map` is pure; pass a printing one and `Map` prints — and if the calling
+  function didn't declare that it prints, you get told, with a line explaining exactly where
+  the permission came from. The name you give the placeholder doesn't matter: an interface can
+  call it `e` and the implementing class `f`; the compiler matches them by position, the way
+  it already matches ordinary type parameters. If the compiler can't resolve the placeholder —
+  because the callback you passed carries no annotation — it says so (Calor0425) instead of
+  guessing.
 - **The `§E{…}` on a lambda is now a promise the compiler checks.** You could always write
-  one; the compiler read it and threw it away. Now it compares it against what the lambda
-  body actually does, and tells you if the body does more than the lambda promised. If you
-  *don't* write one, the compiler works the permission out from the body — which means a
-  lambda you hand to something with an annotation is now properly checked instead of
-  coming back "I can't tell".
+  one; the compiler read it and threw it away. Now it compares the annotation against what the
+  lambda body actually does, and reports a body that does more than the lambda promised. If
+  you *don't* write one, the compiler infers the permission from the body — which means a
+  lambda you hand to something annotated is now properly checked instead of coming back "I
+  can't tell".
 - **Two more "I can't tell" cases now say so out loud.** When a method overrides something
   from a C# base class the compiler can't see, or a class satisfies an interface through a
   member inherited from one, the permissions can't be verified. That used to be filed as
@@ -437,49 +421,49 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
   asks the type checker now instead of guessing from the name.
 - **Calling a callback now just works — and is charged to whoever calls it.** Until now,
   calling a function value (a callback parameter, a lambda you bound to a name, a callback
-  field) was refused outright under effect enforcement (Calor0418), no matter what you had
-  annotated. Now the compiler reads the callback's annotation and charges it to the
-  function doing the calling, the same way calling a named function charges that
-  function's `§E{…}`. If `transform` may print and `Apply` calls it, `Apply` prints — and
-  if `Apply` didn't say so, the error tells you exactly why: `Effect row: charged by
-  invoking 'transform' (row: cw)`. A callback with **no** annotation is a callback the
-  compiler knows nothing about, so calling it is "I can't tell" (Calor0425) and the caller
-  is charged an unknown effect. Calor0418 survives for one thing only: calling something
-  that provably isn't a function at all, like an `i32`.
+  field) was refused outright under effect enforcement (Calor0418), whatever you had
+  annotated. Now the compiler reads the callback's annotation and charges it to the calling
+  function, the same way calling a named function charges that function's `§E{…}`. If
+  `transform` may print and `Apply` calls it, `Apply` prints — and if `Apply` didn't declare
+  that, the error tells you exactly why:
+  `Effect row: charged by invoking 'transform' (row: cw)`. A callback with **no** annotation
+  is a callback the compiler knows nothing about, so calling it is "I can't tell"
+  (Calor0425) and the caller is charged an unknown effect. Calor0418 survives for one thing
+  only: calling something that provably isn't a function at all, like an `i32`.
 - **`§E{db}` now covers `§E{db:r}`, and the same for `net` and `env`.** If a function
   declared the broad "touches the database" effect, and the code inside it only *read*
   from the database, the compiler used to complain that the narrow effect wasn't declared.
   It no longer does — declaring the broad effect covers the narrow ones, which is what
   everyone already assumed it meant. This only ever makes more programs compile, never
   fewer.
-- **A clearer message when an effect annotation is on something that can't have one.**
-  Writing `§E{cw}` after a plain `i32` — a number performs no effects — used to be
-  silently accepted and quietly re-read as the whole function's effect declaration. It is
-  now **Calor0405**, the same message you already get for an annotation on the wrong line,
-  and it tells you both ways to fix it: remove it, or move it onto its own line if it was
-  meant to be the function's own declaration.
+- **A clearer message when an effect annotation is on something that cannot have one.**
+  Writing `§E{cw}` after a plain `i32` — a number performs no effects — used to be silently
+  accepted and quietly re-read as the whole function's effect declaration. It is now
+  **Calor0405**, the same diagnostic you already get for an annotation on the wrong line, and
+  it tells you both ways to fix it: remove it, or move it onto its own line if it was meant to
+  be the function's own declaration.
 - **You can now write down what a callback is allowed to do.** Use the same `§E{…}` tag
   effects have always used, placed **on the same line** as the type it describes:
-  `§I{Func<i32,i32>:transform} §E{cw}` says "this callback may write to the console". You
-  can write one on a parameter, a return type, a `§B` binding, a `§FLD` field, a `§LAM`
-  lambda and a `§DEL` delegate — eight places in all. A function or method can also
-  declare a *placeholder* effect, written `<eff e>` in its type-parameter list, which
-  stands for "whatever the caller's function does". **One thing changed meaning:** an
-  `§E{…}` written on the *same line* as a type used to be read as the whole function's
-  effect declaration; now it belongs to that type. Written on its **own line**, as almost
-  everyone writes it and as the docs have always recommended, nothing changes at all. Two
-  new messages come with it: **Calor0405** when an effect row is on the wrong line (naming
-  both ways to fix it), and **Calor0404** when an `eff` placeholder is declared somewhere
-  it cannot be, or is named after a real effect code such as `cw`.
-- **The test that judges this release's effects feature was written down before the
-  feature was built.** It is called `PP-E1`, and it lives in the project's proof-point
-  registry (`docs/plans/agent-native-gates.md`, entry A-1.11). The pass mark, the exact
-  files it runs on, and the ten deliberate bugs it injects into them were all fixed in
-  advance, so the result could not be argued into a success later. It has four possible
-  answers — pass, fail, too-noisy-to-tell, and cannot-be-judged — with the rules for each
-  set beforehand. A later correction (entry `A-1.11.1`) re-measured the "control" for one
-  file, which had been copied from a run that used a switch the test forbids; the original
-  record is left untouched and the corrected one sits beside it.
+  `§I{Func<i32,i32>:transform} §E{cw}` says "this callback may write to the console". You can
+  write one on a parameter, a return type, a `§B` binding, a `§FLD` field, a `§LAM` lambda and
+  a `§DEL` delegate — eight places in all. A function or method can also declare a
+  *placeholder* effect, written `<eff e>` in its type-parameter list, standing for "whatever
+  the caller's function does". **One thing changed meaning:** an `§E{…}` written on the *same
+  line* as a type used to be read as the whole function's effect declaration; now it belongs
+  to that type. Written on its **own line**, as almost everyone writes it and as the docs have
+  always recommended, nothing changes at all. Two new diagnostics come with it: **Calor0405**
+  when an effect row is on the wrong line (naming both ways to fix it), and **Calor0404** when
+  an `eff` placeholder is declared somewhere it cannot be, or is named after a real effect
+  code such as `cw`.
+- **The test that judges this release's effects feature was written down before the feature
+  was built.** It is called `PP-E1`, and it lives in the project's proof-point registry
+  (`docs/plans/agent-native-gates.md`, entry A-1.11). The pass mark, the exact files it runs
+  on, and the ten deliberate bugs it injects into them were all fixed in advance, so the
+  result could not be argued into a success later. It has four possible verdicts — pass, fail,
+  too-noisy-to-tell, and cannot-be-judged — with the rules for each set beforehand. A later
+  correction (entry `A-1.11.1`) re-measured the "control" for one file, which had been copied
+  from a run that used a switch the test forbids; the original record is left untouched and
+  the corrected one sits beside it.
 - **CI now refuses any pull request that edits or deletes an already-frozen line in the
   project's proof-point registry; only additions are allowed.** The append-only check that
   already protected `docs/experiments/registry.json` now also runs
@@ -495,33 +479,32 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
 
 ### Changed
 
-- **The part of the compiler that looks up what a .NET method does now identifies that
-  method properly, instead of by a handful of loose text strings.** Before, asking "what
-  does `File.ReadAllText` do?" meant passing around a type name, a method name and a list
-  of argument types as plain text, and hoping the spellings lined up. Now there is one
-  thing that names the method — where it comes from, what it is called, what it takes, and
-  whether it is a normal method, a property read or write, a constructor, or an extension
-  method — and every lookup goes through it. Nothing about your code compiles differently.
-  One message does change, in one situation: if you call something by a bare name —
-  `§C{u}` — and the compiler cannot work out what `u` is at all, it used to say "you
-  cannot invoke a function-typed value of type `?`". It now says the call target is
-  unknown, and counts it as unknown, which is the safe answer.
-- **The effect checker now asks the type checker what a method call is being made on,
-  instead of hunting through the source text for a type name.** Two kinds of code that
-  used to be reported as "unknown call" now compile cleanly, because the type checker knew
-  the answer all along: a binding with no written type whose value comes from a .NET call
-  — `§B{g} §C{System.Guid.NewGuid}`, then `g.ToString` — and a local that shares its name
-  with a field of a different type. If the type checker looked and could not name the
-  type, the effect checker no longer substitutes a guess — the call is treated as unknown.
-  Lambdas also get a proper function type internally, so "is this a function value?" is
-  answered by the type rather than by matching text like `Func<`.
-- **When the compiler cannot work out the type of the thing you are calling a method on,
-  it now records that as a fact instead of leaving a placeholder.** In an editor you get
-  an informational note (`Calor0270`) on the two cases you can actually fix — a variable
-  the compiler could not work out a type for, and one whose written type it could not make
-  sense of. Adding an explicit type to the binding clears it. Cases you cannot fix stay
-  silent. Nothing that already worked out a type behaves differently, and command-line
-  output — including `calor effects suggest` — is byte-for-byte what it was.
+- **.NET method lookup now uses one method identity instead of a handful of loose text
+  strings.** Before, asking "what does `File.ReadAllText` do?" meant passing around a type
+  name, a method name and a list of argument types as plain text, and hoping the spellings
+  lined up. Now one record names the method — where it comes from, what it is called, what it
+  takes, and whether it is an ordinary method, a property read or write, a constructor, or an
+  extension method — and every lookup goes through it. Nothing about your code compiles
+  differently. One diagnostic does change, in one situation: if you call something by a bare
+  name — `§C{u}` — and the compiler cannot work out what `u` is at all, it used to say "you
+  cannot invoke a function-typed value of type `?`". It now says the call target is unknown,
+  and counts it as unknown, which is the safe answer.
+- **The effect checker now asks the type checker what a method call is made on, instead of
+  hunting through the source text for a type name.** Two kinds of code that used to be
+  reported as "unknown call" now compile cleanly, because the type checker knew the answer all
+  along: a binding with no written type whose value comes from a .NET call —
+  `§B{g} §C{System.Guid.NewGuid}`, then `g.ToString` — and a local that shares its name with a
+  field of a different type. If the type checker looked and could not name the type, the
+  effect checker no longer substitutes a guess — the call is treated as unknown. Lambdas also
+  get a proper function type internally, so "is this a function value?" is answered by the
+  type rather than by matching text like `Func<`.
+- **When the compiler cannot infer the type of a method call's receiver, it now records that
+  as a fact instead of leaving a placeholder.** In an editor you get an informational
+  diagnostic (`Calor0270`) on the two cases you can actually fix — a variable the compiler
+  could not infer a type for, and one whose written type it could not make sense of. Adding an
+  explicit type to the binding clears it. Cases you cannot fix stay silent. Nothing that
+  already inferred a type behaves differently, and command-line output — including
+  `calor effects suggest` — is byte-for-byte what it was.
 - **Files that declare `§SEMVER{1.x}` (or `0.x`) are now refused with an error pointing at
   #1084.** The compiler implements semantics version 2.0.0. An older major
   (`§SEMVER{1.0.0}`) stops the build with `Calor0701`, and the message tells you what to
@@ -558,14 +541,13 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
 
 ### Fixed
 
-- **Benchmark cost metric no longer under-counts agent output tokens (#881).** The
-  agent-loop benchmark scripts used to read a number from the agent's result file that
-  only covered its final turn, so a run that handed work to a helper agent, or resumed
-  after its context was compacted, looked far cheaper than it was — one archived run
-  recorded 543 tokens when the model had actually generated 30,084 (55x). Both scripts now
-  use one shared helper that adds up every model's output across the whole run, keeps the
-  old number next to the corrected one so the fix can be audited, and warns when the two
-  disagree.
+- **Benchmark cost metric no longer under-counts agent output tokens (#881).** The agent-loop
+  benchmark scripts read a number from the agent's result file that covered only its final
+  turn, so a run that delegated work to a helper agent, or resumed after its context was
+  compacted, looked far cheaper than it was — one archived run recorded 543 tokens when the
+  model had actually generated 30,084 (55x). Both scripts now use one shared helper that sums
+  every model's output across the whole run, keeps the old number next to the corrected one so
+  the fix can be audited, and warns when the two disagree.
 - The round-trip check no longer fails a pull request because of a test that MediatR's own
   test suite is known to flake on. The known-flake list was being dropped on the way into
   the check. Ignored flakes are still listed by name in the report.
@@ -603,16 +585,16 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
 
 ### Added
 - **`Calor0274 NullableArgumentToNonNullableParameter` now fires on pure-Calor
-  call sites**, not only BCL-resolved ones. `BindCallExpression` was
-  previously scoped to `TryResolveBclCall` per the S4 comment; it now
-  additionally checks `resolution.Function.Parameters` (which carry
-  `NullableAnnotation` from the parameter-annotation flow that landed in
-  0.14) and routes through the same `NullabilityChecker.IsPossiblyNullAssignedTo`
-  predicate. `?Foo` argument into `:Foo` parameter on a `§C{this.Take}` call
-  now surfaces the diagnostic symmetrically with the BCL path. Scalar STRING
-  Calor-native fire is still blocked by a separate scope gap in `ResolveCall`
-  (does not OPTION-unwrap arg types on the Calor-native branch); pinned as a
-  known-limitation follow-on.
+  call sites**, not only BCL-resolved ones. `BindCallExpression` used to check
+  only `TryResolveBclCall`, per the S4 comment. It now also checks
+  `resolution.Function.Parameters`, which carry `NullableAnnotation` from the
+  parameter-annotation flow that landed in 0.14, and routes through the same
+  `NullabilityChecker.IsPossiblyNullAssignedTo` predicate. A `?Foo` argument
+  passed into a `:Foo` parameter on a `§C{this.Take}` call now reports the
+  diagnostic symmetrically with the BCL path. Scalar STRING on the Calor-native
+  path is still blocked, by a separate scope gap in `ResolveCall` that does not
+  OPTION-unwrap arg types on that branch; pinned as a known-limitation
+  follow-on.
 - **`BoundCallExpression.Type` on pure-Calor calls now carries the declared
   return-type annotation**, not `Oblivious`. A call to `-> ?string` /
   `-> ?Foo` surfaces as `Annotated`; `-> string` / `-> Foo` as `NotAnnotated`.
@@ -642,12 +624,11 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
 ### Added
 - **Nullability enforcement widens to whitelisted generic instantiations
   (`Option<T>`, `List<T>`, `IList<T>`, `IEnumerable<T>`, `IReadOnlyList<T>`,
-  `ICollection<T>`, `IReadOnlyCollection<T>` over `string`).** A source
-  whose payload/element carries `?string` assigned into a target whose
-  same-shape container declares `string` now trips the three nullability
-  diagnostics symmetrically with the scalar STRING gate. Container
-  annotation stays orthogonal — only the position-0 type-argument
-  mismatch is diagnosed.
+  `ICollection<T>`, `IReadOnlyCollection<T>` over `string`).** Assign a source
+  whose payload/element is `?string` into a same-shape target whose
+  payload/element is `string`, and all three nullability diagnostics now fire,
+  symmetrically with the scalar STRING gate. Container annotation stays
+  orthogonal — only the position-0 type-argument mismatch is diagnosed.
 - **Nullability enforcement widens to user-declared reference types.**
   `§B{b:Foo} a` where `a` is `:?Foo` now trips `Calor0272` (and the
   return-site analog trips `Calor0273`). Fires only when the source
@@ -879,9 +860,10 @@ to nuget.org under 0.13.1.
 - **MCP heavy-tool admission control no longer charges a host process's memory to the next tool
   call (#897).** `calor_compile`, `calor_convert`, `calor_analyze` and `calor_batch` are gated on
   process memory before they start, measured with `Process.WorkingSet64` — the *whole* process.
-  Under `calor mcp` that is sound, because the server owns its process. It was applied
-  unconditionally, so in any host the handler does not own it attributed that host's memory to the
-  next MCP tool, waited its full 30s, and refused with *"Server under memory pressure"*.
+  Under `calor mcp` that is sound, because the server owns its process. But the gate applied
+  unconditionally. Embedded in a host process the handler does not own, it charged that host's
+  memory to the next MCP tool, waited its full 30s, and refused with *"Server under memory
+  pressure"*.
 
   This is what six `McpServerTests` had been failing on since 2026-08-10 — only on Linux CI, where
   the test host (thousands of tests plus Roslyn and Z3 in memory) crossed the 50%-of-RAM threshold
