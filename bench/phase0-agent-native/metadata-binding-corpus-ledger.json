@@ -1,25 +1,17 @@
 {
   "schemaVersion": 1,
-  "aggregateResolvedFraction": 92.79,
-  "aggregateResolved": 1158,
+  "aggregateResolvedFraction": 95.91,
+  "aggregateResolved": 1197,
   "aggregateCandidates": 1248,
   "perSubject": [
     {
       "subject": "MediatR",
       "sha": "fb309026775ef953a64fb5339d074426c1ad2c37",
       "candidateCount": 226,
-      "resolvedCount": 214,
-      "resolvedFraction": 94.69,
+      "resolvedCount": 223,
+      "resolvedFraction": 98.67,
       "unresolvedByClass": {
         "No overload matches the supplied argument types.": 1,
-        "Receiver \u0027global::MediatR.IRequest\u003CTResponse\u003E\u0027 has no member\u2026": 1,
-        "Receiver \u0027TRequest\u0027 has no member named \u0027GetType\u0027.": 1,
-        "Receiver \u0027global::MediatR.INotification\u0027 has no member named\u2026": 1,
-        "Receiver \u0027global::MediatR.IStreamRequest\u003CTResponse\u003E\u0027 has no \u2026": 1,
-        "Receiver \u0027global::System.Reflection.MethodInfo\u0027 has no membe\u2026": 2,
-        "Receiver \u0027global::System.Reflection.TypeInfo\u0027 has no member \u2026": 1,
-        "ResolvedButDifferentSymbol": 1,
-        "Receiver \u0027global::System.Collections.Generic.IList\u003CT\u003E\u0027 has n\u2026": 1,
         "Receiver \u0027global::MediatR.NotificationHandlerExecutor\u0027 has n\u2026": 2
       },
       "filesScanned": 36,
@@ -29,15 +21,10 @@
       "subject": "Serilog",
       "sha": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
       "candidateCount": 113,
-      "resolvedCount": 105,
-      "resolvedFraction": 92.92,
+      "resolvedCount": 110,
+      "resolvedFraction": 97.35,
       "unresolvedByClass": {
-        "No overload matches the supplied argument types.": 3,
-        "Receiver \u0027object[]\u0027 has no member named \u0027GetType\u0027.": 1,
-        "Receiver \u0027global::Serilog.Events.LogEventPropertyValue\u0027 has \u2026": 1,
-        "Receiver \u0027global::System.Reflection.MethodInfo\u0027 has no membe\u2026": 1,
-        "Receiver \u0027Exception?\u0027 has no member named \u0027GetType\u0027.": 1,
-        "Receiver \u0027global::Serilog.Events.LogEventLevel\u0027 has no membe\u2026": 1
+        "No overload matches the supplied argument types.": 3
       },
       "filesScanned": 112,
       "filesSkipped": 0
@@ -46,28 +33,14 @@
       "subject": "FluentValidation",
       "sha": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c",
       "candidateCount": 909,
-      "resolvedCount": 839,
-      "resolvedFraction": 92.3,
+      "resolvedCount": 864,
+      "resolvedFraction": 95.05,
       "unresolvedByClass": {
         "Receiver \u0027global::FluentValidation.ValidatorSelectorOptions\u0027\u2026": 7,
         "Receiver \u0027global::FluentValidation.ValidatorConfiguration\u0027 h\u2026": 11,
         "No overload matches the supplied argument types.": 24,
-        "Receiver \u0027global::FluentValidation.Severity\u0027 has no member n\u2026": 2,
-        "Receiver \u0027global::System.Threading.Tasks.Task\u003Cglobal::Fluent\u2026": 1,
-        "Receiver \u0027global::System.Collections.Generic.IList\u003Cglobal::F\u2026": 7,
-        "Receiver \u0027global::FluentValidation.Validators.IPropertyValid\u2026": 1,
         "ResolvedButDifferentSymbol": 1,
-        "Receiver \u0027global::FluentValidation.ValidationException\u0027 has \u2026": 1,
-        "Receiver \u0027global::FluentValidation.Internal.RuleComponent\u003CT,\u2026": 2,
-        "Receiver \u0027global::FluentValidation.Internal.AccessorCache\u003CT\u003E\u2026": 1,
-        "Receiver \u0027global::FluentValidation.IValidator\u003CT\u003E\u0027 has no mem\u2026": 1,
-        "Receiver \u0027global::FluentValidation.IValidator\u003CTProperty\u003E\u0027 ha\u2026": 1,
-        "Receiver \u0027T\u0027 has no member named \u0027Equals\u0027.": 1,
-        "Receiver \u0027T\u0027 has no member named \u0027ToString\u0027.": 1,
-        "Receiver \u0027TProperty\u0027 has no member named \u0027CompareTo\u0027.": 4,
-        "Receiver \u0027T\u0027 has no member named \u0027CompareTo\u0027.": 1,
-        "Receiver \u0027global::FluentValidation.IValidator\u0027 has no member\u2026": 1,
-        "Receiver \u0027TProperty\u0027 has no member named \u0027GetType\u0027.": 2
+        "Receiver \u0027global::FluentValidation.Internal.RuleComponent\u003CT,\u2026": 2
       },
       "filesScanned": 216,
       "filesSkipped": 0

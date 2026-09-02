@@ -8216,9 +8216,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var operand = node.Operand.Accept(this);
         var csharpType = MapTypeName(node.TargetType);
-        return node.VariableName != null
-            ? $"{operand} is {csharpType} {SanitizeSingleIdentifier(node.VariableName)}"
-            : $"{operand} is {csharpType}";
+        if (node.VariableName == null)
+        {
+            return $"{operand} is {csharpType}";
+        }
+
+        var patternName = SanitizeSingleIdentifier(node.VariableName);
+
+        // v0.17 R4(c), round-4 finding — a pattern variable is a DECLARATION,
+        // and it has to be registered like any other or the name-qualifying
+        // paths cannot see that it shadows a module-level member. R4(c) made
+        // `Visit(ReferenceNode)` qualify identifiers through
+        // QualifyCrossModuleTarget, which skips locals "in scope" — a pattern
+        // variable was never in `_declScopes`, so `§IF{i1} (is o i32 value)`
+        // followed by a reference to `value` emitted the MODULE's `value`
+        // instead. Loud (CS0428) when the two shapes differ; silently the wrong
+        // call when both are delegate-shaped, which is exactly the outcome
+        // #823's suppression exists to prevent.
+        DeclareVarInScope(patternName);
+        return $"{operand} is {csharpType} {patternName}";
     }
 
     // Native StringBuilder Operations

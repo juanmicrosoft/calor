@@ -7484,6 +7484,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return reassigned;
     }
 
+    /// <summary>
+    /// Round-4 finding — can this type name appear inside a <c>§B{…}</c> header?
+    /// <c>ParseAttributes</c> splits the header on <c>:</c>, so a name carrying
+    /// a separator, a comma, a bracket or whitespace does not survive the round
+    /// trip. The guard is on the RENDERED name rather than the symbol kind so a
+    /// display form nobody anticipated still fails safe: the binding is emitted
+    /// untyped, which is what it was before R4(a).
+    /// </summary>
+    private static bool IsSpellableInBindingHeader(string mapped)
+    {
+        foreach (var c in mapped)
+        {
+            if (c is ':' or ',' or '(' or ')' or '{' or '}' || char.IsWhiteSpace(c))
+                return false;
+        }
+
+        return true;
+    }
+
     private BindStatementNode ConvertLocalDeclaration(LocalDeclarationStatementSyntax node)
     {
         _context.IncrementConverted();
@@ -7517,15 +7536,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             && variable.Initializer?.Value is InvocationExpressionSyntax)
         {
             var declared = _semanticModel.GetTypeInfo(node.Declaration.Type).Type;
+
+            // Round-4 finding — a type is only usable here if it has a NAME the
+            // §B header can carry. An anonymous type renders as
+            // `<anonymous type: string Name, int Len>` and a tuple as
+            // `(bool ok, int count)`; both contain `:`, `,` and spaces, which is
+            // exactly what ParseAttributes splits the header on, so writing
+            // either produced source that no longer compiles. On main these were
+            // untyped `§B{q}` and stayed correct — an untyped binding is the
+            // right answer whenever the type cannot be spelled.
             if (declared != null
                 && declared.TypeKind != Microsoft.CodeAnalysis.TypeKind.Error
-                && declared.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Void)
+                && declared.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Void
+                && !declared.IsAnonymousType
+                && !declared.IsTupleType)
             {
                 var mapped = TypeMapper.CSharpToCalor(
                     declared.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat
                         .MinimallyQualifiedFormat));
-                if (!string.IsNullOrWhiteSpace(mapped) && !mapped.Contains('?'))
+                if (!string.IsNullOrWhiteSpace(mapped)
+                    && !mapped.Contains('?')
+                    && IsSpellableInBindingHeader(mapped))
+                {
                     typeName = mapped;
+                }
             }
         }
 

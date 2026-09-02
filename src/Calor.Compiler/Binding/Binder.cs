@@ -1092,6 +1092,12 @@ public sealed class Binder
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
+        // v0.17 R2, round-4 finding — a module-level generic function's type
+        // parameters are declared on the FUNCTION; without this push
+        // GetTypeParameterConstraints fell back to _currentClass, which is null
+        // at module scope, so `§F{…}<T> (T:n)` calling an overload that takes
+        // T's constraint interface still reported Calor0208.
+        using var _tp = PushMemberTypeParameters(func.TypeParameters);
         var functionSymbol = _functionSymbols[func];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
@@ -3783,7 +3789,24 @@ public sealed class Binder
             GetImplicitConversionCost);
     }
 
-    private int? GetImplicitConversionCost(string parameterType, string argumentType)
+    /// <summary>
+    /// Entry point kept two-argument so it converts to the
+    /// <c>Func&lt;string, string, int?&gt;</c> overload-resolution expects.
+    /// </summary>
+    private int? GetImplicitConversionCost(string parameterType, string argumentType) =>
+        GetImplicitConversionCost(parameterType, argumentType, visitedTypeParameters: null);
+
+    /// <param name="visitedTypeParameters">
+    /// v0.17 R2, round-4 finding — the type parameters already expanded on this
+    /// path. `§WHERE T : U` together with `§WHERE U : T` is accepted by
+    /// <c>ParseWhereClause</c>, and without this set the constraint recursion
+    /// below chases the two forever: a StackOverflowException, which the
+    /// Calor0932 handler cannot catch, so the process dies.
+    /// </param>
+    private int? GetImplicitConversionCost(
+        string parameterType,
+        string argumentType,
+        HashSet<string>? visitedTypeParameters)
     {
         var parameter = TypeIdentity.Canonicalize(parameterType);
         var argument = TypeIdentity.Canonicalize(argumentType);
@@ -3807,8 +3830,12 @@ public sealed class Binder
         // resolution reported "no matching overload" for a call C# accepts.
         if (GetTypeParameterConstraints(argumentType) is { Count: > 0 } constraints)
         {
+            var expanded = visitedTypeParameters ?? new HashSet<string>(StringComparer.Ordinal);
+            if (!expanded.Add(argumentType))
+                return null;
+
             var best = constraints
-                .Select(constraint => GetImplicitConversionCost(parameterType, constraint))
+                .Select(constraint => GetImplicitConversionCost(parameterType, constraint, expanded))
                 .Where(cost => cost.HasValue)
                 .Select(cost => cost!.Value)
                 .DefaultIfEmpty(int.MaxValue)
@@ -3935,18 +3962,61 @@ public sealed class Binder
         var generic = head.IndexOf('<');
         if (generic > 0)
             head = head[..generic];
-        head = head.TrimEnd('[', ']', '?', '*');
+        head = StripArrayAndNullableDecorators(head);
         if (head.Length == 0)
             return false;
 
-        // Builtins canonicalize to upper case and are always known.
-        if (head.All(c => !char.IsLetter(c) || char.IsUpper(c)))
+        // v0.17 R2, round-4 finding — this used to ask "is every letter upper
+        // case?", which is false for every DECORATED canonical builtin:
+        // `FLOAT[bits=32]` and `INT[bits=8][signed=true]` carry lower-case
+        // `bits`/`signed`/`true`. Every call with an i8/u8/i16/u16/f32 argument
+        // was therefore declared invisible to the module, which SUPPRESSES
+        // Calor0208 — overload checking silently switched off for those types.
+        // The canonical builtin set is the authority, not letter case.
+        if (TypeIdentity.IsBuiltinCanonicalName(head))
             return false;
 
         if (GetTypeParameterConstraints(head) != null)
             return false;
 
         return ResolveClass(head) == null;
+    }
+
+    /// <summary>
+    /// Strips the postfix decorators <see cref="TypeIdentity.Canonicalize"/>
+    /// preserves — <c>[]</c>, <c>[,]</c>, <c>?</c>, <c>*</c> — while leaving the
+    /// KEYED brackets a canonical builtin carries (<c>INT[bits=8]</c>) alone. A
+    /// blanket <c>TrimEnd('[', ']', '?', '*')</c> cannot tell the two apart.
+    /// </summary>
+    private static string StripArrayAndNullableDecorators(string canonical)
+    {
+        var head = canonical;
+        while (head.Length > 0)
+        {
+            if (head[^1] is '?' or '*')
+            {
+                head = head[..^1];
+                continue;
+            }
+
+            if (head[^1] == ']')
+            {
+                var open = head.LastIndexOf('[');
+                if (open < 0)
+                    break;
+
+                var inner = head[(open + 1)..^1];
+                if (inner.Length == 0 || inner.All(c => c == ','))
+                {
+                    head = head[..open];
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return head;
     }
 
     private static bool IsImplicitNumericConversion(string from, string to) =>

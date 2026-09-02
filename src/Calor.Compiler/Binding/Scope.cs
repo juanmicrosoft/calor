@@ -376,6 +376,18 @@ public static class TypeIdentity
     };
 
     /// <summary>
+    /// v0.17 R2, round-4 finding — is <paramref name="canonical"/> one of the
+    /// built-in spellings <see cref="Canonicalize(string)"/> produces? The
+    /// binder used to answer this by asking whether every letter was upper
+    /// case, which is false for every decorated form (<c>FLOAT[bits=32]</c>,
+    /// <c>INT[bits=8][signed=true]</c>). Callers pass the head with array,
+    /// pointer and nullable decorators already stripped.
+    /// </summary>
+    public static bool IsBuiltinCanonicalName(string canonical) =>
+        ProvablyNonFunctionCanonicalNames.Contains(canonical)
+        || string.Equals(canonical, "OPTION", StringComparison.Ordinal);
+
+    /// <summary>
     /// v0.15 E3 slice a, review round 1 (F2) — "is this type PROVABLY not a
     /// function type?", the conservative complement of
     /// <see cref="IsFunctionTypeName"/>.

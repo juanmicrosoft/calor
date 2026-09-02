@@ -1988,11 +1988,17 @@ public sealed class EffectEnforcementPass
         ///
         /// <para>A variable the arguments could not determine makes the
         /// instantiated row Unknown, which is Calor0425 at the CALL SITE — §10.3's
-        /// second message. Nothing is charged for such a variable — E3b's
-        /// disclosed deviation from §10.3's sample, kept as is. E4 (which charges
-        /// an INVOKED Unknown row fail-closed) did not revisit this cell: the
-        /// author of the caller cannot repair an argument's missing row from the
-        /// call site, and the Calor0425 here already names which argument.</para>
+        /// second message — and the caller is CHARGED Unknown for it.</para>
+        ///
+        /// <para>v0.17 S1 / #1136 reversed the earlier rule here. Through v0.16
+        /// nothing was charged for such a variable (E3b's disclosed deviation
+        /// from §10.3's sample, which E4 did not revisit), so an undetermined
+        /// effect variable simply vanished and a `§E{}` method could invoke a
+        /// `§E{cw}` member through a row-polymorphic callee with the build
+        /// exiting 0. #1136 measured five argument spellings that reach this
+        /// path. The pass now charges what it actually knows — Unknown — and the
+        /// caller reports Calor0410 unless it declares the effect. See the
+        /// comment on the fail-closed branch below for the full record.</para>
         /// </summary>
         private void InstantiateAndCharge(
             FunctionNode callee,
