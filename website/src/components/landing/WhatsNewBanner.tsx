@@ -17,7 +17,7 @@ export function WhatsNewBanner() {
           <p className="text-center">
             <span className="font-semibold text-calor-cerulean">v0.17.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The compiler understands far more of your converted C#: it now resolves 95.9% of calls, up from 92.8%.</span>
+            <span className="text-foreground">Overload resolution and member lookup got smarter: 20 more modules from our three-project conversion corpus now reach effect checking.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
