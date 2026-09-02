@@ -4,27 +4,97 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-02
+
+Calor compiles to C#, and the way we check that claim is to convert three real
+open-source C# projects — MediatR, Serilog and FluentValidation, 364 files in all —
+and see how much of the result the compiler can still make sense of. 0.16 got all
+364 to **parse**. This release is about what happens after that: a file that parses
+can still stop at name binding, before any effect checking runs. Sixty of the 364
+stopped there when this release opened. Forty do now, and the number of files the
+effect checker reaches went from 304 to **324**.
+
 ### Added
 
 - **The compiler now records why it stops on the code it cannot process.** When we
-  convert real C# projects to Calor, 60 modules fail during name binding and never
-  reach the effect checks. Until now that was a bare count: sixty, cause unknown.
-  We now record which diagnostic stopped each module, and in which file, so the
-  biggest group can be found and fixed rather than guessed at. One diagnostic
-  accounts for two thirds of them. We also count the modules that stop for **more
-  than one** reason — ten of the sixty — because fixing a single cause cannot
-  rescue those, and a plan that ignored them would promise more than it could
-  deliver.
+  convert real C# projects to Calor, some modules fail during name binding and
+  never reach the effect checks. Until now that was a bare count — sixty of them,
+  cause unknown. We now record which diagnostic stopped each module, and in which
+  file, so the biggest group can be found and fixed rather than guessed at. One
+  diagnostic accounted for two thirds of them, which is what the next two entries
+  went after. We also count the modules that stop for **more than one** reason,
+  because fixing a single cause cannot rescue those, and a plan that ignored them
+  would promise more than it could deliver. As shipped, 40 modules stop at binding:
+  17 on the largest cause, 12 and 11 on the other two, with 6 carrying more than one.
 - **A demand count we had been reading from the wrong diagnostic.** We track how
   often the compiler meets a function value it cannot identify, to decide whether a
   bigger feature is worth building. That count read zero — because the check watched
   a diagnostic this case never emits. A different diagnostic reports it, and nobody
-  was counting that one. Over exactly the same set of files, the count is **7,543
-  occurrences across 167 of 304 modules**. This does **not** mean the feature is now
+  was counting that one. Over exactly the same set of files, the count is **8,231
+  occurrences across 187 of the 324 modules** the effect checker reaches. This does **not** mean the feature is now
   justified: that diagnostic covers every unresolved external call, not just the
   narrow case in question, so it is a ceiling on the demand and not a measurement of
   it. Both the test and the saved record say so plainly, so the number cannot later
   be quoted as more than it is.
+
+- **Overload resolution now understands the conversions C# already allows.** When
+  you call a function and more than one overload has the right name, the compiler
+  has to decide which one you meant. It was comparing parameter types too
+  literally: passing a `PropertyEnricher` to a parameter typed `ILogEventEnricher`
+  — an interface the class implements — was reported as "no overload matches",
+  and so was passing a generic parameter `T` to a parameter typed as one of `T`'s
+  own constraints. Both are ordinary implicit conversions, and both now resolve.
+  Over the three real C# projects we convert as a test corpus, this took the
+  modules the effect checker can reach from 304 to 319.
+- **The compiler can now find members a type inherits.** Looking up a method asked
+  only the receiver type for its *own* declarations — nothing about base classes,
+  base interfaces, generic constraints, or `System.Object`. So `IValidator.GetType()`
+  was "no such member" (an interface has no base type to walk), and so were
+  `MethodInfo.GetParameters()` (declared on `MethodBase`), `IList<T>.Add(item)`
+  (declared on `ICollection<T>`), and `Severity.ToString()` (an enum's `ToString`
+  comes from `System.Enum`). Resolution over the corpus went from **92.8% to
+  95.9%** of call sites, and every one of the three projects improved.
+- **A related fix for members of types the compiler is reading about, not
+  compiling.** Resolution works by asking Roslyn a question in a small synthetic
+  C# file. That file can only name types it has a reference to, so a receiver
+  defined in the code being analysed could not be named at all, and the failure
+  looked exactly like "no such member". For an inherited member the difference is
+  empty — `IValidator.GetType` *is* `object.GetType` — so the question is now
+  re-asked of whichever type actually declares the member.
+
+### Fixed
+
+- **A cyclic generic constraint crashed the compiler outright.** Writing
+  `§WHERE T : U` together with `§WHERE U : T` sent the conversion-cost search
+  chasing the two constraints in a loop until the stack ran out. A stack overflow
+  cannot be caught, so the process died rather than reporting anything. The search
+  now remembers which type parameters it has already expanded.
+- **Overload checking was silently switched off for several numeric types.** The
+  compiler decides whether it can see a type well enough to judge a call, and it
+  was answering that question by checking whether the type's name was upper-case.
+  The canonical form of the smaller numeric types is not — `FLOAT[bits=32]`,
+  `INT[bits=8][signed=true]` — so every call carrying an `i8`, `u8`, `i16`, `u16`
+  or `f32` argument was treated as unjudgeable, and mismatches went unreported.
+- **A pattern variable could be shadowed by a module-level function.** After
+  `§IF{i1} (is o i32 value)`, a reference to `value` was resolved to the module's
+  `value` function instead of the variable just introduced. Usually that failed to
+  compile; when both happened to be function-shaped it silently called the wrong
+  thing.
+- **Converted C# no longer writes type names it cannot read back.** When the
+  converter can work out the type of a `var`, it writes it down. Anonymous types
+  and tuples render with colons, commas and spaces — the characters that separate
+  the fields of a Calor declaration header — so the result no longer parsed. Those
+  two are now left untyped, which is what the converter did before.
+- **A property's effect annotation survived being read but not being written.**
+  Properties gained the ability to carry an effect row this release, and the
+  parser read it, but the Calor writer dropped it. Anything that round-trips a
+  file through that writer silently deleted the annotation.
+- **Four defects in converting and emitting real C#.** A class using `§EXT` emitted
+  unqualified calls to module functions (`CS0103`); the same function referenced as
+  a method group rather than called was emitted unqualified too; a `var` bound to a
+  method call lost its type, and with it every member access on the result; and a
+  named argument matching no parameter crashed the binder with an
+  `IndexOutOfRangeException`.
 
 ## [0.16.0] - 2026-09-01
 

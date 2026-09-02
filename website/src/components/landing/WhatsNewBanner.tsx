@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.16.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.17.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Your AI assistant can now ask the compiler who calls what, and what each function really does.</span>
+            <span className="text-foreground">The compiler understands far more of your converted C#: it now resolves 95.9% of calls, up from 92.8%.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
