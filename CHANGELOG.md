@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **We can now say WHY the compiler gives up on the code it gives up on.** When we
+  convert real C# projects to Calor and run the effect checks over them, 60 of the
+  modules never get that far — they stop earlier, at the step that works out what
+  every name refers to. Until now that was a bare count: sixty, cause unknown. We
+  now record which error stopped each one, and which file it was, so the biggest
+  group can be found and fixed rather than guessed at. It turns out one error
+  accounts for two thirds of them. We also count the modules that stop for **more
+  than one** reason — ten of the sixty — because those cannot be rescued by fixing
+  a single cause, and a plan that ignored them would promise more than it could
+  deliver.
+- **A number we had been reading with half the picture missing.** We track how often
+  the compiler meets a function value it cannot identify, to decide whether a
+  bigger feature is worth building. That count read zero. It turns out the check
+  was looking in the one place that particular problem never appears — a different
+  message is used for it, and nobody was counting that one. Counted over exactly
+  the same set of files, it is **7,543 occurrences across 167 of 304 modules**.
+  This does **not** mean the feature is now justified: that message covers every
+  unrecognised external call, not just the narrow case in question, so it is a
+  ceiling on the demand and not a measurement of it. Both the test and the saved
+  record say so plainly, so the number cannot later be quoted as more than it is.
+
 ## [0.16.0] - 2026-09-01
 
 ### Benchmark Results (Statistical: 30 runs)

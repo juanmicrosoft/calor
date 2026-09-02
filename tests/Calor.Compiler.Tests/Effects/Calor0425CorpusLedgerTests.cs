@@ -121,7 +121,10 @@ public class Calor0425CorpusLedgerTests
     // v0.16 K1: schema 3 = schema 2 + BindRule + FloorRule + the raw-bag
     // denominator kept beside the production one + the exclusion split that the
     // widened denominator made worth separating (effect-pass faults).
-    private const int SchemaVersion = 3;
+    // v0.17 R1: schema 4 = schema 3 + the bind-failure histogram and its module
+    // list (roadmap-v0.17 §3.1 R1, gate 13) + the Calor0411 count over the
+    // enforced set, which the IL-rows trigger was being read without.
+    private const int SchemaVersion = 4;
 
     /// <summary>
     /// v0.16 K1 — the rule the denominator is measured under, written into the
@@ -143,7 +146,18 @@ public class Calor0425CorpusLedgerTests
         + "exactly as Program.cs:820/829-833 does (v0.16 K1, schema 3), NOT gated on the raw "
         + "binder bag as schema 2 was; modules that fail conversion, whose converted output fails "
         + "to parse, that stop at a propagated binding error, or whose effect pass throws are "
-        + "excluded from the denominator and counted separately. Manifests are BUILT-IN ONLY — "
+        + "excluded from the denominator and counted separately. SCHEMA 4 (v0.17 R1) adds two "
+        + "things its numbers cannot be read without. BindFailureCauses/BindFailureModules break "
+        + "the propagated bind stops out by the FIRST propagated error — the one the compiler "
+        + "stops on — and BindFailureMultiCause counts the modules carrying more than one, "
+        + "because a module attributed to the largest cluster that also stops elsewhere cannot "
+        + "be recovered by fixing that cluster alone. Calor0411Sites/Calor0411Modules count "
+        + "UnknownExternalCall over the SAME enforced set, because the unresolved-receiver class "
+        + "never reaches Calor0425 — the bare-target guard sends it through the unknown-call "
+        + "chain — so a trigger reading UnknownSource + InvocationUndetermined was being read "
+        + "against a partial denominator. Calor0411 is EVERY unknown external call, not only the "
+        + "delegate-returning ones that trigger concerns, so it is an UPPER BOUND on that demand "
+        + "and not a measure of it. Manifests are BUILT-IN ONLY — "
         + "deliberately hermetic, and therefore STRICTER than the CLI leg, which still reads "
         + "~/.calor/manifests: the pass is constructed with no project directory (so no "
         + ".calor-effects.json beside the input can be read, which is the channel the CLI leg "
@@ -395,6 +409,17 @@ public class Calor0425CorpusLedgerTests
                 $"Calor0425 volume moved for {actual.Subject}.\n"
                 + $"  committed: {expected}\n"
                 + $"  measured : {actual}\n"
+                // The record's synthesized printer renders schema 4's two collection
+                // members as `SortedDictionary`2[...]` / `List`1[System.String]`, so a
+                // run where a module's stop code merely SHIFTS (Calor0208 -> Calor0250,
+                // counts still summing to the same ExcludedBindFailed) would print two
+                // character-identical lines above and fire with no indication of what
+                // moved — for exactly the fields schema 4 added. Spelled out here
+                // instead of overriding PrintMembers, which on a sealed record would
+                // mean re-printing all 25 members by hand.
+                + $"  causes   : {Describe(expected.BindFailureCauses)}"
+                + $"  ->  {Describe(actual.BindFailureCauses)}\n"
+                + $"  modules  : {DescribeDelta(expected.BindFailureModules, actual.BindFailureModules)}\n"
                 + "A RISE means the row-less surface grew or the resolution ceiling fell; a FALL "
                 + "means a site went silent. Both are decisions. Regenerate the ledger IN THIS PR "
                 + "with CALOR_REGENERATE_CALOR0425_LEDGER=1 and name the cause — never absorb it.");
@@ -884,6 +909,11 @@ public class Calor0425CorpusLedgerTests
         int externalBase = 0, invocationRowless = 0, invocationUndetermined = 0, invocationAssumed = 0;
         // F7 — WHY a module was excluded, not just how many were.
         int excludedConversionFailed = 0, excludedParseFailed = 0, excludedBindFailed = 0;
+        // v0.17 R1 (schema 4): the bind-failure histogram, the modules behind it,
+        // and the Calor0411 denominator. See the sites where each is filled.
+        var bindFailureCauses = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var bindFailureModules = new List<string>();
+        int calor0411Sites = 0, calor0411Modules = 0, bindFailureMultiCause = 0;
         // v0.16 K1 (schema 3). `excludedEffectPassFaulted` was folded into
         // `excludedBindFailed` under schema 2, which was tolerable when the bind
         // guard kept the pass away from anything hard; under the production rule
@@ -969,6 +999,40 @@ public class Calor0425CorpusLedgerTests
             {
                 notMeasured++;
                 excludedBindFailed++;
+
+                // v0.17 R1 (schema 4). The 60 modules that stop here were a COUNT
+                // and nothing else, in any committed ledger, which is why
+                // roadmap-v0.17 §3.1 R2 cannot be scoped without this: R2 fixes
+                // "the largest cluster R1 names", and until now nothing named one.
+                // The cause is the FIRST propagated error, because that is the one
+                // the shipping compiler stops on (`Program.cs:829-833`) and so the
+                // only one a user sees; counting every error in the bag would
+                // weight a module by how many follow-on errors it happened to
+                // cascade into.
+                var stopCode = propagatedDiagnostics.Errors[0].Code.ToString();
+                bindFailureCauses[stopCode] = bindFailureCauses.GetValueOrDefault(stopCode) + 1;
+
+                // A module can carry MORE THAN ONE propagated code, and this
+                // attributes it to the FIRST — which is the binder's REPORT order
+                // (symbol registration before body binding), not source order. That
+                // matters to §4.1's frozen effect size: R2's target of 20 is half of
+                // the Calor0208 cluster of 40, and a module in that cluster that ALSO
+                // stops on Calor0250 cannot be recovered by fixing Calor0208 alone. So
+                // the ambiguity is published rather than hidden — if this count is
+                // large, the cluster is softer than its number suggests, and PP-R1's
+                // route for that is a MISS with the cause named, not a re-scoping.
+                if (propagatedDiagnostics.Errors.Select(d => d.Code).Distinct().Count() > 1)
+                    bindFailureMultiCause++;
+
+                // Forward slashes ALWAYS: this is the first path to enter the pinned
+                // equality, and every sibling ledger normalizes for exactly this reason
+                // (HigherOrderDemandLedgerTests.cs:226, EffectResolverKeyLedgerTests.cs:259,
+                // BinderIncompleteRatchetTests.cs:94). Without it a Windows run measures
+                // `MediatR\Mediator.cs`, SequenceEqual fails, and the recomputation pin
+                // reds with "volume moved" when nothing did — or a Windows regeneration
+                // rewrites the ledger and flips the failure onto Linux CI.
+                bindFailureModules.Add(
+                    $"{stopCode} {Path.GetRelativePath(srcRoot, file).Replace('\\', '/')}");
                 continue;
             }
 
@@ -1017,6 +1081,23 @@ public class Calor0425CorpusLedgerTests
             enforced++;
             if (!rawBagRejects)
                 enforcedRawBagRule++;
+
+            // v0.17 R1 (schema 4) — the denominator the IL-rows trigger was being
+            // read WITHOUT. This ledger's own class comment records that §13.4's
+            // "unresolved receiver" never reaches Calor0425: the bare-target guard
+            // sends it out as Calor0411 through the unknown-call chain. No
+            // committed ledger counted that, so "UnknownSource +
+            // InvocationUndetermined = 0" was a statement about the sites that
+            // reach THIS code, with an adjacent class unmeasured by construction
+            // (roadmap-v0.17 §0.3, finding M1). Counted here over exactly the
+            // enforced set, so the two are readable against one denominator.
+            var unknownCalls = effectDiagnostics
+                .Count(d => d.Code == DiagnosticCode.UnknownExternalCall);
+            if (unknownCalls > 0)
+            {
+                calor0411Sites += unknownCalls;
+                calor0411Modules++;
+            }
 
             // ANTI-VACUITY WITNESS (schema 2): the invocation-bucket Calor0425s
             // counted below. Pre-E4 this was the Calor0418 count, which E4 drove
@@ -1085,7 +1166,183 @@ public class Calor0425CorpusLedgerTests
             externalBase, invocationRowless, invocationUndetermined, invocationAssumed,
             invocationRowless + invocationUndetermined + invocationAssumed,
             excludedConversionFailed, excludedParseFailed, excludedBindFailed,
-            excludedEffectPassFaulted, enforcedRawBagRule, rawBagBindFailed);
+            excludedEffectPassFaulted, enforcedRawBagRule, rawBagBindFailed,
+            bindFailureCauses, bindFailureModules, bindFailureMultiCause,
+            calor0411Sites, calor0411Modules);
+    }
+
+    private static string Describe(SortedDictionary<string, int>? causes) =>
+        causes is null ? "<null>" : string.Join("+", causes.Select(c => $"{c.Key}:{c.Value}"));
+
+    /// <summary>
+    /// What moved, described the way the assertion COMPARES. The equality is
+    /// <see cref="Enumerable.SequenceEqual{T}(IEnumerable{T},IEnumerable{T})"/>,
+    /// which is order-sensitive; a set difference is not. Same modules in a
+    /// different order — a platform sort-order change, or a corpus rename that
+    /// only shifts positions — would fail the pin while this printed
+    /// "identical", telling the reader nothing moved. So an order-only
+    /// difference reports the first index where the two disagree.
+    /// </summary>
+    private static string DescribeDelta(List<string>? committed, List<string>? measured)
+    {
+        if (committed is null || measured is null)
+            return "<null>";
+        var gone = committed.Except(measured, StringComparer.Ordinal).ToList();
+        var came = measured.Except(committed, StringComparer.Ordinal).ToList();
+        if (gone.Count > 0 || came.Count > 0)
+            return $"-[{string.Join("; ", gone)}] +[{string.Join("; ", came)}]";
+        if (committed.SequenceEqual(measured, StringComparer.Ordinal))
+            return "identical";
+        var i = Enumerable.Range(0, Math.Min(committed.Count, measured.Count))
+            .First(n => !string.Equals(committed[n], measured[n], StringComparison.Ordinal));
+        return $"same members, ORDER differs — first at index {i}: "
+            + $"committed '{committed[i]}' vs measured '{measured[i]}'";
+    }
+
+    /// <summary>
+    /// System.Text.Json leaves schema 4's members null for a schema-3 file, and
+    /// the only schema assertion lives in the recomputation test, which SKIPS on
+    /// a bare clone. Without this a stale ledger (a bad merge, a
+    /// <c>git checkout main -- ...</c>) makes the gate tests throw
+    /// NullReferenceException instead of naming the mismatch.
+    /// </summary>
+    private static void AssertSchema4(Ledger committed)
+    {
+        Assert.True(committed.SchemaVersion >= 4,
+            $"the committed ledger is schema {committed.SchemaVersion}; these gates read schema 4 "
+            + "fields (BindFailureCauses, BindFailureModules, Calor0411*). Regenerate with "
+            + "CALOR_REGENERATE_CALOR0425_LEDGER=1.");
+        Assert.All(committed.PerSubject, subject =>
+        {
+            Assert.NotNull(subject.BindFailureCauses);
+            Assert.NotNull(subject.BindFailureModules);
+        });
+    }
+
+    /// <summary>
+    /// Schema 4's collection members forced a hand-written
+    /// <c>SubjectVolume.Equals</c>, replacing the compiler's member-wise one. It
+    /// is now a hand-maintained list of every member, so schema 5 adds a field,
+    /// someone forgets a line there, and the ledger's central pin SILENTLY STOPS
+    /// DETECTING MOVEMENT in that field — the exact failure the ledger exists to
+    /// prevent, and invisible because the test still passes. This makes adding a
+    /// member fail loudly until the comparison is updated with it.
+    /// </summary>
+    [Fact]
+    public void SubjectVolumeEquality_CoversEveryMember()
+    {
+        var members = typeof(SubjectVolume).GetProperties().Length;
+        Assert.True(members == 26,
+            $"SubjectVolume has {members} members; the hand-written Equals covers 26. Add the new "
+            + "member to Equals(SubjectVolume?) — omitting it makes "
+            + "Calor0425CorpusLedgerMatchesRecomputation blind to that field — then update this "
+            + "count.");
+    }
+
+    /// <summary>
+    /// Gate 13 (roadmap-v0.17 §5). The bind-failure histogram must SUM to
+    /// <c>ExcludedBindFailed</c> on every subject, and name one module per
+    /// exclusion. A cause that does not add up is a red gate, not a rounding
+    /// note: the histogram exists so §3.1 R2 can be scoped against a real
+    /// cluster, and one that loses modules would scope it against a smaller
+    /// cluster than the corpus holds.
+    /// </summary>
+    [Fact]
+    public void Gate13_BindFailureCauses_SumToExcludedBindFailed()
+    {
+        var committed = CommittedLedger();
+        AssertSchema4(committed);
+        foreach (var subject in committed.PerSubject)
+        {
+            Assert.Equal(subject.ExcludedBindFailed, subject.BindFailureCauses.Values.Sum());
+            Assert.Equal(subject.ExcludedBindFailed, subject.BindFailureModules.Count);
+        }
+    }
+
+    /// <summary>
+    /// v0.17 R1's deliverable to §3.1 R2: the largest binding cluster, named.
+    /// <para>The RULE this feeds is frozen in roadmap-v0.17 §4.1 and was written
+    /// BEFORE this measurement existed — R2 recovers at least half the largest
+    /// cluster and never fewer than 10 modules. R1 supplies the cluster's SIZE
+    /// and may not choose the fraction or the floor (review round 3, finding
+    /// R3-b: deferring the whole effect size to R1 would have let whoever writes
+    /// R1's PR pick the target with the breakdown already in front of them).
+    /// Both constants are asserted here, so moving one is a diff on a pin rather
+    /// than a quiet re-scoping.</para>
+    /// </summary>
+    [Fact]
+    public void R1_NamesTheLargestBindingCluster_AndTheFrozenRuleSizesR2()
+    {
+        var committed = CommittedLedger();
+        AssertSchema4(committed);
+        var aggregate = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        foreach (var subject in committed.PerSubject)
+            foreach (var cause in subject.BindFailureCauses)
+                aggregate[cause.Key] = aggregate.GetValueOrDefault(cause.Key) + cause.Value;
+
+        var largest = aggregate.MaxBy(entry => entry.Value);
+        Assert.Equal("Calor0208", largest.Key);
+        Assert.Equal(40, largest.Value);
+        Assert.Equal(60, aggregate.Values.Sum());
+
+        // The frozen rule, applied. Neither constant is R1's to move.
+        const double RecoverAtLeastFraction = 0.5;
+        const int NeverFewerThan = 10;
+        var target = Math.Max(
+            (int)Math.Ceiling(largest.Value * RecoverAtLeastFraction), NeverFewerThan);
+        Assert.Equal(20, target);
+
+        // PP-R1 may read UNDERPOWERED on ONE condition: the corpus cannot supply
+        // the effect under a rule fixed before the data was seen. It can.
+        Assert.True(largest.Value >= NeverFewerThan,
+            "the largest cluster is below the frozen floor, which is the only condition under "
+            + "which PP-R1 may read UNDERPOWERED (roadmap-v0.17 §4.1).");
+    }
+
+    /// <summary>
+    /// v0.17 R1 / review round 1 finding M1 — the denominator the IL-rows trigger
+    /// was being read without.
+    /// <para>This class's own comment records that §13.4's "unresolved receiver"
+    /// never reaches Calor0425: the bare-target guard sends it out as Calor0411
+    /// through the unknown-call chain. The trigger reads
+    /// <c>UnknownSource + InvocationUndetermined</c> over the enforced set, so a
+    /// zero there said nothing about the adjacent class until that class was
+    /// counted over the SAME set.</para>
+    /// <para><b>What this number is not.</b> Calor0411 is every unknown external
+    /// call, not only the delegate-returning ones the IL-rows item is about, so
+    /// it is an UPPER BOUND on that demand and not a measure of it. Splitting it
+    /// is the next question, not an answered one — asserted here so the count is
+    /// never read as "the IL-rows trigger really fires".</para>
+    /// </summary>
+    [Fact]
+    public void R1_Calor0411_IsCountedOverTheEnforcedSet()
+    {
+        var committed = CommittedLedger();
+        AssertSchema4(committed);
+        var sites = committed.PerSubject.Sum(s => s.Calor0411Sites);
+        var enforced = committed.PerSubject.Sum(s => s.ModulesEnforced);
+
+        Assert.True(sites > 0, "Calor0411 is uncounted again — M1's whole point.");
+
+        // PER SUBJECT, not on the aggregate. "Counted over the enforced set" is a
+        // per-subject invariant, and an aggregate check would pass while MediatR
+        // reported 40 Calor0411 modules over 31 enforced — the 304 total absorbing
+        // it. Gate 13 above loops per subject for the same reason.
+        foreach (var subject in committed.PerSubject)
+            Assert.True(subject.Calor0411Modules <= subject.ModulesEnforced,
+                $"{subject.Subject}: Calor0411 is counted over the ENFORCED set, so "
+                + $"{subject.Calor0411Modules} may not exceed {subject.ModulesEnforced}.");
+
+        // The contrast M1 asked for, as an assertion rather than a sentence: the
+        // trigger's own fields read zero over exactly this set.
+        var trigger = committed.PerSubject.Sum(s => s.UnknownSource + s.InvocationUndetermined);
+        Assert.True(trigger == 0,
+            $"UnknownSource + InvocationUndetermined is {trigger}, not 0. This is not a defect — "
+            + "it is the IL-rows demand the roadmap's DEFERRED list is waiting for, and it fires "
+            + "at > 10. Update this pin to the measured value, and re-read the IL-rows trigger "
+            + "against it rather than against the Calor0411 upper bound below.");
+        Assert.True(sites > trigger,
+            "if this ever inverts, the trigger is measuring the larger class and M1 is closed.");
     }
 
     /// <summary>
@@ -1195,7 +1452,74 @@ public class Calor0425CorpusLedgerTests
         /// <summary>v0.16 K1 (schema 3). Modules that parsed but whose RAW binder
         /// bag has errors — schema 2's exclusion count, kept so the size of the
         /// correction is readable from the ledger alone.</summary>
-        int RawBagBindFailed);
+        int RawBagBindFailed,
+        /// <summary>v0.17 R1 (schema 4) — <c>ExcludedBindFailed</c> broken out by
+        /// the diagnostic the shipping compiler STOPS on, which is the first
+        /// propagated error. These counts sum to <c>ExcludedBindFailed</c>
+        /// (gate 13), and the largest entry across all subjects is the cluster
+        /// roadmap-v0.17 §3.1 R2 is scoped against. Before this, the 60 modules
+        /// were a count with no causes anywhere in the tree.</summary>
+        SortedDictionary<string, int> BindFailureCauses,
+        /// <summary>v0.17 R1 (schema 4). Each excluded module as
+        /// "<c>Code path</c>", so the cluster R2 targets can be opened rather
+        /// than trusted.</summary>
+        List<string> BindFailureModules,
+        /// <summary>v0.17 R1 (schema 4). Modules whose propagated bag holds MORE
+        /// THAN ONE distinct code, so their attribution to a single cluster is a
+        /// choice of the binder's report order. Published because §4.1 sizes R2
+        /// off the largest cluster: a module counted in it that ALSO stops on
+        /// another code cannot be recovered by fixing that cluster alone, and a
+        /// large number here means the cluster is softer than its size suggests.
+        /// </summary>
+        int BindFailureMultiCause,
+        /// <summary>v0.17 R1 (schema 4) — Calor0411 over the ENFORCED set. The
+        /// unresolved-receiver class never reaches Calor0425 (see the class
+        /// comment): the bare-target guard sends it out through the unknown-call
+        /// chain instead. The IL-rows trigger reads
+        /// <c>UnknownSource + InvocationUndetermined</c>, so without this it was
+        /// being read against a partial denominator.</summary>
+        int Calor0411Sites,
+        int Calor0411Modules)
+    {
+        /// <summary>
+        /// Schema 4 added two COLLECTION members, and a positional record's
+        /// synthesized equality compares members with
+        /// <see cref="EqualityComparer{T}.Default"/> — which for
+        /// <see cref="List{T}"/> and <see cref="SortedDictionary{TKey,TValue}"/>
+        /// is REFERENCE equality. Without this override the committed-vs-measured
+        /// comparison in
+        /// <c>Calor0425CorpusLedgerMatchesRecomputation</c> compares two distinct
+        /// instances and is unequal on every run, turning the ledger's central
+        /// pin into a permanent red that says "volume moved" when nothing did.
+        /// Caught by that test on the first run of schema 4.
+        /// </summary>
+        public bool Equals(SubjectVolume? other) =>
+            other is not null
+            && (Subject, Diagnostics, ModulesWithDiagnostics, ModulesEnforced, ModulesNotMeasured)
+               == (other.Subject, other.Diagnostics, other.ModulesWithDiagnostics,
+                   other.ModulesEnforced, other.ModulesNotMeasured)
+            && (RowlessDestination, UnknownSource, Assumed, RowlessInvoked, RowlessNeverInvoked)
+               == (other.RowlessDestination, other.UnknownSource, other.Assumed,
+                   other.RowlessInvoked, other.RowlessNeverInvoked)
+            && (ExternalBase, InvocationRowless, InvocationUndetermined, InvocationAssumed,
+                InvocationWitness)
+               == (other.ExternalBase, other.InvocationRowless, other.InvocationUndetermined,
+                   other.InvocationAssumed, other.InvocationWitness)
+            && (ExcludedConversionFailed, ExcludedParseFailed, ExcludedBindFailed,
+                ExcludedEffectPassFaulted)
+               == (other.ExcludedConversionFailed, other.ExcludedParseFailed,
+                   other.ExcludedBindFailed, other.ExcludedEffectPassFaulted)
+            && (ModulesEnforcedRawBagRule, RawBagBindFailed, Calor0411Sites, Calor0411Modules,
+                BindFailureMultiCause)
+               == (other.ModulesEnforcedRawBagRule, other.RawBagBindFailed, other.Calor0411Sites,
+                   other.Calor0411Modules, other.BindFailureMultiCause)
+            && (BindFailureCauses ?? []).SequenceEqual(other.BindFailureCauses ?? [])
+            && (BindFailureModules ?? []).SequenceEqual(other.BindFailureModules ?? []);
+
+        public override int GetHashCode() =>
+            HashCode.Combine(Subject, Diagnostics, ModulesEnforced, ExcludedBindFailed,
+                Calor0411Sites, BindFailureCauses?.Count ?? 0, BindFailureModules?.Count ?? 0);
+    }
 
     /// <summary>v0.16 K1 — one per-subject leg of gate 9's <c>ModulesEnforced</c>
     /// floor.</summary>
