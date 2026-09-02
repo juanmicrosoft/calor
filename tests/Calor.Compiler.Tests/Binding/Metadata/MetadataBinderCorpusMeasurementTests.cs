@@ -200,18 +200,36 @@ public class MetadataBinderCorpusMeasurementTests
 
                 candidateCount++;
 
-                var receiverType = target.IsStatic || target.IsExtensionMethod
-                    ? target.ContainingType
-                    : ExtractReceiverType(invocation, model) ?? target.ContainingType;
+                // v0.17 R3 — MEASUREMENT CORRECTION. `GetSymbolInfo` hands back the
+                // REDUCED form of an extension method: `items.Where(pred)` yields a
+                // symbol whose ContainingType is `System.Linq.Enumerable` and whose
+                // Parameters have had `this IEnumerable<T> source` REMOVED. Pairing
+                // those two — the static class as receiver, the reduced parameter
+                // list as arguments — asks the binder to find
+                // `Enumerable.Where(Func<T,bool>)`, a one-argument overload that
+                // does not exist and never did. Every such candidate was counted
+                // and could not be resolved, whatever the binder did.
+                //
+                // 341 of the 431 unresolved candidates were this. See the note in
+                // the ledger: the corrected question is asked of `ReducedFrom`,
+                // which is the unreduced symbol Roslyn actually resolved, and the
+                // numerator compares against THAT symbol rather than the reduced
+                // one — comparing a two-parameter result to a one-parameter
+                // definition would simply move the failure into the equality.
+                var queried = target.ReducedFrom ?? target;
+
+                var receiverType = queried.IsStatic || queried.IsExtensionMethod
+                    ? queried.ContainingType
+                    : ExtractReceiverType(invocation, model) ?? queried.ContainingType;
 
                 if (receiverType is null) { Tally(unresolvedByClass, "NoReceiverType"); continue; }
 
-                var argTypes = target.Parameters.Select(p =>
+                var argTypes = queried.Parameters.Select(p =>
                     new MetadataArgument(p.Type, p.RefKind)).ToArray();
 
-                var result = binder.ResolveCall(receiverType, target.Name, argTypes);
+                var result = binder.ResolveCall(receiverType, queried.Name, argTypes);
                 if (result.IsResolved &&
-                    SymbolEqualityComparer.Default.Equals(result.Symbol!.OriginalDefinition, target.OriginalDefinition))
+                    SymbolEqualityComparer.Default.Equals(result.Symbol!.OriginalDefinition, queried.OriginalDefinition))
                 {
                     resolvedCount++;
                 }

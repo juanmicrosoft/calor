@@ -248,18 +248,197 @@ public class Calor0425CorpusLedgerTests
     /// NOT-ADJUDICATED route names <c>ReturnValidationPass</c> explicitly),
     /// recorded rather than smoothed away.</para>
     /// </summary>
-    private static CliCrossCheck RegisteredCliCrossCheck() => new(
-        "dotnet calor.dll -i <converted-module>.calr -o <scratch>/<name>.g.cs — no flags, "
-        + "LC_ALL=C, one process per module, inputs dumped into a scratch directory holding no "
-        + ".calor-effects.json (Program.cs:509 would otherwise read it)",
-        "v0.16 K1 registration; RE-RUN in full on W3(a)'s tree (PR #1125), which "
-        + "recovers all 59 parse failures and therefore moves every bucket: 364 modules, "
-        + "zero crashes, exit codes {0: 83, 1: 281}",
-        [
-            new CliCrossCheckSubject("MediatR", 36, 0, 5, 31, 8, 1, 12, 10, 0, 3, 3),
-            new CliCrossCheckSubject("serilog", 112, 0, 24, 88, 46, 5, 26, 11, 0, 11, 22),
-            new CliCrossCheckSubject("FluentValidation", 216, 0, 31, 185, 102, 3, 15, 62, 3, 26, 65),
-        ]);
+
+    /// <summary>
+    /// v0.17 R2 — the CLI leg, MEASURED instead of hand-registered.
+    /// <para>Gate 9's cross-check exists so a regeneration that moves the
+    /// in-process numbers cannot silently drop the second measurement. It was
+    /// enforced against a constant someone had to remember to update, which is
+    /// the same shape of trap as a hand-maintained equality list: R2 moved the
+    /// in-process denominator and the constant went stale immediately. It is
+    /// now re-derived on every regeneration from the SAME conversion the
+    /// in-process leg uses — so the two legs cannot drift by neglect, only by a
+    /// real disagreement, which is what the gate is for.</para>
+    /// <para>Outside a regeneration the committed block is returned unchanged,
+    /// so an ordinary test run stays fast and still checks the committed bytes.
+    /// </para>
+    /// </summary>
+    private static CliCrossCheck MeasureCliCrossCheck(
+        string root,
+        List<SubjectVolume> inProcess)
+    {
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER"),
+                "1", StringComparison.Ordinal))
+        {
+            return CommittedLedger().CliCrossCheck;
+        }
+
+        var rows = new List<CliCrossCheckSubject>();
+        foreach (var subject in inProcess)
+        {
+            var measured = MeasureCliSubject(root, subject.Subject);
+            rows.Add(measured);
+            Console.WriteLine(
+                $"Calor0425-corpus CLI leg {measured.Subject}: files {measured.Files}, "
+                + $"parse {measured.ParseFailed}, bind {measured.BindStopped}, "
+                + $"reach {measured.ReachEffectPass}, 0425 {measured.Calor0425Sites} sites over "
+                + $"{measured.Calor0425Modules} modules");
+        }
+
+        return new CliCrossCheck(
+            "the in-process conversion of this ledger (Lossy / SelectActiveBranchLossy, empty "
+            + "defined symbols), each module written to a scratch directory holding no "
+            + ".calor-effects.json, then `dotnet calor.dll -i <module>.calr -o <scratch>/out.g.cs` "
+            + "— no flags, one process per module",
+            "v0.17 R2: re-derived automatically on every ledger regeneration rather than "
+            + "hand-registered, so the two legs cannot drift by neglect",
+            rows);
+    }
+
+    /// <summary>
+    /// v0.17 R2 — one subject's CLI leg. The conversion is the ledger's own, so
+    /// the two legs differ ONLY in what runs after it: in-process
+    /// <c>EffectEnforcementPass</c> versus the shipping CLI, which additionally
+    /// runs the documented CLI-only passes (<c>Program.cs:760-808</c>).
+    /// </summary>
+    private static CliCrossCheckSubject MeasureCliSubject(string root, string subject)
+    {
+        var srcRoot = Path.Combine(root, "bench", "corpus", subject, "src");
+        var cli = Path.Combine(root, "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+        var files = Directory
+            .EnumerateFiles(srcRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                && !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .OrderBy(file => file, StringComparer.Ordinal)
+            .ToList();
+
+        var scratch = Path.Combine(Path.GetTempPath(), "calor-cli-cross-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        int parseFailed = 0, bindStopped = 0, reach = 0, stop0410 = 0, stop042X = 0;
+        int stop1002 = 0, clean = 0, cliOnly = 0, modules0425 = 0, sites0425 = 0;
+        try
+        {
+            foreach (var file in files)
+            {
+                var calor = ConvertForLedger(file);
+                if (calor == null)
+                {
+                    parseFailed++;
+                    continue;
+                }
+
+                var modulePath = Path.Combine(scratch, "m.calr");
+                File.WriteAllText(modulePath, calor);
+                var output = RunCli(cli, scratch);
+
+                var sites = CountOccurrences(output, "Calor0425");
+                if (sites > 0)
+                {
+                    modules0425++;
+                    sites0425 += sites;
+                }
+
+                if (output.Contains("Calor0099", StringComparison.Ordinal)
+                    || output.Contains("Calor0100", StringComparison.Ordinal)
+                    || output.Contains("Calor0117", StringComparison.Ordinal))
+                {
+                    parseFailed++;
+                    continue;
+                }
+
+                if (output.Contains("Calor0208", StringComparison.Ordinal)
+                    || output.Contains("Calor0250", StringComparison.Ordinal)
+                    || output.Contains("Calor0201", StringComparison.Ordinal))
+                {
+                    bindStopped++;
+                    continue;
+                }
+
+                reach++;
+                if (output.Contains("error Calor0410", StringComparison.Ordinal))
+                    stop0410++;
+                else if (output.Contains("error Calor0422", StringComparison.Ordinal)
+                    || output.Contains("error Calor0423", StringComparison.Ordinal))
+                    stop042X++;
+                else if (output.Contains("error Calor1002", StringComparison.Ordinal))
+                    stop1002++;
+                else if (output.Contains("error Calor", StringComparison.Ordinal))
+                    cliOnly++;
+                else
+                    clean++;
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(scratch, recursive: true); } catch { /* scratch */ }
+        }
+
+        return new CliCrossCheckSubject(subject, files.Count, parseFailed, bindStopped, reach,
+            stop0410, stop042X, stop1002, clean, cliOnly, modules0425, sites0425);
+    }
+
+    /// <summary>The ledger's own conversion, so both legs share one input.</summary>
+    private static string? ConvertForLedger(string file)
+    {
+        try
+        {
+            var conversion = new Compiler.Migration.CSharpToCalorConverter(
+                new Compiler.Migration.ConversionOptions
+                {
+                    Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
+                    PreprocessorMode = Compiler.Migration.PreprocessorConversionMode
+                        .SelectActiveBranchLossy,
+                    DefinedSymbols = Array.Empty<string>(),
+                    ModuleName = "Calor0425Leg",
+                    GracefulFallback = true,
+                    AutoGenerateIds = true
+                }).Convert(File.ReadAllText(file), Path.GetFileName(file));
+            return string.IsNullOrEmpty(conversion.CalorSource)
+                ? null
+                : conversion.CalorSource.Replace("\r\n", "\n");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string RunCli(string cliDll, string workingDirectory)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        start.ArgumentList.Add(cliDll);
+        start.ArgumentList.Add("-i");
+        start.ArgumentList.Add("m.calr");
+        start.ArgumentList.Add("-o");
+        start.ArgumentList.Add("out.g.cs");
+        start.Environment["LC_ALL"] = "C";
+        using var process = System.Diagnostics.Process.Start(start);
+        Assert.NotNull(process);
+        var stdout = process!.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        return stdout.Result + stderr.Result;
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
 
     private static string RepoRoot()
     {
@@ -308,7 +487,7 @@ public class Calor0425CorpusLedgerTests
             ScopeText,
             BindRuleText,
             RegisteredFloorRule(),
-            RegisteredCliCrossCheck(),
+            MeasureCliCrossCheck(root, perSubject),
             MeasuredCommit(root),
             perSubject.Sum(s => s.Diagnostics),
             perSubject.Sum(s => s.ModulesWithDiagnostics),
@@ -393,7 +572,13 @@ public class Calor0425CorpusLedgerTests
         // exactly the failure K1 exists to correct.
         Assert.Equal(BindRuleText, committed.BindRule);
         AssertFloorRuleEqual(RegisteredFloorRule(), committed.FloorRule);
-        AssertCliCrossCheckEqual(RegisteredCliCrossCheck(), committed.CliCrossCheck);
+        // v0.17 R2 — the CLI leg is MEASURED on every regeneration, not compared
+        // to a hand-registered constant. That constant was the thing that went
+        // stale the moment R2 moved the in-process denominator, and keeping it
+        // would mean maintaining the same numbers in two places. What guards the
+        // block now is `Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement`,
+        // which holds it against the in-process cells it must agree with —
+        // a real cross-check rather than a copy of itself.
 
         // measuredCommit is SHAPE-checked, never compared to HEAD — the
         // convention the two existing ledgers use
@@ -632,8 +817,21 @@ public class Calor0425CorpusLedgerTests
         }
 
         Assert.Equal(364, cli.PerSubject.Sum(s => s.Files));
-        // 256 at K1's registration; 304 after W3(a) recovered all 59 parse failures.
-        Assert.Equal(304, cli.PerSubject.Sum(s => s.ReachEffectPass));
+
+        // The aggregate is AGREEMENT plus a regression floor, not a frozen
+        // number. 256 at K1's registration; 304 after W3(a) recovered all 59
+        // parse failures; 319 after v0.17 R2 taught overload resolution
+        // assignability. Pinning the literal made this gate fail every time the
+        // measurement legitimately improved — the same moving-target trap
+        // review round 3 caught in PP-R1's effect size, in the opposite
+        // direction.
+        Assert.Equal(
+            committed.AggregateModulesEnforced,
+            cli.PerSubject.Sum(s => s.ReachEffectPass));
+        Assert.True(cli.PerSubject.Sum(s => s.ReachEffectPass) >= 304,
+            "gate 9's regression floor: the CLI leg reached "
+            + $"{cli.PerSubject.Sum(s => s.ReachEffectPass)} modules, below the 304 W3(a) "
+            + "established.");
         Assert.Equal(0, cli.PerSubject.Sum(s => s.ParseFailed));
     }
 
@@ -1280,23 +1478,68 @@ public class Calor0425CorpusLedgerTests
             foreach (var cause in subject.BindFailureCauses)
                 aggregate[cause.Key] = aggregate.GetValueOrDefault(cause.Key) + cause.Value;
 
-        var largest = aggregate.MaxBy(entry => entry.Value);
-        Assert.Equal("Calor0208", largest.Key);
-        Assert.Equal(40, largest.Value);
-        Assert.Equal(60, aggregate.Values.Sum());
-
-        // The frozen rule, applied. Neither constant is R1's to move.
-        const double RecoverAtLeastFraction = 0.5;
-        const int NeverFewerThan = 10;
+        // THE REGISTRATION IS HISTORY AND DOES NOT MOVE. R1 measured the cluster
+        // at 40 over 60 stops, and §4.1's rule — frozen in review round 3 BEFORE
+        // R1 ran — sized R2's target from that number. Re-deriving the target
+        // from the CURRENT cluster after R2 shrank it is precisely the moving
+        // goalpost finding R3-b forbade: the experiment would size its own
+        // ambition to whatever it had already achieved.
+        const int RegisteredLargestCluster = 40;      // R1's measurement
+        const int RegisteredTotalBindStops = 60;      // R1's measurement
+        const double RecoverAtLeastFraction = 0.5;    // §4.1, frozen
+        const int NeverFewerThan = 10;                // §4.1, frozen
         var target = Math.Max(
-            (int)Math.Ceiling(largest.Value * RecoverAtLeastFraction), NeverFewerThan);
+            (int)Math.Ceiling(RegisteredLargestCluster * RecoverAtLeastFraction), NeverFewerThan);
         Assert.Equal(20, target);
 
-        // PP-R1 may read UNDERPOWERED on ONE condition: the corpus cannot supply
-        // the effect under a rule fixed before the data was seen. It can.
-        Assert.True(largest.Value >= NeverFewerThan,
-            "the largest cluster is below the frozen floor, which is the only condition under "
-            + "which PP-R1 may read UNDERPOWERED (roadmap-v0.17 §4.1).");
+        // PP-R1 may read UNDERPOWERED on ONE condition: the corpus could not
+        // supply the effect under a rule fixed before the data was seen. At 40
+        // it could, so that route is closed and the outcome is HIT or MISS.
+        Assert.True(RegisteredLargestCluster >= NeverFewerThan);
+
+        // WHERE THE CLUSTER STANDS NOW. R2 (overload assignability) moved it;
+        // this asserts the direction, never the target.
+        var largest = aggregate.MaxBy(entry => entry.Value);
+        Assert.Equal("Calor0208", largest.Key);
+        Assert.True(largest.Value <= RegisteredLargestCluster,
+            $"the Calor0208 cluster is {largest.Value}, above R1's registered {RegisteredLargestCluster} "
+            + "— a regression in the very cause R2 was scoped against.");
+        Assert.True(aggregate.Values.Sum() <= RegisteredTotalBindStops,
+            $"binding stops total {aggregate.Values.Sum()}, above R1's registered "
+            + $"{RegisteredTotalBindStops}.");
+
+        // R2's OUTCOME IS HISTORY AND DOES NOT MOVE. R2 took ModulesEnforced
+        // 304 -> 319: +15 against the frozen target of 20, so PP-R1 leg 1 reads
+        // MISS. Pinned as a constant rather than recomputed, because the whole
+        // point is that later work cannot reach back and turn it into a pass.
+        const int EnforcedAtR1 = 304;
+        const int EnforcedAfterR2 = 319;
+        const int RecoveredByR2 = EnforcedAfterR2 - EnforcedAtR1;
+        Assert.True(RecoveredByR2 < target,
+            $"R2 recovered {RecoveredByR2} modules against the frozen target of {target}. "
+            + "PP-R1 leg 1 is recorded as a MISS in roadmap-v0.17 §3.1 — update that outcome, this "
+            + "assertion, and the release notes together.");
+
+        // WHERE THE RELEASE STANDS NOW, kept separate from that verdict.
+        //
+        // v0.17 R3's inherited-member lookup and round 4's finding 4 removed six
+        // more Calor0208 bind stops, so ModulesEnforced is 324 and the recovery
+        // from R1's 304 is 20 — numerically the frozen target. THIS IS NOT A HIT
+        // AND MUST NOT BE RECORDED AS ONE. The rule frozen in review round 3
+        // measures R2, and no rule was ever registered for "the release
+        // recovers N". A number that meets a target it was not registered
+        // against is not evidence, and writing that rule now — after seeing the
+        // data — is exactly the moving goalpost §10 R3-b forbade. The release
+        // figure is reported beside the verdict, never on top of it.
+        var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
+        Assert.True(enforcedNow >= EnforcedAfterR2,
+            $"ModulesEnforced fell to {enforcedNow}, below the {EnforcedAfterR2} R2 left it at.");
+        const int EnforcedAfterR3AndRound4 = 324;
+        Assert.True(enforcedNow == EnforcedAfterR3AndRound4,
+            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterR3AndRound4} recorded for the "
+            + "R3 + round-4 commit. This is an EXACT pin: a move — in either direction — regenerates "
+            + "the ledger IN THIS PR with the change named, and updates §3.1's outcome record. It "
+            + "does not reopen PP-R1 leg 1, which is closed as a MISS on R2's own 15.");
     }
 
     /// <summary>

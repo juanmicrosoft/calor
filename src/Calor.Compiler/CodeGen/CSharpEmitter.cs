@@ -115,6 +115,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         new Dictionary<string, CrossModuleFunctionTarget>(StringComparer.Ordinal);
     private HashSet<FunctionNode> _moduleFunctionsRequiringWiderVisibility = [];
     private HashSet<string> _currentClassMemberNames = new(StringComparer.Ordinal);
+
+    /// <summary>v0.17 R4(b) / #1137 — the classes declared in the module being
+    /// emitted, so a derived class's inherited members can be enumerated when
+    /// its whole base chain is local. Empty means every base is opaque, which is
+    /// #823's original assumption.</summary>
+    private IReadOnlyList<ClassDefinitionNode> _moduleClasses = Array.Empty<ClassDefinitionNode>();
     private Stack<(string? ClassName, HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
     private readonly HashSet<int> _preambleDirectiveStarts = new();
@@ -560,6 +566,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 module,
                 _intraModuleFunctionModules);
         _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
+        _moduleClasses = module.Classes;
         _classMemberScopes =
             new Stack<(string? ClassName, HashSet<string> Members, bool Suppress)>();
         _suppressCrossModuleQualification = false;
@@ -2930,6 +2937,44 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 : target;
     }
 
+    /// <summary>
+    /// v0.17 R4(b) / #1137 — every member name inherited from
+    /// <paramref name="baseClassName"/>, when the WHOLE chain is declared in
+    /// this module. Returns false the moment a base cannot be resolved here:
+    /// the chain is then opaque, inherited members are unknowable, and the
+    /// caller must keep #823's conservative suppression rather than risk
+    /// qualifying a name the base actually provides.
+    /// </summary>
+    private bool TryCollectVisibleInheritedMembers(
+        string baseClassName,
+        out HashSet<string> members)
+    {
+        members = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var current = baseClassName;
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (!seen.Add(current))
+                return false;   // a cycle is not a chain we can reason about
+
+            var declaration = _moduleClasses.FirstOrDefault(cls =>
+                string.Equals(cls.Name, current, StringComparison.Ordinal));
+            if (declaration == null)
+                return false;   // opaque base — the #823 case, unchanged
+
+            foreach (var name in declaration.Methods.Select(m => m.Name)
+                         .Concat(declaration.Fields.Select(f => f.Name))
+                         .Concat(declaration.Properties.Select(pr => pr.Name)))
+            {
+                members.Add(name);
+            }
+
+            current = declaration.BaseClass;
+        }
+
+        return true;
+    }
+
     private bool TryGetCrossModuleFunctionTarget(
         string target,
         out CrossModuleFunctionTarget functionTarget)
@@ -3414,7 +3459,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         RegisterQualifiedNameDependencies(node.Name);
-        return SanitizeQualifiedName(node.Name);
+
+        // v0.17 R4(c) / #1118 — a module-level function referenced AS A VALUE (a
+        // method group passed as an argument, or assigned) was emitted bare,
+        // while the same function CALLED from the same position was qualified
+        // correctly. The generated identifier then lives in the class, not the
+        // module's static class, and Roslyn reports CS0103 — surfaced as
+        // Calor1002.
+        //
+        // The call path's qualifier is reused deliberately rather than
+        // reimplemented: it already skips locals and parameters in scope, the
+        // enclosing class's members, and honours the derived-class suppression
+        // flag, so a method group cannot be qualified past a name that shadows
+        // it. Names it does not recognise pass through unchanged.
+        return SanitizeQualifiedName(QualifyCrossModuleTarget(node.Name));
     }
 
     // Phase 2: Control Flow
@@ -5262,8 +5320,24 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Inherited (OR'd with the enclosing class's flag): a nested type inside a
         // derived class also sees the enclosing base's statics bare (#823
         // re-review NEW-1 adjacent).
-        _suppressCrossModuleQualification = _suppressCrossModuleQualification
-            || !string.IsNullOrEmpty(node.BaseClass);
+        // v0.17 R4(b) / #1137 — NARROWED, not removed. #823 suppressed
+        // qualification for every derived class because inherited members are
+        // not enumerable when the base may be C#, and mis-qualifying one runs
+        // another module's code silently. That reasoning holds only while the
+        // base chain is OPAQUE. When every base is declared in this module we
+        // can enumerate the inherited members exactly, so there is nothing to
+        // guess at and no reason to accept CS0103 — which is what a class with
+        // `§EXT` got for every module-level call it made (#1137).
+        //
+        // The failure direction is preserved: an unresolvable base anywhere in
+        // the chain, or a chain that loops, falls back to suppressing.
+        if (!string.IsNullOrEmpty(node.BaseClass))
+        {
+            if (TryCollectVisibleInheritedMembers(node.BaseClass, out var inherited))
+                _currentClassMemberNames.UnionWith(inherited);
+            else
+                _suppressCrossModuleQualification = true;
+        }
 
         if (node.Items.Count > 0)
         {
@@ -8142,9 +8216,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var operand = node.Operand.Accept(this);
         var csharpType = MapTypeName(node.TargetType);
-        return node.VariableName != null
-            ? $"{operand} is {csharpType} {SanitizeSingleIdentifier(node.VariableName)}"
-            : $"{operand} is {csharpType}";
+        if (node.VariableName == null)
+        {
+            return $"{operand} is {csharpType}";
+        }
+
+        var patternName = SanitizeSingleIdentifier(node.VariableName);
+
+        // v0.17 R4(c), round-4 finding — a pattern variable is a DECLARATION,
+        // and it has to be registered like any other or the name-qualifying
+        // paths cannot see that it shadows a module-level member. R4(c) made
+        // `Visit(ReferenceNode)` qualify identifiers through
+        // QualifyCrossModuleTarget, which skips locals "in scope" — a pattern
+        // variable was never in `_declScopes`, so `§IF{i1} (is o i32 value)`
+        // followed by a reference to `value` emitted the MODULE's `value`
+        // instead. Loud (CS0428) when the two shapes differ; silently the wrong
+        // call when both are delegate-shaped, which is exactly the outcome
+        // #823's suppression exists to prevent.
+        DeclareVarInScope(patternName);
+        return $"{operand} is {csharpType} {patternName}";
     }
 
     // Native StringBuilder Operations

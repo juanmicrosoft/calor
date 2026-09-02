@@ -74,6 +74,26 @@ internal sealed class MetadataBinder
             return MetadataBinderResult.CreateResolved(staticFallback);
         }
 
+        // v0.17 R3 — the probe is a synthetic C# file compiled against the
+        // HOST compilation, so the receiver has to be *nameable there*. A
+        // receiver defined in the code under analysis is not: probing
+        // `((global::FluentValidation.IValidator)default!).GetType()` fails
+        // with CS0400, and the failure looks identical to "no such member".
+        // For an INHERITED member that is a distinction without a difference —
+        // `IValidator.GetType` and `object.GetType` are the same symbol — so
+        // retry against each type that actually declares the member,
+        // most-derived first. The equality check at the call site still holds
+        // the result to the symbol Roslyn originally resolved.
+        foreach (var declaringType in MetadataMemberLookup.DeclaringTypes(
+                     _context.HostCompilationForBinder, receiverType, methodName))
+        {
+            var inherited = TryResolveWithLinq(declaringType, methodName, arguments, out _);
+            if (inherited is not null)
+            {
+                return MetadataBinderResult.CreateResolved(inherited);
+            }
+        }
+
         return MetadataBinderResult.CreateUnresolved(reason ?? "Method resolution failed for an unknown reason.");
     }
 
@@ -165,7 +185,10 @@ internal sealed class MetadataBinder
         // Static-vs-instance heuristic identical to MetadataContext's, but
         // exposed here because we need to know which branch was taken for
         // the static-fallback path.
-        var methodGroup = receiverType.GetMembers(methodName).OfType<IMethodSymbol>().ToArray();
+        // v0.17 R3 — see MetadataMemberLookup: inherited members were reported
+        // "has no member named" before Roslyn was ever asked.
+        var methodGroup = MetadataMemberLookup.MethodGroup(
+            _context.HostCompilationForBinder, receiverType, methodName);
         var hasStatic = methodGroup.Any(m => m.IsStatic);
         var hasInstance = methodGroup.Any(m => !m.IsStatic);
         string receiverExpr;

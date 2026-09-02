@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "registeredAt": "2026-08-24",
-  "measuredCommit": "fdff11de6c824b33208f978c0e6654811feda76b",
+  "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
   "floor": 25,
   "floorRule": "Pre-registered (roadmap §4.1): if dA.total + dB.aggregate.total is below 25 sites, §4.4 gate 2 adjudicates NOT-ADJUDICATED, never HIT. The floor is frozen with the ledger's registration PR and is not re-tuned after the design doc opens.",
   "scope": "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap §4.1) excluded; nothing else filtered), compiled one file at a time via Program.Compile with EnforceEffects=true, UnknownCallPolicy.Strict, StrictEffects=false, EnableTypeChecking=true (the CLI default), UnsafeTranspileOnly=false, DeferGeneratedOutputValidation=true (per-file Roslyn validation of the emitted C# is skipped; it runs after the effect pass and cannot affect the counts), ProjectDirectory=null (the CLI sets it to the file's directory; here no project-local manifest is consulted), and a shared hermetic EffectResolver loading built-in manifests only; no project/solution/user-level manifests. Files that fail before the effect pass (lexer/parser/type-check/binder errors; witnessed by the absence of Program.Compile's verbose 'Effect enforcement completed' status line) are listed by name with their first error code in notReachingEffectPass, never dropped. Calor0419 is counted per DIAGNOSTIC (one per function, first three reasons shown), so a function with more than three assumptions whose function-typed reason is truncated out of the message is under-counted — a known floor, not a ceiling. D-B: Roslyn syntax-only (CSharpSyntaxTree.ParseText, LanguageVersion.Preview, no preprocessor symbols defined, so inactive #if branches are not scanned) over bench/corpus/{MediatR,serilog,FluentValidation}/src/**/*.cs (bin/, obj/ excluded). delegate declarations are collected per SUBJECT (all files) before classifying, so a delegate declared in one file counts where it is used in another.",
@@ -16,9 +16,9 @@
   },
   "demandTotal": 3123,
   "dA": {
-    "measuredCommit": "fdff11de6c824b33208f978c0e6654811feda76b",
+    "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
     "fileCount": 936,
-    "filesNotReachingEffectPass": 45,
+    "filesNotReachingEffectPass": 44,
     "notReachingEffectPassNote": "Known state at registration, not a filter: bench/mcp/tasks/*/expected.calr and input.calr are MCP benchmark fixtures that are deliberately broken or written against older syntax (30 of 33 die on Calor0830 legacy closing tags, two on Calor0006, one on Calor0403), benchmarks/* entries are the #901 stale subjects, and tests/TestData/LintScenarios/10_error_cases/* are error fixtures.",
     "notReachingEffectPass": [
       {
@@ -186,10 +186,6 @@
         "firstError": "Calor0102"
       },
       {
-        "file": "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
-        "firstError": "Calor0208"
-      },
-      {
         "file": "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
         "firstError": "Calor0830"
       },
@@ -220,7 +216,7 @@
     ]
   },
   "dB": {
-    "measuredCommit": "fdff11de6c824b33208f978c0e6654811feda76b",
+    "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
     "perSubject": [
       {
         "subject": "MediatR",

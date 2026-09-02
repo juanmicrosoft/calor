@@ -177,7 +177,20 @@ public sealed class EffectResolver
             || normalized.StartsWith("IList<", StringComparison.Ordinal)
             || normalized.StartsWith("List<", StringComparison.Ordinal)
             || normalized.StartsWith("HashSet<", StringComparison.Ordinal)
-            || normalized.StartsWith("Dictionary<", StringComparison.Ordinal);
+            || normalized.StartsWith("Dictionary<", StringComparison.Ordinal)
+            // v0.17 R4(a) / #1128 — the shapes a LINQ CHAIN produces, which the
+            // list omitted even though `System.Linq.Enumerable` was already
+            // covered with every operator. `numbers.Where(…)` resolved and then
+            // `evens.OrderBy(…)` did not, because the result's type never
+            // appeared here: `Seq<T>` is what the converter emits for
+            // `IEnumerable<T>`, and `OrderBy` returns `IOrderedEnumerable<T>`.
+            // The manifest was never the gap — the receiver shapes were.
+            || normalized.StartsWith("Seq<", StringComparison.Ordinal)
+            || normalized.StartsWith("IOrderedEnumerable<", StringComparison.Ordinal)
+            || normalized.StartsWith("IGrouping<", StringComparison.Ordinal)
+            || normalized.StartsWith("IQueryable<", StringComparison.Ordinal)
+            || normalized.StartsWith("IReadOnlyCollection<", StringComparison.Ordinal)
+            || normalized.StartsWith("IReadOnlyList<", StringComparison.Ordinal);
     }
 
     /// <summary>

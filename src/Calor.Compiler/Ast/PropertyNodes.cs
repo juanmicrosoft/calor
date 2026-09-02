@@ -23,6 +23,22 @@ public sealed class PropertyNode : AstNode
     public PropertyAccessorNode? Setter { get; }
     public PropertyAccessorNode? Initer { get; }
     public ExpressionNode? DefaultValue { get; }
+
+    /// <summary>
+    /// v0.17 S1 / #1136 — the effect row on a function-typed property, written in
+    /// the header group like a field's: <c>§PROP{p1:Stage:Func&lt;i32&gt;:pub:get,set} §E{cw}</c>.
+    /// <para>Before this, <c>§PROP</c> could not carry a row AT ALL — the parser
+    /// never consumed an <c>Effects</c> token there, so the declaration was 4x
+    /// Calor0100. #1136 recorded the consequence: a property read was
+    /// <c>Unknown</c> BY CONSTRUCTION rather than by an inference gap, which is
+    /// why that issue's fix set is {a row on §PROP} UNION {fail closed} and says
+    /// fixing only fields leaves properties laundering. With fail-closed alone
+    /// the diagnostic tells the author to "state a row on the argument's
+    /// declaration" — an instruction a §PROP could not follow.</para>
+    /// <para>Nothing binds an effect variable here, exactly as for a field, so
+    /// the parser rejects a variable in this position.</para>
+    /// </summary>
+    public EffectsNode? Row { get; }
     public AttributeCollection Attributes { get; }
 
     /// <summary>
@@ -82,7 +98,8 @@ public sealed class PropertyNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         TextSpan? identifierSpan = null,
-        TextSpan? typeNameSpan = null)
+        TextSpan? typeNameSpan = null,
+        EffectsNode? row = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -96,6 +113,7 @@ public sealed class PropertyNode : AstNode
         Setter = setter;
         Initer = initer;
         DefaultValue = defaultValue;
+        Row = row;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }

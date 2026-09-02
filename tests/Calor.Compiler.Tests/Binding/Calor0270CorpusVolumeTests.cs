@@ -186,8 +186,19 @@ public class Calor0270CorpusVolumeTests
     /// (<c>CALOR_REGENERATE_CALOR0270_LEDGER=1</c>), not edited, and the
     /// per-subject causes are named in #1125's PR body.</para>
     /// </summary>
-    private const int PreK1AggregateDiagnostics = 315;
-    private const int PreK1AggregateModulesWithDiagnostics = 39;
+    /// <para>v0.17 R4(a) MOVED THE FIRST TWO, downward. Typing a `var` bound to
+    /// an invocation gives the next call in a chain a receiver to resolve
+    /// against, so fewer signatures go unresolved: 315 -> 302 diagnostics over
+    /// 39 -> 35 modules, entirely in MediatR (26 -> 17) and FluentValidation
+    /// (255 -> 251). A FALL here is an improvement, and the ledger was
+    /// regenerated through its documented hook with the cause named — the same
+    /// discipline #1125 followed. What this test guards is unchanged: that the
+    /// bind rule is recorded, is this ledger's own, is NOT the Calor0425
+    /// ledger's, and that the K1 hook does not regenerate this file.</para>
+    /// <para>`ModulesBound` stays 364 exactly: every module still parses, which
+    /// is the property gate 9's parse leg holds.</para>
+    private const int AggregateDiagnostics = 302;
+    private const int AggregateModulesWithDiagnostics = 35;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
@@ -208,9 +219,9 @@ public class Calor0270CorpusVolumeTests
         Assert.Equal(BindRuleText, committed.BindRule);
         Assert.NotEqual(Calor0425CorpusLedgerTests.BindRuleText, committed.BindRule);
 
-        Assert.Equal(PreK1AggregateDiagnostics, committed.AggregateDiagnostics);
+        Assert.Equal(AggregateDiagnostics, committed.AggregateDiagnostics);
         Assert.Equal(
-            PreK1AggregateModulesWithDiagnostics, committed.AggregateModulesWithDiagnostics);
+            AggregateModulesWithDiagnostics, committed.AggregateModulesWithDiagnostics);
         Assert.Equal(PreK1AggregateModulesBound, committed.AggregateModulesBound);
     }
 

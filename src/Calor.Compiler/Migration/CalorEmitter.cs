@@ -1124,13 +1124,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     accessors.Add("init");
                 var accessorStr = string.Join(",", accessors);
                 var defaultVal = node.DefaultValue != null ? $" = {node.DefaultValue.Accept(this)}" : "";
-                AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{defaultVal}");
+                // v0.17 S1, round-4 finding — the row goes here, before the
+                // default value, because that is where the parser reads it
+                // (Parser.cs TryParseSameLineRow(EffectRowPosition.Property)).
+                // Omitting it let a Calor -> Calor re-emit silently strip a
+                // hand-written `§PROP{...} §E{cw}` and reopen the escape S1 closed.
+                AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
                 return "";
             }
         }
 
         // Full property syntax with body and closing tag
-        AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}");
+        AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}");
         Indent();
 
         if (node.Getter != null) Visit(node.Getter);

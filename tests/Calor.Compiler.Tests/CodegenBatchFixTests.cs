@@ -592,4 +592,95 @@ public class CodegenBatchFixTests
     }
 
     #endregion
+
+    /// <summary>
+    /// v0.17 R4(b) / #1137 — adding <c>§EXT</c> to a class made every
+    /// module-level CALL from its body emit unqualified, so Roslyn reported
+    /// CS0103 and the compiler surfaced Calor1002. The same body without
+    /// <c>§EXT</c> compiled clean.
+    /// <para>#823 suppressed qualification for any derived class on purpose:
+    /// inherited members are not enumerable when the base may be C#, and
+    /// mis-qualifying one silently runs another module's code. That reasoning
+    /// only holds while the base chain is OPAQUE — when every base is declared
+    /// in this module the inherited members are known exactly, and there is
+    /// nothing left to guess at.</para>
+    /// </summary>
+    [Fact]
+    public void ModuleFunctionCall_FromClassWithLocalBase_IsQualified()
+    {
+        var emitted = ParseAndEmit("""
+§M{m001:ExtProbe}
+  §F{f001:Helper:pub} (i32:x) -> i32
+    §E{}
+    §R (* x INT:2)
+
+  §CL{c000:BaseThing:pub}
+    §MT{mt000:Tag:pub} () -> i32
+      §E{}
+      §R INT:0
+
+  §CL{c001:Derived:pub}
+    §EXT{BaseThing}
+    §MT{mt001:Use:pub} (i32:v) -> i32
+      §E{}
+      §R §C{Helper} §A v §/C
+""");
+
+        Assert.Contains("ExtProbeModule.Helper(", emitted, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// v0.17 R4(b) — the OTHER half of #823's guarantee, which the #1137 fix may
+    /// not trade away. When the base class is NOT declared in this module the
+    /// chain is opaque, an inherited member could carry the same name, and
+    /// qualifying past it would silently run the wrong code. Suppression must
+    /// still apply there: CS0103 is the acceptable failure, wrong code is not.
+    /// </summary>
+    [Fact]
+    public void ModuleFunctionCall_FromClassWithOpaqueBase_StaysUnqualified()
+    {
+        var emitted = ParseAndEmit("""
+§M{m001:OpaqueProbe}
+  §F{f001:Helper:pub} (i32:x) -> i32
+    §E{}
+    §R (* x INT:2)
+
+  §CL{c001:Derived:pub}
+    §EXT{SomeExternalBase}
+    §MT{mt001:Use:pub} (i32:v) -> i32
+      §E{}
+      §R §C{Helper} §A v §/C
+""");
+
+        Assert.DoesNotContain("OpaqueProbeModule.Helper(", emitted, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// v0.17 R4(c) / #1118 — a module-level function referenced AS A VALUE (a
+    /// method group in argument position) was emitted bare from inside a class
+    /// body, while the same function CALLED from the same position was qualified
+    /// correctly. #1137 and #1118 are complementary defects, not one root cause,
+    /// which is why fixing calls does not close this and both need a test.
+    /// </summary>
+    [Fact]
+    public void ModuleFunctionMethodGroup_FromClassBody_IsQualified()
+    {
+        var emitted = ParseAndEmit("""
+§M{m001:MgProbe}
+  §F{f001:Shout:pub} (i32:x) -> i32
+    §E{}
+    §R x
+
+  §F{f002:Apply:pub} (Func<i32,i32>:f, i32:v) -> i32
+    §E{}
+    §R §C{f} §A v §/C
+
+  §CL{c001:Holder:pub}
+    §MT{mt001:Use:pub} (i32:v) -> i32
+      §E{}
+      §R §C{Apply} §A Shout §A v §/C
+""");
+
+        Assert.Contains("MgProbeModule.Shout", emitted, StringComparison.Ordinal);
+    }
 }

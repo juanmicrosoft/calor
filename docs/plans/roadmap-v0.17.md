@@ -1,7 +1,7 @@
 # Roadmap — v0.17 "Reach, and the Rows We Shipped"
 
 **Date:** 2026-09-01
-**Status:** **Draft v4** — three adversarial rounds (§10), matching the v0.16 roadmap's bar.
+**Status:** **Draft v5** — four adversarial rounds (§10). Rounds 1-3 reviewed this document; round 4 reviewed the CODE the MUST tier shipped, and found seven defects the plan could not have. The MUST tier is complete: R1, R2, R3 (both legs), R4(a)-(d) and S1 have all landed.
 Round 1: self-conducted, twelve findings. **Round 2: independent (cloud multi-agent)** — found that
 three of round 1's twelve "Applied" dispositions were only half-applied, the finding a self-review
 structurally cannot make. **Round 3:** verified **27/27** dispositions landed, **independently
@@ -117,7 +117,9 @@ Measured over the three A-1.5.3 conversion subjects at their pinned submodule co
 `ExcludedParseFailed ≤ 2` and the measurement is 0, and `ModulesEnforced` landed at 304 against a
 floor of 250, matching R:§5 gate 9's published expectation of "≈ 256 + 48" exactly. What did *not*
 move is everything after parsing: **60 modules still stop at binding**, and metadata resolution is
-**unchanged at 65.46 %** — the same 817/1248 gate 6 has read since 0.14. The reach frontier moved
+**unchanged at 65.46 %** — the same 817/1248 gate 6 has read since 0.14. *(That 65.46 % was later
+shown to be a harness defect, not a compiler limit; §3.1 R3 has the correction to 92.79 % and the
+subsequent move to 95.91 %. This paragraph records the branch cut as it was believed then.)* The reach frontier moved
 from the parser to the binder, and nobody has measured what is behind it: the 60 modules' failure
 causes are **not broken out by code in any committed ledger**. §3.1 R1 is that measurement.
 
@@ -205,12 +207,107 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   release has assigned it (§0.4, §6). *Touches:* `Calor0425CorpusLedgerTests.cs`,
   `calor0425-corpus-ledger.json`, `CHANGELOG.md`.
   *Discriminating:* drop the breakdown and gate 13 (§5) has no denominator to floor.
-- **R2 — Fix the largest binding cluster R1 names.** Scoped by measurement, not by guess: R1 runs
+- **R2 — Fix the largest binding cluster R1 names. OUTCOME (2026-09-02): the
+  cluster moved, and PP-R1 leg 1 reads MISS on the frozen rule.** R1 named
+  Calor0208 at 40 modules, so §4.1's pre-registered rule — half the cluster,
+  never fewer than 10 — set the target at **20**. R2 recovered **15**:
+  `ModulesEnforced` **304 → 319**, `ExcludedBindFailed` **60 → 45**, the
+  Calor0208 cluster **40 → 23**. Fifteen is short of twenty; the rule was frozen
+  before the measurement existed and is not R2's to move, so this is a **MISS**,
+  published with what it cost rather than re-scoped. *The 17-vs-15 gap* is the
+  multi-cause effect `BindFailureMultiCause` exists to expose: two modules
+  stopped failing on Calor0208 and began failing on Calor0201 (9 → 11).
+  **The residual has no dominant cause** — each of the **23** remaining is a
+  distinct fix (`GetType()` inferred as `OBJECT`, `params` arrays,
+  `OPTION<STRING>` vs `STRING`, a generic method group). There is no second
+  cluster for one fix to aim at, which is the finding the next release
+  inherits. *(Draft v4 wrote "the 17 remaining" here, conflating the 17 modules
+  that LEFT the cluster with the 23 still in it. Corrected, and the correction
+  matters more than it looks: the cluster later reached 17 for real, and a stale
+  17 would have read as if it had been there all along.)*
+- **The cluster moved again, after R2, and PP-R1 leg 1 still reads MISS.**
+  R3's inherited-member lookup and round 4's finding 4 removed six more Calor0208
+  stops. The cluster is now **17** (40 → 17), and `ModulesEnforced` is **324** —
+  a recovery of **20** from R1's 304, which is numerically the frozen target.
+  **That does not convert R2's MISS into a HIT and must never be recorded as
+  one.** The frozen rule names *R2* as the thing being measured; R2 recovered 15.
+  Work done afterwards by a different change, for a different reason, is a
+  different fact. And **no rule was ever registered for "the release recovers
+  N"** — writing one now, with 20 already on the board, is review round 3's
+  finding R3-b happening a second time. So the release figure is **not a HIT
+  either**; it is a measured number with no pre-registered rule, reported beside
+  the verdict rather than on top of it. The precedent is v0.16 §0.1 and this
+  release's own R3 measurement correction: a number published beside the old one
+  is honest, a number published *instead of* it is not.
+  *Pinned:* `Calor0425CorpusLedgerTests.R1_NamesTheLargestBindingCluster_AndTheFrozenRuleSizesR2`
+  now holds R2's 15 as a CONSTANT — so later work cannot reach back and turn the
+  MISS into a pass — and pins today's 324 exactly, so a move in either direction
+  regenerates the ledger with the change named.
+- **R2 — the change itself.** Scoped by measurement, not by guess: R1 runs
   first and its answer picks the target. The pre-registered acceptance is a **move in
   `ModulesEnforced`**, published per subject against gate 9's existing floors (250 aggregate;
   MediatR ≥ 29, serilog ≥ 84, FluentValidation ≥ 137). *Sequencing pin:* R2's PR asserts that the
   schema-4 ledger exists.
-- **R3 — Metadata resolution must move.** Gate 6 has read **817/1248 = 65.46 %** since 0.14 and is
+- **R3 — Metadata resolution must move. OUTCOME (2026-09-02): a MEASUREMENT
+  CORRECTION, and R3's movement leg is NOT satisfied by it.** Gate 6 read
+  **817/1248 = 65.46 %** and had since 0.14. It was wrong, and the compiler was
+  never the reason.
+  *The defect:* `GetSymbolInfo` returns the **reduced** form of an extension
+  method — `items.Where(pred)` yields a symbol whose `ContainingType` is
+  `System.Linq.Enumerable` and whose parameters have had `this IEnumerable<T>
+  source` removed. The harness paired those two, asking the binder to find
+  `Enumerable.Where(Func<T,bool>)`: a one-argument overload that does not exist
+  and never did. **341 of the 431 unresolved candidates were that question**, and
+  no binder could have answered it.
+  *Corrected:* the query is asked of `ReducedFrom` — the unreduced symbol Roslyn
+  actually resolved — and the numerator compares against that same symbol.
+  **817/1248 = 65.46 % → 1158/1248 = 92.79 %**; MediatR 57.08 % → 94.69 %,
+  FluentValidation 64.25 % → 92.30 %, Serilog 92.04 % → 92.92 %. Ninety candidates
+  still fail, so the check is not vacuous.
+  ***This does not satisfy R3, and must not be recorded as if it did.*** The
+  compiler resolves exactly the same calls it resolved yesterday; only the
+  question changed. A 27-point jump earned by fixing the instrument is the
+  precise shape of the self-serving move the whole §10 discipline exists to
+  prevent — and it has a house precedent: v0.16 §0.1's "Correction to a published
+  0.15 number", where the raw-bag denominator was corrected and the corrected
+  figure published beside the old one rather than claimed as progress.
+  **Gate 6's floor is re-registered at the corrected 92.79 %, and R3's movement
+  leg must be measured FROM THAT BASELINE by a real compiler improvement.** At the
+  moment this was written it was not done, and the residual it handed forward was
+  90 candidates — 28 genuine "no overload" plus a long tail of 1–11. The entry
+  below is what came of that target; this record stays as written so the two
+  numbers are never confused for one achievement.
+- **R3 — the movement leg. OUTCOME (2026-09-02): SATISFIED, 92.79 % → 95.91 %, and the
+  measurement did not move.** The same question, asked of the same corpus at the same
+  submodule SHAs, of a compiler that now answers more of it. 1158 → 1197 of 1248.
+  *The defect:* both metadata resolution paths built their method group with
+  `receiverType.GetMembers(name)`, which returns only the members **declared on
+  that one type**. An empty group short-circuited to *"Receiver 'X' has no member
+  named 'Y'"* **without Roslyn ever being asked**, so every INHERITED member was
+  unresolvable: `IValidator.GetType()` (an interface has no `BaseType`),
+  `MethodInfo.GetParameters()` (declared on `MethodBase`), `IList<T>.Add(item)`
+  (declared on `ICollection<T>`), `TProperty.CompareTo(other)` (reached through a
+  constraint), `Severity.ToString()` (an enum reaching `Enum` → `ValueType` →
+  `Object`).
+  *Second defect, same family:* the probe is a synthetic C# file compiled against
+  the HOST compilation, so the receiver must be **nameable there**. A receiver
+  defined in the code under analysis is not — probing
+  `((global::FluentValidation.IValidator)default!).GetType()` fails with CS0400,
+  and that failure was indistinguishable from "no such member". For an inherited
+  member the distinction is empty (`IValidator.GetType` **is** `object.GetType`),
+  so resolution now retries against each type that actually declares the member,
+  most-derived first.
+  *Two-sided, as gate 6 requires:* MediatR **94.69 → 98.67 %**, Serilog
+  **92.92 → 97.35 %**, FluentValidation **92.30 → 95.05 %**. No subject falls.
+  *Residual, 51 candidates, published so the next attempt inherits a target:* 28
+  "no overload matches", 22 an implicit **delegate invocation** — `config.Selector(x)`
+  hands the harness `ValidatorConfiguration` as the receiver and `Invoke` as the
+  member, which is a receiver-extraction question and **not** a binder gap, so it
+  is deliberately left alone rather than counted — and 1 ResolvedButDifferentSymbol.
+  *Observed by:* `MetadataMemberLookupTests` (10 facts, 8 of which fail on the
+  pre-fix binder; the 2 that pass either way are the negative directions) plus the
+  regenerated ledger.
+- **R3 — the original scoping.** Gate 6 has read **817/1248 = 65.46 %** since 0.14 and is
   the single largest "the compiler cannot see this code" number in the tree; MediatR at **57.08 %**
   is the outlier and the smallest subject, so it is the tractable one. The registered target is a
   **two-sided move**: the aggregate fraction rises and no subject falls. Related and sequenced
@@ -311,6 +408,12 @@ escaping lambda; **the PP-W-rows fixture redesign and re-run (0.18, §2)**.
 *Claim:* at the 0.17 release commit, `ModulesEnforced` over the three pinned subjects exceeds its
 0.16 branch-cut value of **304**, and gate 6's resolved fraction exceeds **65.46 %**, with no
 subject falling on either.
+*Registered floor kept as written, and it no longer discriminates.* 65.46 % was the value gate 6
+had carried since 0.14; R3 then showed it was a harness defect and the honest pre-fix figure was
+92.79 % (§3.1). The floor is not restated here — moving a pre-registered number after seeing the
+data is the move §10 exists to prevent — but a claim that clears its floor by 30 points is not
+evidence of anything, so **read gate 6's own two legs (§5) for the verdict**: the movement leg
+carries the registered 92.79 % baseline and the two-sided per-subject requirement.
 *Instrument:* the schema-4 Calor0425 corpus ledger (R1) and the metadata ledger, both already
 exact-equality tested. *Denominator:* 364 subject modules / 1248 metadata candidates at the pinned
 submodule SHAs. *Freeze:* this document, before R2 or R3 merges.
@@ -376,10 +479,13 @@ can reproduce them on a laptop.
 floor 25), 3 (surface agreement — the MCP leg now exists; the CLI-process and `Calor.Sdk` legs are
 **still unbuilt**, issue #1116, and gate 3 claims only the legs it has), 4 (PP-E1 regression pin:
 leg A 10/10 with a clean control on every 0.17 commit), 5 (corpus compatibility, leg (a) only —
-leg (b) unbuilt), 6 (**resolution floor — two legs, because a floor at today's value cannot gate a MUST whose
-content is "must move": (i) regression, ≥ 65.46 % aggregate and no subject below its own current
-figure, two-sided as it has always been; (ii) movement, the aggregate strictly above 65.46 % at the
-release commit, which is PP-R1's leg 2 and reds gate 6 if R3 lands as a no-op**),
+leg (b) unbuilt), 6 (**resolution floor, RE-BASELINED on the v0.17 R3 measurement correction — the
+65.46 % this gate carried since 0.14 was an artifact of asking the binder for a reduced extension
+method against its static class, and the corrected figure is 92.79 % (§3.1 R3). Two legs:
+(i) regression, ≥ 95.91 % aggregate and no subject below its own figure, two-sided as
+always; (ii) movement, **SATISFIED** — 92.79 % → 95.91 % aggregate on a compiler fix, two-sided
+per subject (MediatR 94.69 → 98.67, Serilog 92.92 → 97.35, FluentValidation 92.30 → 95.05). See
+§3.1 R3's outcome record for what moved and what the residual is**),
 7 (index/query goldens including E7's leg), 8 (harness capture), 9 (**conversion denominator, re-set on the measurement:
 `ExcludedParseFailed` = 0, and `ModulesEnforced` ≥ 304 aggregate with MediatR ≥ 31 and serilog ≥ 88
 exact and FluentValidation ≥ 179 — the SAME floors §4.1 registers, because two pre-registered
@@ -659,3 +765,52 @@ attack §7's dispositions for the two dozen issues not in R1–R4 or S1. And it 
 self-conducted round on a document this author wrote — the independent round (2) found three things
 no self-review had, and a fourth independent pass would be worth more than a fifth self-conducted
 one.
+
+### Round 4 — 2026-09-02, on the CODE, not the plan
+
+The first three rounds reviewed the document. Round 4 reviewed the branch carrying R1, R2,
+R4(a)–(d), S1 and R3's measurement correction — a diff no one had read — with the standing rule
+that a PR is reviewed adversarially before it merges. Seven findings, five of them verified with
+an executed repro against the built CLI. **All seven applied.** Six are observed by
+`tests/Calor.Compiler.Tests/V017Round4FindingsTests.cs` — 15 facts, of which the cyclic-constraint
+one **kills the test host** on the pre-fix compiler rather than failing, and of the remaining 14,
+10 fail and the 4 that pass either way are the deliberate negative directions.
+
+| # | Lens | Finding | Disposition |
+|---|------|---------|-------------|
+| **1** | engineering | **Cyclic generic constraints killed the process.** `GetImplicitConversionCost` recursed through `GetTypeParameterConstraints` with no visited set, and `ParseWhereClause` accepts any identifier as a `TypeName` constraint without checking circularity. `§WHERE T : U` with `§WHERE U : T` overflowed the stack — and a StackOverflowException **cannot be caught**, so the Calor0932 handler that catches every other analysis ICE was no help and the process died. Same defect class as R4(d) in this very branch, one severity worse. | **Applied.** The recursion carries the set of type parameters already expanded; the two-argument entry point stays so it still converts to the `Func<string, string, int?>` overload resolution expects. |
+| **2** | engineering | **R4(a) wrote unnameable types into `§B{…}`, producing source that no longer compiles.** The new guard covered error types and `void` but not anonymous types or tuples, and `MinimallyQualifiedFormat` renders those as `<anonymous type: string Name, int Len>` and `(bool ok, int count)` — both carrying `:`, `,` and spaces, exactly what `ParseAttributes` splits the header on. Six C# errors on a file that converted cleanly on main. | **Applied.** Anonymous and tuple types are skipped, and the RENDERED name is checked for separators as well, so a display form nobody anticipated still fails safe. An untyped binding is the correct answer whenever the type cannot be spelled. |
+| **3** | engineering | **R4(c) qualified identifiers past shadowing pattern variables, re-opening #823.** The new code reuses the call path's qualifier "because it already skips locals in scope" — but an `IsPatternNode` variable was never passed to `DeclareVarInScope`, so it was not in scope by that test. `§IF{i1} (is o i32 value)` then emitted the MODULE's `value`. Loud (CS0428) when the shapes differ; **silently the wrong call** when both are delegate-shaped — the exact outcome #823's suppression exists to prevent. | **Applied at the cause, not the symptom.** The pattern variable is declared in scope like any other declaration, so every path that asks "is this name shadowed?" gets the right answer, not just this one. |
+| **4** | measurement | **The "builtins are upper case" test misfired on every decorated canonical form, silently switching off Calor0208.** `TypeIdentity.Canonicalize` produces `FLOAT[bits=32]` and `INT[bits=8][signed=true]`; the lower-case `bits`/`signed`/`true` made the letter-case test false, so the type was declared "invisible to this module" — which **suppresses** the no-matching-overload report. Overload checking was off for every call carrying an i8/u8/i16/u16/f32 argument. A guard added in R2 to avoid false positives had become a hole. | **Applied.** `TypeIdentity.IsBuiltinCanonicalName` is the authority; letter case is not evidence. A separate helper strips array/pointer/nullable decorators without mangling the keyed brackets a builtin carries, which a blanket `TrimEnd('[', ']', '?', '*')` cannot do. |
+| **5** | engineering | **`PushMemberTypeParameters` was called only for methods**, though its own doc comment claimed it covered "a method or a module-level function". A module-level generic function fell back to `_currentClass?.TypeParameters` — null at module scope — so R2's whole constraint mechanism was missing at exactly one of the two places it is declared. | **Applied to the code, not the comment.** `BindFunction` pushes too. Correcting the comment instead would have made the document agree with a gap. |
+| **6** | test-lens | **S1's `PropertyNode.Row` was parsed but never emitted back.** Both `§PROP` emission sites in `CalorEmitter` omit it while the sibling `§FLD` path writes it. Anything round-tripping through that emitter — `calor fix`, the indent migrator, the C# converter — **stripped a hand-written row**, reinstating the escape S1 closed and now without the parse error that used to make it visible. | **Applied.** Emitted in both forms, positioned before the default value because that is where the parser reads it. |
+| **7** | plan | **The XML doc on `InstantiateAndCharge` still documented the behaviour S1 reversed** — "Nothing is charged for such a variable" sits directly above the line that now charges Unknown. In a repo whose ledger tests read these notes as the spec of record, a stale contradiction is a live trap. | **Applied.** The note records the reversal and why, rather than the rule it replaced. |
+
+**A measured consequence, named as the D-A ledger requires.** Finding 4's fix moved a file OUT of
+the "never reaches the effect pass" set: `tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr`
+was failing with Calor0208 on `Handle(str, Func<i32>)` called with a block lambda — a **false
+positive**, because a lambda is assignable to that parameter. The old letter-case test read the
+canonical argument spelling `LAMBDA()->INT` as a BUILTIN (it happens to contain no lower-case
+letter), so the binder asserted a convertibility claim it had no basis for. Both directions of that
+test were wrong, and the same one-line fix corrects both: decorated builtins stop being invisible,
+and a lambda spelling stops being mistaken for a builtin. `higher-order-demand-ledger.json` is
+regenerated for it — `FilesNotReachingEffectPass` 45 → 44, D-A's `calor0419FunctionTyped` unchanged
+at 2, nothing else moved.
+
+**The second measured consequence, and the larger one: `ModulesEnforced` 319 → 324.** R3's
+inherited-member lookup and round 4's finding 4 both remove Calor0208 stops, and a module that no
+longer stops at binding reaches the effect pass. Six fewer modules stop on Calor0208 (MediatR 3→2,
+serilog 10→7, FluentValidation 10→8); five of them reach the pass and one now stops later at
+Calor0250 instead. **Two-sided: MediatR 33 → 34, serilog 95 → 97, FluentValidation 191 → 193** — no
+subject falls, so §4.1's registered floors (≥ 304 aggregate, MediatR ≥ 31, serilog ≥ 88,
+FluentValidation ≥ 179) and gate 9 both hold with more slack than before. What follows from a
+larger enforced set is also recorded, because a rising denominator makes other counts rise for
+reasons that are not regressions: `AggregateDiagnostics` 105 → 113, Calor0411 sites 8135 → 8231,
+and serilog's higher-order invocation witness 10 → 18. `ExcludedParseFailed` stays 0.
+`calor0425-corpus-ledger.json` regenerated for all of it.
+
+**What round 4 did not do.** It reviewed one branch, not the tree. It did not re-examine the three
+earlier rounds' applied fixes, the 0.16-carried gates, or §7's dispositions. It found nothing in
+R1 or in R2's core assignability work, which may mean those are sound or may mean the diff's size
+hid them — five of seven findings are in code written in the last two days, and the two oldest
+surfaces in the diff drew no finding at all.
