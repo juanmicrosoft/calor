@@ -271,6 +271,30 @@ docs/                    Syntax reference, guides, philosophy
 editors/                 VSCode extension
 ```
 
+## Writing for the public surface
+
+`CHANGELOG.md`, `website/content/**`, and GitHub release notes are written **as if
+speaking to a computer science college student**. Internal artifacts — `docs/plans/`,
+`docs/design/`, PR bodies, review records, code comments — stay technical and precise.
+
+An earlier version of this rule said "a high schooler must understand it", and it
+backfired: avoiding every technical term produced *longer, harder* prose. "The step that
+works out what every name refers to" is worse than **name binding**. Circumlocution is the
+thing to avoid, not vocabulary.
+
+- **Use the standard term** when one exists: binding, parser, AST, diagnostic, type
+  checker, submodule, CI. Do not paraphrase it away.
+- **Explain Calor's own vocabulary** briefly on first use — effect rows, `Calor0410`,
+  `§PROP`, the row charge, laundering, a ledger. One clause, not a paragraph.
+- **Short sentences, active voice, lead with what changed.** Split any sentence carrying
+  three subordinate clauses.
+- **Numbers, not adjectives**: "40 of 60 modules" beats "most modules".
+- Simpler language never means vaguer claims. Say plainly when a result is unproven,
+  underpowered, or an upper bound.
+
+Test: would a second-year CS student skim the entry and know what changed and whether it
+affects them?
+
 ## Benchmarks
 
 Benchmarks live in `benchmarks/`. When writing or modifying benchmarks, ensure they are **not biased towards Calor** — benchmarks must be fair and representative comparisons.
