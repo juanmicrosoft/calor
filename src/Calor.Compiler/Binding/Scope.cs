@@ -1681,6 +1681,16 @@ public sealed class Scope
                     .DefaultIfEmpty(-1)
                     .First();
 
+                // v0.17 R4(d) / #1127. A named argument matching NO parameter
+                // leaves parameterIndex at -1, and when the candidate has no
+                // `params` parameter `paramsIndex` is -1 too — so the equality
+                // below holds and `assigned[-1]` throws
+                // IndexOutOfRangeException, taking down the binder on input that
+                // is merely wrong. The candidate simply does not accept this
+                // call: no parameter bears that name.
+                if (parameterIndex < 0)
+                    yield break;
+
                 if (parameterIndex == paramsIndex)
                 {
                     if (assigned[parameterIndex])

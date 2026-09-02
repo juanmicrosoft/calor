@@ -27,16 +27,16 @@
     "Note": "ModulesEnforced \u003E= 250 is a live regression floor (six below the 256 observed at registration; the per-subject MediatR/serilog floors are EXACT and the slack sits in FluentValidation). ExcludedParseFailed \u003C= 2 is the registered user-visible bar. It was NOT met at K1\u0027s registration \u2014 59 modules failed to parse, pinned EXACTLY at ExcludedParseFailedRegisteredAt with ExcludedParseFailedPendingUntil = \u0022W3(a)\u0022 so that W3(a)\u0027s merge would flip this rule rather than silently satisfy a weakened one. v0.16 W3(a) (#903 clusters 1-2, PR #1125) then recovered ALL 59, not the 57 it was registered for: clusters 1 and 2 account for 57 and cluster 3 (Calor0117, two modules) turned out to be trivial and landed with them. The observed value is now 0, at or under the bar, so the pending state is cleared and RegisteredAt is restated at the value the gate now holds EXACTLY \u2014 the leg is live rather than pending, and a regression to even one parse failure reds it."
   },
   "CliCrossCheck": {
-    "Invocation": "dotnet calor.dll -i \u003Cconverted-module\u003E.calr -o \u003Cscratch\u003E/\u003Cname\u003E.g.cs \u2014 no flags, LC_ALL=C, one process per module, inputs dumped into a scratch directory holding no .calor-effects.json (Program.cs:509 would otherwise read it)",
-    "MeasuredAt": "v0.16 K1 registration; RE-RUN in full on W3(a)\u0027s tree (PR #1125), which recovers all 59 parse failures and therefore moves every bucket: 364 modules, zero crashes, exit codes {0: 83, 1: 281}",
+    "Invocation": "the in-process conversion of this ledger (Lossy / SelectActiveBranchLossy, empty defined symbols), each module written to a scratch directory holding no .calor-effects.json, then \u0060dotnet calor.dll -i \u003Cmodule\u003E.calr -o \u003Cscratch\u003E/out.g.cs\u0060 \u2014 no flags, one process per module",
+    "MeasuredAt": "v0.17 R2: re-derived automatically on every ledger regeneration rather than hand-registered, so the two legs cannot drift by neglect",
     "PerSubject": [
       {
         "Subject": "MediatR",
         "Files": 36,
         "ParseFailed": 0,
-        "BindStopped": 5,
-        "ReachEffectPass": 31,
-        "StopCalor0410": 8,
+        "BindStopped": 3,
+        "ReachEffectPass": 33,
+        "StopCalor0410": 10,
         "StopCalor0422Or0423": 1,
         "StopCalor1002": 12,
         "CompileClean": 10,
@@ -48,33 +48,33 @@
         "Subject": "serilog",
         "Files": 112,
         "ParseFailed": 0,
-        "BindStopped": 24,
-        "ReachEffectPass": 88,
-        "StopCalor0410": 46,
-        "StopCalor0422Or0423": 5,
+        "BindStopped": 17,
+        "ReachEffectPass": 95,
+        "StopCalor0410": 54,
+        "StopCalor0422Or0423": 4,
         "StopCalor1002": 26,
         "CompileClean": 11,
         "StoppedInCliOnlyPass": 0,
-        "Calor0425Modules": 11,
-        "Calor0425Sites": 22
+        "Calor0425Modules": 14,
+        "Calor0425Sites": 31
       },
       {
         "Subject": "FluentValidation",
         "Files": 216,
         "ParseFailed": 0,
-        "BindStopped": 31,
-        "ReachEffectPass": 185,
-        "StopCalor0410": 102,
+        "BindStopped": 25,
+        "ReachEffectPass": 191,
+        "StopCalor0410": 108,
         "StopCalor0422Or0423": 3,
         "StopCalor1002": 15,
         "CompileClean": 62,
         "StoppedInCliOnlyPass": 3,
-        "Calor0425Modules": 26,
-        "Calor0425Sites": 65
+        "Calor0425Modules": 28,
+        "Calor0425Sites": 69
       }
     ]
   },
-  "MeasuredCommit": "dbf4673747ac561cf9b566d1ae868a6d3ae87034",
+  "MeasuredCommit": "ad1abc1d40412a3e593884a659098bd7c5178957",
   "AggregateDiagnostics": 103,
   "AggregateModulesWithDiagnostics": 45,
   "AggregateModulesEnforced": 319,
