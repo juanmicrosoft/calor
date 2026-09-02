@@ -225,7 +225,34 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   `ModulesEnforced`**, published per subject against gate 9's existing floors (250 aggregate;
   MediatR ≥ 29, serilog ≥ 84, FluentValidation ≥ 137). *Sequencing pin:* R2's PR asserts that the
   schema-4 ledger exists.
-- **R3 — Metadata resolution must move.** Gate 6 has read **817/1248 = 65.46 %** since 0.14 and is
+- **R3 — Metadata resolution must move. OUTCOME (2026-09-02): a MEASUREMENT
+  CORRECTION, and R3's movement leg is NOT satisfied by it.** Gate 6 read
+  **817/1248 = 65.46 %** and had since 0.14. It was wrong, and the compiler was
+  never the reason.
+  *The defect:* `GetSymbolInfo` returns the **reduced** form of an extension
+  method — `items.Where(pred)` yields a symbol whose `ContainingType` is
+  `System.Linq.Enumerable` and whose parameters have had `this IEnumerable<T>
+  source` removed. The harness paired those two, asking the binder to find
+  `Enumerable.Where(Func<T,bool>)`: a one-argument overload that does not exist
+  and never did. **341 of the 431 unresolved candidates were that question**, and
+  no binder could have answered it.
+  *Corrected:* the query is asked of `ReducedFrom` — the unreduced symbol Roslyn
+  actually resolved — and the numerator compares against that same symbol.
+  **817/1248 = 65.46 % → 1158/1248 = 92.79 %**; MediatR 57.08 % → 94.69 %,
+  FluentValidation 64.25 % → 92.30 %, Serilog 92.04 % → 92.92 %. Ninety candidates
+  still fail, so the check is not vacuous.
+  ***This does not satisfy R3, and must not be recorded as if it did.*** The
+  compiler resolves exactly the same calls it resolved yesterday; only the
+  question changed. A 27-point jump earned by fixing the instrument is the
+  precise shape of the self-serving move the whole §10 discipline exists to
+  prevent — and it has a house precedent: v0.16 §0.1's "Correction to a published
+  0.15 number", where the raw-bag denominator was corrected and the corrected
+  figure published beside the old one rather than claimed as progress.
+  **Gate 6's floor is re-registered at the corrected 92.79 %, and R3's movement
+  leg must be measured FROM THAT BASELINE by a real compiler improvement.** It is
+  not done. The residual is 90 candidates — 28 genuine "no overload" plus a long
+  tail of 1–11 — which is the target the next attempt inherits.
+- **R3 — the original scoping.** Gate 6 has read **817/1248 = 65.46 %** since 0.14 and is
   the single largest "the compiler cannot see this code" number in the tree; MediatR at **57.08 %**
   is the outlier and the smallest subject, so it is the tractable one. The registered target is a
   **two-sided move**: the aggregate fraction rises and no subject falls. Related and sequenced
@@ -391,10 +418,12 @@ can reproduce them on a laptop.
 floor 25), 3 (surface agreement — the MCP leg now exists; the CLI-process and `Calor.Sdk` legs are
 **still unbuilt**, issue #1116, and gate 3 claims only the legs it has), 4 (PP-E1 regression pin:
 leg A 10/10 with a clean control on every 0.17 commit), 5 (corpus compatibility, leg (a) only —
-leg (b) unbuilt), 6 (**resolution floor — two legs, because a floor at today's value cannot gate a MUST whose
-content is "must move": (i) regression, ≥ 65.46 % aggregate and no subject below its own current
-figure, two-sided as it has always been; (ii) movement, the aggregate strictly above 65.46 % at the
-release commit, which is PP-R1's leg 2 and reds gate 6 if R3 lands as a no-op**),
+leg (b) unbuilt), 6 (**resolution floor, RE-BASELINED on the v0.17 R3 measurement correction — the
+65.46 % this gate carried since 0.14 was an artifact of asking the binder for a reduced extension
+method against its static class, and the corrected figure is 92.79 % (§3.1 R3). Two legs:
+(i) regression, ≥ 92.79 % aggregate and no subject below its own corrected figure, two-sided as
+always; (ii) movement, the aggregate strictly above 92.79 %, which R3 has NOT achieved — correcting
+an instrument is not moving the thing it measures, and this leg stays open**),
 7 (index/query goldens including E7's leg), 8 (harness capture), 9 (**conversion denominator, re-set on the measurement:
 `ExcludedParseFailed` = 0, and `ModulesEnforced` ≥ 304 aggregate with MediatR ≥ 31 and serilog ≥ 88
 exact and FluentValidation ≥ 179 — the SAME floors §4.1 registers, because two pre-registered
