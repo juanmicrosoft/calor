@@ -170,6 +170,21 @@ because the review that caught them is part of how this project works.*
 
 ## [0.16.0] - 2026-09-01
 
+Calor 0.16 makes the project model useful to agents. The new `calor_query` MCP
+tool exposes callers, callees, change impact, and effect rows from the same
+persistent index used by `calor query`. Those CLI facets also gain
+machine-readable JSON and explicit partial-answer residuals.
+
+Migration is more dependable. All 364 modules in the MediatR, Serilog, and
+FluentValidation conversion corpus now parse. Uncertain lambda parameter types
+no longer become invalid `?` syntax, and one failed file no longer floods its
+dependents with misleading generated-C# errors.
+
+MSBuild projects can use `CalorPermissiveEffects` without disabling effect
+checking entirely, and verification now says plainly when Z3 is unavailable.
+The effect-row benefit study was prepared and dry-run honestly, but the sample
+was underpowered. This release therefore makes no safety-benefit claim from it.
+
 ### Benchmark Results (Statistical: 30 runs)
 - **Overall Advantage**: 1.32 (Calor leads)
 - **Metrics**: Calor wins 7 categories, C# wins 1

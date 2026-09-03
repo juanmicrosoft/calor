@@ -1,7 +1,7 @@
 ---
 title: "Project Intelligence for Agents"
 section: "guides"
-order: 2
+order: 2.5
 description: "Use the project index and MCP query tool to inspect callers, effects, and change impact before editing"
 ---
 
@@ -94,9 +94,11 @@ An agent can ask the same effect-impact question with:
 ```
 
 The four MCP facets are `callers`, `callees`, `impact`, and `effects`.
-Rebuilding the index writes under the project, so `projectDirectory` and any
-custom `indexPath` must stay inside the MCP server's `--root`. Set
-`noBuild: true` for a read-only query.
+Rebuilding the index writes under `projectDirectory`, so that directory must
+stay inside the MCP server's `--root`. A custom `indexPath` must also stay
+inside the root, but it is read-only: if that index is stale, the tool refuses
+it rather than rebuilding it. Set `noBuild: true` to make the normal project
+query read-only too.
 
 ## 6. Edit, Build, and Query Again
 

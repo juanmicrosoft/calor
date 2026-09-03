@@ -50,16 +50,16 @@ Place the effect declaration after the output type:
   // body
 ```
 
-**The line matters.** A `§E{...}` on its **own line**, as above, is the
-function's own effect declaration. A `§E{...}` written on the **same line** as
-a function type belongs to that value instead.
-
 ---
 
 ## Effect Rows for Callbacks
 
 When a function accepts another function — a callback, handler, predicate, or
-transform — an effect row says what that callback is allowed to do:
+transform — an effect row says what that callback is allowed to do.
+
+**The line matters.** A `§E{...}` on its **own line** is the containing
+function's effect declaration. A `§E{...}` on the **same line** as a function
+type belongs to that callback, binding, field, property, or return value.
 
 ```calor
 §M{m001:Callbacks}
@@ -80,13 +80,13 @@ permissions.
 
 ```calor
 §M{m001:Rows}
-  §F{f001:Use:pub} (Func<i32,i32>:callback §E{cw}, i32:value) -> Func<i32> §E{cw}
+  §F{f001:Use:pub} (Func<i32,i32>:callback §E{cw}, i32:value) -> Func<i32,i32> §E{cw}
     §E{cw}
     §B{saved:Func<i32,i32>} §E{cw} callback
     §B{local} §LAM{lam1:x:i32} §E{cw}
       §P x
       §R x
-    §/LAM
+    §/LAM{lam1}
     §R callback
 
   §DEL{d001:Handler}
@@ -167,9 +167,12 @@ not allowed, or is named after a real effect code.
 
 Effect rows do not yet fully verify callbacks reached through reflection or
 `dynamic`, event-handler `+=`, or delegates returned by .NET libraries.
-Unresolved cases remain visible as warnings or assumptions rather than being
-treated as verified. Async rows remain limited; consult the diagnostics and
-the [project index](/docs/cli/query/) before relying on a higher-order boundary.
+Unresolved cases fail closed: the caller is charged `unknown`, and an
+under-declared caller fails the build. These boundaries are never silently
+treated as verified. Permissive effects explicitly waive that fail-closed
+behavior for unknown calls. Async rows remain limited; consult the diagnostics
+and the [project index](/docs/cli/query/) before relying on a higher-order
+boundary.
 
 ---
 
@@ -200,7 +203,7 @@ the [project index](/docs/cli/query/) before relying on a higher-order boundary.
   §I{i32:a}
   §I{i32:b}
   §O{i32}
-  // No §E means pure - no side effects
+  // No §E declares this function pure; an effectful body would be an error.
   §R (+ a b)
 ```
 

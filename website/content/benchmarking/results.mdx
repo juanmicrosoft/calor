@@ -39,12 +39,19 @@ behavior. Those questions use separate, pre-registered agent studies.
 
 ### Effect-row toolchain cost
 
-The 0.15 study ran four ordinary programming tasks five times on each of two
-compiler configurations, for 40 green runs. Agents used roughly 18% more output
-tokens with the stricter compiler. The registered result was **HIT**, meaning
-the study did not detect the large slowdown its rule was designed to catch. It
-did not prove zero cost, and the tasks contained no callbacks, so it did not
-measure the feature's safety benefit.
+The 0.15 PP-E1 study had two legs:
+
+- The compiler caught all 10 seeded effect-laundering mistakes at the
+  registered locations. The unmutated fixtures reproduced their frozen
+  diagnostic baselines exactly.
+- Four ordinary programming tasks ran five times on each of two compiler
+  configurations, for 40 green runs. The median paired output-token ratio was
+  1.18. Its 95% lower bound was 0.90, below the registered 1.0 bound gate, and
+  the point estimate stayed below the 1.35 failure threshold.
+
+The combined registered verdict was **HIT**. The tasks measured compiler
+feedback cost on ordinary code; because they contained no callbacks, they did
+not measure the safety benefit of effect rows.
 
 ### Effect-row safety benefit
 
