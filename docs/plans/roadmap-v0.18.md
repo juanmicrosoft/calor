@@ -1,8 +1,9 @@
 # Roadmap — v0.18 "The Claim, Tested"
 
 **Date:** 2026-09-03
-**Status:** **Draft v1** — no adversarial round has been run against this document. §10 is a
-registration of what must be attacked, not a record of what was.
+**Status:** **Draft v2** — one self-conducted adversarial round (§10), five findings, two Major,
+both found by checking a citation rather than trusting it. **No independent round has been run**;
+§10 registers the lenses that still must be applied.
 **Written against:** `691b65ec` (main after PR #1155, the 0.17.0 version bump).
 `Directory.Build.props:3` reads `0.17.0`; **v0.17.0 has been released and verified** — published
 2026-09-03T02:22Z as the project's first non-prerelease, `Verify Release (installed tool)` green
@@ -33,10 +34,11 @@ working, and this document is written to the same standard.
 
 ### 0.2 The finding: two registered gates were never evaluated
 
-**R17:§5 gate 14 ("the row escape table") and PP-R1's sibling proof point PP-S1 (R17:§4.2) have no
-instrument and no published outcome.**
+**R17:§5 gate 14 ("the row escape table") and PP-R1's sibling proof point PP-S1(rows) (R17:§4.2)
+have no instrument and no published outcome.** (On the qualified name, see §4.1: `PP-S1` alone is
+ambiguous in this repository's record.)
 
-R17:§4.2 registers PP-S1's instrument precisely: *a table-driven test over exactly the twelve
+R17:§4.2 registers the instrument precisely: *a table-driven test over exactly the twelve
 argument shapes in #1136's table*, five expected to move from escaping to charged-or-refused and
 **seven controls that must not change**, with the outcome map HIT / MISS / NOT-ADJUDICATED. Gate 14
 names the same test as its instrument, #1136's table as its denominator, and a revert-either-half
@@ -50,7 +52,7 @@ good test. They are not the table. Three shapes verified is not twelve shapes ve
 seven controls are not covered at all.
 
 The v0.17.0 release notes' `### Proof points and gates` reports PP-R1 leg 1, gate 6 and gate 9, and
-is **silent on PP-S1 and gate 14**.
+is **silent on PP-S1(rows) and gate 14**.
 
 Under R17's own outcome map this is **NOT-ADJUDICATED**. It leaves half of R17:§1's release claim
 — *"every argument shape in #1136's table is either charged or refused"* — carrying no instrument,
@@ -116,6 +118,8 @@ results) **closed**: it replaced a 30-run statistical result over 8 metrics (`ov
 1.32) with a **single run** over a different 11-metric set (1.19, `statisticalRunCount: 0`). The
 two figures do not answer the same question, and merging it would have put an incomparable number
 on the website beside a changelog publishing the other one. Generator defects filed as **#1157**.
+The sweep also pruned 38 stale agent worktrees and a nested clone — recorded only because removing
+those local refs is what made §10 finding 1's dangling `MeasuredCommit` stamps visible.
 
 ---
 
@@ -168,7 +172,7 @@ exactly why" is a success of this plan, not a failure of it.**
 
 ### 3.1 MUST
 
-**M1 — PP-S1 and gate 14 adjudicated. The instrument R17 registered and did not build.**
+**M1 — PP-S1(rows) and gate 14 adjudicated. The instrument R17 registered and did not build.**
 
 *Deliverable:* a table-driven test over **exactly the twelve shapes in #1136's table**, each named
 individually, sourced from the fixtures already committed under
@@ -190,6 +194,11 @@ before-state.
 - *Freeze:* #1136's table, which A-1.12 registered as a pre-registered confound. **This release may
   not edit it.** If the table is found wrong, that is a supersession requiring written defect
   analysis (A:90-92) — not an edit.
+- *Commit order, because M1's adjudicator has a stake in its verdict* (round 1 finding 4): M1 = MISS
+  blocks M4, and this release wants M4 to run. The twelve rows and their expected outcomes are
+  transcribed from #1136's table and **committed before the test is first run**, in a commit that
+  contains no observed results. The frozen table is the source of truth; the commit order is the
+  evidence that it was.
 - *Discrimination pin (gate 14):* revert S1(a) and the `§PROP` row goes red while the field shapes
   stay green; revert S1(b) and the alias / other-instance / method-group shapes go red. The two
   halves must fail **different rows**.
@@ -201,7 +210,7 @@ before-state.
 on a laptop.
 
 *A correction this MUST also owes.* v0.17.0's notes reported three gates and omitted these two.
-0.18's notes state plainly that gate 14 and PP-S1 went unevaluated in 0.17 and report them now. The
+0.18's notes state plainly that gate 14 and PP-S1(rows) went unevaluated in 0.17 and report them now. The
 0.17 release is not re-cut; the record is corrected forward, the way R17 printed the old gate 6
 figure beside the corrected one rather than replacing it.
 
@@ -273,17 +282,33 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   it is not the IL-rows class, so IL rows' trigger will never cover it.
 
   **The figure R17 carried is stale, and it moved in the direction that matters.** R17:§0.4 and §6
-  both say *53 of 90 (59 %)*. Re-measured against `calor0425-corpus-ledger.json` (schema 4,
-  `MeasuredCommit: 4767668a`, the 0.17 measurement — cross-checked by its `Calor0411Sites` summing
-  to the 8,231 over 187 modules the release notes publish): **61 of 113 = 54 %**, per subject
-  MediatR 0/3, serilog 20/39, FluentValidation 41/71.
+  both say *53 of 90 (59 %)*. Re-measured against `calor0425-corpus-ledger.json` (schema 4) as
+  committed at **`1609b695`** — the squash commit that carries the 0.17 measurement onto `main`,
+  cited in place of the ledger's own `MeasuredCommit` stamp, which is **dangling** (round 1
+  finding 1, #1159). Cross-checked by its `Calor0411Sites` summing to the 8,231 over 187 modules the
+  release notes publish: **61 of 113 = 54 %**, per subject MediatR 0/3, serilog 20/39,
+  FluentValidation 41/71.
 
   So the **absolute count rose, 53 → 61, while the fraction fell, 59 % → 54 %** — because 0.17's
   reach work enlarged the denominator (304 → 324 modules enforced) faster than it touched this
   group. Reporting the fall alone would read as progress against a group nothing was done to.
   *Deliverable:* the per-subject breakdown R17:§6 asked for and never got, and a fix or a
   registered trigger — **not a fourth carry**.
-- **S3 — Benchmark integrity (#1157), and one honest re-run.** Fix the generator (`metricCount`
+- **S3 — Measurement provenance (#1159) and benchmark integrity (#1157), and one honest re-run.**
+
+  **#1159 first, because it is the cheaper and the more load-bearing.** Every ledger under
+  `bench/phase0-agent-native/` stamps a `MeasuredCommit`, every roadmap since 0.15 cites those
+  stamps as the provenance of its published numbers, and **none of them resolves on `main`** — the
+  repo squash-merges, so a stamp written on a branch names a commit the squash discards. Three of
+  five name commits contained by **zero** remote branches: they exist only as unreferenced objects
+  in individual clones and will not survive `git gc`, so a fresh clone cannot resolve them at all.
+  The numbers are unaffected and reconcile with the release notes; what is gone is a third party's
+  ability to check them, which is the entire purpose of the stamp. *Deliverable:* stamp something
+  that survives squash-merge (the merge commit written back, as #1030 already registers for
+  `roundtrip-baseline.json`; or the release tag), plus **a test that fails when a stamp does not
+  resolve on `main`** — cheap, and it would have caught this the first time.
+
+  Then benchmark integrity: Fix the generator (`metricCount`
   carrying the program count; the silent 30-run → single-run methodology swap), then re-run the
   **30-run statistical** suite at the 0.18 commit so the website and the changelog publish the same
   measurement. v0.17.0 disclosed that its numbers were carried forward from `82a7c653` and do not
@@ -306,7 +331,16 @@ lambda; gate 3's CLI-process and `Calor.Sdk` legs (#1116); gate 5 leg (b) (R15:9
 
 ## 4. Proof points
 
-### 4.1 PP-S1 (re-run) — "no argument shape launders silently"
+### 4.1 PP-S1(rows) (re-run) — "no argument shape launders silently"
+
+**Named `PP-S1(rows)` throughout, because `PP-S1` is ambiguous in this repository's record**
+(round 1 finding 2). `substrate-plan-v0.12.md` uses **PP-S1** for a different proof point —
+*"converter fidelity is movable"* — and adjudicates it with its own hit/miss table and decision
+matrix (§167, §197-200). Anyone grepping `PP-S1` for evidence that *this* proof point was
+adjudicated finds that history instead. Given §0.2 is a gap that survived five rounds, a naming
+collision that manufactures false evidence of adjudication is not cosmetic. The v0.12 name is
+frozen prose in a closed plan and is **not** renamed retrospectively; this release disambiguates on
+its own side and carries the qualified name into the release notes.
 
 *Claim:* every one of the twelve argument shapes in #1136's table is charged (`Calor0410`) or
 refused, and none produces an uncharged `warning Calor0425` at exit 0.
@@ -352,7 +386,11 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 **New:**
 
 15. **Release-path stability.** *Instrument:* the CI run log for `tests (compiler)` on main.
-    *Floor:* **zero exit-143 kills across the last 20 consecutive runs** before the 0.18.0 cut.
+    *Floor:* **zero exit-143 kills across 20 consecutive runs**, counting **only runs after M2's fix
+    lands** — a window that straddles the fix measures two different systems.
+    *Short window:* if fewer than 20 post-fix runs accumulate before the cut, the gate reads
+    **NOT-ADJUDICATED and blocks the cut**. It may not pass on an empty or partial window; a gate
+    that passes for lack of data is the failure §0.2 is about.
     *Pin:* retries are not passes; a kill followed by a green retry is a **failed** gate.
 16. **Benchmark methodology agreement.** *Instrument:* `website/public/data/benchmark-results.json`
     against `CHANGELOG.md`. *Floor:* the published `overallAdvantage` is computed from the same
@@ -366,13 +404,14 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 
 | Item | Source | Trigger | Venue |
 |---|---|---|---|
-| **Gate 14 / PP-S1 unevaluated in 0.17** | §0.2 | — | **0.18 M1, unconditional** |
+| **Gate 14 / PP-S1(rows) unevaluated in 0.17** | §0.2 | — | **0.18 M1, unconditional** |
 | **`--permissive-effects` Calor0410 demotion unadjudicated; end condition met 2026-09-01** | R16:§6; §0.4 | **fired** | **0.18 S1, and a hard input to M3(3)** |
 | **`ExternalBase` — 61 of 113 Calor0425 (54 %)**, re-measured; R17 carries a stale 53 of 90 (59 %) | R17:§0.4, §6; `calor0425-corpus-ledger.json` | carried unassigned through three releases | **0.18 S2 — fix or registered trigger, not a fourth carry** |
 | **exit-143 kills on the publish path** | #1150 (4 data points) | **fired** | **0.18 M2 + gate 15** |
 | #965 perf suite kills the runner; runs only on the release path | #965 | recurrence | 0.18 S1 observation; kept distinct from #1150 |
 | Flake cluster #948, #959, #884, #859, #1135 | R15:1040 | rate attached — **overdue since the 0.16 branch cut** | 0.18 S1 |
 | Async rows | D:§11, 1922-1945 | maintainer, in writing — **overdue since the 0.16 branch cut** | 0.18 S1 |
+| **Ledger `MeasuredCommit` stamps unresolvable on main; 3 of 5 on no remote at all** | #1159; round 1 finding 1 | **fired** | **0.18 S3** — a stamp test, and a stamp that survives squash-merge |
 | Benchmark generator defects; methodology swap | #1157 | — | 0.18 S3 + gate 16 |
 | `FunctionBoundType.Row` end-to-end; lambda params in-lambda → Calor0411 | R15:747; D:2700-2708; e4:255-259 | — | 0.18 S4 |
 | Index parity with `calor build`; interface members unindexed; index-build cost | e5:256-275 | — | 0.18 S4 |
@@ -395,6 +434,7 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 | #1136 | **0.18 M1** — open by design; §0.2's comment records what shipped and what closes it |
 | #1150 | **0.18 M2**, release-gating (gate 15) |
 | #1157 | **0.18 S3** (gate 16) |
+| #1159 | **0.18 S3** — measurement provenance; related to #1030, same class |
 | #965 | 0.18 S1 observation; kept distinct from #1150 |
 | #948, #959, #884, #859, #1135 | 0.18 S1 — flake rate, **overdue since the 0.16 branch cut** |
 | #1116 | 0.18.x; gate 3 claims only its built legs |
@@ -445,15 +485,34 @@ authorization — the mistake §0.4 shows this project already makes with adjudi
 
 ---
 
-## 10. Adversarial review — registered, not yet run
+## 10. Adversarial review
 
-**No round has been conducted against this draft.** Registered so the gap is visible rather than
-implied by silence, and because R17's five rounds still did not catch §0.2 — which was found by a
-post-release cleanup sweep. That is this document's most important prior: **the rounds reviewed the
-plan, then the code, then the release notes, and none of them reviewed whether the instruments the
-plan registered actually existed.**
+R17's five rounds did not catch §0.2 — a post-release cleanup sweep did. That is this document's
+most important prior: **the rounds reviewed the plan, then the code, then the release notes, and
+none of them asked whether the instruments the plan registered actually existed.**
 
-Lenses required before this draft is acted on:
+### Round 1 — 2026-09-03, self-conducted, on Draft v1
+
+Five findings. Two are Major and both were found by *checking a citation instead of trusting it*,
+which is the cheapest lens available and the one Draft v1 had not applied to itself.
+
+| # | Lens | Finding | Disposition |
+|---|---|---|---|
+| **1** | provenance | **Major. Every ledger's `MeasuredCommit` is unresolvable, and three of five name commits on no remote at all.** Draft v1 cited `MeasuredCommit: 4767668a` as the corpus ledger's provenance without checking it. It is **not on `main`** and is contained by **zero** remote branches — it survives only as an unreferenced object in individual clones and will not survive `git gc`. Same for `fdff11de` (resolver-key ledger). The repo squash-merges, so a stamp written on a branch names a commit the squash discards. Worse, the field chases its own tail: at `4767668a` the file reads `MeasuredCommit: 0484426f`, and on `main` the same file reads `4767668a` — the **only** byte that differs between the two versions. Every roadmap since 0.15 cites these stamps as the provenance of its published numbers. | **Applied.** Filed as **#1159**; added to §3.2 S3 and §6. §3.2 S2's citation now names the *resolvable* squash commit `1609b695` and states the stamp is dangling rather than repeating it as fact. **The numbers are unaffected** — the ledger's `Calor0411Sites` sums to 8,231 over 187 modules, exactly the release notes' figure, and `ModulesEnforced` to 324. What is broken is third-party verifiability, which is the whole purpose of the stamp. |
+| **2** | naming | **Major. `PP-S1` names two different proof points, and the collision points straight at §0.2's failure mode.** `substrate-plan-v0.12.md` uses **PP-S1** for *"converter fidelity is movable"* (§167, §197-200), adjudicated with a hit/miss table and a decision matrix. R17:§4.2 uses **PP-S1** for *"no argument shape launders silently."* A reader — or a future adversarial round — grepping `PP-S1` for evidence of adjudication finds a rich adjudication history belonging to a **different proof point**. That is a live route to concluding §0.2's gap was already closed. | **Applied.** This document uses **PP-S1(rows)** at every occurrence, and §4.1 states the collision. Registered for the release notes too. Renaming the v0.12 proof point retrospectively is *not* proposed: it is frozen prose in a closed plan. |
+| **3** | gating | **Gate 15's 20-run floor can be vacuous or unreachable, and M2 contradicts it.** M2 says *measure before fixing*; gate 15 demands 20 consecutive clean runs before the cut. If the fix lands late, 20 runs cannot accumulate; if `main` sees fewer than 20 runs in the cycle, the gate passes on an empty window. Neither is a gate. | **Applied.** Gate 15 restated in §5: the 20-run window counts **only runs after the fix lands**, and if fewer than 20 accumulate the gate reads **NOT-ADJUDICATED and blocks the cut** — it may not pass on a short window. |
+| **4** | incentive | **M1's adjudicator has a stake in its verdict.** M1 = MISS blocks M4, and the same release wants M4 to run. Nothing in Draft v1 stopped the twelve rows from being written *after* observing which shapes pass. | **Applied.** §3.1 M1 now requires the twelve rows be transcribed from #1136's table and **committed before the test is first run**, in a separate commit from any expectation values. The frozen table is the source; the commit order is the evidence. |
+| **5** | scope | §0.6 records disk reclamation (60 GB → 4.9 GB), which is a local environment fact, not repo state, and does not belong in a roadmap's findings. | **Partially applied.** Kept, trimmed to one clause, because the worktree prune is what surfaced finding 1 — the commits' unreachability became visible only once the local refs were gone. Recorded as the provenance of the finding, not as an accomplishment. |
+
+### What round 1 did not do
+
+It was **self-conducted**, which R16 round 2 established is structurally unable to find half-applied
+dispositions of its own findings. It did not review any code (there is none yet). It did not
+independently recompute §3.2 S2's 61/113 — that figure was computed once, from the ledger, by the
+same pass that wrote it, and its cross-check (`Calor0411Sites` = 8,231) confirms the *ledger* is the
+0.17 measurement, **not** that 61/113 was summed correctly. An independent round should re-sum it.
+
+### Rounds required before this draft is acted on
 
 - **Instrument-existence lens (new, and it is the one §0.2 demands).** For every proof point and
   gate in §4 and §5: does the test exist, and does the release-notes template have a line for its
