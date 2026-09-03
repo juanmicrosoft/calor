@@ -1,7 +1,7 @@
 # Roadmap — v0.17 "Reach, and the Rows We Shipped"
 
 **Date:** 2026-09-01
-**Status:** **Draft v5** — four adversarial rounds (§10). Rounds 1-3 reviewed this document; round 4 reviewed the CODE the MUST tier shipped, and found seven defects the plan could not have. The MUST tier is complete: R1, R2, R3 (both legs), R4(a)-(d) and S1 have all landed.
+**Status:** **Draft v6** — five adversarial rounds (§10). Rounds 1-3 reviewed this document; round 4 reviewed the CODE the MUST tier shipped and found seven defects the plan could not have; round 5 reviewed the RELEASE NOTES and found seventeen. The MUST tier is complete: R1, R2, R3 (both legs), R4(a)-(d) and S1 have all landed. The SHOULD tier (S2/S3/S4) has not been started and defers to 0.17.x.
 Round 1: self-conducted, twelve findings. **Round 2: independent (cloud multi-agent)** — found that
 three of round 1's twelve "Applied" dispositions were only half-applied, the finding a self-review
 structurally cannot make. **Round 3:** verified **27/27** dispositions landed, **independently
@@ -814,3 +814,29 @@ earlier rounds' applied fixes, the 0.16-carried gates, or §7's dispositions. It
 R1 or in R2's core assignability work, which may mean those are sound or may mean the diff's size
 hid them — five of seven findings are in code written in the last two days, and the two oldest
 surfaces in the diff drew no finding at all.
+
+### Round 5 — 2026-09-02, on the RELEASE NOTES
+
+Round 4 reviewed the code. Round 5 reviewed what the release *says about itself* —
+`CHANGELOG.md`, the website changelog, the convert page, the landing banner, the version
+bump. Seventeen findings, **all applied**. Five were called blocking and two of those are
+failures of the same discipline the rest of this document enforces.
+
+| # | Finding | Disposition |
+|---|---|---|
+| **1** | **"95.9 % of calls" is an order of magnitude too broad.** The denominator is 1,248 invocations into **allowlisted .NET library types** — `MetadataBinderCorpusMeasurementTests` excludes calls into the corpus's own types and into un-allowlisted packages. The entry sat four lines below the changelog's own **8,231** Calor0411 unresolved external calls, so the two contradicted each other on the page. | **Applied.** Absolutes with the denominator named: 1,197 of 1,248, up from 1,158, and a sentence saying which calls are not in it. |
+| **2** | **The landing banner claimed "far more of YOUR converted C#".** Nothing was measured about a reader's code — the corpus is three projects at pinned SHAs. It also used an adjective where the public-surface rule asks for a number, for a move of 3.1 points. | **Applied.** Rewritten to the release's own headline: 20 more modules from the three-project corpus reach effect checking. |
+| **3** | **Five of the six "Fixed" entries described defects no released version ever had.** The cyclic-constraint crash, the suppressed Calor0208, the pattern-variable shadowing, the unnameable `§B` types and the dropped `§PROP` row were all introduced by R2/R4/S1 and fixed by round 4 — inside this release. A 0.16 user reading *"the process died rather than reporting anything"* would conclude their installed compiler has that crash. | **Applied.** Moved under **"Fixed before release"**, which states in its own subtitle that these are defects this release's work introduced and its review caught. Only the four filed issues stay in a plain `### Fixed`. |
+| **4** | **S1(b) had no entry at all**, and it is the one an upgrader most needs: the fail-closed effect charge turns hand-written Calor that compiled under 0.16 into a `Calor0410`. §3.2 registers it as *"a fail-closed change to a shipped diagnostic [that] **will produce new errors on converted code**"*. | **Applied.** A `### Changed` section, naming the new error and the `--permissive-effects` escape. |
+| **5** | **`§PROP` rows appeared only as a subordinate clause inside a "Fixed" bullet**, though a construct that was a parse error in 0.16 and is enforced in 0.17 is a language feature. The syntax reference was never updated either. | **Applied.** Its own `### Added` entry; `docs/syntax-reference/effects.md`'s position table goes from **eight to nine**; the website's structure-tags table says a property may carry a row. |
+| **6** | **PP-R1 leg 1 read MISS and the notes published only the number that produced it.** The intro led with 304 → 324, i.e. exactly the recovery of 20 that §3.1 says *"must never be recorded as"* the frozen target being met. No proof point or gate was published at all, though 0.13, 0.15 and 0.16 all published theirs. | **Applied.** A **"Proof points and gates"** section: leg 1 MISS in the same words §3.1 uses, gate 6's movement leg SATISFIED, gate 9 held. |
+| **7** | **The 92.8 % baseline contradicted a figure this same file already published.** 0.15's notes carry gate 6 at 817/1248 = 65.5 %. Quoting a corrected baseline against an uncorrected published one, silently, is the exact failure §3.1 R3 forbids. | **Applied.** A `### Corrected` entry printing the old number beside the new, with the reduced-extension-method cause, per the house rule and v0.16 §0.1's precedent. |
+| **8–17** | The heading of one bullet was the inverse of its body; "converted C#" named the wrong artifact (the converter emits **Calor**, and it was Calor's own parser that could not read it back); "the Calor writer" paraphrased **emitter**, a term the next bullet uses correctly; "a bigger feature" left the reader unable to follow the argument about it; R4's four separately-filed issues were compressed into one bullet after §3.1 spent a paragraph rejecting exactly that framing; `CS0103` was cited with no gloss; "files" and "modules" named one quantity across two files; a stray blank line made one list loose; one sentence carried four subordinate clauses; and the `### Benchmark Results` section every release since 0.12 carries was absent. | **All applied.** The benchmark section is present with **"not re-run for this release"** stated plainly and the commit its numbers come from, rather than omitted or silently re-presented. |
+
+**One error round 5 did not catch**, found while verifying its own examples against the
+built CLI: the named-argument spelling is `§A[name]`, not `§A{name}`. Every code example in
+the notes now compiles. The lesson is the one §10 keeps re-learning — *run the thing*.
+
+**What round 5 did not do.** It reviewed the release's prose, not the release. It did not
+re-derive the ledger numbers from the corpus (it checked them against the committed
+ledgers, which is a different claim), and it did not review the SHOULD tier's absence.

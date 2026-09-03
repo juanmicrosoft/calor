@@ -95,6 +95,36 @@ validation passed.
 | `for` loop | `§L{id:var:from:to:step}` |
 | `while` loop | `§WH{id}` |
 
+### What Changed in 0.17
+
+0.16 got all 364 modules to **parse**. 0.17 is about what happens next: a module
+that parses can still stop at name binding, before any of the effect checking
+runs. At the 0.16 branch cut, 60 of the 364 stopped there. Now 40 do, and the
+number of modules the effect checker reaches went from 304 to **324**.
+
+Most of that came from two fixes to how the compiler resolves calls.
+
+**Overload resolution learned the conversions C# already allows.** Deciding which
+overload you meant was comparing parameter types too literally. Passing a
+`PropertyEnricher` to a parameter typed `ILogEventEnricher` — an interface the
+class implements — was reported as "no overload matches", and so was passing a
+generic parameter `T` to a parameter typed as one of `T`'s own constraints.
+
+**Member lookup learned about inheritance.** Looking up a method asked the
+receiver type for its *own* declarations only — nothing about base classes, base
+interfaces, generic constraints, or `System.Object`. `IValidator.GetType()` was
+"no such member" because an interface has no base type to walk; so were
+`MethodInfo.GetParameters()`, declared on `MethodBase`, and `IList<T>.Add(item)`,
+declared on `ICollection<T>`. Across the same three projects, the share of call
+sites the compiler can resolve went from **92.8% to 95.9%**.
+
+Four converter and emitter defects are fixed alongside them. A class using `§EXT`
+emitted unqualified calls to module functions, which the C# compiler then
+rejected; the same function referenced as a method group rather than called had
+the same problem; a `var` bound to a method call lost its type, and with it every
+member access on the result; and a named argument matching no parameter crashed
+the binder outright.
+
 ### What Changed in 0.16
 
 Converted code is only useful if the compiler can read it back. We test that on

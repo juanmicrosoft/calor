@@ -77,7 +77,7 @@ The rule is just the line. A `§E{...}` on the same line as a type is that type'
 `§E{...}` on its own line is the function's effect declaration, exactly as it always was.
 Almost everyone already writes the second form, so almost nothing changes.
 
-### The eight places you can write one
+### The nine places you can write one
 
 ```
 §F{f001:F:pub} () -> void
@@ -96,6 +96,7 @@ Almost everyone already writes the second form, so almost nothing changes.
 () -> Func<i32> §E{cw}                      //    …or the arrow spelling
 §B{f:Func<i32,i32>} §E{cw} <initializer>    // 7. a binding
 §FLD{Action<i32>:onChange:pri} §E{cw}       // 8. a field
+§PROP{p1:OnChange:Action<i32>:pub:get,set} §E{cw}  // 9. a property (0.17)
 ```
 
 A type carries **one** row. To allow several effects, put them in the one row —
