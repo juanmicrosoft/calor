@@ -1,0 +1,332 @@
+{
+  "schemaVersion": 1,
+  "proofPoint": "PP-S1(rows)",
+  "gate": 14,
+  "registeredBy": "docs/plans/roadmap-v0.17.md §4.2 and §5 gate 14",
+  "adjudicatedBy": "docs/plans/roadmap-v0.18.md §3.1 M1",
+  "note": "Registered in v0.17 and NOT evaluated there; v0.17.0's release notes report PP-R1, gate 6 and gate 9 and are silent on this proof point and this gate. Adjudicated here for the first time.",
+  "instrument": "tests/Calor.Enforcement.Tests/RowEscapeTableTests.cs",
+  "denominator": 12,
+  "frozenTable": "issue #1136 (also committed verbatim in pairs/W-001-middleware-stage/pair.json and pairs/W-006-map-doubler/pair.json, field `note`)",
+  "invocation": "dotnet <calor.dll> -i <src> -o <out>   (no flags — the configuration #1136's table was measured in)",
+  "commitStampPolicy": "Both stamps are commits REACHABLE ON MAIN, per issue #1159: every existing ledger under this directory stamps a pre-squash branch commit that main discards, and three of five name commits on no remote at all. This ledger does not repeat that.",
+  "preS1Baseline": {
+    "commit": "0defc5dc",
+    "reachableOnMain": true,
+    "what": "parent of S1's merge — the compiler before the fix"
+  },
+  "compilerUnderTest": {
+    "commit": "1609b695",
+    "reachableOnMain": true,
+    "what": "the squash merge of PR #1154 on main, which landed S1"
+  },
+  "outcome": "HIT",
+  "outcomeRule": "HIT iff all 12 are charged (Calor0410) or refused and none launders silently; MISS if any shape is still silent OR any of the 7 controls regressed",
+  "summary": {
+    "shapesTotal": 12,
+    "shapesClosed": 12,
+    "controls": 7,
+    "controlsStillCharged": 7,
+    "escapes": 5,
+    "escapesNowCharged": 5,
+    "stillSilent": 0
+  },
+  "discriminationPin": "TWO different discriminations are wanted, and this instrument supplies one of them alone.\n(1) PRE/POST — satisfied by this ledger, with a real compiler instead of a synthetic revert: the pre-S1 build at 0defc5dc reproduces #1136's frozen table EXACTLY — the same 7 charged (shape 7 with its Calor0410+Calor0411 signature) and the same 5 at exit 0 with Calor0425. That is what establishes the twelve fixtures are not vacuous: they reproduce the frozen before-state on an independently built compiler from before the fix.\n(2) THE TWO HALVES OF S1 — gate 14 also wants 'revert S1(a) and the §PROP row goes red while the field shapes stay green; revert S1(b) and the alias / other-instance / method-group shapes go red.' This file does NOT supply that half on its own, and saying otherwise would be an overclaim. Shape 9 is a ROWLESS §PROP — faithful to the committed fixture and to how v0.15 measured it, since a row on a §PROP was a parse error then — so it is closed by S1(b) fail-closed, not by S1(a). Reverting S1(a) would leave shape 9 green. S1(a) is discriminated instead by StrictnessBatchTests.cs:2089 (PropertyRow_IsParsedAndHonoured) and :2117 (PropertyRow_IsResolved_NotMerelyParsed), both of which write §PROP{...} §E{cw}. Gate 14's two-halves pin is therefore satisfied JOINTLY by this table and those two tests — not by this table alone.",
+  "disclosures": "The two shapes #1136 carries as disclosures (inherited field unqualified; module-qualified module function from inside a class body) are reported by Disclosure_ShapesAreReported_NeverScored and are NOT in the denominator of 12.",
+  "rows": [
+    {
+      "row": 1,
+      "shape": "module function by simple name (module scope)",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 2,
+      "shape": "module function module-qualified (module scope)",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 3,
+      "shape": "own rowed §FLD by simple name",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 4,
+      "shape": "static rowed §FLD by simple name",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 5,
+      "shape": "local bound from such a field",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 6,
+      "shape": "§B-bound §LAM with its row omitted",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 7,
+      "shape": "direct invocation of a this.-qualified field",
+      "frozenOnV0150": "charged",
+      "preS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0411": 1
+        },
+        "emitted": false
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0411": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 8,
+      "shape": "own §FLD via this.",
+      "frozenOnV0150": "escaped",
+      "preS1": {
+        "exitCode": 0,
+        "diagnostics": {
+          "Calor0425": 1
+        },
+        "emitted": true
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0425": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 9,
+      "shape": "§PROP by simple name — no receiver at all",
+      "frozenOnV0150": "escaped",
+      "preS1": {
+        "exitCode": 0,
+        "diagnostics": {
+          "Calor0425": 1
+        },
+        "emitted": true
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0425": 2
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 10,
+      "shape": "own §FLD via a local alias of this",
+      "frozenOnV0150": "escaped",
+      "preS1": {
+        "exitCode": 0,
+        "diagnostics": {
+          "Calor0425": 1
+        },
+        "emitted": true
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0425": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 11,
+      "shape": "§FLD on another instance of the same class",
+      "frozenOnV0150": "escaped",
+      "preS1": {
+        "exitCode": 0,
+        "diagnostics": {
+          "Calor0425": 1
+        },
+        "emitted": true
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0425": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    },
+    {
+      "row": 12,
+      "shape": "instance method group with a parameter receiver",
+      "frozenOnV0150": "escaped",
+      "preS1": {
+        "exitCode": 0,
+        "diagnostics": {
+          "Calor0425": 1
+        },
+        "emitted": true
+      },
+      "postS1": {
+        "exitCode": 1,
+        "diagnostics": {
+          "Calor0410": 1,
+          "Calor0425": 1
+        },
+        "emitted": false
+      },
+      "chargedNow": true,
+      "laundersSilentlyNow": false,
+      "verdict": "closed"
+    }
+  ],
+  "nameCollision": {
+    "warning": "The bare name PP-S1 is AMBIGUOUS in this repository, and the ambiguity points the wrong way. docs/plans/agent-native-gates.md:340 registers PP-S1 as \"converter fidelity is movable\", and A-1.7 (line 1251) adjudicated THAT PP-S1 = MISS with the real-scale venue RETIRED (line 1257). So the repository's own registration record, grepped for \"PP-S1\", answers MISS / venue retired — the opposite of this ledger's result for a different proof point of the same name.",
+    "resolution": "This proof point is PP-S1(rows) everywhere. The v0.12 name is frozen prose in a closed plan and is not renamed retrospectively.",
+    "annexScope": "PP-S1(rows) is deliberately NOT registered in the A-annex: that annex governs agent-native experiments with spend and power (its PP rows are byte-frozen by scripts/check-annex-freeze.py). This proof point runs inside dotnet test with zero agent runs, and is registered in the release roadmap instead."
+  },
+  "processFindings": [
+    {
+      "finding": "The instrument was vacuous as first written",
+      "detail": "The scored assertion was `!(no errors && Calor0425)`. A fixture with a typo produces a parse or bind error, HasErrors goes true, and the row passes GREEN while measuring nothing. Closed by asserting (a) no error below Calor0300 — lexer, parser and semantic codes, none of which this table is about — and (b) Calor0410 is present. The per-row expected verdicts did not change; the check got stricter, not looser."
+    },
+    {
+      "finding": "A stale Release binary produced a false MISS",
+      "detail": "The first CLI measurement used src/Calor.Compiler/bin/Release from Sep 1 18:17. S1 landed Sep 2 19:07. That pre-S1 binary reported 5 of 12 still escaping — a MISS that would have blocked M4 for no reason. Caught by checking the artifact's timestamp against the fix's merge date. The same accident then supplied the discrimination pin, which is why it is rebuilt from 0defc5dc here rather than left as an artifact."
+    },
+    {
+      "finding": "The first CLI invocation measured the CLI's own help text",
+      "detail": "`calor build <file>` is not a subcommand; the run printed usage, and grepping it for Calor codes matched the option descriptions, yielding an identical fake diagnostic set for all twelve rows. The real invocation is `-i <src> -o <out>`, which is what ppw-seeded-compiles.json's own `invocation` field records."
+    }
+  ],
+  "limitations": [
+    "The CI instrument and this ledger use DIFFERENT entry points. RowEscapeTableTests calls the in-process API (TestHarness.Compile, which sets UnsafeTranspileOnly); this ledger drives the calor CLI, which is what #1136's table was measured with. They agree on all twelve here, but the committed test would NOT catch a CLI-only regression. That is exactly the gap issue #1116 names — gate 3's CLI-process leg is unbuilt — and it is disclosed rather than papered over.",
+    "Shape 9 exercises S1(b), not S1(a); see discriminationPin (2)."
+  ]
+}
