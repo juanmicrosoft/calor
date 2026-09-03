@@ -273,3 +273,91 @@ The fix must reduce retained memory, and the candidates are ordinary: release co
 contexts between test classes; split the compiler shard; or run the suite in more than one host so
 retention resets. **None is attempted here.** M2's sequence is measure, then fix, and gate 15's
 20-consecutive-clean-run floor is unchanged and undischarged.
+
+---
+
+## 10. Fix leg: the memory is **native**, not managed — two experiments, both decisive
+
+The obvious next step after §9 was to cut the test host's memory. That step was not taken, because
+the leak **does not reproduce locally** and the fix depends on which kind of memory is growing.
+
+### The local non-repro, which is the fact that shaped everything after it
+
+Identical suite, identical corpus, `-c Release`:
+
+| | peak | min | reclaim events | non-decreasing |
+|---|---:|---:|---:|---:|
+| local (macOS ARM64) | **2,049 MB** | 621 MB | **8** | 63 % |
+| CI (`tests (compiler)`) | **9,579 MB** | — | **~0** | 83 % |
+
+Local memory oscillates and is reclaimed; CI climbs monotonically. That is a **qualitative**
+difference, not a scale one. It rules out "some test class leaks" — the same code over the same
+corpus does not leak on one platform — and it points at something environment-specific.
+
+### Which process, settled
+
+`comm` is `dotnet` for the test host, every MSBuild node and the CLI driver alike, so the sampler
+was taught to print the argv of the largest process. It is the test host, unambiguously:
+
+```
+19:20  3,959,740 KB  dotnet exec --runtimeconfig .../Calor.Compiler.Tests...
+19:22  5,383,364 KB  (same process)
+19:24  6,595,860 KB  (same process)
+19:26  7,906,040 KB  (same process)
+```
+
+Not MSBuild, not VBCSCompiler, not the driver.
+
+### Round 1 — is it GC policy? **No.**
+
+`DOTNET_GCConserveMemory=9` with `DOTNET_GCRetainVM=0`, the most aggressive managed-heap settings
+available:
+
+| | peak `memUsed` | min `memAvail` | reclaim events |
+|---|---:|---:|---:|
+| control | 11,331M | 4,658M | 2 |
+| treatment | **11,954M** | 4,035M | 2 |
+
+Marginally **worse**, not flatter. The growth is not managed-heap policy, and no GC setting reaches
+it.
+
+### Round 2 — native memory, or a managed reference leak? **Native.**
+
+Round 1 could not distinguish these: `GCConserveMemory` cannot collect what is still rooted, so a
+static cache accumulating across test classes would have produced the same null result.
+
+`DOTNET_GCHeapHardLimit=0xC0000000` (3 GiB) separates them, and the prediction was registered before
+the run: a managed reference leak must exceed the cap and throw `OutOfMemoryException`, failing the
+tests; native memory never touches it, so the tests pass while RSS climbs past 3 GiB anyway.
+
+**The tests passed. Zero `OutOfMemoryException`. RSS reached 8.94 GB — three times the cap.**
+
+```
+19:35  2.23 GB      19:38  5.86 GB
+19:36  3.42 GB      19:39  7.47 GB      <- already past the 3 GiB managed cap
+19:37  4.56 GB      19:42  8.94 GB
+```
+
+The managed heap fits comfortably in 3 GiB. **The ~9 GB is native.**
+
+### What that leaves, and the platform split it explains
+
+The only large native component in this compiler is **Z3** — `Microsoft.Z3` over native `libz3`,
+whose allocations are invisible to the GC and counted in RSS.
+
+It also explains the local non-repro, which nothing else did. `CLAUDE.md` records Z3 4.15.7 as a
+**custom ARM64 build** on macOS against the standard binaries on Linux x64. Different builds,
+different allocator behaviour — one accumulates and one does not.
+
+**Not yet shown**, and not to be assumed: that Z3 *is* the allocator. The contexts at
+`ContractVerificationPass.cs:55` and `GuardDiscovery.cs:227` are already `using var`, which is
+exactly the kind of fact that makes a confident-but-wrong diagnosis easy. The next experiment is a
+CI run with the Z3-dependent classes excluded: if the curve flattens, it is Z3; if it does not, the
+native allocator is something else and the search continues.
+
+### Status
+
+The fix is **not** written. Three hypotheses are now discarded or refuted (quota, platform incident,
+parallelism from §8) and two more are refuted here (GC policy, managed reference leak). The cause is
+narrowed to **native memory in the test host**, with Z3 as the leading and untested candidate.
+Gate 15's 20-consecutive-clean-run floor is unchanged and undischarged.

@@ -65,7 +65,7 @@ sample_linux() {
     read -r total used avail <<<"$(free -m | awk '/^Mem:/ {print $2, $3, $7}')"
     read -r swap_used swap_total <<<"$(free -m | awk '/^Swap:/ {print $3, $2}')"
 
-    local load disk top
+    local load disk top biggest
     load="$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || echo '?')"
     disk="$(df -Pm / 2>/dev/null | awk 'NR==2 {print $4}')"
     # Top three resident processes, name:MB — names the memory holder if there is one.
@@ -73,9 +73,19 @@ sample_linux() {
            | sort -rn \
            | head -3 \
            | awk '{printf "%s:%dM ", $2, $1/1024}')"
+    # `comm` is "dotnet" for the test host, every MSBuild node and the CLI driver
+    # alike, so it cannot say WHICH of them is holding the memory. The argv tail
+    # can: testhost.dll, MSBuild.dll and the `dotnet test` driver are distinct
+    # there. Truncated hard because argv on these processes runs to kilobytes.
+    biggest="$(ps -o rss=,args= -A 2>/dev/null \
+               | sort -rn \
+               | head -1 \
+               | cut -c1-160 \
+               | sed 's/  */ /g')"
 
     printf '[#1150 probe %s] memAvail=%sM memUsed=%sM swap=%s/%sM load=%s diskFree=%sM top=[%s]\n' \
         "$(date -u +%H:%M:%S)" "$avail" "$used" "$swap_used" "$swap_total" "$load" "$disk" "${top% }"
+    printf '[#1150 argv  %s] %s\n' "$(date -u +%H:%M:%S)" "$biggest"
 }
 
 sample_fallback() {
