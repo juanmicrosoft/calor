@@ -425,6 +425,19 @@ jobs:
         run: bash src/Calor.Compiler/scripts/download-z3.sh
 
       - name: Run project tests
+        # #1150 M2 fix leg, DISCRIMINATING EXPERIMENT (temporary — remove once read).
+        # RSS alone cannot tell a GC-policy problem from native (Z3) memory, and the
+        # leak does NOT reproduce locally: on macOS the same suite oscillates
+        # 621-2049 MB with 8 reclaim events, while CI climbs monotonically to
+        # 9579 MB with none. These two knobs only affect the MANAGED heap:
+        #   GCConserveMemory=9  - collect far more aggressively
+        #   GCRetainVM=0        - release segments back to the OS instead of caching
+        # If the curve flattens, the cause is GC policy and the production fix is a
+        # tuned version of this. If RSS still climbs, the memory is native and no GC
+        # setting can help — which sends the fix somewhere else entirely.
+        env:
+          DOTNET_GCConserveMemory: '9'
+          DOTNET_GCRetainVM: '0'
         run: |
           set -euo pipefail
           # #1150: stream resource readings INTO THIS STEP'S LOG. The post-hoc
