@@ -1,8 +1,10 @@
 # Roadmap — v0.18 "The Claim, Tested"
 
 **Date:** 2026-09-03
-**Status:** **Draft v3** — one self-conducted adversarial round (§10), five findings, two Major.
-**M1 is built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
+**Status:** **Draft v4** — one self-conducted adversarial round (§10), five findings, two Major.
+**M1 built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
+**M2's measure leg done: the kill rate is 14.7 %, and the instrument built for it could never fire**
+(§3.1 M2). **Spend authorized 2026-09-03; the ceiling is still due with M3's sizing** (§8).
 **No independent round has been run**; §10 registers the lenses that still must be applied.
 **Written against:** `691b65ec` (main after PR #1155, the 0.17.0 version bump).
 `Directory.Build.props:3` reads `0.17.0`; **v0.17.0 has been released and verified** — published
@@ -294,6 +296,43 @@ memory during the `tests (compiler)` job, and whether xUnit `maxParallelThreads`
 - *Distinctness maintained:* #965 stays a separate issue. R17:§9.3 declined to file them together
   and this release does not overturn that on the strength of a shared exit code.
 
+#### Measure leg, 2026-09-03: done. Record: `2026-09-03-issue-1150-kill-rate-measurement.md`
+
+**The rate is 14.7 % — 10 kills in 68 compiler-shard attempts**, not the 4 in #1150's body nor the
+7 in `test.yml`'s comment. The undercount is structural: the API's default job listing returns only
+the **latest** attempt, and every one of these kills passes on retry, so six of the ten are
+invisible unless you walk `run_attempt` and `/attempts/{n}/jobs`. Any future count taken from final
+run state will undercount it the same way.
+
+| date | attempts | kills | rate |
+|---|---:|---:|---:|
+| 08-28 | 6 | 0 | 0.0 % |
+| 09-01 | 18 | 5 | 27.8 % |
+| 09-02 | 31 | 5 | 16.1 % |
+| 09-03 | 13 | 0 | 0.0 % |
+
+**It is a bounded 27-hour episode** (09-01T18:50 → 09-02T21:51) with 6 clean attempts before and 13
+after — **and 13 is not a fix.** At p = 0.147 the chance of 13 clean by luck is ≈ **0.13**. Gate
+15's 20-run floor lands at ≈ 0.042, so the registered floor is about a 5 %-level check against the
+measured rate: **well chosen, unchanged, and not discharged by this.** No candidate cause is named,
+because none is supported — the episode spans `main` and five branches including a docs-only PR.
+
+**The instrument built for this could not observe it.** #1153's probe carries `if: always()` and the
+claim *"a reading taken at the moment of death"*. Exactly one kill occurred after it landed
+(`33687411104`) and its log contains **no probe output at all**: a shutdown stops the runner, so no
+later step runs. Six weeks of hypotheses, and the instrument had never once fired on the event —
+the same shape as §0.2, one layer down.
+
+*Fixed by* `scripts/runner-resource-sampler.sh`, started **inside** the test step so its readings
+stream into the live log and survive the kill. 10-second interval, set by the measurement: the logs
+show the job goes **silent** before it dies — 97.1 s, 29.1 s and ~0 s between last output and the
+shutdown — so a sub-30-second sampler is needed to land a reading inside that silence. Carries a
+`--self-test` for its `free -m` parsing, run in CI, because the sampler executes on Linux and is
+edited on macOS.
+
+*Still open:* the cause. Resource exhaustion remains the standing hypothesis and remains
+**unmeasured**, which is exactly what M2 said to fix first.
+
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
 
 W:§6 states the defect: *"six tasks that agents complete honestly cannot measure whether a compiler
@@ -537,6 +576,25 @@ What is needed, in writing, before any paid run:
 
 **Not granted by this document.** Recorded here so a later release cannot mistake the plan for the
 authorization — the mistake §0.4 shows this project already makes with adjudications it defers.
+
+### Authorization — GRANTED 2026-09-03
+
+The maintainer authorized the spend on 2026-09-03, in session. Recorded here as the durable
+record this section exists to hold.
+
+**Still outstanding, and needed before M4 runs, not before M3 is written:**
+
+1. **A ceiling.** The authorization did not name one. W:§4's $150 was frozen against the *old*
+   fixture set; M3 re-derives cost and power for the redesigned tasks, so the number to authorize
+   against does not exist yet. **The ceiling is due with M3's sizing block**, before any paid run,
+   and M3(5)'s off-ramp is written against it.
+2. **The null-result acceptance** (condition 2 above) — that an adequately powered null result is
+   the answer and gets published as one. Not separately confirmed.
+
+**M4 remains blocked on its other two conditions.** M1 is met (§3.1 M1: HIT). M2's floor is not:
+gate 15 requires 20 consecutive clean post-fix runs and §3.1 M2's measurement puts the current
+evidence at 13 clean attempts, ≈0.13 under the measured episode rate. Authorizing the spend does
+not shorten that.
 
 ---
 
