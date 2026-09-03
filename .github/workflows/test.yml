@@ -306,10 +306,21 @@ jobs:
           python3 scripts/run_mutation_gate.py --self-test
           python3 scripts/run_performance_gate.py --self-test
           python3 scripts/run_flake_gate.py --self-test
+          # #1150: the sampler runs on Linux but is edited on macOS, where its
+          # Linux branch never executes. Without this, a typo in the awk ships as
+          # a probe that runs and records nothing — the exact silent-instrument
+          # failure this issue is about.
+          bash scripts/runner-resource-sampler.sh --self-test
 
       - name: Collect component coverage
         run: |
           set -euo pipefail
+          # #1150: same streaming sampler as the compiler shard. This step is the
+          # other place the SIGTERM lands, and the post-hoc probe below could
+          # never have caught it — see the correction on that step.
+          bash scripts/runner-resource-sampler.sh 10 &
+          sampler_pid=$!
+          trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
           for project in \
             Calor.Compiler.Tests \
             Calor.Conversion.Tests \
@@ -332,7 +343,13 @@ jobs:
       # matched" and the kill. Observed on #1152 (a docs-only PR, so not a
       # compiler regression) and again on #1155 attempt 2, while the SAME commit
       # passed on two earlier runs — intermittent, and undiagnosable without a
-      # reading taken at the moment of death. `if: always()` for exactly that.
+      # reading taken at the moment of death.
+      #
+      # CORRECTED 2026-09-03 (v0.18 M2): `if: always()` cannot take that reading.
+      # A shutdown signal stops the runner, so no later step executes — verified
+      # on run 33687411104, where the sibling probe produced no output at all.
+      # This step is retained as a post-mortem for ORDINARY failures; the kill is
+      # observed by the streaming sampler started inside the step above.
       - name: Runner resource probe (#1150)
         if: always()
         run: |
@@ -410,6 +427,17 @@ jobs:
       - name: Run project tests
         run: |
           set -euo pipefail
+          # #1150: stream resource readings INTO THIS STEP'S LOG. The post-hoc
+          # probe below cannot observe a runner shutdown — verified on run
+          # 33687411104, a kill that happened AFTER that probe landed, whose log
+          # contains no probe output at all. A step cannot run once the runner
+          # service is stopping, so `if: always()` buys nothing here. Streamed
+          # samples survive, because the log is captured up to the instant of
+          # death. Its own stdout, deliberately not through `tee`, so
+          # test-output.log stays clean for the Z3 grep below.
+          bash scripts/runner-resource-sampler.sh 10 &
+          sampler_pid=$!
+          trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
           dotnet test "${{ matrix.project }}" -c Release \
             --logger "trx;LogFileName=${{ matrix.name }}.trx" \
             --results-directory artifacts/test \
@@ -429,8 +457,13 @@ jobs:
       # Guessing has cost more than measuring would. `df` and `free` before and
       # after the run cost ~1 s and settle the resource question directly: if the
       # disk is near full or memory is exhausted at the point of death, the next
-      # kill's log says so. `if: always()` because the interesting reading is the
-      # one taken when the job is about to die.
+      # kill's log says so.
+      #
+      # CORRECTED 2026-09-03 (v0.18 M2): `if: always()` does NOT run when the
+      # runner is shut down — checked on run 33687411104, where this probe
+      # emitted nothing. It is kept for ORDINARY failures, where it still reports
+      # a useful post-mortem; the instrument that actually observes a kill is the
+      # streaming sampler started inside the test step above.
       - name: Runner resource probe (#1150)
         if: always()
         run: |

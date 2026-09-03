@@ -1,8 +1,11 @@
 # Roadmap — v0.18 "The Claim, Tested"
 
 **Date:** 2026-09-03
-**Status:** **Draft v3** — one self-conducted adversarial round (§10), five findings, two Major.
-**M1 is built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
+**Status:** **Draft v4** — one self-conducted adversarial round (§10), five findings, two Major.
+**M1 built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
+**M2's measure leg done: the kill rate is 14.7 %, the instrument built for it could never fire, and
+the replacement caught a death on its first encounter — 139 MB free, swap full. Memory exhaustion is
+measured, not hypothesised** (§3.1 M2). **Spend authorized 2026-09-03; the ceiling is still due with M3's sizing** (§8).
 **No independent round has been run**; §10 registers the lenses that still must be applied.
 **Written against:** `691b65ec` (main after PR #1155, the 0.17.0 version bump).
 `Directory.Build.props:3` reads `0.17.0`; **v0.17.0 has been released and verified** — published
@@ -294,6 +297,108 @@ memory during the `tests (compiler)` job, and whether xUnit `maxParallelThreads`
 - *Distinctness maintained:* #965 stays a separate issue. R17:§9.3 declined to file them together
   and this release does not overturn that on the strength of a shared exit code.
 
+#### Measure leg, 2026-09-03: done. Record: `2026-09-03-issue-1150-kill-rate-measurement.md`
+
+**The rate is 14.7 % — 10 kills in 68 compiler-shard attempts**, not the 4 in #1150's body nor the
+7 in `test.yml`'s comment. The undercount is structural: the API's default job listing returns only
+the **latest** attempt, and every one of these kills passes on retry, so six of the ten are
+invisible unless you walk `run_attempt` and `/attempts/{n}/jobs`. Any future count taken from final
+run state will undercount it the same way.
+
+| date | attempts | kills | rate |
+|---|---:|---:|---:|
+| 08-28 | 6 | 0 | 0.0 % |
+| 09-01 | 18 | 5 | 27.8 % |
+| 09-02 | 31 | 5 | 16.1 % |
+| 09-03 | 13 | 0 | 0.0 % |
+
+**It is a bounded 27-hour episode** (09-01T18:50 → 09-02T21:51) with 6 clean attempts before and 13
+after — **and 13 is not a fix.** At p = 0.147 the chance of 13 clean by luck is ≈ **0.13**. Gate
+15's 20-run floor lands at ≈ 0.042, so the registered floor is about a 5 %-level check against the
+measured rate: **well chosen, unchanged, and not discharged by this.** No candidate cause is named,
+because none is supported — the episode spans `main` and five branches including a docs-only PR.
+
+**The instrument built for this could not observe it.** #1153's probe carries `if: always()` and the
+claim *"a reading taken at the moment of death"*. Exactly one kill occurred after it landed
+(`33687411104`) and its log contains **no probe output at all**: a shutdown stops the runner, so no
+later step runs. Six weeks of hypotheses, and the instrument had never once fired on the event —
+the same shape as §0.2, one layer down.
+
+*Fixed by* `scripts/runner-resource-sampler.sh`, started **inside** the test step so its readings
+stream into the live log and survive the kill. 10-second interval, set by the measurement: the logs
+show the job goes **silent** before it dies — 97.1 s, 29.1 s and ~0 s between last output and the
+shutdown — so a sub-30-second sampler is needed to land a reading inside that silence. Carries a
+`--self-test` for its `free -m` parsing, run in CI, because the sampler executes on Linux and is
+edited on macOS.
+
+**First readings, same day: the hypothesis is now supported, and it has a mechanism.** On the
+sampler's own PR (run `33781423935`), both instrumented steps show a **single `dotnet` test-host
+process growing monotonically to 9.6 GB** (compiler shard) and **8.7 GB** (coverage), with available
+memory falling 14.9 GB → **4.7 GB** — under a third of the runner left, and still climbing when the
+suite ended. **Swap was never touched: 0 MB of 3,071 MB on both.**
+
+That is a leak-shaped curve, not a working set: memory is retained across the run rather than
+released between test classes. And it explains the intermittency, which no earlier hypothesis did —
+the job does not need more memory than exists; it runs **close to the edge** and finishes most of
+the time, so whether it crosses depends on run-to-run variance. A 27-hour episode at 27.8 % and then
+nothing is what a near-threshold system looks like when something nudges it.
+
+*Still open, and deliberately not closed here:* **both sampled runs survived**, so this is the
+trajectory of a job that finished, not of one that was killed — the next kill's log is what the
+sampler was built for. And the mechanism of death is unshown: swap untouched plus a *shutdown
+signal* rather than a kernel OOM notice points at the **host reclaiming the runner** rather than the
+in-guest OOM killer, which is plausible and not demonstrated.
+
+**The parallelism hypothesis is refuted, and published as such.** #1150's second measurable was
+*"whether xUnit `maxParallelThreads` is the multiplier."*
+`tests/Calor.Compiler.Tests/AssemblyInfo.cs:3` already carries
+`[assembly: CollectionBehavior(DisableTestParallelization = true)]` — parallelization has been
+**off the whole time**, the suite runs sequentially in one host, and that single host still reaches
+9.6 GB. Median load over the 48 samples is **1.49**. Concurrency cannot be the multiplier because
+there is no concurrency to multiply, and turning it down further cannot help. M2 registered in
+advance that a refuted hypothesis is published as refuted; this is that.
+
+Sequential execution makes the retention **more** interesting, not less: nothing holds memory
+concurrently, so what accumulates is held across test classes by the one host.
+
+**THE MOMENT OF DEATH, OBSERVED — memory exhaustion, measured.** The sampler caught a death on its
+**first encounter with one** (run `33788456072`, `quality-ratchets` / `Collect component coverage`,
+on this measurement's own PR). This reading has never existed for #1150:
+
+```
+18:13:57   memAvail 4951M   swap    0/3071   load 1.07
+18:14:07   memAvail  535M   swap    0/3071   load 1.06   <- 4.4 GB in ONE 10 s interval
+18:15:08   memAvail  383M   swap 1023/3071   load 1.85
+18:15:48   memAvail  387M   swap 2968/3071   load 1.79
+18:16:27   memAvail  139M   swap 3071/3071   load 6.07   <- swap FULL
+18:16:33   ##[error]The operation was canceled.
+```
+
+**139 MB left of ~16 GB, swap completely full, dead six seconds later.** The hypothesis is no
+longer plausible — it is measured.
+
+*This corrects the paragraph above.* The "swap never touched" reading was drawn from two runs that
+**survived**, and it was wrong to lean on: on a run that dies, swap fills completely first. The
+escalation is ordinary and in-guest — memory fills, swap fills, death — not a host reclaiming a
+healthy runner.
+
+*It also explains the silence.* The historical kills are preceded by 29.1 s and 97.1 s of no output
+and nothing could say why. The sampler is a `sleep 10` loop, and here its last two readings are
+**39 seconds apart**: the machine was thrashing so hard a shell loop could not be scheduled. The
+silence is not a hung test — it is thrashing on full swap, and its length measures the severity.
+
+*Scope, precisely:* this death was on the coverage step and presented as `The operation was
+canceled` rather than exit 143. Whether `tests (compiler)`'s exit-143 has an identical trajectory is
+**strongly suggested and not yet caught** — same curve on both steps, same suite, same runner. The
+sampler is now on both, so the next one says.
+
+*What changed for the fix leg:* it has a target — **the test host retains memory across the run**,
+~9.6 GB of ~16 GB in the healthy case, exhausting the machine when a large allocation lands on top.
+Candidates are ordinary: release compilations and Z3 contexts between test classes, split the shard,
+or use more than one host so retention resets. **None attempted here** — measure, then fix, and
+gate 15's floor is unchanged and undischarged. Gate 15 is unaffected: no
+fix has been attempted, and its 20-run floor stands.
+
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
 
 W:§6 states the defect: *"six tasks that agents complete honestly cannot measure whether a compiler
@@ -537,6 +642,25 @@ What is needed, in writing, before any paid run:
 
 **Not granted by this document.** Recorded here so a later release cannot mistake the plan for the
 authorization — the mistake §0.4 shows this project already makes with adjudications it defers.
+
+### Authorization — GRANTED 2026-09-03
+
+The maintainer authorized the spend on 2026-09-03, in session. Recorded here as the durable
+record this section exists to hold.
+
+**Still outstanding, and needed before M4 runs, not before M3 is written:**
+
+1. **A ceiling.** The authorization did not name one. W:§4's $150 was frozen against the *old*
+   fixture set; M3 re-derives cost and power for the redesigned tasks, so the number to authorize
+   against does not exist yet. **The ceiling is due with M3's sizing block**, before any paid run,
+   and M3(5)'s off-ramp is written against it.
+2. **The null-result acceptance** (condition 2 above) — that an adequately powered null result is
+   the answer and gets published as one. Not separately confirmed.
+
+**M4 remains blocked on its other two conditions.** M1 is met (§3.1 M1: HIT). M2's floor is not:
+gate 15 requires 20 consecutive clean post-fix runs and §3.1 M2's measurement puts the current
+evidence at 13 clean attempts, ≈0.13 under the measured episode rate. Authorizing the spend does
+not shorten that.
 
 ---
 
