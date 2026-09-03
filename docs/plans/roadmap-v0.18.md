@@ -330,8 +330,27 @@ shutdown — so a sub-30-second sampler is needed to land a reading inside that 
 `--self-test` for its `free -m` parsing, run in CI, because the sampler executes on Linux and is
 edited on macOS.
 
-*Still open:* the cause. Resource exhaustion remains the standing hypothesis and remains
-**unmeasured**, which is exactly what M2 said to fix first.
+**First readings, same day: the hypothesis is now supported, and it has a mechanism.** On the
+sampler's own PR (run `33781423935`), both instrumented steps show a **single `dotnet` test-host
+process growing monotonically to 9.6 GB** (compiler shard) and **8.7 GB** (coverage), with available
+memory falling 14.9 GB → **4.7 GB** — under a third of the runner left, and still climbing when the
+suite ended. **Swap was never touched: 0 MB of 3,071 MB on both.**
+
+That is a leak-shaped curve, not a working set: memory is retained across the run rather than
+released between test classes. And it explains the intermittency, which no earlier hypothesis did —
+the job does not need more memory than exists; it runs **close to the edge** and finishes most of
+the time, so whether it crosses depends on run-to-run variance. A 27-hour episode at 27.8 % and then
+nothing is what a near-threshold system looks like when something nudges it.
+
+*Still open, and deliberately not closed here:* **both sampled runs survived**, so this is the
+trajectory of a job that finished, not of one that was killed — the next kill's log is what the
+sampler was built for. And the mechanism of death is unshown: swap untouched plus a *shutdown
+signal* rather than a kernel OOM notice points at the **host reclaiming the runner** rather than the
+in-guest OOM killer, which is plausible and not demonstrated.
+
+*What changed for the fix leg:* it now has a target — **the test host's retained memory across the
+compiler suite** — instead of a guess about quotas or platform incidents. Gate 15 is unaffected: no
+fix has been attempted, and its 20-run floor stands.
 
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
 

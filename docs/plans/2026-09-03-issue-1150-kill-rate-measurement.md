@@ -128,3 +128,58 @@ gh run list --workflow=test.yml --limit 60 --json databaseId,conclusion,headBran
 gh api "repos/juanmicrosoft/calor/actions/runs/<id>"                       # -> run_attempt
 gh api "repos/juanmicrosoft/calor/actions/runs/<id>/attempts/<n>/jobs"     # -> per-attempt conclusion
 ```
+
+---
+
+## 7. First readings from the sampler — the hypothesis is now supported, with a mechanism
+
+The sampler ran on its own PR (run `33781423935`), on both instrumented steps. It works: 48 and 74
+readings streamed into the live logs.
+
+| | `tests (compiler)` | `release-quality` coverage |
+|---|---|---|
+| samples | 48 | 74 |
+| `memAvail` start → min | 14,905M → **4,658M** | 13,626M → **4,754M** |
+| headroom left at the end | **29 %** of ~15,989M | **30 %** of ~15,989M |
+| largest process RSS | 148M → **9,579M** | 1,071M → **8,669M** |
+| top-RSS growth monotone | 39 of 47 intervals | 64 of 73 intervals |
+| **swap used** | **0M** of 3,071M | **0M** of 3,071M |
+
+Trajectory on the compiler shard, one line per minute:
+
+```
+54:59  avail 14905M  used  1084M   top provjobd:148M
+56:00  avail 13534M  used  2455M   top VBCSCompiler:1164M
+57:00  avail 11228M  used  4760M   top dotnet:2011M
+58:00  avail  9067M  used  6922M   top dotnet:4857M
+59:00  avail  7054M  used  8935M   top dotnet:6827M
+01:00  avail  5738M  used 10250M   top dotnet:8378M
+02:51  avail  4658M  used 11331M   top dotnet:9579M   <- still climbing at the end
+```
+
+**What this establishes.** A *single* `dotnet` test-host process accumulates **~9.6 GB** over
+roughly eight minutes and never plateaus. That is a leak-shaped curve, not a steady-state working
+set: memory is retained across the run rather than released between test classes. Available memory
+falls by **10.2 GB**, leaving under a third of the runner. The same shape appears independently on
+the coverage step, which runs five projects sequentially and reaches 8.7 GB.
+
+**Why this explains the intermittency**, which no previous hypothesis did. The job does not fail
+because it needs more memory than exists — it finishes, most of the time, with a couple of gigabytes
+to spare. It runs *close to the edge*, and whether it crosses depends on run-to-run variance:
+runner model, background load, how far the curve gets before the suite ends. A 27-hour episode at
+27.8 % and then nothing is exactly what a near-threshold system looks like when something nudges it.
+
+**Two things this does NOT establish, stated because the temptation is to stop here.**
+
+1. **Both sampled runs survived.** This is the trajectory of a job that *finished*, not of one that
+   was killed. It shows the shard runs near the edge; it does not show the far side. The next kill's
+   log will, and that is what the sampler was built for.
+2. **The mechanism of death is still open.** **Swap was never touched — 0M of 3,071M on both
+   steps** — and the message is `The runner has received a shutdown signal`, not a kernel OOM
+   notice. So the plausible reading is the *host* reclaiming the runner under memory pressure rather
+   than the Linux OOM killer firing inside it. Plausible, not shown.
+
+**Gate 15 is unaffected.** Its floor is 20 consecutive clean post-fix runs, and no fix has been
+attempted — this is still the measure leg. What has changed is that the fix, when it comes, has a
+target: **the test host's retained memory across the compiler suite**, not a guess about runner
+quotas or platform incidents.
