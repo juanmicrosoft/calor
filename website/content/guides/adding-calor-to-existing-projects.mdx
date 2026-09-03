@@ -5,7 +5,9 @@ order: 1
 ---
 
 
-This guide walks you through adding Calor to an existing C# project, from enabling Calor to building with mixed Calor/C# code.
+This guide takes an existing C# project from Calor setup to a small mixed
+Calor/C# pilot. You will convert one well-tested file, review what could not be
+translated, build it with the rest of the project, and inspect its impact.
 
 ---
 
@@ -13,10 +15,12 @@ This guide walks you through adding Calor to an existing C# project, from enabli
 
 Adding Calor to an existing project is a gradual process:
 
-1. **Initialize** - Enable Calor with MSBuild integration
-2. **Analyze** - Find files that benefit most from Calor's features
-3. **Write/Convert** - Create new files in Calor, convert high-scoring C# files
-4. **Build** - Calor compiles automatically with your project
+1. **Enable Calor** - Add MSBuild integration
+2. **Analyze the codebase** - Find useful pilot candidates
+3. **Add a Calor file** - Confirm the mixed project builds
+4. **Build and verify** - Exercise the normal project workflow
+5. **Convert one C# file** - Validate and review the result
+6. **Inspect project impact** - Query a converted method and its callers
 
 You don't need to convert everything at once. Calor and C# coexist seamlessly.
 
@@ -111,11 +115,11 @@ The build process:
 Based on your analysis results, convert files that score High or Critical:
 
 ```bash
-# Convert a single file
-calor convert src/Services/PaymentProcessor.cs
+# Convert, parse-check, and return the structured loss report
+calor convert src/Services/PaymentProcessor.cs --validate --format json
 
 # With benchmark comparison
-calor convert src/Services/PaymentProcessor.cs --benchmark
+calor convert src/Services/PaymentProcessor.cs --validate --benchmark
 ```
 
 For bulk conversion:
@@ -124,6 +128,71 @@ For bulk conversion:
 calor migrate ./src --dry-run  # Preview first
 calor migrate ./src            # Execute
 ```
+
+### Review the Conversion Result
+
+Conversion is not an all-or-nothing claim. The command above returns JSON;
+without `--format json`, inspect the equivalent text loss report. Review:
+
+- `losses[]` in JSON output or the text loss report,
+- every `§CSHARP` block that preserves source the converter could not express
+  natively,
+- validation diagnostics,
+- the generated C# and existing tests.
+
+When a member cannot be converted safely, `calor convert` can preserve the
+original C# inside `§CSHARP` rather than discarding the whole file. That is a
+useful migration boundary, not completed conversion. `--passthrough` widens the
+set of members eligible for preservation; `--no-fallback` asks the command to
+fail instead.
+
+The converter is continuously exercised against MediatR, Serilog, and
+FluentValidation. All 364 converted modules currently parse, but parse success
+does not mean every member is native Calor or that every call binds. The loss
+report and interop blocks remain the source of truth for each file.
+
+### Use a Migration Waiver Deliberately
+
+Converted code often calls APIs the compiler cannot resolve yet. Prefer the
+project-file permissive setting over switching effect checking off:
+
+```xml
+<PropertyGroup>
+  <CalorPermissiveEffects>true</CalorPermissiveEffects>
+</PropertyGroup>
+```
+
+This suppresses the two “cannot tell” diagnostics (`Calor0411` and
+`Calor0425`) and demotes `Calor0410` to a warning. It never waives a known
+callback mismatch (`Calor0424`) or an override/interface violation
+(`Calor0420`, `Calor0421`). Because unknown calls are assumed harmless, this
+waives the full effect guarantee. Record the setting in the pull request, and
+pass `--permissive-effects` to `calor review-packet` so the waiver prints on
+the packet's first line.
+
+---
+
+## Step 6: Build and Inspect Project Impact
+
+After the converted file builds, create or refresh the project index:
+
+```bash
+dotnet build
+calor index build .
+calor query effects ProcessPayment --in-file src/Services/PaymentProcessor.calr
+calor query callers ProcessPayment --in-file src/Services/PaymentProcessor.calr
+calor query impact ProcessPayment --in-file src/Services/PaymentProcessor.calr
+```
+
+Replace `ProcessPayment` with a converted method. Effect queries apply to
+functions, methods, constructors, and accessors, not to the containing class.
+Read any `PARTIAL` residual before relying on a caller count. For an
+agent-driven workflow, use the equivalent `calor_query` MCP tool and compile
+with `options.crossModule: true` so effects are checked across files.
+
+See
+[Project Intelligence for Agents](/docs/guides/project-intelligence-for-agents/)
+for the complete pre-edit and post-edit loop.
 
 ---
 
@@ -161,16 +230,18 @@ Write a function that validates email addresses with:
 
 ### What to Convert First
 
-1. **High-scoring files** from `calor assess`
-2. **Files with complex validation** - benefit from contracts
-3. **Files with error handling** - benefit from `Result\<T,E\>`
-4. **Files with side effects** - benefit from effect declarations
+1. **Small, well-tested files** with a clear owner and rollback path
+2. **Contract-dense code** where preconditions and postconditions add value
+3. **Pure or first-order effect-checked code** with few dynamic boundaries
+4. **High-scoring files** from `calor assess`, after the first three checks
 
 ### What to Keep in C#
 
 - Simple DTOs and record types
 - Auto-generated code (EF migrations, gRPC stubs)
 - Code using features Calor doesn't support yet
+- Reflection-heavy, dynamic, or delegate-heavy service layers for the first
+  pilot
 
 ---
 
@@ -180,3 +251,5 @@ Write a function that validates email addresses with:
 - [Contracts](/docs/syntax-reference/contracts/) - Writing preconditions and postconditions
 - [Effects](/docs/syntax-reference/effects/) - Declaring side effects
 - [calor assess](/docs/cli/analyze/) - Understanding migration scores
+- [calor convert](/docs/cli/convert/) - Conversion losses, validation, and interop rescue
+- [Project Intelligence for Agents](/docs/guides/project-intelligence-for-agents/) - Query callers and impact

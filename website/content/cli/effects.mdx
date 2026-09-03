@@ -27,3 +27,34 @@ With `--merge`, `suggest` updates `.calor-effects.json`; review that generated
 file before committing it. For package-wide inference and provenance, use
 [`calor import`](/docs/cli/import/). See the [effect-manifest guide](/docs/guides/effect-manifests-dotnet-ecosystem/)
 for resolution order and manifest format.
+
+## Suggesting Manifest Entries Safely
+
+`calor effects suggest` uses the compiler's bound type information to identify
+the receiver of an unresolved call. It does not turn a variable name into a
+type name or guess when the compiler cannot establish the type.
+
+```bash
+calor effects suggest \
+  --input src/App.calr \
+  --output .calor-effects.suggested.json \
+  --json
+```
+
+When a receiver type is known, the suggested entry uses that type even if it
+was inferred from .NET metadata rather than written in the Calor source.
+
+When the receiver cannot be typed reliably — for example an unresolved
+inferred binding, a chained access such as `a.b.Method`, or a function value —
+the command:
+
+- reports `Calor1360`,
+- omits the unsafe suggestion,
+- increments `data.untypedReceivers` in JSON output.
+
+This is deliberate: a missing manifest entry remains visible as an unresolved
+call, while a guessed entry could silently assign the wrong effects.
+
+`--merge` is additive, but generated entries still require review. Confirm the
+fully qualified member, parameter types, effect row, and provenance before
+committing `.calor-effects.json`.
