@@ -417,8 +417,23 @@ Linux. **Not yet shown**, and deliberately not assumed: the contexts at
 `ContractVerificationPass.cs:55` and `GuardDiscovery.cs:227` are already `using var`. Next
 experiment: a CI run excluding the Z3-dependent classes.
 
-*Status:* five hypotheses now discarded or refuted — quota, platform incident, parallelism, GC
-policy, managed reference leak. The fix is **not** written and gate 15's floor is undischarged.
+**Round 3 — Z3 is ELIMINATED.** Deleting the native `libz3.so` between build and test (every Z3
+entry point is gated on `IsAvailable`, so the compiler degrades to `CreateSkippedResult`; 62
+`Z3 not available` confirmations in the log) left the peak at **8.14 GB against 8.94 GB with Z3**.
+Under a gigabyte of difference on a nine-gigabyte problem. The leading candidate is gone.
+
+*Next candidate, fitting every observation:* `MetadataReference.CreateFromFile` — Roslyn's PE
+loader **memory-maps** the assembly, and mapped pages are native, counted in RSS, and not
+GC-reclaimable. `CSharpEmitter.cs` calls it at `:9391`, `:9400`, `:9656`, `:9817` and **caches
+nothing**; the only such cache in the repo is
+`Calor.LanguageServer/State/WorkspaceState.cs:163`'s `static readonly Lazy<…> PlatformReferences`.
+So every Calor→C# validation re-maps the platform assemblies. That explains native-not-managed, the
+GC's inability to touch it, the test host being the holder, the absence of a plateau, and the macOS
+non-repro. **Hypothesis, not a result.**
+
+*Status:* six hypotheses now discarded or refuted — quota, platform incident, parallelism, GC
+policy, managed reference leak, **Z3**. The fix is **not** written and gate 15's floor is
+undischarged.
 
 *Earlier framing, superseded:* it has a target — **the test host retains memory across the run**,
 ~9.6 GB of ~16 GB in the healthy case, exhausting the machine when a large allocation lands on top.

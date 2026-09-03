@@ -361,3 +361,55 @@ The fix is **not** written. Three hypotheses are now discarded or refuted (quota
 parallelism from §8) and two more are refuted here (GC policy, managed reference leak). The cause is
 narrowed to **native memory in the test host**, with Z3 as the leading and untested candidate.
 Gate 15's 20-consecutive-clean-run floor is unchanged and undischarged.
+
+## 11. Round 3 — **Z3 is eliminated**
+
+§10 named Z3 as the leading candidate and said explicitly that it was untested. It has now been
+tested, and it is **not** the allocator.
+
+*Method.* Every Z3 entry point is gated on `Z3ContextFactory.IsAvailable`
+(`ContractVerificationPass.cs:33`, `GuardDiscovery.cs:224`,
+`ContractInheritanceChecker.cs:31`, `Program.cs:938`), and `VerifyCore` carries
+`[MethodImpl(NoInlining)]` precisely so the managed Z3 types are not loaded when that is false. So
+deleting the **native** `libz3.so` between build and test bypasses every Z3 allocation while leaving
+the managed assembly in place, and the compiler degrades to `CreateSkippedResult`.
+
+*Confirmation the lever worked:* 62 occurrences of `Z3 not available` in the job log.
+
+*Result, against the prediction registered before the run:*
+
+| | with Z3 | **without Z3** |
+|---|---:|---:|
+| test-host peak RSS | 8.94 GB | **8.14 GB** |
+
+**The curve did not flatten.** Removing Z3 entirely changes the peak by under a gigabyte on a
+9-gigabyte problem. Z3 is eliminated as the cause.
+
+### The next candidate, and why it fits everything
+
+`MetadataReference.CreateFromFile` — Roslyn's PE loader. It **memory-maps** the assembly file, and
+mapped pages are native, are counted in RSS, and are not reclaimable by the GC.
+
+`CSharpEmitter.cs` calls it at `:9391`, `:9400`, `:9656` and `:9817`, and **the compiler caches
+nothing**: the only `MetadataReference` cache in the repository is
+`Calor.LanguageServer/State/WorkspaceState.cs:163`, a
+`static readonly Lazy<IReadOnlyList<MetadataReference>> PlatformReferences`. Every Calor→C#
+validation in the test suite therefore re-maps the platform assemblies from scratch.
+
+That fits every observation this issue has produced:
+
+| observation | fits? |
+|---|---|
+| native, not managed heap (round 2) | mapped file pages, outside the GC heap |
+| unreachable by GC settings (round 1) | mapped pages are not collectable |
+| not Z3 (round 3) | different subsystem entirely |
+| the **test host** specifically, not MSBuild | the tests are what run the emitter repeatedly |
+| monotone growth, no plateau | uncached, so every compilation adds a mapping |
+| does not reproduce on macOS | mapped-page accounting and reclaim differ from Linux |
+
+**Not shown.** This is a hypothesis with a good fit and a precedent in the same repository, not a
+result. The next experiment is the same shape as rounds 1-3: cache the platform references in the
+emitter, or count the mappings, and see whether the curve flattens.
+
+**Status unchanged where it matters:** the fix is not written, and gate 15's 20-consecutive-clean-run
+floor is undischarged.
