@@ -211,3 +211,65 @@ because it is already off.** `Calor.Performance.Tests` carries the same attribut
 That leaves the finding in §7 as the live one: a single sequential test host retaining ~9.6 GB
 across the run. Sequential execution makes the retention *more* interesting, not less — nothing is
 holding memory concurrently, so what accumulates is being held across test classes by the one host.
+
+---
+
+## 9. The moment of death, observed — memory exhaustion, measured
+
+The sampler caught a death on its **first encounter with one**: run `33788456072`,
+`quality-ratchets`, step `Collect component coverage`, on this measurement's own PR. This reading
+has never existed for #1150 before.
+
+```
+time      memAvail   memUsed   swapUsed   load
+18:13:57     4951M    11037M     0/3071   1.07
+18:14:07      535M    15452M     0/3071   1.06   <- 4.4 GB consumed in ONE 10 s interval
+18:14:27      507M    15481M    31/3071   1.12   <- swap starts
+18:15:08      383M    15605M  1023/3071   1.85
+18:15:38      517M    15471M  1485/3071   1.58
+18:15:48      387M    15600M  2968/3071   1.79
+18:16:27      139M    15849M  3071/3071   6.07   <- swap FULL, load spiking
+18:16:33  ##[error]The operation was canceled.
+```
+
+**The hypothesis is no longer plausible; it is measured.** Available memory reaches **139 MB** of
+~16 GB, **swap fills completely** (3,071 of 3,071 MB), load spikes to 6.07, and the job dies six
+seconds later.
+
+### This corrects §7
+
+§7 reported *"swap was never touched — 0M of 3,071M on both steps"* and read that as evidence the
+host reclaims the runner rather than the guest OOM killer firing. That inference was drawn from two
+runs that **survived**, and it was wrong to lean on. On a run that dies, swap fills completely
+first. The escalation is ordinary and in-guest: **memory fills → swap fills → death.**
+
+### It also explains the silence before the kill
+
+§3 recorded that historical kills are preceded by 29.1 s and 97.1 s of no output, and could not say
+why. This run answers it. The sampler is a `sleep 10` loop, and its last two readings are **39
+seconds apart** — 18:15:48 then 18:16:27. The machine was thrashing so hard that a shell loop could
+not be scheduled on time.
+
+So the "silence" in the historical logs is not a hung test and not a stalled runner. **It is the
+system thrashing on a full swap.** The gap length is a *measure of the thrashing*, which makes the
+97-second case the most severe of the three.
+
+### Scope, stated precisely
+
+This death was on `quality-ratchets` / `Collect component coverage` and presented as
+`The operation was canceled` rather than `shutdown signal` / exit 143. That is the step
+`test.yml`'s own comment already identified as where the kill lands. Whether the `tests (compiler)`
+exit-143 has an identical trajectory is **strongly suggested and not yet caught** — same memory
+curve on both steps in §7, same suite, same runner size — but the compiler shard has not itself been
+sampled at the moment of death. The sampler is now in place on both, so the next one will say.
+
+### Where this leaves the fix leg
+
+Cause: **the test host retains memory across the run**, reaching ~9.6 GB on a ~16 GB runner in the
+healthy case and exhausting the machine when a large allocation lands on top of it. Three earlier
+hypotheses are discarded or refuted — quotas, platform incidents, and parallelism (§8).
+
+The fix must reduce retained memory, and the candidates are ordinary: release compilations and Z3
+contexts between test classes; split the compiler shard; or run the suite in more than one host so
+retention resets. **None is attempted here.** M2's sequence is measure, then fix, and gate 15's
+20-consecutive-clean-run floor is unchanged and undischarged.

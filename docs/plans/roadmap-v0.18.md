@@ -3,8 +3,9 @@
 **Date:** 2026-09-03
 **Status:** **Draft v4** — one self-conducted adversarial round (§10), five findings, two Major.
 **M1 built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
-**M2's measure leg done: the kill rate is 14.7 %, and the instrument built for it could never fire**
-(§3.1 M2). **Spend authorized 2026-09-03; the ceiling is still due with M3's sizing** (§8).
+**M2's measure leg done: the kill rate is 14.7 %, the instrument built for it could never fire, and
+the replacement caught a death on its first encounter — 139 MB free, swap full. Memory exhaustion is
+measured, not hypothesised** (§3.1 M2). **Spend authorized 2026-09-03; the ceiling is still due with M3's sizing** (§8).
 **No independent round has been run**; §10 registers the lenses that still must be applied.
 **Written against:** `691b65ec` (main after PR #1155, the 0.17.0 version bump).
 `Directory.Build.props:3` reads `0.17.0`; **v0.17.0 has been released and verified** — published
@@ -360,8 +361,42 @@ advance that a refuted hypothesis is published as refuted; this is that.
 Sequential execution makes the retention **more** interesting, not less: nothing holds memory
 concurrently, so what accumulates is held across test classes by the one host.
 
-*What changed for the fix leg:* it now has a target — **the test host's retained memory across the
-compiler suite** — instead of a guess about quotas, incidents, or parallelism. Gate 15 is unaffected: no
+**THE MOMENT OF DEATH, OBSERVED — memory exhaustion, measured.** The sampler caught a death on its
+**first encounter with one** (run `33788456072`, `quality-ratchets` / `Collect component coverage`,
+on this measurement's own PR). This reading has never existed for #1150:
+
+```
+18:13:57   memAvail 4951M   swap    0/3071   load 1.07
+18:14:07   memAvail  535M   swap    0/3071   load 1.06   <- 4.4 GB in ONE 10 s interval
+18:15:08   memAvail  383M   swap 1023/3071   load 1.85
+18:15:48   memAvail  387M   swap 2968/3071   load 1.79
+18:16:27   memAvail  139M   swap 3071/3071   load 6.07   <- swap FULL
+18:16:33   ##[error]The operation was canceled.
+```
+
+**139 MB left of ~16 GB, swap completely full, dead six seconds later.** The hypothesis is no
+longer plausible — it is measured.
+
+*This corrects the paragraph above.* The "swap never touched" reading was drawn from two runs that
+**survived**, and it was wrong to lean on: on a run that dies, swap fills completely first. The
+escalation is ordinary and in-guest — memory fills, swap fills, death — not a host reclaiming a
+healthy runner.
+
+*It also explains the silence.* The historical kills are preceded by 29.1 s and 97.1 s of no output
+and nothing could say why. The sampler is a `sleep 10` loop, and here its last two readings are
+**39 seconds apart**: the machine was thrashing so hard a shell loop could not be scheduled. The
+silence is not a hung test — it is thrashing on full swap, and its length measures the severity.
+
+*Scope, precisely:* this death was on the coverage step and presented as `The operation was
+canceled` rather than exit 143. Whether `tests (compiler)`'s exit-143 has an identical trajectory is
+**strongly suggested and not yet caught** — same curve on both steps, same suite, same runner. The
+sampler is now on both, so the next one says.
+
+*What changed for the fix leg:* it has a target — **the test host retains memory across the run**,
+~9.6 GB of ~16 GB in the healthy case, exhausting the machine when a large allocation lands on top.
+Candidates are ordinary: release compilations and Z3 contexts between test classes, split the shard,
+or use more than one host so retention resets. **None attempted here** — measure, then fix, and
+gate 15's floor is unchanged and undischarged. Gate 15 is unaffected: no
 fix has been attempted, and its 20-run floor stands.
 
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
