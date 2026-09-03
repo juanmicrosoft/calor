@@ -436,8 +436,17 @@ jobs:
         # tuned version of this. If RSS still climbs, the memory is native and no GC
         # setting can help — which sends the fix somewhere else entirely.
         env:
-          DOTNET_GCConserveMemory: '9'
-          DOTNET_GCRetainVM: '0'
+          # Round 2. Round 1 (GCConserveMemory=9 + GCRetainVM=0) moved NOTHING —
+          # peak 11954M vs a control 11331M — so the growth is not managed-heap
+          # policy. Two candidates remain and this separates them cleanly:
+          #   managed LIVE objects (a reference leak) -> the managed heap must
+          #     exceed the cap, so the host throws OutOfMemoryException and the
+          #     tests FAIL. That failure is the informative result, not a problem.
+          #   native memory (Z3 et al.) -> the cap is never reached by the managed
+          #     heap, tests PASS, and the sampler still shows RSS climbing past it.
+          # 0xC0000000 = 3 GiB, comfortably above the ~2 GB the identical suite
+          # peaks at locally and far below the 7.9 GB the host reaches here.
+          DOTNET_GCHeapHardLimit: '0xC0000000'
         run: |
           set -euo pipefail
           # #1150: stream resource readings INTO THIS STEP'S LOG. The post-hoc
