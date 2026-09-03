@@ -348,11 +348,27 @@ public sealed class RowEscapeTableTests
               §R §C{RunTwice} §A RowTableModule.Beat §/C
         """));
 
-        // Recorded, not asserted. The test output is the record.
-        Assert.True(true,
-            $"DISCLOSURE 1 (inherited field, unqualified): {Describe(inheritedField)}\n"
-            + $"DISCLOSURE 2 (module-qualified module function inside a class body): "
-            + $"{Describe(moduleQualifiedInClass)}");
+        // Their CHARGE VERDICT is deliberately not asserted — that is what "never
+        // scored" means. What IS asserted is that both fixtures are well-formed, so
+        // this test cannot rot into a pair of typos that record nothing. An
+        // `Assert.True(true, ...)` would have been vacuous; this is the weakest
+        // assertion that still has content.
+        foreach (var (label, result) in new[]
+        {
+            ("inherited field, unqualified", inheritedField),
+            ("module-qualified module function inside a class body", moduleQualifiedInClass),
+        })
+        {
+            var malformed = result.Diagnostics
+                .Where(d => d.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Error)
+                .Where(d => string.Compare(d.Code, "Calor0300", StringComparison.Ordinal) < 0)
+                .ToList();
+
+            Assert.True(
+                malformed.Count == 0,
+                $"DISCLOSURE fixture '{label}' is malformed, so it records nothing: "
+                + $"{string.Join(", ", malformed.Select(d => $"{d.Code} {d.Message}"))}");
+        }
     }
 
     /// <summary>
@@ -362,10 +378,6 @@ public sealed class RowEscapeTableTests
     /// these are the arm-B records for the six committed <c>unregistered-*</c> roles,
     /// transcribed here so an edit to that file fails a test rather than quietly
     /// moving the baseline.
-    /// <para>
-    /// Skips on a tree where the bench corpus is not present, in the manner of
-    /// <c>BinderIncompleteRatchetTests</c>.
-    /// </para>
     /// </summary>
     [Fact]
     public void FrozenBeforeState_IsUnedited()
@@ -384,10 +396,14 @@ public sealed class RowEscapeTableTests
             ["W-006-map-doubler/unregistered-property-backed-escape"] = "0|Calor0425/warning*3",
         };
 
+        // No skip guard: bench/phase0-agent-native is tracked in-repo, not a
+        // submodule (.gitmodules pins only bench/corpus/*), so this file is present
+        // in every checkout. A missing file is a real failure, not a reason to skip —
+        // a skipped baseline guard is a baseline that can move unobserved.
         var path = FindBenchFile("pairs/ppw-seeded-compiles.json");
-        Skip.If(path is null, "bench/phase0-agent-native not present in this tree");
+        Assert.NotNull(path);
 
-        using var doc = JsonDocument.Parse(File.ReadAllText(path!));
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
         var actual = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var record in doc.RootElement.GetProperty("compiles").EnumerateArray())
