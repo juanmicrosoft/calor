@@ -221,13 +221,30 @@ was measured in, per `ppw-seeded-compiles.json`'s own `invocation` field.
 | 7 controls | exit 1, `Calor0410` (shape 7 also `Calor0411`) | **unchanged** |
 | 5 escapes | **exit 0, `Calor0425`** — nothing charged | **exit 1, `Calor0410`** |
 
-**Gate 14's discrimination pin is satisfied with a real compiler, not a synthetic revert.** The
-pre-S1 build at `0defc5dc` — the parent of S1's merge — **reproduces #1136's frozen table exactly**:
-the same seven charged, including shape 7's `Calor0410`+`Calor0411` signature, and the same five at
-exit 0 with `Calor0425`. That is what establishes the twelve fixtures are not vacuous. They
-reproduce the frozen before-state on an independently built compiler from before the fix.
+**Gate 14 wants two different discriminations, and this instrument supplies one of them alone.**
+
+*(1) Pre/post — satisfied here, with a real compiler instead of a synthetic revert.* The pre-S1
+build at `0defc5dc` — the parent of S1's merge — **reproduces #1136's frozen table exactly**: the
+same seven charged, including shape 7's `Calor0410`+`Calor0411` signature, and the same five at exit
+0 with `Calor0425`. That is what establishes the twelve fixtures are not vacuous — they reproduce
+the frozen before-state on an independently built compiler from before the fix.
+
+*(2) The two halves of S1 — **not** satisfied by this file alone, and claiming otherwise would be an
+overclaim.* Gate 14 also asks that reverting S1(a) turn the `§PROP` row red while the field shapes
+stay green, and reverting S1(b) turn the alias / other-instance / method-group shapes red. **Shape 9
+is a rowless `§PROP`** — faithful to the committed fixture and to how v0.15 measured it, since a row
+on a `§PROP` was a parse error then — so it is closed by S1(b) fail-closed, and reverting S1(a)
+would leave it green. S1(a) is discriminated instead by `StrictnessBatchTests.cs:2089` and `:2117`,
+which write `§PROP{…} §E{cw}`. **Gate 14's two-halves pin is satisfied jointly by this table and
+those two tests.**
 
 Both commit stamps are **reachable on `main`**, applying #1159 rather than repeating it.
+
+**One limitation, disclosed.** The committed test calls the in-process API
+(`TestHarness.Compile`); this adjudication's ledger drives the **CLI**, which is what #1136's table
+was measured with. They agree on all twelve — but the test in CI would **not** catch a CLI-only
+regression. That is the gap #1116 names (gate 3's CLI-process leg, unbuilt), and it is recorded
+rather than papered over.
 
 **Three process findings, recorded because two of them nearly produced a false verdict** (full text
 in the ledger's `processFindings`):

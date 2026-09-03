@@ -25,6 +25,25 @@ namespace Calor.Enforcement.Tests;
 /// prevent — do not promote a disclosure into the table.
 /// </para>
 /// <para>
+/// <b>What this file does NOT discriminate.</b> Gate 14 asks that reverting S1(a)
+/// turn the <c>§PROP</c> row red while the field shapes stay green, and reverting
+/// S1(b) turn the alias / other-instance / method-group shapes red. <b>Shape 9 here
+/// is a ROWLESS <c>§PROP</c></b> — faithful to the committed fixture and to how
+/// v0.15.0 measured it, since a row on a <c>§PROP</c> was a parse error then — so it
+/// is closed by S1(b) fail-closed, and reverting S1(a) would leave it green. S1(a)
+/// is discriminated by <c>StrictnessBatchTests.PropertyRow_IsParsedAndHonoured</c>
+/// and <c>PropertyRow_IsResolved_NotMerelyParsed</c>, which write
+/// <c>§PROP{…} §E{cw}</c>. Gate 14's two-halves pin is satisfied <b>jointly</b> by
+/// this table and those two tests — not by this table alone.
+/// </para>
+/// <para>
+/// <b>Limitation.</b> This file compiles through the in-process API
+/// (<see cref="TestHarness.Compile"/>, which sets <c>UnsafeTranspileOnly</c>), while
+/// #1136's table and the adjudication ledger were measured through the <b>CLI</b>.
+/// They agree on all twelve, but this test would not catch a CLI-only regression —
+/// the gap issue #1116 names (gate 3's CLI-process leg is unbuilt).
+/// </para>
+/// <para>
 /// <b>Freeze.</b> #1136's table is a pre-registered confound under annex A-1.12 and
 /// may not be edited by this release. It is committed in-repo in two places besides
 /// the issue: <c>pairs/W-001-middleware-stage/pair.json</c> and

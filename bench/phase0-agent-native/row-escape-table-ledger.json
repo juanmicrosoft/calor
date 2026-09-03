@@ -31,7 +31,7 @@
     "escapesNowCharged": 5,
     "stillSilent": 0
   },
-  "discriminationPin": "Gate 14 asks that reverting either half of S1 turn a DIFFERENT set of rows red. Satisfied here with a real compiler instead of a synthetic revert: the pre-S1 build at 0defc5dc reproduces #1136's frozen table EXACTLY — the same 7 charged (shape 7 with its Calor0410+Calor0411 signature) and the same 5 at exit 0 with Calor0425. That is what establishes the twelve fixtures are not vacuous: they reproduce the frozen before-state on an independently built compiler from before the fix.",
+  "discriminationPin": "TWO different discriminations are wanted, and this instrument supplies one of them alone.\n(1) PRE/POST — satisfied by this ledger, with a real compiler instead of a synthetic revert: the pre-S1 build at 0defc5dc reproduces #1136's frozen table EXACTLY — the same 7 charged (shape 7 with its Calor0410+Calor0411 signature) and the same 5 at exit 0 with Calor0425. That is what establishes the twelve fixtures are not vacuous: they reproduce the frozen before-state on an independently built compiler from before the fix.\n(2) THE TWO HALVES OF S1 — gate 14 also wants 'revert S1(a) and the §PROP row goes red while the field shapes stay green; revert S1(b) and the alias / other-instance / method-group shapes go red.' This file does NOT supply that half on its own, and saying otherwise would be an overclaim. Shape 9 is a ROWLESS §PROP — faithful to the committed fixture and to how v0.15 measured it, since a row on a §PROP was a parse error then — so it is closed by S1(b) fail-closed, not by S1(a). Reverting S1(a) would leave shape 9 green. S1(a) is discriminated instead by StrictnessBatchTests.cs:2089 (PropertyRow_IsParsedAndHonoured) and :2117 (PropertyRow_IsResolved_NotMerelyParsed), both of which write §PROP{...} §E{cw}. Gate 14's two-halves pin is therefore satisfied JOINTLY by this table and those two tests — not by this table alone.",
   "disclosures": "The two shapes #1136 carries as disclosures (inherited field unqualified; module-qualified module function from inside a class body) are reported by Disclosure_ShapesAreReported_NeverScored and are NOT in the denominator of 12.",
   "rows": [
     {
@@ -324,5 +324,9 @@
       "finding": "The first CLI invocation measured the CLI's own help text",
       "detail": "`calor build <file>` is not a subcommand; the run printed usage, and grepping it for Calor codes matched the option descriptions, yielding an identical fake diagnostic set for all twelve rows. The real invocation is `-i <src> -o <out>`, which is what ppw-seeded-compiles.json's own `invocation` field records."
     }
+  ],
+  "limitations": [
+    "The CI instrument and this ledger use DIFFERENT entry points. RowEscapeTableTests calls the in-process API (TestHarness.Compile, which sets UnsafeTranspileOnly); this ledger drives the calor CLI, which is what #1136's table was measured with. They agree on all twelve here, but the committed test would NOT catch a CLI-only regression. That is exactly the gap issue #1116 names — gate 3's CLI-process leg is unbuilt — and it is disclosed rather than papered over.",
+    "Shape 9 exercises S1(b), not S1(a); see discriminationPin (2)."
   ]
 }
