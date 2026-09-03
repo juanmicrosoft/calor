@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Diagnostics;
+using Xunit;
 
 namespace Calor.Enforcement.Tests;
 
@@ -235,6 +236,27 @@ public sealed class RowEscapeTableTests
     {
         var result = TestHarness.Compile(shape.Source);
 
+        // (a) The fixture must be WELL-FORMED. Without this, the whole theory is
+        // vacuous: a fixture with a typo produces a parse or bind error, HasErrors
+        // goes true, "did not launder silently" holds, and the row passes green
+        // while measuring nothing at all. Codes below Calor0300 are lexer (0001-0099),
+        // parser (0100-0199) and semantic/binding (0200-0299) — none of which this
+        // table is about.
+        var malformed = result.Diagnostics
+            .Where(d => d.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Error)
+            .Where(d => string.Compare(d.Code, "Calor0300", StringComparison.Ordinal) < 0)
+            .ToList();
+
+        Assert.True(
+            malformed.Count == 0,
+            $"Shape {shape.Row} ({shape.Name}) is MALFORMED, so it measures nothing: "
+            + $"{string.Join(", ", malformed.Select(d => $"{d.Code} {d.Message}"))}");
+
+        // (b) The scored claim: charged, and not silently laundering.
+        Assert.Contains(
+            result.Diagnostics,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+
         var launderedSilently =
             !result.HasErrors
             && result.Diagnostics.Any(d => d.Code == DiagnosticCode.EffectRowUnknown);
@@ -379,7 +401,9 @@ public sealed class RowEscapeTableTests
             actual[key] = $"{record.GetProperty("exitCode").GetInt32()}|{multiset}";
         }
 
-        Assert.Equal(expected.OrderBy(kv => kv.Key, StringComparer.Ordinal), actual);
+        Assert.Equal(
+            expected.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToList(),
+            actual.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToList());
     }
 
     private static string Describe(Calor.Compiler.CompilationResult result)

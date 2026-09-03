@@ -1,9 +1,9 @@
 # Roadmap — v0.18 "The Claim, Tested"
 
 **Date:** 2026-09-03
-**Status:** **Draft v2** — one self-conducted adversarial round (§10), five findings, two Major,
-both found by checking a citation rather than trusting it. **No independent round has been run**;
-§10 registers the lenses that still must be applied.
+**Status:** **Draft v3** — one self-conducted adversarial round (§10), five findings, two Major.
+**M1 is built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
+**No independent round has been run**; §10 registers the lenses that still must be applied.
 **Written against:** `691b65ec` (main after PR #1155, the 0.17.0 version bump).
 `Directory.Build.props:3` reads `0.17.0`; **v0.17.0 has been released and verified** — published
 2026-09-03T02:22Z as the project's first non-prerelease, `Verify Release (installed tool)` green
@@ -209,6 +209,53 @@ before-state.
 *Cost:* a `dotnet test` run. Zero agent runs, zero usage allowance. Any reviewer can reproduce it
 on a laptop.
 
+#### Outcome, 2026-09-03: **HIT — twelve of twelve**
+
+*Instrument:* `tests/Calor.Enforcement.Tests/RowEscapeTableTests.cs`.
+*Record:* `bench/phase0-agent-native/row-escape-table-ledger.json`.
+*Invocation:* `dotnet <calor.dll> -i <src> -o <out>`, no flags — the configuration #1136's table
+was measured in, per `ppw-seeded-compiles.json`'s own `invocation` field.
+
+| | pre-S1 (`0defc5dc`) | post-S1 (`1609b695`) |
+|---|---|---|
+| 7 controls | exit 1, `Calor0410` (shape 7 also `Calor0411`) | **unchanged** |
+| 5 escapes | **exit 0, `Calor0425`** — nothing charged | **exit 1, `Calor0410`** |
+
+**Gate 14's discrimination pin is satisfied with a real compiler, not a synthetic revert.** The
+pre-S1 build at `0defc5dc` — the parent of S1's merge — **reproduces #1136's frozen table exactly**:
+the same seven charged, including shape 7's `Calor0410`+`Calor0411` signature, and the same five at
+exit 0 with `Calor0425`. That is what establishes the twelve fixtures are not vacuous. They
+reproduce the frozen before-state on an independently built compiler from before the fix.
+
+Both commit stamps are **reachable on `main`**, applying #1159 rather than repeating it.
+
+**Three process findings, recorded because two of them nearly produced a false verdict** (full text
+in the ledger's `processFindings`):
+
+1. **The instrument was vacuous as first written.** The scored assertion was `!(no errors &&
+   Calor0425)` — so a fixture with a typo produces a parse error, `HasErrors` goes true, and the row
+   passes **green while measuring nothing**. Closed by also asserting no error below `Calor0300` and
+   that `Calor0410` is present. The per-row expected verdicts did not change; the check got
+   stricter, not looser.
+2. **A stale Release binary produced a false MISS.** The first CLI run used a `bin/Release` artifact
+   from Sep 1 18:17; S1 landed Sep 2 19:07. That pre-S1 binary reported five shapes still escaping —
+   a MISS that would have blocked M4 for no reason. Caught by checking the artifact's timestamp
+   against the fix's merge date.
+3. **The first CLI invocation measured the CLI's own help text.** `calor build <file>` is not a
+   subcommand; the run printed usage, and grepping that for `Calor` codes matched the option
+   descriptions, producing an identical fake diagnostic set for all twelve rows.
+
+**The name collision is worse than round 1 recorded** (§4.1). `agent-native-gates.md:340` registers
+**PP-S1** as *"converter fidelity is movable"*, and A-1.7 adjudicated **that** PP-S1 = **MISS** with
+the real-scale venue **RETIRED** (lines 1251, 1257). So grepping the repository's registration
+record for `PP-S1` answers *MISS, venue retired* — the opposite of this result, for a different
+proof point of the same name. PP-S1(rows) is **not** added to the A-annex: that annex governs
+agent-native experiments with spend and power and its PP rows are byte-frozen by
+`scripts/check-annex-freeze.py`, while this proof point runs in `dotnet test` with zero agent runs.
+
+**M4's first condition is met.** The other two — the spend authorization (§8) and M2's floor —
+are untouched by this result.
+
 *A correction this MUST also owes.* v0.17.0's notes reported three gates and omitted these two.
 0.18's notes state plainly that gate 14 and PP-S1(rows) went unevaluated in 0.17 and report them now. The
 0.17 release is not re-cut; the record is corrected forward, the way R17 printed the old gate 6
@@ -336,8 +383,11 @@ lambda; gate 3's CLI-process and `Calor.Sdk` legs (#1116); gate 5 leg (b) (R15:9
 **Named `PP-S1(rows)` throughout, because `PP-S1` is ambiguous in this repository's record**
 (round 1 finding 2). `substrate-plan-v0.12.md` uses **PP-S1** for a different proof point —
 *"converter fidelity is movable"* — and adjudicates it with its own hit/miss table and decision
-matrix (§167, §197-200). Anyone grepping `PP-S1` for evidence that *this* proof point was
-adjudicated finds that history instead. Given §0.2 is a gap that survived five rounds, a naming
+matrix (§167, §197-200). **The A-annex carries it too**, and that is the sharper problem:
+`agent-native-gates.md:340` registers `PP-S1` under that meaning, and A-1.7 adjudicated it
+**MISS**, with the real-scale venue **RETIRED** (lines 1251, 1257). The annex is the repository's
+registration record — so grepping it for `PP-S1` returns *MISS, venue retired*, which is the
+**opposite** of the rows proof point's actual outcome (§3.1 M1: HIT). Given §0.2 is a gap that survived five rounds, a naming
 collision that manufactures false evidence of adjudication is not cosmetic. The v0.12 name is
 frozen prose in a closed plan and is **not** renamed retrospectively; this release disambiguates on
 its own side and carries the qualified name into the release notes.
@@ -347,6 +397,8 @@ refused, and none produces an uncharged `warning Calor0425` at exit 0.
 *Instrument, denominator, freeze, discrimination, outcome map:* §3.1 M1, unchanged from R17:§4.2.
 *Why it is re-registered rather than inherited:* R17 registered it and shipped without it. A proof
 point carried forward silently is how it was missed the first time.
+***Outcome, 2026-09-03: HIT — twelve of twelve.*** Seven controls unchanged, five escapes now
+charged, zero still silent. Full record and the discrimination pin in §3.1 M1.
 
 ### 4.2 PP-W-rows (redesigned) — CONDITIONAL
 
