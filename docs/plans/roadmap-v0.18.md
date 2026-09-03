@@ -392,7 +392,35 @@ canceled` rather than exit 143. Whether `tests (compiler)`'s exit-143 has an ide
 **strongly suggested and not yet caught** — same curve on both steps, same suite, same runner. The
 sampler is now on both, so the next one says.
 
-*What changed for the fix leg:* it has a target — **the test host retains memory across the run**,
+**FIX LEG, 2026-09-03: the memory is NATIVE, not managed — two decisive experiments.** The obvious
+step was to cut the host's memory; it was not taken, because the leak **does not reproduce locally**
+(macOS: peak 2,049 MB, 8 reclaim events, oscillating — CI: 9,579 MB, ~0 reclaim, monotonic). That is
+a qualitative difference, and it rules out "a test class leaks".
+
+*Which process:* the sampler now prints the largest process's argv. It is the **test host**
+(`dotnet exec --runtimeconfig .../Calor.Compiler.Tests…`, 3.96 → 7.91 GB), not MSBuild or
+VBCSCompiler.
+
+*Round 1 — GC policy?* **No.** `GCConserveMemory=9` + `GCRetainVM=0` gave peak 11,954M against a
+control 11,331M — marginally **worse**, not flatter.
+
+*Round 2 — native, or a managed reference leak?* Round 1 could not tell these apart, since
+`GCConserveMemory` cannot collect what is still rooted. `GCHeapHardLimit=0xC0000000` (3 GiB) does,
+and the prediction was registered before the run: a reference leak must exceed the cap and throw
+`OutOfMemoryException`; native memory never touches it. **The tests passed, zero OOM, and RSS
+reached 8.94 GB — three times the cap.** The managed heap fits in 3 GiB. **The ~9 GB is native.**
+
+*What that leaves:* the only large native component here is **Z3** (`Microsoft.Z3` over native
+`libz3`), invisible to the GC and counted in RSS. It also explains the local non-repro that nothing
+else did — `CLAUDE.md` records a **custom ARM64 Z3 build** on macOS against standard binaries on
+Linux. **Not yet shown**, and deliberately not assumed: the contexts at
+`ContractVerificationPass.cs:55` and `GuardDiscovery.cs:227` are already `using var`. Next
+experiment: a CI run excluding the Z3-dependent classes.
+
+*Status:* five hypotheses now discarded or refuted — quota, platform incident, parallelism, GC
+policy, managed reference leak. The fix is **not** written and gate 15's floor is undischarged.
+
+*Earlier framing, superseded:* it has a target — **the test host retains memory across the run**,
 ~9.6 GB of ~16 GB in the healthy case, exhausting the machine when a large allocation lands on top.
 Candidates are ordinary: release compilations and Z3 contexts between test classes, split the shard,
 or use more than one host so retention resets. **None attempted here** — measure, then fix, and
