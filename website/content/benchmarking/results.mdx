@@ -32,6 +32,41 @@ composite favors Calor.
 
 ---
 
+## Agent Proof Points
+
+The static dashboard does not measure effect rows or live coding-agent
+behavior. Those questions use separate, pre-registered agent studies.
+
+### Effect-row toolchain cost
+
+The 0.15 study ran four ordinary programming tasks five times on each of two
+compiler configurations, for 40 green runs. Agents used roughly 18% more output
+tokens with the stricter compiler. The registered result was **HIT**, meaning
+the study did not detect the large slowdown its rule was designed to catch. It
+did not prove zero cost, and the tasks contained no callbacks, so it did not
+measure the feature's safety benefit.
+
+### Effect-row safety benefit
+
+The 0.16 practice study used six callback-heavy tasks designed to catch a
+hidden console effect. Across 28 usable runs, neither compiler arm produced the
+target hidden-effect behavior. The practice data estimated that the full study
+would need nine runs per task and compiler, while the registered budget could
+fund three, giving about 48% power at the registered effect size.
+
+The recorded verdict is therefore **underpowered: the claim is neither
+supported nor refuted**. The stricter compiler cost about 12% more work to
+reach a green build on these tasks, below the registered “noticeable” threshold,
+but that is descriptive practice-round evidence rather than a product claim.
+
+Keep the three statements separate:
+
+- The 1.32x dashboard is a deterministic source/structure comparison.
+- The 0.15 proof point did not detect a large toolchain tax.
+- The 0.16 proof point did not have enough evidence to judge the safety benefit.
+
+---
+
 ## When to Use Calor
 
 Based on results, Calor is most valuable when:

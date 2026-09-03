@@ -97,7 +97,30 @@ consume that sidecar as trusted input.
 
 See [calor import](/docs/cli/import/) for all options.
 
-## 4. Review the Unproven Remainder
+## 4. Query the Project Before Editing
+
+Before editing an established module, ask the project index what the edit can
+affect:
+
+```bash
+calor query callers ClampToCap
+calor query effects ClampToCap
+calor query impact ClampToCap
+```
+
+For a proposed effect change, include the new row:
+
+```bash
+calor query impact ClampToCap --effects --row "cw"
+```
+
+Read any `PARTIAL` residual before trusting the count. MCP clients can ask the
+same questions with `calor_query`, then compile the result with
+`options.crossModule: true`. See
+[Project Intelligence for Agents](/docs/guides/project-intelligence-for-agents/)
+for the complete workflow.
+
+## 5. Review the Unproven Remainder
 
 ```bash
 calor review-packet src/Pricing.calr --baseline-ref origin/main
@@ -112,7 +135,7 @@ envelope.
 The claim is intentionally narrow: `proven` means proven under the modeled
 semantics. Everything else remains visible with its reason.
 
-## 5. Keep the Eject Path Open
+## 6. Keep the Eject Path Open
 
 `calor convert Module.calr` produces standalone C#. The eject suite
 compiles and executes the result to pin these degradation rules:

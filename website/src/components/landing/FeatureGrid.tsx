@@ -31,12 +31,12 @@ const features = [
     href: '/docs/philosophy/stable-identifiers/',
   },
   {
-    name: 'Structure AI Can Navigate',
+    name: 'Structure Agents Can Query',
     description:
-      'Every block opens with a §-prefixed tag. AI tools find any function, module, or loop at a glance—indentation defines scope, just like Python.',
+      'The project index answers callers, callees, effect rows, and change impact. Agents and humans read the same persistent model before editing.',
     icon: Layers,
-    code: '§M{m001:App}\n  §F{f001:Main:pub} () -> void\n    §P "hello"',
-    href: '/docs/syntax-reference/',
+    code: 'calor query impact Save\n  --effects --row fs:w',
+    href: '/docs/guides/project-intelligence-for-agents/',
   },
 ];
 

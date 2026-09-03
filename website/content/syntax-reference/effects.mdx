@@ -50,6 +50,127 @@ Place the effect declaration after the output type:
   // body
 ```
 
+**The line matters.** A `§E{...}` on its **own line**, as above, is the
+function's own effect declaration. A `§E{...}` written on the **same line** as
+a function type belongs to that value instead.
+
+---
+
+## Effect Rows for Callbacks
+
+When a function accepts another function — a callback, handler, predicate, or
+transform — an effect row says what that callback is allowed to do:
+
+```calor
+§M{m001:Callbacks}
+  §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
+    §E{cw}
+    §R §C{transform} §A value §/C
+```
+
+The `§E{cw}` beside `transform` belongs to the callback type. The `§E{cw}` on
+its own line belongs to `Apply`. Calling `transform` charges its `cw` effect to
+`Apply`, so both rows are required here.
+
+Rows are part of the type. `Func<i32,i32> §E{}` and
+`Func<i32,i32> §E{cw}` have the same inputs and output, but different effect
+permissions.
+
+### Where a row can appear
+
+```calor
+§M{m001:Rows}
+  §F{f001:Use:pub} (Func<i32,i32>:callback §E{cw}, i32:value) -> Func<i32> §E{cw}
+    §E{cw}
+    §B{saved:Func<i32,i32>} §E{cw} callback
+    §B{local} §LAM{lam1:x:i32} §E{cw}
+      §P x
+      §R x
+    §/LAM
+    §R callback
+
+  §DEL{d001:Handler}
+    §I{i32:value}
+    §O{void}
+    §E{cw}
+
+  §CL{c001:Callbacks:pub}
+    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §PROP{p001:Current:Action<i32>:pub:get,set} §E{cw}
+```
+
+Rows are supported on:
+
+- function and method declarations,
+- lambdas and delegates,
+- parameters in tag or inline signature form,
+- return types in tag or arrow form,
+- bindings, fields, and properties.
+
+A type carries one row. Put multiple permissions in that row
+(`§E{cw,fs:w}`), rather than writing multiple `§E` tags.
+
+### Effect placeholders
+
+A higher-order helper often needs to have exactly the effects of the callback
+passed to it. Declare an effect placeholder with `<eff name>` and use it in the
+callback and function rows:
+
+```calor
+§M{m001:HigherOrder}
+  §F{f001:Twice:pub}<eff e> (Func<i32,i32>:callback §E{e}, i32:value) -> i32
+    §E{e}
+    §B{first:i32} §C{callback} §A value §/C
+    §R §C{callback} §A first §/C
+```
+
+`Twice` is pure when `callback` is pure and carries `cw` when the callback may
+write to the console. The compiler resolves `e` at each call site.
+
+Effect placeholders can be declared on functions and methods, including
+interface methods. They can be used in that declaration's own row and its
+parameter rows. A placeholder cannot use the name of a real effect code such
+as `cw`.
+
+### What the compiler checks
+
+The compiler checks a row whenever a function value moves:
+
+- binding or reassigning it,
+- passing it as an argument,
+- returning it,
+- overriding a method,
+- implementing an interface member.
+
+A callback whose effects exceed the destination row is `Calor0424`, always an
+error. If one side has no row and the compiler cannot decide, it reports
+`Calor0425`; strict mode promotes that warning and permissive mode waives it.
+
+Lambda rows are promises too. If a lambda body does more than its row allows,
+the compiler reports the mismatch. If the lambda has no written row, the
+compiler infers one from the body when it can.
+
+### Common row mistakes
+
+`Calor0405` means a row is attached to something that cannot carry one, is on
+the wrong line, or duplicates another row:
+
+```calor
+§FLD{i32:count:pri}
+§E{cw} // Wrong: count is not a function value, and this is a separate line.
+```
+
+`Calor0404` means an effect placeholder is declared or used somewhere it is
+not allowed, or is named after a real effect code.
+
+### Current limitations
+
+Effect rows do not yet fully verify callbacks reached through reflection or
+`dynamic`, event-handler `+=`, or delegates returned by .NET libraries.
+Unresolved cases remain visible as warnings or assumptions rather than being
+treated as verified. Async rows remain limited; consult the diagnostics and
+the [project index](/docs/cli/query/) before relying on a higher-order boundary.
+
 ---
 
 ## Effect Codes

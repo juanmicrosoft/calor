@@ -1,0 +1,120 @@
+---
+title: "Project Intelligence for Agents"
+section: "guides"
+order: 2
+description: "Use the project index and MCP query tool to inspect callers, effects, and change impact before editing"
+---
+
+Calor's project index gives coding agents a shared, persistent view of a
+project. Before changing a declaration, an agent can ask who calls it, what it
+calls, what its body actually does, and which callers would stop fitting if its
+effect row changed.
+
+The command line and MCP server read the same index and use the same query
+implementation. A human and an agent therefore get the same answer.
+
+## 1. Build or Refresh the Index
+
+```bash
+calor index build .
+calor index status .
+```
+
+The index is stored under `obj/calor/`. Normal `calor query` calls rebuild a
+missing or stale index automatically. Use `--no-build` when a query must be
+read-only or when CI should reject stale state instead of repairing it.
+
+The index becomes stale when source files, compiler options, the compiler
+version, or effect manifests change.
+
+## 2. Understand the Declaration
+
+```bash
+calor query callers SaveOrder
+calor query callees SaveOrder
+calor query effects SaveOrder
+```
+
+`effects` reports:
+
+- the row declared with `§E{...}`,
+- the row inferred from the body,
+- whether the inferred row fits,
+- assumptions or unresolved boundaries that weaken the answer.
+
+Use `--in-file` when several files declare the same name.
+
+## 3. Estimate the Blast Radius
+
+For an ordinary implementation change:
+
+```bash
+calor query impact SaveOrder
+```
+
+For a proposed effect change:
+
+```bash
+calor query impact SaveOrder --effects --row "db:w,net:w"
+```
+
+Effect impact follows callers transitively and separates definite failures
+from callers whose rows are unknown. Unknown is never counted as safe.
+
+## 4. Read the Residual
+
+Every partial answer names what the index could not account for: unresolved
+calls, ambiguous callees, unreadable files, or unavailable effect rows.
+
+Do not treat a count as complete when the output says `PARTIAL`. In JSON, check
+`data.partial` and inspect `data.residual` before using the answer to authorize
+an edit.
+
+## 5. Ask Through MCP
+
+Start the server with an explicit project boundary:
+
+```bash
+calor mcp --stdio --root /absolute/path/to/project
+```
+
+An agent can ask the same effect-impact question with:
+
+```json
+{
+  "name": "calor_query",
+  "arguments": {
+    "projectDirectory": "/absolute/path/to/project",
+    "facet": "impact",
+    "symbol": "SaveOrder",
+    "effects": true,
+    "row": "db:w,net:w"
+  }
+}
+```
+
+The four MCP facets are `callers`, `callees`, `impact`, and `effects`.
+Rebuilding the index writes under the project, so `projectDirectory` and any
+custom `indexPath` must stay inside the MCP server's `--root`. Set
+`noBuild: true` for a read-only query.
+
+## 6. Edit, Build, and Query Again
+
+A reliable agent loop is:
+
+1. Query callers, current effects, and impact.
+2. Read every residual and assumption.
+3. Make the smallest edit.
+4. Compile the project with cross-module effects enabled.
+5. Query the declaration again and compare the new impact.
+
+For MCP compilation, set `options.crossModule: true`; plain batch mode checks
+files independently and is useful for migration triage, not for judging a
+whole project's effect guarantees.
+
+## See Also
+
+- [calor query](/docs/cli/query/) — Complete CLI reference and JSON schema
+- [calor mcp](/docs/cli/mcp/) — MCP inputs, confinement, and compile options
+- [Effects](/docs/syntax-reference/effects/) — Effect rows and callback checking
+- [Adoption Playbook](/docs/guides/adoption-playbook/) — Introducing Calor incrementally
