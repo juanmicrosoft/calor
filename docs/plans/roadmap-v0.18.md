@@ -348,8 +348,20 @@ sampler was built for. And the mechanism of death is unshown: swap untouched plu
 signal* rather than a kernel OOM notice points at the **host reclaiming the runner** rather than the
 in-guest OOM killer, which is plausible and not demonstrated.
 
+**The parallelism hypothesis is refuted, and published as such.** #1150's second measurable was
+*"whether xUnit `maxParallelThreads` is the multiplier."*
+`tests/Calor.Compiler.Tests/AssemblyInfo.cs:3` already carries
+`[assembly: CollectionBehavior(DisableTestParallelization = true)]` — parallelization has been
+**off the whole time**, the suite runs sequentially in one host, and that single host still reaches
+9.6 GB. Median load over the 48 samples is **1.49**. Concurrency cannot be the multiplier because
+there is no concurrency to multiply, and turning it down further cannot help. M2 registered in
+advance that a refuted hypothesis is published as refuted; this is that.
+
+Sequential execution makes the retention **more** interesting, not less: nothing holds memory
+concurrently, so what accumulates is held across test classes by the one host.
+
 *What changed for the fix leg:* it now has a target — **the test host's retained memory across the
-compiler suite** — instead of a guess about quotas or platform incidents. Gate 15 is unaffected: no
+compiler suite** — instead of a guess about quotas, incidents, or parallelism. Gate 15 is unaffected: no
 fix has been attempted, and its 20-run floor stands.
 
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**

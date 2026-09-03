@@ -183,3 +183,31 @@ runner model, background load, how far the curve gets before the suite ends. A 2
 attempted — this is still the measure leg. What has changed is that the fix, when it comes, has a
 target: **the test host's retained memory across the compiler suite**, not a guess about runner
 quotas or platform incidents.
+
+## 8. The parallelism hypothesis is refuted
+
+#1150 names two things worth measuring: runner memory, and *"whether xUnit parallelism
+(`maxParallelThreads`) is the multiplier."* The second is answered, and the answer is no.
+
+`tests/Calor.Compiler.Tests/AssemblyInfo.cs:3` already carries
+
+```csharp
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+```
+
+**Test parallelization on this assembly has been off the whole time.** The suite runs sequentially,
+in one test host, and that single host still climbs to 9.6 GB. Concurrency is not the multiplier
+because there is no concurrency to multiply.
+
+The load average agrees: over the 48 samples, median **1.49**, max 6.35 (the max during the build
+phase, not the test phase). A 4-core runner executing tests in parallel would sit far higher for
+far longer.
+
+**Registered consequence.** M2 committed in advance that a refuted hypothesis gets published as
+refuted. This one is: **parallelism is not the cause, and turning it down further cannot help,
+because it is already off.** `Calor.Performance.Tests` carries the same attribute — relevant to
+#965, which is a separate issue and stays separate.
+
+That leaves the finding in §7 as the live one: a single sequential test host retaining ~9.6 GB
+across the run. Sequential execution makes the retention *more* interesting, not less — nothing is
+holding memory concurrently, so what accumulates is being held across test classes by the one host.
