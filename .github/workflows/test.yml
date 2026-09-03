@@ -424,9 +424,30 @@ jobs:
       - name: Seed Z3 native libraries
         run: bash src/Calor.Compiler/scripts/download-z3.sh
 
+      # #1150 M2 fix leg, EXPERIMENT ROUND 3 (temporary — remove once read).
+      # Rounds 1 and 2 proved the growth is NATIVE, not managed: the most
+      # aggressive GC settings moved nothing, and under a 3 GiB managed heap cap
+      # the tests passed with zero OutOfMemoryException while RSS still reached
+      # 8.94 GB. The only large native component here is Z3.
+      #
+      # Every Z3 entry point is gated on Z3ContextFactory.IsAvailable
+      # (ContractVerificationPass.cs:33, GuardDiscovery.cs:224,
+      # ContractInheritanceChecker.cs:31, Program.cs:938), and VerifyCore carries
+      # [MethodImpl(NoInlining)] specifically so the managed Z3 types are not
+      # loaded when it is false. Deleting the NATIVE libz3.so alone therefore
+      # bypasses every Z3 allocation while leaving the managed assembly in place.
+      #
+      # Z3-gated tests then skip, so the "Z3 not available" guard below fails the
+      # step BY DESIGN. That is fine: it fires after dotnet test returns, so the
+      # sampler trace is complete. This step is expected to go red.
       - name: Run project tests
         run: |
           set -euo pipefail
+          dotnet build "${{ matrix.project }}" -c Release
+          if [ "${{ matrix.name }}" = "compiler" ]; then
+            echo "EXPERIMENT: removing native libz3 so Z3ContextFactory.IsAvailable is false"
+            find . -name 'libz3.so' -not -path './.git/*' -print -delete || true
+          fi
           # #1150: stream resource readings INTO THIS STEP'S LOG. The post-hoc
           # probe below cannot observe a runner shutdown — verified on run
           # 33687411104, a kill that happened AFTER that probe landed, whose log
@@ -438,7 +459,7 @@ jobs:
           bash scripts/runner-resource-sampler.sh 10 &
           sampler_pid=$!
           trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
-          dotnet test "${{ matrix.project }}" -c Release \
+          dotnet test "${{ matrix.project }}" -c Release --no-build \
             --logger "trx;LogFileName=${{ matrix.name }}.trx" \
             --results-directory artifacts/test \
             --verbosity normal 2>&1 | tee test-output.log
