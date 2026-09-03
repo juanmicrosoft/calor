@@ -413,3 +413,82 @@ emitter, or count the mappings, and see whether the curve flattens.
 
 **Status unchanged where it matters:** the fix is not written, and gate 15's 20-consecutive-clean-run
 floor is undischarged.
+
+## 12. Round 4 — anonymous, not file-backed. **Cause found: non-collectible assembly loads.**
+
+### The correction that came first
+
+§11 named `MetadataReference.CreateFromFile` uncached in `CSharpEmitter.cs` as the leading
+candidate. **That was wrong.** `GeneratedCSharpCompiler` already caches the reference set in a
+`static readonly Lazy<IReadOnlyList<MetadataReference>>` (`CSharpEmitter.cs:9376`), with a comment
+saying why. The two remaining call sites are the `#r` resolver (`:9656`) and the
+explicit-project-reference path (`:9817`), neither hot here. Reading the code before changing it is
+what caught it.
+
+### The measurement
+
+`/proc/<pid>/status` splits RSS by kind. Anonymous pages are malloc, the native heap, loader heaps
+and JIT code; file-backed pages are memory-mapped assemblies.
+
+| | start | end |
+|---|---:|---:|
+| `RssAnon` | 57 M | **9,260 M** |
+| `RssFile` | 89 M | **106 M** |
+| `RssShmem` | 0 M | 190 M |
+
+**All of the growth is anonymous.** File-backed memory moves 17 MB across the whole run. That
+eliminates memory-mapped metadata — Roslyn's or anyone's — outright.
+
+### The cause
+
+`Calor.Compiler.Tests` calls **`Assembly.Load(stream.ToArray())`** at 8 sites across 7 files:
+
+| file | test methods |
+|---|---:|
+| `ObligationTests.cs` | 69 |
+| `LiteralRawSemanticsTests.cs` | 27 |
+| `Issue766DeclarationModuleSemanticsTests.cs` | 26 |
+| `StructuralControlFlowTests.cs` | 22 |
+| `PostconditionReturnLoweringRuntimeTests.cs` | 20 |
+| `RenameHarnessTests.cs` | 3 |
+| `BugPatternRuntimeOracleTests.cs` | 2 |
+| **total** | **169** |
+
+`Assembly.Load(byte[])` loads into the **default** `AssemblyLoadContext**, which is **never
+collectible**. Every call permanently adds the assembly's metadata, its loader-heap allocations and
+the JIT-compiled code for every method executed. None of it is on the GC heap, none is reclaimable,
+and all of it is anonymous. 169 test methods is the floor, not the count — the theories among them
+compile and load a fresh assembly per case.
+
+This fits every observation the issue has produced:
+
+| observation | fits |
+|---|---|
+| anonymous, not file-backed (round 4) | loader heaps and JIT code are anonymous |
+| not the managed heap (round 2) | loader heaps sit outside it, so `GCHeapHardLimit` never applies |
+| unreachable by GC settings (round 1) | a non-collectible ALC can never be unloaded |
+| not Z3 (round 3) | different subsystem |
+| the test host, not MSBuild | only the tests load generated assemblies |
+| monotone, no plateau | nothing is ever released |
+
+### The fix, with an in-repo precedent
+
+`isCollectible: true` plus an unload, which this repository already does in four places —
+including **the same test project**:
+
+- `tests/Calor.Compiler.Tests/Issue769NamespaceTopologyTests.cs:1932`
+- `tests/Calor.Verification.Tests/VerifierRuntimeDifferential/GeneratedRuntime.cs:202`
+- `tests/Calor.Evaluation/LlmTasks/Execution/CodeExecutor.cs:198`
+
+It is not a mechanical substitution: a collectible context only unloads once nothing holds a
+reference into it, and these tests keep `Type` and `MethodInfo` handles. Doing it correctly is real
+work and is not attempted here.
+
+### Still open
+
+The **macOS non-repro** is not fully explained by this. Non-collectible loads should leak on any
+platform, yet the local peak is 2 GB. Plausible readings — fewer resident pages for the same
+loaded assemblies, different JIT and loader page behaviour — are guesses, and this issue has
+punished guesses four times. Recorded as open.
+
+**Status:** cause identified, fix **not** written, gate 15's floor undischarged.

@@ -86,6 +86,28 @@ sample_linux() {
     printf '[#1150 probe %s] memAvail=%sM memUsed=%sM swap=%s/%sM load=%s diskFree=%sM top=[%s]\n' \
         "$(date -u +%H:%M:%S)" "$avail" "$used" "$swap_used" "$swap_total" "$load" "$disk" "${top% }"
     printf '[#1150 argv  %s] %s\n' "$(date -u +%H:%M:%S)" "$biggest"
+
+    # RSS alone cannot say WHAT KIND of memory is growing, and that is now the
+    # open question: rounds 1-3 ruled out managed heap, GC policy and Z3.
+    # /proc/<pid>/status splits it, and the split is the diagnosis:
+    #   RssAnon  - anonymous pages: malloc/native heap, and the managed heap
+    #   RssFile  - file-backed pages: memory-mapped assemblies (Roslyn metadata)
+    #   RssShmem - shared memory
+    # Anon-dominated points at a native allocator; File-dominated points at
+    # mapped PE files. They need different fixes, so guessing between them is
+    # exactly the mistake rounds 1-3 kept making.
+    local pid
+    pid="$(ps -o pid=,rss= -A 2>/dev/null | sort -k2 -rn | head -1 | awk '{print $1}')"
+    if [ -n "${pid:-}" ] && [ -r "/proc/${pid}/status" ]; then
+        awk -v p="$pid" -v t="$(date -u +%H:%M:%S)" '
+            /^VmRSS:/    {rss=$2}
+            /^RssAnon:/  {anon=$2}
+            /^RssFile:/  {file=$2}
+            /^RssShmem:/ {shm=$2}
+            END {printf "[#1150 rss   %s] pid=%s VmRSS=%dM anon=%dM file=%dM shmem=%dM\n",
+                        t, p, rss/1024, anon/1024, file/1024, shm/1024}
+        ' "/proc/${pid}/status" 2>/dev/null || true
+    fi
 }
 
 sample_fallback() {
