@@ -10,8 +10,14 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// Tests for obligation generation, solving, and C# emission (Milestone 1).
 /// </summary>
-public sealed class ObligationTests
+public sealed class ObligationTests : IDisposable
 {
+    // #1150: generated assemblies go into collectible contexts and are unloaded when
+    // xUnit disposes this instance, i.e. as soon as the test that made them finishes.
+    private readonly CollectibleAssemblyLoader _assemblies = new();
+
+    public void Dispose() => _assemblies.Dispose();
+
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
@@ -2220,7 +2226,9 @@ public sealed class ObligationTests
         return new CSharpEmitter().Emit(module);
     }
 
-    private static Exception InvokeGenerated(
+    // #1150: instance, because CompileGenerated now loads into this instance's
+    // collectible context.
+    private Exception InvokeGenerated(
         string csharp,
         string methodName,
         params object?[] arguments)
@@ -2272,7 +2280,8 @@ public sealed class ObligationTests
             $"Generated method '{methodName}' did not throw.");
     }
 
-    private static Exception InvokeGeneratedConstructor(
+    // #1150: instance, for the same reason as InvokeGenerated.
+    private Exception InvokeGeneratedConstructor(
         string csharp,
         params object?[] arguments)
     {
@@ -2295,17 +2304,20 @@ public sealed class ObligationTests
             $"Generated constructor for '{type.FullName}' did not throw.");
     }
 
-    private static System.Reflection.Assembly CompileGenerated(string csharp)
+    private System.Reflection.Assembly CompileGenerated(string csharp)
     {
         var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
             GeneratedCSharpCompiler.GlobalUsingsPreamble + csharp);
-        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Select(path => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path));
+        var name = $"ObligationRuntime_{Guid.NewGuid():N}";
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
-            $"ObligationRuntime_{Guid.NewGuid():N}",
+            name,
             [syntaxTree],
-            references,
+            // #1150: was re-reading TRUSTED_PLATFORM_ASSEMBLIES and rebuilding every
+            // MetadataReference on each call. GeneratedCSharpCompiler.References is the
+            // same set, built once per process behind a Lazy. Not the leak — round 4
+            // measured file-backed RSS flat at ~100 MB — but there is no reason to
+            // re-enumerate the platform assemblies 69 times.
+            GeneratedCSharpCompiler.References,
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
                 Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
 
@@ -2315,6 +2327,6 @@ public sealed class ObligationTests
             emitResult.Success,
             string.Join(Environment.NewLine, emitResult.Diagnostics));
 
-        return System.Reflection.Assembly.Load(stream.ToArray());
+        return _assemblies.Load(stream.ToArray(), name);
     }
 }

@@ -11,8 +11,14 @@ using Xunit;
 
 namespace Calor.Compiler.Tests.Analysis;
 
-public class BugPatternRuntimeOracleTests
+public class BugPatternRuntimeOracleTests : IDisposable
 {
+    // #1150: generated assemblies go into collectible contexts, unloaded when xUnit
+    // disposes this instance — i.e. as soon as the test that made them finishes.
+    private readonly CollectibleAssemblyLoader _assemblies = new();
+
+    public void Dispose() => _assemblies.Dispose();
+
     public static TheoryData<OracleCase> Corpus => new()
     {
         OracleCase.Throws(
@@ -572,7 +578,8 @@ public class BugPatternRuntimeOracleTests
         return findings;
     }
 
-    private static Assembly Compile(string source)
+    // #1150: instance, because CompileGenerated loads into this instance's context.
+    private Assembly Compile(string source)
     {
         var result = Program.Compile(
             source,
@@ -589,12 +596,13 @@ public class BugPatternRuntimeOracleTests
         return CompileGenerated(result.GeneratedCode);
     }
 
-    private static Assembly CompileGenerated(string generatedCode)
+    private Assembly CompileGenerated(string generatedCode)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             GeneratedCSharpCompiler.GlobalUsingsPreamble + generatedCode);
+        var name = $"BugPatternOracle_{Guid.NewGuid():N}";
         var compilation = CSharpCompilation.Create(
-            $"BugPatternOracle_{Guid.NewGuid():N}",
+            name,
             [syntaxTree],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -603,7 +611,7 @@ public class BugPatternRuntimeOracleTests
         Assert.True(
             emit.Success,
             string.Join(Environment.NewLine, emit.Diagnostics));
-        return Assembly.Load(stream.ToArray());
+        return _assemblies.Load(stream.ToArray(), name);
     }
 
     public sealed record OracleCase(

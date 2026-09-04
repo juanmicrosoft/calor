@@ -23,8 +23,14 @@ public sealed class RenameHarnessTests : IDisposable
 {
     private readonly List<string> _tempDirs = [];
 
+    // #1150: generated assemblies go into collectible contexts, unloaded below.
+    private readonly CollectibleAssemblyLoader _assemblies = new();
+
     public void Dispose()
     {
+        // #1150: unload the generated assemblies this test loaded.
+        _assemblies.Dispose();
+
         foreach (var dir in _tempDirs)
         {
             try { Directory.Delete(dir, recursive: true); } catch { }
@@ -174,7 +180,8 @@ public sealed class RenameHarnessTests : IDisposable
     /// cross-module qualification map, without which a cross-file call does not
     /// resolve — then loads the result and invokes the entry method.
     /// </summary>
-    private static int Execute(
+    // #1150: instance, because the assembly loads into this instance's context.
+    private int Execute(
         IReadOnlyDictionary<string, string> sources,
         string entryMethod,
         string label)
@@ -215,8 +222,9 @@ public sealed class RenameHarnessTests : IDisposable
         var trees = generated
             .Select(unit => CSharpSyntaxTree.ParseText(unit.Code, path: unit.Name))
             .ToArray();
+        var name = "RenameOracle_" + Guid.NewGuid().ToString("N")[..8];
         var compilation = CSharpCompilation.Create(
-            "RenameOracle_" + Guid.NewGuid().ToString("N")[..8],
+            name,
             trees,
             PlatformReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -232,7 +240,7 @@ public sealed class RenameHarnessTests : IDisposable
                         .Where(d => d.Severity == DiagnosticSeverity.Error)
                         .Select(d => d.ToString())));
 
-        var assembly = Assembly.Load(stream.ToArray());
+        var assembly = _assemblies.Load(stream.ToArray(), name);
         var method = assembly.GetTypes()
             .Select(type => type.GetMethod(
                 entryMethod,

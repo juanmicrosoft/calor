@@ -11,8 +11,14 @@ using Xunit;
 
 namespace Calor.Compiler.Tests;
 
-public class StructuralControlFlowTests
+public class StructuralControlFlowTests : IDisposable
 {
+    // #1150: generated assemblies go into collectible contexts, unloaded when xUnit
+    // disposes this instance — i.e. as soon as the test that made them finishes.
+    private readonly CollectibleAssemblyLoader _assemblies = new();
+
+    public void Dispose() => _assemblies.Dispose();
+
     private static readonly TextSpan Span = TextSpan.Empty;
 
     [Fact]
@@ -1345,7 +1351,8 @@ public class StructuralControlFlowTests
             new AttributeCollection(),
             Array.Empty<CalorAttributeNode>());
 
-    private static Assembly Compile(string source, out string generatedCode)
+    // #1150: instance, because CompileGenerated loads into this instance's context.
+    private Assembly Compile(string source, out string generatedCode)
     {
         var result = Program.Compile(
             source,
@@ -1363,7 +1370,7 @@ public class StructuralControlFlowTests
         return CompileGenerated(generatedCode);
     }
 
-    private static Assembly CompileGenerated(
+    private Assembly CompileGenerated(
         string generatedCode,
         params string[] preprocessorSymbols)
     {
@@ -1371,8 +1378,9 @@ public class StructuralControlFlowTests
             GeneratedCSharpCompiler.GlobalUsingsPreamble + generatedCode,
             CSharpParseOptions.Default.WithPreprocessorSymbols(
                 preprocessorSymbols));
+        var name = $"StructuralControlFlow_{Guid.NewGuid():N}";
         var compilation = CSharpCompilation.Create(
-            $"StructuralControlFlow_{Guid.NewGuid():N}",
+            name,
             [syntaxTree],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -1381,7 +1389,7 @@ public class StructuralControlFlowTests
         Assert.True(
             emit.Success,
             string.Join(Environment.NewLine, emit.Diagnostics));
-        return Assembly.Load(stream.ToArray());
+        return _assemblies.Load(stream.ToArray(), name);
     }
 
     private static object? InvokeStatic(

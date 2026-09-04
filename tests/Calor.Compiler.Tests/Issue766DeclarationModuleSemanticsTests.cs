@@ -10,8 +10,14 @@ using Xunit;
 
 namespace Calor.Compiler.Tests;
 
-public class Issue766DeclarationModuleSemanticsTests
+public class Issue766DeclarationModuleSemanticsTests : IDisposable
 {
+    // #1150: generated assemblies go into collectible contexts, unloaded when xUnit
+    // disposes this instance — i.e. as soon as the test that made them finishes.
+    private readonly CollectibleAssemblyLoader _assemblies = new();
+
+    public void Dispose() => _assemblies.Dispose();
+
     private static readonly TextSpan Span = TextSpan.Empty;
 
     [Fact]
@@ -1574,7 +1580,7 @@ public class Issue766DeclarationModuleSemanticsTests
         return count;
     }
 
-    private static Assembly CompileAssembly(
+    private Assembly CompileAssembly(
         string source,
         IReadOnlyList<string>? preprocessorSymbols = null)
     {
@@ -1583,8 +1589,9 @@ public class Issue766DeclarationModuleSemanticsTests
             new CSharpParseOptions(
                 LanguageVersion.Latest,
                 preprocessorSymbols: preprocessorSymbols ?? []));
+        var name = $"Issue766_{Guid.NewGuid():N}";
         var compilation = CSharpCompilation.Create(
-            $"Issue766_{Guid.NewGuid():N}",
+            name,
             [syntaxTree],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -1597,6 +1604,6 @@ public class Issue766DeclarationModuleSemanticsTests
                 emit.Diagnostics
                     .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
                     .Select(d => d.ToString())));
-        return Assembly.Load(stream.ToArray());
+        return _assemblies.Load(stream.ToArray(), name);
     }
 }

@@ -10,8 +10,14 @@ using Xunit;
 
 namespace Calor.Compiler.Tests;
 
-public sealed class LiteralRawSemanticsTests
+public sealed class LiteralRawSemanticsTests : IDisposable
 {
+    // #1150: generated assemblies go into collectible contexts, unloaded when xUnit
+    // disposes this instance — i.e. as soon as the test that made them finishes.
+    private readonly CollectibleAssemblyLoader _assemblies = new();
+
+    public void Dispose() => _assemblies.Dispose();
+
     public static TheoryData<string, string> IntegerBoundaryCorpus => new()
     {
         { "-0x2A", "-0x2A" },
@@ -727,43 +733,47 @@ public sealed class LiteralRawSemanticsTests
             Assert.IsType<ReturnStatementNode>(Assert.Single(function.Body)).Expression);
     }
 
-    private static decimal EvaluateInteger(string emitted)
+    // #1150: instance, because the assembly loads into this instance's context.
+    private decimal EvaluateInteger(string emitted)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             $"public static class LiteralProbe {{ public static object Value() => {emitted}; }}");
+        var name = $"LiteralProbe_{Guid.NewGuid():N}";
         var compilation = CSharpCompilation.Create(
-            $"LiteralProbe_{Guid.NewGuid():N}",
+            name,
             [syntaxTree],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
-        var assembly = Assembly.Load(stream.ToArray());
+        var assembly = _assemblies.Load(stream.ToArray(), name);
         var value = assembly.GetType("LiteralProbe")!.GetMethod("Value")!.Invoke(null, null)!;
         return Convert.ToDecimal(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static string EvaluateStringExpression(string expression)
+    // #1150: instance, because CompileCSharp loads into this instance's context.
+    private string EvaluateStringExpression(string expression)
         => InvokeString(
             CompileCSharp(
                 $"public static class StringProbe {{ public static string Value() => {expression}; }}"),
             "StringProbe",
             "Value");
 
-    private static Assembly CompileCSharp(string source)
+    private Assembly CompileCSharp(string source)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             GeneratedCSharpCompiler.GlobalUsingsPreamble + source);
+        var name = $"LiteralRawProbe_{Guid.NewGuid():N}";
         var compilation = CSharpCompilation.Create(
-            $"LiteralRawProbe_{Guid.NewGuid():N}",
+            name,
             [syntaxTree],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
-        return Assembly.Load(stream.ToArray());
+        return _assemblies.Load(stream.ToArray(), name);
     }
 
     private static string InvokeString(
