@@ -55,7 +55,7 @@ def read_counts(trx: Path) -> tuple[int, int, int]:
     return total, executed, passed
 
 
-def validate(trx: Path, project: str, manifest_path: Path,
+def validate(trx, project: str, manifest_path: Path,
              submodules: bool = False) -> list[str]:
     """`submodules` selects the skip expectation for the CALLER'S CHECKOUT.
 
@@ -72,12 +72,26 @@ def validate(trx: Path, project: str, manifest_path: Path,
     entry = next((item for item in manifest["projects"] if item["path"] == project), None)
     if entry is None:
         return [f"project is not in test manifest: {project}"]
-    if not trx.is_file():
-        return [f"TRX report does not exist: {trx}"]
-    try:
-        total, executed, passed = read_counts(trx)
-    except (ET.ParseError, ValueError) as error:
-        return [f"invalid TRX report {trx}: {error}"]
+    # #1150: a project may be run as SEVERAL invocations in one job — the
+    # tests (compiler) shard is split so each `dotnet test` gets a fresh test
+    # host, bounding how much memory any one host accumulates. Counts are summed
+    # across the parts and checked against the SAME expectedTotal, which makes
+    # the split self-verifying: if the filters overlap, miss a test, or one part
+    # silently fails to run, the sum stops matching and this gate goes red.
+    reports = [trx] if isinstance(trx, Path) else list(trx)
+    if not reports:
+        return ["no TRX report given"]
+    total = executed = passed = 0
+    for report in reports:
+        if not report.is_file():
+            return [f"TRX report does not exist: {report}"]
+        try:
+            part_total, part_executed, part_passed = read_counts(report)
+        except (ET.ParseError, ValueError) as error:
+            return [f"invalid TRX report {report}: {error}"]
+        total += part_total
+        executed += part_executed
+        passed += part_passed
     expected_total = int(entry["expectedTotal"])
     # A project that declares `corpusDependent` MUST declare both skip counts.
     # Falling back silently is how this bug class reappears: add a corpus-gated
@@ -230,7 +244,11 @@ def self_test() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--trx", type=Path)
+    parser.add_argument(
+        "--trx", type=Path, action="append",
+        help="TRX report. Repeatable: a project run as several invocations (see the "
+             "split tests (compiler) shard, #1150) passes one --trx per part and the "
+             "counts are summed against the single expectedTotal.")
     parser.add_argument("--project")
     parser.add_argument("--manifest", type=Path, default=Path("eng/test-manifest.json"))
     parser.add_argument("--self-test", action="store_true")
@@ -243,7 +261,7 @@ def main() -> int:
     if args.self_test:
         self_test()
         return 0
-    if args.trx is None or args.project is None:
+    if not args.trx or args.project is None:
         parser.error("--trx and --project are required")
     errors = validate(args.trx, args.project, args.manifest, submodules=args.submodules)
     for error in errors:

@@ -427,6 +427,11 @@ jobs:
       - name: Run project tests
         run: |
           set -euo pipefail
+          # #1150: the compiler shard's two invocations pass --no-build, so build once
+          # up front. Other shards keep building as part of their single `dotnet test`.
+          if [ "${{ matrix.name }}" = "compiler" ]; then
+            dotnet build "${{ matrix.project }}" -c Release
+          fi
           # #1150: stream resource readings INTO THIS STEP'S LOG. The post-hoc
           # probe below cannot observe a runner shutdown — verified on run
           # 33687411104, a kill that happened AFTER that probe landed, whose log
@@ -438,10 +443,42 @@ jobs:
           bash scripts/runner-resource-sampler.sh 10 &
           sampler_pid=$!
           trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
+          # #1150: the compiler shard runs in TWO invocations, so each `dotnet test`
+          # gets a FRESH test host and no single host accumulates the whole suite.
+          # This CAPS THE SYMPTOM; it does not fix the leak — six candidate causes
+          # have been tested and refuted (see
+          # docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md), and a full
+          # single-host run on Linux still exhausts a 16 GB machine. Anyone reading a
+          # green pipeline here should read that document before concluding otherwise.
+          #
+          # The split is by test-class initial, balanced from real counts: 3,996 vs
+          # 3,982 of 7,978. Part 2's filter is the exact NEGATION of part 1's, so the
+          # two partition the suite — and check_trx.py sums both TRX files against the
+          # one expectedTotal, which makes that self-verifying: overlap, a gap, or a
+          # part that silently fails to run all break the sum.
+          if [ "${{ matrix.name }}" = "compiler" ]; then
+            letters="B C G L O Q R S T U Y"
+            inc=""; exc=""
+            for letter in $letters; do
+              inc="${inc:+$inc|}FullyQualifiedName~Calor.Compiler.Tests.$letter"
+              exc="${exc:+$exc&}FullyQualifiedName!~Calor.Compiler.Tests.$letter"
+            done
+            dotnet test "${{ matrix.project }}" -c Release --no-build \
+              --filter "$inc" \
+              --logger "trx;LogFileName=${{ matrix.name }}-1.trx" \
+              --results-directory artifacts/test \
+              --verbosity normal 2>&1 | tee test-output.log
+            dotnet test "${{ matrix.project }}" -c Release --no-build \
+              --filter "$exc" \
+              --logger "trx;LogFileName=${{ matrix.name }}-2.trx" \
+              --results-directory artifacts/test \
+              --verbosity normal 2>&1 | tee -a test-output.log
+          else
           dotnet test "${{ matrix.project }}" -c Release \
             --logger "trx;LogFileName=${{ matrix.name }}.trx" \
             --results-directory artifacts/test \
             --verbosity normal 2>&1 | tee test-output.log
+          fi
           if grep -q "Z3 not available" test-output.log; then
             echo "::error::Z3-gated tests skipped — natives did not reach this test host."
             grep -c "Z3 not available" test-output.log
@@ -472,10 +509,19 @@ jobs:
           echo "--- dotnet build servers ---"; ps -o pid,rss,comm -A 2>/dev/null | sort -k2 -rn | head -12
 
       - name: Enforce test inventory
-        run: >-
-          python3 scripts/check_trx.py
-          --trx "artifacts/test/${{ matrix.name }}.trx"
-          --project "${{ matrix.project }}"
+        # #1150: the compiler shard produces two TRX files (see the split above);
+        # check_trx.py sums them against the single expectedTotal.
+        run: |
+          if [ "${{ matrix.name }}" = "compiler" ]; then
+            python3 scripts/check_trx.py \
+              --trx "artifacts/test/${{ matrix.name }}-1.trx" \
+              --trx "artifacts/test/${{ matrix.name }}-2.trx" \
+              --project "${{ matrix.project }}"
+          else
+            python3 scripts/check_trx.py \
+              --trx "artifacts/test/${{ matrix.name }}.trx" \
+              --project "${{ matrix.project }}"
+          fi
 
       - name: Upload test report
         if: always()
