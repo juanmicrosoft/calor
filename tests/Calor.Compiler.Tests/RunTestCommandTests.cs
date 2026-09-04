@@ -189,6 +189,32 @@ public class RunTestCommandTests : IDisposable
     // effect enforcement on calor run
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// The counterpart to <see cref="WritePureViolator"/> after the 2026-09-04
+    /// adjudication (roadmap-v0.18 §9.4): a Calor0410 whose forbidden effect is
+    /// <c>Unknown</c>, because the pass cannot name the value being passed. That is
+    /// "we cannot tell", so <c>--permissive-effects</c> still waives it and the
+    /// compilation still succeeds — which is what keeps the warning-visible-on-success
+    /// guarantee testable now that a NAMED violation is an error.
+    /// </summary>
+    private string WriteUnknownCharger()
+    {
+        var file = Path.Combine(_tempDir, "unknowncharger.calr");
+        File.WriteAllText(file, """
+            §M{m001:UnknownCharger}
+              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+                §E{e}
+                §R (+ §C{stage} §/C §C{stage} §/C)
+
+              §CL{c001:Holder:pub}
+                §FLD{Func<i32>:stage:pri} §E{cw}
+                §MT{mt001:Twice:pub} () -> i32
+                  §E{}
+                  §R §C{RunTwice} §A this.stage §/C
+            """);
+        return file;
+    }
+
     private string WritePureViolator()
     {
         // Declares §E{} (pure) but prints — a forbidden 'cw' effect.
@@ -212,14 +238,21 @@ public class RunTestCommandTests : IDisposable
     }
 
     [Fact]
-    public void Run_EffectViolation_Permissive_RunsAndPrintsDemotedWarning()
+    /// <summary>
+    /// <b>Updated 2026-09-04 (roadmap-v0.18 §9.4).</b> Was
+    /// <c>Run_EffectViolation_Permissive_RunsAndPrintsDemotedWarning</c>. This fixture
+    /// declares <c>§E{}</c> and prints — a NAMED <c>cw</c> effect, i.e. "we know it is
+    /// wrong" — and <c>--permissive</c> no longer demotes that. The waiver still covers
+    /// an Unknown charge; see
+    /// <see cref="TopLevelCompile_PermissiveEffects_WarningVisibleOnSuccess"/>.
+    /// </summary>
+    public void Run_NamedEffectViolation_Permissive_StillFails()
     {
         var (exitCode, stdOut, stdErr) = RunCli("run", WritePureViolator(), "--permissive");
 
-        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
-        Assert.Contains("side effect!", stdOut);
-        // The demoted warning must be visible even though compilation succeeded.
-        Assert.Contains("warning Calor04", stdErr);
+        Assert.True(exitCode != 0, $"expected a non-zero exit, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.Contains("Calor0410", stdErr);
+        Assert.DoesNotContain("warning Calor0410", stdErr);
     }
 
     [Fact]
@@ -234,9 +267,11 @@ public class RunTestCommandTests : IDisposable
     [Fact]
     public void TopLevelCompile_PermissiveEffects_WarningVisibleOnSuccess()
     {
-        // Same visibility guarantee on the top-level compile command: demoted
-        // warnings print even though the compilation succeeds.
-        var file = WritePureViolator();
+        // Same visibility guarantee on the top-level compile command: a WAIVED
+        // warning prints even though the compilation succeeds. Retargeted
+        // 2026-09-04 at an Unknown-charged Calor0410, because a NAMED violation is
+        // no longer waived and so no longer reaches a successful compile.
+        var file = WriteUnknownCharger();
 
         var (exitCode, stdOut, stdErr) = RunCli(
             "--input", file, "--enforce-effects", "--permissive-effects");
