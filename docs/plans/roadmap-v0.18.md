@@ -3,9 +3,10 @@
 **Date:** 2026-09-03
 **Status:** **Draft v4** — one self-conducted adversarial round (§10), five findings, two Major.
 **M1 built and adjudicated: PP-S1(rows) and gate 14 = HIT, twelve of twelve** (§3.1 M1).
-**M2's measure leg done: the kill rate is 14.7 %, the instrument built for it could never fire, and
-the replacement caught a death on its first encounter — 139 MB free, swap full. Memory exhaustion is
-measured, not hypothesised** (§3.1 M2). **Spend authorized 2026-09-03; the ceiling is still due with M3's sizing** (§8).
+**M2 done as far as gate 15 allows: kill rate 14.7 %, cause narrowed to anonymous memory in the
+test host with eight candidates refuted, symptom capped by splitting the suite (peaks 9.3/13.9 GB →
+5.9/6.1 GB), and the leak now reproducible locally on Linux. Gate 15's floor is armed and
+undischarged** (§3.1 M2). **Spend authorized 2026-09-03; the ceiling is still due with M3's sizing** (§8).
 **No independent round has been run**; §10 registers the lenses that still must be applied.
 **Written against:** `691b65ec` (main after PR #1155, the 0.17.0 version bump).
 `Directory.Build.props:3` reads `0.17.0`; **v0.17.0 has been released and verified** — published
@@ -432,8 +433,37 @@ GC's inability to touch it, the test host being the holder, the absence of a pla
 non-repro. **Hypothesis, not a result.**
 
 *Status:* six hypotheses now discarded or refuted — quota, platform incident, parallelism, GC
-policy, managed reference leak, **Z3**. The fix is **not** written and gate 15's floor is
-undischarged.
+policy, managed reference leak, **Z3**. Two more followed: Roslyn's memory-mapped metadata
+(round 4) and non-collectible assembly loads (round 5, a fix **built and measured worse**).
+
+#### M2 outcome, 2026-09-04: **symptom capped, leak unattributed, gate 15 armed**
+
+`Calor.Compiler.Tests` now runs as **two invocations** wherever it runs (PR #1170, `35e4cd62`).
+
+| job | peak anon before | after |
+|---|---:|---:|
+| `tests (compiler)` | 9,264 M | **5,929 M** |
+| `quality-ratchets` | 13,896 M | **6,105 M** |
+
+Both peak near 6 GB on a 16 GB runner, against the 139 MB the machine had left when it was being
+killed. The filters live in `scripts/compiler-shard-filter.sh` — one source, because the suite runs
+in two jobs that must split identically and a drifted partition fails *silently*. Its self-test
+pins that shard 2 is the exact negation of shard 1, and `check_trx.py` sums both parts against the
+one `expectedTotal`, so overlap, a gap, or a part that fails to run all turn CI red.
+
+**This caps the symptom. It does not fix the leak** — eight candidate causes are now tested and
+refuted, and what allocates the ~9 GB is still unattributed. A single-host run on Linux still
+exhausts a 16 GB machine. Said here, in the script header, and in the workflow comment, because the
+realistic failure is someone reading a green pipeline as #1150 solved.
+
+**Gate 15's 20-consecutive-clean-run floor starts at `35e4cd62` and is undischarged.** M4's M2
+condition is that floor, so the authorized spend does not shorten it.
+
+**Newly available: a local reproduction.** The leak reproduces in a Linux container (Colima,
+Ubuntu 24.04, 16 GB) at anon 6,535 M — and that container is **ARM**, so the split is
+**Linux vs macOS, not Intel vs ARM**, two variables that had been tangled together for six rounds.
+That gives a profiler-attachable repro instead of a ten-minute CI round trip, which is the route to
+**attributing** the allocation rather than eliminating a ninth hypothesis.
 
 *Earlier framing, superseded:* it has a target — **the test host retains memory across the run**,
 ~9.6 GB of ~16 GB in the healthy case, exhausting the machine when a large allocation lands on top.
