@@ -95,5 +95,21 @@ internal sealed class CollectibleAssemblyLoader : IDisposable
         }
 
         _contexts.Clear();
+
+        // #1150: Unload() only MARKS a context for collection. The loader heap and JIT
+        // code are released when the GC actually reclaims it, which needs a gen-2
+        // collection plus finalization — and nothing else in a test run forces one,
+        // because the runtime sees plenty of free memory right up until it does not.
+        //
+        // Without this, the first version of this fix changed nothing measurable:
+        // anonymous RSS still reached 10,867 MB against a 9,264 MB control. Whether
+        // that was "unload never happened" or "assembly loading is not the cause" is
+        // exactly what forcing the collection here settles.
+        //
+        // Cost is bounded: only the seven classes that load generated assemblies own a
+        // loader, so this runs about 169 times across a suite that takes minutes.
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 }
