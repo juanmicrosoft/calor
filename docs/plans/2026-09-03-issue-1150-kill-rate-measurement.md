@@ -492,3 +492,65 @@ loaded assemblies, different JIT and loader page behaviour — are guesses, and 
 punished guesses four times. Recorded as open.
 
 **Status:** cause identified, fix **not** written, gate 15's floor undischarged.
+
+## 13. Round 5 — the fix was built, and it **failed**. Assembly loading is refuted.
+
+§12 identified non-collectible `Assembly.Load(byte[])` as the cause and called the fix
+"straightforward, with an in-repo precedent". It was built, and it does not work.
+
+**What was built.** A `CollectibleAssemblyLoader` owning one collectible
+`AssemblyLoadContext` per load, unloaded when xUnit disposes the test-class instance. All
+8 sites converted across 7 classes; 64 call sites untouched; `Assembly.Load(byte[])` gone
+from the project. Locally 8,026 passed / 0 failed, and CI green.
+
+**Result, on the same instrument that found the problem:**
+
+| variant | peak `RssAnon` | reclaim events | non-decreasing |
+|---|---:|---:|---:|
+| control (no fix) | 9,264 M | 2 | 88 % |
+| collectible ALCs | **10,867 M** | 1 | 84 % |
+| collectible ALCs + forced gen-2 GC | **12,059 M** | 3 | 84 % |
+
+**Every variant is worse than the control, and none flattened.**
+
+The second variant exists because `Unload()` only *marks* a context for collection — its
+loader heap is released when the GC reclaims it, and nothing in a test run forces that. So
+`GC.Collect()` + `WaitForPendingFinalizers()` + `GC.Collect()` was added to the loader's
+`Dispose` to remove that reading. It made things worse again.
+
+**Conclusion: non-collectible assembly loading is not the dominant allocator.** Hypothesis
+refuted, and the change is **not merged**.
+
+**Why it plausibly got worse, recorded as a lead rather than a finding.** A collectible
+context does not share loader-heap segments with the default context; each carries its own
+minimum overhead. At ~169 contexts that is real memory, and it would explain a change that
+moves the number in the wrong direction rather than not at all.
+
+### The honest position after five rounds
+
+| hypothesis | status |
+|---|---|
+| Actions quota, platform incident | discarded |
+| xUnit parallelism | refuted |
+| GC policy / heap retention | refuted (round 1) |
+| managed reference leak | refuted (round 2) |
+| Z3 | refuted (round 3) |
+| Roslyn memory-mapped metadata | refuted (round 4) |
+| **non-collectible assembly loads** | **refuted (round 5)** |
+| native, in the test host, anonymous | confirmed — and still unattributed |
+
+What is solid: the rate (14.7 %), the process (the test host), the kind (anonymous, not
+file-backed), and that six named causes are eliminated. What is not: **what allocates it.**
+
+### Recommendation: cap the symptom, and say so plainly
+
+Gate 15 asks that the release path stop dying, not that the leak be understood. Splitting
+the `tests (compiler)` shard into two jobs roughly halves per-host accumulation, costs
+almost nothing, and carries no correctness risk. It does **not** fix the leak, and a full
+local run on Linux would still exhaust a 16 GB machine — that must be stated wherever the
+split is described, or the next person will read a green pipeline as a solved problem.
+
+The remaining diagnostic lead, if the leak itself is pursued later: a native-heap profiler
+on the shard (`dotnet-counters`, or `heaptrack` on the test host) to attribute the
+anonymous allocations directly, rather than a seventh hypothesis tested by elimination.
+Five eliminations have cost more than one attribution would have.
