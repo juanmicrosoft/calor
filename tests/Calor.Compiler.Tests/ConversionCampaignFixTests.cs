@@ -2424,10 +2424,19 @@ public class Demo
         Assert.Empty(unknownCallWarnings);
     }
 
+    /// <summary>
+    /// <b>Updated 2026-09-04 (roadmap-v0.18 §9.4).</b> This test used to be
+    /// <c>PermissiveMode_ForbiddenEffect_DemotedToWarning</c> and asserted that
+    /// Permissive turned this Calor0410 into a warning. The forbidden effect here is
+    /// <c>cw</c> — a NAMED effect, from <c>§P "hello"</c> — which is "we know it is
+    /// wrong", and no flag demotes that any more. Permissive still waives an
+    /// <c>EffectKind.Unknown</c> charge; that half is pinned by
+    /// <c>NonConvergenceTests.Permissive_StillWaives_UnknownChargedCalor0410</c>.
+    /// </summary>
     [Fact]
-    public void PermissiveMode_ForbiddenEffect_DemotedToWarning()
+    public void PermissiveMode_NamedForbiddenEffect_StaysAnError()
     {
-        // In permissive mode, Calor0410 (forbidden effect) should be a warning, not an error
+        // A named effect is not waived by any flag.
         var source = @"
 §M{m001:TestModule}
   §F{f001:greet}
@@ -2439,16 +2448,15 @@ public class Demo
         var pass = new EffectEnforcementPass(diag, policy: UnknownCallPolicy.Permissive);
         pass.Enforce(ast);
 
-        // Should not have errors (demoted to warnings)
+        // 'cw' is named, so it stays an error even under Permissive.
         var errors = diag.Errors.Where(d =>
             d.Code == DiagnosticCode.ForbiddenEffect).ToList();
-        Assert.Empty(errors);
+        Assert.Single(errors);
+        Assert.Contains("cw", errors[0].Message, StringComparison.Ordinal);
 
-        // Should have warnings instead
         var warnings = diag.Warnings.Where(d =>
             d.Code == DiagnosticCode.ForbiddenEffect).ToList();
-        Assert.Single(warnings);
-        Assert.Contains("cw", warnings[0].Message);
+        Assert.Empty(warnings);
     }
 
     [Fact]
