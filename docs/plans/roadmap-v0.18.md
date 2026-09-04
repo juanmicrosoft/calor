@@ -77,7 +77,7 @@ R17:§2 gave two reasons not to re-run PP-W-rows in 0.17. One was cost. The othe
 **S1 shipped.** Both halves of #1136's fix set are on main. The treatment arm can now plausibly be
 the fail-closed compiler the design assumed — *plausibly*, because §0.2 is exactly the reason we
 cannot yet assert it. **M1 is therefore a hard prerequisite of M4, not a parallel workstream:**
-the twelve-shape table is the evidence that arm A is fail-closed, and running the epoch without it
+the twelve-shape table is the evidence that arm B is fail-closed, and running the epoch without it
 would re-run the experiment against an unverified treatment arm, which is the confound again in a
 new costume.
 
@@ -90,9 +90,16 @@ so it is not forgotten then."
 **v0.16.0 was released 2026-09-01T22:53Z.** The end condition is met. The adjudication is due now,
 and it was forgotten exactly as R17:§9 feared.
 
-It is not housekeeping. `--permissive-effects` **is arm B** of PP-W-rows. An experiment contrasting
-a fail-closed compiler with a permissive one cannot have an unadjudicated definition of its
-permissive arm. This lands in M3's registration, before any collection.
+It is not housekeeping. **`--permissive-effects` is arm A** of PP-W-rows — the *permissive control*
+(`ppw-seeded-compiles.json`: A = `calor+v0.14.3 --permissive-effects`, B = `calor+v0.15.0 strict`,
+no flags). An experiment contrasting a fail-closed compiler with a permissive one cannot have an
+unadjudicated definition of its permissive arm. This lands in M3's registration, before any
+collection.
+
+*Corrected 2026-09-04:* this section previously called `--permissive-effects` "arm B", and §0.3
+called arm A the fail-closed one. Both were backwards — **A is the permissive control, B is the
+strict treatment** — and #1136's table is measured on **arm B**, which is why R17:§0.2's finding is
+that the *treatment* arm leaked five of twelve shapes.
 
 ### 0.5 CI is unreliable on the release-critical path
 
@@ -747,7 +754,7 @@ not shorten that.
 3. **#965** — whether the perf suite killed the runner on a release path. 0.16.0 and 0.17.0 have
    both now shipped, so the observation window R17 was waiting on has closed twice.
 4. **`--permissive-effects` Calor0410 demotion** (§0.4) — **newly due**; the end condition fired on
-   2026-09-01. It defines arm B and blocks M3(3).
+   2026-09-01. It defines **arm A** — the permissive control — and blocks M3(3).
 
 ---
 
