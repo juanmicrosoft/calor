@@ -311,6 +311,9 @@ jobs:
           # a probe that runs and records nothing — the exact silent-instrument
           # failure this issue is about.
           bash scripts/runner-resource-sampler.sh --self-test
+          # #1150: the two shard halves must stay exact complements; a drifted
+          # partition skips or double-runs tests without saying so.
+          bash scripts/compiler-shard-filter.sh --self-test
 
       - name: Collect component coverage
         run: |
@@ -321,6 +324,17 @@ jobs:
           bash scripts/runner-resource-sampler.sh 10 &
           sampler_pid=$!
           trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
+          # #1150: Calor.Compiler.Tests is split here too. Splitting only
+          # tests (compiler) left THIS step as the remaining death site — it runs the
+          # same suite unsplit, with coverage instrumentation on top, and the sampler
+          # caught it at anon=13,783M holding
+          # `dotnet exec ... Calor.Compiler.Tests`. Same project, same leak, the job
+          # that had not been split.
+          #
+          # Safe for coverage: check_coverage.py rglobs every coverage.cobertura.xml
+          # under artifacts/coverage/raw and merges by taking max(hits) per
+          # (file, line), so two partial reports for one project union correctly.
+          eval "$(bash scripts/compiler-shard-filter.sh)"
           for project in \
             Calor.Compiler.Tests \
             Calor.Conversion.Tests \
@@ -328,12 +342,26 @@ jobs:
             Calor.Semantics.Tests \
             Calor.Verification.Tests
           do
-            dotnet test "tests/$project/$project.csproj" \
-              -c Release --no-build --no-restore \
-              --collect:"XPlat Code Coverage" \
-              --logger "trx;LogFileName=$project.trx" \
-              --results-directory "artifacts/coverage/raw/$project" \
-              --verbosity quiet
+            if [ "$project" = "Calor.Compiler.Tests" ]; then
+              for part in 1 2; do
+                filter="$SHARD1_FILTER"
+                [ "$part" = "2" ] && filter="$SHARD2_FILTER"
+                dotnet test "tests/$project/$project.csproj" \
+                  -c Release --no-build --no-restore \
+                  --filter "$filter" \
+                  --collect:"XPlat Code Coverage" \
+                  --logger "trx;LogFileName=$project-$part.trx" \
+                  --results-directory "artifacts/coverage/raw/$project" \
+                  --verbosity quiet
+              done
+            else
+              dotnet test "tests/$project/$project.csproj" \
+                -c Release --no-build --no-restore \
+                --collect:"XPlat Code Coverage" \
+                --logger "trx;LogFileName=$project.trx" \
+                --results-directory "artifacts/coverage/raw/$project" \
+                --verbosity quiet
+            fi
           done
 
       # #1150, 2026-09-02. The probe added in #1153 went on the `tests` matrix
@@ -457,19 +485,14 @@ jobs:
           # one expectedTotal, which makes that self-verifying: overlap, a gap, or a
           # part that silently fails to run all break the sum.
           if [ "${{ matrix.name }}" = "compiler" ]; then
-            letters="B C G L O Q R S T U Y"
-            inc=""; exc=""
-            for letter in $letters; do
-              inc="${inc:+$inc|}FullyQualifiedName~Calor.Compiler.Tests.$letter"
-              exc="${exc:+$exc&}FullyQualifiedName!~Calor.Compiler.Tests.$letter"
-            done
+            eval "$(bash scripts/compiler-shard-filter.sh)"
             dotnet test "${{ matrix.project }}" -c Release --no-build \
-              --filter "$inc" \
+              --filter "$SHARD1_FILTER" \
               --logger "trx;LogFileName=${{ matrix.name }}-1.trx" \
               --results-directory artifacts/test \
               --verbosity normal 2>&1 | tee test-output.log
             dotnet test "${{ matrix.project }}" -c Release --no-build \
-              --filter "$exc" \
+              --filter "$SHARD2_FILTER" \
               --logger "trx;LogFileName=${{ matrix.name }}-2.trx" \
               --results-directory artifacts/test \
               --verbosity normal 2>&1 | tee -a test-output.log
