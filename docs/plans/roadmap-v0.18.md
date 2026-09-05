@@ -753,8 +753,33 @@ not shorten that.
    forced it.
 3. **#965** — whether the perf suite killed the runner on a release path. 0.16.0 and 0.17.0 have
    both now shipped, so the observation window R17 was waiting on has closed twice.
-4. **`--permissive-effects` Calor0410 demotion** (§0.4) — **newly due**; the end condition fired on
-   2026-09-01. It defines **arm A** — the permissive control — and blocks M3(3).
+4. **`--permissive-effects` Calor0410 demotion** (§0.4) — **ADJUDICATED 2026-09-04.**
+
+   > `--permissive-effects` waives `Calor0425` and assumes unresolved calls pure — "we cannot
+   > tell". It no longer demotes `Calor0410` for a **named** effect, which is "we know it is
+   > wrong", matching the rule already stated for `Calor0424` ("never waived, at any site, by any
+   > flag"). A `Calor0410` whose forbidden effect is `EffectKind.Unknown` **is** still waived: that
+   > charge means the pass could not name the value, which is exactly what the flag exists for.
+
+   *Scoping, not removal*, pinned from both sides —
+   `Permissive_DoesNotDemoteNamedCalor0410_AndLeavesCalor0406Alone` and
+   `Permissive_StillWaives_UnknownChargedCalor0410`. Without the second, the change would be
+   indistinguishable from deleting the flag's effect on `Calor0410` entirely.
+
+   *Cost, measured before the change and confirmed after.* Corpus: **~21 diagnostics across ~14
+   modules** move warning → error, against **328** that permissive's assume-pure behaviour still
+   suppresses — about 6 % of what the flag was hiding. Test suite: **six tests**, three of which
+   merely encoded the old rule.
+
+   *What the other three exposed, and it is the more useful half.* The converter emits Calor whose
+   `§E` rows do not cover the effects its own emitted body performs — `alloc` most often. The flag
+   had been hiding that, on exactly the code it was built for. **Filed as #1173**, same class as
+   #1128. Those round trips now disable effect enforcement in their own helper, which is what
+   `ConversionScorecardRunner:157` and `ConvertibilityAnalyzer:144` already do and is **narrower**
+   than the global waiver just removed: the pass is skipped for one helper with the issue cited,
+   not silenced everywhere.
+
+   **Unblocks M3(3):** arm A, the permissive control, now has a definition to register.
 
 ---
 

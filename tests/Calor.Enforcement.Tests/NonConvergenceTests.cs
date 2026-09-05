@@ -562,12 +562,21 @@ public class NonConvergenceTests
     }
 
     /// <summary>
-    /// The control for the theory above: under Permissive the same SCC fixture
-    /// with an under-declaring member gets its Calor0410 as a WARNING, so the
-    /// flag is doing its job on 0410 while leaving 0406 alone.
+    /// The control for the theory above: Permissive leaves Calor0406 alone.
+    /// <para>
+    /// <b>Updated 2026-09-04 (roadmap-v0.18 §9.4).</b> This test used to assert that
+    /// the same fixture's Calor0410 came back as a WARNING. It no longer does, and the
+    /// change is the point: the forbidden effect here is <c>fs:r</c>, a NAMED effect
+    /// reached through <c>File.ReadAllText</c>. That is "we know it is wrong", and no
+    /// flag demotes it now — matching what the compiler already said about Calor0424
+    /// ("never waived, at any site, by any flag") and about Calor0425 ("a waiver for
+    /// <i>we do not know</i> is honest; a waiver for <i>we know it is wrong</i> is
+    /// not"). Permissive still waives an <c>EffectKind.Unknown</c> charge; see
+    /// <see cref="Permissive_StillWaives_UnknownChargedCalor0410"/>.
+    /// </para>
     /// </summary>
     [Fact]
-    public void Permissive_DemotesCalor0410_ButNotCalor0406()
+    public void Permissive_DoesNotDemoteNamedCalor0410_AndLeavesCalor0406Alone()
     {
         var underDeclared = ThreeHopMutualRecursion.Replace(
             "§F{f003:C:pub} (i32:n) -> i32\n    §E{cw,cr,fs:r}",
@@ -578,10 +587,65 @@ public class NonConvergenceTests
         var diagnostics = Enforce(underDeclared, sccCap: 100, policy: UnknownCallPolicy.Permissive);
         var forbidden = diagnostics.Where(d => d.Code == DiagnosticCode.ForbiddenEffect).ToList();
         Assert.NotEmpty(forbidden);
-        Assert.All(forbidden, d => Assert.Equal(DiagnosticSeverity.Warning, d.Severity));
+
+        // 'fs:r' is a named effect, so Permissive does not touch it.
+        Assert.All(forbidden, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
+        Assert.All(forbidden, d => Assert.Contains("fs:r", d.Message, StringComparison.Ordinal));
 
         var capped = Enforce(underDeclared, sccCap: 2, policy: UnknownCallPolicy.Permissive);
         Assert.Equal(DiagnosticSeverity.Error, Assert.Single(NonConvergence(capped)).Severity);
+    }
+
+    /// <summary>
+    /// The other half of the 2026-09-04 adjudication, and the one that makes it a
+    /// SCOPING of <c>--permissive-effects</c> rather than a removal: a Calor0410 whose
+    /// forbidden effect is <c>EffectKind.Unknown</c> is still demoted under Permissive.
+    /// <para>
+    /// That charge means the pass could not name the value it was charging — "we cannot
+    /// tell" — which is exactly what the flag exists to waive. Here <c>Twice</c> passes
+    /// a field the pass cannot resolve to a rowed declaration, so v0.17's S1 fail-closed
+    /// rule charges Unknown; under Strict that is an error, under Permissive a warning.
+    /// </para>
+    /// <para>
+    /// Without this test the adjudication is indistinguishable from deleting the flag's
+    /// effect on Calor0410 entirely, and the pair
+    /// (<see cref="Permissive_DoesNotDemoteNamedCalor0410_AndLeavesCalor0406Alone"/>,
+    /// this) is what pins the line between the two halves.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Permissive_StillWaives_UnknownChargedCalor0410()
+    {
+        const string source = """
+            §M{m001:UnknownCharge}
+              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+                §E{e}
+                §R (+ §C{stage} §/C §C{stage} §/C)
+
+              §CL{c001:Holder:pub}
+                §FLD{Func<i32>:stage:pri} §E{cw}
+                §MT{mt001:Twice:pub} () -> i32
+                  §E{}
+                  §R §C{RunTwice} §A this.stage §/C
+            """;
+
+        var strict = TestHarness.CompileWithEffects(
+            source, policy: UnknownCallPolicy.Strict);
+        var strictForbidden = strict.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.ForbiddenEffect).ToList();
+        Assert.NotEmpty(strictForbidden);
+        Assert.All(strictForbidden, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
+
+        var permissive = TestHarness.CompileWithEffects(
+            source, policy: UnknownCallPolicy.Permissive);
+        var permissiveForbidden = permissive.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.ForbiddenEffect).ToList();
+
+        // Waived, not escalated: whatever Permissive leaves is a warning, never an error.
+        Assert.DoesNotContain(
+            permissive.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.All(permissiveForbidden, d => Assert.Equal(DiagnosticSeverity.Warning, d.Severity));
     }
 
     // ------------------------------------------------------------------

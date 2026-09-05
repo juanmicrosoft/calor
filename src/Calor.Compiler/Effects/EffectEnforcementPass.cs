@@ -721,10 +721,32 @@ public sealed class EffectEnforcementPass
         {
             var forbidden = computedEffects.Except(declaredEffects).ToList();
 
-            // In permissive mode, demote forbidden-effect errors to warnings
-            var severity = _policy == UnknownCallPolicy.Permissive
-                ? DiagnosticSeverity.Warning
-                : DiagnosticSeverity.Error;
+            // ADJUDICATED 2026-09-04 (roadmap-v0.18 §9.4). --permissive-effects used
+            // to demote EVERY Calor0410 here, whatever the forbidden effect was. That
+            // contradicted the rule this compiler states for itself on Calor0425:
+            //
+            //     a waiver for "we do not know" is honest;
+            //     a waiver for "we know it is wrong" is not
+            //
+            // and it made Calor0410 the odd one out beside Calor0424, which is
+            // "never waived, at any site, by any flag".
+            //
+            // The waiver is now scoped to what it can honestly cover. A forbidden
+            // effect of EffectKind.Unknown IS "we cannot tell" — the pass charged
+            // Unknown because it could not name the value — so permissive may still
+            // waive it. A NAMED effect is "we know it is wrong": the function
+            // demonstrably does the thing and did not declare it, and no flag demotes
+            // that.
+            //
+            // Measured cost at adjudication, over the converted corpus with the effect
+            // pass enforcing under Permissive: ~21 diagnostics across ~14 modules move
+            // from warning to error, against 328 that permissive's assume-pure
+            // behaviour for unresolved calls continues to suppress. So this changes
+            // ~6 % of what the flag was hiding and leaves the other 94 % alone.
+            DiagnosticSeverity SeverityFor(EffectKind kind) =>
+                _policy == UnknownCallPolicy.Permissive && kind == EffectKind.Unknown
+                    ? DiagnosticSeverity.Warning
+                    : DiagnosticSeverity.Error;
 
             // Compute the full correct effect set for the fix
             var correctEffects = declaredEffects.Union(computedEffects);
@@ -763,6 +785,8 @@ public sealed class EffectEnforcementPass
 
             foreach (var (kind, value) in forbidden)
             {
+                var severity = SeverityFor(kind);
+
                 // Find the call chain that leads to this effect
                 var chain = FindCallChain(function.Id, kind, value);
                 var chainStr = chain.Count > 0 ? $"\n  Call chain: {string.Join(" → ", chain)}" : "";
