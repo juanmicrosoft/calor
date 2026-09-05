@@ -480,6 +480,18 @@ gate 15's floor is unchanged and undischarged. Gate 15 is unaffected: no
 fix has been attempted, and its 20-run floor stands.
 
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
+**Draft v1 written 2026-09-05: `2026-09-05-ppw-rows-fixture-redesign.md`.** The defect analysis
+A:90-92 requires is §1 there, and it found something stronger than "the fixtures are underpowered":
+**the six tasks were built so that the laundering the effect system catches is also a visible
+failure of the stated requirement**, which the held-out tests already catch. Where those coincide,
+rows are redundant *by construction* and no sample size can produce a positive result. W:§2's
+worked example is the proof — an agent declared `§E{cw}` honestly because declaring it cost
+nothing. §2 turns that into seven rules a candidate task is rejected against; §3 re-registers the
+arms on **one compiler** (the old A/B confounded rows-vs-no-rows with v0.14.3-vs-v0.15.0) and
+records that the 2026-09-04 adjudication makes arm A a *narrower* control, so the expected effect is
+smaller — registered before collection, not discovered after. §4 declines to invent a Δ and
+registers a two-stage pilot/confirmatory design with pilot data barred from the confirmatory
+analysis.
 
 W:§6 states the defect: *"six tasks that agents complete honestly cannot measure whether a compiler
 stops dishonesty."* The evidence A:90-92 requires as a "documented empirical defect in the
