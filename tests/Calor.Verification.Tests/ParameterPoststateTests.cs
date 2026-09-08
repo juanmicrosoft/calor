@@ -76,6 +76,46 @@ public class ParameterPoststateTests
     }
 
     [Fact]
+    public void PropertyGetterMutatingRefAlias_KeepsRuntimeGuard()
+    {
+        const string source = """
+            §M{m1:HiddenMutation}
+              §CL{c1:Counter:pub}
+                §FLD{i32:Value:pub}
+                §PROP{p1:Mutate:i32:pub}
+                  §GET
+                    §ASSIGN Value INT:-1
+                    §R Value
+                §MT{mt1:Change:pub}
+                  §I{i32:x:ref}
+                  §O{i32}
+                  §E{}
+                  §Q (>= x 0)
+                  §S (>= x 0)
+                  §B{ignored:i32} Mutate
+                  §R x
+            """;
+        const string harness = """
+            public static class Caller
+            {
+                public static int Run()
+                {
+                    var counter = new HiddenMutation.Counter { Value = 1 };
+                    return counter.Change(ref counter.Value);
+                }
+            }
+            """;
+        foreach (var verify in new[] { false, true })
+        {
+            var result = Compile(source, verify);
+            if (verify)
+                Assert.Contains(result.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
+            var exception = Assert.Throws<TargetInvocationException>(() => Invoke(result, harness));
+            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+        }
+    }
+
+    [Fact]
     public void PreviousCacheFormat_IsRejected()
     {
         var entry = new VerificationCacheEntry { Version = "1.14" };
@@ -113,17 +153,19 @@ public class ParameterPoststateTests
         return result;
     }
 
-    private static object? Invoke(CompilationResult result)
+    private static object? Invoke(CompilationResult result, string? harness = null)
     {
         var compilation = CSharpCompilation.Create(
             "Poststate_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode)],
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode + harness)],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
         var assembly = Assembly.Load(stream.ToArray());
+        if (harness != null)
+            return assembly.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null);
         var type = Assert.Single(assembly.GetTypes(), t => t.Name == "ParameterPoststateModule");
         return type.GetMethod("Change")!.Invoke(null, [1]);
     }

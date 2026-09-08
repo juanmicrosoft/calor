@@ -645,39 +645,43 @@ public sealed class Z3Verifier : IDisposable
 public static class FunctionBodyEncoder
 {
     internal static bool PreservesEntryState(
-        IReadOnlyList<StatementNode> body, IReadOnlySet<string> parameters)
+        IReadOnlyList<StatementNode> body, IReadOnlySet<string> parameters,
+        IReadOnlySet<string>? enclosingLocals = null)
     {
+        var locals = new HashSet<string>(enclosingLocals ?? parameters, StringComparer.Ordinal);
         foreach (var statement in body)
         {
             var safe = statement switch
             {
-                ReturnStatementNode ret => ret.Expression == null || IsStatePreservingExpression(ret.Expression),
+                ReturnStatementNode ret => ret.Expression == null || IsStatePreservingExpression(ret.Expression, locals),
                 BindStatementNode bind => !parameters.Contains(bind.Name)
-                    && bind.Initializer != null && IsStatePreservingExpression(bind.Initializer),
-                IfStatementNode conditional => IsStatePreservingExpression(conditional.Condition)
-                    && PreservesEntryState(conditional.ThenBody, parameters)
-                    && conditional.ElseIfClauses.All(c => IsStatePreservingExpression(c.Condition)
-                        && PreservesEntryState(c.Body, parameters))
-                    && (conditional.ElseBody == null || PreservesEntryState(conditional.ElseBody, parameters)),
+                    && bind.Initializer != null && IsStatePreservingExpression(bind.Initializer, locals),
+                IfStatementNode conditional => IsStatePreservingExpression(conditional.Condition, locals)
+                    && PreservesEntryState(conditional.ThenBody, parameters, locals)
+                    && conditional.ElseIfClauses.All(c => IsStatePreservingExpression(c.Condition, locals)
+                        && PreservesEntryState(c.Body, parameters, locals))
+                    && (conditional.ElseBody == null || PreservesEntryState(conditional.ElseBody, parameters, locals)),
                 _ => false
             };
             if (!safe)
                 return false;
+            if (statement is BindStatementNode binding)
+                locals.Add(binding.Name);
         }
         return true;
     }
 
-    private static bool IsStatePreservingExpression(ExpressionNode expression) => expression switch
+    private static bool IsStatePreservingExpression(ExpressionNode expression, IReadOnlySet<string> locals) => expression switch
     {
         IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode => true,
-        ReferenceNode reference => !reference.Name.Contains('.'),
+        ReferenceNode reference => locals.Contains(reference.Name),
         UnaryOperationNode unary => unary.Operator is UnaryOperator.Negate or UnaryOperator.Not or UnaryOperator.BitwiseNot
-            && IsStatePreservingExpression(unary.Operand),
-        BinaryOperationNode binary => IsStatePreservingExpression(binary.Left)
-            && IsStatePreservingExpression(binary.Right),
-        ConditionalExpressionNode conditional => IsStatePreservingExpression(conditional.Condition)
-            && IsStatePreservingExpression(conditional.WhenTrue)
-            && IsStatePreservingExpression(conditional.WhenFalse),
+            && IsStatePreservingExpression(unary.Operand, locals),
+        BinaryOperationNode binary => IsStatePreservingExpression(binary.Left, locals)
+            && IsStatePreservingExpression(binary.Right, locals),
+        ConditionalExpressionNode conditional => IsStatePreservingExpression(conditional.Condition, locals)
+            && IsStatePreservingExpression(conditional.WhenTrue, locals)
+            && IsStatePreservingExpression(conditional.WhenFalse, locals),
         _ => false
     };
 
