@@ -2,13 +2,14 @@
 
 **Created:** 2026-09-08
 
-**Status:** Draft v2, revised for a second review round. Decision-first proposal;
+**Status:** Draft v3, focused revision after two critique rounds. Decision-first proposal;
 no prototype, experiment, recruitment commitment, or spending authorized.
 
 **Release sequence:** v0.18 finishes its current work; v0.19 addresses the
 [language audit epic #1182](https://github.com/juanmicrosoft/calor/issues/1182)
 and [website audit epic #1202](https://github.com/juanmicrosoft/calor/issues/1202).
-v0.20 tests whether safe delegation earns Calor an adoption advantage.
+This roadmap evaluates the investment proposed for v0.20; a decision-only
+stop does not trigger a package release or consume that version number.
 
 **Decision owner:** repository maintainer. An independent reviewer must sign
 off on the comparison and final interpretation before any advantage claim.
@@ -55,8 +56,9 @@ substitute for this experiment.
 **M0 is a desk feasibility screen before implementation or external
 commitments.** The initial arithmetic in section 6.3 does not justify
 scheduling the full comparison under the proposed resource envelope.
-M0 must either produce a credible route to the unchanged adoption gates,
-or stop that comparison before M1-M4 consume resources.
+M0 first sizes the original gates, then maps conditional alternatives
+without approving them. Its four outputs are defined in section 6.3.
+No output itself authorizes implementation or changes the safety claim.
 
 An independently approved exploratory study is another option, not a
 fallback pass. It may measure friction or disprove a mechanism on an
@@ -236,9 +238,11 @@ All arms may use practical existing tools, including formal tools in C#.
 Do not require B to analyze unrestricted C#: it may use the same restrictions
 as C. Do not ban a good C# solution because it makes Calor less distinctive.
 
-M0 sketches B using practical existing components, including property-based
-testing, runtime guards, and the shared acceptance service. M1 requires a
-C#-experienced non-maintainer to approve B's design, diagnostics, and tool
+M0 sketches B using property-based testing, runtime guards, the shared
+acceptance service, and Roslyn/static restrictions on I/O, host mutation,
+and nondeterminism. A banned-API list alone is not an effect system:
+the design must address wrappers, transitive calls, and unanalyzed code.
+M1 requires a C#-experienced non-maintainer to approve B's design and tool
 choices **before C's integration starts**, not merely endorse the result.
 Publish the review's concrete acceptance criteria and disclose conflicts.
 
@@ -272,11 +276,13 @@ source clusters disjoint between pilot and final pools. Report historical
 and authored outcomes separately as well as under the frozen task weights.
 
 Use the adopter's preceding 12-month history as the initial sampling frame.
-Do not assume the next two weeks can supply a year's changes. M0 estimates
-required task supply; M1 inventories eligible historical requests and their
-artifacts. If that frame cannot supply the powered design, stop rather than
-fill it with synthetic variants. The 50-future-request adoption horizon
-is a separate business assumption, not the size of the evaluation pool.
+M0 reports available inventory or labels scenario counts as unverified;
+M1 confirms actual eligible requests before authorizing implementation.
+Record source IDs/hashes, exclusions, usable historical count, independently
+authored clusters, source linkage, and pilot/final reservations. Apply the
+75% historical-weight floor to each pool. Missing supply cannot be filled
+with correlated variants. The 50-future-request adoption minimum is neither
+a historical measurement nor a ceiling; section 6.3 accounts for actual supply.
 Historical implementations and incident reports inform the independent
 oracle but are not automatically correct reference answers.
 
@@ -369,9 +375,11 @@ no exclusions based on which arm lost.
 ## 6. Primary claim and decision rules
 
 These are **proposed adoption thresholds**, not observed results or approved
-spend. M0 first sizes these thresholds as written. M1 may approve them or
-propose a separately reviewed change on business grounds before any
-comparative pilot; it cannot silently trade safety for affordability.
+spend. The safety margin remains **+1 percentage point** in this revision.
+M0 may map alternatives, but cannot approve one. A changed margin requires
+a separate, written business-risk rationale, adopter acceptance, independent
+review, and decision-owner approval before any comparative pilot. Publish
+the original and replacement claims; affordability alone is not a rationale.
 Once pilot outcomes are visible, do not relax them to obtain power or a win.
 M4 freezes the complete statistical implementation before final collection.
 v0.20 uses one primary economic route, not a choice between several favorable
@@ -428,9 +436,13 @@ Use preapproved role-specific human rates, identical for the same role in
 all arms. Publish results over a preregistered plausible rate range.
 
 Setup observed once per arm is a case-specific cost, not a population
-estimate with repeated-task precision. M1 freezes setup uncertainty bands
-and rate scenarios from documented estimates before observing comparative
-pilot outcomes. Report the measured setup, the bands, and break-even
+estimate with repeated-task precision. The maintainer proposes the cost
+dictionary, setup bands, and role-rate scenarios; the adopter's engineering
+lead and independent methods reviewer approve them in M1 before the pilot.
+Band widths must cover documented estimation uncertainty; tighter ranges
+need written evidence, not a convenient universal percentage. Record names,
+estimates, uncertainty sources, and classifications, including training
+versus research-only work. Report the measured setup, bands, and break-even
 sensitivity. An economic pass must hold at the least favorable allowed
 setup/rate combination for each required comparison. Statistical intervals
 cover task/reviewer sampling conditional on those inputs; they do not imply
@@ -470,10 +482,21 @@ The +1 percentage point safety allowance is a proposed non-inferiority
 margin, **not "no extra risk"**. The adopter must explicitly accept it before
 pilot collection; unacceptable risk means no experiment under this proposal.
 Report absolute rates and intervals alongside relative differences.
-Bounds are one-sided with simultaneous 95% coverage across the registered
-gate quantities for C versus A, C versus B, and the B-versus-A workflow
-decision. M4 freezes the joint error-control method; unadjusted individual
-95% intervals do not substitute for the complete decision procedure.
+**Error control is across the two positive decision branches.** Allocate
+alpha = 0.025 to LANGUAGE EARNS CONTINUATION and alpha = 0.025 to WORKFLOW
+VALUE. Within each branch, every statistical component must pass at that
+branch's level: use valid **one-sided 97.5% bounds**, including pessimistic
+registered cost inputs. The branch is an intersection-union test; if any
+required component is false, passing the entire conjunction has probability
+at most 0.025. No further within-branch multiplicity penalty is needed.
+
+The union bound therefore limits any false positive branch claim to 5%,
+without assuming independent components or branches. Section 8's precedence
+selects the reported outcome; precedence alone is not error control. These
+are decision bounds, **not simultaneous confidence coverage** of every
+quantity. Descriptive 95% intervals may also be shown but cannot adjudicate
+the gates. M4 validates the estimators under the actual clustered design.
+See [intersection-union theorem 17.3](https://bookdown.org/jkang37/stat205b-notes/lecture13.html#thm:thm17003).
 
 Review time, agent iterations, context read, and prevented violations are
 secondary explanations. Neither a fivefold point-estimate defect reduction
@@ -481,52 +504,65 @@ nor a better token score can rescue failure of the primary economic route.
 
 ### 6.3 Size first; calibrate only if a credible route exists
 
-#### M0 desk screen: before recruitment or implementation
+#### M0 desk screen: conditional outputs, no implementation authority
 
-The following is planning arithmetic, not results from Calor runs. For
-independent binary observations with zero events, the exact one-sided
-95% upper bound on a **single rate** is `1 - 0.05^(1/n)`:
+These are single-rate, zero-event illustrations, not Calor results or the
+paired risk-difference design. For n independent binary observations the
+upper bound is `1 - alpha^(1/n)`:
 
-| Independent observations n | Single-rate upper bound | Six-way Bonferroni illustration |
+| Independent observations n | Descriptive 95% bound | Branch-level 97.5% illustration |
 |---|---|---|
-| 20 | 13.91% | 21.29% |
-| 30 | 9.50% | 14.75% |
-| 50 | 5.82% | 9.13% |
-| 100 | 2.95% | 4.67% |
-| 299 | <= 1.00% | > 1.00% |
+| 20 | 13.91% | 16.84% |
+| 30 | 9.50% | 11.57% |
+| 50 | 5.82% | 7.11% |
+| 100 | 2.95% | 3.62% |
+| 299 | <= 1.00% | 1.23% |
+| 368 | 0.81% | <= 1.00% |
 
-The six-way illustration uses `1 - (0.05/6)^(1/n)`; it reaches 1% at
-477 observations. Neither column is the paired risk-difference interval
-or the final simultaneous procedure. They show why zero defects in a small
-sample is not strong safety evidence. Accepted-only denominators and
-task/reviewer dependence add further constraints.
+The 1% crossovers are 299 and 368 observations respectively. For scale,
+an unpaired approximation with equal 3% event rates, zero true difference,
+1-point margin, alpha 0.025 and 80% power gives about 4,570 per arm:
+`n = (1.960 + 0.842)^2 * 2 * 0.03 * 0.97 / 0.01^2`.
+Pairing, accepted-only denominators, and clustering require the actual
+methods, not substitution of these figures as final sample sizes.
 
-For another illustration, an unpaired normal approximation at equal 3%
-defect rates, true difference zero, 1-point margin, one-sided alpha 0.05,
-and 80% power gives about 3,600 observations **per arm**:
-`n = (1.645 + 0.842)^2 * 2 * 0.03 * 0.97 / 0.01^2`.
-Pairing may reduce this if cross-arm outcomes are correlated; neither that
-correlation nor these assumed rates have been measured for this workload.
+Capacity and task supply are separate constraints. At 20 minutes per slot,
+40 available review hours buy 40 three-arm triplets with one repetition;
+all 80 hours buy 80, before pilot reservations and other duties. If actual
+eligible historical supply H is 50, the 75% historical-weight floor allows
+at most `floor(H / 0.75) = 66` equal-weight clusters across both pools,
+before further source-linkage restrictions. This is an upper bound, not a
+promise that independent authored clusters exist. Final capacity must also
+subtract pilot history and review use. **H has not been measured here**;
+the minimum 50 future requests does not imply H = 50.
 
-If 40 of the proposed 80 non-maintainer hours remain after other duties,
-20 minutes of review per slot buys 120 slots, or just 40 three-arm task
-triplets with one repetition, **before** reserving a disjoint pilot.
-Even spending all 80 hours on timed review buys only 80 triplets under
-that assumption. These are capacity scenarios, not measured review times.
+Before calculating, register scenario ranges, methods, and the following
+output rules. Size the original 1-point margin first. Map margins
+{1, 2, 5, 10} points against review capacities {40, 80, 150, 300} triplets
+and inventoried or explicitly hypothetical task supplies. Larger margins
+are tradeoff illustrations, not acceptable risk by default. Record the
+adopter/owner's independently justified risk limit separately; absent
+approval, 1 point remains the only adoption claim.
 
-**Current disposition: the full comparison is not justified for scheduling
-under the proposed ceiling.** M0 must assess all section 6.2 gates at
-candidate independent task counts 20, 30, 50, and 100, plus any larger
-fundable design. Include paired event-rate/correlation scenarios, cost
-variation, setup bands, completion uncertainty, and task/reviewer supply.
-Do not infer final power from this single-rate table.
+For each row, show every gate's required sample/cost range, both positive
+decision scenarios, source-task limits, and assumptions about pairing,
+event rates, completion, cost variation, setup, and reviewer dependence.
+Compute available final n from **both** review capacity and independent
+task supply after pilot reservations. M0 uses analytic bounds/approximations
+with limitations disclosed; an indeterminate calculation is not a pass.
 
-M0 delivers a short sizing memo and resource worksheet, not a new compiler
-or full adjudicator. Explicitly identify which assumptions lack evidence.
-If conservative, plausible scenarios do not show a credible joint route
-within an approved resource ceiling, stop before M1. A tiny pilot may not
-be funded merely in the hope that implausibly favorable rates will appear.
-An increased resource proposal needs separate approval before commitment.
+| M0 output | Rule and next action |
+|---|---|
+| FEASIBLE AS PROPOSED | Conservative registered scenarios show a credible joint route under the original gates, candidate resources, and evidenced task supply. Refer to M1 authorization; this is not final power confirmation. |
+| REQUIRES SEPARATE APPROVAL | A credible conditional row requires specified resource, risk, or scope changes. Refer only that proposal to M1 review; no implementation until business approval and updated sizing establish the approved route. |
+| NOT FEASIBLE | Even the most favorable registered, defensible scenario needs more than available capacity/supply for every acceptable row. Publish the scoped stop; no automatic exploration or funding. |
+| INSUFFICIENT INFORMATION | Missing inventory/estimates or unresolved method uncertainty prevents the above dispositions. Name the smallest information request, owner, and deadline; M1 may approve only that bounded inquiry. Deadline expiry stops the study with this label retained, not converted into evidence of no demand or no value. |
+
+Apply rules in order; favorable-only scenarios cannot yield FEASIBLE AS
+PROPOSED. The independent methods reviewer countersigns the memo before
+M1 may authorize follow-on work. Unknown supply stays unknown, not zero
+or an invented large pool. A stop is scoped to the registered scenario
+envelope, not a proof that no future experiment could work.
 
 #### M4 calibration and final registration
 
@@ -587,16 +623,29 @@ separate authorization; it is not automatic v0.20 scope.
 ### 7.1 Decision stage first
 
 M0 is proposed as a maximum **two engineering person-day desk exercise**,
-with no paid agent collection, new acceptance service, or external
-commitments. It may be done before v0.19 finishes because its first job is
-to reject an unaffordable design. Approval of this roadmap alone does not
-authorize even that exercise; the owner records its limited authorization.
+with no paid agent collection, new acceptance service, or adopter
+commitments. Its authorization also names the independent methods reviewer
+and budgets review time explicitly against the non-maintainer allowance.
+It may precede v0.19; roadmap approval alone does not authorize execution.
 
-Order: desk sizing of the original gates -> protected-C# design sketch ->
-resource/task-supply screen -> decision whether to pursue research
-participation. M1's independent B-design sign-off and research agreement
-follow only a credible M0 outcome. Do not recruit against an eight-week
-experiment that has not passed its desk screen.
+M0 reports recruitment status since Call W as **not attempted**, **attempted
+without commitment**, **participant secured**, or **unknown**, with dated
+aggregate evidence. Do not equate unattempted/unknown recruitment with a
+failed search. Either can leave demand unproven without implying rejection.
+
+| Approval responsibility | Required owner and decision |
+|---|---|
+| Resources and investment | Repository maintainer: authorize M0/inquiries, decide resource proposals and final action; no self-approval of independent methodological review. |
+| Methods and M0 disposition | Independent methods reviewer: approve scenario rules before calculation, countersign M0, approve estimators and final interpretation. |
+| Business risk and cost assumptions | Adopter engineering lead plus independent methods reviewer: approve safety acceptability, cost classification, setup/rate uncertainty; maintainer signs any replacement claim. |
+| Protected-C# credibility | Qualified non-maintainer C# reviewer: sign B's design before C integration; may also fill another compatible role. |
+| Historical supply and consent | Adopter engineering lead: confirm inventory, workload horizon, research agreement and exit promises in M1. |
+| Correctness follow-through | Compiler maintainer: record ownership/disposition of the false-established search even if comparison work stops. |
+
+Enter actual assignee names and dated decisions in the authorization record;
+these roles are not claims that anyone has agreed. Missing required approval
+blocks that action. M1 review-only entry under a conditional M0 output may
+address requirements or bounded information requests, not start M2-M4.
 
 If the original comparison is not feasible, record that before considering
 an **exploratory option**. A separate proposal must name one uncertainty,
@@ -607,6 +656,9 @@ probe can find false guarantees. Neither can pass section 6, downgrade its
 safety gate to descriptive reporting, cross Call 3, or authorize full
 section 4 implementation. A promising exploration may justify proposing a
 new study, not automatically continuing language investment.
+Maintainer-only timings must be labeled **author time**, not adopter review
+savings. Any external-review-time claim needs a non-maintainer participant
+and must still disclose the exploratory sample and its limits.
 
 ### 7.2 Resource reconciliation is an entry gate
 
@@ -653,23 +705,24 @@ basis; M4 cannot increase it after examining pilot outcomes.
 
 ### 7.3 Gated milestones, not a prebooked eight-week study
 
-M1 may start only after M0 has a credible disposition and v0.19 has a
-published release/epic disposition. The delivery clock starts on **M1
-approval**, after people, scope, and resources are committed, not on this
-document's date. M0 authorization must also set a fixed deadline for an M1
-decision so recruitment cannot remain pending indefinitely. M1 publishes
-actual dates and critical-path estimates within the authorized ceiling.
-No overlapping milestone is assumed to create extra engineering capacity.
+M1 may review FEASIBLE AS PROPOSED or REQUIRES SEPARATE APPROVAL outputs;
+INSUFFICIENT INFORMATION permits only an explicitly bounded inquiry. M1
+**implementation authorization** additionally requires an approved, sized
+route, all named approvals, and v0.19's published release/epic disposition.
+Only then does the delivery clock start. M0 authorization fixes the M1
+decision/inquiry deadline; expiry cannot trigger automatic extension.
+M1 publishes actual dates and critical-path estimates within the ceiling.
+Overlapping milestones do not create extra capacity.
 
 | Milestone | Dependency | Deliverable and stop condition |
 |---|---|---|
-| M0: desk feasibility | Limited owner authorization | Sizing of unchanged gates, B sketch, resources, task supply, and pursue/stop disposition. No credible route means no M1-M4 implementation commitment. |
-| M1: authorize the chosen comparison | M0 credible; v0.19 disposition | Governance, research agreement, B-design sign-off, historical inventory, supported matrix, cost dictionary/bands, people, dates, thresholds, and resources. Missing demand or capacity stops. |
-| M2: build the smallest credible comparison | M1 approved | Working A/B/C and shared protected service; separately budgeted matrix-wide mechanism suite. Missing credible comparator or trust boundary stops collection. |
+| M0: desk feasibility | Limited authorization; named methods reviewer | Original-gate sizing, conditional frontier, B sketch, actual/scenario task supply, and countersigned four-way output. No implementation authority. |
+| M1: review then authorize | M0 route or bounded inquiry; v0.19 disposition required for implementation | Resolve stated conditions, independently approve any business-risk change, and confirm governance, B design, inventory, cost bands, people, dates, and resources. Only completed authorization opens M2. |
+| M2: build the smallest credible comparison | M1 implementation authorization complete | Working A/B/C and shared protected service; separately budgeted matrix-wide mechanism suite. Missing credible comparator or trust boundary stops collection. |
 | M3: establish independent task evidence | M1 inventory; M2 runnable | Shared oracle, deterministic references, disjoint pilot/final pools, reviewer assignment, boundary cases. Insufficient independent task supply stops. |
 | M4: calibrate once and freeze | M2-M3 entry criteria pass | Pilot report, executable joint-power/cost analysis, fixed final counts, exact estimators, pins, and funded collection dates. Infeasible means stop, not a bar change. |
 | M5: collect without tuning | M4 frozen and feasible | Complete paired runs, timed reviews, immutable submissions, costs and hidden outcomes. Budget stop or soundness defect cannot pass. |
-| M6: publish and decide | M5 complete or any stop | Report, independent interpretation where a comparative claim is made, handoff obligations, and investment decision. A pre-collection stop does not require building later milestones. |
+| M6: publish and decide | M5 complete or any stop | Report, required independent interpretation, obligations and correctness-work disposition, and investment decision. A stop does not require later implementation or a package release. |
 
 v0.19 retains ownership of both epics; this roadmap neither reopens their
 tasks nor silently transfers them to v0.20. Its entry disposition must list
@@ -678,6 +731,12 @@ touching the experiment's guarantees must be resolved or explicitly
 excluded with an enforced restriction.
 Website defects do not become new proof work; their remediation must keep
 eventual claims and instructions aligned with the actual experiment.
+On any stop, the compiler maintainer records a disposition for section 4.4's
+broader false-established search: covered by existing #1182 work, proposed
+as a separately scoped correctness follow-up with a named owner, or explicitly
+deferred with rationale and risk. Known audit fixes remain v0.19 obligations.
+Do not silently enlarge that epic, drop the search, or automatically fund
+an experimental acceptance service.
 
 ### 7.4 Reuse plan to cost, not assumed compatibility
 
@@ -708,6 +767,9 @@ commands, or schemas are not assumed to exist.
 Decision precedence: INVALID first, then LANGUAGE EARNS CONTINUATION,
 then WORKFLOW VALUE, then TARGET NOT MET. Pre-collection stops use the
 specific NOT FEASIBLE or DEMAND UNPROVEN label.
+Preserve INSUFFICIENT INFORMATION when an M0 inquiry expires unresolved;
+it is a stopped investment, not evidence of infeasibility or rejected demand.
+REQUIRES SEPARATE APPROVAL is pending, never a positive experimental result.
 
 Exploratory evidence is **EXPLORATORY ONLY**, outside this outcome table's
 positive decisions. It cannot produce LANGUAGE EARNS CONTINUATION or
@@ -717,6 +779,13 @@ separately from any later authorized exploration.
 One domain and one model do not support a general language superiority claim.
 Wider claims require separately funded replication. A later model or adopter
 may justify a new experiment, but not a rewrite of this outcome.
+
+**Release rule:** a memo or stop decision alone does not produce a v0.20
+NuGet package, release tag, or version bump. Close the investigation with
+its decision record; the next version number remains for actual software.
+If separately authorized implementation ships, its release plan must name
+the artifacts, supported guarantees, and normal release criteria. Neither
+a green experiment nor a stop memo substitutes for those criteria.
 
 ## 9. Evidence package and relationship to existing gates
 
@@ -744,10 +813,10 @@ M4 registers a **new experiment identity**, with an explicit crosswalk of
 changed metrics, denominators, controls, and resource rules. Existing guards
 and append-only registry requirements must still be honored.
 
-## 10. Definition of done for v0.20
+## 10. Definition of done for this investment decision
 
-- [ ] v0.18's actual result and v0.19's two epic dispositions are recorded.
-- [ ] M0 sizes the original claim before implementation and records pursue/stop.
+- [ ] Current v0.18/v0.19 status is recorded; final dispositions gate implementation, not an early M0 stop.
+- [ ] M0 sizes the original claim and conditional options, records supply assumptions, and receives independent sign-off.
 - [ ] If pursued, M1 approves governance, the business case, B design, cost bands, people, and a reconciled finite budget.
 - [ ] If pursued, credible A/B/C paths and the full supported-matrix boundary checks pass.
 - [ ] If pursued, independent tasks and reviewers exist, with source-cluster pilot/final separation.
@@ -755,49 +824,30 @@ and append-only registry requirements must still be honored.
 - [ ] Every executed outcome and cost is retained; no favorable-only reporting.
 - [ ] The report states the supported claim, uncertainty, and exclusions.
 - [ ] The decision owner records and applies section 8's investment action.
+- [ ] Any stop preserves support obligations and a named disposition for correctness work; no memo-only release is cut.
 
-A release may finish with a documented stop rather than a positive result.
-It must not call an unfinished experiment a demonstrated advantage.
+The investigation may finish with a documented stop. Actual software
+delivery has a separate definition of done; no unfinished experiment is
+a demonstrated advantage.
 
-## 11. Review disposition and next-round questions
+## 11. Review disposition
 
-Draft v2 responds to the 2026-09-08 critique of `b63b50f6`, titled
-*Critical Review - Roadmap v0.20 "Earn the Language"*. That critique is a
-local review artifact, not a prerequisite for understanding this revision.
-No independent human review or experimental result is claimed.
+Draft v3 responds to the second 2026-09-08 critique, against `85ae1c54`.
+The first-round dispositions remain in that commit. This revision retains
+the original safety margin, strong C# control, total-cost primary, protected
+requirements, and refusal to fund mechanisms automatically. No independent
+human approval or experimental result is claimed.
 
-| Critique item | Disposition in this revision |
+| Round-2 item | Draft v3 disposition |
 |---|---|
-| C1: late, likely unaffordable safety sizing | Accepted the sequencing defect. Added M0 arithmetic and a pre-implementation stop. Single-rate and unpaired calculations are illustrations, not exact paired-design impossibility proofs. |
-| C2: adoption governance and obligations | Accepted Call 3/exit requirements; separated research from production adoption and allowed compatible roles to share people. Historical lack of an adopter is not evidence about current recruitment without an update. |
-| C3: unallocated service and undercosted schedule | Accepted. Exposed the review's 41-47-day estimate, required a bottom-up worksheet, and removed prebooked week numbers. |
-| M1: setup measured once | Accepted. Setup/rate bands fixed before pilot; economic gates must pass under pessimistic registered inputs. Sampling intervals do not establish cross-organization setup precision. |
-| M2 / R3: replace dollars with human minutes | Partly accepted. Human minutes, actual spend, list-price usage, and role rates are separate; total adoption cost remains primary with sensitivity analysis. |
-| M3: historical supply versus future change horizon | Accepted. Inventory the previous 12 months; at least 75% historical requests, cluster related variants, and do not treat old implementations as unquestionable oracles. |
-| M4: weak protected-C# control | Accepted design-first independent sign-off and an explicit hypothesized effect; equal integration budgets do not imply equal maturity. |
-| M5: model familiarity | Accepted as a measured limitation and practical adoption cost, not established as the dominant causal factor or grounds for excusing a loss. |
-| M6: entry coverage and false-established search | Accepted with a corrected oracle: violated claimed property plus established verdict, not merely changed behavior. |
-| M7 / R6: import hardness gates | Rejected C# failure quotas for a cost-primary study. Adopted determinism/configuration evidence and applicable diagnostic instrumentation. |
-| M8-M9: units and cost classification | Accepted task-cluster formulas and a pre-pilot allocation dictionary, including research-only versus adopter training. |
-| m1-m3: headline, reuse, solver pins | Clarified confidence-bound meaning; named reuse candidates and required replacements; made solver limits/cache policy explicit. |
-| R1: automatically fund the trust-boundary half | Rejected automatic funding. Only a separately scoped exploratory proposal can authorize a smaller artifact. |
-| R2: demote safety to reporting | Rejected for the adoption claim. A descriptive safety result belongs to a separately labeled exploration, not a weakened pass. |
-| R4-R5: cheapest decisions first; re-cost | Accepted through M0, governance-aware M1, and the reconciled resource gate. |
+| S1 / R1: conditional M0 | Accepted four outputs and a requirement/resource frontier. Mapping risk does not approve it; M1 has a review-only path before implementation authorization. |
+| S2 / R3: task-supply ceiling | Accepted inventory and explicit supply accounting. H = 50 is conditional, not implied by the minimum future workload; linked variants are not new independent tasks. |
+| S3 / R2: multiplicity | Accepted intersection-union branches, each at alpha 0.025 with one-sided 97.5% component bounds. Dropped simultaneous-coverage requirements and the six-way illustration; precedence is not error control. |
+| S4: mechanical screen and recruitment | Registered output rules, independent M0 sign-off, bounded inquiries, and explicit attempted/not-attempted/unknown recruitment states. Favorable-only sizing cannot authorize the study. |
+| S5 / R4: cost-band ownership | Named proposer and approvers; uncertainty must be evidence-based, not a mandatory arbitrary percentage. |
+| S6-S7 / R5: correctness and release | Named disposition for the broader correctness search on every stop; existing audit obligations remain v0.19's. No package/tag/version bump for a memo alone. |
+| S8-S10 / R6: smaller clarifications | Author time distinguished from external review, static restricted-subset enforcement explicit in B, and confidence-bound meaning retained. |
 
-The next review should answer these questions before another implementation
-plan is commissioned:
-
-1. Does M0 have a credible, inexpensive way to rule out the full comparison,
-   or does it still hide an empirical study inside "desk sizing"?
-2. Is any plausible route to the unchanged joint gates compatible with task
-   supply and human capacity, without inventing advantageous base rates?
-3. Does the proposed C# control reflect what an informed adopter would use?
-4. Can any cost allocation, setup band, variant weighting, or positive
-   decision branch manufacture a win?
-5. Are research consent, negative-outcome support, and Call 3 boundaries
-   explicit enough to avoid accidental production commitments?
-6. Does the exploratory option remain a bounded question, rather than a
-   back door to another release of mechanisms without value evidence?
-
-This round is for review of Draft v2. It is not approval to run M0, recruit,
-implement the service, or collect pilot/final data.
+Review should now check the conditional authorization paths, branch error
+control, and whether supplied inventory/cost assumptions can support M0.
+It must not treat this document as approval to execute any stage.
