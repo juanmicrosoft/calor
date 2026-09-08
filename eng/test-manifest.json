@@ -94,7 +94,7 @@
       "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 395,
+      "expectedTotal": 404,
       "expectedSkipped": 0
     }
   ],
