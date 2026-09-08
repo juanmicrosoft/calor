@@ -85,8 +85,9 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 123,
-      "expectedSkipped": 0
+      "expectedTotal": 124,
+      "expectedSkipped": 0,
+      "note": "2026-09-08: 123 -> 124. PermissiveEffectsTests' single \"Calor0410 is a warning\" test became two, one per half of the 2026-09-04 adjudication (#1174) — a NAMED Calor0410 is still an error under the property, an Unknown-charged one is still demoted. The pair is what stops an \"always Strict\" or \"always Permissive\" mutation passing the file."
     },
     {
       "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
