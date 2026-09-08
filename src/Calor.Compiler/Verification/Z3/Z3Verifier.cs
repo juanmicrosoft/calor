@@ -182,6 +182,8 @@ public sealed class Z3Verifier : IDisposable
         IReadOnlyList<StatementNode>? body = null)
     {
         var sw = Stopwatch.StartNew();
+        if (string.Equals(outputType, "void", StringComparison.OrdinalIgnoreCase))
+            outputType = null;
 
         var translator = CreateTranslator();
 
@@ -291,6 +293,18 @@ public sealed class Z3Verifier : IDisposable
                     ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
                     Duration: sw.Elapsed);
             }
+        }
+
+        // Parameter-only contracts still observe the exit state. Until writes are
+        // encoded, only a positively checked, non-mutating body may reuse entry variables.
+        if (!FunctionBodyEncoder.ReferencesResult(postcondition.Condition)
+            && body != null
+            && !FunctionBodyEncoder.PreservesEntryState(body, parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal)))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    "The function body may change the postcondition's entry-state variables; exit-state mutation is not modeled. Runtime check kept.")),
+                Duration: sw.Elapsed);
         }
 
         // Translate the postcondition
@@ -630,6 +644,48 @@ public sealed class Z3Verifier : IDisposable
 /// </summary>
 public static class FunctionBodyEncoder
 {
+    internal static bool PreservesEntryState(
+        IReadOnlyList<StatementNode> body, IReadOnlySet<string> parameters,
+        IReadOnlySet<string>? enclosingLocals = null)
+    {
+        var locals = new HashSet<string>(enclosingLocals ?? parameters, StringComparer.Ordinal);
+        foreach (var statement in body)
+        {
+            var safe = statement switch
+            {
+                ReturnStatementNode ret => ret.Expression == null || IsStatePreservingExpression(ret.Expression, locals),
+                BindStatementNode bind => !parameters.Contains(bind.Name)
+                    && IsWidthNeutralBindingType(bind.TypeName)
+                    && bind.Initializer != null && IsStatePreservingExpression(bind.Initializer, locals),
+                IfStatementNode conditional => IsStatePreservingExpression(conditional.Condition, locals)
+                    && PreservesEntryState(conditional.ThenBody, parameters, locals)
+                    && conditional.ElseIfClauses.All(c => IsStatePreservingExpression(c.Condition, locals)
+                        && PreservesEntryState(c.Body, parameters, locals))
+                    && (conditional.ElseBody == null || PreservesEntryState(conditional.ElseBody, parameters, locals)),
+                _ => false
+            };
+            if (!safe)
+                return false;
+            if (statement is BindStatementNode binding)
+                locals.Add(binding.Name);
+        }
+        return true;
+    }
+
+    private static bool IsStatePreservingExpression(ExpressionNode expression, IReadOnlySet<string> locals) => expression switch
+    {
+        IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode => true,
+        ReferenceNode reference => locals.Contains(reference.Name),
+        UnaryOperationNode unary => unary.Operator is UnaryOperator.Negate or UnaryOperator.Not or UnaryOperator.BitwiseNot
+            && IsStatePreservingExpression(unary.Operand, locals),
+        BinaryOperationNode binary => IsStatePreservingExpression(binary.Left, locals)
+            && IsStatePreservingExpression(binary.Right, locals),
+        ConditionalExpressionNode conditional => IsStatePreservingExpression(conditional.Condition, locals)
+            && IsStatePreservingExpression(conditional.WhenTrue, locals)
+            && IsStatePreservingExpression(conditional.WhenFalse, locals),
+        _ => false
+    };
+
     /// <summary>
     /// Attempts to encode the body as a single solver expression for the returned value.
     /// Returns the expression, or null with a human-readable reason.

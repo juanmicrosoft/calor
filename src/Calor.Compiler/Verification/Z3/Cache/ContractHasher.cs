@@ -30,9 +30,8 @@ public sealed class ContractHasher
     /// <summary>
     /// Computes a hash key for a postcondition.
     /// Format: POST:{params}:{output}:PRECS:{prec_hashes}::POST:{post_hash}[::BODY:{body}]
-    /// The body component is included exactly when the postcondition references
-    /// <c>result</c> — the verifier binds <c>result</c> to the body in that case
-    /// (guarantees plan D-G1.1), so a body edit must invalidate the cached proof.
+    /// Every supplied body is included: parameter-only postconditions also
+    /// depend on whether the body preserves the entry state.
     /// </summary>
     public string HashPostcondition(
         IReadOnlyList<(string Name, string TypeName)> parameters,
@@ -59,7 +58,7 @@ public sealed class ContractHasher
         sb.Append("::POST:");
         AppendExpression(sb, postcondition.Condition);
 
-        if (body != null && FunctionBodyEncoder.ReferencesResult(postcondition.Condition))
+        if (body != null)
         {
             sb.Append("::BODY:");
             AppendStatements(sb, body);
