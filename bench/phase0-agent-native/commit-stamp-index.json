@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "issue": "#1159",
+  "what": "Provenance for every ledger under bench/phase0-agent-native/ that stamps a measuredCommit. Those stamps name PRE-SQUASH BRANCH commits: this repository squash-merges, so the squash discards them and no third party can resolve them — three of five are contained by zero remote branches and survive only as unreferenced objects in individual clones. Every roadmap since 0.15 cites them as the provenance of its published numbers.",
+  "whyNotJustRepointTheStamps": "Because measuredCommit is the experimental record, not a pointer. Repointing it would falsify what was measured, and effect-rows-benefit-ledger.json's stamp is additionally ARM_B_COMMIT — a frozen constant of a completed epoch, pinned by ppw-compile.py, ppw-analyze.py and PpWRowsRegistrationTests. Two of these ledgers are also byte-compared against their own generators, so a field added by hand would make them permanently 'stale'. The stamps stay; this file carries the resolvable equivalent beside them.",
+  "basisKinds": {
+    "identical-src-tree": "STRONGEST. A commit reachable from main whose `src/` tree is byte-identical to the measured commit's, verified with `git rev-parse <sha>:src` on both. Same compiler; a third party can check the numbers against it.",
+    "landing-commit-only": "WEAKER, and said so. No commit reachable from main has an identical `src/` tree, so the exact compiler state was never landed as such. The commit named is the squash that carried the LEDGER onto main — where the numbers landed, not the compiler that produced them."
+  },
+  "enforcedBy": "tests/Calor.Compiler.Tests/LedgerCommitStampTests.cs",
+  "ledgers": [
+    {
+      "ledger": "calor0425-corpus-ledger.json",
+      "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
+      "resolvableOnMain": "a307ccf0080c2edaf514718c898af92176d4af88",
+      "basis": "identical-src-tree",
+      "note": "src/ tree 8086a938… on both."
+    },
+    {
+      "ledger": "higher-order-demand-ledger.json",
+      "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
+      "resolvableOnMain": "a307ccf0080c2edaf514718c898af92176d4af88",
+      "basis": "identical-src-tree",
+      "note": "Same measured commit as the Calor0425 ledger; same verified equivalent."
+    },
+    {
+      "ledger": "effect-rows-probe-ledger.json",
+      "measuredCommit": "72d060f400b5787ba4ec11cb4dd8860c95173da3",
+      "resolvableOnMain": "bb5bbdb478979abc006972b4a87028d3a6c5fb0a",
+      "basis": "identical-src-tree",
+      "note": "src/ tree b6ae250a… on both."
+    },
+    {
+      "ledger": "effect-resolver-key-ledger.json",
+      "measuredCommit": "fdff11de6c824b33208f978c0e6654811feda76b",
+      "resolvableOnMain": "a1230e2aee089e07c194d1a7c076cc6b58ff3068",
+      "basis": "landing-commit-only",
+      "note": "Searched every commit reachable from main: none has an identical src/ tree, so this compiler state was never landed. The residual is real and is stated rather than hidden behind a stronger-looking stamp."
+    },
+    {
+      "ledger": "effect-rows-benefit-ledger.json",
+      "measuredCommit": "3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a",
+      "resolvableOnMain": "82a7c653cbf1ea2f6231e38cc328c74a34e6589b",
+      "basis": "landing-commit-only",
+      "note": "The measured commit is not present in this clone at all, so no tree comparison is possible. It is also ARM_B_COMMIT and must not move. Worth recording: it shares its first EIGHT hex characters with main's real v0.15.0 release commit 3bb2601e3ff83597ddf2f27dcc334b6399ab97ea, which is why short shas looked right to every reader until now."
+    }
+  ]
+}

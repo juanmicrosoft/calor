@@ -629,6 +629,89 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   `roundtrip-baseline.json`; or the release tag), plus **a test that fails when a stamp does not
   resolve on `main`** — cheap, and it would have caught this the first time.
 
+  #### #1159 outcome, 2026-09-08: **provenance restored beside the stamps, not on top of them**
+
+  The obvious repair — repoint each `measuredCommit` at a commit that resolves — is wrong, and
+  finding out why is most of the work. A `measuredCommit` is the **experimental record**, not a
+  pointer: overwriting it falsifies what was measured. `effect-rows-benefit-ledger.json`'s stamp is
+  additionally **`ARM_B_COMMIT`**, a frozen constant of a completed epoch pinned by
+  `ppw-compile.py`, `ppw-analyze.py` and `PpWRowsRegistrationTests`. And two ledgers are
+  byte-compared against their own generators, so a field added by hand leaves them permanently
+  "stale". Each of those was hit in turn before the shape below was reached.
+
+  **`bench/phase0-agent-native/commit-stamp-index.json`** carries the resolvable equivalent beside
+  each stamp, with the basis stated per entry — because the bases are not equally strong:
+
+  | ledger | basis | equivalent on main |
+  |---|---|---|
+  | `calor0425-corpus-ledger.json` | **identical `src/` tree** (verified) | `a307ccf0` |
+  | `higher-order-demand-ledger.json` | **identical `src/` tree** (verified) | `a307ccf0` |
+  | `effect-rows-probe-ledger.json` | **identical `src/` tree** (verified) | `bb5bbdb4` |
+  | `effect-resolver-key-ledger.json` | landing commit only | `a1230e2a` |
+  | `effect-rows-benefit-ledger.json` | landing commit only | `82a7c653` |
+
+  Three are strong: a commit reachable from main whose `src/` tree is **byte-identical** to the
+  measured commit's, so a third party can check the numbers against the same compiler. Two are
+  weaker and say so — every commit reachable from main was searched and none has an identical
+  `src/` tree, so that compiler state was never landed. Recording "where the numbers landed" as if
+  it were "the compiler that produced them" is precisely the conflation that made these stamps
+  useless, so the distinction is a field, not a footnote.
+
+  *Instrument:* `LedgerCommitStampTests` — three properties, because the first alone passes
+  vacuously on an empty index: every indexed commit resolves **and** is reachable from HEAD; every
+  entry's `measuredCommit` still matches the ledger it describes; and every ledger stamping a
+  measurement **is** indexed. The `test` job checks out at `fetch-depth: 0` so it runs for real
+  there rather than skipping everywhere.
+
+  *One detail worth keeping.* The benefit ledger's dangling stamp `3bb2601e0c…` and main's real
+  v0.15.0 release commit `3bb2601e3f…` share their first **eight** hex characters. Short shas
+  looked right to every reader, which is how this survived three releases.
+
+  #### #1157 outcome, 2026-09-08: **one defect reproduces, one does not**
+
+  **Defect 1 — `metricCount` carrying the program count — does not reproduce.** The generator was
+  run at `74ba4973`: the only `metricCount` in its output is `summary.metricCount = 8`, beside
+  `programCount = 217`. Both C# sites are right by inspection too. The bad artefact was in #1148,
+  which was closed and never merged. Recorded as not-reproducible rather than quietly "fixed" —
+  claiming a fix for a defect that is not there is how a suite acquires tests that guard nothing.
+
+  **Defect 2 reproduces exactly**, and on every ordinary bot run:
+
+  | | statisticalRunCount | overallAdvantage | metrics |
+  |---|---:|---:|---:|
+  | committed (what CHANGELOG publishes) | 30 | 1.32 | 8 |
+  | a fresh generator run | **0** | **1.28** | 8 |
+
+  The metric set is unchanged, so this is not the 11-metric shape #1157 describes — it is purely the
+  methodology swap, and a reviewer reads 1.32 → 1.28 as a regression in Calor's advantage.
+
+  *Two instruments, because the workflow and the published artefacts are different routes in.*
+  `scripts/check-benchmark-methodology.js` refuses a weaker candidate before the PR is opened
+  (verified: the #1148 shape exits 1 naming the numbers, an unchanged file exits 0), is wired into
+  `benchmark.yml` with an `allow_weaker_methodology` opt-in, and its report is interpolated into the
+  PR body in place of "Updated benchmark-results.json with latest metrics".
+  `BenchmarkMethodologyAgreementTests` is **gate 16**: CHANGELOG's block against the website's JSON,
+  with a second test that builds the #1148 shape and pins that the gate is red for it — a gate
+  nobody has seen fail is §0.2's finding.
+
+  #### The honest re-run, 2026-09-08: **reproduces exactly**
+
+  0.17.0 disclosed that its benchmark numbers were carried forward from `82a7c653` and not re-run.
+  Re-run here at the 0.18 line, 30 runs, `--format website`:
+
+  | | committed | fresh 30-run |
+  |---|---:|---:|
+  | overallAdvantage | 1.32 | **1.32** |
+  | Comprehension / ErrorDetection / TokenEconomics | 1.84 / 1.49 / 1.42 | **identical** |
+  | RefactoringStability / EditPrecision / Correctness | 1.38 / 1.36 / 1.29 | **identical** |
+  | GenerationAccuracy / InformationDensity | 1.02 / 0.98 | **identical** |
+
+  All eight ratios reproduce to two decimal places. **What this does not establish:** whether that
+  is a *stable* measurement or a *deterministic* one. These metrics are computed over a fixed
+  corpus, so 30 runs of a deterministic function agree trivially, and this re-run cannot tell the
+  two apart. Worth settling before a future release cites exact reproduction as evidence of
+  stability.
+
   Then benchmark integrity: Fix the generator (`metricCount`
   carrying the program count; the silent 30-run → single-run methodology swap), then re-run the
   **30-run statistical** suite at the 0.18 commit so the website and the changelog publish the same
