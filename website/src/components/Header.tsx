@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Drawer } from '@/components/ui/Drawer';
 import { cn, getBasePath } from '@/lib/utils';
 import { SITE_VERSION } from '@/lib/version';
 import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/lib/analytics';
@@ -60,6 +61,8 @@ export function Header() {
               type="button"
               className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5"
               onClick={() => setMobileMenuOpen(true)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="main-navigation-drawer"
             >
               <span className="sr-only">Open main menu</span>
               <Menu className="h-6 w-6" aria-hidden="true" />
@@ -119,15 +122,10 @@ export function Header() {
       </header>
 
       {/* Mobile menu - rendered outside header to avoid stacking context issues */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+      <Drawer id="main-navigation-drawer" label="Main navigation" open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)}>
           <div className="fixed inset-y-0 right-0 w-full overflow-y-auto bg-background p-4 sm:max-w-sm sm:ring-1 sm:ring-border">
             <div className="flex items-center justify-between">
-              <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
+              <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <Image
                   src={`${basePath}/calor-logo.png`}
                   alt="Calor logo"
@@ -161,7 +159,7 @@ export function Header() {
                   ))}
                 </div>
                 <div className="flex items-center gap-4 py-6">
-                  <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
+                  <Button variant="ghost" size="icon" onClick={toggleDarkMode} aria-label="Toggle dark mode">
                     {isDark ? (
                       <Sun className="h-5 w-5" />
                     ) : (
@@ -174,6 +172,7 @@ export function Header() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackOutboundLink('https://github.com/juanmicrosoft/calor')}
+                      aria-label="GitHub"
                     >
                       <Github className="h-5 w-5" />
                     </a>
@@ -184,6 +183,7 @@ export function Header() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackAskCalorClick('mobile_menu')}
+                      aria-label="Ask Calor"
                     >
                       <MessageCircle className="h-5 w-5" />
                     </a>
@@ -192,8 +192,7 @@ export function Header() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+      </Drawer>
     </>
   );
 }

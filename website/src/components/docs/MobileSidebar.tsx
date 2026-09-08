@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Drawer } from '@/components/ui/Drawer';
 import { cn, getBasePath } from '@/lib/utils';
 import type { DocSection } from '@/lib/docs';
 
@@ -47,13 +48,14 @@ export function MobileSidebar({ sections }: MobileSidebarProps) {
         size="sm"
         className="mb-4"
         onClick={() => setIsOpen(true)}
+        aria-expanded={isOpen}
+        aria-controls="documentation-drawer"
       >
         <Menu className="h-4 w-4 mr-2" />
         Menu
       </Button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+      <Drawer id="documentation-drawer" label="Documentation navigation" open={isOpen} onClose={() => setIsOpen(false)}>
           <div className="fixed inset-y-0 left-0 w-full max-w-xs bg-background border-r p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <span className="text-lg font-semibold">Documentation</span>
@@ -61,6 +63,7 @@ export function MobileSidebar({ sections }: MobileSidebarProps) {
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsOpen(false)}
+                aria-label="Close documentation menu"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -122,8 +125,7 @@ export function MobileSidebar({ sections }: MobileSidebarProps) {
               })}
             </ul>
           </div>
-        </div>
-      )}
+      </Drawer>
     </div>
   );
 }
