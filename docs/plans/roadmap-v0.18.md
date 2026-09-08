@@ -553,6 +553,15 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   demotion, whose end condition has now occurred. **§0.4 is a hard input to M3(3)** — if the SHOULD
   tier slips, M3 cannot complete, so this one item is promoted to MUST-by-dependency and named as
   such rather than left to be discovered late.
+
+  **Outcome: all four are adjudicated** — §0.4 on 2026-09-04 (which unblocked M3 and exposed #1173),
+  and the remaining three on 2026-09-08. Each was decided from evidence gathered for it rather than
+  from recollection: the async re-entry test checked clause by clause against the code
+  (**passes** — the deferral is scheduling, not feasibility); the flake rate **counted** over 25
+  main runs and attributed per failure (**5 of 7 reds are #1150, all pre-fix; 0 kills in the 7
+  post-fix runs**); and #965's two premises checked against `performance.yml` and 59 runs of
+  history (**both false — it is nightly now, and it has been green since 2026-08-21**). §9 carries
+  the working.
 - **S2 — `ExternalBase`: 61 of 113 Calor0425 diagnostics (54 %), re-measured at the 0.17 ledger.**
   An override or interface implementation reaching an external base. Carried **unassigned** through
   0.15, 0.16 and 0.17 (R17:§6 registered a venue for it in the 0.17 notes; that venue was not
@@ -812,12 +821,78 @@ not shorten that.
 ## 9. Maintainer adjudications now due
 
 1. **Async rows** (D:§11, 1922-1945) — the three-clause test, due in writing at the 0.16 branch
-   cut. **Overdue by two releases.** DEFERRED is a placeholder, not an adjudication.
-2. **The flake rate** for #859/#884/#959/#948/#1135, due at the 0.16 branch cut. #1150 now supplies
-   four data points for one member. R17:§9.2's argument stands: nobody was counting until a release
-   forced it.
-3. **#965** — whether the perf suite killed the runner on a release path. 0.16.0 and 0.17.0 have
-   both now shipped, so the observation window R17 was waiting on has closed twice.
+   cut. Overdue by two releases. **ADJUDICATED 2026-09-08: the re-entry test PASSES; the deferral
+   is now a scheduling decision rather than a feasibility one.**
+
+   The test is *"async rows are taken up only if all three hold"*. Each clause was checked against
+   the code at this commit rather than argued:
+
+   | clause | required | at `74ba4973` |
+   |---|---|---|
+   | **(a)** asynchrony expressible as a row *property*, needing no `EffectKind` member, no registry entry, and no change to `EffectEntry{Kind,Value}` | — | **holds.** `EffectKind` is still `Unknown, IO, Mutation, Memory, Exception, Nondeterminism`; the registry contains **zero** `async`/`task`/`await` codes; `EffectEntry` is still two strings |
+   | **(b)** `fits` needs no async-specific case | — | **holds.** `await` is still transparent in the inferrer (`AwaitExpressionNode await_ => InferFromExpression(await_.Awaited)`), and asynchrony is carried by the `Task<T>` return type the binder already has |
+   | **(c)** additive — a 0.15 program compiles unchanged | — | **holds**, as a consequence of (a) and (b): nothing listed there changes |
+
+   **What this changes, and it is not nothing.** "DEFERRED" was a placeholder standing in for an
+   unmade decision, and the placeholder implied the feature might be blocked. It is not: the design
+   is admissible today, on the terms its own re-entry test set. What defers it now is scope — 0.18
+   is at its cut lines with M4 already conditional, and a language feature is not something to add
+   under a SHOULD tier.
+
+   *Disposition:* **eligible, scheduled for 0.19**, with the clause evaluations above as the record.
+   *Trigger for re-checking rather than re-deciding:* any change that adds an `EffectKind` member,
+   an async registry code, or a field to `EffectEntry` breaks clause (a) and this adjudication with
+   it — such a change must say so.
+2. **The flake rate** for #859/#884/#959/#948/#1135, due at the 0.16 branch cut.
+   **ADJUDICATED 2026-09-08 — counted, and attributed.**
+
+   R17:§9.2's complaint was that nobody was counting. Counted over the **last 25 `test.yml` runs on
+   `main`** (2026-09-01 → 2026-09-08): **18 green, 7 red — a 28 % failure rate.** Every red was
+   classified from its logs rather than assumed:
+
+   | date | commit | job | cause |
+   |---|---|---|---|
+   | 09-01 | `82a7c653` | `tests (compiler)` | **exit 143 / runner shutdown** — #1150 |
+   | 09-02 | `13d4bd47` | `tests (compiler)` | **exit 143** — #1150 |
+   | 09-03 | `06690294` | `tests (compiler)` | **exit 143** — #1150 |
+   | 09-03 | `2463810f` | `quality-ratchets` | **runner shutdown** — #1150, second job |
+   | 09-03 | `85a5ad30` | `quality-ratchets` | **exit 143** — #1150, second job |
+   | 09-05 | `d65cb283` | `tests (tasks)` | a real regression — stale assertions from the §9.4 adjudication, fixed in #1179 |
+   | 09-08 | `74ba4973` | `tests (evaluation)`, `(verification)` | infrastructure — `Failed to FinalizeArtifact: 403`; `Run project tests` passed in both |
+
+   **Five of the seven are #1150, and all five predate M2's fix.** Since `35e4cd62` there have been
+   **7 runs and 0 kills**. So the cluster's rate is not one number: it is **5 of 18 pre-fix (28 %)**
+   and **0 of 7 post-fix**, and reporting a single blended figure would hide precisely the thing the
+   count was for.
+
+   *The other members of the cluster did not appear at all in this window* — no #859/#884 Z3
+   propagation failure, no #959 host crash, no #948 round-trip regression, no #1135 non-determinism.
+   That is a real observation about a 25-run window and **not** evidence they are fixed; it means
+   the cluster's residual rate is below what 25 runs can measure, which is itself the answer to
+   "what is the rate".
+
+   *Disposition:* the cluster is **dominated by #1150**, which has a fix and a gate (15). The
+   remaining members are individually unobserved at this sample size; they stay open with the
+   rate recorded as *below 1 in 25* rather than carried as an unquantified worry.
+3. **#965** — whether the perf suite killed the runner on a release path.
+   **ADJUDICATED 2026-09-08: both of the issue's premises are now false. Close it.**
+
+   #965 says the perf suite *"reproducibly kills the CI runner (exit 143)"* and *"runs ONLY on the
+   release path"*.
+
+   - **It no longer runs only on the release path.** `performance.yml` runs nightly on a schedule
+     plus `workflow_dispatch` — moved there by #790 / W1 Slice 4, whose comment gives the reason
+     (wall-clock thresholds are load-sensitive, so a per-PR gate would train people to ignore red).
+   - **It is not reproducibly killing anything.** Over the last 59 runs (from 2026-08-02):
+     46 green, 13 red — and **every red is on 2026-08-13 (9), 08-14 (3) or 08-21 (1)**. Zero since
+     2026-08-21: **15+ consecutive green nights**, spanning both the 0.16.0 and 0.17.0 releases the
+     roadmap was waiting on.
+
+   *Disposition:* **not release-blocking.** The exit-143 mechanism #965 describes is #1150's, which
+   M2 measured and capped and gate 15 now guards; the perf suite's own instance of it stopped
+   recurring a month before this adjudication. Closed as resolved-by-relocation, with the nightly
+   schedule as the standing observation — a red nightly is a real signal and this record is what
+   makes the next one legible.
 4. **`--permissive-effects` Calor0410 demotion** (§0.4) — **ADJUDICATED 2026-09-04.**
 
    > `--permissive-effects` waives `Calor0425` and assumes unresolved calls pure — "we cannot
