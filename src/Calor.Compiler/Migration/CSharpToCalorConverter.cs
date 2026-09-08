@@ -761,18 +761,31 @@ public sealed class CSharpToCalorConverter
     internal Func<string, bool>? ParseValidatorOverride { get; set; }
 
     /// <summary>
-    /// The manifest resolver the row synthesis reuses. Loading the embedded BCL
-    /// manifests is the expensive part and it does not depend on the file being
-    /// converted, so one resolver serves every conversion and every round.
-    /// <see cref="EffectResolver.Initialize"/> is idempotent, which is what makes
-    /// sharing it safe.
+    /// Resolvers the row synthesis reuses. Loading the embedded BCL manifests is the
+    /// expensive part and does not depend on the file being converted, so a resolver
+    /// is worth keeping — but NOT worth sharing across threads:
+    /// <see cref="EffectResolver"/> memoises into plain dictionaries, and conversion
+    /// runs in parallel (<c>ProjectMigrator</c> fans out under a semaphore, the
+    /// round-trip harness under <c>Parallel.ForEachAsync</c>). Renting gives one
+    /// conversion exclusive use of one resolver, so the pool grows to the degree of
+    /// parallelism actually used and no further.
+    ///
+    /// <para>The alternative — one static resolver, as the deleted
+    /// <c>RoslynSyntaxVisitor._migrationResolver</c> was — races on those
+    /// dictionaries. That race predates this change, but synthesis resolves far more
+    /// call targets per file than the old walker did, so it is not a risk to inherit
+    /// quietly.</para>
     /// </summary>
-    private static readonly Lazy<EffectResolver> SynthesisResolver = new(() =>
+    private static readonly System.Collections.Concurrent.ConcurrentBag<EffectResolver> SynthesisResolvers = new();
+
+    private static EffectResolver RentSynthesisResolver()
     {
+        if (SynthesisResolvers.TryTake(out var pooled))
+            return pooled;
         var resolver = new EffectResolver();
         resolver.Initialize();
         return resolver;
-    });
+    }
 
     /// <summary>
     /// #1173 — writes each declaration's <c>§E</c> row from the compiler's own
@@ -814,6 +827,7 @@ public sealed class CSharpToCalorConverter
             return;
 
         cancellationToken.ThrowIfCancellationRequested();
+        var resolver = RentSynthesisResolver();
         try
         {
             var probe = new CalorEmitter(CreateContext(sourceFile)).Emit(module);
@@ -826,9 +840,7 @@ public sealed class CSharpToCalorConverter
                 return;
             }
 
-            var converged = EffectEnforcementPass.SynthesizeDeclaredRows(
-                reparsed,
-                SynthesisResolver.Value);
+            var converged = EffectEnforcementPass.SynthesizeDeclaredRows(reparsed, resolver);
             CopyEffectRows(reparsed, module);
 
             if (!converged)
@@ -851,6 +863,10 @@ public sealed class CSharpToCalorConverter
                 $"Effect-row synthesis failed ({ex.GetType().Name}: {ex.Message}); the emitted §E rows "
                 + "may be narrower than the effects the converted bodies perform.",
                 feature: "effect-row-synthesis");
+        }
+        finally
+        {
+            SynthesisResolvers.Add(resolver);
         }
     }
 
