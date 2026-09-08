@@ -6,6 +6,7 @@ import { ChevronUp, ChevronDown, Check, X } from 'lucide-react';
 import { trackProgramTableSort, trackProgramTableFilter } from '@/lib/analytics';
 
 interface ProgramData {
+  identity: string;
   id: string;
   name: string;
   level: number;
@@ -187,7 +188,7 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
           </thead>
           <tbody className="divide-y">
             {sortedPrograms.map((program) => (
-              <tr key={program.id} className="hover:bg-muted/30 transition-colors">
+              <tr key={program.identity} className="hover:bg-muted/30 transition-colors">
                 <td className="px-3 py-2 font-medium sticky left-0 bg-background">
                   {program.name}
                 </td>
