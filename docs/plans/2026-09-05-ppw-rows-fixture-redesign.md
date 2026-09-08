@@ -1,7 +1,9 @@
 # PP-W-rows — fixture redesign, registered before collection
 
 **Date:** 2026-09-05
-**Status:** **Draft v1.** No adversarial round has been run against this document (§8).
+**Status:** **Draft v2**, 2026-09-08. Round 1 conducted against Draft v1 before merge (§8.1):
+five findings, one Major — the re-registered arms return identical verdicts for any shape charged a
+named effect, which rule **R8** now rejects. Merging this document freezes it.
 **What this is:** the supersession `docs/plans/agent-native-gates.md` §7 (A:90-92) requires before
 the PP-W-rows protocol may be replaced — *"a documented empirical defect in the measurement protocol
 itself"*, with **a written defect analysis**. §1 is that analysis.
@@ -100,12 +102,20 @@ silently effectful, declared as such in *its* row, where the agent's own body lo
 
 Registered as rules, so a task can be rejected against them rather than argued about.
 
-- **R1 — the convenient path is the laundering path.** The shortest correct-looking solution must
-  route an effectful value into a context declared without it. If writing the honest version is
-  the same length, the task is rejected (that is the W-002 failure).
-- **R2 — the spec must not forbid the effect.** No acceptance criterion may say "prints nothing"
-  about the very effect under test. The spec describes *what to build*, never *what not to emit*
-  (that is the W-001 failure).
+- **R1 — the convenient path is the laundering path.** Using the dependency's documented API the
+  way its documentation suggests must route an effectful value into a context declared without it,
+  and the honest version must require a step the agent has no signal to take. Round 1 (§8.1
+  finding 2) demoted the original phrasing — "if writing the honest version is the same length" —
+  because length is the wrong currency: R3 hides the effect in a dependency's row, so the honest
+  version can be identical in length and still demand knowledge the agent does not have, while a
+  shorter path that looks strange is not convenient at all. Length remains one symptom, not the
+  test. The W-002 failure is still the worked example: there, honesty cost nothing.
+- **R2 — nothing the agent can read may forbid the effect.** No acceptance criterion may prohibit
+  the effect under test, whether directly ("prints nothing" — the W-001 failure) or indirectly
+  ("usable from a pure context", "must not touch the filesystem"). Round 1 (§8.1 finding 3) added
+  the part Draft v1 missed: **the names of the visible tests are a spec too.** A visible
+  `Total_IsSilent` tells the agent what not to emit as loudly as any acceptance criterion, so the
+  visible suite's test names are reviewed under this rule alongside the spec text.
 - **R3 — the effect is declared away from the edit site.** It lives in a dependency's row, not in
   the body the agent writes, so reading their own diff does not reveal it.
 - **R4 — the agent's runnable tests must pass on the laundering solution.** If the visible suite
@@ -117,7 +127,13 @@ Registered as rules, so a task can be rejected against them rather than argued a
 - **R7 — one shape per task, drawn from #1136's twelve.** M1's table and the epoch's fixtures then
   share a denominator, and a realized shape is attributable to a row of that table.
 
-**Rejection is the expected outcome for most candidate tasks.** A task set that passes R1-R7 on the
+- **R8 — the two arms must actually disagree about the registered shape.** Before a task is
+  frozen, its shape is compiled under both arm definitions and the verdicts compared. If arm A and
+  arm B return the same verdict, the task measures nothing and is rejected. Added by round 1
+  (§8.1 finding 1), which found this is *not* automatic: after the 2026-09-04 adjudication the arms
+  agree on every shape charged a **named** effect, and differ only on shapes charged `unknown`.
+
+**Rejection is the expected outcome for most candidate tasks.** A task set that passes R1-R8 on the
 first attempt should be treated as suspicious rather than lucky.
 
 ---
@@ -175,7 +191,9 @@ registered in an amendment to this document, and *then* collected.
 
 **The rule that makes this honest, and it is the load-bearing one:** stage 1's runs are **pilot
 data and may not be pooled into stage 2's analysis**, nor may stage 2's verdict be read off stage
-1. If stage 1's escape rate is ~0 again, that is a **negative result about the redesign** — the
+1. *Enforced, not merely stated* (§8.1 finding 5): stage 1 archives under its own epoch id, and
+stage 2's analysis takes an epoch id as its only input — so pooling requires editing the analysis,
+which is a reviewable act, rather than forgetting a rule, which is not. If stage 1's escape rate is ~0 again, that is a **negative result about the redesign** — the
 tasks still fail R1/R2 — and it is published as such, not repaired by widening Δ until something
 fits.
 
@@ -224,8 +242,12 @@ Registered so it is not discovered later and read as a surprise.
 ## 7. What must exist before collection
 
 1. This document merged.
-2. The replacement tasks written, each checked against R1-R7, with rejections recorded — a task
-   set with no rejections is itself a finding.
+2. The replacement tasks written, each checked against R1-R8, with rejections recorded — a task
+   set with no rejections is itself a finding. Round 1 tightened how three of the rules are
+   discharged: R4 and R5 by RUNNING both suites against a committed laundering solution per task,
+   not by describing one; R6 by reusing M1's instrument (`RowEscapeTableTests`) rather than
+   repeating its check by hand; R8 by two compiler invocations per shape, output committed beside
+   the task.
 3. Held-out effect-observing tests per task, and a *visible* suite that passes on the laundering
    solution (R4). Both frozen before any run.
 4. A spend ceiling, in writing.
@@ -233,23 +255,92 @@ Registered so it is not discovered later and read as a surprise.
 
 ---
 
-## 8. Adversarial review — registered, not yet run
+## 8. Adversarial review
 
-No round has been conducted. Lenses required:
+### 8.1 Round 1 — 2026-09-08, self-conducted, on Draft v1
 
-- **The redundancy lens**, which is §1.3's finding turned into a check: for each new task, does the
-  visible test suite already catch the laundering? If yes, the task is redundant with its own tests
-  and measures nothing.
-- **The convenience lens.** Is the laundering path genuinely shorter, or only shorter to someone
-  who already knows what is being measured? A task that requires the agent to be careless is not
-  measuring rows.
-- **The spec lens.** Does any acceptance criterion forbid the effect under test (R2)?
-- **The arm lens.** Do A and B differ in exactly one thing? §3 fixed one confound (two compiler
-  versions); a review should look for others.
-- **The pilot-contamination lens.** Trace every path by which stage 1 data could reach stage 2's
-  verdict. §4's rule is only as good as its enforcement.
+Run before merge, because merging this document freezes it. Five findings, one Major.
 
-Known unattacked at Draft v1: whether R1 and R4 can both hold at once — a laundering path that the
-visible tests pass **and** that is shorter than the honest one may be rarer than §2 assumes, and if
-it turns out to be empty, the honest conclusion is that this experiment cannot be built rather than
-that it should be run anyway.
+**Finding 1 — arm lens — MAJOR. The re-registered arms agree on every shape charged a *named*
+effect, so a task registered on one of those cannot produce a delta.**
+
+§3 registered that the 2026-09-04 adjudication makes arm A "a *narrower* control" and that this
+"weakens the expected effect". Measured, that is understated. The adjudication left
+`--permissive-effects` waiving only `EffectKind.Unknown`, so the arms now differ on exactly one
+thing: whether an **Unknown** charge is an error. Compiled at `74ba4973`, both arm definitions, on
+the seeded fixtures the twelve shapes are drawn from:
+
+| fixture | charge | arm B (strict) | arm A (permissive) |
+|---|---|---:|---:|
+| W-001 `unregistered-this-qualified-escape-b` | `'unknown'` | 1 error | 0 |
+| W-001 `unregistered-property-backed-escape-b` | `'unknown'` | 1 error | 0 |
+| W-001 `unregistered-other-receiver-escape-b` | `'unknown'` | 1 error | 0 |
+| W-001 `unregistered-method-group-receiver-escape-b` | `'unknown'` | 1 error | 0 |
+| W-004 `unregistered-this-qualified-escape-b` | `'unknown'` | 1 error | 0 |
+| W-001 `unregistered-resolvable-alias-control-b` | `'cw'` | 1 error | **1 error** |
+| W-002 `unregistered-rowless-lambda-control-b` | `'cw'` | 2 errors | **2 errors** |
+
+The last two rows are the finding. A task whose registered shape is charged a named effect gets the
+**same verdict on both arms**, so its cell is a null before a single run — §1.3's defect ("the
+experiment measures a quantity the control already covers") in a new guise, arriving through the
+arm definitions rather than through the task text. Draft v1 could not have caught it by reading:
+the discriminating property is not the shape but the *kind of charge* the shape produces, which is
+visible only by running both arms.
+
+*Disposition:* **applied.** New rule **R8** (§2): a shape must be shown to produce different
+verdicts on the two arms before it is frozen, evidenced by the two invocations, committed beside
+the task. The table above is the first application and is why the rule is not theoretical.
+
+*Not fixed here, and registered:* the five discriminating shapes above are the ones S1 closed, so
+the redesign's natural task material is also the material that discriminates. That is fortunate, not
+guaranteed — R8 exists so the next shape is checked rather than assumed.
+
+**Finding 2 — convenience lens — minor. R1's test is stated in the wrong currency.** R1 rejects a
+task when "writing the honest version is the same length". Length is measurable but is not what
+convenience means here: R3 deliberately hides the effect in a dependency's row, so the honest
+version can be *identical in length* and still require knowing something the agent has no signal to
+learn. Conversely a shorter laundering path that looks strange is not convenient.
+*Disposition:* applied — R1 now reads in terms of what the dependency's documented API produces when
+used as intended, with length demoted to one symptom among others.
+
+**Finding 3 — spec lens — minor. R2 is phrased too narrowly, and it omits the tests the agent can
+read.** R2 forbids an acceptance criterion that says "prints nothing" about the effect under test.
+But a spec can forbid the effect indirectly ("usable from a pure context", "must not touch the
+filesystem"), and — the part Draft v1 missed — **the names of the visible tests are themselves a
+spec the agent reads**. A visible test called `Total_IsSilent` tells the agent what not to emit as
+loudly as any acceptance criterion.
+*Disposition:* applied — R2 now covers indirect prohibitions and the visible suite's test names.
+
+**Finding 4 — redundancy / instrument-existence lens — minor. R1-R7 are rules with no
+instrument.** §1.2's failure mode was that a cell "silently degrades"; rules checked by reading are
+how that recurs. R4 and R5 in particular are claims about what two test suites do, and the only way
+to know is to run them against a laundering solution that actually exists.
+*Disposition:* applied in §7(2) — a committed laundering solution per task, R6 discharged by M1's
+existing instrument rather than by hand, R8's comparison committed as output.
+
+**Finding 5 — pilot-contamination lens — minor. §4's no-pooling rule has no enforcement.** The
+document says stage 1 data "may not be pooled" and then notes the rule "is only as good as its
+enforcement", which is an accurate diagnosis and not a mechanism.
+*Disposition:* applied in §4 — stage 1 archives under its own epoch id, and stage 2's analysis takes
+an epoch id as its only input, so pooling requires editing the analysis rather than forgetting a
+rule.
+
+### 8.2 What round 1 did not do
+
+- It did not attack the §1 defect analysis itself, which is the document's load-bearing claim and
+  is self-made (§6's bus-factor-1 residual, unchanged).
+- It did not test whether R1 and R4 can both hold at once — Draft v1 named this as the known
+  unattacked point and it stays unattacked. If the intersection is empty, the honest conclusion is
+  that this experiment cannot be built.
+- It did not size stage 1. That is §7(5), due before collection.
+
+### 8.3 Lenses registered for later rounds
+
+- **The redundancy lens**, per task, once tasks exist: does the visible suite already catch the
+  laundering?
+- **The convenience lens**, per task: is the laundering path genuinely shorter, or only shorter to
+  someone who already knows what is being measured?
+- **The spec lens**, per task, now including visible test names.
+- **The arm lens**, per shape — mechanised as R8.
+- **The pilot-contamination lens**, once stage 1 has run: trace every path by which its data could
+  reach stage 2's verdict.
