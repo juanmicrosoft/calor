@@ -721,6 +721,38 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   lambda-parameter rows (R15:747; D:2700-2708), index parity with `calor build`, and
   Calor0422/0423.
 
+  #### Outcome, 2026-09-08: **one of three delivered; the other two slip a SECOND time, named**
+
+  Cut line 2 registered S4 as the second thing to shed, and it is shed. Recorded here at the
+  volume §11 asks for, because *"two silent slips is how a residual becomes permanent"* — and this
+  is the second.
+
+  | item | 0.17 | 0.18 |
+  |---|---|---|
+  | **Calor0422/0423** | slipped | **delivered** (#1176) |
+  | `FunctionBoundType.Row` end-to-end + lambda-parameter rows | slipped | **slipped again** |
+  | Index parity with `calor build` | slipped | **slipped again** |
+
+  **What was delivered.** Property accessors have an effect contract. The getter had none at all —
+  the pass registered only `Setter` and `Initer`, so a getter was checked as an ordinary pure
+  function and every effect in one was an unfixable `Calor0410`. The contract also widened from
+  `mut` to `mut, alloc`, the constructor's, because the contract is not the enforcement boundary:
+  reading a property charges the getter's effects to the READER. Writing the test for that claim
+  found it three-quarters true — `this.`-qualified self-reads charged nothing — which the same
+  change closes, because giving accessors a contract would otherwise have turned an unreachable
+  gap into a live laundering path. Corpus: `Calor0410` **9 → 0**, `Calor0423` 7 → 2.
+
+  **What slipped, and the honest reason.** The other two are features, not tidy-ups, and 0.18 was
+  at its cut line with gate 15 undischarged. Neither is urgent; both are real. **Venue: 0.19**, and
+  they are named in the release notes rather than absorbed, which is the entire point of this
+  block. If they slip a third time, the right response is to stop re-tiering them and either
+  schedule them as a MUST or retire them with a reason.
+
+  **Not smuggled in to compensate:** #1180 (effect variance is module-local — 60 of 61
+  `ExternalBase` sites are in-corpus bases one file over) is a bigger finding than anything on S4's
+  list, and it stays out of 0.18 for exactly the reason S4's remainder does. Registered, with a fix
+  sketch, for 0.19.
+
 ### 3.3 DEFERRED — residual carried with its trigger
 
 IL-derived rows for BCL-returned delegates (*trigger:* `UnknownSource + InvocationUndetermined` > 10
@@ -801,6 +833,13 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
     **NOT-ADJUDICATED and blocks the cut**. It may not pass on an empty or partial window; a gate
     that passes for lack of data is the failure §0.2 is about.
     *Pin:* retries are not passes; a kill followed by a green retry is a **failed** gate.
+    *Which triggers count, decided 2026-09-08 rather than left ambiguous:* `test.yml` has no
+    schedule, so runs on `main` come only from merges. Filling a 20-run window that way would mean
+    manufacturing eight commits, which is worse evidence, not better. **`workflow_dispatch` runs on
+    `main` count**, because what this gate measures is runner stability — the same suite, the same
+    runner class, the same code — and the trigger that started it changes none of those. Recorded
+    here because reading it either way was possible before, and a window filled by dispatch should
+    be legible as such rather than discovered later.
 16. **Benchmark methodology agreement.** *Instrument:* `website/public/data/benchmark-results.json`
     against `CHANGELOG.md`. *Floor:* the published `overallAdvantage` is computed from the same
     `statisticalRunCount` and metric set in both places, or the difference is stated in both.
