@@ -543,6 +543,40 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   group. Reporting the fall alone would read as progress against a group nothing was done to.
   *Deliverable:* the per-subject breakdown R17:§6 asked for and never got, and a fix or a
   registered trigger — **not a fourth carry**.
+
+  #### Outcome, 2026-09-08: **breakdown delivered, and the group is not what its name says**
+
+  Record: `docs/plans/2026-09-08-externalbase-s2-breakdown.md`. Measured at `74ba4973`.
+
+  | subject | Calor0425 | `ExternalBase` | share |
+  |---|---:|---:|---:|
+  | MediatR | 3 | 0 | 0 % |
+  | serilog | 39 | 20 | 51 % |
+  | FluentValidation | 71 | 41 | 58 % |
+  | **aggregate** | **113** | **61** | **54 %** |
+
+  Then the part three releases of carrying the percentage did not ask: **60 of the 61 name a base
+  class declared in the same corpus, one file over.** Exactly one (`System.IO.StringWriter`) is
+  genuinely outside the program. "External" here means *external to the module*, because conversion
+  is per-file.
+
+  **And compiling the modules together does not fix it** — checked, not assumed. The base's own
+  module in the same invocation leaves all three sites reporting. `CrossModuleEffectEnforcementPass`
+  propagates effects along *calls* and has no notion of a base class; `CheckEffectVariance` resolves
+  through `_classesByName`, built from one module, and never consults the registry. The base is
+  visible to the compilation and invisible to the pass.
+
+  So the honest statement of the 54 % is: **the compiler cannot decide variance across a module
+  boundary**, at the two sites whose purpose is stopping effects laundering through dynamic
+  dispatch. An override that broadens its base's row is undetectable today whenever the base is in
+  another file — the normal case under per-file conversion.
+
+  *Disposition:* **registered trigger, which is what §6 accepts as the minimum, but now with a
+  named mechanism instead of a percentage.** Filed as **#1180** with the fix sketch and its four
+  design questions. Not fixed in 0.18: cross-module variance needs type identity across modules
+  (names alone would silently cross-link same-named classes), a trust rule for rows read from a
+  summary, split base chains, and a preserved absent-base path. That is a feature, not a SHOULD-tier
+  patch.
 - **S3 — Measurement provenance (#1159) and benchmark integrity (#1157), and one honest re-run.**
 
   **#1159 first, because it is the cheaper and the more load-bearing.** Every ledger under
@@ -660,7 +694,7 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 |---|---|---|---|
 | **Gate 14 / PP-S1(rows) unevaluated in 0.17** | §0.2 | — | **0.18 M1, unconditional** |
 | **`--permissive-effects` Calor0410 demotion unadjudicated; end condition met 2026-09-01** | R16:§6; §0.4 | **fired** | **0.18 S1, and a hard input to M3(3)** |
-| **`ExternalBase` — 61 of 113 Calor0425 (54 %)**, re-measured; R17 carries a stale 53 of 90 (59 %) | R17:§0.4, §6; `calor0425-corpus-ledger.json` | carried unassigned through three releases | **0.18 S2 — fix or registered trigger, not a fourth carry** |
+| **`ExternalBase` — 61 of 113 Calor0425 (54 %)**, and **60 of the 61 are in-corpus bases one file over**; compiling the modules together does not resolve them | R17:§0.4, §6; `2026-09-08-externalbase-s2-breakdown.md` | **discharged as a diagnosis** — the mechanism is module-local variance resolution, not external types | **0.18 S2 done; fix registered as #1180** |
 | **exit-143 kills on the publish path** | #1150 (4 data points) | **fired** | **0.18 M2 + gate 15** |
 | #965 perf suite kills the runner; runs only on the release path | #965 | recurrence | 0.18 S1 observation; kept distinct from #1150 |
 | Flake cluster #948, #959, #884, #859, #1135 | R15:1040 | rate attached — **overdue since the 0.16 branch cut** | 0.18 S1 |
