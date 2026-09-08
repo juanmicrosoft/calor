@@ -22,7 +22,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class Issue1173ConverterEffectRowTests
 {
-    public static TheoryData<string, string, string> UnderDeclaredConstructs => new()
+    public static TheoryData<string, string, string, string> UnderDeclaredConstructs => new()
     {
         {
             "foreach over a collection the loop itself allocates",
@@ -38,6 +38,7 @@ public class Issue1173ConverterEffectRowTests
                 }
             }
             """,
+            "Run",
             "alloc"
         },
         {
@@ -49,6 +50,7 @@ public class Issue1173ConverterEffectRowTests
                 public void Run() { using (var stream = new MemoryStream()) { } }
             }
             """,
+            "Run",
             "alloc"
         },
         {
@@ -60,6 +62,7 @@ public class Issue1173ConverterEffectRowTests
                 public Func<object> Run() => () => new object();
             }
             """,
+            "Run",
             "alloc"
         },
         {
@@ -71,6 +74,7 @@ public class Issue1173ConverterEffectRowTests
                 public void Run(List<int> values) { values.Add(1); }
             }
             """,
+            "Run",
             "mut"
         },
         {
@@ -84,6 +88,7 @@ public class Issue1173ConverterEffectRowTests
             }
             public class V { public int X; }
             """,
+            "Run",
             "mut"
         },
     };
@@ -93,14 +98,35 @@ public class Issue1173ConverterEffectRowTests
     public void ConvertedCode_DeclaresTheEffectsItsOwnBodyPerforms(
         string description,
         string csharp,
+        string declaration,
         string expectedCode)
     {
         var conversion = Convert(csharp);
 
+        // The row on THE declaration under test, read off the AST rather than searched
+        // for in the module text: the sibling-call case has a callee that carries the
+        // same code, so a text search would pass on the callee's row even when nothing
+        // propagated to the caller — which is the only thing that case exists to pin.
         Assert.Contains(
-            $"§E{{{expectedCode}}}",
-            conversion.CalorSource!.Replace("alloc,mut", expectedCode, StringComparison.Ordinal));
+            expectedCode,
+            RowOf(conversion, declaration).Split(',').Select(code => code.Trim()));
+
         Assert.Empty(EffectErrors(conversion.CalorSource!).Select(d => $"{description}: {d.Message}"));
+    }
+
+    /// <summary>
+    /// The compact <c>§E</c> codes on the named method of the converted module, as the
+    /// emitter would write them.
+    /// </summary>
+    private static string RowOf(ConversionResult conversion, string methodName)
+    {
+        var method = CallGraphAnalysis.EnumerateClasses(conversion.Ast!)
+            .SelectMany(CallGraphAnalysis.EnumerateMethods)
+            .Single(m => m.Name == methodName);
+        return string.Join(
+            ",",
+            EffectEnforcementPass.GetDeclaredEffects(method.Effects).Effects
+                .Select(e => EffectCodes.ToCompact(e.Kind, e.Value)));
     }
 
     /// <summary>
@@ -251,6 +277,74 @@ public class Issue1173ConverterEffectRowTests
         Assert.Equal("cw, fs:w", declared.ToDisplayString());
     }
 
+    /// <summary>
+    /// The rows are a DIAGNOSTIC surface and nothing else: effect codes erase at
+    /// codegen, so stripping every <c>§E</c> from converted output must produce the
+    /// same C#. Without this, synthesis could change what converted code MEANS and the
+    /// only evidence would be that the tests happened to still pass.
+    /// </summary>
+    [Fact]
+    public void EffectRows_DoNotChangeGeneratedCode()
+    {
+        var conversion = Convert(
+            """
+            using System.Collections.Generic;
+            using System.IO;
+            public class C
+            {
+                public int Run(List<int> values)
+                {
+                    values.Add(1);
+                    using (var stream = new MemoryStream()) { }
+                    var total = 0;
+                    foreach (var x in new List<int> { 1, 2 }) total += x;
+                    return total;
+                }
+            }
+            """);
+
+        Assert.Contains("§E{", conversion.CalorSource!);
+        var stripped = string.Join(
+            "\n",
+            conversion.CalorSource!.Split('\n')
+                .Where(line => !line.TrimStart().StartsWith("§E{", StringComparison.Ordinal)));
+
+        // Enforcement OFF on both sides: the question here is what the rows do to
+        // CODEGEN, and leaving it on would compare "the C# for the stripped module"
+        // against nothing at all, since the stripped module fails Calor0410 and an
+        // effect error stops code generation.
+        Assert.Equal(
+            CompileWithoutEffects(stripped).GeneratedCode,
+            CompileWithoutEffects(conversion.CalorSource!).GeneratedCode);
+    }
+
+    /// <summary>
+    /// Conversion runs in parallel — <c>ProjectMigrator</c> fans out under a semaphore,
+    /// the round-trip harness under <c>Parallel.ForEachAsync</c> — and synthesis rents a
+    /// pooled <see cref="EffectResolver"/>, whose memoisation is not thread-safe. Same
+    /// input, converted concurrently, must give the same rows as converting it serially.
+    /// </summary>
+    [Fact]
+    public void ParallelConversion_ProducesTheSameRowsAsSerialConversion()
+    {
+        const string csharp =
+            """
+            using System.Collections.Generic;
+            public class C
+            {
+                public List<int> Make() { return new List<int> { 1 }; }
+                public void Fill(List<int> values) { values.Add(2); }
+            }
+            """;
+
+        var expected = Convert(csharp).CalorSource;
+
+        var actual = new string?[32];
+        Parallel.For(0, actual.Length, i => actual[i] = Convert(csharp).CalorSource);
+
+        Assert.All(actual, source => Assert.Equal(expected, source));
+    }
+
     private static ConversionResult Convert(string csharp)
     {
         var conversion = new CSharpToCalorConverter(new ConversionOptions
@@ -267,6 +361,14 @@ public class Issue1173ConverterEffectRowTests
         Assert.NotNull(conversion.CalorSource);
         return conversion;
     }
+
+    private static CompilationResult CompileWithoutEffects(string calorSource)
+        => Program.Compile(calorSource, null, new CompilationOptions
+        {
+            DeferGeneratedOutputValidation = true,
+            EnforceEffects = false,
+            UnknownCallPolicy = UnknownCallPolicy.Permissive
+        });
 
     private static CompilationResult Compile(string calorSource)
         => Program.Compile(calorSource, null, new CompilationOptions

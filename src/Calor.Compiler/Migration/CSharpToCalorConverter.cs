@@ -234,6 +234,28 @@ public sealed class ConversionOptions
     /// Project migration disables this per file and validates all generated files together.
     /// </summary>
     public bool ValidateRoundTripCSharp { get; set; } = true;
+
+    /// <summary>
+    /// Where the project-local effect manifest (<c>.calor-effects.json</c>) lives, if
+    /// there is one. #1173: the <c>§E</c> rows this conversion writes are derived from
+    /// effect resolution, and the compile that later CHECKS them resolves with the
+    /// project and solution manifests loaded (<c>Program.Compile</c> passes its
+    /// <c>ProjectDirectory</c> straight into the effect pass). If a project manifest
+    /// widens a member the embedded BCL manifests describe more narrowly, a synthesis
+    /// that cannot see it writes a row missing a NAMED effect — and since the
+    /// 2026-09-04 adjudication a named forbidden effect is an error even under
+    /// <c>--permissive-effects</c>. Setting this makes the two sides resolve alike.
+    ///
+    /// <para>Null means "no project manifest", which is what every caller that does not
+    /// set it gets: embedded manifests only, exactly as before.</para>
+    /// </summary>
+    public string? ProjectDirectory { get; set; }
+
+    /// <summary>
+    /// Where solution-level manifests (<c>.calor-effects/</c>) live, if anywhere. Same
+    /// reason as <see cref="ProjectDirectory"/>.
+    /// </summary>
+    public string? SolutionDirectory { get; set; }
 }
 
 /// <summary>
@@ -568,8 +590,12 @@ public sealed class CSharpToCalorConverter
                     calorAst = rewrapped;
                     // The rewrap replaced member bodies with their original C#
                     // (§CSHARP), whose effects are ASSUMED rather than inferred, so
-                    // the rows synthesised over the native bodies no longer describe
-                    // what is emitted. Re-synthesise over the tree that actually ships.
+                    // re-synthesise over the tree that actually ships. Note what this
+                    // does and does not do: synthesis only ever WIDENS, so a row that
+                    // covered the native body and is now broader than the §CSHARP one
+                    // survives. Over-declaration is not diagnosed (nothing reports
+                    // Calor0401), so the rewrapped output still compiles; what the
+                    // second pass buys is coverage of anything the rewrap ADDED.
                     SynthesizeEffectRows(calorAst, context, sourceFile, cancellationToken);
                     calorSource = new CalorEmitter(context).Emit(calorAst);
                 }
@@ -776,16 +802,37 @@ public sealed class CSharpToCalorConverter
     /// call targets per file than the old walker did, so it is not a risk to inherit
     /// quietly.</para>
     /// </summary>
-    private static readonly System.Collections.Concurrent.ConcurrentBag<EffectResolver> SynthesisResolvers = new();
+    /// <para>Keyed by manifest SCOPE, because <see cref="EffectResolver.Initialize"/> is
+    /// idempotent per instance: a resolver initialized for one project's manifests would
+    /// silently ignore a second project's. Callers that set neither directory share one
+    /// pool of embedded-manifest resolvers, which is every caller that has no project.</para>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string, System.Collections.Concurrent.ConcurrentBag<EffectResolver>> SynthesisResolvers = new(StringComparer.Ordinal);
 
-    private static EffectResolver RentSynthesisResolver()
+    private static string ManifestScopeKey(string? projectDirectory, string? solutionDirectory)
+        => (projectDirectory ?? "") + "\u0000" + (solutionDirectory ?? "");
+
+    private static EffectResolver RentSynthesisResolver(string? projectDirectory, string? solutionDirectory)
     {
-        if (SynthesisResolvers.TryTake(out var pooled))
+        var pool = SynthesisResolvers.GetOrAdd(
+            ManifestScopeKey(projectDirectory, solutionDirectory),
+            _ => new System.Collections.Concurrent.ConcurrentBag<EffectResolver>());
+        if (pool.TryTake(out var pooled))
             return pooled;
         var resolver = new EffectResolver();
-        resolver.Initialize();
+        resolver.Initialize(projectDirectory, solutionDirectory);
         return resolver;
     }
+
+    private static void ReturnSynthesisResolver(
+        EffectResolver resolver,
+        string? projectDirectory,
+        string? solutionDirectory)
+        => SynthesisResolvers
+            .GetOrAdd(
+                ManifestScopeKey(projectDirectory, solutionDirectory),
+                _ => new System.Collections.Concurrent.ConcurrentBag<EffectResolver>())
+            .Add(resolver);
 
     /// <summary>
     /// #1173 — writes each declaration's <c>§E</c> row from the compiler's own
@@ -811,6 +858,11 @@ public sealed class CSharpToCalorConverter
     /// hand by declaration id, which survives the round trip, and step 3 then
     /// emits once with them.</para>
     ///
+    /// <para>Resolution must see what the later compile will see, or the two agree
+    /// about the body and disagree about the manifests — see
+    /// <see cref="ConversionOptions.ProjectDirectory"/>, which callers that have a
+    /// project set so the rented resolver loads the same manifests.</para>
+    ///
     /// <para>Best-effort by design: a row that is missing or too narrow is a
     /// diagnostic on a later compile, never a reason to throw away a conversion
     /// that otherwise succeeded. Synthesis only ever WIDENS a row, so a run that
@@ -827,7 +879,7 @@ public sealed class CSharpToCalorConverter
             return;
 
         cancellationToken.ThrowIfCancellationRequested();
-        var resolver = RentSynthesisResolver();
+        var resolver = RentSynthesisResolver(_options.ProjectDirectory, _options.SolutionDirectory);
         try
         {
             var probe = new CalorEmitter(CreateContext(sourceFile)).Emit(module);
@@ -866,7 +918,7 @@ public sealed class CSharpToCalorConverter
         }
         finally
         {
-            SynthesisResolvers.Add(resolver);
+            ReturnSynthesisResolver(resolver, _options.ProjectDirectory, _options.SolutionDirectory);
         }
     }
 

@@ -924,6 +924,14 @@ public sealed class EffectEnforcementPass
     /// cover the override, and an interface member to cover its implementations.
     /// Without that, synthesising a truthful row on an implementing method would
     /// trade one error for another.</para>
+    ///
+    /// <para>The reach is <see cref="CallGraphAnalysis.EnumerateClasses"/>'s, which
+    /// does not descend into NESTED classes. So a nested type's methods get no
+    /// synthesised row — and no Calor0410 either, because <see cref="Enforce"/> walks
+    /// the same enumerator and cannot see them to check. The "row and check agree by
+    /// construction" property holds there only because both sides are blind, which is
+    /// worth saying out loud: whoever teaches the pass about nested types must teach
+    /// this at the same time, or converted output starts failing the day they do.</para>
     /// </summary>
     /// <param name="module">The module to rewrite in place.</param>
     /// <param name="resolver">Manifest resolver to reuse across rounds; a fresh
@@ -991,6 +999,17 @@ public sealed class EffectEnforcementPass
         // rows just written. Both use the pass's OWN resolution — FindBaseMethod
         // and FindImplementingMethod are what CheckEffectVariance asks, so what is
         // repaired here is exactly what would have been reported there.
+        //
+        // The CONCRETE part of it, precisely. CheckEffectVariance decides with
+        // PolyRow.Fits, which also compares `eff` VARIABLES by ordinal; this repair
+        // widens with EffectSet.Except, which sees only concrete codes. An override
+        // binding an `eff` its base does not would therefore still report Calor0420
+        // after this loop reports convergence. Unreachable through the converter,
+        // which never emits an `eff` binder — but SynthesizeDeclaredRows is public,
+        // so the limit belongs in writing rather than in the caller's luck. Widening
+        // a base's BINDER list is not the same kind of edit as widening its code set:
+        // it changes the declaration's arity, and that is a decision for whoever
+        // wants polymorphic rows synthesised, not a detail to slip in here.
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))

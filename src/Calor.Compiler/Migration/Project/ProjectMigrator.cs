@@ -18,6 +18,15 @@ public sealed class ProjectMigrator
     private IReadOnlyList<ProjectCompilationInputs>? _projectCompilationInputs;
     private string? _projectCompilationInputError;
 
+    /// <summary>
+    /// The directory whose <c>.calor-effects.json</c> the converted files will be
+    /// compiled against. #1173: the converter derives each <c>§E</c> row from effect
+    /// resolution, so it has to resolve with the same manifests the later compile
+    /// does — see <see cref="ConversionOptions.ProjectDirectory"/>. Set per migration
+    /// from the plan, which is the only place the project's location is known.
+    /// </summary>
+    private string? _manifestProjectDirectory;
+
     public ProjectMigrator(MigrationPlanOptions? options = null)
     {
         _options = options ?? new MigrationPlanOptions();
@@ -40,6 +49,7 @@ public sealed class ProjectMigrator
     /// </summary>
     public async Task<MigrationReport> ExecuteAsync(MigrationPlan plan, bool dryRun = false, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default)
     {
+        _manifestProjectDirectory = ResolveManifestProjectDirectory(plan);
         var projectFilePath = plan.ProjectFilePath
             ?? (File.Exists(plan.ProjectPath)
                 && Path.GetExtension(plan.ProjectPath).Equals(
@@ -249,8 +259,26 @@ public sealed class ProjectMigrator
     /// <summary>
     /// Performs a dry run showing what would be migrated.
     /// </summary>
+    /// <summary>
+    /// The plan's project directory: the directory holding the project file when there
+    /// is one, else the project path itself when that is already a directory. Null when
+    /// neither, which leaves conversion on the embedded manifests alone.
+    /// </summary>
+    private static string? ResolveManifestProjectDirectory(MigrationPlan plan)
+    {
+        var projectFile = plan.ProjectFilePath;
+        if (!string.IsNullOrEmpty(projectFile) && File.Exists(projectFile))
+            return Path.GetDirectoryName(Path.GetFullPath(projectFile));
+        if (!string.IsNullOrEmpty(plan.ProjectPath) && Directory.Exists(plan.ProjectPath))
+            return Path.GetFullPath(plan.ProjectPath);
+        if (!string.IsNullOrEmpty(plan.ProjectPath) && File.Exists(plan.ProjectPath))
+            return Path.GetDirectoryName(Path.GetFullPath(plan.ProjectPath));
+        return null;
+    }
+
     public async Task<MigrationReport> DryRunAsync(MigrationPlan plan, CancellationToken cancellationToken = default)
     {
+        _manifestProjectDirectory = ResolveManifestProjectDirectory(plan);
         return await ExecuteAsync(plan, dryRun: true, cancellationToken: cancellationToken);
     }
 
@@ -483,6 +511,8 @@ public sealed class ProjectMigrator
         {
             conversionOptions.ModuleName = _options.ModuleNameOverride;
         }
+
+        conversionOptions.ProjectDirectory = _manifestProjectDirectory;
 
         var converter = new CSharpToCalorConverter(conversionOptions);
 
