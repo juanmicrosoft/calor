@@ -53,7 +53,7 @@ export function TableOfContents({ headings }: TableOfContentsProps) {
   }
 
   return (
-    <nav className="w-56 shrink-0 hidden xl:block">
+    <nav aria-label="On this page" className="w-56 shrink-0 hidden xl:block">
       <div className="sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto">
         <p className="mb-4 text-sm font-medium">On this page</p>
         <ul className="space-y-2 text-sm">
@@ -70,14 +70,9 @@ export function TableOfContents({ headings }: TableOfContentsProps) {
                     ? 'text-primary font-medium'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
-                onClick={(e) => {
-                  e.preventDefault();
+                onClick={() => {
                   trackTocAnchorClick(heading.text);
-                  const element = document.getElementById(heading.id);
-                  if (element) {
-                    element.scrollIntoView({ behavior: 'smooth' });
-                    setActiveId(heading.id);
-                  }
+                  setActiveId(heading.id);
                 }}
               >
                 {heading.text}
