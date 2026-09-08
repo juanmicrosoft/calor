@@ -285,6 +285,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          # #1159: LedgerCommitStampTests decides whether every ledger's
+          # MeasuredCommit is reachable from HEAD, which needs history. Under the
+          # default depth-1 checkout it skips, and a gate that skips everywhere is
+          # the failure roadmap-v0.18 §0.2 is about. This is the job where it runs
+          # for real; the sharded `tests` matrix stays shallow and skips, which is
+          # registered in eng/test-manifest.json.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

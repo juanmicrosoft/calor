@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 8043,
+      "expectedTotal": 8046,
       "expectedSkipped": 4,
       "note": "2026-09-08 (#1173): 8030 -> 8041, +11 from Issue1173ConverterEffectRowTests — the converter now derives its \u00a7E rows from the compiler's own effect inference over the emitted text (5 under-declared constructs as theory rows, plus chain desugaring, interface/override variance repair, the pure-body case, row round-trip, widen-never-narrow, codegen neutrality, and parallel-vs-serial conversion)."
     },
@@ -155,6 +155,11 @@
     },
     {
       "reason": "no committed .calr found under the repository root — partial checkout",
+      "count": 1
+    },
+    {
+      "_comment": "#1159 LedgerCommitStampTests: reachability of a ledger's MeasuredCommit cannot be decided without history. The `test` job checks out fetch-depth:0 so both run there for real; the sharded `tests` matrix stays shallow, where they skip rather than pass vacuously.",
+      "reason": "shallow clone: history is not present, so reachability cannot be decided here",
       "count": 1
     }
   ],
