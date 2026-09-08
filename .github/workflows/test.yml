@@ -448,6 +448,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: ${{ matrix.name == 'compiler' && 'recursive' || 'false' }}
+          # #1159: LedgerCommitStampTests needs history to decide whether a ledger's
+          # MeasuredCommit is reachable. Without this the compiler shard is a depth-1
+          # checkout, the test skips, and the shard's skip count stops matching
+          # eng/test-manifest.json's expectedSkipped — so the gate would be both
+          # vacuous here and noisy.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

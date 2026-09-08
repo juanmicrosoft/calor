@@ -34,7 +34,10 @@ public class LedgerCommitStampTests
 {
     private const string IndexFile = "commit-stamp-index.json";
 
-    [Fact]
+    // SkippableFact, not Fact: Skip.If throws, and xUnit reports that as a FAILURE on a
+    // plain [Fact]. Caught by CI rather than locally, because a developer clone is not
+    // shallow and the guard never fired here.
+    [SkippableFact]
     public void EveryIndexedCommitResolvesAndIsReachableFromThisBranch()
     {
         var root = RepoRoot();
