@@ -1,12 +1,11 @@
 import { notFound } from 'next/navigation';
-import { MDXRemote } from 'next-mdx-remote/rsc';
+import { compileMDX } from 'next-mdx-remote/rsc';
 import remarkGfm from 'remark-gfm';
 import {
   getDocBySlug,
   getDocSlugs,
   getDocSections,
   getAdjacentDocs,
-  extractHeadings,
 } from '@/lib/docs';
 import { Sidebar } from '@/components/docs/Sidebar';
 import { TableOfContents } from '@/components/docs/TableOfContents';
@@ -14,6 +13,7 @@ import { Pagination } from '@/components/docs/Pagination';
 import { MobileSidebar } from '@/components/docs/MobileSidebar';
 import { DocsPageTracker } from '@/components/docs/DocsPageTracker';
 import { mdxComponents } from '@/components/mdx';
+import { Heading, remarkHeadings } from '@/lib/headings';
 
 interface DocPageProps {
   params: Promise<{ slug?: string[] }>;
@@ -58,7 +58,12 @@ export default async function DocPage({ params }: DocPageProps) {
 
   const sections = getDocSections();
   const { prev, next } = getAdjacentDocs(slugPath);
-  const headings = extractHeadings(doc.content);
+  const headings: Heading[] = [];
+  const { content } = await compileMDX({
+    source: doc.content,
+    components: mdxComponents,
+    options: { mdxOptions: { remarkPlugins: [remarkGfm, remarkHeadings(headings)] } },
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
@@ -80,15 +85,7 @@ export default async function DocPage({ params }: DocPageProps) {
               <p className="lead text-xl text-muted-foreground">{doc.description}</p>
             )}
 
-            <MDXRemote
-              source={doc.content}
-              components={mdxComponents}
-              options={{
-                mdxOptions: {
-                  remarkPlugins: [remarkGfm],
-                },
-              }}
-            />
+            {content}
           </article>
 
           <Pagination prev={prev} next={next} />
