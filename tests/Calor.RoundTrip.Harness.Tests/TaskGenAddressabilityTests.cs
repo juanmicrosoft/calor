@@ -81,16 +81,28 @@ public class TaskGenAddressabilityTests
         Assert.DoesNotContain("Calor0410", result.FiredOnClean);
     }
 
+    /// <summary>
+    /// This test used to check the differential's other half — that a `Calor0410` the CLEAN
+    /// conversion already produces is not credited to the mutation — using a fixture built from
+    /// converter-baseline noise. **That noise no longer exists**, and the history is the point.
+    ///
+    /// <para>#1173 took converted-corpus `Calor0410` from 219 to 9 by deriving each `§E` row from
+    /// the inference that checks it. #1176 took the last 9 to **zero** by giving property accessors
+    /// an effect contract — those nine were allocating getters, undeclarable rather than
+    /// under-declared. So a converted module that reports `Calor0410` on its clean arm cannot be
+    /// constructed any more: the converter does not under-declare.</para>
+    ///
+    /// <para><b>The coverage that costs, stated rather than quietly dropped.</b> The probe's
+    /// "fires on both arms → not attributable to the mutation" branch is now unreachable through
+    /// conversion, so nothing exercises it. Testing it again needs a hand-written Calor fixture,
+    /// which <see cref="VerificationAddressability.Probe"/> does not accept — it converts C#. That
+    /// is a real gap in this file and it is written down here so the next reader finds it rather
+    /// than assuming the branch is covered.</para>
+    /// </summary>
     [Fact]
-    public void EffectViolation_NotAddressable_WhenCalor0410AlreadyFiresOnTheCleanConversion()
+    public void EffectViolation_CleanConversionNoLongerProducesBaselineCalor0410()
     {
-        // The differential must not credit the mutation with a diagnostic the CLEAN
-        // conversion already produces. The one converter-baseline Calor0410 left
-        // after #1173 is a property GETTER that allocates: Calor has nowhere to
-        // write a row on a property, so an allocating getter is undeclarable rather
-        // than under-declared (#1176). That makes it the honest fixture for this
-        // case — real baseline noise, not an artifact this repo has since fixed.
-        const string alreadyDirty = """
+        const string cleanWithAllocatingGetter = """
             using System.Collections.Generic;
             namespace S;
             public class Counter
@@ -101,14 +113,15 @@ public class TaskGenAddressabilityTests
             }
             """;
         var cand = Assert.Single(
-            ExpressibleMutationOperators.Enumerate(alreadyDirty, "Counter.cs"),
+            ExpressibleMutationOperators.Enumerate(cleanWithAllocatingGetter, "Counter.cs"),
             c => c.Operator == MutationOperatorKind.EffectViolation);
 
-        var result = _probe.Probe("Calor0410", cand.MutatedSource, alreadyDirty, "Counter.cs");
+        var result = _probe.Probe("Calor0410", cand.MutatedSource, cleanWithAllocatingGetter, "Counter.cs");
 
-        Assert.Contains("Calor0410", result.FiredOnClean);
+        // The allocating getter was the last converter-baseline Calor0410 (#1176).
+        Assert.DoesNotContain("Calor0410", result.FiredOnClean);
         Assert.False(result.Addressable,
-            $"a pre-existing Calor0410 must not be credited to the mutation; note: {result.Note}");
+            $"nothing fires on either arm, so nothing is attributable; note: {result.Note}");
     }
 
     // ---- DivByZero → Calor0920 (guard removal, Z3-backed) ----

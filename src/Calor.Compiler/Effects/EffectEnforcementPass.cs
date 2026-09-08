@@ -280,7 +280,15 @@ public sealed class EffectEnforcementPass
             }
             foreach (var property in CallGraphAnalysis.EnumerateProperties(cls))
             {
-                foreach (var accessor in new[] { property.Setter, property.Initer }.Where(a => a != null))
+                // #1176: the GETTER belongs here too. It was the one accessor left out, so
+                // unlike its siblings it fell through to CheckEffects as an ordinary
+                // function whose declared row is the `effects: null` that
+                // ToPropertyAccessorFunctionNode hard-codes — declared pure, always, with
+                // no surface on which to say otherwise. Every effect in every getter body
+                // was Calor0410 and unfixable. The pass's own contract comment already
+                // described the rule as covering "custom accessors"; the omission was an
+                // oversight, not a decision.
+                foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.Where(a => a != null))
                 {
                     var id = CallGraphAnalysis.GetPropertyAccessorFunctionId(cls.Name, property, accessor!);
                     _ownerClassByFunctionId[id] = cls;
@@ -359,8 +367,8 @@ public sealed class EffectEnforcementPass
                 CheckImplicitEffectBody(function, accessor.Declaration,
                     DiagnosticCode.AccessorEffectContractUnavailable,
                     $"{accessor.Kind} accessor '{accessor.OwnerName}.{accessor.MemberName}'",
-                    EffectSet.From("mut"),
-                    "intrinsic accessor mutation ('mut')");
+                    AccessorContract,
+                    "intrinsic accessor mutation/allocation ('mut', 'alloc')");
             else
                 CheckEffects(function);
         }
@@ -397,14 +405,14 @@ public sealed class EffectEnforcementPass
             {
                 kind = "accessor";
                 mismatchCode = DiagnosticCode.AccessorEffectContractUnavailable;
-                declaredSet = EffectSet.From("mut");
+                declaredSet = AccessorContract;
                 hasDeclaration = false;
             }
             else
             {
-                // Member ids are class-qualified (`Cls.m001`, `Cls.p001.get`); a
-                // getter with a body is a member too, though it is registered in
-                // no owner map (it has no implicit contract to check).
+                // Member ids are class-qualified (`Cls.m001`, `Cls.p001.get`).
+                // Since #1176 every property accessor has an implicit contract, so
+                // what reaches this arm is a method, or a top-level function.
                 kind = _ownerClassByFunctionId.ContainsKey(function.Id) || function.Id.Contains('.')
                     ? "method"
                     : "function";
@@ -841,6 +849,26 @@ public sealed class EffectEnforcementPass
                 assumedSeverity);
         }
     }
+
+    /// <summary>
+    /// #1176 — what a property accessor may do without a <c>§E</c> surface to say so.
+    ///
+    /// <para>Widened from <c>mut</c> to <c>mut, alloc</c>, which is the contract a
+    /// CONSTRUCTOR already gets, and the reason is that the contract is not the
+    /// enforcement boundary. Reading a property charges the getter's computed effects to
+    /// the READER (<c>InferGetterEffects</c> → <c>InferFromInternalFunctions</c>), so an
+    /// effect cannot hide behind an accessor whatever this set says. What the contract
+    /// decides is only whether the accessor is itself reported for doing something it
+    /// cannot declare.</para>
+    ///
+    /// <para>Given that, forbidding <c>alloc</c> here bought no soundness and cost real
+    /// code: a getter that returns a computed value usually allocates, and a memoising
+    /// one mutates — the pattern behind every Calor0410 that #1173 left standing on the
+    /// converted corpus. Everything else an accessor might do — <c>io</c>, <c>fs</c>,
+    /// <c>net</c>, <c>throw</c> — is still rejected and must move behind a declared
+    /// method, which is the fail-closed stance this contract exists for.</para>
+    /// </summary>
+    private static readonly EffectSet AccessorContract = EffectSet.From("mut", "alloc");
 
     private EffectSet GetDeclaredEffects(FunctionNode function) => GetDeclaredEffects(function.Effects);
 
@@ -5293,7 +5321,21 @@ public sealed class EffectEnforcementPass
             if (!TrySplitMemberReference(reference.Name, out var receiver, out var member))
                 return EffectSet.Empty;
 
-            var receiverType = ResolveLocalValueType(receiver);
+            // #1176: `this.` and `self.` resolve to the enclosing class, the same way the
+            // event-accessor path at InferFromEventAccessor already does. Without this,
+            // `ResolveLocalValueType("this")` answers null and reading YOUR OWN property
+            // charges nothing — while the identical read through a typed receiver
+            // (`b.Items`) charges the getter's effects in full.
+            //
+            // That asymmetry was unreachable until now: an effectful getter was itself
+            // Calor0410 with no surface to declare on, so no getter could carry effects
+            // for a self-read to launder. Giving accessors a contract makes effectful
+            // getters legal, which would have made this a laundering path — the shape
+            // #1136's table catalogues for fields, one member kind over. Closed here
+            // rather than shipped and found later.
+            var receiverType = receiver is "this" or "self"
+                ? _context.OwnerClass?.Name
+                : ResolveLocalValueType(receiver);
             return receiverType == null
                 ? EffectSet.Empty
                 : InferGetterEffects(receiverType, member, reference.Span, receiver);

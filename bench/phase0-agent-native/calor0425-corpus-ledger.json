@@ -50,8 +50,8 @@
         "ParseFailed": 0,
         "BindStopped": 15,
         "ReachEffectPass": 97,
-        "StopCalor0410": 56,
-        "StopCalor0422Or0423": 4,
+        "StopCalor0410": 55,
+        "StopCalor0422Or0423": 5,
         "StopCalor1002": 26,
         "CompileClean": 11,
         "StoppedInCliOnlyPass": 0,
@@ -64,8 +64,8 @@
         "ParseFailed": 0,
         "BindStopped": 23,
         "ReachEffectPass": 193,
-        "StopCalor0410": 110,
-        "StopCalor0422Or0423": 3,
+        "StopCalor0410": 109,
+        "StopCalor0422Or0423": 4,
         "StopCalor1002": 15,
         "CompileClean": 62,
         "StoppedInCliOnlyPass": 3,
@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
+  "MeasuredCommit": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
   "AggregateDiagnostics": 113,
   "AggregateModulesWithDiagnostics": 46,
   "AggregateModulesEnforced": 324,
@@ -158,7 +158,7 @@
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],
       "BindFailureMultiCause": 4,
-      "Calor0411Sites": 534,
+      "Calor0411Sites": 538,
       "Calor0411Modules": 60
     },
     {

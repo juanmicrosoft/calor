@@ -6,6 +6,38 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **A property's `get` can now do the ordinary things getters do.** Every Calor
+  declaration says what effects it may have — allocating memory, mutating
+  something, writing to the console. A property accessor has nowhere to write
+  that down, so the compiler gives it a fixed allowance instead: a *contract*.
+  Two things were wrong with it.
+
+  The `get` had no contract at all. The compiler hands one to `set` and to
+  `init`, and simply missed `get` — so a getter was checked as though it had
+  promised to do nothing, and *any* effect in one was an error you could not fix,
+  because there was nowhere to say otherwise. A getter that returns a fresh list
+  allocates. A getter that computes its value once and remembers it mutates.
+  Neither could be written.
+
+  The allowance was also too small: mutation only, where a constructor is allowed
+  mutation *and* allocation. Why widening it is safe is the part worth stating —
+  **the allowance is not what keeps effects honest.** Reading a property charges
+  the getter's effects to *the code doing the reading*, which still has to declare
+  them. So forbidding allocation inside a getter never prevented anything; it only
+  outlawed code that had nowhere else to go. Anything an accessor could not
+  plausibly need — writing files, printing, throwing — is still refused, and has
+  to move into a method that declares it.
+
+  Fixing this exposed a second hole, now closed: reading **your own** property
+  through `this.` charged nothing, while the identical read through another
+  variable charged in full. That did not matter while getters could not carry
+  effects at all. It would have mattered the moment they could.
+
+  Across the three real projects we convert as a test, this takes the remaining
+  "uses an effect it does not declare" errors from **9 to zero** — every one of
+  them one of these getters.
+
+
 - **The C# → Calor converter now declares the effects the code it writes actually
   performs.** Every Calor declaration carries an effect row — the `§E{...}` line
   saying what the body may do: `alloc` for allocating memory, `mut` for mutating
@@ -23,11 +55,12 @@ All notable changes to this project will be documented in this file.
   three real projects we convert as a test — MediatR, Serilog and FluentValidation,
   364 files — this takes `Calor0410` errors from **219 in 53 files to 9 in 2**.
 
-  The nine that remain are all property getters, and they are a different problem.
-  A property's accessors — its `get` and `set` — have nowhere to declare effects,
-  so an allocating getter is not under-declared, it is undeclarable. (The property
+  The nine that remained were all property getters, and they were a different
+  problem: a property's accessors have nowhere to declare effects, so an
+  allocating getter was not under-declared, it was undeclarable. (The property
   itself has carried a row since 0.17, but that row describes the *value* the
-  property holds, not what its accessors do.) That gap is tracked as issue #1176.
+  property holds, not what its accessors do.) **That is now fixed too** — see the
+  entry above; the corpus reports no such errors at all.
 
   Two smaller fixes came with it. Interface members can now keep an effect row
   through a round trip — the parser always read one and the checker always used
