@@ -3,10 +3,10 @@ name: Website regressions
 on:
   pull_request:
     branches: [main, release/v0.19]
-    paths: ['website/**', '.github/workflows/website-tests.yml']
+    paths: ['website/**', 'src/**', 'scripts/**', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
   push:
     branches: [release/v0.19]
-    paths: ['website/**', '.github/workflows/website-tests.yml']
+    paths: ['website/**', 'src/**', 'scripts/**', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
 
 permissions:
   contents: read
