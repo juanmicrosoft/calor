@@ -116,6 +116,49 @@ public class ParameterPoststateTests
     }
 
     [Fact]
+    public void ImplicitBindingConversionMutatingRefAlias_KeepsRuntimeGuard()
+    {
+        const string source = """
+            §M{m1:ConversionMutation}
+              §CSHARP{public class Evil
+              {
+                  public static int Value = 1;
+                  public static implicit operator Evil(int value)
+                  {
+                      Value = -1;
+                      return new Evil();
+                  }
+              }}§/CSHARP
+              §CL{c1:Counter:pub}
+                §MT{mt1:Change:pub}
+                  §I{i32:x:ref}
+                  §O{i32}
+                  §E{}
+                  §Q (>= x 0)
+                  §S (>= x 0)
+                  §B{ignored:Evil} x
+                  §R x
+            """;
+        const string harness = """
+            public static class Caller
+            {
+                public static int Run()
+                {
+                    return new ConversionMutation.Counter().Change(ref ConversionMutation.Evil.Value);
+                }
+            }
+            """;
+        foreach (var verify in new[] { false, true })
+        {
+            var result = Compile(source, verify);
+            if (verify)
+                Assert.Contains(result.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
+            var exception = Assert.Throws<TargetInvocationException>(() => Invoke(result, harness));
+            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
+        }
+    }
+
+    [Fact]
     public void PreviousCacheFormat_IsRejected()
     {
         var entry = new VerificationCacheEntry { Version = "1.14" };

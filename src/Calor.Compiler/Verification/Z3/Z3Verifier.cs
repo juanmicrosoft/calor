@@ -655,6 +655,7 @@ public static class FunctionBodyEncoder
             {
                 ReturnStatementNode ret => ret.Expression == null || IsStatePreservingExpression(ret.Expression, locals),
                 BindStatementNode bind => !parameters.Contains(bind.Name)
+                    && IsWidthNeutralBindingType(bind.TypeName)
                     && bind.Initializer != null && IsStatePreservingExpression(bind.Initializer, locals),
                 IfStatementNode conditional => IsStatePreservingExpression(conditional.Condition, locals)
                     && PreservesEntryState(conditional.ThenBody, parameters, locals)
