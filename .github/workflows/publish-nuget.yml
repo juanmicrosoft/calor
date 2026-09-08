@@ -70,6 +70,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          # #1159: LedgerCommitStampTests decides whether a ledger's MeasuredCommit
+          # is reachable, which needs history. Under a depth-1 checkout it SKIPS —
+          # and that extra skip put the shard at 5 skips against the manifest's 4,
+          # so `Enforce test inventory` failed the release with
+          # "executed 8043, expected 8044" and publish-nuget shipped nothing.
+          # test.yml already checks out full history for the same reason; the
+          # release path is if anything where provenance most wants verifying.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
