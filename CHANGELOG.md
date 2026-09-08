@@ -23,9 +23,11 @@ All notable changes to this project will be documented in this file.
   three real projects we convert as a test — MediatR, Serilog and FluentValidation,
   364 files — this takes `Calor0410` errors from **219 in 53 files to 9 in 2**.
 
-  The nine that remain are all property getters, and they are a different problem:
-  Calor has nowhere to write a row on a property at all, so an allocating getter
-  is not under-declared, it is undeclarable. That gap is tracked as issue #1176.
+  The nine that remain are all property getters, and they are a different problem.
+  A property's accessors — its `get` and `set` — have nowhere to declare effects,
+  so an allocating getter is not under-declared, it is undeclarable. (The property
+  itself has carried a row since 0.17, but that row describes the *value* the
+  property holds, not what its accessors do.) That gap is tracked as issue #1176.
 
   Two smaller fixes came with it. Interface members can now keep an effect row
   through a round trip — the parser always read one and the checker always used
