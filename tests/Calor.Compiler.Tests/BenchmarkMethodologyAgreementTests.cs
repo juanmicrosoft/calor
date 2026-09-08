@@ -29,6 +29,14 @@ public class BenchmarkMethodologyAgreementTests
     /// <c>### Benchmark Results (Statistical: 30 runs)</c>, then <c>- **Overall Advantage**: 1.32
     /// (Calor leads)</c> and <c>- **Programs Tested**: 217</c>.
     /// </summary>
+    /// <summary>
+    /// The explicit authorisation for a changelog/website mismatch. Deliberately a comment and
+    /// deliberately ugly: it has to be typed on purpose, and it has to be accompanied by the
+    /// statement gate 16 requires — <c>&lt;!-- gate16: methodology-differs — the website publishes
+    /// N runs; this block publishes M, because … --&gt;</c>
+    /// </summary>
+    private const string MethodologyDiffersMarker = "gate16: methodology-differs";
+
     private static readonly Regex BlockHeader =
         new(@"^###\s+Benchmark Results\s*\(Statistical:\s*(?<runs>\d+)\s+runs?\)\s*$",
             RegexOptions.Multiline | RegexOptions.Compiled);
@@ -56,11 +64,18 @@ public class BenchmarkMethodologyAgreementTests
         var changelogAdvantage = Number(block, @"\*\*Overall Advantage\*\*:\s*([0-9.]+)");
         var changelogPrograms = (int?)Number(block, @"\*\*Programs Tested\*\*:\s*([0-9]+)");
 
-        // A block that states its own difference from the website is honest and passes — that is
-        // gate 16's "or the difference is stated in both". 0.17.0's block does exactly this: it
-        // says its numbers were carried forward and not re-run for that release.
-        var statesTheDifference = block.Contains("not re-run", StringComparison.OrdinalIgnoreCase)
-            || block.Contains("carried forward", StringComparison.OrdinalIgnoreCase);
+        // Gate 16's "or the difference is stated in both" needs an EXPLICIT marker, not a phrase.
+        //
+        // This was first written as a substring match for "not re-run" / "carried forward", and it
+        // was vacuous within hours: 0.18.0's own benchmark note says the numbers were "re-run for
+        // this release, unlike 0.17's, which were carried forward" — describing the PREVIOUS
+        // release — and that tripped the hatch. Simulated with the website at 1.28/0 against a
+        // changelog at 1.32/30, the gate passed. A gate that cannot fire is roadmap-v0.18 §0.2's
+        // finding, and prose about an earlier release is no way to authorise a mismatch in this one.
+        //
+        // The marker is a comment, so it cannot be written by accident, cannot be tripped by
+        // narrative, and forces whoever needs the escape to say what differs and why.
+        var statesTheDifference = block.Contains(MethodologyDiffersMarker, StringComparison.Ordinal);
 
         var mismatches = new List<string>();
         if (changelogRuns != publishedRuns)
@@ -85,8 +100,9 @@ public class BenchmarkMethodologyAgreementTests
             + "does not say so." + Environment.NewLine
             + string.Join(Environment.NewLine, mismatches.Select(m => "  - " + m))
             + Environment.NewLine
-            + "Either publish the same measurement in both, or state the difference in the "
-            + "CHANGELOG block (as 0.17.0's does).");
+            + "Either publish the same measurement in both, or authorise the difference "
+            + $"explicitly by putting the marker '{MethodologyDiffersMarker}' in the CHANGELOG "
+            + "block together with a statement of what differs and why.");
     }
 
     /// <summary>
@@ -118,9 +134,14 @@ public class BenchmarkMethodologyAgreementTests
         Assert.NotEqual(30, websiteRuns);
         Assert.NotEqual(1.32, websiteAdvantage);
         Assert.False(
-            block.Contains("not re-run", StringComparison.OrdinalIgnoreCase)
-            || block.Contains("carried forward", StringComparison.OrdinalIgnoreCase),
-            "this fixture must NOT state a difference, or it would pass for the wrong reason");
+            block.Contains(MethodologyDiffersMarker, StringComparison.Ordinal),
+            "this fixture must NOT authorise a difference, or it would pass for the wrong reason");
+
+        // The regression that made this gate vacuous once: narrative ABOUT AN EARLIER RELEASE
+        // must not authorise a mismatch in this one.
+        const string proseAboutAnotherRelease =
+            "- **Note**: re-run for this release, unlike 0.17's, which were carried forward.";
+        Assert.DoesNotContain(MethodologyDiffersMarker, proseAboutAnotherRelease, StringComparison.Ordinal);
     }
 
     private static string Block(string changelog, Match header)
