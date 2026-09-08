@@ -9,6 +9,8 @@ out/
 
 # Testing
 coverage/
+test-results/
+playwright-report/
 
 # Misc
 .DS_Store

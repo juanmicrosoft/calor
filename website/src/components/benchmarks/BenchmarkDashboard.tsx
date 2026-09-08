@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { BarChart3, FileCode, Trophy, Clock } from 'lucide-react';
 import { trackBenchmarkResultsView } from '@/lib/analytics';
 import { useEffect } from 'react';
+import { identifyPrograms } from '@/lib/benchmark-identity';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
@@ -38,7 +39,10 @@ interface BenchmarkData {
 }
 
 // Pre-loaded at build time
-const data = benchmarkData as BenchmarkData;
+const data = {
+  ...benchmarkData as BenchmarkData,
+  programs: identifyPrograms(benchmarkData.programs),
+};
 
 function formatDate(isoString: string): string {
   try {
