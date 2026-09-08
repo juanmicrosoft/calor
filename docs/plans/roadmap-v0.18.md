@@ -833,6 +833,44 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
     **NOT-ADJUDICATED and blocks the cut**. It may not pass on an empty or partial window; a gate
     that passes for lack of data is the failure §0.2 is about.
     *Pin:* retries are not passes; a kill followed by a green retry is a **failed** gate.
+    #### Outcome, 2026-09-08: **PASS — 21 consecutive runs, zero exit-143 kills**
+
+    *Window:* every `test.yml` run on `main` from `35e4cd62` (M2's fix, 2026-09-04T16:23Z) onward.
+    *Instrument:* the `tests (compiler)` job in each.
+
+    | | |
+    |---|---:|
+    | completed post-fix runs carrying the instrument | **21** |
+    | `tests (compiler)` conclusions other than `success` | **0** |
+    | runs at `attempt` > 1 | **0** |
+    | composition | 14 `push`, 7 `workflow_dispatch` |
+
+    **The pin holds without interpretation.** The gate says *"retries are not passes; a kill
+    followed by a green retry is a failed gate"*. No run in the window was retried at all — every
+    one is `attempt = 1` — so the situation the pin exists to catch never arose. Checked per run
+    rather than asserted.
+
+    **Four runs in the window were red, none of them in the instrument.** `tests (tasks)` at
+    `d65cb283` (stale assertions from §9.4, fixed in #1179); and `tests (evaluation)` /
+    `(verification)` / `(language-server)` across three runs, all `Failed to FinalizeArtifact: 403`
+    on the artifact-upload step with `Run project tests` green. Gate 15 counts kills of
+    `tests (compiler)`; none occurred.
+
+    **What this licenses, and what it does not.** It licenses the cut: the release path is stable
+    enough that an epoch's analysis could survive CI to publication, which is what M4's third
+    condition asks. It does **not** say #1150 is fixed. M2 capped the symptom by splitting the suite
+    into two processes and the leak is unattributed — eight candidate causes tested and refuted, a
+    single process still exhausting a 16 GB Linux machine. **A green window on a suite that no
+    longer runs in one process is evidence about the split, not about the allocator.**
+
+    **An observation, recorded with its size rather than as a rate.** 2026-09-08 produced four CI
+    failures in a class distinct from #1150: three `FinalizeArtifact: 403` uploads and one
+    `sdk-package-consumer (linux-arm64)` failing in 62 seconds on a docs-only PR while its four
+    sibling platforms passed (it passed on re-run). All transient, none code-caused. That is one
+    day's observations across PR and main runs, **not** a measured rate, and it is here only so the
+    next person to count has a starting point — which is precisely what §9.2 says was missing last
+    time.
+
     *Which triggers count, decided 2026-09-08 rather than left ambiguous:* `test.yml` has no
     schedule, so runs on `main` come only from merges. Filling a 20-run window that way would mean
     manufacturing eight commits, which is worse evidence, not better. **`workflow_dispatch` runs on
