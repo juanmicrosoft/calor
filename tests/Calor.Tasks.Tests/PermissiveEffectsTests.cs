@@ -11,8 +11,13 @@ namespace Calor.Tasks.Tests;
 /// <see cref="Calor.Compiler.Effects.UnknownCallPolicy"/> from MSBuild, not only from the CLI).
 ///
 /// <para><b>What the waiver covers, exactly</b> — the tests below pin both halves.
-/// <c>Calor0410</c> (uses an effect it does not declare) is demoted to a warning, in the
-/// per-file pass and in the cross-module pass alike. <c>Calor0411</c> (unknown external
+/// <c>Calor0410</c> (uses an effect it does not declare) is demoted to a warning
+/// <b>only when the effect it names is <c>unknown</c></b> — the 2026-09-04 adjudication
+/// (#1174, roadmap-v0.18 §9.4) scoped the flag to <c>EffectKind.Unknown</c>, "we cannot
+/// tell", and stopped it waiving named effects, which are "we know it is wrong". A
+/// <c>Calor0410</c> naming <c>cw</c> is therefore an error under this property, exactly as
+/// it is without it; the demotion that remains applies to the per-file pass and the
+/// cross-module pass alike. <c>Calor0411</c> (unknown external
 /// call) and <c>Calor0425</c> ("cannot be decided") are <b>suppressed</b>, not demoted:
 /// <c>ReportUnknownCall</c> reports only when the policy is Strict or
 /// <c>StrictEffects</c> is on (<c>EffectEnforcementPass.cs:4101</c>), and the
@@ -30,14 +35,36 @@ public sealed class PermissiveEffectsTests : IDisposable
     private readonly string _projectDir;
     private readonly string _outputDir;
 
-    // A pure function that prints: `error Calor0410` strict, `warning Calor0410` permissive.
-    // The v0.16 W1 harness compiles this same three-line program as its pre-rows canary
-    // before any paid run (bench/phase0-agent-native/, W1 branch).
+    // A pure function that prints: `error Calor0410` naming `cw`, under BOTH policies
+    // since the 2026-09-04 adjudication. The v0.16 W1 harness compiles this same
+    // three-line program as its pre-rows canary before any paid run
+    // (bench/phase0-agent-native/, W1 branch).
     private const string LaunderingSource = """
         §M{m001:PermissiveCanary}
           §F{f001:Quiet:pub} () -> void
             §E{}
             §P "laundered"
+
+        """;
+
+    // The half the waiver still covers: `Twice` passes a field the pass cannot resolve to
+    // a rowed declaration, so v0.17's S1 fail-closed rule charges Unknown and Calor0410
+    // names `unknown` rather than an effect. `error` strict, `warning` permissive — this
+    // is the only shape that still discriminates the two policies, which is why the
+    // policy-difference tests below all use it. Same shape as
+    // NonConvergenceTests.Permissive_StillWaives_UnknownChargedCalor0410, the compiler-side
+    // pin for the same half.
+    private const string UnknownChargeSource = """
+        §M{m001:UnknownCharge}
+          §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+            §E{e}
+            §R (+ §C{stage} §/C §C{stage} §/C)
+
+          §CL{c001:Holder:pub}
+            §FLD{Func<i32>:stage:pri} §E{cw}
+            §MT{mt001:Twice:pub} () -> i32
+              §E{}
+              §R §C{RunTwice} §A this.stage §/C
 
         """;
 
@@ -135,7 +162,7 @@ public sealed class PermissiveEffectsTests : IDisposable
     /// <summary>
     /// A SHAPE pin, stated as such: the task's default must equal the compiler's.
     /// It is explicitly NOT the discriminator — an "always Strict" mutation keeps this
-    /// green (both sides are Strict). <see cref="PropertyTrue_Calor0410_IsAWarning_AndTheBuildSucceeds"/>
+    /// green (both sides are Strict). <see cref="PropertyTrue_UnknownChargedCalor0410_IsAWarning_AndTheBuildSucceeds"/>
     /// and <see cref="MsBuildProperty_ReachesTheTask_EndToEnd"/> are what fail then.
     /// </summary>
     [Fact]
@@ -208,15 +235,36 @@ public sealed class PermissiveEffectsTests : IDisposable
         Assert.DoesNotContain(engine.Warnings, w => w.Contains("does not declare it"));
     }
 
+    /// <summary>
+    /// The adjudicated half (#1174): a Calor0410 naming a real effect is NOT waived. The
+    /// property is a statement about what the compiler could not determine, not a licence
+    /// to ignore what it did.
+    /// </summary>
     [Fact]
-    public void PropertyTrue_Calor0410_IsAWarning_AndTheBuildSucceeds()
+    public void PropertyTrue_NamedCalor0410_IsStillAnError()
     {
         var task = CreateTask(permissive: true, Write("Canary.calr", LaunderingSource));
 
         var engine = Engine(task);
+        Assert.False(task.Execute(), "a named Calor0410 is not waived by the property");
+        Assert.Contains(engine.Errors, e => e.Contains("Quiet") && e.Contains("cw"));
+        Assert.DoesNotContain(engine.Warnings, w => w.Contains("does not declare it"));
+    }
+
+    /// <summary>
+    /// The preserved half: a Calor0410 whose forbidden effect is <c>unknown</c> is still
+    /// demoted, which is what makes the adjudication a SCOPING of the flag rather than its
+    /// removal. Without this test, "always Strict" would pass the whole file.
+    /// </summary>
+    [Fact]
+    public void PropertyTrue_UnknownChargedCalor0410_IsAWarning_AndTheBuildSucceeds()
+    {
+        var task = CreateTask(permissive: true, Write("Unknown.calr", UnknownChargeSource));
+
+        var engine = Engine(task);
         Assert.True(task.Execute(), "permissive build must succeed; errors: " + string.Join("; ", engine.Errors));
         Assert.Single(task.GeneratedFiles);
-        Assert.Contains(engine.Warnings, w => w.Contains("Quiet") && w.Contains("cw"));
+        Assert.Contains(engine.Warnings, w => w.Contains("Twice") && w.Contains("unknown"));
         Assert.DoesNotContain(engine.Errors, e => e.Contains("does not declare it"));
     }
 
@@ -328,7 +376,10 @@ public sealed class PermissiveEffectsTests : IDisposable
     [Fact]
     public void FlippingPermissiveToStrict_InvalidatesTheWarmCache()
     {
-        var source = Write("Canary.calr", LaunderingSource);
+        // The Unknown-charged source: the only shape whose verdict still differs by
+        // policy, and therefore the only one that can catch a warm cache serving the
+        // wrong policy's answer.
+        var source = Write("Unknown.calr", UnknownChargeSource);
 
         var permissive = CreateTask(permissive: true, source);
         Assert.True(permissive.Execute());
@@ -374,16 +425,16 @@ public sealed class PermissiveEffectsTests : IDisposable
     [Fact]
     public void WarmSamePolicyBuild_ReplaysTheDemotedWarning()
     {
-        var source = Write("Canary.calr", LaunderingSource);
+        var source = Write("Unknown.calr", UnknownChargeSource);
 
         var cold = CreateTask(permissive: true, source);
         Assert.True(cold.Execute());
-        Assert.Contains(Engine(cold).Warnings, w => w.Contains("Quiet") && w.Contains("cw"));
+        Assert.Contains(Engine(cold).Warnings, w => w.Contains("Twice") && w.Contains("unknown"));
 
         var warm = CreateTask(permissive: true, source);
         Assert.True(warm.Execute());
         Assert.Contains(Engine(warm).Messages, m => m.Contains("skipping (up-to-date)"));
-        Assert.Contains(Engine(warm).Warnings, w => w.Contains("Quiet") && w.Contains("cw"));
+        Assert.Contains(Engine(warm).Warnings, w => w.Contains("Twice") && w.Contains("unknown"));
     }
 
     // ---------------------------------------------------------------------
@@ -401,7 +452,10 @@ public sealed class PermissiveEffectsTests : IDisposable
         var root = RepoPaths.Root;
         var dir = Path.Combine(_tempDir, "e2e-" + (permissive ? "permissive" : "strict"));
         Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, "canary.calr"), LaunderingSource);
+        // The Unknown-charged source, for the same reason the warm-cache probes use it:
+        // it is the only shape whose verdict still turns on the property, so a dead
+        // property or a Condition="false" PropertyGroup fails here.
+        File.WriteAllText(Path.Combine(dir, "canary.calr"), UnknownChargeSource);
         File.WriteAllText(Path.Combine(dir, "E2E.csproj"), $"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
