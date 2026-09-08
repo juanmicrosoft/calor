@@ -47,11 +47,18 @@ test('native fragments support click, new tab, reload and back/forward', async (
   await expect(page).toHaveURL(/#basic-init-calor-init$/);
   await expect(page.locator('#basic-init-calor-init')).toBeInViewport();
   const fragment = page.url();
+  await page.locator('header').getByRole('link', { name: 'Docs', exact: true }).click();
+  await expect(page.locator('article > h1')).toHaveText('Documentation');
+  await page.goBack();
+  await expect(page).toHaveURL(fragment);
+  await expect(page.locator('article > h1')).toHaveText('Getting Started');
+  await expect(page.locator('#basic-init-calor-init')).toBeInViewport();
   const other = await context.newPage();
   await other.goto(fragment);
   await expect(other.locator('#basic-init-calor-init')).toBeInViewport();
   await other.close();
   await toc.getByRole('link', { name: 'With Claude (calor init --ai claude)', exact: true }).click();
+  await expect(page).toHaveURL(/#with-claude-calor-init-ai-claude$/);
   await page.goBack();
   await expect(page).toHaveURL(fragment);
   await page.goForward();

@@ -49,27 +49,27 @@ export const mdxComponents = {
   h2: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h2 id={id} {...props}>
-        <a href={`#${id}`} className="anchor-link">
+        <Link href={`#${id}`} className="anchor-link">
           {children}
-        </a>
+        </Link>
       </h2>
     );
   },
   h3: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h3 id={id} {...props}>
-        <a href={`#${id}`} className="anchor-link">
+        <Link href={`#${id}`} className="anchor-link">
           {children}
-        </a>
+        </Link>
       </h3>
     );
   },
   h4: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h4 id={id} {...props}>
-        <a href={`#${id}`} className="anchor-link">
+        <Link href={`#${id}`} className="anchor-link">
           {children}
-        </a>
+        </Link>
       </h4>
     );
   },

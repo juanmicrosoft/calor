@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { trackTocAnchorClick } from '@/lib/analytics';
+import Link from 'next/link';
 
 interface Heading {
   id: string;
@@ -62,7 +63,7 @@ export function TableOfContents({ headings }: TableOfContentsProps) {
               key={heading.id}
               style={{ paddingLeft: `${(heading.level - 2) * 12}px` }}
             >
-              <a
+              <Link
                 href={`#${heading.id}`}
                 className={cn(
                   'block py-1 transition-colors',
@@ -76,7 +77,7 @@ export function TableOfContents({ headings }: TableOfContentsProps) {
                 }}
               >
                 {heading.text}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
