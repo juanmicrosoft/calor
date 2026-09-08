@@ -253,7 +253,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 visibility: Visibility.Public,
                 parameters: new List<ParameterNode>(),
                 output: null, // void return type
-                effects: InferEffectsFromBody(_topLevelStatements),
+                effects: null,
                 body: _topLevelStatements,
                 attributes: new AttributeCollection());
 
@@ -3826,7 +3826,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             typeParameters,
             parameters,
             output,
-            effects: InferEffectsFromBody(body),
+            effects: null,
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -3893,7 +3893,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<TypeParameterNode>(),
             parameters,
             output,
-            effects: InferEffectsFromBody(body),
+            effects: null,
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -3927,7 +3927,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<TypeParameterNode>(),
             parameters,
             output,
-            effects: InferEffectsFromBody(body),
+            effects: null,
             preconditions: Array.Empty<RequiresNode>(),
             postconditions: Array.Empty<EnsuresNode>(),
             body,
@@ -12464,308 +12464,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return defaultVisibility;
     }
 
-    /// <summary>
-    /// Walks already-converted AST statements and infers effects.
-    /// Returns an EffectsNode if any effects are found, null otherwise.
-    /// </summary>
-    private EffectsNode? InferEffectsFromBody(IReadOnlyList<StatementNode> body)
-    {
-        var effects = new Dictionary<string, string>();
-        InferEffectsFromStatements(body, effects);
-        if (effects.Count == 0)
-            return null;
-        return new EffectsNode(new TextSpan(0, 0, 0, 0), effects);
-    }
-
-    private void InferEffectsFromStatements(IEnumerable<StatementNode> statements, Dictionary<string, string> effects)
-    {
-        foreach (var stmt in statements)
-        {
-            InferEffectsFromStatement(stmt, effects);
-        }
-    }
-
-    /// <summary>
-    /// Adds an effect value to a category, appending comma-separated if the category already has a value.
-    /// </summary>
-    private static void AddEffect(Dictionary<string, string> effects, string category, string value)
-    {
-        if (effects.TryGetValue(category, out var existing))
-        {
-            // Check if this value is already present (avoid duplicates)
-            var existingValues = existing.Split(',');
-            if (!existingValues.Contains(value, StringComparer.Ordinal))
-            {
-                effects[category] = existing + "," + value;
-            }
-        }
-        else
-        {
-            effects[category] = value;
-        }
-    }
-
-    private void InferEffectsFromStatement(StatementNode statement, Dictionary<string, string> effects)
-    {
-        switch (statement)
-        {
-            case PrintStatementNode:
-                AddEffect(effects, "io", "console_write");
-                break;
-            case ThrowStatementNode throwStatement:
-                AddEffect(effects, "exception", "intentional");
-                if (throwStatement.Exception != null)
-                    InferEffectsFromExpression(throwStatement.Exception, effects);
-                break;
-            case RethrowStatementNode:
-                AddEffect(effects, "exception", "intentional");
-                break;
-            case CallStatementNode call:
-                InferEffectsFromCallTarget(call.Target, call.Arguments, effects);
-                foreach (var arg in call.Arguments)
-                    InferEffectsFromExpression(arg, effects);
-                break;
-            case IfStatementNode ifStmt:
-                InferEffectsFromStatements(ifStmt.ThenBody, effects);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    InferEffectsFromStatements(elseIf.Body, effects);
-                if (ifStmt.ElseBody != null)
-                    InferEffectsFromStatements(ifStmt.ElseBody, effects);
-                InferEffectsFromExpression(ifStmt.Condition, effects);
-                break;
-            case ForStatementNode forStmt:
-                InferEffectsFromStatements(forStmt.Body, effects);
-                break;
-            case WhileStatementNode whileStmt:
-                InferEffectsFromStatements(whileStmt.Body, effects);
-                InferEffectsFromExpression(whileStmt.Condition, effects);
-                break;
-            case DoWhileStatementNode doWhileStmt:
-                InferEffectsFromStatements(doWhileStmt.Body, effects);
-                InferEffectsFromExpression(doWhileStmt.Condition, effects);
-                break;
-            case ForeachStatementNode foreachStmt:
-                InferEffectsFromStatements(foreachStmt.Body, effects);
-                break;
-            case TryStatementNode tryStmt:
-                InferEffectsFromStatements(tryStmt.TryBody, effects);
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    InferEffectsFromStatements(catchClause.Body, effects);
-                if (tryStmt.FinallyBody != null)
-                    InferEffectsFromStatements(tryStmt.FinallyBody, effects);
-                break;
-            case MatchStatementNode matchStmt:
-                foreach (var matchCase in matchStmt.Cases)
-                    InferEffectsFromStatements(matchCase.Body, effects);
-                break;
-            case BindStatementNode bind:
-                if (bind.Initializer != null)
-                    InferEffectsFromExpression(bind.Initializer, effects);
-                break;
-            case ReturnStatementNode ret:
-                if (ret.Expression != null)
-                    InferEffectsFromExpression(ret.Expression, effects);
-                break;
-            case AssignmentStatementNode assign:
-                InferEffectsFromExpression(assign.Value, effects);
-                break;
-        }
-    }
-
-    private void InferEffectsFromExpression(ExpressionNode expr, Dictionary<string, string> effects)
-    {
-        switch (expr)
-        {
-            case CallExpressionNode callExpr:
-                InferEffectsFromCallTarget(callExpr.Target, callExpr.Arguments, effects);
-                foreach (var arg in callExpr.Arguments)
-                    InferEffectsFromExpression(arg, effects);
-                break;
-            case NewExpressionNode creation:
-            {
-                AddEffect(effects, "memory", "allocation");
-                foreach (var argument in creation.Arguments)
-                    InferEffectsFromExpression(argument, effects);
-                var typeName = EffectEnforcementPass.MapShortTypeNameToFullName(creation.TypeName);
-                var argumentTypes = creation.Arguments.Select(InferMigrationExpressionType).ToArray();
-                // v0.15 E1 slice 2c — the C# → Calor converter runs before any
-                // Calor binder exists, so its keys are string fallbacks by
-                // construction, and the ledger counts them as such.
-                AddResolvedEffects(
-                    _migrationResolver.Value.Resolve(EffectResolverKey.FromStrings(
-                        typeName, ".ctor", argumentTypes, EffectMemberKind.Constructor)),
-                    effects);
-                foreach (var initializer in creation.Initializers)
-                {
-                    InferEffectsFromExpression(initializer.Value, effects);
-                    AddEffect(effects, "mutation", "heap_write");
-                    AddResolvedEffects(
-                        _migrationResolver.Value.Resolve(EffectResolverKey.FromStrings(
-                            typeName, initializer.PropertyName, kind: EffectMemberKind.Setter)),
-                        effects);
-                }
-                break;
-            }
-            case ArrayCreationNode array:
-                AddEffect(effects, "memory", "allocation");
-                if (array.Size != null)
-                    InferEffectsFromExpression(array.Size, effects);
-                foreach (var item in array.Initializer)
-                    InferEffectsFromExpression(item, effects);
-                break;
-            case MultiDimArrayCreationNode multiDim:
-                AddEffect(effects, "memory", "allocation");
-                foreach (var size in multiDim.DimensionSizes)
-                    InferEffectsFromExpression(size, effects);
-                foreach (var row in multiDim.Initializer)
-                foreach (var item in row)
-                    InferEffectsFromExpression(item, effects);
-                break;
-            case ListCreationNode list:
-                AddEffect(effects, "memory", "allocation");
-                foreach (var item in list.Elements)
-                    InferEffectsFromExpression(item, effects);
-                break;
-            case SetCreationNode set:
-                AddEffect(effects, "memory", "allocation");
-                foreach (var item in set.Elements)
-                    InferEffectsFromExpression(item, effects);
-                break;
-            case DictionaryCreationNode dictionary:
-                AddEffect(effects, "memory", "allocation");
-                foreach (var entry in dictionary.Entries)
-                {
-                    InferEffectsFromExpression(entry.Key, effects);
-                    InferEffectsFromExpression(entry.Value, effects);
-                }
-                break;
-            case StackAllocNode stackAlloc:
-                AddEffect(effects, "memory", "allocation");
-                if (stackAlloc.Size != null)
-                    InferEffectsFromExpression(stackAlloc.Size, effects);
-                foreach (var item in stackAlloc.Initializer)
-                    InferEffectsFromExpression(item, effects);
-                break;
-            case BinaryOperationNode binOp:
-                InferEffectsFromExpression(binOp.Left, effects);
-                InferEffectsFromExpression(binOp.Right, effects);
-                break;
-            case ConditionalExpressionNode condExpr:
-                InferEffectsFromExpression(condExpr.Condition, effects);
-                InferEffectsFromExpression(condExpr.WhenTrue, effects);
-                InferEffectsFromExpression(condExpr.WhenFalse, effects);
-                break;
-            case MatchExpressionNode matchExpr:
-                foreach (var matchCase in matchExpr.Cases)
-                    InferEffectsFromStatements(matchCase.Body, effects);
-                break;
-        }
-    }
-
-    // Lazy-initialized resolver for effect inference during C# → Calor conversion.
-    // Loads only embedded BCL manifests (no project-level .calor-effects.json) because
-    // the converter is best-effort for effects — strict checking happens at compilation time.
-    private static readonly Lazy<EffectResolver> _migrationResolver = new(() =>
-    {
-        var resolver = new EffectResolver();
-        resolver.Initialize();
-        return resolver;
-    });
-
-    private void InferEffectsFromCallTarget(
-        string target,
-        IReadOnlyList<ExpressionNode> arguments,
-        Dictionary<string, string> effects)
-    {
-        // Parse the call target into type + method for manifest resolution
-        var lastDot = target.LastIndexOf('.');
-        if (lastDot <= 0)
-            return;
-
-        var methodName = target[(lastDot + 1)..];
-        var typePart = target[..lastDot];
-        var instanceReceiver = false;
-
-        // For chained calls like "response.Content.ReadAsStringAsync", take the first part
-        var firstDot = typePart.IndexOf('.');
-        var receiverName = firstDot > 0 ? typePart[..firstDot] : typePart;
-
-        // Try to resolve the type: first via known type names, then via variable type map
-        if (!typePart.Contains('.'))
-        {
-            var mapped = Calor.Compiler.Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
-            if (mapped != typePart)
-            {
-                // Successfully mapped a known type name
-                typePart = mapped;
-            }
-            else if (_variableTypeMap.TryGetValue(typePart, out var resolvedType))
-            {
-                // Variable name resolved to its declared type
-                typePart = resolvedType;
-                instanceReceiver = true;
-            }
-        }
-        else if (_variableTypeMap.TryGetValue(receiverName, out var resolvedType))
-        {
-            // Chained call: "response.Content.ReadAsStringAsync" — resolve "response" to its type
-            // For now, use just the resolved type + final method name
-            typePart = resolvedType;
-            instanceReceiver = true;
-        }
-
-        var argumentTypes = arguments.Select(InferMigrationExpressionType).ToArray();
-        // v0.15 E1 slice 2c — string fallback: the converter's own
-        // `_variableTypeMap` is the only receiver type source on this path, and
-        // there is no bound tree at migration time.
-        var resolution = _migrationResolver.Value.Resolve(
-            EffectResolverKey.FromStrings(typePart, methodName, argumentTypes));
-        if (resolution.Status == EffectResolutionStatus.Unknown && instanceReceiver)
-        {
-            resolution = _migrationResolver.Value.Resolve(EffectResolverKey.FromStrings(
-                typePart, methodName, argumentTypes, EffectMemberKind.Extension));
-        }
-        AddResolvedEffects(resolution, effects);
-        // Don't add wildcard for unknown calls — let the enforcement pass handle them
-    }
-
-    private static void AddResolvedEffects(
-        EffectResolution resolution,
-        Dictionary<string, string> effects)
-    {
-        if (resolution.Status != EffectResolutionStatus.Unknown)
-        {
-            foreach (var effect in resolution.Effects.Effects)
-            {
-                var category = effect.Kind switch
-                {
-                    EffectKind.IO => "io",
-                    EffectKind.Mutation => "mutation",
-                    EffectKind.Nondeterminism => "nondeterminism",
-                    EffectKind.Exception => "exception",
-                    EffectKind.Memory => "memory",
-                    _ => "unknown"
-                };
-                AddEffect(effects, category, effect.Value);
-            }
-        }
-    }
-
-    private string InferMigrationExpressionType(ExpressionNode expression)
-    {
-        return expression switch
-        {
-            StringLiteralNode => "String",
-            IntLiteralNode => "Int32",
-            BoolLiteralNode => "Boolean",
-            FloatLiteralNode => "Double",
-            DecimalLiteralNode => "Decimal",
-            NewExpressionNode creation => EffectResolver.NormalizeParameterType(creation.TypeName),
-            ReferenceNode reference when _variableTypeMap.TryGetValue(reference.Name, out var type) =>
-                EffectResolver.NormalizeParameterType(type),
-            _ => "?"
-        };
-    }
+    // #1173 — the converter no longer walks the converted body to guess its own
+    // §E rows. That walker was a second, independently maintained copy of the
+    // compiler's effect inference, and the two drifted: it never visited a
+    // foreach's collection, a §USE resource, or a lambda body, so the converter
+    // wrote "pure" over bodies that allocate. Rows are now derived from the
+    // inference that later checks them — see
+    // CSharpToCalorConverter.SynthesizeEffectRows and
+    // EffectEnforcementPass.SynthesizeDeclaredRows.
 
     // --- Unsafe/Low-Level conversions ---
 

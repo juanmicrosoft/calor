@@ -123,7 +123,14 @@ public sealed class FunctionNode : AstNode
         = Array.Empty<EffectParameterInfo>();
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
-    public EffectsNode? Effects { get; }
+    /// <summary>
+    /// The declaration's <c>§E</c> row. Settable within the compiler for ONE
+    /// purpose: <see cref="Effects.EffectEnforcementPass.SynthesizeDeclaredRows"/>
+    /// writes the row a generated declaration should carry (#1173), so a producer
+    /// of Calor source cannot emit a body that its own row contradicts. Nothing
+    /// else may rewrite a parsed declaration's row.
+    /// </summary>
+    public EffectsNode? Effects { get; internal set; }
     public IReadOnlyList<RequiresNode> Preconditions { get; }
     public IReadOnlyList<EnsuresNode> Postconditions { get; }
     public IReadOnlyList<StatementNode> Body { get; }

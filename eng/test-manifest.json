@@ -5,8 +5,9 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 8030,
-      "expectedSkipped": 4
+      "expectedTotal": 8041,
+      "expectedSkipped": 4,
+      "note": "2026-09-08 (#1173): 8030 -> 8041, +11 from Issue1173ConverterEffectRowTests — the converter now derives its \u00a7E rows from the compiler's own effect inference over the emitted text (5 under-declared constructs as theory rows, plus chain desugaring, interface/override variance repair, the pure-body case, row round-trip, and widen-never-narrow)."
     },
     {
       "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj",

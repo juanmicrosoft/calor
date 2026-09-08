@@ -47,6 +47,7 @@
 
   §CL{c016:ConditionalHarness:pub:stat}
     §MT{m017:Get:pub:stat} () -> i32
+      §E{alloc}
       §B{ConditionalDelegate:d} §LAM{lam018:value:i32} (+ value 1) §/LAM{lam018}
       §B{~_hoist000} §NEW{ConditionalRecord} §A 3 §/NEW
       §B{~_hoist001} §C{ConditionalClass.Value} §/C
