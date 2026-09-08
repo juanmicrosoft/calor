@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The C# → Calor converter now declares the effects the code it writes actually
+  performs.** Every Calor declaration carries an effect row — the `§E{...}` line
+  saying what the body may do: `alloc` for allocating memory, `mut` for mutating
+  something, `cw` for writing to the console. The converter wrote that row itself,
+  using its own copy of the analysis, kept beside the code that emits the Calor.
+  The two copies drifted. The converter's copy never looked inside a `foreach`
+  loop's collection, a `using` statement's resource, or a lambda body, so it wrote
+  "this function is pure" over functions that allocate. Compiling the result then
+  reported `Calor0410` — "uses effect 'alloc' but does not declare it" — against
+  code the converter had just produced.
+
+  The row is now computed by the compiler's own effect analysis, the same pass
+  that later checks it, run over the Calor text the converter is about to write.
+  One analysis, one answer, so the row and the check cannot disagree. Across the
+  three real projects we convert as a test — MediatR, Serilog and FluentValidation,
+  364 files — this takes `Calor0410` errors from **219 in 53 files to 9 in 2**.
+
+  The nine that remain are all property getters, and they are a different problem:
+  Calor has nowhere to write a row on a property at all, so an allocating getter
+  is not under-declared, it is undeclarable. That gap is tracked as issue #1176.
+
+  Two smaller fixes came with it. Interface members can now keep an effect row
+  through a round trip — the parser always read one and the checker always used
+  one, but the Calor writer silently dropped it. And when a method's row grows,
+  the interface member and base method it answers to grow with it, because Calor
+  does not let an implementation promise more than what it implements.
+
 ## [0.17.0] - 2026-09-02
 
 Calor compiles to C#, and the way we check that claim is to convert three real

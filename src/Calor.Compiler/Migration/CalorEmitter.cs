@@ -873,6 +873,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitTypeParameterConstraints(node.TypeParameters);
             Dedent();
         }
+
+        // #1173: an interface member's own §E. The parser has always read one here
+        // and CheckEffectVariance (Calor0421) has always checked against it, but
+        // this visitor dropped it, so a row on an interface member could not
+        // survive a round trip. That is load-bearing now: an implementation may not
+        // broaden its interface's row, so the row synthesised for a method has to
+        // travel to the interface it implements or the converter would trade
+        // Calor0410 for Calor0421.
+        Indent();
+        EmitEffects(node.Effects);
+        Dedent();
+
         EmitBlockEnd($"§/MT{{{node.Id}}}");
 
         return "";

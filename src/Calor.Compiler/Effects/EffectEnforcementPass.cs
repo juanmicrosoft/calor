@@ -881,6 +881,244 @@ public sealed class EffectEnforcementPass
     }
 
     /// <summary>
+    /// How many <see cref="Enforce"/> rounds <see cref="SynthesizeDeclaredRows"/>
+    /// runs before it gives up. Rows only ever GROW under synthesis and the effect
+    /// universe is finite, so the loop converges; the cap bounds the pathological
+    /// case (a long override/implementation chain, one hop per round) rather than
+    /// a non-terminating one.
+    /// </summary>
+    public const int DefaultRowSynthesisRounds = 8;
+
+    /// <summary>
+    /// #1173 — writes each declaration's <c>§E</c> row from THIS pass's own
+    /// inference over the body, for a PRODUCER of Calor source: the C# → Calor
+    /// converter.
+    ///
+    /// <para>The bug this closes is structural, not a missing case. The converter
+    /// used to infer its rows with a second walker maintained beside the emitter
+    /// (<c>RoslynSyntaxVisitor.InferEffectsFromBody</c>), so the two could — and
+    /// did — disagree: the emitter wrote a <c>§NEW</c> the walker never visited,
+    /// the row said pure, and the next compile of that file reported Calor0410
+    /// against code the converter had just written. Deriving the row from the
+    /// inference that later CHECKS it makes them the same answer by construction:
+    /// what phase 4 would call a forbidden effect is exactly what phase 2 put in
+    /// the row.</para>
+    ///
+    /// <para>Rows are WIDENED, never narrowed, and only by effects the body is
+    /// actually charged — <see cref="EffectSet.Except"/>, the same difference
+    /// Calor0410 reports (subtyping included), so the loop's fixed point is
+    /// literally "phase 4 has nothing left to report". A declaration whose body
+    /// inference can only answer <c>Unknown</c> for is left alone: an unknown row
+    /// has no concrete spelling to write, and it is exactly what
+    /// <c>--permissive-effects</c> waives.</para>
+    ///
+    /// <para>Rounds exist because a declaration's row feeds the NEXT round's
+    /// inference at three places the pass reads a DECLARED row rather than a
+    /// computed one — a method-group argument, an override's base, and an
+    /// interface member. Widening a callee's row therefore widens its callers on
+    /// the following round, and the loop stops when a whole round changes
+    /// nothing.</para>
+    ///
+    /// <para>Sites 4 and 5 (Calor0420/Calor0421) are repaired in the same round:
+    /// an override may not broaden its base's row, so the base is widened to
+    /// cover the override, and an interface member to cover its implementations.
+    /// Without that, synthesising a truthful row on an implementing method would
+    /// trade one error for another.</para>
+    ///
+    /// <para>The reach is <see cref="CallGraphAnalysis.EnumerateClasses"/>'s, which
+    /// does not descend into NESTED classes. So a nested type's methods get no
+    /// synthesised row — and no Calor0410 either, because <see cref="Enforce"/> walks
+    /// the same enumerator and cannot see them to check. The "row and check agree by
+    /// construction" property holds there only because both sides are blind, which is
+    /// worth saying out loud: whoever teaches the pass about nested types must teach
+    /// this at the same time, or converted output starts failing the day they do.</para>
+    /// </summary>
+    /// <param name="module">The module to rewrite in place.</param>
+    /// <param name="resolver">Manifest resolver to reuse across rounds; a fresh
+    /// one is built when null.</param>
+    /// <param name="maxRounds">Round cap; see <see cref="DefaultRowSynthesisRounds"/>.</param>
+    /// <returns>True when the rounds converged — a full round changed no row.
+    /// False when the cap was reached, in which case the rows written so far are
+    /// still sound (they only grew), just possibly not yet complete.</returns>
+    public static bool SynthesizeDeclaredRows(
+        ModuleNode module,
+        EffectResolver? resolver = null,
+        int maxRounds = DefaultRowSynthesisRounds)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        if (maxRounds < 1)
+            throw new ArgumentOutOfRangeException(nameof(maxRounds), maxRounds, "At least one round is required.");
+
+        for (var round = 0; round < maxRounds; round++)
+        {
+            // The diagnostics of a synthesis round are scratch: the rows are being
+            // rewritten underneath them, so the only run whose diagnostics mean
+            // anything is the caller's own later compile.
+            var pass = new EffectEnforcementPass(
+                new DiagnosticBag(),
+                UnknownCallPolicy.Permissive,
+                resolver);
+            pass.Enforce(module);
+            if (!pass.WidenDeclaredRows(module))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// One synthesis round over a module this pass has just enforced: widen every
+    /// row-bearing declaration to cover its own inferred effects, then widen bases
+    /// and interface members to cover what overrides and implementations now
+    /// declare. Returns true when any row changed.
+    /// </summary>
+    private bool WidenDeclaredRows(ModuleNode module)
+    {
+        var changed = false;
+
+        // Own body first. Top-level functions are keyed by their bare id and class
+        // members by `Class.id` — the same keys Phase 1 built the fact map with,
+        // taken from the same enumerators, so a member cannot be missed by
+        // spelling its key differently here.
+        foreach (var function in module.Functions)
+            changed |= WidenToInferredRow(function.Id, function.Effects, row => function.Effects = row, function.Span);
+
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
+        {
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
+            {
+                changed |= WidenToInferredRow(
+                    $"{cls.Name}.{method.Id}",
+                    method.Effects,
+                    row => method.Effects = row,
+                    method.Span);
+            }
+        }
+
+        // Then the declaration-local variance relation (sites 4 and 5), using the
+        // rows just written. Both use the pass's OWN resolution — FindBaseMethod
+        // and FindImplementingMethod are what CheckEffectVariance asks, so what is
+        // repaired here is exactly what would have been reported there.
+        //
+        // The CONCRETE part of it, precisely. CheckEffectVariance decides with
+        // PolyRow.Fits, which also compares `eff` VARIABLES by ordinal; this repair
+        // widens with EffectSet.Except, which sees only concrete codes. An override
+        // binding an `eff` its base does not would therefore still report Calor0420
+        // after this loop reports convergence. Unreachable through the converter,
+        // which never emits an `eff` binder — but SynthesizeDeclaredRows is public,
+        // so the limit belongs in writing rather than in the caller's luck. Widening
+        // a base's BINDER list is not the same kind of edit as widening its code set:
+        // it changes the declaration's arity, and that is a decision for whoever
+        // wants polymorphic rows synthesised, not a detail to slip in here.
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
+        {
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
+            {
+                if (!method.IsOverride)
+                    continue;
+                var (baseMethod, _) = FindBaseMethod(cls, method);
+                if (baseMethod != null)
+                {
+                    changed |= WidenRow(
+                        baseMethod.Effects,
+                        GetDeclaredEffects(method.Effects),
+                        row => baseMethod.Effects = row,
+                        baseMethod.Span);
+                }
+            }
+
+            foreach (var iface in ResolveInterfaceChain(cls))
+            {
+                foreach (var signature in iface.Methods)
+                {
+                    var (implementation, _, _) = FindImplementingMethod(cls, signature);
+                    if (implementation != null)
+                    {
+                        changed |= WidenRow(
+                            signature.Effects,
+                            GetDeclaredEffects(implementation.Effects),
+                            row => signature.Effects = row,
+                            signature.Span);
+                    }
+                }
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Widens one declaration's row to cover what inference charged its body.
+    /// The <c>Kind</c> guard keeps synthesis to declarations that HAVE a <c>§E</c>
+    /// surface: a constructor or an implicit accessor is checked against an
+    /// intrinsic contract instead, and writing a row for one would be writing a row
+    /// nothing reads. A body whose inferred row is <c>Unknown</c> is left alone too.
+    /// </summary>
+    private bool WidenToInferredRow(
+        string functionId,
+        EffectsNode? declared,
+        Action<EffectsNode> assign,
+        TextSpan span)
+    {
+        if (!_declarationFacts.TryGetValue(functionId, out var fact))
+            return false;
+        if (fact.Kind is not ("function" or "method"))
+            return false;
+
+        return WidenRow(declared, fact.InferredRow.ToEffectSet(), assign, span);
+    }
+
+    /// <summary>
+    /// Adds to <paramref name="declared"/> whatever of <paramref name="required"/>
+    /// it does not already cover, and returns whether that changed anything.
+    /// </summary>
+    private static bool WidenRow(
+        EffectsNode? declared,
+        EffectSet required,
+        Action<EffectsNode> assign,
+        TextSpan span)
+    {
+        if (required.IsUnknown || required.IsEmpty)
+            return false;
+
+        var current = GetDeclaredEffects(declared);
+        var missing = required.Except(current).ToList();
+        if (missing.Count == 0)
+            return false;
+
+        assign(ToEffectsNode(EffectSet.FromInternal(current.Effects.Concat(missing)), declared, span));
+        return true;
+    }
+
+    /// <summary>
+    /// Renders an effect set back into the <c>§E</c> node shape the parser
+    /// produces: category key, comma-joined internal values. The exact inverse of
+    /// <see cref="GetDeclaredEffects(EffectsNode?)"/>, so a synthesised row reads
+    /// back as the set it was built from. Any effect variables the declaration
+    /// already carried travel across unchanged — synthesis adds concrete codes and
+    /// never touches the polymorphic part of a row.
+    /// </summary>
+    private static EffectsNode ToEffectsNode(EffectSet effects, EffectsNode? existing, TextSpan span)
+    {
+        var byCategory = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var effect in effects.Effects
+            .Select(e => (Category: EffectCodes.ToCategory(e.Kind), e.Value))
+            .OrderBy(e => e.Category, StringComparer.Ordinal)
+            .ThenBy(e => e.Value, StringComparer.Ordinal))
+        {
+            byCategory[effect.Category] = byCategory.TryGetValue(effect.Category, out var values)
+                ? values + "," + effect.Value
+                : effect.Value;
+        }
+
+        return new EffectsNode(
+            existing?.Span ?? span,
+            byCategory,
+            existing?.EffectVariables,
+            existing?.EffectVariableOrdinals);
+    }
+
+    /// <summary>
     /// D-W2.2 — declaration-local effect-variance checks (behavioral subtyping):
     /// an override may declare only effects covered by its base method's declared
     /// set (Calor0420), and an interface implementation only effects covered by the
