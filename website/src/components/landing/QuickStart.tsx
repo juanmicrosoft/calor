@@ -5,6 +5,7 @@ import { Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackInstallCommandCopy } from '@/lib/analytics';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
+import Link from 'next/link';
 
 const commands = [
   {
@@ -13,14 +14,14 @@ const commands = [
     description: 'One command. Works on Windows, Mac, and Linux. Requires .NET 10+.',
   },
   {
-    label: 'Set up your AI agent',
-    command: 'calor init --ai claude',
-    description: 'Teaches Claude Code the Calor syntax so it can start writing code.',
+    label: 'Enable Calor in your project',
+    command: 'calor init',
+    description: 'Adds MSBuild integration. Connecting an AI agent is optional.',
   },
   {
     label: 'Build and check',
     command: 'dotnet build',
-    description: 'Compiles your code and catches bugs—before you run anything.',
+    description: 'Compiles the Calor sources in this project to C# and builds the application.',
   },
 ];
 
@@ -46,7 +47,15 @@ export function QuickStart() {
             Try It Now
           </h2>
           <p className="mt-4 text-lg text-muted-foreground font-body">
-            Three commands to start writing safer code with your AI agent
+            Existing .NET project integration
+          </p>
+          <p className="mt-3 text-muted-foreground font-body">
+            Requires the .NET 10 SDK. Run these commands in a directory containing
+            your <code>.csproj</code> and Calor source files; keep your existing entry point.
+            {' '}Starting from scratch?{' '}
+            <Link className="text-primary underline" href="/docs/getting-started/hello-world/">
+              Run the complete Hello World example
+            </Link>{' '}without an AI subscription.
           </p>
         </div>
 
