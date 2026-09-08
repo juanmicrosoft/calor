@@ -480,6 +480,35 @@ gate 15's floor is unchanged and undischarged. Gate 15 is unaffected: no
 fix has been attempted, and its 20-run floor stands.
 
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
+**Registered 2026-09-08 (Draft v2): `2026-09-05-ppw-rows-fixture-redesign.md`.** The defect analysis
+A:90-92 requires is §1 there, and it found something stronger than "the fixtures are underpowered":
+**the six tasks were built so that the laundering the effect system catches is also a visible
+failure of the stated requirement**, which the held-out tests already catch. Where those coincide,
+rows are redundant *by construction* and no sample size can produce a positive result. W:§2's
+worked example is the proof — an agent declared `§E{cw}` honestly because declaring it cost
+nothing. §2 turns that into seven rules a candidate task is rejected against; §3 re-registers the
+arms on **one compiler** (the old A/B confounded rows-vs-no-rows with v0.14.3-vs-v0.15.0) and
+records that the 2026-09-04 adjudication makes arm A a *narrower* control, so the expected effect is
+smaller — registered before collection, not discovered after. §4 declines to invent a Δ and
+registers a two-stage pilot/confirmatory design with pilot data barred from the confirmatory
+analysis.
+
+**Round 1 ran before merge, because merging freezes it**, and returned one Major finding the
+document could not have caught by reading. §3 registered that the 2026-09-04 adjudication makes arm
+A "narrower"; measured, it is stronger than that. The arms now differ on exactly one thing —
+whether an **Unknown** charge is an error — so a shape charged a **named** effect returns the *same
+verdict on both arms* and its cell is a null before a run. Two of the seeded fixtures behave exactly
+that way (`'cw'`, 1 and 2 errors on both arms) while the five escape shapes charge `'unknown'` and
+discriminate 1-vs-0. That is §1.3's defect arriving through the arm definitions instead of the task
+text. Rule **R8** now rejects any shape whose two arms agree, evidenced by the two invocations
+committed beside the task. Four minor findings applied: R1 restated away from "same length" (the
+wrong currency, since R3 hides the effect in a dependency), R2 widened to indirect prohibitions
+**and to the names of the visible tests**, §7 requiring a committed laundering solution per task
+rather than a described one, and §4's no-pooling rule given a mechanism instead of a promise.
+
+**M3 is met: the registration is merged.** What remains is pre-collection, not pre-freeze — the
+tasks themselves (§7.2), a ceiling in writing (§7.4, and §8's outstanding item 1), and stage 1's
+size (§7.5).
 
 W:§6 states the defect: *"six tasks that agents complete honestly cannot measure whether a compiler
 stops dishonesty."* The evidence A:90-92 requires as a "documented empirical defect in the
@@ -670,6 +699,8 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 | `FunctionBoundType.Row` end-to-end; lambda params in-lambda → Calor0411 | R15:747; D:2700-2708; e4:255-259 | — | 0.18 S4 |
 | Index parity with `calor build`; interface members unindexed; index-build cost | e5:256-275 | — | 0.18 S4 |
 | Calor0422/0423 | N:S2.2 | — | 0.18 S4 |
+| **Property getters cannot declare effects at all** — `§PROP` carries no row, so an allocating getter is *undeclarable*, not under-declared. 9 Calor0410 + 25 Calor0422 + 7 Calor0423 on the converted corpus, one root cause | #1176; #1173's residual | **fired** — measured 2026-09-08 | **0.18 S4, joined to Calor0422/0423**: same "no `§E` surface" family, and S4 already carries the other two thirds of it |
+| **The `EffectViolation` mutation operator's Calor0410 differential was a converter artifact and #1173 retired it** — a row derived from a body cannot contradict that body, so no body mutation produces Calor0410 on converted code | #1177; `substrate-plan-v0.12` D-S1.6 | **fired** — the pre-committed disposition was "the fix ships and the supply loss is published" | **0.18 release notes**, published as the loss D-S1.6 promised; the instrument decision (pin the contract, or move the stratum) is **0.18.x** |
 | Gate 3 CLI-process and `Calor.Sdk` legs | #1116 | — | 0.18.x; gate 3 claims built legs only |
 | Gate 5 leg (b) | R15:996 | — | 0.18.x |
 | `§FLD`/`§B` rows not index positions; hover declared-only | e5:168-175 | — | 0.18.x |
