@@ -1461,16 +1461,17 @@ public class Issue766DeclarationModuleSemanticsTests
 
     private static string CompileConvertedCalor(ConversionResult conversion)
     {
-        // #1173 (fixed): the converter derives every §E row from the compiler's own
-        // effect inference over the text it emits, so converted code no longer
-        // reports Calor0410 against rows the converter itself wrote. Enforcing here
-        // is what holds that: if the converter under-declares again, these tests
-        // fail rather than waive it.
+        // #1173 (fixed) and #1176 (fixed): the converter derives every §E row from the
+        // compiler's own inference over the text it emits, and a property accessor now
+        // has an intrinsic effect contract like every other surface-less declaration. So
+        // converted code reports NO Calor0410 at all — this helper enforces effects and
+        // tolerates nothing.
         //
-        // The check is its own compile because effect errors STOP code generation,
-        // and the assertions below need the generated C#. Compiling twice keeps the
-        // guard without making it the thing that decides what these tests can see.
-        var enforced = Program.Compile(
+        // It used to compile twice: once enforcing, to hold the #1173 guard, and once
+        // not, because the one residual #1173 left — an allocating getter, undeclarable
+        // until #1176 — is an ERROR and errors stop code generation, and these tests need
+        // the generated C#. That residual is gone, so the second compile is gone with it.
+        var result = Program.Compile(
             conversion.CalorSource!,
             null,
             new CompilationOptions
@@ -1479,48 +1480,12 @@ public class Issue766DeclarationModuleSemanticsTests
                 EnforceEffects = true,
                 UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
             });
-        Assert.Empty(
-            enforced.Diagnostics
-                .Where(diagnostic =>
-                    diagnostic.Severity == Calor.Compiler.Diagnostics.DiagnosticSeverity.Error)
-                .Where(diagnostic => !IsUndeclarableAccessorEffect(diagnostic))
-                .Select(diagnostic => diagnostic.Message));
-
-        var result = Program.Compile(
-            conversion.CalorSource!,
-            null,
-            new CompilationOptions
-            {
-                DeferGeneratedOutputValidation = true,
-
-                // Effects are enforced above, on their own compile. This one is off
-                // for the single residual the enforcing compile tolerates: a
-                // property GETTER has no §E surface anywhere in the language (§PROP
-                // cannot carry a row), so an allocating getter is UNDECLARABLE
-                // rather than under-declared — a different defect from #1173,
-                // tracked as #1176. Left on, that one error would stop code
-                // generation and these tests would have no C# to run.
-                EnforceEffects = false,
-                UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
-            });
 
         Assert.False(
             result.HasErrors,
             string.Join("; ", result.Diagnostics.Select(diagnostic => diagnostic.Message)));
         return result.GeneratedCode;
     }
-
-    /// <summary>
-    /// True for a Calor0410 against a property accessor, whose row cannot be
-    /// written in Calor source at all. Matched on the accessor suffix the effect
-    /// pass puts in the message, because that is the only place the diagnostic
-    /// records which declaration it is about.
-    /// </summary>
-    private static bool IsUndeclarableAccessorEffect(Calor.Compiler.Diagnostics.Diagnostic diagnostic)
-        => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-            && (diagnostic.Message.Contains(".get'", StringComparison.Ordinal)
-                || diagnostic.Message.Contains(".set'", StringComparison.Ordinal)
-                || diagnostic.Message.Contains(".init'", StringComparison.Ordinal));
 
     private static string InvokeCreatedType(Assembly assembly)
     {

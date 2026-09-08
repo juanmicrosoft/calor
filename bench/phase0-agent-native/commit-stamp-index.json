@@ -5,16 +5,17 @@
   "whyNotJustRepointTheStamps": "Because measuredCommit is the experimental record, not a pointer. Repointing it would falsify what was measured, and effect-rows-benefit-ledger.json's stamp is additionally ARM_B_COMMIT — a frozen constant of a completed epoch, pinned by ppw-compile.py, ppw-analyze.py and PpWRowsRegistrationTests. Two of these ledgers are also byte-compared against their own generators, so a field added by hand would make them permanently 'stale'. The stamps stay; this file carries the resolvable equivalent beside them.",
   "basisKinds": {
     "identical-src-tree": "STRONGEST. A commit reachable from main whose `src/` tree is byte-identical to the measured commit's, verified with `git rev-parse <sha>:src` on both. Same compiler; a third party can check the numbers against it.",
-    "landing-commit-only": "WEAKER, and said so. No commit reachable from main has an identical `src/` tree, so the exact compiler state was never landed as such. The commit named is the squash that carried the LEDGER onto main — where the numbers landed, not the compiler that produced them."
+    "landing-commit-only": "WEAKER, and said so. No commit reachable from main has an identical `src/` tree, so the exact compiler state was never landed as such. The commit named is the squash that carried the LEDGER onto main — where the numbers landed, not the compiler that produced them.",
+    "measured-on-top-of": "The numbers were measured with the landing change APPLIED to the named commit, which is what regenerating a ledger inside the PR that moves it always means. The stamp its generator writes is HEAD at regeneration time, and the squash commit that will carry the change does not exist yet — the #1159 bootstrapping problem, and the reason this index exists rather than a rule that the stamp must equal the landing commit."
   },
   "enforcedBy": "tests/Calor.Compiler.Tests/LedgerCommitStampTests.cs",
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
-      "resolvableOnMain": "a307ccf0080c2edaf514718c898af92176d4af88",
-      "basis": "identical-src-tree",
-      "note": "src/ tree 8086a938… on both."
+      "measuredCommit": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
+      "resolvableOnMain": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
+      "basis": "measured-on-top-of",
+      "note": "Regenerated in the PR that gives property accessors an effect contract (#1176). The stamp names the base the change was applied to. What moved: serilog Calor0411Sites 534 -> 538, because this.-qualified property reads became visible and four of them resolve to unknown externals; and one module per subject moved its first stop from Calor0410 to Calor0422/0423."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
