@@ -24,6 +24,7 @@ public sealed class ContractInheritanceChecker : IDisposable
     private readonly Dictionary<AstNode, string> _qualifiedNames = new();
     private readonly Dictionary<AstNode, string> _displayNames = new();
     private readonly Dictionary<AstNode, AstNode?> _enclosingDeclarations = new();
+    private string _moduleNamespace = "";
 
     public ContractInheritanceChecker(
         DiagnosticBag diagnostics,
@@ -66,6 +67,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         _qualifiedNames.Clear();
         _displayNames.Clear();
         _enclosingDeclarations.Clear();
+        _moduleNamespace = module.Name == "_global" ? "" : module.Name;
         var interfaces = new List<InterfaceDefinitionNode>();
         var classes = new List<ClassDefinitionNode>();
         void Collect(AstNode declaration, AstNode? enclosing)
@@ -115,7 +117,8 @@ public sealed class ContractInheritanceChecker : IDisposable
 
     private sealed record ResolvedDeclaration(
         AstNode Declaration,
-        IReadOnlyDictionary<string, string> Substitutions);
+        IReadOnlyDictionary<string, string> Substitutions,
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>> TypeArguments);
 
     private static string DeclarationName(AstNode declaration) => declaration switch
     {
@@ -136,23 +139,29 @@ public sealed class ContractInheritanceChecker : IDisposable
         AstNode owner,
         IReadOnlyDictionary<string, string>? substitutions = null,
         bool memberLookup = false,
-        HashSet<AstNode>? resolvingBases = null)
+        HashSet<AstNode>? resolvingBases = null,
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? typeArguments = null)
     {
-        var segments = ParseQualifiedTypeReference(reference);
         substitutions ??= new Dictionary<string, string>(StringComparer.Ordinal);
+        // Every argument in the reference belongs to the caller's lexical scope,
+        // not to a target type introduced by an earlier qualified segment.
+        var segments = ParseQualifiedTypeReference(reference).Select(segment =>
+            new TypeReference(segment.Name, segment.Arguments.Select(argument =>
+                SubstituteTypeName(argument, substitutions)).ToArray())).ToArray();
+        typeArguments ??= new Dictionary<AstNode, IReadOnlyList<string>>();
         resolvingBases ??= new HashSet<AstNode>();
         // A base/interface list is outside its own type body. Explicit interface
         // members, in contrast, resolve names from inside that body.
         var scope = memberLookup ? owner : _enclosingDeclarations[owner];
         while (true)
         {
-            var match = FindNestedDeclaration(scope, segments[0], substitutions, resolvingBases);
+            var match = FindNestedDeclaration(scope, segments[0], typeArguments, resolvingBases);
             if (match != null)
             {
                 foreach (var segment in segments.Skip(1))
                 {
                     match = FindNestedDeclaration(match.Declaration, segment,
-                        match.Substitutions, resolvingBases);
+                        match.TypeArguments, resolvingBases);
                     if (match == null)
                         return null;
                 }
@@ -167,7 +176,7 @@ public sealed class ContractInheritanceChecker : IDisposable
     private ResolvedDeclaration? FindNestedDeclaration(
         AstNode? scope,
         TypeReference reference,
-        IReadOnlyDictionary<string, string> substitutions,
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>> typeArguments,
         HashSet<AstNode> resolvingBases)
     {
         var declaration = _enclosingDeclarations.Keys.FirstOrDefault(candidate =>
@@ -176,23 +185,24 @@ public sealed class ContractInheritanceChecker : IDisposable
             && DeclarationParameters(candidate).Count == reference.Arguments.Count);
         if (declaration != null)
         {
-            var arguments = reference.Arguments.Select(argument =>
-                SubstituteTypeName(argument, substitutions)).ToArray();
-            var bound = new Dictionary<string, string>(substitutions, StringComparer.Ordinal);
-            for (var index = 0; index < arguments.Length; index++)
-                bound[DeclarationParameters(declaration)[index].Name] = arguments[index];
-            return new ResolvedDeclaration(declaration, bound);
+            var arguments = new Dictionary<AstNode, IReadOnlyList<string>>(typeArguments)
+            {
+                [declaration] = reference.Arguments
+            };
+            return new ResolvedDeclaration(declaration,
+                DeclarationSubstitutions(declaration, arguments), arguments);
         }
         if (scope is not ClassDefinitionNode { BaseClass: { } baseName } cls
             || !resolvingBases.Add(cls))
             return null;
         try
         {
-            var baseType = ResolveDeclaration(baseName, cls, substitutions,
-                resolvingBases: resolvingBases);
+            var baseType = ResolveDeclaration(baseName, cls,
+                DeclarationSubstitutions(cls, typeArguments),
+                resolvingBases: resolvingBases, typeArguments: typeArguments);
             return baseType?.Declaration is ClassDefinitionNode
                 ? FindNestedDeclaration(baseType.Declaration, reference,
-                    baseType.Substitutions, resolvingBases)
+                    baseType.TypeArguments, resolvingBases)
                 : null;
         }
         finally
@@ -201,10 +211,53 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
     }
 
+    private IEnumerable<AstNode> DeclarationChain(AstNode declaration)
+    {
+        var chain = new Stack<AstNode>();
+        for (AstNode? current = declaration; current != null; current = _enclosingDeclarations[current])
+            chain.Push(current);
+        return chain;
+    }
+
+    private static IReadOnlyList<string> DeclarationArguments(
+        AstNode declaration,
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>> typeArguments) =>
+        typeArguments.TryGetValue(declaration, out var arguments)
+            ? arguments : DeclarationParameters(declaration).Select(parameter => parameter.Name).ToArray();
+
+    private Dictionary<string, string> DeclarationSubstitutions(
+        AstNode declaration,
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>> typeArguments)
+    {
+        var substitutions = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var ancestor in DeclarationChain(declaration))
+        {
+            var parameters = DeclarationParameters(ancestor);
+            var arguments = DeclarationArguments(ancestor, typeArguments);
+            for (var index = 0; index < parameters.Count; index++)
+                substitutions[parameters[index].Name] = arguments[index];
+        }
+        return substitutions;
+    }
+
     private string ResolvedIdentity(ResolvedDeclaration declaration) =>
-        _qualifiedNames[declaration.Declaration] + "<" + string.Join(",",
-            declaration.Substitutions.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => $"{pair.Key}={pair.Value}")) + ">";
+        string.Join(".", DeclarationChain(declaration.Declaration).Select(ancestor =>
+            _qualifiedNames[ancestor] + "<" + string.Join(",",
+                DeclarationArguments(ancestor, declaration.TypeArguments).Select(argument =>
+                    TypeIdentity.CanonicalizeSignature(argument, Array.Empty<string>()))) + ">"));
+
+    private string QualifiedTypeName(ResolvedDeclaration declaration)
+    {
+        var chain = DeclarationChain(declaration.Declaration).ToArray();
+        var namespaceName = chain[0].NamespaceIdentity ?? _moduleNamespace;
+        return "global::" + (namespaceName.Length == 0 ? "" : namespaceName + ".")
+            + string.Join(".", chain.Select(ancestor =>
+            {
+                var arguments = DeclarationArguments(ancestor, declaration.TypeArguments);
+                return DeclarationName(ancestor) + (arguments.Count == 0 ? ""
+                    : "<" + string.Join(",", arguments) + ">");
+            }));
+    }
 
     private ClassInheritanceResult CheckClass(
         ClassDefinitionNode classNode,
@@ -249,7 +302,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                     pair.Method.TypeParameters
                         .Select(parameter => parameter.Name)
                         .ToArray(),
-                    pair.TypeSubstitutions)));
+                    pair.TypeSubstitutions,
+                    pair.Resolution)));
             sources.AddRange(CollectBaseMethods(
                 classNode,
                 implementingMethod,
@@ -405,7 +459,8 @@ public sealed class ContractInheritanceChecker : IDisposable
     private IReadOnlyList<InterfaceMethodSource> CollectInterfaceMethods(
         ClassDefinitionNode classNode,
         IReadOnlyList<InterfaceDefinitionNode> interfaces,
-        IReadOnlyDictionary<string, string>? initialSubstitutions = null)
+        IReadOnlyDictionary<string, string>? initialSubstitutions = null,
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? initialTypeArguments = null)
     {
         var result = new List<InterfaceMethodSource>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -414,9 +469,11 @@ public sealed class ContractInheritanceChecker : IDisposable
         void Visit(
             string interfaceReference,
             IReadOnlyDictionary<string, string> outerSubstitutions,
-            AstNode owner)
+            AstNode owner,
+            IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? outerTypeArguments)
         {
-            var resolved = ResolveDeclaration(interfaceReference, owner, outerSubstitutions);
+            var resolved = ResolveDeclaration(interfaceReference, owner, outerSubstitutions,
+                typeArguments: outerTypeArguments);
             if (resolved?.Declaration is not InterfaceDefinitionNode interfaceNode)
             {
                 return;
@@ -428,7 +485,7 @@ public sealed class ContractInheritanceChecker : IDisposable
             foreach (var baseInterface in interfaceNode.BaseInterfaces
                          .OrderBy(name => name, StringComparer.Ordinal))
             {
-                Visit(baseInterface, substitutions, interfaceNode);
+                Visit(baseInterface, substitutions, interfaceNode, resolved.TypeArguments);
             }
             foreach (var method in interfaceNode.Methods
                          .OrderBy(method => method.Name, StringComparer.Ordinal)
@@ -437,7 +494,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                 result.Add(new InterfaceMethodSource(
                     interfaceNode,
                     method,
-                    substitutions));
+                    substitutions,
+                    resolved));
             }
             active.Remove(interfaceNode);
         }
@@ -448,7 +506,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             Visit(
                 interfaceName,
                 initialSubstitutions ?? new Dictionary<string, string>(StringComparer.Ordinal),
-                classNode);
+                classNode,
+                initialTypeArguments);
         }
         return result;
     }
@@ -464,14 +523,17 @@ public sealed class ContractInheritanceChecker : IDisposable
         AstNode owner = classNode;
         var substitutions =
             new Dictionary<string, string>(StringComparer.Ordinal);
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? typeArguments = null;
         while (baseClassReference != null)
         {
-            var resolved = ResolveDeclaration(baseClassReference, owner, substitutions);
+            var resolved = ResolveDeclaration(baseClassReference, owner, substitutions,
+                typeArguments: typeArguments);
             if (resolved?.Declaration is not ClassDefinitionNode baseClass)
                 yield break;
             if (!visited.Add(baseClass))
                 yield break;
             substitutions = new Dictionary<string, string>(resolved.Substitutions, StringComparer.Ordinal);
+            typeArguments = resolved.TypeArguments;
             var baseMethod = baseClass.Methods.FirstOrDefault(method =>
                 MethodsMatch(implementingMethod, method, substitutions));
             if (baseMethod != null)
@@ -490,14 +552,16 @@ public sealed class ContractInheritanceChecker : IDisposable
                             .ToArray(),
                         new Dictionary<string, string>(
                             substitutions,
-                            StringComparer.Ordinal));
+                            StringComparer.Ordinal),
+                        resolved);
                 }
                 else
                 {
                     foreach (var pair in CollectInterfaceMethods(
                                  baseClass,
                                  interfaces,
-                                 substitutions)
+                                 substitutions,
+                                 typeArguments)
                                  .Where(pair => MethodsMatch(
                                      implementingMethod,
                                      pair.Method,
@@ -513,12 +577,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                             pair.Method.TypeParameters
                                 .Select(parameter => parameter.Name)
                                 .ToArray(),
-                            pair.TypeSubstitutions.ToDictionary(
-                                substitution => substitution.Key,
-                                substitution => SubstituteTypeName(
-                                    substitution.Value,
-                                    substitutions),
-                                StringComparer.Ordinal));
+                            pair.TypeSubstitutions,
+                            pair.Resolution);
                     }
                 }
             }
@@ -527,7 +587,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
     }
 
-    private static ContractSource RebindSourceParameters(
+    private ContractSource RebindSourceParameters(
         ContractSource source,
         MethodNode implementation)
     {
@@ -558,6 +618,13 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             typeReplacements[pair.Key] = pair.Value;
         }
+        var typeBindings = new TypeRebindings(typeReplacements, name =>
+        {
+            var declaration = ResolveDeclaration(name, source.Resolution.Declaration,
+                source.TypeSubstitutions, memberLookup: true,
+                typeArguments: source.Resolution.TypeArguments);
+            return declaration == null ? null : QualifiedTypeName(declaration);
+        });
 
         return source with
         {
@@ -570,7 +637,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                             contract.Condition,
                             replacements),
                         replacements,
-                        typeReplacements),
+                        typeBindings),
                     contract.Message,
                     contract.Attributes))
                 .ToArray(),
@@ -582,7 +649,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                             contract.Condition,
                             replacements),
                         replacements,
-                        typeReplacements),
+                        typeBindings),
                     contract.Message,
                     contract.Attributes))
                 .ToArray()
@@ -592,7 +659,7 @@ public sealed class ContractInheritanceChecker : IDisposable
     private static ExpressionNode RewriteReferences(
         ExpressionNode expression,
         IReadOnlyDictionary<string, string> replacements,
-        IReadOnlyDictionary<string, string>? typeReplacements = null)
+        TypeRebindings? typeReplacements = null)
     {
         if (expression is ReferenceNode reference)
         {
@@ -1037,17 +1104,32 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
     }
 
-    private static string RewriteTypeName(
-        string typeName,
-        IReadOnlyDictionary<string, string>? replacements) =>
-        replacements == null
-            ? typeName
-            : SubstituteTypeName(typeName, replacements);
+    private sealed record TypeRebindings(
+        IReadOnlyDictionary<string, string> Parameters,
+        Func<string, string?> Qualify);
+
+    private static string RewriteTypeName(string typeName, TypeRebindings? replacements)
+    {
+        if (replacements == null)
+            return typeName;
+        if (replacements.Parameters.TryGetValue(typeName, out var parameter))
+            return parameter;
+        if (replacements.Qualify(typeName) is { } qualified)
+            return qualified;
+        if (typeName.EndsWith('?') || typeName.EndsWith('*'))
+            return RewriteTypeName(typeName[..^1], replacements) + typeName[^1];
+        if (typeName.EndsWith(']') && typeName.LastIndexOf('[') is var arrayStart && arrayStart >= 0)
+            return RewriteTypeName(typeName[..arrayStart], replacements) + typeName[arrayStart..];
+        return string.Join(".", ParseQualifiedTypeReference(typeName).Select(reference =>
+            reference.Arguments.Count == 0 ? reference.Name : reference.Name + "<"
+                + string.Join(",", reference.Arguments.Select(argument =>
+                    RewriteTypeName(argument, replacements))) + ">"));
+    }
 
     private static IReadOnlyList<QuantifierVariableNode> RewriteQuantifierTypes(
         IReadOnlyList<QuantifierVariableNode> variables,
-        IReadOnlyDictionary<string, string>? replacements) =>
-        replacements == null || replacements.Count == 0
+        TypeRebindings? replacements) =>
+        replacements == null
             ? variables
             : variables.Select(variable => new QuantifierVariableNode(
                 variable.Span,
@@ -1231,7 +1313,8 @@ public sealed class ContractInheritanceChecker : IDisposable
         IReadOnlyList<RequiresNode> Preconditions,
         IReadOnlyList<EnsuresNode> Postconditions,
         IReadOnlyList<string> MethodTypeParameters,
-        IReadOnlyDictionary<string, string> TypeSubstitutions)
+        IReadOnlyDictionary<string, string> TypeSubstitutions,
+        ResolvedDeclaration Resolution)
     {
         public bool HasContracts =>
             Preconditions.Count > 0 || Postconditions.Count > 0;
@@ -1240,7 +1323,8 @@ public sealed class ContractInheritanceChecker : IDisposable
     private sealed record InterfaceMethodSource(
         InterfaceDefinitionNode Interface,
         MethodSignatureNode Method,
-        IReadOnlyDictionary<string, string> TypeSubstitutions);
+        IReadOnlyDictionary<string, string> TypeSubstitutions,
+        ResolvedDeclaration Resolution);
 
     private sealed record TypeReference(
         string Name,
@@ -1561,17 +1645,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             var resolved = ResolveDeclaration(name[..separator], owner, memberLookup: true);
             if (resolved?.Declaration != source.Interface)
                 return false;
-            for (AstNode? scope = source.Interface; scope != null; scope = _enclosingDeclarations[scope])
-            {
-                foreach (var parameter in DeclarationParameters(scope))
-                {
-                    var expected = source.TypeSubstitutions.GetValueOrDefault(parameter.Name, parameter.Name);
-                    var actual = resolved.Substitutions.GetValueOrDefault(parameter.Name, parameter.Name);
-                    if (TypeIdentity.CanonicalizeSignature(actual, Array.Empty<string>())
-                        != TypeIdentity.CanonicalizeSignature(expected, Array.Empty<string>()))
-                        return false;
-                }
-            }
+            if (ResolvedIdentity(resolved) != ResolvedIdentity(source.Resolution))
+                return false;
             name = name[(separator + 1)..];
         }
         return name.Equals(source.Method.Name, StringComparison.Ordinal)

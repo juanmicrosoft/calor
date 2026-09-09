@@ -225,6 +225,87 @@ public sealed class NestedContractInheritanceRuntimeTests
             -1, 1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QualifiedGenericArguments_StayInTheCallersLexicalScope(bool verify)
+    {
+        foreach (var contracts in new[] { "§Q (is x U)", "§S (is result U)", "§Q (is x U)\n§S (is result U)" })
+        foreach (var outerParameter in new[] { "T", "V" })
+        {
+            var source = $$"""
+                §M{m1:NestedContracts}
+                  §CL{c1:Outer:pub}<{{outerParameter}}>
+                    §IFACE{i1:IValue}<U>
+                      §MT{im1:Check} (object:x) -> object
+                {{Indent(Indent(Indent(Indent(contracts))))}}
+                  §CL{c2:Impl:pub}<T>
+                    §IMPL{Outer<i32>.IValue<T>}
+                    §MT{mt1:Check:pub} (object:value) -> object
+                      §E{}
+                      §R value
+                """;
+            var assembly = Compile(source, verify);
+            var type = assembly.GetType("NestedContracts.Impl`1")!.MakeGenericType(typeof(string));
+            Assert.Equal(new[] { typeof(int), typeof(string) }, Assert.Single(type.GetInterfaces()).GetGenericArguments());
+            var instance = Activator.CreateInstance(type);
+            var method = type.GetMethod("Check")!;
+            Assert.Equal("valid", method.Invoke(instance, ["valid"]));
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [1]));
+            Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InheritedPredicateTypes_KeepTheDeclaringScope(bool verify)
+    {
+        foreach (var contracts in new[] { "§Q (is x Marker)", "§S (is result Marker)", "§Q (is x Marker)\n§S (is result Marker)" })
+        foreach (var generic in new[] { false, true })
+        {
+            var source = $$"""
+                §M{m1:NestedContracts}
+                  §CL{c1:Outer:pub}
+                    §CL{c2:Marker:pub}
+                      §MT{mm1:Tag:pub} () -> i32
+                        §E{}
+                        §R INT:1
+                    §IFACE{i1:IValue}
+                      §MT{im1:Check} (object:x) -> object
+                {{Indent(Indent(Indent(Indent(contracts))))}}
+                  §CL{c3:Marker:pub}
+                    §MT{mm2:Tag:pub} () -> i32
+                      §E{}
+                      §R INT:2
+                  §CL{c4:Impl:pub}
+                    §IMPL{Outer.IValue}
+                    §MT{mt1:Check:pub} (object:value) -> object
+                      §E{}
+                      §R value
+                """;
+            if (generic)
+            {
+                source = source.Replace("§CL{c1:Outer:pub}", "§CL{c1:Outer:pub}<T>")
+                    .Replace("§CL{c2:Marker:pub}", "§CL{c2:Marker:pub}<T>")
+                    .Replace("Outer.IValue", "Outer<i32>.IValue")
+                    .Replace(" Marker)", " Marker<str>)");
+            }
+            var assembly = Compile(source, verify);
+            var type = assembly.GetType("NestedContracts.Impl")!;
+            var markerType = generic
+                ? assembly.GetType("NestedContracts.Outer`1+Marker`1")!.MakeGenericType(typeof(int), typeof(string))
+                : assembly.GetType("NestedContracts.Outer+Marker")!;
+            var valid = Activator.CreateInstance(markerType);
+            var invalid = Activator.CreateInstance(assembly.GetType("NestedContracts.Marker")!);
+            var instance = Activator.CreateInstance(type);
+            var method = type.GetMethod("Check")!;
+            Assert.Same(valid, method.Invoke(instance, [valid]));
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [invalid]));
+            Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+        }
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions
