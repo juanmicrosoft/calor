@@ -950,7 +950,7 @@ public class ConverterImprovementTests
             {
                 public void Run(int n)
                 {
-                    for (int i = 0; i < n; i++)
+                    for (int i = 0; i < 3; i++)
                     {
                         System.Console.WriteLine(i);
                     }
@@ -965,7 +965,7 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be (- n 1) for exclusive < bound
+        // Upper bound should be (- 3 1) for the proven constant range.
         var to = Assert.IsType<BinaryOperationNode>(loop.To);
         Assert.Equal(BinaryOperator.Subtract, to.Operator);
         var right = Assert.IsType<IntLiteralNode>(to.Right);
@@ -980,7 +980,7 @@ public class ConverterImprovementTests
             {
                 public void Run(int n)
                 {
-                    for (int i = 0; i <= n; i++)
+                    for (int i = 0; i <= 3; i++)
                     {
                         System.Console.WriteLine(i);
                     }
@@ -995,14 +995,13 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be n directly (no adjustment for inclusive <=)
-        Assert.IsType<ReferenceNode>(loop.To);
+        Assert.Equal(3, Assert.IsType<IntLiteralNode>(loop.To).Value);
     }
 
     [Fact]
-    public void Migration_ForLessThan_CompoundBound_AdjustsCorrectly()
+    public void Migration_ForLessThan_CompoundBound_PreservesReevaluation()
     {
-        // i < arr.Length should produce (- arr.Length 1)
+        // The array reference may change during execution; do not capture its length.
         var csharp = """
             public class Service
             {
@@ -1021,15 +1020,10 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
-
-        // Upper bound should be (- arr.Length 1) wrapping the compound expression
-        var to = Assert.IsType<BinaryOperationNode>(loop.To);
-        Assert.Equal(BinaryOperator.Subtract, to.Operator);
-        var right = Assert.IsType<IntLiteralNode>(to.Right);
-        Assert.Equal(1, right.Value);
-        // Left side should be the arr.Length expression (FieldAccessNode or similar)
-        Assert.NotNull(to.Left);
+        Assert.IsType<RawCSharpNode>(method.Body[0]);
+        Assert.Contains("i < arr.Length", result.CalorSource);
+        Assert.Contains(result.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
 
     [Fact]
@@ -1040,7 +1034,7 @@ public class ConverterImprovementTests
             {
                 public void Run(int n)
                 {
-                    for (int i = 10; i > n; i--)
+                    for (int i = 10; i > 0; i--)
                     {
                         System.Console.WriteLine(i);
                     }
@@ -1055,7 +1049,7 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be (+ n 1) for exclusive > bound
+        // Upper bound should be (+ 0 1) for the proven constant range.
         var to = Assert.IsType<BinaryOperationNode>(loop.To);
         Assert.Equal(BinaryOperator.Add, to.Operator);
         var right = Assert.IsType<IntLiteralNode>(to.Right);

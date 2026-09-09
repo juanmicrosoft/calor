@@ -8103,142 +8103,80 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("for");
         _context.IncrementConverted();
 
+        if (!CanUseNativeForRange(node))
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+                "C# for loop preserved to retain condition reevaluation and incrementor/continue behavior",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return [new RawCSharpNode(GetTextSpan(node), node.ToFullString())];
+        }
+
         var id = _context.GenerateId("for");
         var span = GetTextSpan(node);
         var result = new List<StatementNode>();
 
-        // Try to extract standard for loop pattern: for (var i = from; i <= to; i += step)
-        var varName = (string?)null;
-        ExpressionNode? from = null;
-        ExpressionNode? to = null;
-        ExpressionNode? step = null;
-        bool isStandard = true;
-
-        // Extract variable name and initial value from declaration
-        if (node.Declaration?.Variables.Count > 0)
-        {
-            if (node.Declaration.Variables.Count > 1)
-            {
-                isStandard = false; // Multiple variables — non-standard
-            }
-            var decl = node.Declaration.Variables[0];
-            varName = decl.Identifier.Text;
-            if (decl.Initializer != null)
-            {
-                from = ConvertExpression(decl.Initializer.Value);
-            }
-        }
-        else
-        {
-            isStandard = false; // No variable declaration — non-standard
-        }
-
-        // Extract upper bound from condition
-        if (node.Condition is BinaryExpressionSyntax binExpr)
-        {
-            to = ConvertExpression(binExpr.Right);
-
-            // Calor loops are inclusive (<=), so adjust for exclusive C# bounds
-            if (binExpr.OperatorToken.IsKind(SyntaxKind.LessThanToken))
-            {
-                to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(TextSpan.Empty, 1));
-            }
-            else if (binExpr.OperatorToken.IsKind(SyntaxKind.GreaterThanToken))
-            {
-                to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Add, to, new IntLiteralNode(TextSpan.Empty, 1));
-            }
-        }
-        else
-        {
-            isStandard = false; // No binary condition — non-standard
-        }
-
-        // Extract step from incrementors
-        if (node.Incrementors.Count > 1)
-        {
-            isStandard = false; // Multiple incrementors — non-standard
-        }
-        if (node.Incrementors.Count > 0)
-        {
-            var incrementor = node.Incrementors[0];
-            if (incrementor is PostfixUnaryExpressionSyntax postfix)
-            {
-                step = postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
-                    ? new IntLiteralNode(TextSpan.Empty, 1)
-                    : new IntLiteralNode(TextSpan.Empty, -1);
-            }
-            else if (incrementor is PrefixUnaryExpressionSyntax prefix)
-            {
-                step = prefix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
-                    ? new IntLiteralNode(TextSpan.Empty, 1)
-                    : new IntLiteralNode(TextSpan.Empty, -1);
-            }
-            else if (incrementor is AssignmentExpressionSyntax assignment)
-            {
-                // KNOWN LIMITATION (#836 m2, pre-existing on main; #774
-                // follow-up): §L's step is ADDITIVE, but this takes the RHS of
-                // any compound assignment — `k *= 2` / `j >>= 1` become
-                // additive step 2 / 1, and `i -= 2` a positive step 2,
-                // changing loop semantics. Documented in the FeatureSupport
-                // "for" entry; the fix is to restrict this to += (negating -=)
-                // and route other compound incrementors to the while-loop
-                // fallback.
-                step = ConvertExpression(assignment.Right);
-            }
-        }
+        var declaration = node.Declaration!.Variables[0];
+        var varName = declaration.Identifier.Text;
+        var from = ConvertExpression(declaration.Initializer!.Value);
+        var condition = (BinaryExpressionSyntax)node.Condition!;
+        var to = ConvertExpression(condition.Right);
+        if (condition.IsKind(SyntaxKind.LessThanExpression))
+            to = new BinaryOperationNode(span, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(span, 1));
+        else if (condition.IsKind(SyntaxKind.GreaterThanExpression))
+            to = new BinaryOperationNode(span, Ast.BinaryOperator.Add, to, new IntLiteralNode(span, 1));
+        var incrementor = node.Incrementors[0];
+        var step = new IntLiteralNode(span,
+            incrementor.IsKind(SyntaxKind.PostIncrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreIncrementExpression) ? 1 : -1);
 
         var body = node.Statement is BlockSyntax block
             ? ConvertBlock(block)
             : new List<StatementNode> { ConvertStatement(node.Statement)! };
 
-        // Fall back to while loop for non-standard for patterns
-        if (!isStandard)
+        bool CanUseNativeForRange(ForStatementSyntax node)
         {
-            var whileBody = new List<StatementNode>();
+            if (_semanticModel == null
+                || node.Declaration?.Variables.Count != 1
+                || node.Declaration.Variables[0] is not { Initializer: { } initializer } declaration
+                || _semanticModel.GetDeclaredSymbol(declaration) is not ILocalSymbol variable
+                || variable.Type.SpecialType != SpecialType.System_Int32
+                || _semanticModel.GetConstantValue(initializer.Value) is not { HasValue: true, Value: int }
+                || node.Condition is not BinaryExpressionSyntax condition
+                || !SymbolEqualityComparer.Default.Equals(
+                    _semanticModel.GetSymbolInfo(condition.Left).Symbol, variable)
+                || _semanticModel.GetConstantValue(condition.Right) is not { HasValue: true, Value: int bound }
+                || node.Incrementors.Count != 1)
+                return false;
 
-            // Prepend initializer(s) directly to result (before the while loop)
-            if (node.Declaration != null)
+            var incrementor = node.Incrementors[0];
+            var operand = incrementor switch
             {
-                foreach (var variable in node.Declaration.Variables)
-                {
-                    var initExpr = variable.Initializer != null
-                        ? ConvertExpression(variable.Initializer.Value)
-                        : new ReferenceNode(span, "default");
-                    result.Add(new BindStatementNode(
-                        span, variable.Identifier.Text,
-                        TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
-                        true, initExpr, new AttributeCollection()));
-                }
-            }
-            else if (node.Initializers.Count > 0)
-            {
-                foreach (var init in node.Initializers)
-                {
-                    var initStmt = ConvertExpressionToStatement(init, span);
-                    if (initStmt != null) result.Add(initStmt);
-                }
-            }
+                PostfixUnaryExpressionSyntax postfix => postfix.Operand,
+                PrefixUnaryExpressionSyntax prefix => prefix.Operand,
+                _ => null
+            };
+            if (operand == null
+                || !SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(operand).Symbol, variable))
+                return false;
 
-            // Body + incrementors
-            whileBody.AddRange(body);
-            foreach (var inc in node.Incrementors)
-            {
-                var incStmt = ConvertExpressionToStatement(inc, span);
-                if (incStmt != null) whileBody.Add(incStmt);
-            }
-
-            var condition = node.Condition != null
-                ? ConvertExpression(node.Condition)
-                : new BoolLiteralNode(span, true);
-
-            result.Add(new WhileStatementNode(span, id, condition, whileBody, new AttributeCollection()));
-            return result;
+            var ascending = incrementor.IsKind(SyntaxKind.PostIncrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreIncrementExpression);
+            var descending = incrementor.IsKind(SyntaxKind.PostDecrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreDecrementExpression);
+            // Native ranges stop at overflow. C# may wrap or throw instead, so the
+            // final increment must remain representable as well as the endpoint.
+            var safeCondition = ascending
+                ? condition.IsKind(SyntaxKind.LessThanExpression) && bound > int.MinValue
+                    || condition.IsKind(SyntaxKind.LessThanOrEqualExpression) && bound < int.MaxValue
+                : descending && (condition.IsKind(SyntaxKind.GreaterThanExpression) && bound < int.MaxValue
+                    || condition.IsKind(SyntaxKind.GreaterThanOrEqualExpression) && bound > int.MinValue);
+            var flow = _semanticModel.AnalyzeDataFlow(node.Statement);
+            return safeCondition && flow is { Succeeded: true }
+                && !flow.WrittenInside.Contains(variable, SymbolEqualityComparer.Default);
         }
 
         // Hoist complex from/to/step expressions to temp bindings.
         // The §L{...} header is colon-delimited — nested section markers (§IDX, §C, §NEW) would break parsing.
-        from ??= new IntLiteralNode(TextSpan.Empty, 0);
-        to ??= new IntLiteralNode(TextSpan.Empty, 10);
         if (ContainsNestedMarker(from))
         {
             var tempFrom = _context.GenerateId("_from");
@@ -8255,7 +8193,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         result.Add(new ForStatementNode(
             span,
             id,
-            varName ?? "i",
+            varName,
             from,
             to,
             step,

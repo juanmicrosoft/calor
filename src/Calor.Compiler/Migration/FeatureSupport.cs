@@ -116,19 +116,11 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "If statements are converted to Calor IF blocks"
         },
-        // NOTE (#836 m2, pre-existing; #774 follow-up): §L's step is additive,
-        // but compound incrementors currently take the raw RHS — `k *= 2` /
-        // `j >>= 1` / `i -= 2` produce wrong additive steps. Kept at Full for
-        // the common ++/--/+= forms (a Partial level would warn on every for
-        // loop); the limitation is documented here and at the extraction site
-        // in RoslynSyntaxVisitor until the #774 follow-up routes non-additive
-        // incrementors to the while-loop fallback.
         ["for"] = new FeatureInfo
         {
             Name = "for",
-            Support = SupportLevel.Full,
-            Description = "For loops are converted to Calor LOOP blocks. Known limitation (#774 follow-up): non-additive compound incrementors (*=, /=, <<=, >>=, -=) take the raw RHS as an additive §L step, changing loop semantics",
-            Workaround = "Rewrite non-additive incrementors as while loops, or review converted §L steps"
+            Support = SupportLevel.Partial,
+            Description = "Constant-bound int loops with matching ++/-- steps and an unmodified induction variable use native ranges when termination cannot overflow. Other C# loops are explicitly preserved as interop, retaining condition reevaluation, incrementors, continue paths and overflow behavior."
         },
         ["foreach"] = new FeatureInfo
         {

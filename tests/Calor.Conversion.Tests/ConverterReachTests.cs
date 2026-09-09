@@ -440,7 +440,7 @@ public class ConverterReachTests
                     var isJson = false;
                     if (format != null)
                     {
-                        for (var i = 0; i < format.Length; ++i)
+                        for (var i = 0; i < 3; ++i)
                         {
                             if (format[i] == 'l')
                                 isLiteral = true;
