@@ -19,9 +19,10 @@ The default `calor` command (when no subcommand is specified) compiles Calor sou
 
 > **Guard behavior since 0.15:** with `--verify`, a clean, non-vacuous,
 > assumption-free `proven` verdict drops its runtime guard by default. Pass
-> `--keep-proven-guards` to keep every guard and treat verdicts as
+> `--keep-proven-guards` to retain otherwise-emitted guards and treat verdicts as
 > diagnostic only (the 0.13/0.14 behavior). `--elide-proven-guards` is still
-> accepted and now simply restates the default.
+> accepted and now simply restates the default. Checks still require an enabled
+> contract mode and supported runtime lowering; `--contract-mode off` emits none.
 
 ---
 
@@ -169,9 +170,10 @@ calor -i MyModule.calr -o MyModule.g.cs --verify
 
 The compiler uses Z3 to attempt proving contracts at compile time and reports
 one of seven verdicts. Since 0.15, a clean `proven` postcondition drops its
-runtime guard by default; every other verdict keeps its guard. Pass
-`--keep-proven-guards` to keep all guards and use verification as a
-diagnostic only.
+runtime guard by default; other verdicts never authorize proof-based removal.
+Pass `--keep-proven-guards` to retain otherwise-emitted guards and use verification
+as a diagnostic only. `--contract-mode off` emits no checks, and enabled checks
+still require supported runtime lowering.
 
 Example output:
 
@@ -185,7 +187,7 @@ Generated MyModule.g.cs
 The seven statuses are `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
 `unsupported`, and `unavailable`. Only a clean, non-vacuous, assumption-free
 `proven` postcondition is eligible to lose its runtime guard — and
-`--keep-proven-guards` keeps even that one. See
+`--keep-proven-guards` prevents that proof-based removal. See
 [Verification Guarantees](/docs/guides/verification-guarantees/).
 
 ---

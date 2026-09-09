@@ -217,7 +217,7 @@ if (x > 0) {
 ```
 
 Calor code:
-```
+```calor
 §IF{if1} (> x 0)
   §L{for1:i:0:n:1}
     §IF{if2} (> y 0)
@@ -230,7 +230,7 @@ Every scope begins with an explicit, stable ID and ends when indentation returns
 
 Tell Claude: "Change the loop `for1` to start at 1 instead of 0"
 
-```
+```calor
 // Before
 §L{for1:i:0:n:1}
 
@@ -242,7 +242,7 @@ The ID `for1` uniquely identifies the target. No confusion with other loops.
 
 ### 3. Explicit Contracts for Verification
 
-```
+```calor
 §F{f001:CalculateInterest:pub}
   §I{f64:principal}
   §I{f64:rate}
@@ -262,7 +262,7 @@ Claude can verify:
 
 ### 4. Effects for Side Effect Analysis
 
-```
+```calor
 §F{f001:ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
@@ -290,7 +290,7 @@ and postcondition that result >= 1
 ```
 
 **Claude generates:**
-```
+```calor
 §M{m001:Math}
   §F{f001:Factorial:pub}
     §I{i32:n}
@@ -337,7 +337,7 @@ Refactor this to extract the calculation into a separate function:
 ```
 
 **Claude generates:**
-```
+```calor
 §F{f001:Square:pri}
   §I{i32:n}
   §O{i32}

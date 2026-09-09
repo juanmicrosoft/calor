@@ -16,7 +16,31 @@ public class TaskGenAddressabilityTests
 {
     private readonly VerificationAddressability _probe = new();
 
-    // ---- EffectViolation → Calor0410 (the flagship: a deterministic build-time signal) ----
+    // ---- EffectViolation → Calor0410 ----
+    //
+    // #1173 changed what this family measures, and the change is worth stating
+    // plainly rather than absorbing. The EffectViolation operator injects an `fs`
+    // effect (a `using`-nested Directory.Exists) and Calor0410 used to fire on the
+    // converted arm — which read as "Calor catches this defect at build time".
+    //
+    // It did not. The signal was the CONVERTER's bug: its §E walker never visited
+    // `using` bodies, `foreach` collections or lambda bodies, so it wrote a pure
+    // row over a body that performs effects, and the compiler then reported the
+    // converter's own row against the converter's own code. #1173 fixed that by
+    // deriving the row from the same inference that checks it.
+    //
+    // The consequence is structural, not incidental: a row DERIVED from a body can
+    // never disagree with that body, so no mutation of the body alone can produce
+    // Calor0410 on converted code. Effect enforcement catches a body that departs
+    // from a contract someone WROTE; converted code has no such contract. Whether
+    // the probe should pin the clean file's row onto the mutated body — the
+    // hand-authored analogue, and a real signal rather than an artifact — is #1177.
+    //
+    // None of this is a surprise. substrate-plan-v0.12 §1 item 7 named the blind
+    // spot as the source of the signal, and D-S1.6 pre-committed the disposition
+    // while it was still free to make: "the fix ships and the supply loss is
+    // published. A converter blind spot is not an asset." It also predicted this
+    // very test would be what fails loudly. It was.
 
     private const string EffectClean = """
         namespace S;
@@ -28,7 +52,7 @@ public class TaskGenAddressabilityTests
         """;
 
     [Fact]
-    public void EffectViolation_IsAddressable_Calor0410_IntroducedByTheMutation()
+    public void EffectViolation_IsNotAddressable_BecauseAConvertedRowCannotContradictItsOwnBody()
     {
         // Generate the mutation via the real operator, then probe it.
         var cand = Assert.Single(
@@ -43,39 +67,61 @@ public class TaskGenAddressabilityTests
         Assert.True(conv.Success, "mutated file must convert to Calor");
         Assert.DoesNotContain("CSHARP", conv.CalorSource ?? ""); // no interop escalation → native
 
-        // Property 3 (addressability differential): Calor0410 introduced by the mutation.
+        // The converter DECLARES the injected effect rather than hiding it: that is
+        // the fix, and it is why the check below finds nothing to report.
+        Assert.Contains("§E{", conv.CalorSource!);
+
         var result = _probe.Probe("Calor0410", cand.MutatedSource, EffectClean, "Counter.cs");
         Assert.True(result.Determinable, $"probe should be determinable; note: {result.Note}");
-        Assert.True(result.Addressable,
-            $"the injected using-nested fs effect must introduce Calor0410 on the converted arm. " +
-            $"mutated={string.Join(",", result.FiredOnMutated)} clean={string.Join(",", result.FiredOnClean)}; note: {result.Note}");
-        Assert.Contains("Calor0410", result.FiredOnMutated);
+        Assert.False(
+            result.Addressable,
+            "a converted row is derived from the body it describes, so a body mutation cannot "
+            + $"contradict it; note: {result.Note}");
+        Assert.DoesNotContain("Calor0410", result.FiredOnMutated);
         Assert.DoesNotContain("Calor0410", result.FiredOnClean);
     }
 
+    /// <summary>
+    /// This test used to check the differential's other half — that a `Calor0410` the CLEAN
+    /// conversion already produces is not credited to the mutation — using a fixture built from
+    /// converter-baseline noise. **That noise no longer exists**, and the history is the point.
+    ///
+    /// <para>#1173 took converted-corpus `Calor0410` from 219 to 9 by deriving each `§E` row from
+    /// the inference that checks it. #1176 took the last 9 to **zero** by giving property accessors
+    /// an effect contract — those nine were allocating getters, undeclarable rather than
+    /// under-declared. So a converted module that reports `Calor0410` on its clean arm cannot be
+    /// constructed any more: the converter does not under-declare.</para>
+    ///
+    /// <para><b>The coverage that costs, stated rather than quietly dropped.</b> The probe's
+    /// "fires on both arms → not attributable to the mutation" branch is now unreachable through
+    /// conversion, so nothing exercises it. Testing it again needs a hand-written Calor fixture,
+    /// which <see cref="VerificationAddressability.Probe"/> does not accept — it converts C#. That
+    /// is a real gap in this file and it is written down here so the next reader finds it rather
+    /// than assuming the branch is covered.</para>
+    /// </summary>
     [Fact]
-    public void EffectViolation_NotAddressable_WhenCalor0410AlreadyFiresOnTheCleanConversion()
+    public void EffectViolation_CleanConversionNoLongerProducesBaselineCalor0410()
     {
-        // A clean file that ALREADY has a lock-wrapped effect the converter's §E-walker skips:
-        // enforcement fires Calor0410 on the CLEAN conversion too, so the differential probe must NOT
-        // credit the diagnostic to the mutation (converter-baseline noise, not the mutation's effect).
-        const string alreadyDirty = """
-            using System;
+        const string cleanWithAllocatingGetter = """
+            using System.Collections.Generic;
             namespace S;
             public class Counter
             {
                 private int _n;
-                public int Next() { lock (this) { Console.WriteLine("audit"); } return _n + 1; }
+                public List<int> Snapshot => new List<int> { _n };
+                public int Next() { return _n + 1; }
             }
             """;
         var cand = Assert.Single(
-            ExpressibleMutationOperators.Enumerate(alreadyDirty, "Counter.cs"),
+            ExpressibleMutationOperators.Enumerate(cleanWithAllocatingGetter, "Counter.cs"),
             c => c.Operator == MutationOperatorKind.EffectViolation);
 
-        var result = _probe.Probe("Calor0410", cand.MutatedSource, alreadyDirty, "Counter.cs");
+        var result = _probe.Probe("Calor0410", cand.MutatedSource, cleanWithAllocatingGetter, "Counter.cs");
 
+        // The allocating getter was the last converter-baseline Calor0410 (#1176).
+        Assert.DoesNotContain("Calor0410", result.FiredOnClean);
         Assert.False(result.Addressable,
-            $"a pre-existing Calor0410 must not be credited to the mutation; note: {result.Note}");
+            $"nothing fires on either arm, so nothing is attributable; note: {result.Note}");
     }
 
     // ---- DivByZero → Calor0920 (guard removal, Z3-backed) ----

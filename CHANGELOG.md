@@ -4,6 +4,233 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-09
+
+### Benchmark Results (Statistical: 30 runs)
+
+- **Overall Advantage**: 1.32 (legacy calculator score, not a measured language advantage)
+- **Metrics**: Calor scores higher in 7 categories; C# in 1
+- **Highlights**: Comprehension 1.84x, ErrorDetection 1.49x, TokenEconomics 1.42x;
+  InformationDensity 0.97x, where C# scores higher
+- **Programs Tested**: 217; both inputs pass the runner's parse checks for all 217
+- **Recorded source**: `3a452b09` (declares version 0.19.0)
+- **Reported intervals**: Comprehension has a headline interval of [1.836, 1.836]
+  and a pooled interval of [1.822, 1.850]. ErrorDetection's pooled interval is
+  [1.478, 1.505]; TokenEconomics is [1.403, 1.430].
+- **Interpretation limits**: The headline intervals use singleton aggregates.
+  The pooled intervals repeat deterministic program scores 30 times, not
+  independent samples. Neither establishes sampling uncertainty or an agent
+  productivity or safety benefit. Source pairs are not all behaviorally
+  equivalent; `CsvParser` is one concrete counterexample. These are legacy
+  feature scores, not evidence that Calor beats C#. Follow-up: #1276.
+
+This release closes 16 language-audit findings and 15 website-audit findings.
+The focus is correctness: a successful compilation or proof must not hide a
+changed result, a missing runtime check, or a reordered side effect.
+
+### Fixed
+
+- **The C# CSV benchmark compiles again.** A malformed newline literal was
+  incorrectly penalizing the C# input. Both report formats were regenerated;
+  the broader pair-equivalence and interval limitations are tracked in #1276.
+- **Contract checks survive parameter mutation.** Postcondition proofs no longer
+  assume that a parameter still has its entry value after the body changes it.
+  Contract simplification also respects NaN, numeric types, and evaluation order.
+- **Effect checking includes assignment targets.** Indexed writes and executable
+  receivers, getters, and setters contribute their effects. Nested implementations
+  retain inherited interface contracts in the covered inheritance cases.
+- **Native code preserves expression meaning and scope.** C# emission retains
+  expression and pattern grouping and gives sibling match arms separate scopes.
+  Unsupported expression-match block arms are rejected instead of losing statements.
+- **Migration preserves observable execution in the repaired cases.** Short-circuit
+  operands stay conditional; eager operands keep their evaluation order; tuple
+  right-hand sides are captured before destination writes. Dictionary initializers
+  retain their operations and types, loop conditions are reevaluated, and LINQ
+  grouping retains element selectors and deferred execution.
+- **Website navigation and accessibility work consistently.** Fixes cover benchmark
+  sorting and row expansion, heading anchors and browser history, keyboard-accessible
+  drawers, active-page navigation, theme persistence, contrast, and copy controls.
+  Benchmark timestamps now identify their timezone.
+
+### Added
+
+- **Behavioral regression coverage through the production compiler.** Generated
+  cases compare results, exceptions, output, state, and evaluation traces.
+  Negative controls confirm that the oracles detect deliberately changed behavior.
+- **Frontend coverage floors, native code-generation mutation targets, and
+  specification drift checks.** These complement runtime regressions rather than
+  treating emitted text or AST counts as proof of correctness.
+- **A complete first-run guide and local documentation search.** The website now
+  includes clearer setup instructions, cross-document search, canonical routes,
+  sitemap and robots metadata, and clearer code labels.
+
+### Changed
+
+- **Integer overflow follows the documented module policy in production.**
+  Under the default checked policy, code that previously wrapped accidentally can
+  now throw `OverflowException`. Use the documented unchecked policy when wrapping
+  is intended; disabling contract checks does not disable overflow checks.
+- **Published claims distinguish guarantees from evidence.** Documentation separates
+  runtime contract modes, optional static proofs, effect-checking limits, and
+  static benchmark scores. Decorative website media is optional.
+
+### Known limits
+
+Some migration compositions are preserved as explicitly reported C# interop or
+rejected, rather than translated into native Calor. These fixes do not establish
+whole-language soundness, complete cross-file effect checking, or an advantage
+for coding agents over C#. Earlier roadmap proposals outside these two audits
+are not claimed complete by this release.
+
+The pre-existing optional Tier 2 corpus-workflow defects remain tracked in #1241.
+Historical measurements and their recorded misses remain unchanged.
+
+## [0.18.0] - 2026-09-08
+
+0.17 was about **reach** — how many of the 364 converted modules the effect checker
+manages to get to. It got to 324. 0.18 asks the next question: once it gets there,
+is what it says true? Two answers came back, and both were uncomfortable.
+
+The compiler was reporting errors against code **it had written itself**. And a
+claim we published in 0.17 — that six ways of hiding an effect had been closed —
+had never actually been measured. It has been now.
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32 (Calor leads)
+- **Metrics**: Calor wins 7 categories, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (Calor)
+  - ErrorDetection: 1.49x (Calor)
+  - TokenEconomics: 1.42x (Calor)
+  - RefactoringStability: 1.38x (Calor)
+  - InformationDensity: 0.98x (C#)
+- **Programs Tested**: 217
+- **Note**: re-run for this release, unlike 0.17's, which were carried forward. All
+  eight ratios reproduce the previous figures exactly. That means they are
+  **reproducible**, not that they are stable: these metrics are computed over a
+  fixed set of programs, so a deterministic calculation agreeing thirty times is
+  not evidence of anything. Worth settling before a future release treats exact
+  reproduction as a result.
+
+### Fixed
+
+- **The C# → Calor converter now declares the effects the code it writes actually
+  performs.** Every Calor declaration carries an effect row — the `§E{...}` line
+  saying what the body may do: `alloc` for allocating memory, `mut` for mutating
+  something, `cw` for writing to the console. The converter wrote that row using
+  its own copy of the analysis, kept beside the code that emits the Calor. The two
+  copies drifted. The converter's copy never looked inside a `foreach` loop's
+  collection, a `using` statement's resource, or a lambda body, so it wrote "this
+  function is pure" over functions that allocate. Compiling the result then
+  reported an error — "uses effect 'alloc' but does not declare it" — against code
+  the converter had just produced.
+
+  The row is now computed by the compiler's own effect analysis, the same pass that
+  later checks it, run over the Calor text the converter is about to write. One
+  analysis, one answer, so the row and the check cannot disagree. Across the three
+  real projects we convert as a test — MediatR, Serilog and FluentValidation, 364
+  files — this takes those errors from **219 in 53 files to zero**.
+
+- **A property's `get` can now do the ordinary things getters do.** A property
+  accessor has nowhere to write down its effects, so the compiler gives it a fixed
+  allowance instead. The `get` had no allowance at all — the compiler hands one to
+  `set` and to `init` and simply missed `get` — so a getter was checked as though
+  it had promised to do nothing, and *any* effect in one was an error you could not
+  fix. A getter that returns a fresh list allocates. A getter that computes its
+  value once and remembers it mutates. Neither could be written.
+
+  Why widening the allowance is safe is the part worth stating: **the allowance is
+  not what keeps effects honest.** Reading a property charges the getter's effects
+  to the code doing the reading, which still has to declare them. Fixing this
+  exposed a second hole and closed it — reading your *own* property through `this.`
+  charged nothing, while the identical read through another variable charged in
+  full.
+
+- **`--permissive-effects` now waives only what the compiler cannot determine.** The
+  flag exists for code the compiler can't fully analyse, and it used to downgrade
+  every "uses an effect it does not declare" error to a warning. That covered two
+  different situations: *we cannot tell* and *we know this is wrong*. It now waives
+  only the first. Cost, measured before the change: about 21 diagnostics across 14
+  modules move from warning to error, against 328 the flag still suppresses.
+
+  This is also what uncovered the converter defect above. The flag had been hiding
+  it, on exactly the code it was built for.
+
+### Verified
+
+- **The six ways of hiding an effect: twelve shapes checked, twelve closed.** 0.17
+  said it had closed a set of holes where an effectful function could be smuggled
+  into a context declared not to have effects. The instrument that was supposed to
+  check that claim was registered and then never built, so the claim shipped
+  unevidenced. This release built it: twelve specific shapes, five that used to slip
+  through and seven that were already handled and must stay that way. All twelve
+  behave as the table says. The seven controls matter as much as the five fixes —
+  a result of "five out of five" with a regressed control would read like success
+  and be one.
+
+### Changed
+
+- **The test suite no longer kills the machine that runs it.** Our continuous
+  integration was being terminated part-way through at a measured **14.7 %** rate,
+  which meant roughly one in seven attempts to verify a change produced no answer.
+  The compiler's test suite now runs as two separate processes rather than one,
+  which halves peak memory: **9.3 GB → 5.9 GB** on a 16 GB machine.
+
+  **This caps the symptom and does not fix the cause.** Eight explanations were
+  tested and refuted, and what allocates the memory is still unidentified. A single
+  process still exhausts a 16 GB Linux machine. Said plainly here because a green
+  pipeline is easy to read as "solved".
+
+### Measurement integrity
+
+Three fixes that change no compiler behaviour and matter anyway, because a number
+nobody can check is not evidence.
+
+- **Every measurement we publish now names a commit that exists.** Each of our
+  measurement records stamped the commit it was taken at, and every roadmap since
+  0.15 cited those stamps as provenance. **None of them resolved.** The repository
+  squashes branches when merging, so a stamp written on a branch names a commit the
+  merge throws away; three of five named commits existed on no remote branch at all
+  and would not have survived routine cleanup. The numbers were never in doubt —
+  what was gone was anyone else's ability to check them. The stamps are preserved
+  (overwriting one would falsify the record) and a companion index now carries a
+  commit that does resolve, **stating for each whether it is the same compiler,
+  verified by comparing source trees, or merely where the numbers landed**. A test
+  fails if any stamp stops resolving.
+
+- **The benchmark bot can no longer swap one kind of measurement for another.** The
+  published headline figure is computed from 30 runs. An ordinary automated
+  benchmark run produces a single-run figure, and it was overwriting the 30-run one
+  **under the same name**, in a pull request that said "updated with latest
+  metrics". A reviewer would read 1.32 → 1.28 as Calor losing ground. It is not —
+  the two numbers are not measuring the same thing. The generator now refuses, and
+  a test compares what the website publishes against what the changelog says.
+
+- **A second defect in the same report did not reproduce**, and we say so rather
+  than shipping a fix for a problem that is not there.
+
+### Not in this release
+
+Named rather than omitted, because a thing that is written down gets picked up.
+
+- **Two effect-row features slip for the second time**: function-typed values
+  carrying their row end-to-end, and index parity with `calor build`. Both are real
+  and neither is urgent. Venue: 0.19. A third slip should mean scheduling them or
+  retiring them, not re-tiering them again.
+- **Effect promises are not checked across file boundaries.** A class that overrides
+  a method from a base class in *another file* is not checked against that base's
+  effect row — the compiler cannot see across the boundary at exactly the two places
+  whose purpose is stopping effects from leaking through inheritance. This is 54 %
+  of one diagnostic category, and it was carried for three releases as though those
+  base classes were external library types. They are not: **60 of 61 are declared
+  in the same project, one file over.** Diagnosed here, fixed in 0.19.
+- **The agent experiment did not run.** Its fixtures were redesigned first, because
+  the previous set could not measure what it claimed to: the tasks were built so
+  that hiding an effect also broke a stated requirement, which the ordinary tests
+  already catch. Where those coincide, effect checking is redundant by construction
+  and no number of runs produces a result. The redesign is registered; the run is
+  not funded yet.
+
 ## [0.17.0] - 2026-09-02
 
 Calor compiles to C#, and the way we check that claim is to convert three real

@@ -297,7 +297,7 @@ public class ControlFlowTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors);
-        Assert.Contains("return a + b;", result.GeneratedCode);
+        Assert.Contains("return checked(a + b);", result.GeneratedCode);
     }
 
     [Fact]
@@ -409,7 +409,7 @@ public class ControlFlowTests
         var intSumCount = result.GeneratedCode.Split("int sum").Length - 1;
         Assert.Equal(1, intSumCount);
         // Verify the reassignment exists
-        Assert.Contains("sum = sum + i;", result.GeneratedCode);
+        Assert.Contains("sum = checked(sum + i);", result.GeneratedCode);
     }
 
     [Fact]
@@ -434,7 +434,7 @@ public class ControlFlowTests
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
         Assert.Contains("var __calorForFrom = 0;", result.GeneratedCode);
-        Assert.Contains("var __calorForTo = n - 1;", result.GeneratedCode);
+        Assert.Contains("var __calorForTo = checked(n - 1);", result.GeneratedCode);
         Assert.Contains("var __calorForStep = 1;", result.GeneratedCode);
     }
 
@@ -488,7 +488,7 @@ public class ControlFlowTests
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message)));
         // Verify nested expressions are parsed correctly
-        Assert.Contains("a - 1 + (b - 2)", result.GeneratedCode);
+        Assert.Contains("checked(checked(a - 1) + (checked(b - 2)))", result.GeneratedCode);
     }
 
     [Fact]

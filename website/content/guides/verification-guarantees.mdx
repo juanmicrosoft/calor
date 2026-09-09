@@ -9,9 +9,29 @@ Calor verifies individual contract obligations under a positive, enumerated
 model of .NET behavior. It does not claim whole-program correctness, and the
 number of soundness gaps that have not yet been found is not knowable.
 
+## Select checks explicitly
+
+Type and effect checks run by default on the supplied Calor inputs. They do not
+analyze every external library or all raw C# bodies. Static bug-pattern analysis
+requires `--analyze`; Z3 contract verification requires `--verify`.
+
+Runtime contract checking is a separate choice:
+
+| Contract mode | Runtime behavior for supported lowering |
+|:--------------|:----------------------------------------|
+| `--contract-mode debug` (default) | Checks include detailed failure information |
+| `--contract-mode release` | Checks throw leaner exceptions |
+| `--contract-mode off` | No runtime contract checks |
+
+These compiler modes are not the .NET Debug/Release build configuration.
+Both `debug` and `release` modes can emit checks. Unsupported body shapes,
+disabled checks, and compilation errors must be reviewed separately from proof status.
+`--keep-proven-guards` disables proof-based removal; it does not enable checks
+when contract mode is `off` or repair unsupported lowering.
+
 ## The Seven Statuses
 
-| Status | What it says | Eligible for opt-in runtime postcondition guard removal? |
+| Status | What it says | Eligible for runtime postcondition guard removal with verification? |
 |:-------|:-------------|:---------------------------------------------------------|
 | `proven` | The obligation holds under the modeled semantics | Only when non-vacuous and assumption-free |
 | `refuted` | A violation exists | No; a counterexample is included when available |
@@ -25,12 +45,65 @@ Preconditions are never elided from satisfiability results. A vacuous proof is
 reported with a flag and also keeps its runtime check.
 
 Since 0.15, compiling with `--verify` removes a runtime guard by default —
-but only after a clean, non-vacuous, assumption-free proof. `assumed` and all
-inconclusive outcomes always keep their guards. Pass
-`--verify --keep-proven-guards` to keep every guard and use the verdicts as
+but only after a clean, non-vacuous, assumption-free proof. `assumed` and
+inconclusive outcomes do not authorize proof-based removal. This does not
+promise a guard when checking is disabled or lowering is unsupported. Pass
+`--verify --keep-proven-guards` to retain otherwise-emitted guards and use verdicts as
 diagnostics only (the 0.13/0.14 behavior). The flip is backed by the
 solver-vs-runtime differential suite: 0 mismatches over the pinned
-modeled-forms denominator, with elision coverage published at 40/65.
+modeled-forms denominator in that historical release, with elision coverage
+published at 40/65. That bounded result is not a proof of soundness for all programs.
+
+## Parameter mutation and numeric limits
+
+A postcondition observes parameter values at function exit, not a frozen entry
+snapshot. Entry preconditions cannot simply be reused after a parameter changes.
+The parameter-poststate fix rejects unmodeled mutations, including implicit
+getter/conversion paths that may mutate ref aliases, rather than claiming a
+proof. Read the returned status and retain runtime checks where supported.
+
+### Integer overflow policy
+
+Native Calor defaults to **TRAP**, using checked arithmetic. For example,
+`46340 * 46340` returns `2147395600`, but `46341 * 46341` throws
+`OverflowException`. Contract mode and overflow policy are separate:
+`--contract-mode off` disables contract checks, not this overflow exception.
+A postcondition describes normal returns, not a promise of exception-free execution.
+
+Converted C# modules explicitly record their source overflow policy.
+Ordinary unchecked C# uses the module attribute `overflow=unchecked`, preserving
+its wrapping behavior; it does not inherit native Calor's default.
+Explicit checked/unchecked contexts remain distinct. Unscoped raw C# from a
+globally checked compilation is rejected, not silently treated as unchecked.
+
+Verification follows the selected policy. A predicate proof that depends on an
+unestablished arithmetic-safety condition carries the named `checked-arithmetic`
+assumption and cannot authorize proof-based guard removal. Read the reported
+status and assumptions rather than treating `--verify` as a universal
+overflow-safety guarantee.
+
+Floating-point `NaN`, infinities, overflow, overloaded operators, and repeated
+property evaluation need their own semantics. Identities such as `x == x` or
+`x - x == 0` are not universal .NET laws. The untyped simplifier preserves
+unknown operands and their evaluations instead of assuming IEEE reflexivity,
+built-in operators, or purity. A supported literal fold is not a general
+symbolic proof. The September soundness audit tracks these boundaries
+in [parameter poststate](https://github.com/juanmicrosoft/calor/issues/1183) and
+[typed simplification](https://github.com/juanmicrosoft/calor/issues/1184).
+Their regression suites are bounded checks, not whole-program guarantees.
+
+## Runtime quantifier limits
+
+Runtime quantifiers retain the full predicate, including short-circuit guards
+and observable evaluations. Finite-domain lowering preserves the declared
+integer type and evaluation order only when the compiler can certify the
+required bounds and their stability. It does not move an unknown getter ahead
+of another condition to discover a range.
+
+When a requested runtime check cannot be lowered faithfully, compilation fails
+with `Calor0326` before proof-based guard removal. There is no silent static-only
+fallback, and even a `proven` result does not authorize unsupported runtime
+lowering. Disabling runtime contracts is a separate, explicit mode choice.
 
 ## What Changed in v0.12
 
@@ -74,10 +147,12 @@ runtime check on a false proof.
 
 A sound static proof and correct runtime-check placement are different
 problems. v0.12 fixed a quantified-contract lowering bug that had discarded
-part of an implication. Bodies with early, nested, or raw-C# returns remain a
-known stopgap: the emitter reports `Calor1001` and does not emit postcondition
-runtime checks for that body shape. It fails loudly rather than placing a check
-incorrectly.
+part of an implication. Current lowering routes structured returns, including
+early and nested returns, through a shared postcondition exit when checks are
+enabled. Opaque raw-C# bodies are rejected with `Calor1001`, because their returns
+cannot be identified structurally. Iterator postconditions are rejected with
+`Calor1004`; their semantics across `yield` are not defined. These diagnostics
+are not successful enforcement or proof.
 
 ## Type and Effect Defaults
 
@@ -92,6 +167,13 @@ error: the compiler reads the callback's own `§E{…}` and charges it to the
 caller. `Calor0418` is reserved for invoking something that is provably not a
 function at all.
 
+Contract proofs do not establish effect completeness. Indexed heap stores,
+including compound assignments, charge `mut`. Receiver and index evaluations
+and invoked property accessors contribute their effects; a simple property
+write does not charge a final getter that it never reads. The
+[indexed-assignment fix](https://github.com/juanmicrosoft/calor/issues/1185)
+covers these paths, not universally complete effect checking.
+
 `--no-enforce-effects` disables the gate. `--permissive-effects` assumes a call
 the compiler cannot look up does nothing, so `Calor0411` and `Calor0425` go
 unreported and `Calor0410` is demoted to a warning; it never waives
@@ -102,12 +184,12 @@ what it does and does not waive.
 
 ## Review Checklist
 
-1. Since 0.15, `--verify` drops eligible guards by default; add `--keep-proven-guards` when you want verdicts reported but every guard kept.
+1. With `--verify`, eligible postcondition guards may be removed; add `--keep-proven-guards` to retain otherwise-emitted guards.
 2. Treat only a non-vacuous, assumption-free `proven` as eligible for elision.
 3. Read every named assumption on `assumed` results.
 4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their
    remedies differ.
-5. Check for `Calor1001` before relying on postcondition runtime enforcement.
+5. Check for `Calor0326`, `Calor1001`, and `Calor1004` before relying on runtime enforcement.
 6. Record any effect or contract waiver in review.
 
 Use [calor verify](/docs/cli/verify/) for raw results and

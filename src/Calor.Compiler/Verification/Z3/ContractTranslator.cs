@@ -16,7 +16,9 @@ namespace Calor.Compiler.Verification.Z3;
 /// </para>
 /// <para>
 /// This translator uses Z3 bit-vectors instead of unbounded integers to correctly model
-/// fixed-width arithmetic with wrap-around overflow semantics (two's complement).
+/// fixed-width values. Checked arithmetic additionally requires the safety conditions
+/// returned by <see cref="GetCheckedArithmeticSafety"/>; a bit-vector identity alone
+/// does not establish that evaluating the executable expression cannot overflow.
 /// </para>
 /// <para>
 /// <b>Supported types:</b> i8, i16, i32, i64, u8, u16, u32, u64, bool, string, arrays
@@ -67,6 +69,19 @@ public sealed class ContractTranslator
     private readonly Context _ctx;
     private readonly Dictionary<string, (Expr Expr, string Type)> _variables = new();
     private readonly Stack<Dictionary<string, (Expr Expr, string Type)>> _scopeStack = new();
+    private readonly List<BoolExpr> _bindingConstraints = [];
+
+    internal IReadOnlyList<BoolExpr> BindingConstraints => _bindingConstraints;
+
+    internal ReferenceNode BindInt32Constant(IntLiteralNode value)
+    {
+        var ordinal = _bindingConstraints.Count;
+        string name;
+        do { name = $"__calor_bound_{ordinal++}"; } while (_variables.ContainsKey(name));
+        DeclareVariable(name, "i32");
+        _bindingConstraints.Add(_ctx.MkEq(_variables[name].Expr, TranslateIntLiteral(value)));
+        return new ReferenceNode(value.Span, name);
+    }
 
     /// <summary>
     /// Tracks metadata for bit-vector expressions (width and signedness).
@@ -807,7 +822,130 @@ public sealed class ContractTranslator
         if (condition == null || whenTrue == null || whenFalse == null)
             return null;
 
+        if (whenTrue is BitVecExpr trueInteger && whenFalse is BitVecExpr falseInteger)
+        {
+            var width = trueInteger.SortSize;
+            var signed = IsSigned(trueInteger);
+            if (width != falseInteger.SortSize || signed != IsSigned(falseInteger))
+                return Refuse("conditional integer branches with different executable types are not yet modeled");
+            return TrackBitVec((BitVecExpr)_ctx.MkITE(condition, trueInteger, falseInteger), width, signed);
+        }
         return _ctx.MkITE(condition, whenTrue, whenFalse);
+    }
+
+    /// <summary>
+    /// A sufficient condition for checked arithmetic to complete without overflow.
+    /// Lazy operands are guarded by their execution condition. Quantified bodies
+    /// require safety for every bound value, including for existential predicates:
+    /// that is conservative about early termination, never an elision of a throw.
+    /// </summary>
+    internal BoolExpr? GetCheckedArithmeticSafety(ExpressionNode node)
+    {
+        switch (node)
+        {
+            case BinaryOperationNode binary:
+            {
+                var leftSafety = GetCheckedArithmeticSafety(binary.Left);
+                var rightSafety = GetCheckedArithmeticSafety(binary.Right);
+                if (leftSafety == null || rightSafety == null)
+                    return null;
+                if (binary.Operator is BinaryOperator.And or BinaryOperator.Or)
+                {
+                    var left = TranslateBoolExpr(binary.Left);
+                    return left == null ? null : _ctx.MkAnd(leftSafety,
+                        _ctx.MkImplies(binary.Operator == BinaryOperator.And ? left : _ctx.MkNot(left), rightSafety));
+                }
+                var operandsSafe = _ctx.MkAnd(leftSafety, rightSafety);
+                if (binary.Operator is not (BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply))
+                    return operandsSafe;
+                var operands = GetDivModOperands(binary.Left, binary.Right);
+                if (operands == null)
+                    return null;
+                var (l, r, signed) = operands.Value;
+                var operationSafe = binary.Operator switch
+                {
+                    BinaryOperator.Add => _ctx.MkAnd(_ctx.MkBVAddNoOverflow(l, r, signed),
+                        signed ? _ctx.MkBVAddNoUnderflow(l, r) : _ctx.MkTrue()),
+                    BinaryOperator.Subtract => _ctx.MkAnd(
+                        signed ? _ctx.MkBVSubNoOverflow(l, r) : _ctx.MkTrue(),
+                        _ctx.MkBVSubNoUnderflow(l, r, signed)),
+                    _ => _ctx.MkAnd(_ctx.MkBVMulNoOverflow(l, r, signed),
+                        signed ? _ctx.MkBVMulNoUnderflow(l, r) : _ctx.MkTrue())
+                };
+                return _ctx.MkAnd(operandsSafe, operationSafe);
+            }
+            case UnaryOperationNode unary:
+            {
+                var operandSafety = GetCheckedArithmeticSafety(unary.Operand);
+                if (operandSafety == null || unary.Operator != UnaryOperator.Negate)
+                    return operandSafety;
+                if (Translate(unary.Operand) is not BitVecExpr operand)
+                    return null;
+                if (!IsSigned(operand))
+                    return operand.SortSize < 64 ? operandSafety : null;
+                var promoted = PromoteNarrowIntegral(operand);
+                return _ctx.MkAnd(operandSafety, _ctx.MkBVNegNoOverflow(promoted));
+            }
+            case ConditionalExpressionNode conditional:
+            {
+                var condition = TranslateBoolExpr(conditional.Condition);
+                var conditionSafety = GetCheckedArithmeticSafety(conditional.Condition);
+                var trueSafety = GetCheckedArithmeticSafety(conditional.WhenTrue);
+                var falseSafety = GetCheckedArithmeticSafety(conditional.WhenFalse);
+                return condition == null || conditionSafety == null || trueSafety == null || falseSafety == null
+                    ? null
+                    : _ctx.MkAnd(conditionSafety, (BoolExpr)_ctx.MkITE(condition, trueSafety, falseSafety));
+            }
+            case ImplicationExpressionNode implication:
+            {
+                var antecedent = TranslateBoolExpr(implication.Antecedent);
+                var antecedentSafety = GetCheckedArithmeticSafety(implication.Antecedent);
+                var consequentSafety = GetCheckedArithmeticSafety(implication.Consequent);
+                return antecedent == null || antecedentSafety == null || consequentSafety == null
+                    ? null
+                    : _ctx.MkAnd(antecedentSafety, _ctx.MkImplies(antecedent, consequentSafety));
+            }
+            case ForallExpressionNode forall:
+                return GetQuantifiedArithmeticSafety(forall.BoundVariables, forall.Body);
+            case ExistsExpressionNode exists:
+                return GetQuantifiedArithmeticSafety(exists.BoundVariables, exists.Body);
+            default:
+            {
+                var conditions = new List<BoolExpr>();
+                foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node).OfType<ExpressionNode>())
+                {
+                    var condition = GetCheckedArithmeticSafety(child);
+                    if (condition == null)
+                        return null;
+                    conditions.Add(condition);
+                }
+                return _ctx.MkAnd(conditions.ToArray());
+            }
+        }
+    }
+
+    private BoolExpr? GetQuantifiedArithmeticSafety(
+        IReadOnlyList<QuantifierVariableNode> variables, ExpressionNode body)
+    {
+        PushScope();
+        try
+        {
+            var bound = new List<Expr>();
+            foreach (var variable in variables)
+            {
+                var value = CreateVariableForType(variable.Name, variable.TypeName);
+                if (value == null)
+                    return null;
+                _variables[variable.Name] = (value, variable.TypeName);
+                bound.Add(value);
+            }
+            var safety = GetCheckedArithmeticSafety(body);
+            return safety == null ? null : _ctx.MkForall(bound.ToArray(), safety);
+        }
+        finally
+        {
+            PopScope();
+        }
     }
 
     /// <summary>

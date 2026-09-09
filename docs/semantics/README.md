@@ -43,13 +43,13 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 | **Scoping** | Lexical with explicit shadowing | No surprises from dynamic lookup |
 | **Integer Overflow** | TRAP by default | Safety-first; silent bugs are unacceptable |
 | **Type Conversions** | Explicit for narrowing | Prevents accidental data loss |
-| **Nullability** | `Option<T>` for optional values | No null pointer exceptions |
+| **Nullability** | `Option<T>` for optional values | Models absence; .NET/null interoperability still requires checks |
 | **Exceptions** | Typed, with semantic meaning | `ContractViolationException` carries context |
 
 ### Why This Matters for Agents
 
 1. **Trainable Rules**: Agents can be trained on precise semantics, not approximations.
-2. **Testable Behavior**: Every semantic decision has corresponding tests.
+2. **Testable Behavior**: Conformance tests exercise defined behavior; they do not establish complete coverage of every feature interaction.
 3. **Version Stability**: Semantics are versioned; agents know which rules apply.
 4. **Trust**: Code behaves the same regardless of backend implementation details.
 
@@ -59,7 +59,7 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 
 ### 1. Precise Definitions
 
-Every construct has a formal definition:
+Core constructs have specified rules:
 
 - **Evaluation order**: Section 2 of `core.md`
 - **Scoping and shadowing**: Section 3 of `core.md`
@@ -86,29 +86,36 @@ Agents will be trained and prompted against specific rules. The versioning spec 
 
 ---
 
-## How It Works: The CNF Pipeline
+## How It Works: The Production Pipeline
 
-Calor uses an intermediate representation called **Calor Normal Form (CNF)** to enforce semantics:
+The production compiler analyzes the AST and emits C# directly. In
+`src/Calor.Compiler/Program.cs`, the emission call is `emitter.Emit(ast)` on
+`CSharpEmitter`.
 
 ```
-Source → Parser → AST → TypeChecker → Binder → CNF Lowering → CNF → C# Emitter → C#
-                                                    ↑
-                                          Semantics enforced here
+Source → Lexer/Parser → AST → Binding, type/effect/contract analyses
+                             → CSharpEmitter.Emit(ast) → C# → Roslyn validation
 ```
 
-CNF makes semantics explicit:
+**Calor Normal Form (CNF)** is separate, unintegrated lowering work. It is not
+the default compiler's semantics-enforcement path. Its intended design makes
+semantics explicit through:
 - **Explicit temporaries**: Evaluation order is baked in
 - **Explicit control flow**: No implicit fall-through
 - **Explicit types**: No implicit conversions
 - **Explicit labels/branches**: Short-circuit lowered to control flow
 
-See `normal-form.md` for the full CNF specification.
+See `normal-form.md` for that design. Passing its tests does not demonstrate
+production emitter correctness, and an unimplemented CNF case is not by itself
+a reachable production compiler defect.
 
 ---
 
 ## Test-Backed Semantics
 
-Every semantic decision is backed by tests in `tests/Calor.Semantics.Tests/`:
+Representative conformance tests live in `tests/Calor.Semantics.Tests/`.
+Production-path regressions also live in the compiler, enforcement, conversion,
+and verification suites. This table is not an exhaustive coverage inventory:
 
 | Semantic | Test | What It Verifies |
 |----------|------|------------------|
@@ -130,9 +137,9 @@ Every semantic decision is backed by tests in `tests/Calor.Semantics.Tests/`:
 
 | Document | Purpose |
 |----------|---------|
-| `inventory.md` | Catalog of all 134 AST constructs |
+| `inventory.md` | Complete node catalog generated from `eng/ast-schema.json`; not a per-stage support guarantee |
 | `core.md` | **Core semantics specification** (evaluation, scoping, numerics, contracts) |
-| `normal-form.md` | CNF intermediate representation specification |
+| `normal-form.md` | Unintegrated CNF design, distinct from the production path |
 | `dotnet-backend.md` | How .NET backend implements Calor semantics |
 | `versioning.md` | Semantic versioning for agent training stability |
 
@@ -151,6 +158,9 @@ If you're building agents that generate Calor code:
 
 ## Current Version
 
-**Semantics Version: 1.0.0**
+**Semantics Version: 2.0.0**
 
-This is the initial formal semantics specification. See `versioning.md` for version history and upgrade guidance.
+The language version comes from `SemanticsVersion.VersionString`, independently
+of the compiler package version. `calor self-check docs` checks current
+semantics-version claims, normative examples, and the generated AST inventory.
+See `versioning.md` for version history and upgrade guidance.

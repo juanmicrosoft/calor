@@ -1,0 +1,65 @@
+name: Website regressions
+
+on:
+  pull_request:
+    branches: [main, release/v0.19]
+    paths: ['website/**', 'src/**', 'scripts/**', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
+  push:
+    branches: [release/v0.19]
+    paths: ['website/**', 'src/**', 'scripts/**', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  onboarding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: src/Calor.Compiler/scripts/download-z3.sh
+      - run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj --nologo
+      - run: npm run test:onboarding
+        working-directory: website
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        base-path: ['', '/calor']
+    env:
+      NEXT_PUBLIC_BASE_PATH: ${{ matrix.base-path }}
+      NEXT_PUBLIC_SITE_ORIGIN: ${{ matrix.base-path == '/calor' && 'https://juanmicrosoft.github.io' || 'https://calor.dev' }}
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - name: Exclude unused system Chrome APT feed
+        # Playwright downloads its own pinned Chromium. This unrelated feed can
+        # block Ubuntu dependency installation with an inconsistent package index.
+        run: |
+          for source in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if test -f "$source" && grep -Eq 'https?://dl\.google\.com/linux/chrome(-stable)?/deb' "$source"; then
+              echo "Excluding unused Chrome feed: $source"
+              sudo mv "$source" "$RUNNER_TEMP/$(basename "$source")"
+            fi
+          done
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-traces-${{ strategy.job-index }}
+          path: website/test-results/

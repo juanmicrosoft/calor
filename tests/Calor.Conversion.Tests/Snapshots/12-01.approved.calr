@@ -1,4 +1,4 @@
-§M{m001:Test_12_01}
+§M{m001:Test_12_01:overflow=unchecked}
   §CL{c001:Formatter:pub}
     §MT{m002:Format:priv} (i32:value) -> str
       §R (str value)

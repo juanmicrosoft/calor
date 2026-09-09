@@ -662,9 +662,9 @@ internal static class DifferentialGate
                     "uses signedness at -1 plus an i32-overflow boundary witness (2 * Int32.MaxValue) rather " +
                     "than claiming coverage of Int64.MinValue/MaxValue literals.",
                 ["scalar-type:u32"] =
-                    "The u32 row combines non-negativity with the wrap boundary of " +
-                    "3 * Int32.MaxValue; this distinguishes 32-bit unsigned arithmetic from u64 without " +
-                    "requiring an out-of-model UInt32.MaxValue literal.",
+                    "The u32 row combines non-negativity with the C# shift-count mask: " +
+                    "for witness 3, shifting by 32 is the identity for u32 and zero for u64. " +
+                    "This distinguishes the widths without requiring integer overflow.",
                 ["scalar-type:u64"] =
                     "The u64 row combines non-negativity with the non-wrapping result of " +
                     "3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage.",

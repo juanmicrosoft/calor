@@ -1,4 +1,4 @@
-§M{m001:Test_02_04}
+§M{m001:Test_02_04:overflow=unchecked}
   §EN{e001:HttpStatus:pub}
     Ok = 200
     NotFound = 404

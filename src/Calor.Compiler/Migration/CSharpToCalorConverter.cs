@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Migration;
@@ -233,6 +234,28 @@ public sealed class ConversionOptions
     /// Project migration disables this per file and validates all generated files together.
     /// </summary>
     public bool ValidateRoundTripCSharp { get; set; } = true;
+
+    /// <summary>
+    /// Where the project-local effect manifest (<c>.calor-effects.json</c>) lives, if
+    /// there is one. #1173: the <c>§E</c> rows this conversion writes are derived from
+    /// effect resolution, and the compile that later CHECKS them resolves with the
+    /// project and solution manifests loaded (<c>Program.Compile</c> passes its
+    /// <c>ProjectDirectory</c> straight into the effect pass). If a project manifest
+    /// widens a member the embedded BCL manifests describe more narrowly, a synthesis
+    /// that cannot see it writes a row missing a NAMED effect — and since the
+    /// 2026-09-04 adjudication a named forbidden effect is an error even under
+    /// <c>--permissive-effects</c>. Setting this makes the two sides resolve alike.
+    ///
+    /// <para>Null means "no project manifest", which is what every caller that does not
+    /// set it gets: embedded manifests only, exactly as before.</para>
+    /// </summary>
+    public string? ProjectDirectory { get; set; }
+
+    /// <summary>
+    /// Where solution-level manifests (<c>.calor-effects/</c>) live, if anywhere. Same
+    /// reason as <see cref="ProjectDirectory"/>.
+    /// </summary>
+    public string? SolutionDirectory { get; set; }
 }
 
 /// <summary>
@@ -503,6 +526,15 @@ public sealed class CSharpToCalorConverter
                 };
             }
 
+            // Step 2b (#1173): derive every §E row from the Calor that will ship,
+            // using the compiler's own effect inference. Before this, the rows came
+            // from a second walker maintained beside the emitter, so the converter
+            // could emit a §NEW the walker never visited and write "pure" over it —
+            // and the next compile of that file reported Calor0410 against code the
+            // converter itself had written. The inference that CHECKS the row now
+            // also WRITES it, so the two cannot disagree.
+            SynthesizeEffectRows(calorAst, context, sourceFile, cancellationToken);
+
             // Step 3: Emit Calor source code
             var emitter = new CalorEmitter(context);
             var calorSource = emitter.Emit(calorAst);
@@ -556,6 +588,15 @@ public sealed class CSharpToCalorConverter
                 if (rewrapped != null)
                 {
                     calorAst = rewrapped;
+                    // The rewrap replaced member bodies with their original C#
+                    // (§CSHARP), whose effects are ASSUMED rather than inferred, so
+                    // re-synthesise over the tree that actually ships. Note what this
+                    // does and does not do: synthesis only ever WIDENS, so a row that
+                    // covered the native body and is now broader than the §CSHARP one
+                    // survives. Over-declaration is not diagnosed (nothing reports
+                    // Calor0401), so the rewrapped output still compiles; what the
+                    // second pass buys is coverage of anything the rewrap ADDED.
+                    SynthesizeEffectRows(calorAst, context, sourceFile, cancellationToken);
                     calorSource = new CalorEmitter(context).Emit(calorAst);
                 }
 
@@ -744,6 +785,202 @@ public sealed class CSharpToCalorConverter
     /// exercise the fallback path deterministically. Null in production.
     /// </summary>
     internal Func<string, bool>? ParseValidatorOverride { get; set; }
+
+    /// <summary>
+    /// Resolvers the row synthesis reuses. Loading the embedded BCL manifests is the
+    /// expensive part and does not depend on the file being converted, so a resolver
+    /// is worth keeping — but NOT worth sharing across threads:
+    /// <see cref="EffectResolver"/> memoises into plain dictionaries, and conversion
+    /// runs in parallel (<c>ProjectMigrator</c> fans out under a semaphore, the
+    /// round-trip harness under <c>Parallel.ForEachAsync</c>). Renting gives one
+    /// conversion exclusive use of one resolver, so the pool grows to the degree of
+    /// parallelism actually used and no further.
+    ///
+    /// <para>The alternative — one static resolver, as the deleted
+    /// <c>RoslynSyntaxVisitor._migrationResolver</c> was — races on those
+    /// dictionaries. That race predates this change, but synthesis resolves far more
+    /// call targets per file than the old walker did, so it is not a risk to inherit
+    /// quietly.</para>
+    /// </summary>
+    /// <para>Keyed by manifest SCOPE, because <see cref="EffectResolver.Initialize"/> is
+    /// idempotent per instance: a resolver initialized for one project's manifests would
+    /// silently ignore a second project's. Callers that set neither directory share one
+    /// pool of embedded-manifest resolvers, which is every caller that has no project.</para>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string, System.Collections.Concurrent.ConcurrentBag<EffectResolver>> SynthesisResolvers = new(StringComparer.Ordinal);
+
+    private static string ManifestScopeKey(string? projectDirectory, string? solutionDirectory)
+        => (projectDirectory ?? "") + "\u0000" + (solutionDirectory ?? "");
+
+    private static EffectResolver RentSynthesisResolver(string? projectDirectory, string? solutionDirectory)
+    {
+        var pool = SynthesisResolvers.GetOrAdd(
+            ManifestScopeKey(projectDirectory, solutionDirectory),
+            _ => new System.Collections.Concurrent.ConcurrentBag<EffectResolver>());
+        if (pool.TryTake(out var pooled))
+            return pooled;
+        var resolver = new EffectResolver();
+        resolver.Initialize(projectDirectory, solutionDirectory);
+        return resolver;
+    }
+
+    private static void ReturnSynthesisResolver(
+        EffectResolver resolver,
+        string? projectDirectory,
+        string? solutionDirectory)
+        => SynthesisResolvers
+            .GetOrAdd(
+                ManifestScopeKey(projectDirectory, solutionDirectory),
+                _ => new System.Collections.Concurrent.ConcurrentBag<EffectResolver>())
+            .Add(resolver);
+
+    /// <summary>
+    /// #1173 — writes each declaration's <c>§E</c> row from the compiler's own
+    /// effect inference, over the Calor that will actually ship.
+    ///
+    /// <para>The rows used to come from a second walker maintained beside the
+    /// emitter (<c>RoslynSyntaxVisitor.InferEffectsFromBody</c>), and the two
+    /// drifted: the walker never visited a <c>foreach</c>'s collection, a
+    /// <c>§USE</c> resource or a lambda body, so the converter wrote "pure" over
+    /// bodies that allocate, and the next compile of that file reported Calor0410
+    /// against code the converter itself had written.</para>
+    ///
+    /// <para>Inference runs on the module RE-PARSED from emitted text, not on the
+    /// tree in hand, and that is the whole point. The emitter is not a printer: it
+    /// desugars a method chain into <c>§B</c> temporaries, for one, so the tree
+    /// that ships is not the tree the converter built, and a row derived from the
+    /// latter is a row about code nobody will compile. Deriving it from the emitted
+    /// text closes the loop — the rows are computed from the same characters the
+    /// next compile will read.</para>
+    ///
+    /// <para>The probe emit goes to a scratch context so the loss ledger sees
+    /// exactly one emit, the real one in step 3. Rows travel back onto the tree in
+    /// hand by declaration id, which survives the round trip, and step 3 then
+    /// emits once with them.</para>
+    ///
+    /// <para>Resolution must see what the later compile will see, or the two agree
+    /// about the body and disagree about the manifests — see
+    /// <see cref="ConversionOptions.ProjectDirectory"/>, which callers that have a
+    /// project set so the rented resolver loads the same manifests.</para>
+    ///
+    /// <para>Best-effort by design: a row that is missing or too narrow is a
+    /// diagnostic on a later compile, never a reason to throw away a conversion
+    /// that otherwise succeeded. Synthesis only ever WIDENS a row, so a run that
+    /// stops early — cap reached, unparseable probe, or an exception — leaves rows
+    /// that are sound but possibly incomplete, and says so in the context.</para>
+    /// </summary>
+    private void SynthesizeEffectRows(
+        ModuleNode? module,
+        ConversionContext context,
+        string? sourceFile,
+        CancellationToken cancellationToken)
+    {
+        if (module == null)
+            return;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var resolver = RentSynthesisResolver(_options.ProjectDirectory, _options.SolutionDirectory);
+        try
+        {
+            var probe = new CalorEmitter(CreateContext(sourceFile)).Emit(module);
+            var reparsed = TryParseModule(probe);
+            if (reparsed == null)
+            {
+                // The emitted text does not parse. Step 3b rescues that case by
+                // rewrapping members as §CSHARP and calls back here on the result;
+                // there is nothing to infer from in the meantime.
+                return;
+            }
+
+            var converged = EffectEnforcementPass.SynthesizeDeclaredRows(reparsed, resolver);
+            CopyEffectRows(reparsed, module);
+
+            if (!converged)
+            {
+                context.AddWarning(
+                    "Effect-row synthesis did not converge within "
+                    + $"{EffectEnforcementPass.DefaultRowSynthesisRounds} rounds; the emitted §E rows "
+                    + "cover the bodies they were computed from but may still be narrower than the "
+                    + "effects those bodies perform.",
+                    feature: "effect-row-synthesis");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            context.AddWarning(
+                $"Effect-row synthesis failed ({ex.GetType().Name}: {ex.Message}); the emitted §E rows "
+                + "may be narrower than the effects the converted bodies perform.",
+                feature: "effect-row-synthesis");
+        }
+        finally
+        {
+            ReturnSynthesisResolver(resolver, _options.ProjectDirectory, _options.SolutionDirectory);
+        }
+    }
+
+    /// <summary>
+    /// Parses emitted Calor back into a module, or null when it does not parse
+    /// cleanly. Deliberately independent of <see cref="ParseValidatorOverride"/>:
+    /// that hook exists to let tests force the rescue path, and row synthesis must
+    /// read the real tree or nothing.
+    /// </summary>
+    private static ModuleNode? TryParseModule(string calorSource)
+    {
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Parsing.Lexer(calorSource, diagnostics).TokenizeAllForParser();
+        if (diagnostics.HasErrors)
+            return null;
+        var module = new Parsing.Parser(tokens, diagnostics).Parse();
+        return diagnostics.HasErrors ? null : module;
+    }
+
+    /// <summary>
+    /// Copies synthesised <c>§E</c> rows from the re-parsed module onto the tree
+    /// the converter holds, matching declarations by the id they carry through the
+    /// round trip (<c>f001</c>, <c>Class.m002</c>, <c>IFace.mt003</c>). A
+    /// declaration the round trip did not preserve simply keeps the row it has.
+    /// </summary>
+    private static void CopyEffectRows(ModuleNode source, ModuleNode target)
+    {
+        var rows = new Dictionary<string, EffectsNode?>(StringComparer.Ordinal);
+        foreach (var (key, effects, _) in EnumerateRowSites(source))
+            rows[key] = effects;
+
+        foreach (var (key, _, assign) in EnumerateRowSites(target))
+        {
+            if (rows.TryGetValue(key, out var synthesized) && synthesized != null)
+                assign(synthesized);
+        }
+    }
+
+    /// <summary>
+    /// Every declaration in a module that can carry a <c>§E</c> row, as
+    /// (key, current row, setter). Uses the same enumerators the effect pass keys
+    /// its facts with, so the two cannot disagree about what a declaration is
+    /// called.
+    /// </summary>
+    private static IEnumerable<(string Key, EffectsNode? Effects, Action<EffectsNode> Assign)>
+        EnumerateRowSites(ModuleNode module)
+    {
+        foreach (var function in module.Functions)
+            yield return ($"F:{function.Id}", function.Effects, row => function.Effects = row);
+
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
+        {
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
+                yield return ($"M:{cls.Name}.{method.Id}", method.Effects, row => method.Effects = row);
+        }
+
+        foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))
+        {
+            foreach (var signature in iface.Methods)
+                yield return ($"S:{iface.Name}.{signature.Id}", signature.Effects, row => signature.Effects = row);
+        }
+    }
 
     /// <summary>
     /// #836 M2: counts raw-C# markers (§CSHARP{, §CS{, §RAW) in the emitted

@@ -1,4 +1,4 @@
-§M{m001:Fixture}
+§M{m001:Fixture:overflow=unchecked}
   §PP{FEATURE}
     §CL{c001:ConditionalClass:pub}
       §MT{m002:Value:pub:stat} () -> i32
@@ -47,12 +47,6 @@
 
   §CL{c016:ConditionalHarness:pub:stat}
     §MT{m017:Get:pub:stat} () -> i32
+      §E{alloc}
       §B{ConditionalDelegate:d} §LAM{lam018:value:i32} (+ value 1) §/LAM{lam018}
-      §B{~_hoist000} §NEW{ConditionalRecord} §A 3 §/NEW
-      §B{~_hoist001} §C{ConditionalClass.Value} §/C
-      §B{~_hoist002} §C{d} §A 4 §/C
-      §B{~_hoist003} §C{ConditionalPartial.PartialValue} §/C
-      §B{~_hoist004} §C{ConditionalPartial.Shared} §/C
-      §R (+ (+ (+ (+ _hoist001 _hoist000.Value) _hoist002) _hoist003) _hoist004)
-
-
+      §R (+ (+ (+ (+ §C{ConditionalClass.Value} §/C §NEW{ConditionalRecord} §A 3 §/NEW.Value) §C{d} §A 4 §/C) §C{ConditionalPartial.PartialValue} §/C) §C{ConditionalPartial.Shared} §/C)

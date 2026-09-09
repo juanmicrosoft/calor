@@ -13,7 +13,7 @@ Calor provides loops and conditionals with explicit structure.
 
 ### For Loop Syntax
 
-```
+```calor
 §L{id:var:from:to:step}
   // body
 ```
@@ -29,38 +29,38 @@ Calor provides loops and conditionals with explicit structure.
 ### Examples
 
 **Count 1 to 10:**
-```
+```calor
 §L{for1:i:1:10:1}
   §P i
 ```
 
 **Count down:**
-```
+```calor
 §L{for1:i:10:1:-1}
   §P i
 ```
 
 **Count by 2s:**
-```
+```calor
 §L{for1:i:0:100:2}
   §P i
 ```
 
 **Using variable bounds:**
-```
+```calor
 §L{for1:i:1:n:1}
   §P i
 ```
 
 **Using expressions:**
-```
+```calor
 §L{for1:i:0:(- n 1):1}
   §P i
 ```
 
 ### While Loop Syntax
 
-```
+```calor
 §WH{id} condition
   // body
 ```
@@ -73,7 +73,7 @@ Calor provides loops and conditionals with explicit structure.
 ### While Loop Examples
 
 **Simple countdown:**
-```
+```calor
 §B{i} 10
 §WH{while1} (> i 0)
   §P i
@@ -81,7 +81,7 @@ Calor provides loops and conditionals with explicit structure.
 ```
 
 **Read until done:**
-```
+```calor
 §B{running} true
 §WH{while1} running
   §B{input} §C{Console.ReadLine} §/C
@@ -91,7 +91,7 @@ Calor provides loops and conditionals with explicit structure.
 
 ### Do-While Loop Syntax
 
-```
+```calor
 §DO{id}
   // body (executes at least once)
 ```
@@ -106,7 +106,7 @@ The condition is placed at the end to match the semantics: the body always execu
 ### Do-While Loop Examples
 
 **Execute at least once:**
-```
+```calor
 §B{i} 0
 §DO{do1}
   §P i
@@ -114,7 +114,7 @@ The condition is placed at the end to match the semantics: the body always execu
 ```
 
 **Menu loop (always show menu first):**
-```
+```calor
 §B{choice} 0
 §DO{do1}
   §P "1. Option A"
@@ -124,7 +124,7 @@ The condition is placed at the end to match the semantics: the body always execu
 ```
 
 **Retry until success:**
-```
+```calor
 §B{success} false
 §DO{do1}
   §B{success} §C{TryOperation} §/C
@@ -138,7 +138,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 
 ### Syntax
 
-```
+```calor
 §EACHKV{id:keyVar:valueVar} dictName
   // body uses keyVar and valueVar
 ```
@@ -153,7 +153,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 ### Examples
 
 **Print all entries:**
-```
+```calor
 §DICT{ages:str:i32}
   §KV "alice" 30
   §KV "bob" 25
@@ -164,14 +164,14 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 ```
 
 **Sum all values:**
-```
+```calor
 §B{total} 0
 §EACHKV{e1:k:v} scores
   §ASSIGN total (+ total v)
 ```
 
 **Conditional processing:**
-```
+```calor
 §EACHKV{e1:key:val} data
   §IF{if1} (> val 100)
     §P key
@@ -193,7 +193,7 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
 
 For simple single-action branches:
 
-```
+```calor
 §IF{id} condition → action
 §EI condition → action
 §EL → action
@@ -203,7 +203,7 @@ For simple single-action branches:
 
 For complex branches:
 
-```
+```calor
 §IF{id} condition
   // multiple statements
 §EI condition
@@ -229,13 +229,13 @@ For complex branches:
 
 ### Simple If
 
-```
+```calor
 §IF{if1} (> x 0) → §P "positive"
 ```
 
 ### If-Else
 
-```
+```calor
 §IF{if1} (> x 0)
   §P "positive"
 §EL
@@ -244,7 +244,7 @@ For complex branches:
 
 ### If-ElseIf-Else
 
-```
+```calor
 §IF{if1} (> x 0)
   §P "positive"
 §EI (< x 0)
@@ -255,7 +255,7 @@ For complex branches:
 
 ### Single Line with Multiple Branches
 
-```
+```calor
 §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
 §EI (== (% i 3) 0) → §P "Fizz"
 §EI (== (% i 5) 0) → §P "Buzz"
@@ -264,7 +264,7 @@ For complex branches:
 
 ### Nested Conditionals
 
-```
+```calor
 §IF{if1} (> x 0)
   §IF{if2} (< x 100)
     §P "between 0 and 100"
@@ -276,7 +276,7 @@ For complex branches:
 
 ## FizzBuzz Complete Example
 
-```
+```calor
 §M{m001:FizzBuzz}
   §F{f001:Main:pub}
     §O{void}
@@ -292,7 +292,7 @@ For complex branches:
 
 ## Loop with Conditional
 
-```
+```calor
 §M{m001:Example}
   §F{f001:PrintEvens:pub}
     §I{i32:n}
@@ -310,7 +310,7 @@ For complex branches:
 
 Use conditionals with return for early exit:
 
-```
+```calor
 §F{f001:Factorial:pub}
   §I{i32:n}
   §O{i32}
@@ -327,7 +327,7 @@ Pattern matching provides concise multi-way branching with C# switch expression 
 
 ### Switch Expression Syntax
 
-```
+```calor
 §W{id} expression
   §K pattern1 → result1
   §K pattern2 → result2
@@ -348,7 +348,7 @@ Pattern matching provides concise multi-way branching with C# switch expression 
 
 Match exact values:
 
-```
+```calor
 §B{day} §W{sw1} dayNum
   §K 0 → "Sunday"
   §K 1 → "Monday"
@@ -368,7 +368,7 @@ Match value ranges using relational operators:
 | `§PREL{lt} value` | Less than | `< value` |
 
 **Example - Grade calculation:**
-```
+```calor
 §B{grade} §W{sw1} score
   §K §PREL{gte} 90 → "A"
   §K §PREL{gte} 80 → "B"
@@ -381,7 +381,7 @@ Match value ranges using relational operators:
 
 Capture the matched value and add conditions:
 
-```
+```calor
 §B{desc} §W{sw1} value
   §K §VAR{n} §WHEN (> n 100) → "large positive"
   §K §VAR{n} §WHEN (> n 0) → "small positive"
@@ -399,7 +399,7 @@ Capture the matched value and add conditions:
 
 Match Option types:
 
-```
+```calor
 §R §W{sw1} maybeValue
   §K §SM §VAR{v} → v        // Some(v) - extract value
   §K §NN → 0                 // None - default
@@ -409,7 +409,7 @@ Match Option types:
 
 Match Result types:
 
-```
+```calor
 §R §W{sw1} result
   §K §OK §VAR{v} → (+ "Success: " v)
   §K §ERR §VAR{e} → (+ "Error: " e)
@@ -419,7 +419,7 @@ Match Result types:
 
 For cases with multiple statements, use block syntax:
 
-```
+```calor
 §W{sw1} x
   §K 1 → "one"              // Arrow syntax (single expression)
   §K 2
@@ -432,7 +432,7 @@ The next case dedents to the `§K` column; no case closer is written.
 
 ### Complete Example
 
-```
+```calor
 §M{m001:HttpStatus}
   §F{f001:GetStatusMessage:pub}
     §I{i32:code}

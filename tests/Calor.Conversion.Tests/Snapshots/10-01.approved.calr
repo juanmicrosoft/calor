@@ -1,4 +1,4 @@
-§M{m001:Test_10_01}
+§M{m001:Test_10_01:overflow=unchecked}
   §CL{c001:SizeTest:pub:stat}
     §MT{m002:GetSizeOfInt:pub:stat} () -> i32
       §R §SIZEOF{i32}

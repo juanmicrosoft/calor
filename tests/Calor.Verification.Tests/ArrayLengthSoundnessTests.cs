@@ -186,7 +186,8 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -228,7 +229,8 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -270,7 +272,8 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -1963,7 +1966,8 @@ public class ArrayLengthSoundnessTests
             postcondition);
 
         // Should be DISPROVEN because len(arr) could be UINT32_MAX
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================
@@ -2023,7 +2027,8 @@ public class ArrayLengthSoundnessTests
             postcondition);
 
         // Should be DISPROVEN due to INT32_MIN edge case
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]

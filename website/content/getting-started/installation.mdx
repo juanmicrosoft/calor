@@ -7,6 +7,16 @@ order: 1
 
 This guide covers installing the Calor compiler and setting up your development environment.
 
+## Before you start
+
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), not just the runtime.
+Check `dotnet --version` before the commands below.
+
+- [Try your first program](/docs/getting-started/hello-world/) — a complete new-directory path, without an AI subscription.
+- [Adopt Calor in an existing project](/docs/guides/adoption-playbook/) — preserve your application and its entry point.
+- [Connect an optional agent](#ai-agent-integration) — choose a provider after project setup.
+- [Contribute to the compiler](/docs/contributing/) — source builds and contributor tests are a separate path.
+
 ---
 
 ## Global Tool Install
@@ -29,10 +39,9 @@ To update to the latest version:
 dotnet tool update -g calor
 ```
 
-> **0.12 release note:** v0.12.0 was tagged but its packages did not publish.
-> Install or update to v0.12.1 to get the v0.12.0 language, compiler, and
-> verifier feature set. v0.12.1 contains packaging fixes rather than language
-> changes.
+The site header identifies the compiler release these docs describe. Historical
+packaging notes remain in the [changelog](/docs/changelog/); they are not instructions
+to install an older patch.
 
 ---
 

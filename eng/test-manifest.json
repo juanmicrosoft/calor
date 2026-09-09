@@ -5,8 +5,9 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 8030,
-      "expectedSkipped": 4
+      "expectedTotal": 8546,
+      "expectedSkipped": 3,
+      "note": "2026-09-08 (#1173): 8030 -> 8041, +11 from Issue1173ConverterEffectRowTests — the converter now derives its \u00a7E rows from the compiler's own effect inference over the emitted text (5 under-declared constructs as theory rows, plus chain desugaring, interface/override variance repair, the pure-body case, row round-trip, widen-never-narrow, codegen neutrality, and parallel-vs-serial conversion). #1197: 8048 -> 8052, four production-path native arithmetic, operand-order, and conditional-laziness mutation regressions. #1184: 8052 -> 8085, 32 typed contract/runtime interaction cases plus an expression-wrapper traversal architecture regression."
     },
     {
       "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj",
@@ -19,7 +20,7 @@
       "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 670,
+      "expectedTotal": 684,
       "expectedSkipped": 1,
       "corpusDependent": true,
       "expectedSkippedWithSubmodules": 0,
@@ -85,14 +86,15 @@
       "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 123,
-      "expectedSkipped": 0
+      "expectedTotal": 124,
+      "expectedSkipped": 0,
+      "note": "2026-09-08: 123 -> 124. PermissiveEffectsTests' single \"Calor0410 is a warning\" test became two, one per half of the 2026-09-04 adjudication (#1174) — a NAMED Calor0410 is still an error under the property, an Unknown-charged one is still demoted. The pair is what stops an \"always Strict\" or \"always Permissive\" mutation passing the file."
     },
     {
       "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 395,
+      "expectedTotal": 406,
       "expectedSkipped": 0
     }
   ],
@@ -153,6 +155,11 @@
     },
     {
       "reason": "no committed .calr found under the repository root — partial checkout",
+      "count": 1
+    },
+    {
+      "_comment": "#1159 LedgerCommitStampTests: reachability of a ledger's MeasuredCommit cannot be decided without history. The `test` job checks out fetch-depth:0 so both run there for real; the sharded `tests` matrix stays shallow, where they skip rather than pass vacuously.",
+      "reason": "shallow clone: history is not present, so reachability cannot be decided here",
       "count": 1
     }
   ],

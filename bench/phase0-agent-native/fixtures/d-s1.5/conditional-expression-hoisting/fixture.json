@@ -1,0 +1,13 @@
+{
+  "featureKey": "conditional-expression-hoisting",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 329,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 329,
+  "convertedExpectedDefinedInt": 329,
+  "definedSymbols": []
+}

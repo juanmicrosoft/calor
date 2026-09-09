@@ -171,7 +171,11 @@ public class Calor0425CorpusLedgerTests
         + "design-doc §6.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of "
         + "sites 4/5 and the three verdicts an INVOCATION of a function-typed value can draw — "
         + "row-less declaration, undetermined source (a BCL-returned or row-less-returned value), "
-        + "and an Assumed row; §13.4's unresolved-receiver cause is Calor0411's, not this ledger's";
+        + "and an Assumed row; §13.4's unresolved-receiver cause is Calor0411's, not this ledger's. "
+        + "#1195 moves seven LanguageManagerTests.cs query calls and two ValidatorDescriptor.cs "
+        + "selector calls behind explicit interop boundaries to preserve deferred semantics. "
+        + "These nine fewer Calor0411 sites are opaque, not newly proven pure; the enforced-module "
+        + "denominator and Calor0425 counts are unchanged";
 
     private static readonly string[] Subjects = ["MediatR", "serilog", "FluentValidation"];
 
@@ -1534,10 +1538,12 @@ public class Calor0425CorpusLedgerTests
         var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
         Assert.True(enforcedNow >= EnforcedAfterR2,
             $"ModulesEnforced fell to {enforcedNow}, below the {EnforcedAfterR2} R2 left it at.");
-        const int EnforcedAfterR3AndRound4 = 324;
-        Assert.True(enforcedNow == EnforcedAfterR3AndRound4,
-            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterR3AndRound4} recorded for the "
-            + "R3 + round-4 commit. This is an EXACT pin: a move — in either direction — regenerates "
+        // #1191 later exposes PropertyToken and StreetNumberComparer to effects.
+        // This does not change any historical R2/R3 measurement or verdict.
+        const int EnforcedAfterConditionalPreservation = 326;
+        Assert.True(enforcedNow == EnforcedAfterConditionalPreservation,
+            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterConditionalPreservation} recorded for "
+            + "#1191. This is an EXACT pin: a move — in either direction — regenerates "
             + "the ledger IN THIS PR with the change named, and updates §3.1's outcome record. It "
             + "does not reopen PP-R1 leg 1, which is closed as a MISS on R2's own 15.");
     }

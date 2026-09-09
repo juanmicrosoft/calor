@@ -21,7 +21,7 @@ namespace Contracts
         {
             if (!(x >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: x >= 0", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 159, length: 11, sourceFile: null, line: 7, column: 5, condition: "x >= 0");
             int __calorPostconditionResult0;
-            __calorPostconditionResult0 = x * x;
+            __calorPostconditionResult0 = checked(x * x);
             goto __calorPostconditionExit0;
             __calorPostconditionExit0:
             if (!(__calorPostconditionResult0 >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 >= 0", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 175, length: 16, sourceFile: null, line: 8, column: 5, condition: "__calorPostconditionResult0 >= 0");

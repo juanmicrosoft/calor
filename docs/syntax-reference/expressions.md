@@ -67,6 +67,19 @@ comparisons are parenthesized when required.
 
 Calor uses Lisp-style prefix notation for all operations. This eliminates operator precedence ambiguity.
 
+## Expression-valued allocation sizes
+
+Array and stack-allocation dimensions accept quoted embedded expressions:
+
+```calor
+§ARR{a:i32:"(+ n 1)"}
+§SALLOC{i32:"§C{Size} §/C"}
+```
+
+The quoted attribute is parsed as an expression, not a string value. Its
+evaluation remains at the allocation site, including inside a conditional
+operand; pretty-printing must not run it ahead of an earlier operand.
+
 ---
 
 ## Prefix Notation

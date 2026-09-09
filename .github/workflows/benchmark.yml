@@ -21,6 +21,11 @@ on:
         required: false
         default: 'false'
         type: boolean
+      allow_weaker_methodology:
+        description: '#1157: publish even if the result has FEWER statistical runs or a different metric set than the committed one. Only for a deliberate methodology change, which must then be stated in the PR body and CHANGELOG.'
+        required: false
+        default: 'false'
+        type: boolean
   # Run on pushes to benchmark-related files
   push:
     branches: [main]
@@ -164,6 +169,29 @@ jobs:
       - name: Generate docs/benchmarking/results.md
         run: node scripts/generate-results-md.js
 
+      # #1157 defect 2. The static run above writes benchmark-results.json with
+      # statisticalRunCount: 0, and the committed file is a 30-run result. Without
+      # this step the bot opens a PR that replaces a 30-run overallAdvantage with a
+      # single-run one under the same key, described as "latest metrics" — which
+      # reads as a movement in Calor's advantage and is not one. Measured at
+      # 74ba4973: 30 runs / 1.32 becomes 0 runs / 1.28, same eight metrics.
+      - name: Check the result is not a weaker measurement (#1157)
+        id: methodology
+        run: |
+          git show HEAD:website/public/data/benchmark-results.json > /tmp/benchmark-baseline.json \
+            || echo '{}' > /tmp/benchmark-baseline.json
+          ARGS=""
+          if [ "${{ github.event.inputs.allow_weaker_methodology }}" = "true" ]; then
+            ARGS="--allow-weaker"
+          fi
+          {
+            echo 'report<<METHODOLOGY_EOF'
+            node scripts/check-benchmark-methodology.js \
+              website/public/data/benchmark-results.json \
+              --baseline /tmp/benchmark-baseline.json $ARGS 2>&1 | tee /dev/stderr
+            echo 'METHODOLOGY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -188,8 +216,20 @@ jobs:
           body: |
             This PR updates the benchmark results.
 
+            ## Methodology — read this before the numbers (#1157)
+
+            ```
+            ${{ steps.methodology.outputs.report }}
+            ```
+
+            `overallAdvantage` is a geometric mean over the metric set, computed from
+            `statisticalRunCount` runs. A change in either makes the before and after
+            figures **incomparable** — a lower number is not necessarily a regression.
+            The line above states both, so the swap is visible here rather than buried
+            in JSON.
+
             ## Changes
-            - Updated benchmark-results.json with latest metrics
+            - Updated benchmark-results.json
             - Generated HTML dashboard
             - Updated docs/benchmarking/results.md
 

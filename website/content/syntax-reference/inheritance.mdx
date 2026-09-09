@@ -14,7 +14,7 @@ Classes can be marked with modifiers to control inheritance behavior.
 
 ### Syntax
 
-```
+```calor
 §CL{id:Name:modifiers}
   // class body
 ```
@@ -33,21 +33,21 @@ Classes can be marked with modifiers to control inheritance behavior.
 ### Examples
 
 **Abstract class:**
-```
+```calor
 §CL{c1:Shape:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
 ```
 
 **Sealed class:**
-```
+```calor
 §CL{c1:FinalService:seal}
   §MT{mt1:Process:pub}
     §O{void}
 ```
 
 **Static methods** (static class modifier not fully implemented):
-```
+```calor
 §CL{c1:MathUtils:pub}
   §MT{mt1:Square:pub:stat}
     §I{i32:x}
@@ -63,7 +63,7 @@ Classes can be marked with modifiers to control inheritance behavior.
 
 Use `§EXT{ClassName}` to inherit from a base class.
 
-```
+```calor
 §CL{c1:Circle:pub}
   §EXT{Shape}
   §FLD{f64:_radius:pri}
@@ -82,7 +82,7 @@ public class Circle : Shape
 
 Use `§IMPL{InterfaceName}` to implement interfaces. Multiple interfaces can be implemented.
 
-```
+```calor
 §CL{c1:GameObject:pub}
   §IMPL{IMovable}
   §IMPL{IDrawable}
@@ -103,7 +103,7 @@ public class GameObject : IMovable, IDrawable
 
 ### Combined Inheritance
 
-```
+```calor
 §CL{c1:Dog:pub}
   §EXT{Animal}
   §IMPL{IPet}
@@ -124,7 +124,7 @@ Methods support modifiers for polymorphism.
 
 ### Syntax
 
-```
+```calor
 §MT{id:Name:visibility:modifiers}
   §O{returnType}
   // method body
@@ -142,7 +142,7 @@ Methods support modifiers for polymorphism.
 
 ### Virtual Methods
 
-```
+```calor
 §CL{c1:Animal:pub}
   §MT{mt1:Speak:pub:virt}
     §O{str}
@@ -162,7 +162,7 @@ public class Animal
 
 ### Override Methods
 
-```
+```calor
 §CL{c1:Dog:pub}
   §EXT{Animal}
   §MT{mt1:Speak:pub:over}
@@ -185,7 +185,7 @@ public class Dog : Animal
 
 Abstract methods have no body and must be in an abstract class.
 
-```
+```calor
 §CL{c1:Shape:abs}
   §MT{mt1:Area:pub:abs}
     §O{double}
@@ -203,7 +203,7 @@ public abstract class Shape
 
 Prevents further overriding in derived classes. Combine modifiers with spaces.
 
-```
+```calor
 §MT{mt1:Compute:pub:seal over}
   §O{i32}
   §R 42
@@ -227,7 +227,7 @@ Use `base.MethodName` (lowercase) inside `§C{...}` to call the base class imple
 
 > **Important:** Use `base.Method` not `§BASE.Method` inside call expressions.
 
-```
+```calor
 §CL{c1:Derived:pub}
   §EXT{Base}
   §MT{mt1:GetValue:pub:over}
@@ -250,7 +250,7 @@ public class Derived : Base
 
 Use `§BASE §A args §/BASE` in a constructor to call the base constructor.
 
-```
+```calor
 §CL{c1:Dog:pub}
   §EXT{Animal}
   §FLD{str:_breed:pri}
@@ -284,7 +284,7 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
 
 ### Base Class
 
-```
+```calor
 §CL{c1:Shape:abs}
   §FLD{str:_name:pro}
 
@@ -302,7 +302,7 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
 
 ### Derived Class
 
-```
+```calor
 §CL{c2:Circle:pub}
   §EXT{Shape}
   §FLD{double:_radius:pri}
@@ -319,7 +319,7 @@ Here's a complete example demonstrating inheritance with a Shape hierarchy.
 
 ### Usage
 
-```
+```calor
 §F{f1:Demo:pub}
   §O{str}
   §B{shape:Shape} §NEW{Circle} §A 5.0

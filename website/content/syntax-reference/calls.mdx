@@ -19,7 +19,7 @@ side of an operation).
 
 ## Syntax
 
-```
+```calor
 §C{target}                           // (1) zero arguments, implicit close
 §C{target} arg                       // (2) one inline argument, implicit close
 §C{target} §A arg1 §A arg2 §/C       // (3) explicit form, any arity
@@ -76,7 +76,7 @@ disambiguation rules below match RFC §3.2.
 
 ### Case A — trailing member on an inline argument
 
-```
+```calor
 §B{n} §C{Identity} obj?.Length
 ```
 
@@ -87,14 +87,14 @@ expression `obj?.Length`.
 
 If you intended `Identity(obj)?.Length` instead, write either:
 
-```
+```calor
 §B{n} §C{Identity} §A obj §/C ?.Length     // explicit form
 §B{n} §C{Identity}.Length                  // zero-arg call + access
 ```
 
 ### Case B — two consecutive expression-start tokens (Calor0150)
 
-```
+```calor
 §B{n} §C{Identity} a b           // ambiguous — second expression-start follows inline arg
 ```
 
@@ -115,13 +115,13 @@ and stops consuming tokens at the second expression, leaving it for
 the surrounding statement parser. To fix, rewrite using the explicit
 form:
 
-```
+```calor
 §B{n} §C{Identity} §A a §A b §/C
 ```
 
 ### Case C — nested implicit-close calls
 
-```
+```calor
 §B{x} §C{Foo.bar} §C{Baz.qux} y
 ```
 
@@ -143,7 +143,7 @@ explicit form for `Foo.bar`.
 
 ### Statement context
 
-```
+```calor
 §F{Greet:pub}
   §I{name:string}
   §O{void}
@@ -154,7 +154,7 @@ explicit form for `Foo.bar`.
 
 ### Expression context — zero-arg
 
-```
+```calor
 §F{Count:pub}
   §O{i32}
 
@@ -164,7 +164,7 @@ explicit form for `Foo.bar`.
 
 ### Expression context — one inline arg
 
-```
+```calor
 §F{Doubled:pub}
   §I{x:i32}
   §O{i32}
@@ -175,7 +175,7 @@ explicit form for `Foo.bar`.
 
 ### Expression context — two or more args (explicit form)
 
-```
+```calor
 §F{Clamp:pub}
   §I{x:i32}
   §O{i32}
@@ -188,7 +188,7 @@ explicit form for `Foo.bar`.
 
 ### Trailing member access
 
-```
+```calor
 §B{len} §C{GetMessage}.Length          // zero-arg call, then .Length
 §B{up}  §C{GetMessage}?.ToUpper        // zero-arg call, then ?.ToUpper
 §B{tag} §C{Identity} obj?.Tag          // inline arg = obj?.Tag

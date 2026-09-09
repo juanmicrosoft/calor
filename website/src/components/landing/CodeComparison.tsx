@@ -25,7 +25,7 @@ const csharpCode = `public static int Square(int x)
 const calorAnnotations = [
   { line: 1, text: 'Stable ID gives agents a durable target across renames and moves' },
   { line: 3, text: 'The precondition is explicit and checked according to contract mode' },
-  { line: 4, text: 'v0.12.1 can discharge this guard only with a clean, assumption-free proof' },
+  { line: 4, text: 'Optional --verify can remove an eligible postcondition guard after a clean proof; --keep-proven-guards disables that removal' },
   { line: 2, text: 'The pure effect declaration is checked against known and manifested calls' },
 ];
 
@@ -61,6 +61,7 @@ export function CodeComparison() {
           <div className="flex justify-center mb-6">
             <div className="inline-flex rounded-lg border p-1 bg-background">
               <button
+                aria-pressed={activeTab === 'calor'}
                 onClick={() => { setActiveTab('calor'); trackCodeComparisonTab('calor'); }}
                 className={cn(
                   'px-4 py-2 rounded-md text-sm font-medium transition-colors font-body',
@@ -72,6 +73,7 @@ export function CodeComparison() {
                 Calor - Rules Are Visible
               </button>
               <button
+                aria-pressed={activeTab === 'csharp'}
                 onClick={() => { setActiveTab('csharp'); trackCodeComparisonTab('csharp'); }}
                 className={cn(
                   'px-4 py-2 rounded-md text-sm font-medium transition-colors font-body',

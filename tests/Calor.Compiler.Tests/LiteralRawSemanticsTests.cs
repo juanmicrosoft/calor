@@ -347,7 +347,7 @@ public sealed class LiteralRawSemanticsTests
     }
 
     [Theory]
-    [InlineData(BinaryOperator.Subtract, BinaryOperator.Subtract, "a - (b - c)")]
+    [InlineData(BinaryOperator.Subtract, BinaryOperator.Subtract, "checked(a - (checked(b - c)))")]
     [InlineData(BinaryOperator.Divide, BinaryOperator.Divide, "a / (b / c)")]
     [InlineData(BinaryOperator.LeftShift, BinaryOperator.LeftShift, "a << (b << c)")]
     [InlineData(BinaryOperator.LessThan, BinaryOperator.LessThan, "a < (b < c)")]

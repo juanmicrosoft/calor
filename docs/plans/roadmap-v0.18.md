@@ -480,6 +480,35 @@ gate 15's floor is unchanged and undischarged. Gate 15 is unaffected: no
 fix has been attempted, and its 20-run floor stands.
 
 **M3 — The PP-W-rows fixture redesign, registered before any collection.**
+**Registered 2026-09-08 (Draft v2): `2026-09-05-ppw-rows-fixture-redesign.md`.** The defect analysis
+A:90-92 requires is §1 there, and it found something stronger than "the fixtures are underpowered":
+**the six tasks were built so that the laundering the effect system catches is also a visible
+failure of the stated requirement**, which the held-out tests already catch. Where those coincide,
+rows are redundant *by construction* and no sample size can produce a positive result. W:§2's
+worked example is the proof — an agent declared `§E{cw}` honestly because declaring it cost
+nothing. §2 turns that into seven rules a candidate task is rejected against; §3 re-registers the
+arms on **one compiler** (the old A/B confounded rows-vs-no-rows with v0.14.3-vs-v0.15.0) and
+records that the 2026-09-04 adjudication makes arm A a *narrower* control, so the expected effect is
+smaller — registered before collection, not discovered after. §4 declines to invent a Δ and
+registers a two-stage pilot/confirmatory design with pilot data barred from the confirmatory
+analysis.
+
+**Round 1 ran before merge, because merging freezes it**, and returned one Major finding the
+document could not have caught by reading. §3 registered that the 2026-09-04 adjudication makes arm
+A "narrower"; measured, it is stronger than that. The arms now differ on exactly one thing —
+whether an **Unknown** charge is an error — so a shape charged a **named** effect returns the *same
+verdict on both arms* and its cell is a null before a run. Two of the seeded fixtures behave exactly
+that way (`'cw'`, 1 and 2 errors on both arms) while the five escape shapes charge `'unknown'` and
+discriminate 1-vs-0. That is §1.3's defect arriving through the arm definitions instead of the task
+text. Rule **R8** now rejects any shape whose two arms agree, evidenced by the two invocations
+committed beside the task. Four minor findings applied: R1 restated away from "same length" (the
+wrong currency, since R3 hides the effect in a dependency), R2 widened to indirect prohibitions
+**and to the names of the visible tests**, §7 requiring a committed laundering solution per task
+rather than a described one, and §4's no-pooling rule given a mechanism instead of a promise.
+
+**M3 is met: the registration is merged.** What remains is pre-collection, not pre-freeze — the
+tasks themselves (§7.2), a ceiling in writing (§7.4, and §8's outstanding item 1), and stage 1's
+size (§7.5).
 
 W:§6 states the defect: *"six tasks that agents complete honestly cannot measure whether a compiler
 stops dishonesty."* The evidence A:90-92 requires as a "documented empirical defect in the
@@ -524,6 +553,15 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   demotion, whose end condition has now occurred. **§0.4 is a hard input to M3(3)** — if the SHOULD
   tier slips, M3 cannot complete, so this one item is promoted to MUST-by-dependency and named as
   such rather than left to be discovered late.
+
+  **Outcome: all four are adjudicated** — §0.4 on 2026-09-04 (which unblocked M3 and exposed #1173),
+  and the remaining three on 2026-09-08. Each was decided from evidence gathered for it rather than
+  from recollection: the async re-entry test checked clause by clause against the code
+  (**passes** — the deferral is scheduling, not feasibility); the flake rate **counted** over 25
+  main runs and attributed per failure (**5 of 7 reds are #1150, all pre-fix; 0 kills in the 7
+  post-fix runs**); and #965's two premises checked against `performance.yml` and 59 runs of
+  history (**both false — it is nightly now, and it has been green since 2026-08-21**). §9 carries
+  the working.
 - **S2 — `ExternalBase`: 61 of 113 Calor0425 diagnostics (54 %), re-measured at the 0.17 ledger.**
   An override or interface implementation reaching an external base. Carried **unassigned** through
   0.15, 0.16 and 0.17 (R17:§6 registered a venue for it in the 0.17 notes; that venue was not
@@ -543,6 +581,40 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   group. Reporting the fall alone would read as progress against a group nothing was done to.
   *Deliverable:* the per-subject breakdown R17:§6 asked for and never got, and a fix or a
   registered trigger — **not a fourth carry**.
+
+  #### Outcome, 2026-09-08: **breakdown delivered, and the group is not what its name says**
+
+  Record: `docs/plans/2026-09-08-externalbase-s2-breakdown.md`. Measured at `74ba4973`.
+
+  | subject | Calor0425 | `ExternalBase` | share |
+  |---|---:|---:|---:|
+  | MediatR | 3 | 0 | 0 % |
+  | serilog | 39 | 20 | 51 % |
+  | FluentValidation | 71 | 41 | 58 % |
+  | **aggregate** | **113** | **61** | **54 %** |
+
+  Then the part three releases of carrying the percentage did not ask: **60 of the 61 name a base
+  class declared in the same corpus, one file over.** Exactly one (`System.IO.StringWriter`) is
+  genuinely outside the program. "External" here means *external to the module*, because conversion
+  is per-file.
+
+  **And compiling the modules together does not fix it** — checked, not assumed. The base's own
+  module in the same invocation leaves all three sites reporting. `CrossModuleEffectEnforcementPass`
+  propagates effects along *calls* and has no notion of a base class; `CheckEffectVariance` resolves
+  through `_classesByName`, built from one module, and never consults the registry. The base is
+  visible to the compilation and invisible to the pass.
+
+  So the honest statement of the 54 % is: **the compiler cannot decide variance across a module
+  boundary**, at the two sites whose purpose is stopping effects laundering through dynamic
+  dispatch. An override that broadens its base's row is undetectable today whenever the base is in
+  another file — the normal case under per-file conversion.
+
+  *Disposition:* **registered trigger, which is what §6 accepts as the minimum, but now with a
+  named mechanism instead of a percentage.** Filed as **#1180** with the fix sketch and its four
+  design questions. Not fixed in 0.18: cross-module variance needs type identity across modules
+  (names alone would silently cross-link same-named classes), a trust rule for rows read from a
+  summary, split base chains, and a preserved absent-base path. That is a feature, not a SHOULD-tier
+  patch.
 - **S3 — Measurement provenance (#1159) and benchmark integrity (#1157), and one honest re-run.**
 
   **#1159 first, because it is the cheaper and the more load-bearing.** Every ledger under
@@ -557,6 +629,89 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
   `roundtrip-baseline.json`; or the release tag), plus **a test that fails when a stamp does not
   resolve on `main`** — cheap, and it would have caught this the first time.
 
+  #### #1159 outcome, 2026-09-08: **provenance restored beside the stamps, not on top of them**
+
+  The obvious repair — repoint each `measuredCommit` at a commit that resolves — is wrong, and
+  finding out why is most of the work. A `measuredCommit` is the **experimental record**, not a
+  pointer: overwriting it falsifies what was measured. `effect-rows-benefit-ledger.json`'s stamp is
+  additionally **`ARM_B_COMMIT`**, a frozen constant of a completed epoch pinned by
+  `ppw-compile.py`, `ppw-analyze.py` and `PpWRowsRegistrationTests`. And two ledgers are
+  byte-compared against their own generators, so a field added by hand leaves them permanently
+  "stale". Each of those was hit in turn before the shape below was reached.
+
+  **`bench/phase0-agent-native/commit-stamp-index.json`** carries the resolvable equivalent beside
+  each stamp, with the basis stated per entry — because the bases are not equally strong:
+
+  | ledger | basis | equivalent on main |
+  |---|---|---|
+  | `calor0425-corpus-ledger.json` | **identical `src/` tree** (verified) | `a307ccf0` |
+  | `higher-order-demand-ledger.json` | **identical `src/` tree** (verified) | `a307ccf0` |
+  | `effect-rows-probe-ledger.json` | **identical `src/` tree** (verified) | `bb5bbdb4` |
+  | `effect-resolver-key-ledger.json` | landing commit only | `a1230e2a` |
+  | `effect-rows-benefit-ledger.json` | landing commit only | `82a7c653` |
+
+  Three are strong: a commit reachable from main whose `src/` tree is **byte-identical** to the
+  measured commit's, so a third party can check the numbers against the same compiler. Two are
+  weaker and say so — every commit reachable from main was searched and none has an identical
+  `src/` tree, so that compiler state was never landed. Recording "where the numbers landed" as if
+  it were "the compiler that produced them" is precisely the conflation that made these stamps
+  useless, so the distinction is a field, not a footnote.
+
+  *Instrument:* `LedgerCommitStampTests` — three properties, because the first alone passes
+  vacuously on an empty index: every indexed commit resolves **and** is reachable from HEAD; every
+  entry's `measuredCommit` still matches the ledger it describes; and every ledger stamping a
+  measurement **is** indexed. The `test` job checks out at `fetch-depth: 0` so it runs for real
+  there rather than skipping everywhere.
+
+  *One detail worth keeping.* The benefit ledger's dangling stamp `3bb2601e0c…` and main's real
+  v0.15.0 release commit `3bb2601e3f…` share their first **eight** hex characters. Short shas
+  looked right to every reader, which is how this survived three releases.
+
+  #### #1157 outcome, 2026-09-08: **one defect reproduces, one does not**
+
+  **Defect 1 — `metricCount` carrying the program count — does not reproduce.** The generator was
+  run at `74ba4973`: the only `metricCount` in its output is `summary.metricCount = 8`, beside
+  `programCount = 217`. Both C# sites are right by inspection too. The bad artefact was in #1148,
+  which was closed and never merged. Recorded as not-reproducible rather than quietly "fixed" —
+  claiming a fix for a defect that is not there is how a suite acquires tests that guard nothing.
+
+  **Defect 2 reproduces exactly**, and on every ordinary bot run:
+
+  | | statisticalRunCount | overallAdvantage | metrics |
+  |---|---:|---:|---:|
+  | committed (what CHANGELOG publishes) | 30 | 1.32 | 8 |
+  | a fresh generator run | **0** | **1.28** | 8 |
+
+  The metric set is unchanged, so this is not the 11-metric shape #1157 describes — it is purely the
+  methodology swap, and a reviewer reads 1.32 → 1.28 as a regression in Calor's advantage.
+
+  *Two instruments, because the workflow and the published artefacts are different routes in.*
+  `scripts/check-benchmark-methodology.js` refuses a weaker candidate before the PR is opened
+  (verified: the #1148 shape exits 1 naming the numbers, an unchanged file exits 0), is wired into
+  `benchmark.yml` with an `allow_weaker_methodology` opt-in, and its report is interpolated into the
+  PR body in place of "Updated benchmark-results.json with latest metrics".
+  `BenchmarkMethodologyAgreementTests` is **gate 16**: CHANGELOG's block against the website's JSON,
+  with a second test that builds the #1148 shape and pins that the gate is red for it — a gate
+  nobody has seen fail is §0.2's finding.
+
+  #### The honest re-run, 2026-09-08: **reproduces exactly**
+
+  0.17.0 disclosed that its benchmark numbers were carried forward from `82a7c653` and not re-run.
+  Re-run here at the 0.18 line, 30 runs, `--format website`:
+
+  | | committed | fresh 30-run |
+  |---|---:|---:|
+  | overallAdvantage | 1.32 | **1.32** |
+  | Comprehension / ErrorDetection / TokenEconomics | 1.84 / 1.49 / 1.42 | **identical** |
+  | RefactoringStability / EditPrecision / Correctness | 1.38 / 1.36 / 1.29 | **identical** |
+  | GenerationAccuracy / InformationDensity | 1.02 / 0.98 | **identical** |
+
+  All eight ratios reproduce to two decimal places. **What this does not establish:** whether that
+  is a *stable* measurement or a *deterministic* one. These metrics are computed over a fixed
+  corpus, so 30 runs of a deterministic function agree trivially, and this re-run cannot tell the
+  two apart. Worth settling before a future release cites exact reproduction as evidence of
+  stability.
+
   Then benchmark integrity: Fix the generator (`metricCount`
   carrying the program count; the silent 30-run → single-run methodology swap), then re-run the
   **30-run statistical** suite at the 0.18 commit so the website and the changelog publish the same
@@ -565,6 +720,38 @@ are ever copied into the ledger's outcome fields** — the constraint W:§6 alre
 - **S4 — R17's slipped SHOULD tier**, re-tiered unchanged: `FunctionBoundType.Row` end-to-end plus
   lambda-parameter rows (R15:747; D:2700-2708), index parity with `calor build`, and
   Calor0422/0423.
+
+  #### Outcome, 2026-09-08: **one of three delivered; the other two slip a SECOND time, named**
+
+  Cut line 2 registered S4 as the second thing to shed, and it is shed. Recorded here at the
+  volume §11 asks for, because *"two silent slips is how a residual becomes permanent"* — and this
+  is the second.
+
+  | item | 0.17 | 0.18 |
+  |---|---|---|
+  | **Calor0422/0423** | slipped | **delivered** (#1176) |
+  | `FunctionBoundType.Row` end-to-end + lambda-parameter rows | slipped | **slipped again** |
+  | Index parity with `calor build` | slipped | **slipped again** |
+
+  **What was delivered.** Property accessors have an effect contract. The getter had none at all —
+  the pass registered only `Setter` and `Initer`, so a getter was checked as an ordinary pure
+  function and every effect in one was an unfixable `Calor0410`. The contract also widened from
+  `mut` to `mut, alloc`, the constructor's, because the contract is not the enforcement boundary:
+  reading a property charges the getter's effects to the READER. Writing the test for that claim
+  found it three-quarters true — `this.`-qualified self-reads charged nothing — which the same
+  change closes, because giving accessors a contract would otherwise have turned an unreachable
+  gap into a live laundering path. Corpus: `Calor0410` **9 → 0**, `Calor0423` 7 → 2.
+
+  **What slipped, and the honest reason.** The other two are features, not tidy-ups, and 0.18 was
+  at its cut line with gate 15 undischarged. Neither is urgent; both are real. **Venue: 0.19**, and
+  they are named in the release notes rather than absorbed, which is the entire point of this
+  block. If they slip a third time, the right response is to stop re-tiering them and either
+  schedule them as a MUST or retire them with a reason.
+
+  **Not smuggled in to compensate:** #1180 (effect variance is module-local — 60 of 61
+  `ExternalBase` sites are in-corpus bases one file over) is a bigger finding than anything on S4's
+  list, and it stays out of 0.18 for exactly the reason S4's remainder does. Registered, with a fix
+  sketch, for 0.19.
 
 ### 3.3 DEFERRED — residual carried with its trigger
 
@@ -646,6 +833,51 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
     **NOT-ADJUDICATED and blocks the cut**. It may not pass on an empty or partial window; a gate
     that passes for lack of data is the failure §0.2 is about.
     *Pin:* retries are not passes; a kill followed by a green retry is a **failed** gate.
+    #### Outcome, 2026-09-08: **PASS — 21 consecutive runs, zero exit-143 kills**
+
+    *Window:* every `test.yml` run on `main` from `35e4cd62` (M2's fix, 2026-09-04T16:23Z) onward.
+    *Instrument:* the `tests (compiler)` job in each.
+
+    | | |
+    |---|---:|
+    | completed post-fix runs carrying the instrument | **21** |
+    | `tests (compiler)` conclusions other than `success` | **0** |
+    | runs at `attempt` > 1 | **0** |
+    | composition | 14 `push`, 7 `workflow_dispatch` |
+
+    **The pin holds without interpretation.** The gate says *"retries are not passes; a kill
+    followed by a green retry is a failed gate"*. No run in the window was retried at all — every
+    one is `attempt = 1` — so the situation the pin exists to catch never arose. Checked per run
+    rather than asserted.
+
+    **Four runs in the window were red, none of them in the instrument.** `tests (tasks)` at
+    `d65cb283` (stale assertions from §9.4, fixed in #1179); and `tests (evaluation)` /
+    `(verification)` / `(language-server)` across three runs, all `Failed to FinalizeArtifact: 403`
+    on the artifact-upload step with `Run project tests` green. Gate 15 counts kills of
+    `tests (compiler)`; none occurred.
+
+    **What this licenses, and what it does not.** It licenses the cut: the release path is stable
+    enough that an epoch's analysis could survive CI to publication, which is what M4's third
+    condition asks. It does **not** say #1150 is fixed. M2 capped the symptom by splitting the suite
+    into two processes and the leak is unattributed — eight candidate causes tested and refuted, a
+    single process still exhausting a 16 GB Linux machine. **A green window on a suite that no
+    longer runs in one process is evidence about the split, not about the allocator.**
+
+    **An observation, recorded with its size rather than as a rate.** 2026-09-08 produced four CI
+    failures in a class distinct from #1150: three `FinalizeArtifact: 403` uploads and one
+    `sdk-package-consumer (linux-arm64)` failing in 62 seconds on a docs-only PR while its four
+    sibling platforms passed (it passed on re-run). All transient, none code-caused. That is one
+    day's observations across PR and main runs, **not** a measured rate, and it is here only so the
+    next person to count has a starting point — which is precisely what §9.2 says was missing last
+    time.
+
+    *Which triggers count, decided 2026-09-08 rather than left ambiguous:* `test.yml` has no
+    schedule, so runs on `main` come only from merges. Filling a 20-run window that way would mean
+    manufacturing eight commits, which is worse evidence, not better. **`workflow_dispatch` runs on
+    `main` count**, because what this gate measures is runner stability — the same suite, the same
+    runner class, the same code — and the trigger that started it changes none of those. Recorded
+    here because reading it either way was possible before, and a window filled by dispatch should
+    be legible as such rather than discovered later.
 16. **Benchmark methodology agreement.** *Instrument:* `website/public/data/benchmark-results.json`
     against `CHANGELOG.md`. *Floor:* the published `overallAdvantage` is computed from the same
     `statisticalRunCount` and metric set in both places, or the difference is stated in both.
@@ -660,7 +892,7 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 |---|---|---|---|
 | **Gate 14 / PP-S1(rows) unevaluated in 0.17** | §0.2 | — | **0.18 M1, unconditional** |
 | **`--permissive-effects` Calor0410 demotion unadjudicated; end condition met 2026-09-01** | R16:§6; §0.4 | **fired** | **0.18 S1, and a hard input to M3(3)** |
-| **`ExternalBase` — 61 of 113 Calor0425 (54 %)**, re-measured; R17 carries a stale 53 of 90 (59 %) | R17:§0.4, §6; `calor0425-corpus-ledger.json` | carried unassigned through three releases | **0.18 S2 — fix or registered trigger, not a fourth carry** |
+| **`ExternalBase` — 61 of 113 Calor0425 (54 %)**, and **60 of the 61 are in-corpus bases one file over**; compiling the modules together does not resolve them | R17:§0.4, §6; `2026-09-08-externalbase-s2-breakdown.md` | **discharged as a diagnosis** — the mechanism is module-local variance resolution, not external types | **0.18 S2 done; fix registered as #1180** |
 | **exit-143 kills on the publish path** | #1150 (4 data points) | **fired** | **0.18 M2 + gate 15** |
 | #965 perf suite kills the runner; runs only on the release path | #965 | recurrence | 0.18 S1 observation; kept distinct from #1150 |
 | Flake cluster #948, #959, #884, #859, #1135 | R15:1040 | rate attached — **overdue since the 0.16 branch cut** | 0.18 S1 |
@@ -670,6 +902,8 @@ never evaluated. Instrument: M1's test. Denominator: twelve shapes. Freeze: #113
 | `FunctionBoundType.Row` end-to-end; lambda params in-lambda → Calor0411 | R15:747; D:2700-2708; e4:255-259 | — | 0.18 S4 |
 | Index parity with `calor build`; interface members unindexed; index-build cost | e5:256-275 | — | 0.18 S4 |
 | Calor0422/0423 | N:S2.2 | — | 0.18 S4 |
+| **Property ACCESSORS cannot declare effects**, and getters are not even given the intrinsic contract setters get (`§PROP`'s own row, added by v0.17 S1, is the *value's* row — not the accessors'). 9 Calor0410 + 25 Calor0422 + 7 Calor0423 on the converted corpus, one family | #1176 (corrected 2026-09-08); #1173's residual | **fired** — measured 2026-09-08 | **0.18 S4, joined to Calor0422/0423**: same "no `§E` surface" family, and S4 already carries the other two thirds of it |
+| **The `EffectViolation` mutation operator's Calor0410 differential was a converter artifact and #1173 retired it** — a row derived from a body cannot contradict that body, so no body mutation produces Calor0410 on converted code | #1177; `substrate-plan-v0.12` D-S1.6 | **fired** — the pre-committed disposition was "the fix ships and the supply loss is published" | **0.18 release notes**, published as the loss D-S1.6 promised; the instrument decision (pin the contract, or move the stratum) is **0.18.x** |
 | Gate 3 CLI-process and `Calor.Sdk` legs | #1116 | — | 0.18.x; gate 3 claims built legs only |
 | Gate 5 leg (b) | R15:996 | — | 0.18.x |
 | `§FLD`/`§B` rows not index positions; hover declared-only | e5:168-175 | — | 0.18.x |
@@ -747,12 +981,78 @@ not shorten that.
 ## 9. Maintainer adjudications now due
 
 1. **Async rows** (D:§11, 1922-1945) — the three-clause test, due in writing at the 0.16 branch
-   cut. **Overdue by two releases.** DEFERRED is a placeholder, not an adjudication.
-2. **The flake rate** for #859/#884/#959/#948/#1135, due at the 0.16 branch cut. #1150 now supplies
-   four data points for one member. R17:§9.2's argument stands: nobody was counting until a release
-   forced it.
-3. **#965** — whether the perf suite killed the runner on a release path. 0.16.0 and 0.17.0 have
-   both now shipped, so the observation window R17 was waiting on has closed twice.
+   cut. Overdue by two releases. **ADJUDICATED 2026-09-08: the re-entry test PASSES; the deferral
+   is now a scheduling decision rather than a feasibility one.**
+
+   The test is *"async rows are taken up only if all three hold"*. Each clause was checked against
+   the code at this commit rather than argued:
+
+   | clause | required | at `74ba4973` |
+   |---|---|---|
+   | **(a)** asynchrony expressible as a row *property*, needing no `EffectKind` member, no registry entry, and no change to `EffectEntry{Kind,Value}` | — | **holds.** `EffectKind` is still `Unknown, IO, Mutation, Memory, Exception, Nondeterminism`; the registry contains **zero** `async`/`task`/`await` codes; `EffectEntry` is still two strings |
+   | **(b)** `fits` needs no async-specific case | — | **holds.** `await` is still transparent in the inferrer (`AwaitExpressionNode await_ => InferFromExpression(await_.Awaited)`), and asynchrony is carried by the `Task<T>` return type the binder already has |
+   | **(c)** additive — a 0.15 program compiles unchanged | — | **holds**, as a consequence of (a) and (b): nothing listed there changes |
+
+   **What this changes, and it is not nothing.** "DEFERRED" was a placeholder standing in for an
+   unmade decision, and the placeholder implied the feature might be blocked. It is not: the design
+   is admissible today, on the terms its own re-entry test set. What defers it now is scope — 0.18
+   is at its cut lines with M4 already conditional, and a language feature is not something to add
+   under a SHOULD tier.
+
+   *Disposition:* **eligible, scheduled for 0.19**, with the clause evaluations above as the record.
+   *Trigger for re-checking rather than re-deciding:* any change that adds an `EffectKind` member,
+   an async registry code, or a field to `EffectEntry` breaks clause (a) and this adjudication with
+   it — such a change must say so.
+2. **The flake rate** for #859/#884/#959/#948/#1135, due at the 0.16 branch cut.
+   **ADJUDICATED 2026-09-08 — counted, and attributed.**
+
+   R17:§9.2's complaint was that nobody was counting. Counted over the **last 25 `test.yml` runs on
+   `main`** (2026-09-01 → 2026-09-08): **18 green, 7 red — a 28 % failure rate.** Every red was
+   classified from its logs rather than assumed:
+
+   | date | commit | job | cause |
+   |---|---|---|---|
+   | 09-01 | `82a7c653` | `tests (compiler)` | **exit 143 / runner shutdown** — #1150 |
+   | 09-02 | `13d4bd47` | `tests (compiler)` | **exit 143** — #1150 |
+   | 09-03 | `06690294` | `tests (compiler)` | **exit 143** — #1150 |
+   | 09-03 | `2463810f` | `quality-ratchets` | **runner shutdown** — #1150, second job |
+   | 09-03 | `85a5ad30` | `quality-ratchets` | **exit 143** — #1150, second job |
+   | 09-05 | `d65cb283` | `tests (tasks)` | a real regression — stale assertions from the §9.4 adjudication, fixed in #1179 |
+   | 09-08 | `74ba4973` | `tests (evaluation)`, `(verification)` | infrastructure — `Failed to FinalizeArtifact: 403`; `Run project tests` passed in both |
+
+   **Five of the seven are #1150, and all five predate M2's fix.** Since `35e4cd62` there have been
+   **7 runs and 0 kills**. So the cluster's rate is not one number: it is **5 of 18 pre-fix (28 %)**
+   and **0 of 7 post-fix**, and reporting a single blended figure would hide precisely the thing the
+   count was for.
+
+   *The other members of the cluster did not appear at all in this window* — no #859/#884 Z3
+   propagation failure, no #959 host crash, no #948 round-trip regression, no #1135 non-determinism.
+   That is a real observation about a 25-run window and **not** evidence they are fixed; it means
+   the cluster's residual rate is below what 25 runs can measure, which is itself the answer to
+   "what is the rate".
+
+   *Disposition:* the cluster is **dominated by #1150**, which has a fix and a gate (15). The
+   remaining members are individually unobserved at this sample size; they stay open with the
+   rate recorded as *below 1 in 25* rather than carried as an unquantified worry.
+3. **#965** — whether the perf suite killed the runner on a release path.
+   **ADJUDICATED 2026-09-08: both of the issue's premises are now false. Close it.**
+
+   #965 says the perf suite *"reproducibly kills the CI runner (exit 143)"* and *"runs ONLY on the
+   release path"*.
+
+   - **It no longer runs only on the release path.** `performance.yml` runs nightly on a schedule
+     plus `workflow_dispatch` — moved there by #790 / W1 Slice 4, whose comment gives the reason
+     (wall-clock thresholds are load-sensitive, so a per-PR gate would train people to ignore red).
+   - **It is not reproducibly killing anything.** Over the last 59 runs (from 2026-08-02):
+     46 green, 13 red — and **every red is on 2026-08-13 (9), 08-14 (3) or 08-21 (1)**. Zero since
+     2026-08-21: **15+ consecutive green nights**, spanning both the 0.16.0 and 0.17.0 releases the
+     roadmap was waiting on.
+
+   *Disposition:* **not release-blocking.** The exit-143 mechanism #965 describes is #1150's, which
+   M2 measured and capped and gate 15 now guards; the perf suite's own instance of it stopped
+   recurring a month before this adjudication. Closed as resolved-by-relocation, with the nightly
+   schedule as the standing observation — a red nightly is a real signal and this record is what
+   makes the next one legible.
 4. **`--permissive-effects` Calor0410 demotion** (§0.4) — **ADJUDICATED 2026-09-04.**
 
    > `--permissive-effects` waives `Calor0425` and assumes unresolved calls pure — "we cannot

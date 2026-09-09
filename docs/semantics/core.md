@@ -1,6 +1,6 @@
 # Calor Core Semantics Specification
 
-Version: 1.0.0
+Semantics Version: 2.0.0
 
 This document defines the formal semantics of the Calor programming language. These semantics are **backend-independent** - any backend (including the .NET backend) must conform to these rules.
 
@@ -143,13 +143,11 @@ left ?? right
 Calor uses **lexical scoping** with parent chain lookup. See `src/Calor.Compiler/Binding/Scope.cs:74-82`.
 
 ```calor
-§BIND{name=x}{type=INT} INT:1
-§IF{if1}
-  §COND BOOL:true
-  §THEN
-  §BIND{name=x}{type=INT} INT:2   // Shadows outer x
-  §PRINT §REF{name=x}              // Prints 2
-§PRINT §REF{name=x}                  // Prints 1 (outer x unchanged)
+§B{x:i32} 1
+§IF{if1} true
+  §B{inner:i32} (+ x 1)
+  §P inner                     // Prints 2
+§P x                           // Prints 1 (outer x unchanged)
 ```
 
 ### 3.2 Shadowing
@@ -175,9 +173,7 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF{if1}
-  §COND BOOL:true
-  §THEN
+§IF{if1} true
   §R INT:42   // Returns from function, not just if block
 ```
 
@@ -192,16 +188,49 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§BIND{name=max}{type=INT} INT:2147483647
-§BIND{name=result}{type=INT} §OP{kind=ADD} §REF{name=max} INT:1
-// Throws OverflowException
+§M{m1:Overflow}
+  §F{f1:Increment:pub} (i32:value) -> i32
+    §E{}
+    §R (+ value INT:1)
+// Increment(int.MaxValue) throws OverflowException.
 ```
 
 **Rationale:** Safety-first philosophy aligns with the contracts design. Silent wraparound can hide bugs.
 
-**Compiler Flag:** `--overflow=[trap|wrap]`
-- `trap` (default): Overflow throws `OverflowException`
-- `wrap`: Overflow wraps around (two's complement)
+Native addition, subtraction, multiplication, negation, increment/decrement,
+and narrowing casts emit explicit C# `checked` contexts. Dynamic operations
+outside the destination type's range throw `OverflowException`, including
+floating-point-to-integer and integer-to-character casts. Widening conversions
+retain their normal behavior. Floating-point arithmetic still uses IEEE 754;
+`checked` does not turn floating-point infinity into an exception.
+
+Generated-C# validation and the projects used by `calor run` and `calor test`
+retain ordinary C# backend settings, so preserved C# interop keeps its own
+semantics. Explicit source-level checks enforce the native policy, including
+when generated C# is compiled separately with ordinary Roslyn settings.
+
+An explicit module attribute, `overflow=unchecked`, selects C#-compatible
+wrapping integer arithmetic and narrowing casts. C# migration records its
+source policy in this attribute; explicit C# `checked`/`unchecked` expressions
+remain preserved interop. Omitting the attribute, or using `overflow=checked`,
+selects TRAP. The verifier and proof cache distinguish these policies.
+Migration rejects globally checked source compilations with unscoped opaque
+C# interop, including whole-compilation-unit passthrough. A module attribute
+cannot safely restore that implicit context inside preserved code. Native
+lowering and explicit `checked`/`unchecked` expressions and blocks remain
+supported.
+
+Contract verification checks whether arithmetic in a predicate can overflow.
+If its safety follows from the preconditions and lazy evaluation paths, a proof
+can still remove that guard. Otherwise a conditional proof reports the
+`checked-arithmetic` assumption and keeps the runtime check. Postconditions
+describe normal returns: overflow in the function body still throws before a
+postcondition is evaluated.
+
+There is currently no `--overflow` switch. The earlier reference to that flag
+described an unimplemented option, not a supported wrap mode. This implementation
+corrects the backend to the existing semantics 2.0 TRAP policy; it does not
+introduce an intentionally different default policy.
 
 **Test Reference:** `S7: IntegerOverflow_Traps`
 
@@ -214,9 +243,9 @@ Return statements in nested scopes must correctly unwind to the function boundar
 | Narrowing conversions | Explicit required | Data may be lost |
 
 ```calor
-§BIND{name=i}{type=INT} INT:42
-§BIND{name=f}{type=FLOAT} §REF{name=i}           // OK: implicit widening
-§BIND{name=j}{type=INT} §CAST{INT} §REF{name=f}  // Required: explicit narrowing
+§B{i:i32} 42
+§B{f:f64} i                  // OK: implicit widening
+§B{j:i32} (cast i32 f)       // Required: explicit narrowing
 ```
 
 **Test Reference:** `S8: NumericConversion_IntToFloat`
@@ -244,7 +273,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.1 Preconditions (REQUIRES)
 
 ```calor
-§REQUIRES{message="x must be positive"} §OP{kind=GT} §REF{name=x} INT:0
+§Q (> x 0)
 ```
 
 **Semantics:**
@@ -261,7 +290,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.2 Postconditions (ENSURES)
 
 ```calor
-§ENSURES{message="result must be positive"} §OP{kind=GT} result INT:0
+§S (> result 0)
 ```
 
 **Semantics:**
@@ -274,7 +303,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.3 Invariants
 
 ```calor
-§INVARIANT{message="balance must be non-negative"} §OP{kind=GTE} §REF{name=balance} INT:0
+§IV (>= balance 0)
 ```
 
 **Semantics:**
@@ -296,8 +325,8 @@ Contracts are semantic constructs that specify behavioral requirements.
 Represents an optional value: either `Some(value)` or `None`.
 
 ```calor
-§SOME INT:42      // Option<INT> containing 42
-§NONE{INT}        // Option<INT> containing nothing
+§SM INT:42       // Option<i32> containing 42
+§NN              // None, with element type supplied by the surrounding context
 ```
 
 **Semantics:**
@@ -406,7 +435,7 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 
 ### 9.3 Rethrow
 
-`§RETHROW` re-throws the current exception, preserving the original stack trace.
+`§RT` re-throws the current exception, preserving the original stack trace.
 
 ---
 
@@ -424,15 +453,15 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 By default, bindings are immutable:
 
 ```calor
-§BIND{name=x}{type=INT} INT:42
-§SET §REF{name=x} INT:43  // ERROR: x is immutable
+§B{x:i32} 42
+§ASSIGN x 43             // ERROR: x is immutable
 ```
 
 Mutable bindings require explicit declaration:
 
 ```calor
-§BIND{name=x}{type=INT}{mut=true} INT:42
-§SET §REF{name=x} INT:43  // OK
+§B{~x:i32} 42
+§ASSIGN x 43             // OK
 ```
 
 ---

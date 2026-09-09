@@ -148,14 +148,21 @@ public static class ExpressibleMutationOperators
             var corruptedReturn = ownedReturn.WithExpression(
                 SyntaxFactory.ParseExpression(CorruptionExpression(corruptionKind, origExpr, method.ReturnType)));
 
-            // The injected effect MUST be spelled `System.IO.Directory.…`. Qualifying it as
-            // `global::System.IO.…` compiles more widely but the converter's §E-inference no longer
-            // recognises the call, so Calor0410 stops firing and the candidate stops being
-            // addressable — i.e. it fixes a compile error by silently destroying the mechanism under
-            // measurement. Verified: EffectViolation_IsAddressable_Calor0410_IntroducedByTheMutation
-            // fails under `global::`. So instead of qualifying, SKIP the sites where the spelling
-            // cannot bind: a type that declares its own member named `System` shadows the namespace
-            // (Serilog's TimeProvider has `public static TimeProvider System { get; }` → CS1061).
+            // #1173 retired this operator's Calor0410 differential, as substrate-plan-v0.12
+            // D-S1.6 pre-committed it might: the signal came from the converter's §E walker
+            // skipping `using` bodies, and the converter now derives its rows from the same
+            // inference that checks them. A derived row cannot contradict its own body, so a
+            // body mutation cannot produce Calor0410 on converted code. The disposition
+            // recorded there was "the fix ships and the supply loss is published", and it did.
+            // See EffectViolation_IsNotAddressable_BecauseAConvertedRowCannotContradictItsOwnBody
+            // and #1177 (whether the probe should pin the clean file's row instead).
+            //
+            // The injected effect is still spelled `System.IO.Directory.…` rather than
+            // `global::System.IO.…`, which compiles more widely: the spelling was chosen when
+            // §E-inference had to recognise the call, and it is kept because the sites it
+            // skips are the ones where the name cannot bind at all — a type declaring its own
+            // member named `System` shadows the namespace (Serilog's TimeProvider has
+            // `public static TimeProvider System { get; }` → CS1061).
             if (ShadowsSystemNamespace(method)) continue;
 
             var taintStmts = SyntaxFactory.ParseStatement(

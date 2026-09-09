@@ -211,7 +211,13 @@ public static class TypeIdentity
                 switch (type[nested])
                 {
                     case '<':
+                    case '(':
+                    case '[':
                         depth++;
+                        break;
+                    case ')':
+                    case ']':
+                        depth--;
                         break;
                     case '>':
                         if (depth == 0)
@@ -656,9 +662,13 @@ public static class TypeIdentity
             switch (type[index])
             {
                 case '<':
+                case '(':
+                case '[':
                     depth++;
                     break;
                 case '>':
+                case ')':
+                case ']':
                     depth--;
                     if (depth < 0)
                     {

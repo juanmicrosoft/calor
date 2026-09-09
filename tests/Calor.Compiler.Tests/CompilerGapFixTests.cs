@@ -204,7 +204,7 @@ public class CompilerGapFixTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("++x;", result);
+        Assert.Contains("checked(++x);", result);
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public class CompilerGapFixTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("x++;", result);
+        Assert.Contains("checked(x++);", result);
     }
 
     [Fact]
@@ -236,7 +236,7 @@ public class CompilerGapFixTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("--x;", result);
+        Assert.Contains("checked(--x);", result);
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class CompilerGapFixTests
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("x--;", result);
+        Assert.Contains("checked(x--);", result);
     }
 
     #endregion
@@ -283,8 +283,8 @@ public class CompilerGapFixTests
         // Static field
         Assert.Contains("public static int InstanceCount;", result);
         // Increment operators as standalone statements
-        Assert.Contains("++X;", result);
-        Assert.Contains("InstanceCount++;", result);
+        Assert.Contains("checked(++X);", result);
+        Assert.Contains("checked(InstanceCount++);", result);
     }
 
     #endregion

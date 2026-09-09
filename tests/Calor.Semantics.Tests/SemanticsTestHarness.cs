@@ -92,34 +92,6 @@ public static class SemanticsTestHarness
         return ExecuteGeneratedCodeBasic(result.GeneratedCode, methodName, args);
     }
 
-    /// <summary>
-    /// Compiles and executes Calor code with checked arithmetic for overflow testing.
-    /// </summary>
-    public static RuntimeResult ExecuteChecked(
-        string source,
-        string methodName,
-        object?[]? args = null)
-    {
-        var result = Program.Compile(source, "test.calr", new CalorCompilationOptions
-        {
-            EnforceEffects = false,
-            ContractMode = ContractMode.Debug
-        });
-
-        if (result.HasErrors)
-        {
-            return new RuntimeResult
-            {
-                Exception = new InvalidOperationException(
-                    $"Compilation failed: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}")
-            };
-        }
-
-        // Wrap arithmetic in checked context
-        var checkedCode = WrapInCheckedContext(result.GeneratedCode);
-        return ExecuteGeneratedCodeBasic(checkedCode, methodName, args);
-    }
-
     private static string WrapWithSideEffectTracking(string csharpCode)
     {
         // Add SideEffectTracker class to the code
@@ -132,14 +104,6 @@ public static class SideEffectTracker
 }
 ";
         return tracker + "\n" + csharpCode;
-    }
-
-    private static string WrapInCheckedContext(string csharpCode)
-    {
-        // This is a simplified approach - in a full implementation,
-        // we would modify the AST or use Roslyn to wrap arithmetic expressions
-        // For now, we'll use assembly-level CheckForOverflowUnderflow
-        return csharpCode;
     }
 
     private static (object? Result, List<string> SideEffects) ExecuteGeneratedCode(
@@ -159,8 +123,7 @@ public static class SideEffectTracker
                 "TestAssembly",
                 new[] { syntaxTree },
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                    .WithOverflowChecks(true)); // Enable checked arithmetic
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             using var ms = new MemoryStream();
             var emitResult = compilation.Emit(ms);
@@ -233,8 +196,7 @@ public static class SideEffectTracker
                 "TestAssembly",
                 new[] { syntaxTree },
                 references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                    .WithOverflowChecks(true)); // Enable checked arithmetic
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             using var ms = new MemoryStream();
             var emitResult = compilation.Emit(ms);

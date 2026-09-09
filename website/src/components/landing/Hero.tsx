@@ -12,16 +12,48 @@ const basePath = getBasePath();
 
 export function Hero() {
   const heroRef = useRef<HTMLDivElement>(null);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [allowVideo, setAllowVideo] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    setPrefersReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const video = videoRef.current;
+    if (!video) return;
+    return () => {
+      video.pause();
+      video.removeAttribute('src');
+      video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
+      video.load();
+    };
+  }, [allowVideo, playing]);
+
+  useEffect(() => {
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const connection = (navigator as Navigator & {
+      connection?: EventTarget & { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    const update = () => {
+      const allowed = !motion.matches && desktop.matches && !connection?.saveData
+        && !['slow-2g', '2g', '3g'].includes(connection?.effectiveType || '');
+      setAllowVideo(allowed);
+      if (!allowed) setPlaying(false);
+    };
+    update();
+    motion.addEventListener('change', update);
+    desktop.addEventListener('change', update);
+    connection?.addEventListener('change', update);
+    return () => {
+      motion.removeEventListener('change', update);
+      desktop.removeEventListener('change', update);
+      connection?.removeEventListener('change', update);
+    };
   }, []);
 
   useEffect(() => {
     const el = heroRef.current;
     if (!el) return;
-    if (prefersReducedMotion) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     // Stagger hero elements on load
     const children = el.querySelectorAll('[data-hero-animate]');
@@ -39,23 +71,23 @@ export function Hero() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden py-28 sm:py-36 lg:py-44">
-      {/* Video background — replaced by a poster image when the visitor prefers reduced motion */}
-      {prefersReducedMotion ? (
+    <section className="relative overflow-hidden py-8 sm:py-12">
+      {/* Poster is the default: no decorative video request before explicit opt-in. */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
-          style={{ backgroundImage: `url(${basePath}/og-image.jpg)` }}
+          style={{ backgroundImage: `url(${basePath}/calor-lava-poster.jpg)` }}
           aria-hidden="true"
         />
-      ) : (
+      {allowVideo && playing && (
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
-          preload="metadata"
+          preload="none"
           className="absolute inset-0 w-full h-full object-cover -z-20"
-          poster={`${basePath}/og-image.jpg`}
+          poster={`${basePath}/calor-lava-poster.jpg`}
           aria-hidden="true"
         >
           <source src={`${basePath}/calor-lava.mp4`} type="video/mp4" />
@@ -75,30 +107,30 @@ export function Hero() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8" ref={heroRef}>
         <div className="mx-auto max-w-3xl text-center">
           {/* Frosted glass card */}
-          <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-8 py-12 sm:px-12 sm:py-16 shadow-2xl">
-            <div className="flex justify-center mb-8" data-hero-animate>
+          <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-6 sm:px-10 sm:py-8 shadow-2xl">
+            <div className="flex justify-center mb-4" data-hero-animate>
               <Image
-                src={`${basePath}/calor-logo.png`}
+                src={`${basePath}/calor-logo-256.webp`}
                 alt="Calor logo"
                 width={120}
                 height={120}
-                className="h-24 w-24 sm:h-32 sm:w-32 drop-shadow-[0_0_30px_rgba(250,61,111,0.4)]"
+                className="h-16 w-16 sm:h-24 sm:w-24 drop-shadow-[0_0_30px_rgba(250,61,111,0.4)]"
                 priority
               />
             </div>
-            <h1 className="text-5xl font-bold tracking-tight text-white sm:text-7xl font-display" data-hero-animate>
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl font-display" data-hero-animate>
               Calor
             </h1>
-            <p className="mt-4 text-xl font-medium text-white/90 sm:text-2xl font-body" data-hero-animate>
-              A programming language for coding agents
+            <p className="mt-3 text-base font-medium text-white/90 sm:text-xl font-body" data-hero-animate>
+              A language for coding agents, compiled to C# and .NET.
             </p>
-            <p className="mt-6 text-lg leading-8 text-white/60 font-body" data-hero-animate>
-              Fewer errors. Better refactors. Cleaner merges.
+            <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate>
+              Inspect explicit contracts, declared effects, and stable IDs.
             </p>
 
-            <div className="mt-10 flex items-center justify-center gap-x-4" data-hero-animate>
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate>
               <Button asChild size="lg" className="bg-gradient-to-r from-calor-pink to-calor-salmon hover:from-calor-pink/90 hover:to-calor-salmon/90 text-white border-0 shadow-lg shadow-calor-pink/25">
-                <Link href="/docs/getting-started/" onClick={() => trackCtaClick('get_started')}>
+                <Link href="/docs/getting-started/hello-world/" onClick={() => trackCtaClick('get_started')}>
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -119,8 +151,15 @@ export function Hero() {
         </div>
       </div>
 
+      {allowVideo && (
+        <button type="button" onClick={() => setPlaying(!playing)}
+          className="absolute bottom-4 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
+          {playing ? 'Pause background animation' : 'Play background animation'}
+        </button>
+      )}
+
       {/* Shaped bottom divider */}
-      <div className="hero-divider">
+      <div className="hero-divider pointer-events-none" style={{ height: 24 }}>
         <svg viewBox="0 0 1440 80" preserveAspectRatio="none" className="w-full h-full">
           <path
             d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z"

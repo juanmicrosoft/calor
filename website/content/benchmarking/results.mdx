@@ -11,17 +11,32 @@ order: 2
 
 ## Read the Results Carefully
 
-The v0.12 run covers **217 programs**, reports an overall Calor/C# advantage of
-**1.32x**, and has Calor ahead in seven of eight metrics. Comprehension is
+The static snapshot above covers **217 programs** and reports a legacy calculator
+score of **1.32x**, with Calor ahead in seven of eight metrics. This is not a
+measured language advantage. Comprehension is
 1.84x, error detection is 1.49x, token economics is 1.42x, and information
-density is 0.98x—the one category where C# leads.
+density is 0.97x—the one category where C# leads.
 
-These measurements need two important caveats:
+The recorded source revision is `3a452b09`. Its `Directory.Build.props` declares
+compiler `0.19.0`; the JSON's `version: "1.0"` identifies the data format, not the
+compiler release. The corpus is `tests/TestData/Benchmarks`. The exact compiler
+binary used for the measurement was not independently recorded. These are
+fixed-source results, rerun for the 0.19 release. They are not a live measure of
+coding-agent performance. The separate agent-study snapshots below were not rerun.
 
-- The metrics are deterministic static analyses. Thirty runs are thirty
-  identical observations, so the zero-width confidence intervals and p-values
-  measure no run-to-run variance; they do **not** measure sampling uncertainty
-  over the corpus.
+These measurements need important caveats:
+
+- Source pairs are **not all behaviorally equivalent**. For example, the C#
+  `CsvParser` implements parsing, while its Calor counterpart contains only
+  helper functions. The 0.19 rerun fixes an invalid newline literal in the C#
+  fixture, but does not establish equal work across the corpus. The ratios
+  therefore cannot establish a language advantage. See
+  [the benchmark integrity follow-up](https://github.com/juanmicrosoft/calor/issues/1276).
+- The metrics are deterministic static analyses. The exporter reports both
+  zero-width intervals from singleton category aggregates and pooled intervals
+  from repeated program scores. Thirty repetitions are not independent samples.
+  Neither interval establishes sampling uncertainty over the corpus, agent
+  productivity, or safety.
 - These C#-versus-Calor micro-benchmarks are not the v0.12 release gates.
   PP-A1 covered adoption readiness, while PP-W5 measured toolchain tax and
   concluded only that no large tax was detected—not that parity was proven.
@@ -76,13 +91,12 @@ Keep the three statements separate:
 
 ## When to Use Calor
 
-Based on results, Calor is most valuable when:
+These scores are not sufficient evidence for choosing a language. Consider
+Calor when you want to experiment with:
 
-- **Contract verification matters** — The error detection advantage validates explicit contracts
-- **Edit precision is important** — Optional explicit IDs and structural markers provide targeting signals
-- **Agent comprehension is critical** — Explicit structure provides clear signals
-- **Compact source matters across several dimensions** — The composite token,
-  character, and line measure currently favors Calor
+- **Explicit contracts** and the documented limits of optional static verification
+- **Explicit IDs and structural markers** for agent-editing experiments
+- **Structured source representations**, while measuring costs on your own tasks
 
 Use C# when:
 
@@ -117,7 +131,7 @@ To regenerate benchmark results:
 
 ```bash
 # Run the evaluation framework
-dotnet run --project tests/Calor.Evaluation -- run -f website -o website/public/data/benchmark-results.json
+dotnet run --project tests/Calor.Evaluation -c Release -- run -f website -o website/public/data/benchmark-results.json --statistical --runs 30
 
 # Start the website to view results
 cd website && npm run dev

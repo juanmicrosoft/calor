@@ -18,6 +18,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private readonly List<string> _pendingHoistedLines = new();
     private int _ternaryCounter;
     private int _hoistCounter;
+    private int _conditionalExpressionDepth;
     private int _memberBodyDepth;
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
@@ -274,7 +275,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         LambdaExpressionNode node, string header, string lambdaRow, out string inline, out List<string> stmts)
     {
         var shortCandidate = node.StatementBody!.Count <= 2
-            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode);
+            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
+            // A lone call on the header line denotes an expression body. Keep
+            // discarded-return statement lambdas unambiguously block-bodied.
+            && !(node.StatementBody.Count == 1 && node.StatementBody[0] is CallStatementNode);
         stmts = CaptureLambdaStatements(node, inlineSibling: shortCandidate);
         if (shortCandidate && CanInlineLambdaStatements(node, stmts))
         {
@@ -289,7 +293,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
-        AppendLine($"§M{{{node.Id}:{moduleName}}}");
+        var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
+        AppendLine($"§M{{{node.Id}:{moduleName}{overflow}}}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)
@@ -873,6 +878,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitTypeParameterConstraints(node.TypeParameters);
             Dedent();
         }
+
+        // #1173: an interface member's own §E. The parser has always read one here
+        // and CheckEffectVariance (Calor0421) has always checked against it, but
+        // this visitor dropped it, so a row on an interface member could not
+        // survive a round trip. That is load-bearing now: an implementation may not
+        // broaden its interface's row, so the row synthesised for a method has to
+        // travel to the interface it implements or the converter would trade
+        // Calor0410 for Calor0421.
+        Indent();
+        EmitEffects(node.Effects);
+        Dedent();
+
         EmitBlockEnd($"§/MT{{{node.Id}}}");
 
         return "";
@@ -1740,10 +1757,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             bool named = node.ArgumentNames != null
                       && i < node.ArgumentNames.Count
                       && node.ArgumentNames[i] != null;
+            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
+                ? node.ArgumentModifiers[i] : null;
+            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
             var standardWrapped = named
-                ? $"§A[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"§A {argValue}";
-            return (named, standardWrapped, argValue);
+                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
+                : $"{marker} {argValue}";
+            return (named, modifier, standardWrapped, argValue);
         }).ToList();
 
         var target = ConvertVerbatimStringsInTarget(NormalizeCallTarget(node.Target).Replace("->", "."));
@@ -1773,7 +1793,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        if (canElide && rendered.Count == 1 && !rendered[0].named
+        if (canElide && rendered.Count == 1 && !rendered[0].named && rendered[0].modifier == null
             && StartsWithExpressionStarter(rendered[0].argValue))
         {
             AppendLine($"§C{{{target}}} {rendered[0].argValue}");
@@ -2966,9 +2986,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // so a nested zero-arg call without explicit §/C would absorb the next operand.
         // For the §IF expression form we keep it too — the condition slot is followed by
         // " → whenTrue", and a bare §C{X} could absorb the → as a primary token.
-        var condition = AcceptInInlineSibling(node.Condition);
-        var whenTrue = AcceptInInlineSibling(node.WhenTrue);
-        var whenFalse = AcceptInInlineSibling(node.WhenFalse);
+        var condition = AcceptInConditionalRegion(node.Condition);
+        var whenTrue = AcceptInConditionalRegion(node.WhenTrue);
+        var whenFalse = AcceptInConditionalRegion(node.WhenFalse);
 
         // If either branch contains section markers (§C, §NEW, §LAM, etc.) or commas
         // (tuple literals), decompose into §IF/§EL/§/I expression form.
@@ -2990,6 +3010,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private static bool ContainsSectionMarker(string expr)
     {
         return expr.Contains('§');
+    }
+
+    private string EmitSizeAttribute(ExpressionNode expression)
+    {
+        var size = expression.Accept(this);
+        if (!ContainsSectionMarker(size) && !size.Contains('(') && !size.Contains(',')
+            && !size.Contains(':') && !size.Contains("0x"))
+            return size;
+
+        size = HoistToTempVar(size);
+        return _memberBodyDepth == 0 || _conditionalExpressionDepth > 0
+            ? new StringLiteralNode(expression.Span, size).Accept(this)
+            : size;
+    }
+
+    private string AcceptInConditionalRegion(ExpressionNode expression)
+    {
+        _conditionalExpressionDepth++;
+        try
+        {
+            return AcceptInInlineSibling(expression);
+        }
+        finally
+        {
+            _conditionalExpressionDepth--;
+        }
     }
 
     /// <summary>
@@ -3047,7 +3093,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
         // Hoisting at class/module scope would leak §B bindings between members.
-        if (_memberBodyDepth == 0)
+        if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
             return expr;
 
         var varName = $"_hoist{_hoistCounter++:D3}";
@@ -3068,21 +3114,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(BinaryOperationNode node)
     {
-        // AcceptInInlineSibling: operands in Lisp (op a b) form are space-separated,
-        // so a nested zero-arg call without explicit §/C would absorb the next operand.
-        // After AcceptInInlineSibling the inner §/C is kept, then hoisting moves the
-        // §-bearing operand to a temp var (within method bodies). At class/module scope
-        // where HoistToTempVar is a no-op, the explicit §/C is what keeps parsing safe.
-        var left = AcceptInInlineSibling(node.Left);
-        var right = AcceptInInlineSibling(node.Right);
+        // Both lazy and eager operators need intact operand regions. Hoisting a
+        // nested right operand can run it before the left call or variable read.
+        // Explicit inner call closers keep section-bearing Lisp operands unambiguous.
+        var left = AcceptInConditionalRegion(node.Left);
+        var right = AcceptInConditionalRegion(node.Right);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
-
-        // Hoist operands containing section markers or commas (tuples) out of Lisp expression.
-        // § markers and commas are invalid inside (op ...) expressions.
-        if (ContainsSectionMarker(left) || left.Contains(','))
-            left = HoistToTempVar(left);
-        if (ContainsSectionMarker(right) || right.Contains(','))
-            right = HoistToTempVar(right);
 
         return $"({opSymbol} {left} {right})";
     }
@@ -3095,7 +3132,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             UnaryOperator.Negate => "-",
             UnaryOperator.Not => "!",
             UnaryOperator.BitwiseNot => "~",
-            _ => "-"
+            UnaryOperator.PreIncrement => "inc",
+            UnaryOperator.PreDecrement => "dec",
+            UnaryOperator.PostIncrement => "post-inc",
+            UnaryOperator.PostDecrement => "post-dec",
+            _ => throw new ArgumentOutOfRangeException(nameof(node.Operator), node.Operator, null)
         };
 
         if (ContainsSectionMarker(operand))
@@ -3106,14 +3147,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FieldAccessNode node)
     {
-        var target = node.Target.Accept(this);
+        var conditional = IsConditionalCallTarget(node.Target);
+        var target = conditional ? AcceptInConditionalRegion(node.Target) : node.Target.Accept(this);
         if (node.Target is ThisExpressionNode)
             target = "this";
         else if (node.Target is BaseExpressionNode)
             target = "base";
         // Hoist call results that contain section markers (e.g., §C{method} §/C.Property)
         // Only hoist when inside an executable body (method, ctor, etc.)
-        else if (ContainsSectionMarker(target) && _memberBodyDepth > 0)
+        else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0)
             target = HoistToTempVar(target);
         var fieldName = node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName;
         return $"{target}.{fieldName}";
@@ -3206,9 +3248,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (node.Arguments.Count == 0)
                 return $"{node.Target}{typeArgsSuffix}()";
 
+            if (node.ArgumentModifiers?.Any(modifier => modifier != null) == true)
+                RecordEmitterFallback(node, "interpolation-call-modifiers",
+                    "Modified call arguments are preserved using C# interpolation expression syntax");
             var inlineArgs = node.Arguments.Select((a, i) =>
             {
                 var argValue = a.Accept(this);
+                if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
+                    && node.ArgumentModifiers[i] is { } modifier)
+                    argValue = $"{modifier} {argValue}";
                 if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
                     return $"{node.ArgumentNames[i]}: {argValue}";
                 return argValue;
@@ -3271,10 +3319,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             bool named = node.ArgumentNames != null
                       && i < node.ArgumentNames.Count
                       && node.ArgumentNames[i] != null;
+            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
+                ? node.ArgumentModifiers[i] : null;
+            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
             var wrapped = named
-                ? $"§A[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"§A {argValue}";
-            return (named, wrapped, argValue);
+                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
+                : $"{marker} {argValue}";
+            return (named, modifier, wrapped, argValue);
         }).ToList();
 
         // RFC v0.6 call-closer-elision §2.1 / §2.2 — expression-context
@@ -3291,7 +3342,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // HoistToTempVar — the same mechanism that protects zero-arg elision.
         // Named args, multi-arg, or args whose first token is not in
         // IsExpressionStart() keep the standard §A ... §/C form.
-        if (args.Count == 1 && !args[0].named)
+        if (args.Count == 1 && !args[0].named && args[0].modifier == null)
         {
             bool canElide = _context?.UseImplicitCallCloser != false
                          && _inInlineSiblingContext == 0
@@ -3503,23 +3554,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Size != null)
         {
-            var size = node.Size.Accept(this);
-            // Hoist complex size expressions out of the attribute braces
-            // (§C calls, parenthesized expressions, commas, hex literals break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':') || size.Contains("0x"))
-            {
-                size = HoistToTempVar(size);
-                // If hoisting failed (field level), fall back to raw C# expression
-                if (ContainsSectionMarker(size) || size.Contains('('))
-                {
-                    var rawExpr = $"new {node.ElementType}[{size}]";
-                    RecordEmitterFallback(
-                        node,
-                        "raw-array-size",
-                        "Array size could not be represented natively and was preserved as §CS");
-                    return $"§CS{{{rawExpr}}}";
-                }
-            }
+            var size = EmitSizeAttribute(node.Size);
             return $"§ARR{{{elementType}:{id}:{size}}}";
         }
         else
@@ -3720,8 +3755,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // AcceptInInlineSibling: operands in Lisp (?? a b) form are space-separated,
         // so a nested zero-arg call without explicit §/C would absorb b as its inline arg.
-        var left = AcceptInInlineSibling(node.Left);
-        var right = AcceptInInlineSibling(node.Right);
+        var left = AcceptInConditionalRegion(node.Left);
+        var right = AcceptInConditionalRegion(node.Right);
         return $"(?? {left} {right})";
     }
 
@@ -3731,7 +3766,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // from the member string literal. A naked zero-arg §C{Get} target would absorb the
         // string literal as its inline argument on re-parse (Parser.IsExpressionStart accepts
         // StrLiteral). Defect: v0.6.1 loop-5 devil's-advocate finding.
-        var target = AcceptInInlineSibling(node.Target);
+        var target = AcceptInConditionalRegion(node.Target);
         // Sanitize member name: collapse whitespace/newlines to single space
         // (multi-line C# chains from converter can produce newlines in member names)
         var memberName = System.Text.RegularExpressions.Regex.Replace(node.MemberName, @"\s+", " ").Trim();
@@ -4811,10 +4846,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Args go through inline-sibling context so that nested zero-arg
         // calls keep their explicit §/C closer — see Visit(CallExpressionNode)
         // for the rationale.
-        var target = node.TargetExpression.Accept(this);
-        var args = node.Arguments.Select(a => $" §A {AcceptInInlineSibling(a)}").ToList();
+        var conditional = IsConditionalCallTarget(node.TargetExpression);
+        var target = conditional
+            ? AcceptInConditionalRegion(node.TargetExpression)
+            : node.TargetExpression.Accept(this);
+        var args = node.Arguments.Select(a =>
+            $" §A {(conditional ? AcceptInConditionalRegion(a) : AcceptInInlineSibling(a))}").ToList();
         return $"§C {target}{string.Join("", args)} §/C";
     }
+
+    private static bool IsConditionalCallTarget(ExpressionNode expression) => expression switch
+    {
+        NullConditionalNode => true,
+        FieldAccessNode field => IsConditionalCallTarget(field.Target),
+        ExpressionCallNode call => IsConditionalCallTarget(call.TargetExpression),
+        _ => false
+    };
 
     public string Visit(RawCSharpNode node)
     {
@@ -5049,9 +5096,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
         if (node.Size != null)
         {
-            var size = node.Size.Accept(this);
-            if (ContainsSectionMarker(size) || size.Contains(':'))
-                size = HoistToTempVar(size);
+            var size = EmitSizeAttribute(node.Size);
             return $"§SALLOC{{{elementType}:{size}}}";
         }
         else if (node.Initializer.Count > 0)

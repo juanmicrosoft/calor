@@ -6,7 +6,9 @@ order: 6
 
 
 **Category:** Generation Accuracy
-**v0.12 result:** Calor narrowly wins (1.02x across 217 programs)
+**Historical dashboard result:** Calor narrowly wins (1.02x across 217 programs)
+
+See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully) for the recorded source, corpus, and measurement method.
 **What it measures:** Compilation success and structural correctness
 
 ---
@@ -91,7 +93,7 @@ public static int Add(int a, int b)
 }
 ```
 
-```
+```calor
 // Calor: Novel syntax, less exposure
 §F{f001:Add:pub}
   §I{i32:a}
@@ -130,7 +132,7 @@ public static int Add(int a, int b)
 - Score: 1.0
 
 **Calor generation (typical):**
-```
+```calor
 §F{f001:Add:pub}
   §I{i32:a}
   §I{i32:b}
@@ -143,7 +145,7 @@ public static int Add(int a, int b)
 - Score: 1.0
 
 **Calor generation (common error):**
-```
+```calor
 §F{f001:Add:pub}
 §I{i32:a}
 §I{i32:b}
@@ -222,7 +224,7 @@ results.Add(MetricResult.CreateHigherIsBetter(
 
 ## Interpretation
 
-The v0.12 ratio is 1.02x, a small Calor lead in the deterministic calculator.
+The historical ratio is 1.02x, a small Calor lead in the deterministic calculator.
 Actual model-generated code may behave differently because:
 - C# has more training data exposure
 - C# patterns are more familiar to LLMs

@@ -1,4 +1,4 @@
-§M{m001:Test_13_07}
+§M{m001:Test_13_07:overflow=unchecked}
   §CL{c001:EmptyMethods:pub}
     §MT{m002:DoNothing:pub}
       §R

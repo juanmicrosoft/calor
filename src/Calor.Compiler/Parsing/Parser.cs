@@ -734,6 +734,12 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Module);
         var attrs = ParseAttributes();
+        var overflowModifier = attrs["_pos2"];
+        if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
+            attrs.Add("overflow", overflowModifier["overflow=".Length..].Trim());
+        if (attrs["overflow"] is { } overflow && overflow is not ("checked" or "unchecked"))
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                $"Module overflow policy must be 'checked' or 'unchecked', not '{overflow}'.");
 
         var (id, moduleName) = AttributeHelper.InterpretModuleAttributes(attrs);
         var moduleNameKey = "_pos1";
@@ -2621,6 +2627,7 @@ public sealed class Parser
 
         // Standard format with explicit §A and (optionally) §/C
         var argumentNames = new List<string?>();
+        var argumentModifiers = new List<string?>();
         while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
@@ -2628,8 +2635,9 @@ public sealed class Parser
                 _inOuterCallArgDepth++;
                 try
                 {
-                    arguments.Add(ParseArgument(out var argName));
+                    arguments.Add(ParseArgument(out var argName, out var argModifier));
                     argumentNames.Add(argName);
+                    argumentModifiers.Add(argModifier);
                 }
                 finally
                 {
@@ -2678,7 +2686,7 @@ public sealed class Parser
             arguments,
             attrs,
             hasNames ? argumentNames : null,
-            argumentModifiers: null,
+            argumentModifiers.Any(m => m != null) ? argumentModifiers : null,
             calleeSpan: calleeSpan,
             receiverSpan: receiverSpan,
             typeArguments: typeArguments);
@@ -2686,13 +2694,26 @@ public sealed class Parser
 
     private ExpressionNode ParseArgument()
     {
-        return ParseArgument(out _);
+        var argument = ParseArgument(out _, out var modifier);
+        if (modifier != null)
+            _diagnostics.ReportError(argument.Span, DiagnosticCode.InvalidModifier,
+                "Argument modifiers are only supported on named-target calls.");
+        return argument;
     }
 
-    private ExpressionNode ParseArgument(out string? argumentName)
+    private ExpressionNode ParseArgument(out string? argumentName, out string? argumentModifier)
     {
-        Expect(TokenKind.Arg);
+        var startToken = Expect(TokenKind.Arg);
         argumentName = null;
+        argumentModifier = null;
+        if (Check(TokenKind.OpenBrace) && Current.Span.Start == startToken.Span.End)
+        {
+            var attributes = ParseAttributes(maxGroups: 1);
+            argumentModifier = attributes["_pos0"];
+            if (attributes["_posCount"] != "1" || argumentModifier is not ("ref" or "out" or "in"))
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    "Call argument modifier must be ref, out, or in.");
+        }
 
         // Check for named argument syntax: §A[name] value
         if (Check(TokenKind.OpenBracket))
@@ -7194,16 +7215,11 @@ public sealed class Parser
                 // Size is an integer literal
                 size = new IntLiteralNode(startToken.Span, sizeVal);
             }
-            else if (sizeStr.StartsWith("("))
-            {
-                // Size is an expression like (len data) - re-lex and parse it
-                // This handles §ARR{a001:i32:(len data)}
-                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
-            }
             else
             {
-                // Size is a variable reference (e.g., §ARR{a001:i32:n} where n is a variable)
-                size = new ReferenceNode(startToken.Span, sizeStr);
+                // Quoted attributes also preserve calls and typed literals,
+                // without moving their evaluation out of a conditional region.
+                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
             }
         }
         else
@@ -10019,6 +10035,7 @@ public sealed class Parser
 
         var arguments = new List<ExpressionNode>();
         var argumentNames = new List<string?>();
+        var argumentModifiers = new List<string?>();
         TextSpan finalSpan;
 
         // Phase 1 (v0.6 call-closer-elision): try implicit-close forms first.
@@ -10064,6 +10081,7 @@ public sealed class Parser
             var argExpr = ParseExpression();
             arguments.Add(argExpr);
             argumentNames.Add(null);
+            argumentModifiers.Add(null);
 
             // Decide whether to consume a trailing §/C. The §/C may belong to
             // this call (top-level) or to a pending outer call's §A. The rule:
@@ -10142,8 +10160,9 @@ public sealed class Parser
                     _inOuterCallArgDepth++;
                     try
                     {
-                        arguments.Add(ParseArgument(out var argName));
+                        arguments.Add(ParseArgument(out var argName, out var argModifier));
                         argumentNames.Add(argName);
+                        argumentModifiers.Add(argModifier);
                     }
                     finally
                     {
@@ -10156,6 +10175,7 @@ public sealed class Parser
                     // Preserved for backward compatibility (§C{f} x §/C).
                     arguments.Add(ParseExpression());
                     argumentNames.Add(null);
+                    argumentModifiers.Add(null);
                 }
                 else
                 {
@@ -10177,7 +10197,7 @@ public sealed class Parser
             target,
             arguments,
             hasNames ? argumentNames : null,
-            argumentModifiers: null,
+            argumentModifiers.Any(m => m != null) ? argumentModifiers : null,
             typeArguments: typeArguments,
             calleeSpan: calleeSpan,
             receiverSpan: receiverSpan);
@@ -11883,7 +11903,24 @@ public sealed class Parser
             }
             _position = savedPos; // restore
         }
-        var isStatementToken = ifIsStatement || Check(TokenKind.Bind) || Check(TokenKind.Call)
+        // A single closed call on the header line is an expression lambda.
+        // Retain statement parsing for multiline bodies or multiple statements.
+        var callIsExpression = false;
+        if (Check(TokenKind.Call) && Current.Span.Line == startToken.Span.Line)
+        {
+            var depth = 0;
+            for (var position = _position; position < _tokens.Count - 1; position++)
+            {
+                if (_tokens[position].Kind == TokenKind.Call) depth++;
+                else if (_tokens[position].Kind == TokenKind.EndCall && --depth == 0)
+                {
+                    callIsExpression = _tokens[position + 1].Kind == TokenKind.EndLambda;
+                    break;
+                }
+            }
+        }
+        var callIsStatement = Check(TokenKind.Call) && !callIsExpression;
+        var isStatementToken = ifIsStatement || Check(TokenKind.Bind) || callIsStatement
             || Check(TokenKind.Assign) || Check(TokenKind.Return) || Check(TokenKind.For)
             || Check(TokenKind.Foreach) || Check(TokenKind.While) || Check(TokenKind.Do)
             || Check(TokenKind.Match) || Check(TokenKind.Try) || Check(TokenKind.Throw)
@@ -14409,7 +14446,7 @@ public sealed class Parser
             if (int.TryParse(sizeStr, out var s))
                 size = new IntLiteralNode(startToken.Span, s);
             else
-                size = new ReferenceNode(startToken.Span, sizeStr);
+                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
         }
         else
         {

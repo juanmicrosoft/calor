@@ -1461,31 +1461,23 @@ public class Issue766DeclarationModuleSemanticsTests
 
     private static string CompileConvertedCalor(ConversionResult conversion)
     {
+        // #1173 (fixed) and #1176 (fixed): the converter derives every §E row from the
+        // compiler's own inference over the text it emits, and a property accessor now
+        // has an intrinsic effect contract like every other surface-less declaration. So
+        // converted code reports NO Calor0410 at all — this helper enforces effects and
+        // tolerates nothing.
+        //
+        // It used to compile twice: once enforcing, to hold the #1173 guard, and once
+        // not, because the one residual #1173 left — an allocating getter, undeclarable
+        // until #1176 — is an ERROR and errors stop code generation, and these tests need
+        // the generated C#. That residual is gone, so the second compile is gone with it.
         var result = Program.Compile(
             conversion.CalorSource!,
             null,
             new CompilationOptions
             {
                 DeferGeneratedOutputValidation = true,
-
-                // #1173: the converter emits Calor whose §E rows do not cover the
-                // effects its own emitted body performs — 'alloc' most often. Until the
-                // 2026-09-04 --permissive-effects adjudication (roadmap-v0.18 §9.4)
-                // that was invisible: the flag demoted EVERY Calor0410 to a warning,
-                // and converted code is exactly what the flag was built for. The waiver
-                // is now scoped to EffectKind.Unknown ("we cannot tell"), so a named
-                // 'alloc' the converter itself failed to declare is an error — which
-                // stops code generation, and these tests need the generated code.
-                //
-                // These tests are about declaration and module SEMANTICS surviving a
-                // round trip, not about effect inference, so effect enforcement is off
-                // here. That is the same choice ConversionScorecardRunner:157 and
-                // ConvertibilityAnalyzer:144 already make for the same reason, and it
-                // is narrower than the global waiver the adjudication removed: the
-                // effect pass is skipped for THIS helper, not silenced everywhere.
-                //
-                // When #1173 is fixed, this can go back to enforcing.
-                EnforceEffects = false,
+                EnforceEffects = true,
                 UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
             });
 

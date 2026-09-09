@@ -5,6 +5,7 @@ import { Bot, CheckCircle2, XCircle } from 'lucide-react';
 
 // Build-time import of agent refactoring data
 import agentData from '../../../public/data/agent-refactoring-results.json';
+import { agentRefactoring as provenance } from '../../../public/data/benchmark-provenance.json';
 
 interface AgentRefactoringData {
   version: string;
@@ -64,8 +65,8 @@ export function AgentRefactoringCard() {
       </div>
 
       <p className="text-sm text-muted-foreground mb-4">
-        Measures Claude Code agent success rates on real refactoring tasks (rename, extract, inline,
-        move, add contracts, change signature).
+        Historical Claude Code study of the bundled refactoring tasks (rename, extract, inline,
+        move, add contracts, change signature), not a measurement of current-release productivity.
       </p>
 
       {/* Overall Results */}
@@ -143,6 +144,9 @@ export function AgentRefactoringCard() {
       {/* Methodology note */}
       <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
         <span>Majority voting (2/3 runs) with compilation + Z3 verification</span>
+        <p>{provenance.method}. Corpus: <code>{provenance.corpus}</code>;
+          recorded source declares compiler v{provenance.sourceDeclaredVersion}.
+          Exact measurement binary not independently recorded.</p>
         {data.commit && (
           <span className="ml-2 font-mono bg-muted px-1.5 py-0.5 rounded">
             {data.commit.slice(0, 7)}

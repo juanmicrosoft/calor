@@ -8,6 +8,9 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Tests for contract simplification pass.
+/// Untyped references deliberately retain the complete operation: their types,
+/// operator overloads, getter effects, and exceptional behavior are not known.
+/// Algebraic formulas in comments identify the candidate rewrite, not a guarantee.
 /// </summary>
 public class SimplificationTests
 {
@@ -140,8 +143,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -154,8 +156,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -168,8 +169,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.False(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -182,8 +182,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.False(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -196,8 +195,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -210,8 +208,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -224,8 +221,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -238,8 +234,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -256,8 +251,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -300,8 +294,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -314,8 +307,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -327,8 +319,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -340,8 +331,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -353,8 +343,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -371,8 +360,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.False(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -385,8 +373,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.False(lit.Value);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -403,8 +390,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -417,8 +403,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -431,8 +416,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.True(lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -445,8 +429,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<BoolLiteralNode>(result);
-        Assert.False(lit.Value);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -462,8 +445,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("p", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -475,10 +457,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var notExpr = Assert.IsType<UnaryOperationNode>(result);
-        Assert.Equal(UnaryOperator.Not, notExpr.Operator);
-        var refNode = Assert.IsType<ReferenceNode>(notExpr.Operand);
-        Assert.Equal("p", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -557,8 +536,7 @@ public class SimplificationTests
 
         var result = Simplify(outer);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(outer, result);
     }
 
     [Fact]
@@ -572,10 +550,7 @@ public class SimplificationTests
 
         var result = Simplify(notNotNotX);
 
-        var unary = Assert.IsType<UnaryOperationNode>(result);
-        Assert.Equal(UnaryOperator.Not, unary.Operator);
-        var refNode = Assert.IsType<ReferenceNode>(unary.Operand);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(notNotNotX, result);
     }
 
     [Fact]
@@ -609,8 +584,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("t", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -624,8 +598,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("f", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -639,8 +612,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -653,8 +625,8 @@ public class SimplificationTests
         var diagnostics = new DiagnosticBag();
         var simplifier = new ExpressionSimplifier(diagnostics);
 
-        // (-> p p) → true (tautology)
-        var p = new ReferenceNode(Span, "p");
+        // (-> false false) → true (tautology)
+        var p = new BoolLiteralNode(Span, false);
         var expr = new ImplicationExpressionNode(Span, p, p);
 
         _ = simplifier.Simplify(expr);
@@ -669,10 +641,9 @@ public class SimplificationTests
         var diagnostics = new DiagnosticBag();
         var simplifier = new ExpressionSimplifier(diagnostics);
 
-        // (&& x (! x)) → false (contradiction)
-        var x = new ReferenceNode(Span, "x");
-        var notX = new UnaryOperationNode(Span, UnaryOperator.Not, x);
-        var expr = new BinaryOperationNode(Span, BinaryOperator.And, x, notX);
+        // (&& false false) → false (contradiction)
+        var x = new BoolLiteralNode(Span, false);
+        var expr = new BinaryOperationNode(Span, BinaryOperator.And, x, x);
 
         _ = simplifier.Simplify(expr);
 
@@ -721,11 +692,11 @@ public class SimplificationTests
         var func = simplified.Functions[0];
         Assert.Single(func.Preconditions);
 
-        // The precondition (&& true (>= x 0)) should simplify to (>= x 0)
+        // Without a typed/effect model, the complete predicate is retained.
         var condition = func.Preconditions[0].Condition;
         Assert.IsType<BinaryOperationNode>(condition);
         var binOp = (BinaryOperationNode)condition;
-        Assert.Equal(BinaryOperator.GreaterOrEqual, binOp.Operator);
+        Assert.Equal(BinaryOperator.And, binOp.Operator);
     }
 
     [Fact]
@@ -749,10 +720,7 @@ public class SimplificationTests
         var func = simplified.Functions[0];
         Assert.Single(func.Preconditions);
 
-        // The precondition (-> p p) should simplify to true
-        var condition = func.Preconditions[0].Condition;
-        var lit = Assert.IsType<BoolLiteralNode>(condition);
-        Assert.True(lit.Value);
+        Assert.Same(module.Functions[0].Preconditions[0].Condition, func.Preconditions[0].Condition);
     }
 
     [Fact]
@@ -951,8 +919,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -965,8 +932,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -979,8 +945,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -993,8 +958,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<IntLiteralNode>(result);
-        Assert.Equal(0, lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1007,8 +971,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1021,8 +984,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1035,8 +997,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<IntLiteralNode>(result);
-        Assert.Equal(0, lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1049,8 +1010,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<IntLiteralNode>(result);
-        Assert.Equal(0, lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1063,8 +1023,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1077,8 +1036,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var lit = Assert.IsType<IntLiteralNode>(result);
-        Assert.Equal(0, lit.Value);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1105,8 +1063,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1119,8 +1076,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -1138,18 +1094,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var orExpr = Assert.IsType<BinaryOperationNode>(result);
-        Assert.Equal(BinaryOperator.Or, orExpr.Operator);
-
-        var notA = Assert.IsType<UnaryOperationNode>(orExpr.Left);
-        Assert.Equal(UnaryOperator.Not, notA.Operator);
-        var refA = Assert.IsType<ReferenceNode>(notA.Operand);
-        Assert.Equal("a", refA.Name);
-
-        var notB = Assert.IsType<UnaryOperationNode>(orExpr.Right);
-        Assert.Equal(UnaryOperator.Not, notB.Operator);
-        var refB = Assert.IsType<ReferenceNode>(notB.Operand);
-        Assert.Equal("b", refB.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1163,18 +1108,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var andExpr = Assert.IsType<BinaryOperationNode>(result);
-        Assert.Equal(BinaryOperator.And, andExpr.Operator);
-
-        var notA = Assert.IsType<UnaryOperationNode>(andExpr.Left);
-        Assert.Equal(UnaryOperator.Not, notA.Operator);
-        var refA = Assert.IsType<ReferenceNode>(notA.Operand);
-        Assert.Equal("a", refA.Name);
-
-        var notB = Assert.IsType<UnaryOperationNode>(andExpr.Right);
-        Assert.Equal(UnaryOperator.Not, notB.Operator);
-        var refB = Assert.IsType<ReferenceNode>(notB.Operand);
-        Assert.Equal("b", refB.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1220,8 +1154,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1304,8 +1237,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -1351,8 +1283,7 @@ public class SimplificationTests
 
         var result = Simplify(sub);
 
-        var lit = Assert.IsType<IntLiteralNode>(result);
-        Assert.Equal(0, lit.Value);
+        Assert.Same(sub, result);
     }
 
     [Fact]
@@ -1372,8 +1303,7 @@ public class SimplificationTests
 
         var result = Simplify(combined);
 
-        var eqResult = Assert.IsType<BinaryOperationNode>(result);
-        Assert.Equal(BinaryOperator.Equal, eqResult.Operator);
+        Assert.Same(combined, result);
     }
 
     #endregion
@@ -1435,8 +1365,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1467,8 +1396,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("c", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1482,10 +1410,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var notExpr = Assert.IsType<UnaryOperationNode>(result);
-        Assert.Equal(UnaryOperator.Not, notExpr.Operator);
-        var refNode = Assert.IsType<ReferenceNode>(notExpr.Operand);
-        Assert.Equal("c", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1498,8 +1423,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1512,10 +1436,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var notExpr = Assert.IsType<UnaryOperationNode>(result);
-        Assert.Equal(UnaryOperator.Not, notExpr.Operator);
-        var refNode = Assert.IsType<ReferenceNode>(notExpr.Operand);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -1528,8 +1449,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("p", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     #endregion
@@ -1996,9 +1916,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        // Should simplify to just x
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -2016,9 +1934,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        // 50 negations (even) → x
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -2036,10 +1952,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var notExpr = Assert.IsType<UnaryOperationNode>(result);
-        Assert.Equal(UnaryOperator.Not, notExpr.Operator);
-        var refNode = Assert.IsType<ReferenceNode>(notExpr.Operand);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -2086,8 +1999,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -2105,8 +2017,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -2125,10 +2036,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var add = Assert.IsType<BinaryOperationNode>(result);
-        Assert.Equal(BinaryOperator.Add, add.Operator);
-        Assert.Equal("x", Assert.IsType<ReferenceNode>(add.Left).Name);
-        Assert.Equal("y", Assert.IsType<ReferenceNode>(add.Right).Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]
@@ -2154,8 +2062,7 @@ public class SimplificationTests
 
         var result = Simplify(expr);
 
-        var refNode = Assert.IsType<ReferenceNode>(result);
-        Assert.Equal("x", refNode.Name);
+        Assert.Same(expr, result);
     }
 
     [Fact]

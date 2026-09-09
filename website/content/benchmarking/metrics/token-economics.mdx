@@ -6,8 +6,10 @@ order: 8
 
 
 **Category:** Token Economics
-**Result:** Calor wins (composite)
+**Historical dashboard result:** Calor wins (composite)
 **What it measures:** Composite compactness — the geometric mean of the token, character, and line ratios between equivalent Calor and C# programs
+
+See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully) for the recorded source, corpus, and measurement method.
 
 ---
 
@@ -23,7 +25,7 @@ usage and lower edit cost.
 > "C# wins" using a **raw token count only**. The calculator computed the composite
 > (token × char × line) and then discarded it, reporting the token ratio alone. That
 > bug is fixed: the category now reports the composite it always computed. On the
-> representative benchmark corpus the composite **favors Calor** (currently **1.42×**),
+> historical benchmark corpus the composite **favors Calor** (**1.42×**),
 > because Calor's character- and line-level compactness outweighs its higher raw token
 > count. Raw token count *alone* — especially on tiny programs — still tends to favor
 > C# (see the per-program examples below, which illustrate that single dimension).
@@ -102,7 +104,7 @@ point estimate.
 ### Hello World
 
 **Calor:**
-```
+```calor
 §M{m001:Hello}
   §F{f001:Main:pub}
     §O{void}
@@ -130,7 +132,7 @@ class Program
 ### FizzBuzz
 
 **Calor:**
-```
+```calor
 §M{m001:FizzBuzz}
   §F{f001:Main:pub}
     §O{void}
@@ -162,7 +164,7 @@ for (int i = 1; i <= 100; i++)
 ### Function with Contract
 
 **Calor:**
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -213,7 +215,7 @@ line-level compactness on the representative corpus.
 
 ### 1. Explicit Tags
 
-```
+```calor
 §M{m001:Name}    // Module requires tag + ID + name
 
 // vs C#
@@ -222,7 +224,7 @@ namespace Name   // Just keyword + name
 
 ### 2. Effect Declarations
 
-```
+```calor
 §E{cw,fs:r,net:rw}    // Explicit effects
 
 // C#: No equivalent - effects are implicit
@@ -231,7 +233,7 @@ namespace Name   // Just keyword + name
 ### 3. Block Indentation
 
 Nested structures use indentation instead of structural closers:
-```
+```calor
 §F{f001}
   §L{for1}
     §IF{if1}
@@ -241,7 +243,7 @@ Nested structures use indentation instead of structural closers:
 ### 4. Contract Syntax
 
 Contracts add lines:
-```
+```calor
 §Q (>= x 0)
 §S (>= result 0)
 ```

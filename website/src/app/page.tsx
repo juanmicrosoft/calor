@@ -1,4 +1,5 @@
 import { Hero } from '@/components/landing/Hero';
+import { FirstProgram } from '@/components/landing/FirstProgram';
 import { CodeComparison } from '@/components/landing/CodeComparison';
 import { CatchBugs } from '@/components/landing/CatchBugs';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
@@ -12,6 +13,7 @@ export default function HomePage() {
     <div className="flex flex-col">
       <ScrollDepthTracker />
       <Hero />
+      <FirstProgram />
       <CodeComparison />
       <CatchBugs />
       <FeatureGrid />

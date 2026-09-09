@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "3a452b09",
+  "sourceDeclaredVersion": "0.19.0",
+  "corpus": "tests/TestData/Benchmarks",
+  "method": "Deterministic static-analysis calculators",
+  "programCount": 217,
+  "metricNames": ["TokenEconomics", "GenerationAccuracy", "Comprehension", "EditPrecision", "ErrorDetection", "InformationDensity", "RefactoringStability", "Correctness"],
+  "limitation": "The exact measurement binary and working-tree state were not independently recorded. Source pairs are not all behaviorally equivalent; the reported confidence intervals do not establish sampling uncertainty or a language advantage. See issue #1276.",
+  "agentTasks": {
+    "sourceCommit": "107462e",
+    "sourceDeclaredVersion": "0.2.3",
+    "corpus": "tests/E2E/agent-tasks",
+    "method": "Historical single-run Claude task snapshot"
+  },
+  "agentRefactoring": {
+    "sourceCommit": "580e189",
+    "sourceDeclaredVersion": "0.2.3",
+    "corpus": "tests/E2E/agent-tasks",
+    "method": "Historical majority-vote refactoring study (2 of 3 runs)"
+  }
+}

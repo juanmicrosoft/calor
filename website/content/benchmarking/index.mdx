@@ -6,10 +6,13 @@ hasChildren: true
 ---
 
 
-The v0.13.2 dashboard compares **217 paired programs across eight
-deterministic metrics**, run as a **30-run statistical suite** (0.13.2 replaced
-the earlier single-run mode). It reports a 1.32x overall Calor/C# composite,
+The dashboard was rerun for v0.19.0 on **217 source pairs across eight
+deterministic metrics**, with **30 repetitions**. It reports a 1.32x legacy Calor/C# composite,
 with Calor ahead in seven metrics and C# ahead in information density.
+The pairs are not all behaviorally equivalent, and the reported intervals do not
+establish independent sampling uncertainty. These scores cannot establish a
+language or coding-agent advantage. Read the
+[snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
 ---
 
@@ -41,15 +44,15 @@ results are not included in the eight-metric headline or the 1.32x composite.
 <BenchmarkSummaryTable />
 
 **Current pattern:** Calor leads seven categories. C# leads information density
-at 0.98x Calor/C#.
+at 0.97x Calor/C#.
 
 ---
 
 ## Key Insight
 
-The strongest current advantages are comprehension (1.84x), error detection
+The highest calculator ratios are comprehension (1.84x), error detection
 (1.49x), token economics (1.42x composite), and refactoring stability (1.38x).
-Generation accuracy is close at 1.02x. Information density is 0.98x, the only
+Generation accuracy is close at 1.02x. Information density is 0.97x, the only
 current C# win.
 
 Token economics is a composite of token, character, and line ratios. Calor

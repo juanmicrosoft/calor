@@ -37,6 +37,22 @@ identifier, dotted reference, member access, indexer access, or a
 parenthesized expression. It is **not** a `§A`-list; for two or more
 arguments use form (3) or (4).
 
+Named-target calls retain C# argument modifiers with `§A{ref}`,
+`§A{out}`, or `§A{in}`. A named argument can combine both forms:
+
+```
+§C{Update} §A{ref} value §/C
+§C{TryRead} §A{out}[result] value §/C
+```
+
+Modifier braces must touch the marker: `§A{ref}`. A space before the brace
+instead starts a collection argument, as in `§A {1, 2}`.
+The modifier belongs to that argument, not the call. It must keep its
+explicit `§A` marker even for a single argument. These modifiers are not
+supported on expression-target calls or constructor/collection argument
+lists; those contexts report an invalid-modifier diagnostic rather than
+silently dropping the modifier.
+
 ---
 
 ## Rules

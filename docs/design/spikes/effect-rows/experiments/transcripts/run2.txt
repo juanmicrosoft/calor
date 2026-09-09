@@ -34,7 +34,7 @@ CASE Y1c-I-sameline-pure-then-decl-cw  args: (none)  exit: 1
 Y1c-I-sameline-pure-then-decl-cw.calr(3,15): error Calor0405: 'm' has type 'STRING', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
 
 ==============================================================================
-CASE Y2a-fallible-brace-form  args: (none)  exit: 1
+CASE Y2a-fallible-brace-form  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:Y2}
   §F{f001:Parse:pub}
@@ -43,7 +43,7 @@ CASE Y2a-fallible-brace-form  args: (none)  exit: 1
     §E{}
     §R §OK s
 ------------------------------------------------------------------------------
-Y2a-fallible-brace-form.calr(6,20): error Calor1002: Generated C# failed compilation (CS0029): Cannot implicitly convert type 'Calor.Runtime.Result<object, string>' to 'Calor.Runtime.Result<string, string>'
+Compilation successful: Y2a-fallible-brace-form.g.cs
 
 ==============================================================================
 CASE Y2b-fallible-in-B  args: (none)  exit: 0
