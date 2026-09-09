@@ -90,8 +90,15 @@ for (const width of [1366, 390]) {
       await expect(page.locator('article')).toContainText('--contract-mode off');
       if (path.endsWith('static-verification') || path.endsWith('contract-verification')) {
         await expect(page.locator('article')).toContainText('46341');
-        await expect(page.locator('article')).toContainText('-2147479015');
+        await expect(page.locator('article')).toContainText('2147395600');
+        await expect(page.locator('article')).toContainText('OverflowException');
+        await expect(page.locator('article')).not.toContainText('-2147479015');
         await expect(page.locator('article')).toContainText('Calor1004');
+        await page.locator('article').getByRole('link', { name: 'integer overflow policy', exact: true }).click();
+        await expect(page).toHaveURL(/\/verification-guarantees\/#integer-overflow-policy$/);
+        await expect(page.getByRole('heading', { name: 'Integer overflow policy', exact: true })).toBeInViewport();
+        await expect(page.locator('article')).toContainText('overflow=unchecked');
+        await expect(page.locator('article')).toContainText('disables contract checks, not this overflow exception');
       }
     }
   });

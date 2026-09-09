@@ -62,6 +62,25 @@ The parameter-poststate fix rejects unmodeled mutations, including implicit
 getter/conversion paths that may mutate ref aliases, rather than claiming a
 proof. Read the returned status and retain runtime checks where supported.
 
+### Integer overflow policy
+
+Native Calor defaults to **TRAP**, using checked arithmetic. For example,
+`46340 * 46340` returns `2147395600`, but `46341 * 46341` throws
+`OverflowException`. Contract mode and overflow policy are separate:
+`--contract-mode off` disables contract checks, not this overflow exception.
+A postcondition describes normal returns, not a promise of exception-free execution.
+
+Converted C# modules explicitly record their source overflow policy.
+Ordinary unchecked C# uses the module attribute `overflow=unchecked`, preserving
+its wrapping behavior; it does not inherit native Calor's default.
+Explicit checked/unchecked contexts remain distinct. Unscoped raw C# from a
+globally checked compilation is rejected, not silently treated as unchecked.
+
+Verification follows the selected policy. Unproven arithmetic-definedness
+conditions can produce `assumed`; they are not a clean proof that execution
+cannot throw. Read the reported status and assumptions rather than treating
+`--verify` as a universal overflow-safety guarantee.
+
 Floating-point `NaN`, infinities, overflow, overloaded operators, and repeated
 property evaluation need their own semantics. Identities such as `x == x` or
 `x - x == 0` are not universal .NET laws. The untyped simplifier preserves

@@ -97,11 +97,11 @@ claim that verification proves arbitrary preconditions at every call site.
 | Negative index | `§Q (>= index 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
 | Out of bounds | `§Q (< index len)` | Array facts are conservatively `assumed` where models diverge |
 | Invalid range | `§S (>= result 0)` | Postcondition receives one of the seven statuses |
-| Integer overflow | `§S (< result MAX_INT)` | Checked with fixed-width semantics in supported forms |
+| Integer overflow | Bounds on operands | Checked arithmetic may throw; a postcondition alone does not establish exception-free execution |
 
 ### Postcondition Verification
 
-An integer signature alone does not make this contract true:
+A postcondition constrains normal returns, not whether every input returns successfully:
 
 ```calor
 §F{f001:Square:pub} (i32:x) -> i32
@@ -111,9 +111,14 @@ An integer signature alone does not make this contract true:
   §R (* x x)
 ```
 
-For `x = 46341`, multiplication wraps to `-2147479015`, violating the
-postcondition. This is a refutable obligation, not a successful proof.
-An additional upper bound of `46340` would prevent this overflow.
+For native Calor, `x = 46340` returns `2147395600`. `x = 46341` instead throws
+`OverflowException` during checked multiplication, before any normal return or
+postcondition check. It does not return a wrapped negative value.
+An additional upper bound of `46340` prevents this multiplication overflow.
+
+The exception still occurs with `--contract-mode off`, and requesting
+`--verify` does not make the call succeed. Imported C# modules can have a
+different overflow policy; see [integer overflow policy](/docs/guides/verification-guarantees/#integer-overflow-policy).
 
 ---
 
@@ -138,7 +143,9 @@ Z3 verification supports:
 | `(\|\| p q)` | `p ∨ q` | Logical or |
 | `(! p)` | `¬p` | Logical not |
 
-Integers use fixed-width bit-vectors and supported C# promotion rules. Selected
+Integers use fixed-width bit-vectors, supported C# promotion rules, and the
+module's overflow policy. A bit-vector encoding does not mean native arithmetic
+wraps at runtime. Selected
 boolean, string, array, quantifier, implication, and registered user-field
 forms are also modeled.
 

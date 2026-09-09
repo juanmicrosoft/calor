@@ -56,3 +56,5 @@ try {
 } finally {
   await rm(workspace, { recursive: true, force: true });
 }
+
+await import('./overflow-guidance.mjs');

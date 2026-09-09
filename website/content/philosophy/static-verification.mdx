@@ -26,11 +26,17 @@ When you write contracts in Calor:
   §R (* x x)
 ```
 
-This contract is false under fixed-width integer semantics. `x = 46341`
-satisfies the precondition, but its square wraps to `-2147479015`.
-Verification can expose this counterexample; it must not report a clean proof
-that the result is always nonnegative. Restricting `x` to `0..46340` avoids this
-overflow. Even a valid proof covers only its modeled obligation, not the whole program.
+Native Calor checks this integer multiplication for overflow. `x = 46340`
+returns `2147395600`. `x = 46341` satisfies the precondition, but multiplication
+throws `OverflowException` instead of returning a wrapped negative value.
+The postcondition constrains normal returns; it does not promise that every
+allowed input returns successfully.
+
+Restricting `x` to `0..46340` avoids this multiplication overflow.
+`--contract-mode off` disables contract checks, not checked arithmetic.
+Optional `--verify` does not make this example return successfully for `46341`.
+See [integer overflow policy](/docs/guides/verification-guarantees/#integer-overflow-policy)
+for the distinction between native Calor and imported C#.
 
 ---
 
@@ -86,7 +92,9 @@ Z3 verification supports:
 | `(! p)` | `¬p` | Logical not |
 
 Integer arithmetic is modeled with fixed-width bit-vectors and C#-compatible
-promotion rules where supported—not arbitrary-precision integers. Boolean,
+promotion rules where supported—not arbitrary-precision integers. Verification
+also follows the module's overflow policy; bit-vectors do not imply that native
+execution wraps on overflow. Boolean,
 integer, selected string, array, quantifier, implication, and registered
 user-field forms are modeled with the restrictions below.
 
