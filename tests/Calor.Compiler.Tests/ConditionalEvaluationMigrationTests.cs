@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -16,6 +17,136 @@ public class ConditionalEvaluationMigrationTests
         AssertRoundTrip(
             "int i = 0; bool gate = false; bool ignored = gate && i++ > 0; return i;",
             0, expectInterop: false);
+    }
+
+    [Fact]
+    public void FieldInitializers_RetainSourceOrder()
+    {
+        AssertRoundTrip("return Snapshot;", 1, false, members: """
+            private static int Seed;
+            private static int First = true ? Seed++ : 0;
+            private static int Snapshot = Seed;
+            """);
+    }
+
+    [Theory]
+    [InlineData("true", 1)]
+    [InlineData("false", 0)]
+    public void PreservedFieldOperand_DoesNotMoveItsInitializer(string gate, int expected)
+    {
+        AssertRoundTrip("return Snapshot;", expected, true, members: $$"""
+            private static int Seed;
+            private static int First = {{gate}} ? (Seed += 1) : 0;
+            private static int Snapshot = Seed;
+            """);
+    }
+
+    [Fact]
+    public void AutoPropertyInitializers_RetainSourceOrder()
+    {
+        AssertRoundTrip("return Snapshot;", 1, false, members: """
+            private static int Seed;
+            private static int First { get; } = true ? Seed++ : 0;
+            private static int Snapshot { get; } = Seed;
+            """);
+    }
+
+    [Fact]
+    public void ConditionalInvocation_DoesNotBecomeACollidingProperty()
+    {
+        AssertRoundTrip("var target = new Holder(); int? ignored = target?.M(1); return target.Calls;",
+            1, false, members: """
+                public sealed class Holder
+                {
+                    public int Calls;
+                    public int M(int value) { Calls++; return value; }
+                    public int M1 => 0;
+                }
+                """);
+    }
+
+    [Theory]
+    [InlineData("Receiver()", false)]
+    [InlineData("((Holder)Receiver())", false)]
+    [InlineData("new Holder()", true)]
+    [InlineData("Items[0]", true)]
+    [InlineData("Items[0].Self", true)]
+    public void CapturedReceivers_PreserveNamedArguments(string receiver, bool expectInterop)
+    {
+        AssertRoundTrip($"bool gate = true; bool ignored = gate && {receiver}.Check(second: 1, first: 2); return Calls;",
+            21, expectInterop, members: """
+                private static int Calls;
+                private static Holder[] Items = new Holder[] { new Holder() };
+                public sealed class Holder
+                {
+                    public Holder Self => this;
+                    public bool Check(int first, int second) { Calls = first * 10 + second; return true; }
+                }
+                public static Holder Receiver() { return new Holder(); }
+                """);
+    }
+
+    [Theory]
+    [InlineData("ref", "false", 7)]
+    [InlineData("ref", "true", 9)]
+    [InlineData("out", "false", 7)]
+    [InlineData("out", "true", 9)]
+    public void CapturedReceivers_PreserveWritableArgumentModifiers(string modifier, string gate, int expected)
+    {
+        AssertRoundTrip($"int value = 7; bool gate = {gate}; bool ignored = gate && Receiver().Check({modifier} value); return value;",
+            expected, true, members: $$"""
+                public sealed class Holder
+                {
+                    public bool Check({{modifier}} int value) { value = 9; return true; }
+                }
+                public static Holder Receiver() { return new Holder(); }
+                """);
+    }
+
+    [Theory]
+    [InlineData("false", 0)]
+    [InlineData("true", 7)]
+    public void CapturedReceivers_PreserveInArgumentModifier(string gate, int expected)
+    {
+        AssertRoundTrip($"int value = 7; bool gate = {gate}; bool ignored = gate && Receiver().Check(in value); return Calls;",
+            expected, true, members: """
+                private static int Calls;
+                public sealed class Holder
+                {
+                    public bool Check(in int value) { Calls = value; return true; }
+                }
+                public static Holder Receiver() { return new Holder(); }
+                """);
+    }
+
+    [Theory]
+    [InlineData("true", "(+ n 1)", 3)]
+    [InlineData("false", "(+ n 1)", 0)]
+    [InlineData("true", "§C{Size} §/C", 3)]
+    [InlineData("false", "§C{Size} §/C", 0)]
+    public void NativeConditionalArraySizes_SurvivePrettyRoundTrip(string gate, string size, int expected)
+    {
+        var source = $$"""
+            §M{m:Probe}
+              §F{s:Size:pub} () -> i32
+                §R 3
+              §F{r:Run:pub} () -> i32
+                §B{n:i32} 2
+                §B{values} (? {{gate}} §ARR{a:i32:"{{size}}"} §ARR{b:i32:0})
+                §R (len values)
+            """;
+        var options = new Calor.Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null };
+        var first = Program.Compile(source, "native-array.calr", options);
+        Assert.False(first.HasErrors, string.Join(Environment.NewLine, first.Diagnostics.Errors));
+        Assert.Equal(expected, Execute(first.GeneratedCode));
+        var diagnostics = new DiagnosticBag();
+        var parser = new Calor.Compiler.Parsing.Parser(
+            new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics);
+        var pretty = new CalorEmitter().Emit(parser.Parse());
+        Assert.DoesNotContain("§CS", pretty);
+        var second = Program.Compile(pretty, "native-array-pretty.calr", options);
+        Assert.False(second.HasErrors, string.Join(Environment.NewLine, second.Diagnostics.Errors));
+        Assert.Equal(expected, Execute(second.GeneratedCode));
     }
 
     [Theory]
@@ -365,6 +496,11 @@ public class ConditionalEvaluationMigrationTests
             $"Expected {expected}, actual {actual}\n{conversion.CalorSource}\n{compilation.GeneratedCode}");
         Assert.Equal(expectInterop,
             conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));
+        if (!expectInterop)
+        {
+            Assert.DoesNotContain(conversion.Losses,
+                loss => loss.Kind == ConversionLossKind.EmitterFallback);
+        }
         if (expectInterop)
         {
             Assert.Contains(conversion.Issues, issue =>

@@ -8818,9 +8818,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.ExpressionsConverted++;
 
-        if (_conditionalRegionDepth > 0 && expression is InvocationExpressionSyntax invocationWithDeclaration &&
-            invocationWithDeclaration.ArgumentList.Arguments.Any(argument =>
-                argument.Expression is DeclarationExpressionSyntax))
+        if (_conditionalRegionDepth > 0 && expression is InvocationExpressionSyntax conditionalInvocation &&
+            conditionalInvocation.ArgumentList.Arguments.Any(argument =>
+                argument.Expression is DeclarationExpressionSyntax ||
+                !argument.RefKindKeyword.IsKind(SyntaxKind.None)))
             return PreserveConditionalOperand(expression);
 
         if (_conditionalRegionDepth > 0 &&
@@ -10820,7 +10821,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_cast", castTypeHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, castConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
 
             // Handle chained method calls (e.g., products.GroupBy(...).Select(...))
@@ -10845,7 +10846,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_chain", innerMethodHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, innerConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
 
             // Handle indexer-then-call pattern: words[0].Method(...)
@@ -10856,7 +10857,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_elem");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, elementConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
 
             // Handle new-then-call pattern: new Foo(...).Method(...)
@@ -10869,7 +10870,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_new", newTypeHint);
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, newConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
 
             // Handle typeof-then-call pattern: typeof(T).Method(...)
@@ -10882,7 +10883,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_typeof");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, typeofConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
 
             // Handle member access chains that contain indexers (e.g., boxes[0].Instance.Method())
@@ -10894,7 +10895,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_idx");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, chainConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
 
             // Handle conditional-access-then-call and other complex patterns
@@ -10910,7 +10911,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var tempName = _context.GenerateId("_expr");
                 _pendingStatements.Add(new BindStatementNode(
                     span, tempName, null, false, complexConverted, new AttributeCollection()));
-                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, null, null, typeArguments);
+                return new CallExpressionNode(span, $"{tempName}.{methodName}", args, argNames, argModifiers, typeArguments);
             }
         }
 

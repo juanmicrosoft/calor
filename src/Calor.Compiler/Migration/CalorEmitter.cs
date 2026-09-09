@@ -3537,20 +3537,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (node.Size != null)
         {
             var size = node.Size.Accept(this);
-            // Hoist complex size expressions out of the attribute braces
-            // (§C calls, parenthesized expressions, commas, hex literals break attribute parsing)
+            // Use a temporary in ordinary statement regions, or a quoted
+            // embedded expression when evaluation must remain inline.
             if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':') || size.Contains("0x"))
             {
                 size = HoistToTempVar(size);
-                // If hoisting failed (field level), fall back to raw C# expression
-                if (ContainsSectionMarker(size) || size.Contains('('))
+                // A quoted embedded expression can remain inside a lazy operand
+                // or field initializer; do not mislabel Calor text as raw C#.
+                if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
                 {
-                    var rawExpr = $"new {node.ElementType}[{size}]";
-                    RecordEmitterFallback(
-                        node,
-                        "raw-array-size",
-                        "Array size could not be represented natively and was preserved as §CS");
-                    return $"§CS{{{rawExpr}}}";
+                    var embedded = new StringLiteralNode(node.Span, size).Accept(this);
+                    return $"§ARR{{{elementType}:{id}:{embedded}}}";
                 }
             }
             return $"§ARR{{{elementType}:{id}:{size}}}";

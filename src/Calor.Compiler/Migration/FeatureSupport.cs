@@ -209,7 +209,7 @@ public static class FeatureSupport
         {
             Name = "conditional-expression-hoisting",
             Support = SupportLevel.Partial,
-            Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
+            Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands, ref/out/in calls, and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
             Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         ["linq-method"] = new FeatureInfo

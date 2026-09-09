@@ -7200,16 +7200,11 @@ public sealed class Parser
                 // Size is an integer literal
                 size = new IntLiteralNode(startToken.Span, sizeVal);
             }
-            else if (sizeStr.StartsWith("("))
-            {
-                // Size is an expression like (len data) - re-lex and parse it
-                // This handles §ARR{a001:i32:(len data)}
-                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
-            }
             else
             {
-                // Size is a variable reference (e.g., §ARR{a001:i32:n} where n is a variable)
-                size = new ReferenceNode(startToken.Span, sizeStr);
+                // Quoted attributes also preserve calls and typed literals,
+                // without moving their evaluation out of a conditional region.
+                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
             }
         }
         else
