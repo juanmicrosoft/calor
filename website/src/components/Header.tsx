@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/Drawer';
-import { cn, getBasePath } from '@/lib/utils';
+import { cn, getBasePath, normalizePathname } from '@/lib/utils';
 import { SITE_VERSION } from '@/lib/version';
 import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/lib/analytics';
 
@@ -23,6 +23,11 @@ const navigation = [
 
 export function Header() {
   const pathname = usePathname();
+  const path = normalizePathname(pathname);
+  const activeNavigation = [...navigation].reverse().find(item => {
+    const target = normalizePathname(item.href);
+    return path === target || path.startsWith(`${target}/`);
+  })?.href;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
 
@@ -74,9 +79,10 @@ export function Header() {
               <Link
                 key={item.name}
                 href={item.href}
+                aria-current={activeNavigation === item.href ? 'location' : undefined}
                 className={cn(
                   'text-sm font-medium transition-colors hover:text-primary',
-                  pathname?.startsWith(item.path.replace(/\/$/, ''))
+                  activeNavigation === item.href
                     ? 'text-primary'
                     : 'text-muted-foreground'
                 )}
@@ -151,6 +157,7 @@ export function Header() {
                     <Link
                       key={item.name}
                       href={item.href}
+                      aria-current={activeNavigation === item.href ? 'location' : undefined}
                       className="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-foreground hover:bg-accent"
                       onClick={() => setMobileMenuOpen(false)}
                     >
