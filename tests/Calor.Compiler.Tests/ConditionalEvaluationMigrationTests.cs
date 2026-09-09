@@ -20,6 +20,23 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Fact]
+    public void NestedArithmetic_PreservesLeftToRightCallOrder()
+    {
+        AssertRoundTrip("int ignored = Trace(1) + Trace(2) * Trace(3); return Calls;",
+            123, false, members: """
+                private static int Calls;
+                public static int Trace(int id) { Calls = Calls * 10 + id; return id; }
+                """);
+    }
+
+    [Fact]
+    public void ArithmeticRightCall_DoesNotChangeAnEarlierOperandValue()
+    {
+        AssertRoundTrip("int value = 7; int saved = value + Mutate(ref value); return saved;",
+            7, false, members: "public static int Mutate(ref int value) { value = 9; return 0; }");
+    }
+
+    [Fact]
     public void FieldInitializers_RetainSourceOrder()
     {
         AssertRoundTrip("return Snapshot;", 1, false, members: """

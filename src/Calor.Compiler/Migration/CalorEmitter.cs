@@ -3098,22 +3098,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(BinaryOperationNode node)
     {
-        // AcceptInInlineSibling: operands in Lisp (op a b) form are space-separated,
-        // so a nested zero-arg call without explicit §/C would absorb the next operand.
-        // After AcceptInInlineSibling the inner §/C is kept, then hoisting moves the
-        // §-bearing operand to a temp var (within method bodies). At class/module scope
-        // where HoistToTempVar is a no-op, the explicit §/C is what keeps parsing safe.
-        var conditional = node.Operator is BinaryOperator.And or BinaryOperator.Or;
-        var left = conditional ? AcceptInConditionalRegion(node.Left) : AcceptInInlineSibling(node.Left);
-        var right = conditional ? AcceptInConditionalRegion(node.Right) : AcceptInInlineSibling(node.Right);
+        // Both lazy and eager operators need intact operand regions. Hoisting a
+        // nested right operand can run it before the left call or variable read.
+        // Explicit inner call closers keep section-bearing Lisp operands unambiguous.
+        var left = AcceptInConditionalRegion(node.Left);
+        var right = AcceptInConditionalRegion(node.Right);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
-
-        // Hoist operands containing section markers or commas (tuples) out of Lisp expression.
-        // § markers and commas are invalid inside (op ...) expressions.
-        if (!conditional && (ContainsSectionMarker(left) || left.Contains(',')))
-            left = HoistToTempVar(left);
-        if (!conditional && (ContainsSectionMarker(right) || right.Contains(',')))
-            right = HoistToTempVar(right);
 
         return $"({opSymbol} {left} {right})";
     }
