@@ -672,7 +672,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                 source.TypeSubstitutions, memberLookup: true,
                 typeArguments: source.Resolution.TypeArguments, argumentsAlreadyBound: true);
             return declaration == null ? null : QualifiedTypeName(declaration);
-        }, source.Parameters.Select(parameter => parameter.Name)
+        }, SourceValueNames(source.Resolution).Concat(source.Parameters.Select(parameter => parameter.Name))
             .Append("result").Append("this").ToHashSet(StringComparer.Ordinal));
 
         return source with
@@ -703,6 +703,57 @@ public sealed class ContractInheritanceChecker : IDisposable
                     contract.Attributes))
                 .ToArray()
         };
+    }
+
+    private IEnumerable<string> SourceValueNames(ResolvedDeclaration source)
+    {
+        var pending = new Stack<ResolvedDeclaration>();
+        pending.Push(source);
+        var visited = new HashSet<AstNode>();
+        while (pending.TryPop(out var scope))
+        {
+            if (!visited.Add(scope.Declaration))
+                continue;
+            IEnumerable<AstNode> members = scope.Declaration switch
+            {
+                ClassDefinitionNode cls => cls.Fields.Cast<AstNode>().Concat(cls.Properties)
+                    .Concat(cls.Methods).Concat(cls.Events).Concat(cls.PreprocessorBlocks),
+                InterfaceDefinitionNode iface => iface.Properties.Cast<AstNode>()
+                    .Concat(iface.Methods).Concat(iface.PreprocessorBlocks),
+                _ => []
+            };
+            foreach (var member in members.SelectMany(member => member is MemberPreprocessorBlockNode
+                         ? EnumerateDescendantsAndSelf(member) : [member]))
+            {
+                var name = member switch
+                {
+                    ClassFieldNode field => field.Name,
+                    PropertyNode property => property.Name,
+                    MethodNode method => method.Name,
+                    MethodSignatureNode method => method.Name,
+                    EventDefinitionNode evt => evt.Name,
+                    _ => null
+                };
+                if (name != null)
+                    yield return name;
+            }
+            if (_enclosingDeclarations[scope.Declaration] is { } enclosing)
+                pending.Push(new ResolvedDeclaration(enclosing,
+                    DeclarationSubstitutions(enclosing, scope.TypeArguments), scope.TypeArguments));
+            var bases = scope.Declaration switch
+            {
+                ClassDefinitionNode { BaseClass: { } baseName } => [baseName],
+                InterfaceDefinitionNode iface => iface.BaseInterfaces,
+                _ => (IReadOnlyList<string>)[]
+            };
+            foreach (var baseName in bases)
+            {
+                var parent = ResolveDeclaration(baseName, scope.Declaration, scope.Substitutions,
+                    typeArguments: scope.TypeArguments);
+                if (parent != null)
+                    pending.Push(parent);
+            }
+        }
     }
 
     private static ExpressionNode RewriteReferences(
@@ -736,11 +787,14 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
         if (expression is ConditionalExpressionNode conditional)
         {
+            var branchBindings = WithBoundValues(typeReplacements,
+                EnumerateDescendantsAndSelf(conditional.Condition).OfType<IsPatternNode>()
+                    .Select(pattern => pattern.VariableName).OfType<string>());
             return new ConditionalExpressionNode(
                 conditional.Span,
                 RewriteReferences(conditional.Condition, replacements, typeReplacements),
-                RewriteReferences(conditional.WhenTrue, replacements, typeReplacements),
-                RewriteReferences(conditional.WhenFalse, replacements, typeReplacements));
+                RewriteReferences(conditional.WhenTrue, replacements, branchBindings),
+                RewriteReferences(conditional.WhenFalse, replacements, branchBindings));
         }
         if (expression is ArrayAccessNode arrayAccess)
         {

@@ -692,6 +692,90 @@ public sealed class NestedContractInheritanceRuntimeTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConditionalPatternReceivers_RemainValuesInInheritedGuards(bool verify)
+    {
+        foreach (var condition in new[] { "(is x Payload Limits)", "(! (is x Payload Limits))" })
+        foreach (var post in new[] { false, true })
+        {
+            var predicate = condition.StartsWith("(!", StringComparison.Ordinal)
+                ? $"(? {condition} BOOL:false (> Limits.Min INT:0))"
+                : $"(? {condition} (> Limits.Min INT:0) BOOL:false)";
+            var contract = post ? "§S " + predicate.Replace("is x", "is result") : "§Q " + predicate;
+            var source = $$"""
+                §M{m1:Scope}
+                  §CL{c1:Outer:pub}
+                    §CL{c2:Limits:pub}
+                      §FLD{i32:Min:pub:stat} INT:10
+                    §IFACE{i1:IValue}
+                      §MT{im1:Check} (object:x) -> object
+                        {{contract}}
+                  §CL{c3:Payload:pub}
+                    §FLD{i32:Min:pub} INT:0
+                  §CL{c4:Impl:pub}
+                    §IMPL{Outer.IValue}
+                    §MT{mt1:Check:pub} (object:value) -> object
+                      §E{}
+                      §R value
+                """;
+            var assembly = Compile(source, verify);
+            var payloadType = assembly.GetType("Scope.Payload")!;
+            var valid = Activator.CreateInstance(payloadType)!;
+            payloadType.GetField("Min")!.SetValue(valid, 1);
+            var invalid = Activator.CreateInstance(payloadType)!;
+            payloadType.GetField("Min")!.SetValue(invalid, -1);
+            AssertObjectGuard(assembly.GetType("Scope.Impl")!, valid, invalid);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourceFieldReceivers_RemainValuesInInheritedGuards(bool verify)
+    {
+        foreach (var inheritedField in new[] { false, true })
+        foreach (var contract in new[] { "§Q (> Limits.Min INT:0)", "§S (> Limits.Min INT:0)" })
+        {
+            var source = $$"""
+                §M{m1:Scope}
+                  §CL{c1:Outer:pub}
+                    §CL{c2:Limits:pub}
+                      §FLD{i32:Min:pub:stat} INT:10
+                    §CL{c3:Storage:pub}
+                      §FLD{Payload:Limits:pub}
+                    §CL{c4:Base:pub}
+                      {{(inheritedField ? "§EXT{Storage}" : "§FLD{Payload:Limits:pub}")}}
+                      §MT{mt1:Get:pub:virt} (i32:x) -> i32
+                        §E{}
+                        {{contract}}
+                        §R x
+                  §CL{c5:Payload:pub}
+                    §FLD{i32:Min:pub} INT:0
+                  §CL{c6:Container:pub}
+                    §CL{c7:Impl:pub}
+                      §EXT{Outer.Base}
+                      §MT{mt2:Get:pub:over} (i32:value) -> i32
+                        §E{}
+                        §R value
+                """;
+            var assembly = Compile(source, verify);
+            foreach (var typeName in new[] { "Scope.Outer+Base", "Scope.Container+Impl" })
+            {
+                var instance = Activator.CreateInstance(assembly.GetType(typeName)!)!;
+                var payload = Activator.CreateInstance(assembly.GetType("Scope.Payload")!)!;
+                instance.GetType().GetField("Limits")!.SetValue(instance, payload);
+                var method = instance.GetType().GetMethod("Get")!;
+                payload.GetType().GetField("Min")!.SetValue(payload, 1);
+                Assert.Equal(1, method.Invoke(instance, [1]));
+                payload.GetType().GetField("Min")!.SetValue(payload, -1);
+                var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [1]));
+                Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+            }
+        }
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions
