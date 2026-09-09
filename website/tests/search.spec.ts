@@ -28,13 +28,20 @@ for (const width of [1366, 390]) {
       await expect(results.getByRole('link').first()).toBeVisible();
       expect(indexRequests.every(url => new URL(url).hostname === '127.0.0.1')).toBe(true);
       expect(indexRequests.every(url => !url.includes(query))).toBe(true);
-      const first = results.getByRole('link').first();
-      const target = await first.getAttribute('href');
+      const targetLink = query === '§F'
+        ? results.getByRole('link').filter({ has: page.getByText('Structure Tags', { exact: true }) })
+        : results.getByRole('link').first();
+      const target = await targetLink.getAttribute('href');
       await input.press('ArrowDown');
-      await expect(first).toBeFocused();
+      for (let i = 0; i < await results.getByRole('link').count(); i++) {
+        if (await targetLink.evaluate(element => element === document.activeElement)) break;
+        await page.keyboard.press('Tab');
+      }
+      await expect(targetLink).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(`http://127.0.0.1:4173${target}`);
       await expect(page.locator('article')).toContainText(query);
+      if (query === '§F') await expect(page.locator('article > h1')).toHaveText('Structure Tags');
       await expect(input).toBeVisible();
     }
 

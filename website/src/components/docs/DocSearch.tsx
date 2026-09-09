@@ -43,12 +43,12 @@ export function DocSearch() {
         {error ? 'Search could not load. Refocus the field to retry, or browse the sidebar.'
           : !query.trim() ? 'Search runs locally in your browser. No account required.'
           : !documents ? 'Loading documentation index…'
-          : results.length ? `${results.length} matching pages${results.length > 10 ? '; showing the first 10' : ''}.`
+          : results.length ? `${results.length} matching pages.`
           : 'No matching pages. Try another diagnostic, flag, or keyword.'}
       </p>
       {query.trim() && results.length > 0 && (
         <ul aria-label="Search results" className="mt-3 max-h-80 space-y-3 overflow-y-auto">
-          {results.slice(0, 10).map((result, index) => (
+          {results.map((result, index) => (
             <li key={result.slug}>
               <Link ref={index === 0 ? firstResult : undefined}
                 href={`/docs/${result.slug}${result.slug ? '/' : ''}`}
