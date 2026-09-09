@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/Drawer';
@@ -31,6 +31,21 @@ export function Header() {
   })?.href;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
+  // The bottom border exists to separate the header from content passing UNDER it
+  // while it is stuck. At the very top of the document there is nothing passing
+  // under it yet, and on the landing page the border instead drew a slate line
+  // straight across the top of the hero video — the header sits flush on the
+  // video's first row, so its border reads as a seam in the footage and defeats
+  // the fade there. Hiding it outright is not the answer either: scrolled, the
+  // translucent blurred header alone does not separate cleanly from the sections
+  // running beneath it. So it appears exactly when it does work.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 0);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const toggleDarkMode = () => {
     trackDarkModeToggle(toggleTheme());
@@ -38,7 +53,7 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className={cn('sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60', scrolled ? 'border-border' : 'border-transparent')}>
         <nav className="mx-auto flex max-w-7xl items-center justify-between p-4 lg:px-8">
           <div className="flex lg:flex-1">
             <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">

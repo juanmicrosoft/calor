@@ -115,27 +115,27 @@ export function Hero() {
 
       {/* Both edges of the video are softened into the page background, so the hero
           neither starts nor ends on a hard horizontal line where the footage is cut
-          off. The ramp is 20px on each edge.
+          off. The ramp is 30px on each edge.
 
           The colour is `background` at both ends and that is correct in both themes:
           below the hero is the page itself, and above it is the header, which is
           `bg-background/95` (Header.tsx) sitting at the top of that same page.
 
-          Sizes differ for one reason. The top element is exactly the 20px ramp. The
-          bottom is 44px — the same 20px ramp, then a hard stop that stays opaque for
+          Sizes differ for one reason. The top element is exactly the 30px ramp. The
+          bottom is 54px — the same 30px ramp, then a hard stop that stays opaque for
           another 24px. That tail is not decoration: the divider below is a WAVY path,
           not a rectangle, so it covers only part of its own 24px band and roughly 10px
           of video showed through above the curve. Going opaque before that band and
           staying opaque through it covers the gap at every x position. Shrinking the
-          bottom element to a bare 20px brings that strip of video straight back. */}
+          bottom element to a bare 30px brings that strip of video straight back. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-5"
-        style={{ background: 'linear-gradient(to top, transparent, hsl(var(--background)) 20px)' }}
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[30px]"
+        style={{ background: 'linear-gradient(to top, transparent, hsl(var(--background)) 30px)' }}
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-11"
-        style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--background)) 20px, hsl(var(--background)))' }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[54px]"
+        style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--background)) 30px, hsl(var(--background)))' }}
         aria-hidden="true"
       />
 
