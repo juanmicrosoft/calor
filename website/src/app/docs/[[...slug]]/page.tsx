@@ -15,6 +15,7 @@ import { DocsPageTracker } from '@/components/docs/DocsPageTracker';
 import { DocSearch } from '@/components/docs/DocSearch';
 import { mdxComponents } from '@/components/mdx';
 import { Heading, remarkHeadings } from '@/lib/headings';
+import { canonicalUrl, publicUrl } from '@/lib/site';
 
 interface DocPageProps {
   params: Promise<{ slug?: string[] }>;
@@ -45,6 +46,15 @@ export async function generateMetadata({ params }: DocPageProps) {
   return {
     title: doc.title,
     description: doc.description,
+    alternates: { canonical: canonicalUrl(`/docs/${slugPath}`) },
+    openGraph: {
+      title: doc.title,
+      description: doc.description,
+      url: canonicalUrl(`/docs/${slugPath}`),
+      type: 'website',
+      siteName: 'Calor',
+      images: [publicUrl('/og-image.jpg')],
+    },
   };
 }
 
