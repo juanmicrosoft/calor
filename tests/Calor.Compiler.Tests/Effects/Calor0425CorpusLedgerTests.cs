@@ -171,7 +171,11 @@ public class Calor0425CorpusLedgerTests
         + "design-doc §6.2 can distinguish, plus (schema 2, v0.15 E4) the external-base arm of "
         + "sites 4/5 and the three verdicts an INVOCATION of a function-typed value can draw — "
         + "row-less declaration, undetermined source (a BCL-returned or row-less-returned value), "
-        + "and an Assumed row; §13.4's unresolved-receiver cause is Calor0411's, not this ledger's";
+        + "and an Assumed row; §13.4's unresolved-receiver cause is Calor0411's, not this ledger's. "
+        + "#1195 moves seven LanguageManagerTests.cs query calls and two ValidatorDescriptor.cs "
+        + "selector calls behind explicit interop boundaries to preserve deferred semantics. "
+        + "These nine fewer Calor0411 sites are opaque, not newly proven pure; the enforced-module "
+        + "denominator and Calor0425 counts are unchanged";
 
     private static readonly string[] Subjects = ["MediatR", "serilog", "FluentValidation"];
 

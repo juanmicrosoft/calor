@@ -197,7 +197,12 @@ public class Calor0270CorpusVolumeTests
     /// ledger's, and that the K1 hook does not regenerate this file.</para>
     /// <para>`ModulesBound` stays 364 exactly: every module still parses, which
     /// is the property gate 9's parse leg holds.</para>
-    private const int AggregateDiagnostics = 302;
+    /// <para>v0.19 #1195 preserves unsupported queries explicitly instead of
+    /// dropping clauses or hoisting selectors. One unresolved `directives` receiver
+    /// in Serilog's KeyValuePairSettings.cs moves behind that declared interop
+    /// boundary: 302 -> 301. This is not newly resolved native analysis; the
+    /// parsed-module denominator and its guard remain unchanged.</para>
+    private const int AggregateDiagnostics = 301;
     private const int AggregateModulesWithDiagnostics = 35;
     private const int PreK1AggregateModulesBound = 364;
 

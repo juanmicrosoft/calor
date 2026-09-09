@@ -11329,6 +11329,33 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("linq-query");
         var span = GetTextSpan(query);
+        var sourceType = _semanticModel?.GetTypeInfo(query.FromClause.Expression).Type;
+        var simpleJoinSelect = query.Body.Clauses.Count == 1
+            && query.Body.Clauses[0] is JoinClauseSyntax { Into: null } join
+            && query.Body.SelectOrGroup is SelectClauseSyntax select
+            && query.Body.Continuation == null
+            && !new[] { join.LeftExpression, join.RightExpression, select.Expression }
+                .SelectMany(expression => expression.DescendantNodesAndSelf())
+                .Any(node => node is InvocationExpressionSyntax);
+        if (query.FromClause.Type != null
+            || sourceType?.Name == "IQueryable"
+            || sourceType?.AllInterfaces.Any(type => type.Name == "IQueryable") == true
+            || query.FromClause.Expression is InvocationExpressionSyntax
+                && (sourceType == null || sourceType.TypeKind == TypeKind.Error)
+            || query.Body.DescendantNodesAndSelf().Any(node =>
+                node is LetClauseSyntax or FromClauseSyntax
+                || node is JoinClauseSyntax && !simpleJoinSelect
+                || node is QueryContinuationSyntax continuation
+                    && (continuation.Body.Clauses.Count > 0
+                        || continuation.Body.SelectOrGroup is not SelectClauseSyntax
+                            { Expression: IdentifierNameSyntax selected }
+                        || selected.Identifier.ValueText != continuation.Identifier.ValueText)))
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "linq-query",
+                "Query range-variable scope and deferred execution preserved verbatim",
+                query.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpExpressionNode(span, query.ToString());
+        }
 
         // Start with the from clause's collection
         var rangeVar = query.FromClause.Identifier.Text;
@@ -11348,8 +11375,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     case WhereClauseSyntax whereClause:
                     {
-                        var condition = ConvertExpression(whereClause.Condition);
-                        var lambda = MakeLinqLambda(span, rangeVar, condition);
+                        var lambda = ConvertLinqLambda(span, rangeVar, whereClause.Condition);
                         currentExpr = MakeChainedCall(span, currentExpr, "Where", new ExpressionNode[] { lambda });
                         break;
                     }
@@ -11358,7 +11384,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         var isFirst = true;
                         foreach (var ordering in orderByClause.Orderings)
                         {
-                            var keyExpr = ConvertExpression(ordering.Expression);
                             var isDescending = ordering.AscendingOrDescendingKeyword.IsKind(SyntaxKind.DescendingKeyword);
 
                             string methodName;
@@ -11367,7 +11392,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             else
                                 methodName = isDescending ? "ThenByDescending" : "ThenBy";
 
-                            var lambda = MakeLinqLambda(span, rangeVar, keyExpr);
+                            var lambda = ConvertLinqLambda(span, rangeVar, ordering.Expression);
                             currentExpr = MakeChainedCall(span, currentExpr, methodName, new ExpressionNode[] { lambda });
                             isFirst = false;
                         }
@@ -11430,7 +11455,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Process the terminal select or group clause
             if (body.SelectOrGroup is SelectClauseSyntax selectClause)
             {
-                var projection = ConvertExpression(selectClause.Expression);
+                var selector = ConvertLinqLambda(span, rangeVar, selectClause.Expression);
+                var projection = selector.ExpressionBody!;
 
                 if (lastJoinVar != null
                     && currentExpr is CallExpressionNode joinCall
@@ -11447,15 +11473,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 else if (projection is not ReferenceNode refNode || refNode.Name != rangeVar)
                 {
                     // Only add Select if projection is not just the range variable
-                    var lambda = MakeLinqLambda(span, rangeVar, projection);
-                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { lambda });
+                    currentExpr = MakeChainedCall(span, currentExpr, "Select", new ExpressionNode[] { selector });
                 }
             }
             else if (body.SelectOrGroup is GroupClauseSyntax groupClause)
             {
-                var byExpr = ConvertExpression(groupClause.ByExpression);
-                var lambda = MakeLinqLambda(span, rangeVar, byExpr);
-                currentExpr = MakeChainedCall(span, currentExpr, "GroupBy", new ExpressionNode[] { lambda });
+                var keySelector = ConvertLinqLambda(span, rangeVar, groupClause.ByExpression);
+                var elementSelector = ConvertLinqLambda(span, rangeVar, groupClause.GroupExpression);
+                currentExpr = MakeChainedCall(span, currentExpr, "GroupBy",
+                    new ExpressionNode[] { keySelector, elementSelector });
             }
 
             // Handle continuation (into g ...)
@@ -11473,15 +11499,74 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return currentExpr;
     }
 
+    private LambdaExpressionNode ConvertLinqLambda(TextSpan span, string parameter, ExpressionSyntax expression)
+    {
+        var savedPending = new List<StatementNode>(_pendingStatements);
+        _pendingStatements.Clear();
+        try
+        {
+            var parameterReferences = expression.DescendantNodesAndSelf()
+                .OfType<IdentifierNameSyntax>()
+                .Where(identifier => identifier.Identifier.ValueText == parameter.TrimStart('@'))
+                .ToList();
+            var parameterType = parameterReferences
+                .Where(identifier => _semanticModel?.GetSymbolInfo(identifier).Symbol is IRangeVariableSymbol)
+                .Select(identifier => _semanticModel!.GetTypeInfo(identifier).Type)
+                .FirstOrDefault(type => type is not null && type.TypeKind != TypeKind.Error);
+            if (parameterType != null && !CanNameQueryParameterType(parameterType))
+                parameterType = null;
+            var body = ConvertExpression(expression);
+            if (_pendingStatements.Count > 0
+                || !IsInlineNativeQuerySelector(expression)
+                || parameterReferences.Count > 0 && parameterType == null)
+            {
+                // Query selectors are deferred, and IQueryable also requires an
+                // expression lambda. Never hoist their work to query construction.
+                _context.RecordLoss(ConversionLossKind.InteropPreserved, "linq-query",
+                    "Deferred query selector preserved inline instead of hoisting its evaluation",
+                    expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+                body = new RawCSharpExpressionNode(GetTextSpan(expression), expression.ToString());
+            }
+            return MakeLinqLambda(span, parameter, body,
+                parameterType == null ? null : TypeMapper.CSharpToCalor(parameterType.ToDisplayString()));
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(savedPending);
+        }
+    }
+
+    private static bool IsInlineNativeQuerySelector(ExpressionSyntax expression) =>
+        expression.DescendantNodesAndSelf().OfType<ExpressionSyntax>().All(node => node switch
+        {
+            IdentifierNameSyntax or LiteralExpressionSyntax or BinaryExpressionSyntax
+                or ParenthesizedExpressionSyntax => true,
+            PrefixUnaryExpressionSyntax unary => unary.IsKind(SyntaxKind.UnaryMinusExpression)
+                || unary.IsKind(SyntaxKind.UnaryPlusExpression)
+                || unary.IsKind(SyntaxKind.LogicalNotExpression)
+                || unary.IsKind(SyntaxKind.BitwiseNotExpression),
+            InvocationExpressionSyntax { Expression: IdentifierNameSyntax } => node == expression,
+            _ => false
+        });
+
+    private static bool CanNameQueryParameterType(ITypeSymbol type) => type switch
+    {
+        INamedTypeSymbol named => !named.IsAnonymousType && !named.IsTupleType
+            && named.TypeArguments.All(CanNameQueryParameterType),
+        IArrayTypeSymbol array => CanNameQueryParameterType(array.ElementType),
+        _ => type.CanBeReferencedByName
+    };
+
     /// <summary>
     /// Creates a single-parameter lambda expression node for LINQ operations.
     /// </summary>
-    private LambdaExpressionNode MakeLinqLambda(TextSpan span, string paramName, ExpressionNode body)
+    private LambdaExpressionNode MakeLinqLambda(TextSpan span, string paramName, ExpressionNode body, string? parameterType = null)
     {
         var id = _context.GenerateId("lam");
         var parameters = new List<LambdaParameterNode>
         {
-            new LambdaParameterNode(span, paramName, null)
+            new LambdaParameterNode(span, paramName, parameterType)
         };
         return new LambdaExpressionNode(span, id, parameters, effects: null, isAsync: false,
             expressionBody: body, statementBody: null, attributes: new AttributeCollection());
