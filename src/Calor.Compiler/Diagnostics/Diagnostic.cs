@@ -392,6 +392,9 @@ public static class DiagnosticCode
     /// </summary>
     public const string QuantifierNestedComplexity = "Calor0325";
 
+    /// <summary>Error: Finite-domain discovery cannot preserve runtime evaluation semantics.</summary>
+    public const string QuantifierRuntimeLoweringUnsupported = "Calor0326";
+
     // Effect errors (Calor0400-0499)
     public const string UndeclaredEffect = "Calor0400";
     public const string UnusedEffectDeclaration = "Calor0401";

@@ -185,10 +185,11 @@ public class BinderQuantifierFamilyTests
     {
         // #910 review: parser→binder reachability pinned for all three spellings, not
         // just forall — `(exists ((v T)) body)` from real source.
+        // The explicit i32 maximum preserves j > x while requesting a finite runtime check.
         const string source = """
             §M{m001:Test}
               §F{f001:Probe:pub} (i32:x) -> bool
-                §R (exists ((j i32)) (> j x))
+                §R (exists ((j i32)) (&& (> j x) (<= j INT:2147483647)))
             """;
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
