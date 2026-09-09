@@ -3112,7 +3112,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: preprocessorBlocks.Count > 0
+            items: preprocessorBlocks.Count > 0 || HasDictionaryMemberInitializer(node)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -3657,7 +3657,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: preprocessorBlocks.Count > 0
+            items: preprocessorBlocks.Count > 0 || HasDictionaryMemberInitializer(node)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -9719,6 +9719,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
+        if (HasDictionaryInitializerOperations(implicitNew.Initializer))
+            return PreserveDictionaryInitializer(implicitNew);
+
         // Try to infer the target type from the surrounding syntax context
         var inferredType = InferTargetType(implicitNew);
 
@@ -11153,6 +11156,48 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
 
+        // §DICT represents Dictionary.Add and emits a statement-level binding.
+        // Keep other contexts inline: hoisting can change exception timing, and
+        // escalating fields to member interop can reorder type initialization.
+        var simpleDictionary = objCreation.Type is GenericNameSyntax dictionaryName
+            && dictionaryName.Identifier.ValueText == "Dictionary"
+            && dictionaryName.TypeArgumentList.Arguments.Count == 2
+            && _semanticModel?.GetTypeInfo(objCreation).Type is INamedTypeSymbol dictionaryType
+            && dictionaryType.ContainingNamespace.ToDisplayString() == "System.Collections.Generic"
+            && (objCreation.Parent is ReturnStatementSyntax
+                || objCreation.Parent is EqualsValueClauseSyntax
+                {
+                    Parent: VariableDeclaratorSyntax
+                    {
+                        Parent: VariableDeclarationSyntax { Parent: LocalDeclarationStatementSyntax }
+                    } local
+                }
+                && _semanticModel.GetDeclaredSymbol(local) is ILocalSymbol localSymbol
+                && SymbolEqualityComparer.Default.Equals(localSymbol.Type, dictionaryType)
+                || objCreation.Parent is AssignmentExpressionSyntax
+                {
+                    Left: IdentifierNameSyntax,
+                    Parent: ExpressionStatementSyntax
+                } localAssignment
+                && localAssignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && _semanticModel.GetSymbolInfo(localAssignment.Left).Symbol is ILocalSymbol)
+            && objCreation.ArgumentList?.Arguments.Count is not > 0
+            && objCreation.Initializer?.Expressions.All(expr =>
+                expr is InitializerExpressionSyntax entry
+                && entry.Expressions.Count == 2
+                && entry.Expressions.All(value => value is LiteralExpressionSyntax)) == true;
+        var collectionName = objCreation.Type switch
+        {
+            GenericNameSyntax generic => generic.Identifier.ValueText,
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
+            _ => typeName
+        };
+        if (!simpleDictionary && objCreation.Initializer?.Expressions.Count > 0
+            && (IsDictionaryType(collectionName)
+                || HasDictionaryInitializerOperations(objCreation.Initializer)))
+            return PreserveDictionaryInitializer(objCreation);
+
         if (objCreation.Type is GenericNameSyntax genericName)
         {
             typeName = genericName.Identifier.Text;
@@ -11172,7 +11217,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 return ConvertListCreation(objCreation, typeArgs[0]);
             }
-            else if (IsDictionaryType(typeName) && typeArgs.Count == 2 && !hasCtorArgs && hasInitializer == true)
+            else if (simpleDictionary && hasInitializer == true)
             {
                 return ConvertDictionaryCreation(objCreation, typeArgs[0], typeArgs[1]);
             }
@@ -11588,6 +11633,32 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         typeName is "Dictionary" or "SortedDictionary" or "ConcurrentDictionary"
             or "FrozenDictionary" or "ImmutableDictionary" or "ImmutableSortedDictionary";
 
+    private static bool HasDictionaryInitializerOperations(InitializerExpressionSyntax? initializer) =>
+        initializer?.Expressions.Any(expr =>
+            expr is InitializerExpressionSyntax
+            || expr is AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax }) == true;
+
+    private static bool HasDictionaryMemberInitializer(TypeDeclarationSyntax type) =>
+        type.Members.SelectMany(member => member switch
+        {
+            FieldDeclarationSyntax field => field.Declaration.Variables
+                .Select(variable => variable.Initializer),
+            PropertyDeclarationSyntax property => [property.Initializer],
+            _ => Enumerable.Empty<EqualsValueClauseSyntax?>()
+        }).Where(initializer => initializer != null)
+            .SelectMany(initializer => initializer!.DescendantNodes()
+                .OfType<BaseObjectCreationExpressionSyntax>())
+            .Any(creation => HasDictionaryInitializerOperations(creation.Initializer));
+
+    private ExpressionNode PreserveDictionaryInitializer(BaseObjectCreationExpressionSyntax creation)
+    {
+        _context.RecordFeatureUsage("dictionary-initializer");
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "dictionary-initializer",
+            "Dictionary construction and initializer operations preserved verbatim",
+            creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
+    }
+
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
     {
         var id = _context.GenerateId("dict");
@@ -11607,25 +11678,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     // Convert block-level collections to inline for dict values
                     if (IsBlockLevelCollection(value))
                         value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(kvInit.Expressions[1]));
-                    entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
-                }
-                else if (expr is AssignmentExpressionSyntax assignment)
-                {
-                    // [key] = value syntax
-                    ExpressionNode key;
-                    if (assignment.Left is ImplicitElementAccessSyntax implicitAccess &&
-                        implicitAccess.ArgumentList.Arguments.Count > 0)
-                    {
-                        key = ConvertExpression(implicitAccess.ArgumentList.Arguments[0].Expression);
-                    }
-                    else
-                    {
-                        key = ConvertExpression(assignment.Left);
-                    }
-                    var value = ConvertExpression(assignment.Right);
-                    // Convert block-level collections to inline for dict values
-                    if (IsBlockLevelCollection(value))
-                        value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(assignment.Right));
                     entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
                 }
             }
