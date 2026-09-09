@@ -1,5 +1,17 @@
 {
   "Issue": "#1191",
+  "OpaqueBudgetProposal": {
+    "Status": "Pending explicit parent/user acceptance, or faithful native repair of the newly opaque sites",
+    "IndependentReviewerApproved": false,
+    "AdditionalBoundaries": 20,
+    "AdditionalSourceExpressions": 180,
+    "FormerlyExactSourceExpressions": 79,
+    "FormerlyUnmappedSourceExpressions": 101,
+    "NotAnArtifactOnlyExplanation": "The original -208 binder-visit change and the +180 opaque-source-expression change are separate instruments. The later -31 visits add no opacity. Neither reduced visits nor counted interop establish unchanged native fidelity",
+    "PreliminaryProbeCorrection": "The earlier +130 (54 exact / 76 unmapped) and 50 lost exact matches compared selected-AST spans to original-file offsets. Correct selected-source coordinates give +180 (79 exact / 101 unmapped) and 72 lost exact matches",
+    "LostExactSourceCarrierEvidence": "binder-source-carrier-evidence.json",
+    "LostExactSourceCarrierCount": 72
+  },
   "BeforeRevision": "639fa93a",
   "AfterRevision": "2738d99b",
   "Scope": "Roslyn selected-active Preview/Regular/Parse, empty symbols; the same 364 pinned corpus files",
