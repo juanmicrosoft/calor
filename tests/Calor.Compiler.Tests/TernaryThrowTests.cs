@@ -9,13 +9,7 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Tests for ternary throw expression hoisting and round-trip.
-///
-/// Fixes: ConvertThrowExpression produced ErrExpressionNode for ternary throws
-/// (flag ? x : throw ...) which degraded to Result.Err in generated C#.
-/// Now hoists to guard statements like null-coalescing throws.
-///
-/// Also adds dedicated round-trip tests for all throw expression patterns.
+/// Tests that throw expressions retain their conditional branch through migration.
 /// </summary>
 public class TernaryThrowTests
 {
@@ -24,7 +18,7 @@ public class TernaryThrowTests
     #region Ternary Throw — False Branch (flag ? value : throw ...)
 
     [Fact]
-    public void Convert_TernaryThrowInFalseBranch_HoistsNegatedGuard()
+    public void Convert_TernaryThrowInFalseBranch_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -41,19 +35,11 @@ public class TernaryThrowTests
         Assert.True(result.Success, GetErrorMessage(result));
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
 
-        // Should have 2 statements: guard + return
-        Assert.Equal(2, method.Body.Count);
-
-        // Guard: if (!ok) throw new InvalidOperationException("failed")
-        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var negation = Assert.IsType<UnaryOperationNode>(guard.Condition);
-        Assert.Equal(UnaryOperator.Not, negation.Operator);
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        Assert.NotNull(throwStmt.Exception);
-
-        // Return: 42 (directly, no conditional wrapper)
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
-        Assert.IsType<IntLiteralNode>(ret.Expression);
+        var ret = Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body));
+        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
+        Assert.Equal("ok", Assert.IsType<ReferenceNode>(conditional.Condition).Name);
+        Assert.Equal(42, Assert.IsType<IntLiteralNode>(conditional.WhenTrue).Value);
+        Assert.IsType<ThrowExpressionNode>(conditional.WhenFalse);
     }
 
     [Fact]
@@ -74,9 +60,10 @@ public class TernaryThrowTests
         Assert.True(result.Success, GetErrorMessage(result));
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
 
-        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        var newExpr = Assert.IsType<NewExpressionNode>(throwStmt.Exception);
+        var ret = Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body));
+        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
+        var throwExpr = Assert.IsType<ThrowExpressionNode>(conditional.WhenFalse);
+        var newExpr = Assert.IsType<NewExpressionNode>(throwExpr.Exception);
         Assert.Equal("ArgumentNullException", newExpr.TypeName);
     }
 
@@ -98,9 +85,10 @@ public class TernaryThrowTests
         Assert.True(result.Success, GetErrorMessage(result));
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
 
-        // Guard should be hoisted before the assignment
-        Assert.True(method.Body.Count >= 2);
-        Assert.IsType<IfStatementNode>(method.Body[0]);
+        var binding = Assert.IsType<BindStatementNode>(Assert.Single(method.Body));
+        var conditional = Assert.IsType<ConditionalExpressionNode>(binding.Initializer);
+        Assert.Equal(100, Assert.IsType<IntLiteralNode>(conditional.WhenTrue).Value);
+        Assert.IsType<ThrowExpressionNode>(conditional.WhenFalse);
     }
 
     #endregion
@@ -108,7 +96,7 @@ public class TernaryThrowTests
     #region Ternary Throw — True Branch (flag ? throw ... : value)
 
     [Fact]
-    public void Convert_TernaryThrowInTrueBranch_HoistsDirectGuard()
+    public void Convert_TernaryThrowInTrueBranch_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -125,18 +113,11 @@ public class TernaryThrowTests
         Assert.True(result.Success, GetErrorMessage(result));
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
 
-        Assert.Equal(2, method.Body.Count);
-
-        // Guard: if (isError) throw new Exception("err") — NO negation
-        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
-        // Condition should NOT be negated (throw is in true branch)
-        Assert.IsNotType<UnaryOperationNode>(guard.Condition);
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        Assert.NotNull(throwStmt.Exception);
-
-        // Return: 0
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
-        Assert.IsType<IntLiteralNode>(ret.Expression);
+        var ret = Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body));
+        var conditional = Assert.IsType<ConditionalExpressionNode>(ret.Expression);
+        Assert.Equal("isError", Assert.IsType<ReferenceNode>(conditional.Condition).Name);
+        Assert.IsType<ThrowExpressionNode>(conditional.WhenTrue);
+        Assert.Equal(0, Assert.IsType<IntLiteralNode>(conditional.WhenFalse).Value);
     }
 
     #endregion

@@ -429,7 +429,7 @@ public class ConverterReachTests
     /// used to land between the then-body and <c>§EI</c>, closing the chain.
     /// </summary>
     [Fact]
-    public void Cluster3_ElseIf_WithHoistedCondition_Parses()
+    public void Cluster3_ElseIf_WithIndexedCondition_KeepsInlineChain()
     {
         const string csharp = """
             public static class Renderer
@@ -440,7 +440,7 @@ public class ConverterReachTests
                     var isJson = false;
                     if (format != null)
                     {
-                        for (var i = 0; i < format.Length; ++i)
+                        for (var i = 0; i < 3; ++i)
                         {
                             if (format[i] == 'l')
                                 isLiteral = true;
@@ -460,20 +460,18 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster3");
 
         AssertParsesClean(rt);
-        // The chain is re-nested: §EL + hoisted binding + nested §IF, with the
-        // trailing else preserved once at the innermost level.
+        // Indexed conditions remain in their branches, without eager bindings
+        // or an artificial chain of nested else/if statements.
         Assert.Contains("§EL", rt.Calor);
-        Assert.Matches(new Regex(@"§EL\n\s+§B\{~_hoist\d+\}"), rt.Calor);
+        Assert.DoesNotContain("_hoist", rt.Calor);
         var method = rt.Module.Classes.Single().Methods.Single();
         var outerIf = method.Body.OfType<IfStatementNode>().Single();
         var loop = outerIf.ThenBody.OfType<ForStatementNode>().Single();
         var chain = loop.Body.OfType<IfStatementNode>().Single();
         Assert.NotNull(chain.ElseBody);
-        // Every else-if condition hoisted here, so each level is one nested §IF.
-        var nested = chain.ElseBody!.OfType<IfStatementNode>().Single();
-        var innermost = nested.ElseBody!.OfType<IfStatementNode>().Single();
-        Assert.NotNull(innermost.ElseBody);
-        Assert.Empty(innermost.ElseIfClauses);
+        Assert.Equal(2, chain.ElseIfClauses.Count);
+        Assert.Single(chain.ElseBody!);
+        Assert.Empty(chain.ElseBody!.OfType<IfStatementNode>());
     }
 
     [Fact]

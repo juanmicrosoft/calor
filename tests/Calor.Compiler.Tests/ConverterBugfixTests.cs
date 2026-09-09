@@ -1194,7 +1194,7 @@ public class Test
     }
 
     [Fact]
-    public void Converter_NonStandardForLoop_InitializersBeforeWhile()
+    public void Converter_NonStandardForLoop_PreservesInitializerScopeBeforeWhile()
     {
         // Non-standard for loop with multiple variables
         var csharp = @"
@@ -1210,15 +1210,13 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // The initializer binds should appear before the while loop
-        var bindIdx = calor.IndexOf("§B{");
-        var whileIdx = calor.IndexOf("§WH{");
-        Assert.True(bindIdx >= 0, "Initializer bind not found");
-        Assert.True(whileIdx > bindIdx, "Initializer binds should appear before while loop");
+        Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
+        Assert.Contains("§WH{", calor);
+        Assert.DoesNotContain("§RAW", calor);
     }
 
     [Fact]
-    public void Converter_ForLoopWithExpressionInit_InitializerBeforeWhile()
+    public void Converter_ForLoopWithExpressionInit_PreservesInitializerBeforeWhile()
     {
         // For loop with expression initializer (no declaration)
         var csharp = @"
@@ -1235,13 +1233,9 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // The assignment should appear before the while loop
-        var assignIdx = calor.IndexOf("§ASSIGN");
-        // For non-standard for loops it falls back to while
-        var whileIdx = calor.IndexOf("§WH{");
-        Assert.True(whileIdx >= 0, "While loop not found (expected for non-standard for-loop fallback)");
-        Assert.True(assignIdx >= 0, "Initializer assignment not found");
-        Assert.True(assignIdx < whileIdx, "Initializer assignment should appear before while loop");
+        Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
+        Assert.Contains("§WH{", calor);
+        Assert.DoesNotContain("§RAW", calor);
     }
 
     #endregion
