@@ -1,5 +1,8 @@
 using System.Text.RegularExpressions;
 using Calor.Compiler;
+using Calor.Enforcement.Tests;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -13,6 +16,117 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class SiblingRebindCodegenTests
 {
+    [Theory]
+    [InlineData(false, 1, 10)]
+    [InlineData(false, 2, 20)]
+    [InlineData(true, 1, 10)]
+    [InlineData(true, 2, 20)]
+    public void StatementMatch_SiblingBindingsHaveExecutableLexicalScopes(bool mutable, int input, int expected)
+    {
+        var modifier = mutable ? "~" : "";
+        var source = $$"""
+            §M{m:SwitchScope}
+              §F{f:Probe:pub} (i32:x) -> i32
+                §W{w} x
+                  §K 1
+                    §B{ {{modifier}}v:i32} 10
+                    §R v
+                  §K _
+                    §B{ {{modifier}}v:i32} 20
+                    §R v
+            """.Replace("§B{ ", "§B{");
+        var generated = Emit(source);
+        var sections = CSharpSyntaxTree.ParseText(generated).GetRoot()
+            .DescendantNodes().OfType<SwitchSectionSyntax>().ToArray();
+        Assert.Equal(2, sections.Length);
+        Assert.All(sections, section => Assert.IsType<BlockSyntax>(Assert.Single(section.Statements)));
+        Assert.Equal(expected, TestHarness.Execute(source, "Probe", [input]).ReturnValue);
+    }
+
+    [Theory]
+    [InlineData(false, 1, 1, 10)]
+    [InlineData(false, 1, 2, 20)]
+    [InlineData(false, 2, 1, 30)]
+    [InlineData(false, 2, 2, 40)]
+    [InlineData(true, 1, 1, 10)]
+    [InlineData(true, 1, 2, 20)]
+    [InlineData(true, 2, 1, 30)]
+    [InlineData(true, 2, 2, 40)]
+    public void NestedStatementMatches_KeepSiblingBindingsIndependent(bool mutable, int x, int y, int expected)
+    {
+        var modifier = mutable ? "~" : "";
+        var source = $$"""
+            §M{m:NestedSwitchScope}
+              §F{f:Probe:pub} (i32:x, i32:y) -> i32
+                §W{outer} x
+                  §K 1
+                    §W{inner1} y
+                      §K 1
+                        §B{ {{modifier}}v:i32} 10
+                        §R v
+                      §K _
+                        §B{ {{modifier}}v:i32} 20
+                        §R v
+                  §K _
+                    §W{inner2} y
+                      §K 1
+                        §B{ {{modifier}}v:i32} 30
+                        §R v
+                      §K _
+                        §B{ {{modifier}}v:i32} 40
+                        §R v
+            """.Replace("§B{ ", "§B{");
+        Emit(source);
+        Assert.Equal(expected, TestHarness.Execute(source, "Probe", [x, y]).ReturnValue);
+    }
+
+    [Theory]
+    [InlineData(false, 1, 20)]
+    [InlineData(false, 2, 30)]
+    [InlineData(true, 1, 20)]
+    [InlineData(true, 2, 30)]
+    public void StatementMatch_BindingsAfterSwitchAndSiblingIfRetainTheirScopes(bool mutable, int input, int expected)
+    {
+        var modifier = mutable ? "~" : "";
+        var source = $$"""
+            §M{m:AfterSwitchScope}
+              §F{f:Probe:pub} (i32:x) -> i32
+                §B{~total:i32} 0
+                §W{w} x
+                  §K 1
+                    §B{ {{modifier}}v:i32} 10
+                    §B{~total} v
+                  §K _
+                    §B{ {{modifier}}v:i32} 20
+                    §B{~total} v
+                §B{after:i32} 3
+                §IF{i} true
+                  §B{ {{modifier}}v:i32} 7
+                  §B{~total} (+ total v)
+                §R (+ total after)
+            """.Replace("§B{ ", "§B{");
+        var generated = Emit(source);
+        Assert.Equal(3, Regex.Matches(generated, @"\bint v = ").Count);
+        Assert.Equal(expected, TestHarness.Execute(source, "Probe", [input]).ReturnValue);
+    }
+
+    [Fact]
+    public void StatementMatch_ArmBindingCannotEscapeSwitch()
+    {
+        var result = Program.Compile("""
+            §M{m:SwitchScope}
+              §F{f:Probe:pub} (i32:x) -> i32
+                §W{w} x
+                  §K 1
+                    §B{v:i32} 10
+                  §K _
+                    §B{v:i32} 20
+                §R v
+            """, "escape.calr");
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+    }
+
     private static string Emit(string calor)
     {
         var result = Program.Compile(calor, "t.calr");
