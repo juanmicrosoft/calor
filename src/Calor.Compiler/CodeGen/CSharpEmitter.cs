@@ -4842,6 +4842,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     var pattern = EmitPattern(matchCase.Pattern);
                     AppendLine($"case {pattern}{guard}:");
                 }
+                AppendLine("{");
                 Indent();
 
                 PushDeclScope();
@@ -4853,6 +4854,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
                 AppendLine("break;");
                 Dedent();
+                AppendLine("}");
             }
             finally
             {
