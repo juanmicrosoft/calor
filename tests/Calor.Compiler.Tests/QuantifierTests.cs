@@ -962,7 +962,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should still generate valid code - Enumerable.Range handles empty ranges correctly
-        Assert.Contains("Enumerable.Range(0, 0 - 0)", result);
+        Assert.Contains("Enumerable.Range(0, (0) - (0))", result);
         Assert.Contains(".All(", result);
     }
 

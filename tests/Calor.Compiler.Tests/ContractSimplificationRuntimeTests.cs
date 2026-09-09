@@ -15,6 +15,109 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Quantifiers_KeepEveryConjunctAndGroupedBounds(bool verify)
+    {
+        var falseExists = Compile(Function("i32",
+            "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:1) (&& (== i i) false))))"), verify);
+        AssertContractViolation(() => Invoke(falseExists, 0));
+
+        var throwingExists = Compile(Function("i32",
+            "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:1) (&& (== i i) (> (/ INT:1 x) INT:0)))))"), verify);
+        var exception = Assert.Throws<TargetInvocationException>(() => Invoke(throwingExists, 0));
+        Assert.IsType<DivideByZeroException>(exception.InnerException);
+
+        var forall = Compile(Function("i32",
+            "(forall ((i i32)) (-> (&& (>= i (- x x)) (< i INT:2)) (< i INT:1)))"), verify);
+        var exists = Compile(Function("i32",
+            "(exists ((i i32)) (&& (>= i (- x x)) (&& (< i INT:2) (== i INT:1))))"), verify);
+        var multi = Compile(Function("i32",
+            "(exists ((i i32) (j i32)) (&& (>= i (- x x)) (&& (< i INT:2) (&& (>= j (- x x)) (&& (< j INT:2) (&& (== i j) (== j INT:1)))))))"), verify);
+        foreach (var value in new[] { -2, 0, 1, 2 })
+        {
+            AssertContractViolation(() => Invoke(forall, value));
+            Assert.Equal(7, Invoke(exists, value));
+            Assert.Equal(7, Invoke(multi, value));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PatternOperand_ContainsCompleteEquality(bool verify)
+    {
+        var assembly = Compile(Function("bool", "(== (is (== x x) bool) false)"), verify);
+        AssertContractViolation(() => Invoke(assembly, false));
+        AssertContractViolation(() => Invoke(assembly, true));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ResultPayloads_UseExpressionTypesNotLiteralShapes(bool verify)
+    {
+        string[] predicates =
+        [
+            "(is (cast object §OK (== x x)) Result<bool,str>)",
+            "(is (cast object §OK (- x x)) Result<i32,str>)",
+            "(is (cast object §ERR (== x x)) Result<object,bool>)",
+            "(is (cast object §OK INT:2147483648) Result<i64,str>)"
+        ];
+        foreach (var predicate in predicates)
+        {
+            var assembly = Compile(Function("i32", $"(== {predicate} true)"), verify);
+            Assert.Equal(7, Invoke(assembly, 3));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PatternBinding_SurvivesBooleanComparisonWrappers(bool verify)
+    {
+        string[] wrappers =
+        [
+            "(== (is result i32 result) true)",
+            "(!= false (is result i32 result))",
+            "(! (== (is result i32 result) false))"
+        ];
+        foreach (var wrapper in wrappers)
+        {
+            var source = $$"""
+                §M{m1:TypedContracts}
+                  §F{f1:Check:pub} (object:x) -> object
+                    §E{}
+                    §S (&& {{wrapper}} (> result INT:0))
+                    §R x
+                """;
+            var assembly = Compile(source, verify);
+            Assert.Equal(5, Invoke(assembly, 5));
+            AssertContractViolation(() => Invoke(assembly, 0));
+            AssertContractViolation(() => Invoke(assembly, "not an integer"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReceiversAndIndices_GroupRetainedArithmetic(bool verify)
+    {
+        var receiver = Compile(Function("i32?", "(== (+ x INT:0).Value INT:3)"), verify);
+        Assert.Equal(7, Invoke(receiver, 3));
+        AssertContractViolation(() => Invoke(receiver, 2));
+        var exception = Assert.Throws<TargetInvocationException>(() => Invoke(receiver, null));
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
+
+        var index = Compile(Function("i32", """(== §IDX "abcd" §^ (+ x INT:0) (cast char INT:98))"""), verify);
+        Assert.Equal(7, Invoke(index, 3));
+        AssertContractViolation(() => Invoke(index, 2));
+        var range = Compile(Function("i32", """(== §IDX "abcd" §RANGE (+ x INT:0) INT:4 "d")"""), verify);
+        Assert.Equal(7, Invoke(range, 3));
+        AssertContractViolation(() => Invoke(range, 2));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void PreservedArithmetic_StaysInsideCast(bool verify)
     {
         var equal = Compile(Function("f64", "(== (cast i32 (- x x)) INT:0)"), verify);

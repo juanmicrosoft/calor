@@ -906,6 +906,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         ExpressionNode expression,
         string name)
     {
+        if (expression is BinaryOperationNode comparison
+            && TryUnwrapPatternComparison(comparison, out var patternOperand, out var negated))
+        {
+            return AnalyzeBindingOutcomes(patternOperand, name)
+                .Select(outcome => (negated ? !outcome.Truth : outcome.Truth, outcome.Bound))
+                .ToHashSet();
+        }
         if (expression is IsPatternNode pattern)
         {
             return pattern.VariableName?.Equals(
@@ -3824,6 +3831,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(BinaryOperationNode node)
     {
+        // C# definite assignment recognizes the pattern itself, not `pattern == true`.
+        if (TryUnwrapPatternComparison(node, out var patternOperand, out var negated))
+        {
+            var pattern = patternOperand.Accept(this);
+            return negated ? $"!({pattern})" : pattern;
+        }
         var left = node.Left.Accept(this);
         var previousShadowDepth = _postconditionResultShadowDepth;
         if (node.Operator is BinaryOperator.And or BinaryOperator.Or
@@ -3964,7 +3977,50 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static bool IsAtomicOperand(ExpressionNode expression) =>
         expression is ReferenceNode or IntLiteralNode or FloatLiteralNode
-            or BoolLiteralNode or StringLiteralNode or DecimalLiteralNode;
+            or BoolLiteralNode or StringLiteralNode or DecimalLiteralNode or SelfRefNode;
+
+    private static bool TryUnwrapPatternComparison(
+        BinaryOperationNode node, out ExpressionNode operand, out bool negated)
+    {
+        operand = node;
+        negated = false;
+        if (node.Operator is not (BinaryOperator.Equal or BinaryOperator.NotEqual))
+            return false;
+        BoolLiteralNode? literal;
+        if (node.Right is BoolLiteralNode right)
+        {
+            literal = right;
+            operand = node.Left;
+        }
+        else if (node.Left is BoolLiteralNode left)
+        {
+            literal = left;
+            operand = node.Right;
+        }
+        else
+            return false;
+
+        if (!IsBooleanPatternExpression(operand))
+            return false;
+        negated = literal.Value != (node.Operator == BinaryOperator.Equal);
+        return true;
+    }
+
+    private static bool IsBooleanPatternExpression(ExpressionNode expression) => expression switch
+    {
+        IsPatternNode => true,
+        BoolLiteralNode => true,
+        UnaryOperationNode { Operator: UnaryOperator.Not } unary => IsBooleanPatternExpression(unary.Operand),
+        BinaryOperationNode { Operator: BinaryOperator.And or BinaryOperator.Or } binary =>
+            IsBooleanPatternExpression(binary.Left) && IsBooleanPatternExpression(binary.Right),
+        _ => false
+    };
+
+    private string EmitGroupedOperand(ExpressionNode expression)
+    {
+        var text = expression.Accept(this);
+        return IsAtomicOperand(expression) ? text : $"({text})";
+    }
 
     private static int GetOperandPrecedence(ExpressionNode expression) => expression switch
     {
@@ -4350,7 +4406,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(FieldAccessNode node)
     {
-        var target = node.Target.Accept(this);
+        var target = EmitGroupedOperand(node.Target);
         var fieldName = SanitizeIdentifier(node.FieldName);
         return $"{target}.{fieldName}";
     }
@@ -4377,14 +4433,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         RequireNamespace("Calor.Runtime");
         var value = node.Value.Accept(this);
-        return $"Calor.Runtime.Result.Ok<{GetInferredTypeName(node.Value)}, string>({value})";
+        var literalType = GetLiteralTypeName(node.Value);
+        return literalType == null
+            ? $"Calor.Runtime.Result.Ok({value})"
+            : $"Calor.Runtime.Result.Ok<{literalType}, string>({value})";
     }
 
     public string Visit(ErrExpressionNode node)
     {
         RequireNamespace("Calor.Runtime");
         var error = node.Error.Accept(this);
-        return $"Calor.Runtime.Result.Err<object, {GetInferredTypeName(node.Error)}>({error})";
+        var literalType = GetLiteralTypeName(node.Error);
+        return literalType == null
+            ? $"Calor.Runtime.Result.Err({error})"
+            : $"Calor.Runtime.Result.Err<object, {literalType}>({error})";
     }
 
     public string Visit(MatchExpressionNode node)
@@ -7091,20 +7153,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(NullConditionalNode node)
     {
-        var target = node.Target.Accept(this);
+        var target = EmitGroupedOperand(node.Target);
         return $"{target}?.{SanitizeIdentifier(node.MemberName)}";
     }
 
     public string Visit(RangeExpressionNode node)
     {
-        var start = node.Start?.Accept(this) ?? "";
-        var end = node.End?.Accept(this) ?? "";
+        var start = node.Start == null ? "" : EmitGroupedOperand(node.Start);
+        var end = node.End == null ? "" : EmitGroupedOperand(node.End);
         return $"{start}..{end}";
     }
 
     public string Visit(IndexFromEndNode node)
     {
-        var offset = node.Offset.Accept(this);
+        var offset = EmitGroupedOperand(node.Offset);
         return $"^{offset}";
     }
 
@@ -7479,15 +7541,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     #endregion
 
-    private string GetInferredTypeName(ExpressionNode expr)
+    private static string? GetLiteralTypeName(ExpressionNode expr)
     {
         return expr switch
         {
-            IntLiteralNode => "int",
+            IntLiteralNode integer => integer.IsUnsigned
+                ? integer.IsLong ? "ulong" : "uint"
+                : integer.IsLong ? "long" : "int",
+            FloatLiteralNode { IsSingle: true } => "float",
+            FloatLiteralNode { IsDecimal: true } or DecimalLiteralNode => "decimal",
             FloatLiteralNode => "double",
             BoolLiteralNode => "bool",
             StringLiteralNode => "string",
-            _ => "object"
+            ReferenceNode { Name: "null" } => "object",
+            _ => null
         };
     }
 
@@ -7994,7 +8061,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     var varRange = range.AllRanges[i];
                     var varName = SanitizeIdentifier(varRange.Name);
-                    result = $"Enumerable.Range({varRange.Start}, {varRange.End} - {varRange.Start}).All({varName} => ({result}))";
+                    result = $"Enumerable.Range({varRange.Start}, ({varRange.End}) - ({varRange.Start})).All({varName} => ({result}))";
                 }
                 return result;
             }
@@ -8003,7 +8070,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Single variable - original behavior
                 var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
                 var body = range.Body.Accept(this);
-                return $"Enumerable.Range({range.Start}, {range.End} - {range.Start}).All({varName} => ({body}))";
+                return $"Enumerable.Range({range.Start}, ({range.End}) - ({range.Start})).All({varName} => ({body}))";
             }
         }
 
@@ -8057,7 +8124,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     var varRange = range.AllRanges[i];
                     var varName = SanitizeIdentifier(varRange.Name);
-                    result = $"Enumerable.Range({varRange.Start}, {varRange.End} - {varRange.Start}).Any({varName} => ({result}))";
+                    result = $"Enumerable.Range({varRange.Start}, ({varRange.End}) - ({varRange.Start})).Any({varName} => ({result}))";
                 }
                 return result;
             }
@@ -8066,7 +8133,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Single variable - original behavior
                 var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
                 var body = range.Body.Accept(this);
-                return $"Enumerable.Range({range.Start}, {range.End} - {range.Start}).Any({varName} => ({body}))";
+                return $"Enumerable.Range({range.Start}, ({range.End}) - ({range.Start})).Any({varName} => ({body}))";
             }
         }
 
@@ -8230,7 +8297,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(IsPatternNode node)
     {
-        var operand = node.Operand.Accept(this);
+        var operand = EmitGroupedOperand(node.Operand);
         var csharpType = MapTypeName(node.TargetType);
         if (node.VariableName == null)
         {
@@ -9004,7 +9071,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         // Try to extract bounds for all bound variables
         var allRanges = new List<VariableRange>();
-        var boundVarNames = node.BoundVariables.Select(bv => bv.Name).ToHashSet(StringComparer.Ordinal);
 
         foreach (var boundVar in node.BoundVariables)
         {
@@ -9025,44 +9091,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             allRanges.Add(new VariableRange(boundVar.Name, lower, upper));
         }
 
-        // Find the body expression (conjuncts that aren't bound constraints)
-        ExpressionNode? bodyExpr = null;
-        foreach (var conjunct in conjuncts)
-        {
-            if (conjunct is BinaryOperationNode cmp && cmp.Operator != BinaryOperator.And)
-            {
-                // Check if this conjunct is a bound constraint for any variable
-                bool isBoundConstraint = false;
-                foreach (var boundVar in node.BoundVariables)
-                {
-                    string? testLower = null;
-                    string? testUpper = null;
-                    ExtractBound(cmp, boundVar.Name, ref testLower, ref testUpper);
-                    if (testLower != null || testUpper != null)
-                    {
-                        isBoundConstraint = true;
-                        break;
-                    }
-                }
-
-                if (!isBoundConstraint)
-                {
-                    bodyExpr = conjunct;
-                    break;
-                }
-            }
-            else if (conjunct is not BinaryOperationNode)
-            {
-                bodyExpr = conjunct;
-                break;
-            }
-        }
-
-        if (bodyExpr == null)
-            return null;
-
         var firstRange = allRanges[0];
-        return new FiniteRange(firstRange.Start, firstRange.End, bodyExpr, allRanges);
+        // Bounds select candidates; they do not replace any part of the predicate.
+        return new FiniteRange(firstRange.Start, firstRange.End, node.Body, allRanges);
     }
 
     /// <summary>

@@ -479,7 +479,7 @@ public class PostconditionReturnLoweringRuntimeTests
             ".All(result => ((!(result >= 0",
             generatedCode);
         Assert.Contains(
-            ".Any(result => (result == 0))",
+            ".Any(result => (result >= 0 && result < 1 && result == 0))",
             generatedCode);
         Assert.Contains(
             "__calorPostconditionResult0 is int result) || (result >= 0)",
