@@ -26,7 +26,7 @@ namespace QuantifierDemo
             __calorPostconditionResult0 = true;
             goto __calorPostconditionExit0;
             __calorPostconditionExit0:
-            if (!(__calorPostconditionResult0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 266, length: 19, sourceFile: null, line: 8, column: 5, condition: "__calorPostconditionResult0");
+            if (!(__calorPostconditionResult0 == true)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 == true", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 266, length: 19, sourceFile: null, line: 8, column: 5, condition: "__calorPostconditionResult0 == true");
             return __calorPostconditionResult0;
         }
 

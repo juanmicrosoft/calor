@@ -3854,10 +3854,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var op = node.Operator.ToCSharpOperator();
         var parentPrecedence = GetPrecedence(node.Operator);
 
-        // Only wrap children when their precedence is lower than parent's
-        if (node.Left is BinaryOperationNode leftBin && GetPrecedence(leftBin.Operator) < parentPrecedence)
+        if (GetOperandPrecedence(node.Left) < parentPrecedence)
             left = $"({left})";
-        if (node.Right is BinaryOperationNode rightBin && GetPrecedence(rightBin.Operator) <= parentPrecedence)
+        if (GetOperandPrecedence(node.Right) <= parentPrecedence)
             right = $"({right})";
 
         return $"{left} {op} {right}";
@@ -3957,13 +3956,26 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
         // Preserve both precedence and token boundaries: -(-x) must not become --x.
-        var needsParens = node.Operand is not (ReferenceNode or IntLiteralNode
-            or FloatLiteralNode or BoolLiteralNode)
-            || operand.StartsWith('-');
+        var needsParens = !IsAtomicOperand(node.Operand) || operand.StartsWith('-');
         if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
             return needsParens ? $"({operand}){op}" : $"{operand}{op}";
         return needsParens ? $"{op}({operand})" : $"{op}{operand}";
     }
+
+    private static bool IsAtomicOperand(ExpressionNode expression) =>
+        expression is ReferenceNode or IntLiteralNode or FloatLiteralNode
+            or BoolLiteralNode or StringLiteralNode or DecimalLiteralNode;
+
+    private static int GetOperandPrecedence(ExpressionNode expression) => expression switch
+    {
+        BinaryOperationNode binary => GetPrecedence(binary.Operator),
+        NullCoalesceNode => 2,
+        IsPatternNode => 9,
+        TypeOperationNode { Operation: TypeOp.Is or TypeOp.As } => 9,
+        RawCSharpExpressionNode or LambdaExpressionNode or ThrowExpressionNode => 1,
+        // Remaining emitters produce primary/unary expressions or explicit groups.
+        _ => 14
+    };
 
     /// <summary>
     /// Returns C# operator precedence (higher = binds tighter).

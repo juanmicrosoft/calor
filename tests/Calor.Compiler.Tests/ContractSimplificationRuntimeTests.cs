@@ -15,6 +15,25 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void PreservedBinaryOperators_GroupNullableOperands(bool verify)
+    {
+        var right = Compile(Function("bool?", "(&& true (?? x false))"), verify);
+        Assert.Equal(7, Invoke(right, true));
+        AssertContractViolation(() => Invoke(right, false));
+        AssertContractViolation(() => Invoke(right, null));
+
+        var left = Compile(Function("bool?", "(&& (?? x false) false)"), verify);
+        foreach (object? value in new object?[] { true, false, null })
+            AssertContractViolation(() => Invoke(left, value));
+
+        var arithmetic = Compile(Function("i32?", "(== (+ (?? x INT:1) INT:2) INT:7)"), verify);
+        Assert.Equal(7, Invoke(arithmetic, 5));
+        AssertContractViolation(() => Invoke(arithmetic, null));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void PreservedLogicalNegation_GroupsNullableFallback(bool verify)
     {
         foreach (var fallback in new[] { false, true })

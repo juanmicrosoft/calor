@@ -530,7 +530,7 @@ public class PostconditionReturnLoweringRuntimeTests
 
         Assert.Equal(1, value);
         Assert.Contains(
-            "is int result && result > 0",
+            "(__calorPostconditionResult0 is int result || false) && result > 0",
             generatedCode);
     }
 
