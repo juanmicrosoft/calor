@@ -125,9 +125,11 @@ public sealed class EffectRowCorpusShapeTests
         // (tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr,
         // v0.16 W3(c)); and 936 = 927 + 9 since the v0.16 kickoff sweep registered ES-08
         // (three steps × three files under tests/TestData/EditScripts/ES-08-effect-row-edit/).
-        // The sweep below still covers every file. A drift from 936 means the sweep is no
+        // #1191 adds expected.calr and test.calr for each of the two conditional
+        // D-S1.5 fixtures, bringing the tracked corpus to 940 without exclusions.
+        // The sweep below still covers every file. A drift from 940 means the sweep is no
         // longer measuring the corpus it claims to.
-        Assert.Equal(936, files.Count);
+        Assert.Equal(940, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.

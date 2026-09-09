@@ -17,3 +17,11 @@ conditional calls with their argument nested inside the call. `test.calr`
 repeats that converted program with a `Run` postcondition requiring 117.
 The manifest also executes the converted output. Original C#, generated C#,
 and the Calor value test were each executed twice during fixture validation.
+
+This is a runtime-fidelity control, not an effect-verification claim. The
+registry's runtime replay disables effect enforcement. With the default CLI
+settings, the expression-valued conditional target has unresolved effects:
+`Run` reports `Calor0410` for an undeclared `unknown` effect and `Calor0419`
+marks its effects as assumed. The formatter therefore preserves both Calor
+artifacts unchanged as explicitly listed semantic fallbacks; it does not
+silently format them as verified programs.
