@@ -156,6 +156,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly HashSet<string> _capturedParameterNames = new(StringComparer.Ordinal);
     private int _contractExpressionDepth;
     private int _statementDepth;
+    private int _lambdaDepth;
     private string? _postconditionResultIdentifier;
     private int _postconditionResultShadowDepth;
     private int _returnLoweringCounter;
@@ -214,25 +215,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _parameterTypes.Clear();
         _capturedParameterNames.Clear();
         if (body != null && parameters != null)
-        {
-            var parameterNames = parameters.Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal);
-            void CollectCaptures(AstNode node, IReadOnlySet<string> shadowed, bool insideLambda)
-            {
-                if (node is LambdaExpressionNode lambda)
-                {
-                    shadowed = shadowed.Concat(lambda.Parameters.Select(parameter => parameter.Name))
-                        .ToHashSet(StringComparer.Ordinal);
-                    insideLambda = true;
-                }
-                if (insideLambda && node is ReferenceNode reference
-                    && parameterNames.Contains(reference.Name) && !shadowed.Contains(reference.Name))
-                    _capturedParameterNames.Add(reference.Name);
-                foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
-                    CollectCaptures(child, shadowed, insideLambda);
-            }
-            foreach (var statement in body)
-                CollectCaptures(statement, new HashSet<string>(StringComparer.Ordinal), false);
-        }
+            _capturedParameterNames.UnionWith(FindCapturedNames(body, parameters.Select(parameter => parameter.Name)));
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         _refinementDeclScopes.Clear();
@@ -312,6 +295,41 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _refinementDeclScopes.Add(
             new Dictionary<string, RefinementConstraint?>(StringComparer.Ordinal));
         _indexedBoundScopes.Add(new Dictionary<string, string?>(StringComparer.Ordinal));
+    }
+
+    private static HashSet<string> FindCapturedNames(IEnumerable<AstNode> roots, IEnumerable<string> candidates)
+    {
+        var names = candidates.ToHashSet(StringComparer.Ordinal);
+        var captured = new HashSet<string>(StringComparer.Ordinal);
+        void Collect(AstNode node, IReadOnlySet<string> shadowed, bool insideLambda)
+        {
+            if (node is LambdaExpressionNode lambda)
+            {
+                shadowed = shadowed.Concat(lambda.Parameters.Select(parameter => parameter.Name))
+                    .ToHashSet(StringComparer.Ordinal);
+                insideLambda = true;
+            }
+            if (insideLambda)
+            {
+                var reference = node switch
+                {
+                    ReferenceNode value => value.Name,
+                    CallExpressionNode call => call.Target,
+                    CallStatementNode call => call.Target,
+                    _ => null
+                };
+                var receiver = reference?.Split('.')[0];
+                if (receiver != null && names.Contains(receiver) && !shadowed.Contains(receiver))
+                    captured.Add(receiver);
+                if (node is RawCSharpNode or RawCSharpExpressionNode)
+                    captured.UnionWith(names.Where(name => !shadowed.Contains(name)));
+            }
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+                Collect(child, shadowed, insideLambda);
+        }
+        foreach (var root in roots)
+            Collect(root, new HashSet<string>(StringComparer.Ordinal), false);
+        return captured;
     }
 
     private void PopDeclScope()
@@ -7091,7 +7109,32 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var previousReturnLowering = _currentReturnLowering;
         var previousReturnValueType = _currentReturnValueType;
         var previousParameterTypes = _parameterTypes;
-        _parameterTypes = new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal);
+        var previousCapturedNames = _capturedParameterNames.ToArray();
+        var inheritsScope = _statementDepth > 0 || _contractExpressionDepth > 0 || _lambdaDepth > 0;
+        var previousDeclScopes = _declScopes;
+        var previousRefinementScopes = _refinementDeclScopes;
+        var previousIndexedScopes = _indexedBoundScopes;
+        var previousOutParameters = _outParameterNames;
+        var previousFunctionId = _currentFunctionId;
+        if (!inheritsScope)
+        {
+            _declScopes = [new(StringComparer.Ordinal)];
+            _refinementDeclScopes = [new(StringComparer.Ordinal)];
+            _indexedBoundScopes = [new(StringComparer.Ordinal)];
+            _outParameterNames = new(StringComparer.Ordinal);
+            _currentFunctionId = null;
+        }
+        _parameterTypes = inheritsScope
+            ? new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        _capturedParameterNames.Clear();
+        if (inheritsScope)
+            _capturedParameterNames.UnionWith(previousCapturedNames.Except(node.Parameters.Select(parameter => parameter.Name)));
+        IEnumerable<AstNode> lambdaBody = node.StatementBody != null
+            ? node.StatementBody
+            : node.ExpressionBody != null ? [node.ExpressionBody] : [];
+        _capturedParameterNames.UnionWith(FindCapturedNames(lambdaBody, node.Parameters.Select(parameter => parameter.Name)));
+        _lambdaDepth++;
         foreach (var parameter in node.Parameters)
         {
             _parameterTypes.Remove(parameter.Name);
@@ -7160,6 +7203,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _currentReturnLowering = previousReturnLowering;
             _currentReturnValueType = previousReturnValueType;
             _parameterTypes = previousParameterTypes;
+            _capturedParameterNames.Clear();
+            _capturedParameterNames.UnionWith(previousCapturedNames);
+            _lambdaDepth--;
+            if (!inheritsScope)
+            {
+                _declScopes = previousDeclScopes;
+                _refinementDeclScopes = previousRefinementScopes;
+                _indexedBoundScopes = previousIndexedScopes;
+                _outParameterNames = previousOutParameters;
+                _currentFunctionId = previousFunctionId;
+            }
             _postconditionResultShadowDepth =
                 previousPostconditionResultShadowDepth;
         }
@@ -9481,7 +9535,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private Dictionary<string, string> GetQuantifierTypes(IReadOnlyList<QuantifierVariableNode> variables)
     {
-        var types = _contractExpressionDepth > 0 || _statementDepth > 0
+        var types = _contractExpressionDepth > 0 || _statementDepth > 0 || _lambdaDepth > 0
             ? new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal)
             : new Dictionary<string, string>(StringComparer.Ordinal);
         if (_postconditionResultIdentifier != null && _postconditionResultShadowDepth == 0)

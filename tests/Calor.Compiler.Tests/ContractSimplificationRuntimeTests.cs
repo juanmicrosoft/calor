@@ -163,6 +163,47 @@ public class ContractSimplificationRuntimeTests
                 var closure = Assert.IsType<Func<bool>>(InvokeArguments(scalarControl, false, probe));
                 Assert.False(closure());
             }
+
+            var initializer = overloaded[..overloaded.IndexOf("  §F{f1:Check:pub}", StringComparison.Ordinal)] + $$"""
+                  §CL{c2:Container:pub}
+                    §MT{mt1:Seed:pub} (bool:x) -> bool
+                      §E{}
+                      §R x
+                    §FLD{Probe:x:pub:static}
+                    §FLD{Func<bool>:Check:pub:static} §LAM{l1} §R {{predicate}} §/LAM{l1}
+                """;
+            var initializerResult = Program.Compile(initializer, "initializer-logic.calr", Options(verify));
+            Assert.Contains(initializerResult.Diagnostics.Errors,
+                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+            var initializerControl = Compile(initializer.Replace(predicate, scalar), verify);
+            var fieldClosure = Assert.IsType<Func<bool>>(initializerControl.GetType("TypedContracts.Container")!
+                .GetField("Check")!.GetValue(null));
+            Assert.False(fieldClosure());
+        }
+
+        foreach (var endpoint in new[] { "n", "(+ n INT:0)" })
+        {
+            string Body(string variable) =>
+                $"(-> (&& (>= {variable} INT:0) (< {variable} {endpoint})) (&& (cast bool §C{{Invoke}} §A grow §/C) (== {variable} INT:0)))";
+            var quantifier = $"(forall ((i i32)) {Body("i")})";
+            var captured = $$"""
+                §M{m1:TypedContracts}
+                  §F{f2:Invoke:pub} (Func<bool>:action §E{}) -> bool
+                    §E{}
+                    §R §C{action} §/C
+                  §F{f1:Check:pub} () -> Func<i32,bool> §E{}
+                    §E{}
+                    §R §LAM{l1:n:i32} §E{}
+                      §B{grow:Func<bool>} §E{} §LAM{l2} §E{} §ASSIGN n INT:3 §R true §/LAM{l2}
+                      §R {{quantifier}}
+                    §/LAM{l1}
+                """;
+            var result = Program.Compile(captured, "captured-endpoint.calr", Options(verify));
+            Assert.Contains(result.Diagnostics.Errors,
+                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+            var control = Compile(captured.Replace(quantifier, $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
+            var closure = Assert.IsType<Func<int, bool>>(InvokeArguments(control));
+            Assert.False(closure(1));
         }
     }
 
