@@ -252,8 +252,14 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   stop for `Serilog/Parsing/MessageTemplateParser.cs` from Calor0208 to
   Calor0250 without changing that file's exclusion status.
   The separately regenerated Calor0270 ledger changes **302 → 299** diagnostics
-  while all **364** modules remain bound. The exact current pin follows this
-  measurement; R2's frozen **MISS** and v0.17's historical **324** remain intact.
+  while all **364** modules remain bound. The combined migration candidate
+  `46baabf8` subsequently records **298** Calor0270 diagnostics and **7420**
+  FluentValidation Calor0411 sites (previously **7429**). The LINQ repair puts
+  one additional unresolved receiver and nine unknown-call sites behind
+  explicit interop; these reductions do not establish new native analysis or
+  proven purity. Calor0425 stays **117** across **326** enforced modules.
+  The exact current pin follows this later measurement; R2's frozen **MISS**
+  and v0.17's historical **324** remain intact.
   Source/opacity limits are recorded in
   [the #1191 measurement amendment](../../bench/phase0-agent-native/binder-expression-measurement.md).
 - **R2 — the change itself.** Scoped by measurement, not by guess: R1 runs
