@@ -86,7 +86,12 @@ public class BinderIncompleteRatchetTests
         + "expression interop is now included in opaque coverage. "
         + "binder-source-coverage.json separately pins source and representation identities; "
         + "the expanded opaque budget (+20 boundaries/+180 source expressions) was explicitly "
-        + "accepted by the parent for #1191 after per-file evidence review, not as a native-fidelity claim";
+        + "accepted by the parent for #1191 after per-file evidence review, not as a native-fidelity claim. "
+        + "Combined migration measurement compares accepted 7d218c59 with exact 46baabf8: "
+        + "34703 -> 35179 binder visits; binder-combined-integration.json records the separate "
+        + "additional 11 opaque boundaries/268 source expressions and four generated lambda carrier "
+        + "renames. The additional opacity requires parent evidence review; it is not covered by "
+        + "the accepted M1 budget";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
