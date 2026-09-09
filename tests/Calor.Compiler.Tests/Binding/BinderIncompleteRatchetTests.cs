@@ -85,8 +85,8 @@ public class BinderIncompleteRatchetTests
         + "(the last step preserves eager operand regions in 67d4c259); "
         + "expression interop is now included in opaque coverage. "
         + "binder-source-coverage.json separately pins source and representation identities; "
-        + "the expanded opaque budget (+20 boundaries/+180 source expressions) is a proposal "
-        + "requiring explicit parent/user acceptance";
+        + "the expanded opaque budget (+20 boundaries/+180 source expressions) was explicitly "
+        + "accepted by the parent for #1191 after per-file evidence review, not as a native-fidelity claim";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");

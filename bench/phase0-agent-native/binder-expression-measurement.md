@@ -10,18 +10,19 @@ artifact rather than preserve coverage.
 
 Keep the exact baseline equality, incomplete-diagnostic ratchet, named parse
 failures, file counts, conversion exception/empty-output/parse-failure counters,
-and preserve-mode identity checks. The proposed amendment changes the visit count from **34,942 to 34,703**
+and preserve-mode identity checks. The amendment changes the visit count from **34,942 to 34,703**
 (through the intermediate 34,734 measurement) only with the independent
 source/opacity checks below. This is an explicit
 measurement amendment, **not an improvement in native coverage**.
 
-**Acceptance status: proposed coverage tradeoff, not independently approved.**
-The 20 additional opaque boundaries / 180 source expressions require explicit
-parent/user acceptance, or faithful native repair of those sites before adopting
-the expanded opaque budget. #1191 permitting counted interop does not itself
-approve a larger budget. The independent reviewer has not approved this budget
-or the proposed number. Passing the technical guards does not constitute that
-acceptance.
+**Acceptance status: explicit parent-owned coverage tradeoff for #1191.**
+After inspecting the per-file attribution and preservation evidence, the parent
+accepted the 20 additional opaque boundaries / 180 source expressions in
+[PR1252 comment5603520220](https://github.com/juanmicrosoft/calor/pull/1252#issuecomment-5603520220).
+The independent code review of the guards at `5bc52771` is clean, but is a
+separate decision: passing the technical guards does not authorize a larger
+opaque budget or establish whole-corpus semantic equivalence. Future increases
+still require explicit evidence and review.
 
 Any interpretation that the original 208-visit decline is **solely removed
 artifacts is withdrawn**. That visit decline and the opacity increase are

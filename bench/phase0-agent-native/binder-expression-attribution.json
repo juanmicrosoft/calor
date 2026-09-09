@@ -1,8 +1,9 @@
 {
   "Issue": "#1191",
-  "OpaqueBudgetProposal": {
-    "Status": "Pending explicit parent/user acceptance, or faithful native repair of the newly opaque sites",
-    "IndependentReviewerApproved": false,
+  "OpaqueBudgetDecision": {
+    "Status": "Accepted by the parent for #1191 after inspecting per-file attribution and preservation evidence; not an unchanged-native-fidelity claim",
+    "DecisionEvidence": "https://github.com/juanmicrosoft/calor/pull/1252#issuecomment-5603520220",
+    "IndependentGuardReview": "Clean implementation review of 5bc52771; separate from the parent-owned opacity-budget decision",
     "AdditionalBoundaries": 20,
     "AdditionalSourceExpressions": 180,
     "FormerlyExactSourceExpressions": 79,
