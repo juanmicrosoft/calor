@@ -53,6 +53,10 @@ public class TupleAssignmentMigrationTests
             "static (int, int) GetPair() { return (2, 1); }", native: true);
         yield return Case("native-scalar-declaration", "var (a, b) = GetPair(); return a && b == \"ok\";", "True",
             "static (bool, string) GetPair() { return (true, \"ok\"); }", native: true);
+        yield return Case("embedded-declaration-scope", "if (true) var (c, b) = GetPair(); return c;", "7",
+            "static int c = 7; static (int, int) GetPair() { return (2, 1); }");
+        yield return Case("switch-declaration-scope", "switch (1) { default: var (c, b) = GetPair(); if (c > 0) { return c * 10 + b; } return 0; }", "21",
+            "static (int, int) GetPair() { return (2, 1); }");
         yield return Case("native-deconstruct-effects", "var (a, b) = pair; return log + \":\" + a + b;", "d:21",
             """
             static string log = ""; static Pair pair = new Pair();

@@ -6590,6 +6590,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
             }
 
+            if (statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax tupleDeclaration }
+                && TryConvertTupleDeclaration(tupleDeclaration, GetTextSpan(statement)) is { } declarationStatements)
+            {
+                statements.AddRange(declarationStatements);
+                continue;
+            }
+
             var converted = ConvertStatement(statement);
             if (converted != null)
             {
@@ -10154,9 +10161,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("tuple-deconstruction");
         _context.IncrementConverted();
 
-        if (TryConvertTupleDeclaration(assignment, span) is { } declaration)
-            return declaration;
-
         // Keep the assignment atomic: C# evaluates targets, then RHS values and
         // conversions, then writes. Splitting it loses aliases and struct storage.
         // Only operands the Calor serializer never hoists are certified here.
@@ -10176,14 +10180,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new RawCSharpNode(span, assignment.ToString() + ";");
     }
 
-    private AssignmentStatementNode? TryConvertTupleDeclaration(
+    private List<StatementNode>? TryConvertTupleDeclaration(
         AssignmentExpressionSyntax assignment, TextSpan span)
     {
         // Scalar local declarations themselves have no evaluation effects. Bind
         // their actual Roslyn-inferred types, then let one C# tuple assignment
         // perform deconstruction (including a user-defined Deconstruct method).
+        // Return the group to ConvertBlock, never hoist declarations through
+        // pending statements across an embedded-statement or switch-arm scope.
         if (_semanticModel == null
-            || assignment.Parent is not ExpressionStatementSyntax
+            || !IsTupleAssignment(assignment)
+            || assignment.Parent is not ExpressionStatementSyntax { Parent: BlockSyntax }
             || assignment.Left is not DeclarationExpressionSyntax
             {
                 Type: IdentifierNameSyntax { Identifier.ValueText: "var" },
@@ -10210,15 +10217,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 TypeMapper.CSharpToCalor(local.Type.ToDisplayString())));
         }
 
+        _context.RecordFeatureUsage("tuple-deconstruction");
+        _context.IncrementConverted();
+        var statements = new List<StatementNode>();
         foreach (var local in locals)
         {
-            _pendingStatements.Add(new BindStatementNode(span, local.Name, local.Type,
+            statements.Add(new BindStatementNode(span, local.Name, local.Type,
                 isMutable: true, initializer: null, new AttributeCollection()));
         }
-        return new AssignmentStatementNode(span,
+        var value = ConvertExpression(assignment.Right);
+        FlushPendingStatements(statements);
+        statements.Add(new AssignmentStatementNode(span,
             new TupleLiteralNode(span, locals.Select(local =>
                 (ExpressionNode)new ReferenceNode(span, local.Name)).ToList()),
-            ConvertExpression(assignment.Right));
+            value));
+        return statements;
     }
 
     private ExpressionNode ConvertAssignmentExpression(AssignmentExpressionSyntax assignment)
