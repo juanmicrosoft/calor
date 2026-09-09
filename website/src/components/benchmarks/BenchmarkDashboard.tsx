@@ -8,6 +8,7 @@ import { BarChart3, FileCode, Trophy, Clock } from 'lucide-react';
 import { trackBenchmarkResultsView } from '@/lib/analytics';
 import { useEffect } from 'react';
 import { identifyPrograms } from '@/lib/benchmark-identity';
+import { formatTimestamp } from '@/lib/timestamps';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
@@ -44,20 +45,6 @@ const data = {
   programs: identifyPrograms(benchmarkData.programs),
 };
 
-function formatDate(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return 'Unknown';
-  }
-}
 
 interface SummaryCardProps {
   icon: React.ReactNode;
@@ -116,7 +103,7 @@ export function BenchmarkDashboard() {
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
-          <span>Updated: {formatDate(data.timestamp)}</span>
+          <span>Updated: <time dateTime={data.timestamp}>{formatTimestamp(data.timestamp)}</time></span>
           {data.commit && (
             <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
               {data.commit.slice(0, 7)}

@@ -1,4 +1,5 @@
 'use client';
+import { formatTimestamp } from '@/lib/timestamps';
 
 import { cn } from '@/lib/utils';
 import { Bot, CheckCircle, XCircle, Target, Layers, TrendingUp } from 'lucide-react';
@@ -43,18 +44,6 @@ interface AgentBenchmarkData {
 
 const data = agentBenchmarkData as AgentBenchmarkData;
 
-function formatDate(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch {
-    return 'Unknown';
-  }
-}
 
 interface SummaryCardProps {
   icon: React.ReactNode;
@@ -166,7 +155,7 @@ export function AgentBenchmarkDashboard() {
           </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
-          <div>Last run: {formatDate(data.timestamp)}</div>
+          <div>Last run: <time dateTime={data.timestamp}>{formatTimestamp(data.timestamp)}</time></div>
           <div>Commit: <code className="text-xs">{data.commit}</code></div>
         </div>
       </div>
