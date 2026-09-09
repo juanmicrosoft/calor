@@ -38,7 +38,7 @@ export function CodeBlock({
     ps1: 'powershell',
     javascript: 'js',
     typescript: 'ts',
-    calor: 'text', // Calor doesn't have built-in highlighting yet
+    calor: 'text', // Keep a truthful text fallback until a verified Calor grammar is available.
   };
 
   const normalizedLanguage = languageMap[language.toLowerCase()] || language;
@@ -57,12 +57,12 @@ export function CodeBlock({
     calor: 'Calor',
   };
 
-  const displayLanguage = languageLabels[normalizedLanguage] || language;
+  const displayLanguage = languageLabels[language.toLowerCase()] || languageLabels[normalizedLanguage] || language;
 
-  const lines = code.trim().split('\n');
+  const lines = code.split('\n');
 
   return (
-    <div className="group relative my-4 rounded-lg border bg-zinc-950 dark:bg-zinc-900">
+    <div role="group" aria-label={filename || `${displayLanguage} code example`} className="group relative my-4 rounded-lg border bg-zinc-950 dark:bg-zinc-900">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
         <div className="flex items-center gap-2">
@@ -70,7 +70,7 @@ export function CodeBlock({
             <span className="text-xs text-zinc-400 font-mono">{filename}</span>
           )}
           {!filename && displayLanguage && (
-            <span className="text-xs text-zinc-500">{displayLanguage}</span>
+            <span className="text-xs text-zinc-400">{displayLanguage}</span>
           )}
         </div>
         <button
@@ -98,13 +98,13 @@ export function CodeBlock({
             {showLineNumbers
               ? lines.map((line, i) => (
                   <span key={i} className="block">
-                    <span className="inline-block w-8 mr-4 text-right text-zinc-600 select-none">
+                    <span aria-hidden="true" className="inline-block w-8 mr-4 text-right text-zinc-400 select-none">
                       {i + 1}
                     </span>
                     {line}
                   </span>
                 ))
-              : code.trim()}
+              : code}
           </code>
         </pre>
       </div>

@@ -22,7 +22,7 @@ test('duplicate corpus IDs preserve exact table membership through sort/filter c
   const table = page.locator('table').filter({ has: page.getByRole('columnheader', { name: 'Program', exact: true }) });
   const rows = table.locator('tbody tr');
   for (let cycle = 0; cycle < 4; cycle++) {
-    await page.getByRole('columnheader', { name: 'Program', exact: true }).click();
+    await page.getByRole('button', { name: 'Program', exact: true }).click();
     for (const level of [1, null]) {
       await page.getByRole('button', { name: level === 1 ? 'L1' : 'All', exact: true }).click();
       const expected = fixture.programs.filter(p => level === null || p.level === level)
@@ -33,4 +33,48 @@ test('duplicate corpus IDs preserve exact table membership through sort/filter c
       await expect(page.getByText(`Showing ${expected.length} of 217 programs.`)).toBeVisible();
     }
   }
+});
+
+test('keyboard sort and filter expose state while preserving focus and membership', async ({ page }) => {
+  await page.route('https://**/*', route => route.abort());
+  await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/docs/benchmarking/results/`);
+  const header = page.getByRole('columnheader', { name: 'Program', exact: true });
+  const sort = header.getByRole('button');
+  await expect(header).toHaveAttribute('aria-sort', 'ascending');
+  await sort.focus();
+  await page.keyboard.press('Enter');
+  await expect(header).toHaveAttribute('aria-sort', 'descending');
+  await expect(sort).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(header).toHaveAttribute('aria-sort', 'ascending');
+  await expect(sort).toBeFocused();
+  const l1 = page.getByRole('button', { name: 'L1', exact: true });
+  await l1.focus();
+  await page.keyboard.press('Space');
+  await expect(l1).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  const rows = page.locator('table').filter({ has: header }).locator('tbody tr');
+  await expect(rows).toHaveCount(14);
+  await expect(rows.locator('td:first-child')).toHaveText(
+    fixture.programs.filter(p => p.level === 1).sort((a, b) => a.name.localeCompare(b.name)).map(p => p.name)
+  );
+  await page.getByRole('button', { name: 'Adv', exact: true }).press('Enter');
+  await expect(page.getByRole('columnheader', { name: 'Adv', exact: true })).toHaveAttribute('aria-sort', 'ascending');
+  await expect(header).not.toHaveAttribute('aria-sort');
+});
+
+test('comparison buttons expose exclusive pressed state through keyboard operation', async ({ page }) => {
+  await page.route('https://**/*', route => route.abort());
+  await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
+  const calor = page.getByRole('button', { name: 'Calor - Rules Are Visible' });
+  const csharp = page.getByRole('button', { name: 'C# - Rules in Control Flow' });
+  await expect(calor).toHaveAttribute('aria-pressed', 'true');
+  await csharp.press('Enter');
+  await expect(csharp).toHaveAttribute('aria-pressed', 'true');
+  await expect(calor).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByText('Program.cs', { exact: true })).toBeVisible();
+  await calor.press('Space');
+  await expect(calor).toHaveAttribute('aria-pressed', 'true');
+  await expect(csharp).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByText('program.calr', { exact: true })).toBeVisible();
 });

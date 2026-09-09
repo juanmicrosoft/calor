@@ -85,7 +85,7 @@ This single line conveys:
 - Expression body
 
 **Calor equivalent:**
-```
+```calor
 §F{f001:Add:pub}
   §I{i32:a}
   §I{i32:b}
@@ -107,7 +107,7 @@ C# closing braces (`}`) carry minimal semantic weight but are still counted as t
 
 Calor's effect declarations add semantic content that C# doesn't have:
 
-```
+```calor
 §E{cw,fs:r,net:rw}    // 3+ semantic elements
 ```
 
@@ -120,7 +120,7 @@ But C# has no equivalent, so it doesn't get penalized for missing this informati
 ### Example: FizzBuzz
 
 **Calor:**
-```
+```calor
 §M{m001:FizzBuzz}
   §F{f001:Main:pub}
     §O{void}

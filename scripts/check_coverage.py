@@ -152,6 +152,42 @@ def self_test() -> None:
         _, merge_failures = evaluate([report, second], baseline)
         if merge_failures:
             raise AssertionError(f"disjoint branch coverage did not merge: {merge_failures}")
+
+        components = {
+            "binder": {"path": "Binding/", "line": 100, "branch": 100},
+            "parsing": {"path": "Parsing/", "line": 100, "branch": 100},
+            "typechecking": {"path": "TypeChecking/", "line": 100, "branch": 100},
+        }
+        baseline.write_text(json.dumps({"components": components}), encoding="utf-8")
+        for failing_component in (None, "parsing", "typechecking"):
+            for metric in ("line", "branch"):
+                classes = []
+                for name, limits in components.items():
+                    hits = 0 if name == failing_component and metric == "line" else 1
+                    covered = 1 if name == failing_component and metric == "branch" else 2
+                    classes.append(
+                        f'<class filename="Calor.Compiler/{limits["path"]}Example.cs"><lines>'
+                        f'<line number="1" hits="{hits}" branch="true" '
+                        f'condition-coverage="{50 * covered}% ({covered}/2)" />'
+                        "</lines></class>"
+                    )
+                report.write_text(
+                    "<coverage><packages><package><classes>"
+                    + "".join(classes)
+                    + "</classes></package></packages></coverage>",
+                    encoding="utf-8",
+                )
+                _, component_failures = evaluate([report], baseline)
+                if failing_component is None:
+                    if component_failures:
+                        raise AssertionError(f"complete stage coverage failed: {component_failures}")
+                elif len(component_failures) != 1 or not component_failures[0].startswith(
+                    f"{failing_component} {metric} coverage "
+                ):
+                    raise AssertionError(
+                        f"isolated {failing_component} {metric} decline was not caught: "
+                        f"{component_failures}"
+                    )
     print("Coverage ratchet negative self-test passed.")
 
 

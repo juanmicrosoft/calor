@@ -6,7 +6,9 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn, getBasePath } from '@/lib/utils';
+import { Drawer } from '@/components/ui/Drawer';
+import { useTheme } from '@/hooks/useTheme';
+import { cn, getBasePath, normalizePathname } from '@/lib/utils';
 import { SITE_VERSION } from '@/lib/version';
 import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/lib/analytics';
 
@@ -22,14 +24,16 @@ const navigation = [
 
 export function Header() {
   const pathname = usePathname();
+  const path = normalizePathname(pathname);
+  const activeNavigation = [...navigation].reverse().find(item => {
+    const target = normalizePathname(item.href);
+    return path === target || path.startsWith(`${target}/`);
+  })?.href;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
 
   const toggleDarkMode = () => {
-    const newMode = isDark ? 'light' : 'dark';
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
-    trackDarkModeToggle(newMode);
+    trackDarkModeToggle(toggleTheme());
   };
 
   return (
@@ -39,7 +43,7 @@ export function Header() {
           <div className="flex lg:flex-1">
             <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
               <Image
-                src={`${basePath}/calor-logo.png`}
+                src={`${basePath}/calor-logo-64.webp`}
                 alt="Calor logo"
                 width={32}
                 height={32}
@@ -60,6 +64,8 @@ export function Header() {
               type="button"
               className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5"
               onClick={() => setMobileMenuOpen(true)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="main-navigation-drawer"
             >
               <span className="sr-only">Open main menu</span>
               <Menu className="h-6 w-6" aria-hidden="true" />
@@ -71,9 +77,10 @@ export function Header() {
               <Link
                 key={item.name}
                 href={item.href}
+                aria-current={activeNavigation === item.href ? 'location' : undefined}
                 className={cn(
                   'text-sm font-medium transition-colors hover:text-primary',
-                  pathname?.startsWith(item.path.replace(/\/$/, ''))
+                  activeNavigation === item.href
                     ? 'text-primary'
                     : 'text-muted-foreground'
                 )}
@@ -84,13 +91,12 @@ export function Header() {
           </div>
 
           <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
-            <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
+            <Button variant="ghost" size="icon" onClick={toggleDarkMode} aria-label="Dark mode" aria-pressed={isDark}>
               {isDark ? (
                 <Sun className="h-5 w-5" />
               ) : (
                 <Moon className="h-5 w-5" />
               )}
-              <span className="sr-only">Toggle dark mode</span>
             </Button>
             <Button variant="ghost" size="icon" asChild>
               <a
@@ -111,7 +117,7 @@ export function Header() {
                 onClick={() => trackAskCalorClick('header')}
               >
                 <MessageCircle className="h-5 w-5" />
-                <span className="sr-only">Ask Calor</span>
+                <span className="sr-only">Ask Calor (external ChatGPT; account may be required)</span>
               </a>
             </Button>
           </div>
@@ -119,17 +125,12 @@ export function Header() {
       </header>
 
       {/* Mobile menu - rendered outside header to avoid stacking context issues */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+      <Drawer id="main-navigation-drawer" label="Main navigation" open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)}>
           <div className="fixed inset-y-0 right-0 w-full overflow-y-auto bg-background p-4 sm:max-w-sm sm:ring-1 sm:ring-border">
             <div className="flex items-center justify-between">
-              <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
+              <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <Image
-                  src={`${basePath}/calor-logo.png`}
+                  src={`${basePath}/calor-logo-64.webp`}
                   alt="Calor logo"
                   width={32}
                   height={32}
@@ -153,6 +154,7 @@ export function Header() {
                     <Link
                       key={item.name}
                       href={item.href}
+                      aria-current={activeNavigation === item.href ? 'location' : undefined}
                       className="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-foreground hover:bg-accent"
                       onClick={() => setMobileMenuOpen(false)}
                     >
@@ -161,7 +163,7 @@ export function Header() {
                   ))}
                 </div>
                 <div className="flex items-center gap-4 py-6">
-                  <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
+                  <Button variant="ghost" size="icon" onClick={toggleDarkMode} aria-label="Dark mode" aria-pressed={isDark}>
                     {isDark ? (
                       <Sun className="h-5 w-5" />
                     ) : (
@@ -174,6 +176,7 @@ export function Header() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackOutboundLink('https://github.com/juanmicrosoft/calor')}
+                      aria-label="GitHub"
                     >
                       <Github className="h-5 w-5" />
                     </a>
@@ -184,6 +187,7 @@ export function Header() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackAskCalorClick('mobile_menu')}
+                      aria-label="Ask Calor (external ChatGPT; account may be required)"
                     >
                       <MessageCircle className="h-5 w-5" />
                     </a>
@@ -192,8 +196,7 @@ export function Header() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+      </Drawer>
     </>
   );
 }
