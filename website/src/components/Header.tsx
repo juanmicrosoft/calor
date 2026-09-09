@@ -117,7 +117,7 @@ export function Header() {
                 onClick={() => trackAskCalorClick('header')}
               >
                 <MessageCircle className="h-5 w-5" />
-                <span className="sr-only">Ask Calor</span>
+                <span className="sr-only">Ask Calor (external ChatGPT; account may be required)</span>
               </a>
             </Button>
           </div>
@@ -187,7 +187,7 @@ export function Header() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackAskCalorClick('mobile_menu')}
-                      aria-label="Ask Calor"
+                      aria-label="Ask Calor (external ChatGPT; account may be required)"
                     >
                       <MessageCircle className="h-5 w-5" />
                     </a>
