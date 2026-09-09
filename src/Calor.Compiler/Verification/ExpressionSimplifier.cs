@@ -5,10 +5,9 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Verification;
 
 /// <summary>
-/// Visitor that simplifies contract expressions by applying algebraic transformations.
-/// Supports constant folding (int and float), boolean identity, double negation elimination,
-/// tautology/contradiction detection, quantifier simplification, De Morgan's laws,
-/// arithmetic identities, and commutativity-aware redundancy elimination.
+/// Simplifies contract expressions using known built-in literal types.
+/// Untyped operands retain their evaluations and operators: this AST pass cannot
+/// establish IEEE reflexivity, purity, overload resolution, or absence of exceptions.
 /// </summary>
 public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
 {
@@ -51,7 +50,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var right = node.Right.Accept(this);
 
         // Constant folding for integers
-        if (left is IntLiteralNode li && right is IntLiteralNode ri)
+        if (left is IntLiteralNode { IsLong: false, IsUnsigned: false } li
+            && right is IntLiteralNode { IsLong: false, IsUnsigned: false } ri)
         {
             var folded = TryFoldIntegerBinaryOp(node.Span, node.Operator, li.Value, ri.Value);
             if (folded != null)
@@ -63,7 +63,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         // Constant folding for floats
-        if (left is FloatLiteralNode lf && right is FloatLiteralNode rf)
+        if (left is FloatLiteralNode { IsSingle: false, IsDecimal: false } lf
+            && right is FloatLiteralNode { IsSingle: false, IsDecimal: false } rf)
         {
             var folded = TryFoldFloatBinaryOp(node.Span, node.Operator, lf.Value, rf.Value);
             if (folded != null)
@@ -75,8 +76,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         // Mixed int/float constant folding (promote int to float)
-        if ((left is IntLiteralNode lmi && right is FloatLiteralNode rmf) ||
-            (left is FloatLiteralNode lmf && right is IntLiteralNode rmi))
+        if ((left is IntLiteralNode { IsLong: false, IsUnsigned: false }
+                && right is FloatLiteralNode { IsSingle: false, IsDecimal: false }) ||
+            (left is FloatLiteralNode { IsSingle: false, IsDecimal: false }
+                && right is IntLiteralNode { IsLong: false, IsUnsigned: false }))
         {
             double leftVal = left is IntLiteralNode li2 ? li2.Value : ((FloatLiteralNode)left).Value;
             double rightVal = right is IntLiteralNode ri2 ? ri2.Value : ((FloatLiteralNode)right).Value;
@@ -89,13 +92,11 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             }
         }
 
-        // Algebraic identity simplifications
-        var algebraic = TrySimplifyAlgebraicIdentity(node.Span, node.Operator, left, right);
-        if (algebraic != null)
-        {
-            Changed = true;
-            return algebraic;
-        }
+        // This pass runs on the unbound AST. Structural equality cannot establish
+        // IEEE reflexivity, built-in operators, purity, or absence of exceptions.
+        // Only literals whose runtime types are known may erase an operand.
+        if (left is not BoolLiteralNode || right is not BoolLiteralNode)
+            return MaybeNewNode(node, left, right);
 
         // Boolean simplification
         return node.Operator switch
@@ -110,13 +111,17 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
 
     private ExpressionNode? TryFoldIntegerBinaryOp(TextSpan span, BinaryOperator op, long left, long right)
     {
-        return op switch
+        var l = checked((int)left);
+        var r = checked((int)right);
+        try
         {
-            BinaryOperator.Add => new IntLiteralNode(span, left + right),
-            BinaryOperator.Subtract => new IntLiteralNode(span, left - right),
-            BinaryOperator.Multiply => new IntLiteralNode(span, left * right),
-            BinaryOperator.Divide when right != 0 => new IntLiteralNode(span, left / right),
-            BinaryOperator.Modulo when right != 0 => new IntLiteralNode(span, left % right),
+            return op switch
+            {
+            BinaryOperator.Add => new IntLiteralNode(span, checked(l + r)),
+            BinaryOperator.Subtract => new IntLiteralNode(span, checked(l - r)),
+            BinaryOperator.Multiply => new IntLiteralNode(span, checked(l * r)),
+            BinaryOperator.Divide when r != 0 => new IntLiteralNode(span, l / r),
+            BinaryOperator.Modulo when r != 0 => new IntLiteralNode(span, l % r),
             BinaryOperator.LessThan => new BoolLiteralNode(span, left < right),
             BinaryOperator.LessOrEqual => new BoolLiteralNode(span, left <= right),
             BinaryOperator.GreaterThan => new BoolLiteralNode(span, left > right),
@@ -126,139 +131,38 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             BinaryOperator.BitwiseAnd => new IntLiteralNode(span, left & right),
             BinaryOperator.BitwiseOr => new IntLiteralNode(span, left | right),
             BinaryOperator.BitwiseXor => new IntLiteralNode(span, left ^ right),
-            BinaryOperator.LeftShift => new IntLiteralNode(span, left << (int)right),
-            BinaryOperator.RightShift => new IntLiteralNode(span, left >> (int)right),
+            BinaryOperator.LeftShift => new IntLiteralNode(span, l << r),
+            BinaryOperator.RightShift => new IntLiteralNode(span, l >> r),
             _ => null
-        };
+            };
+        }
+        catch (OverflowException)
+        {
+            // Preserve the original operation and its checked/exceptional behavior.
+            return null;
+        }
     }
 
     private ExpressionNode? TryFoldFloatBinaryOp(TextSpan span, BinaryOperator op, double left, double right)
     {
-        return op switch
+        ExpressionNode? folded = op switch
         {
             BinaryOperator.Add => new FloatLiteralNode(span, left + right),
             BinaryOperator.Subtract => new FloatLiteralNode(span, left - right),
             BinaryOperator.Multiply => new FloatLiteralNode(span, left * right),
-            BinaryOperator.Divide when Math.Abs(right) > double.Epsilon => new FloatLiteralNode(span, left / right),
-            BinaryOperator.Modulo when Math.Abs(right) > double.Epsilon => new FloatLiteralNode(span, left % right),
+            BinaryOperator.Divide when right != 0 => new FloatLiteralNode(span, left / right),
+            BinaryOperator.Modulo when right != 0 => new FloatLiteralNode(span, left % right),
             BinaryOperator.Power => new FloatLiteralNode(span, Math.Pow(left, right)),
             BinaryOperator.LessThan => new BoolLiteralNode(span, left < right),
             BinaryOperator.LessOrEqual => new BoolLiteralNode(span, left <= right),
             BinaryOperator.GreaterThan => new BoolLiteralNode(span, left > right),
             BinaryOperator.GreaterOrEqual => new BoolLiteralNode(span, left >= right),
-            BinaryOperator.Equal => new BoolLiteralNode(span, Math.Abs(left - right) < double.Epsilon),
-            BinaryOperator.NotEqual => new BoolLiteralNode(span, Math.Abs(left - right) >= double.Epsilon),
+            BinaryOperator.Equal => new BoolLiteralNode(span, left == right),
+            BinaryOperator.NotEqual => new BoolLiteralNode(span, left != right),
             _ => null
         };
-    }
-
-    /// <summary>
-    /// Simplifies algebraic identities like x + 0 → x, x * 1 → x, x - x → 0, etc.
-    /// </summary>
-    private ExpressionNode? TrySimplifyAlgebraicIdentity(TextSpan span, BinaryOperator op, ExpressionNode left, ExpressionNode right)
-    {
-        // x + 0 → x, 0 + x → x
-        if (op == BinaryOperator.Add)
-        {
-            if (IsZero(right))
-            {
-                ReportSimplified(span, "x + 0 -> x");
-                return left;
-            }
-            if (IsZero(left))
-            {
-                ReportSimplified(span, "0 + x -> x");
-                return right;
-            }
-        }
-
-        // x - 0 → x
-        if (op == BinaryOperator.Subtract)
-        {
-            if (IsZero(right))
-            {
-                ReportSimplified(span, "x - 0 -> x");
-                return left;
-            }
-            // x - x → 0 (also handles commutative equality like (+ a b) - (+ b a))
-            if (AreStructurallyEqualOrCommutative(left, right))
-            {
-                ReportSimplified(span, "x - x -> 0");
-                return new IntLiteralNode(span, 0);
-            }
-        }
-
-        // x * 1 → x, 1 * x → x
-        if (op == BinaryOperator.Multiply)
-        {
-            if (IsOne(right))
-            {
-                ReportSimplified(span, "x * 1 -> x");
-                return left;
-            }
-            if (IsOne(left))
-            {
-                ReportSimplified(span, "1 * x -> x");
-                return right;
-            }
-            // x * 0 → 0, 0 * x → 0
-            if (IsZero(right))
-            {
-                ReportSimplified(span, "x * 0 -> 0");
-                return right;
-            }
-            if (IsZero(left))
-            {
-                ReportSimplified(span, "0 * x -> 0");
-                return left;
-            }
-        }
-
-        // x / 1 → x
-        if (op == BinaryOperator.Divide)
-        {
-            if (IsOne(right))
-            {
-                ReportSimplified(span, "x / 1 -> x");
-                return left;
-            }
-            // Note: x / x → 1 is NOT safe in general (x could be 0)
-            // We only do this for known non-zero constants
-            if (left is IntLiteralNode li && right is IntLiteralNode ri && li.Value == ri.Value && li.Value != 0)
-            {
-                ReportSimplified(span, "n / n -> 1");
-                return new IntLiteralNode(span, 1);
-            }
-        }
-
-        // x % 1 → 0 (for integers)
-        if (op == BinaryOperator.Modulo && IsOne(right) && left is IntLiteralNode or ReferenceNode)
-        {
-            ReportSimplified(span, "x % 1 -> 0");
-            return new IntLiteralNode(span, 0);
-        }
-
-        return null;
-    }
-
-    private bool IsZero(ExpressionNode node)
-    {
-        return node switch
-        {
-            IntLiteralNode i => i.Value == 0,
-            FloatLiteralNode f => Math.Abs(f.Value) < double.Epsilon,
-            _ => false
-        };
-    }
-
-    private bool IsOne(ExpressionNode node)
-    {
-        return node switch
-        {
-            IntLiteralNode i => i.Value == 1,
-            FloatLiteralNode f => Math.Abs(f.Value - 1.0) < double.Epsilon,
-            _ => false
-        };
+        // Non-finite values do not have a numeric C# literal spelling.
+        return folded is FloatLiteralNode value && !double.IsFinite(value.Value) ? null : folded;
     }
 
     private ExpressionNode SimplifyAnd(TextSpan span, ExpressionNode left, ExpressionNode right)
@@ -428,6 +332,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(UnaryOperationNode node)
     {
         var operand = node.Operand.Accept(this);
+        if (operand is not BoolLiteralNode
+            && operand is not IntLiteralNode { IsLong: false, IsUnsigned: false }
+            && operand is not FloatLiteralNode { IsSingle: false, IsDecimal: false })
+            return operand == node.Operand ? node : new UnaryOperationNode(node.Span, node.Operator, operand);
 
         if (node.Operator == UnaryOperator.Not)
         {
@@ -480,7 +388,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         if (node.Operator == UnaryOperator.Negate)
         {
             // (- INT:n) → INT:(-n)
-            if (operand is IntLiteralNode intLit)
+            if (operand is IntLiteralNode intLit && intLit.Value != int.MinValue)
             {
                 Changed = true;
                 ReportSimplified(node.Span, "integer negation folded");
@@ -534,6 +442,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     {
         var ante = node.Antecedent.Accept(this);
         var cons = node.Consequent.Accept(this);
+        if (ante is not BoolLiteralNode || cons is not BoolLiteralNode)
+            return ante == node.Antecedent && cons == node.Consequent
+                ? node
+                : new ImplicationExpressionNode(node.Span, ante, cons);
 
         // (-> false p) → true
         if (ante is BoolLiteralNode { Value: false })
@@ -653,6 +565,12 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var cond = node.Condition.Accept(this);
         var whenTrue = node.WhenTrue.Accept(this);
         var whenFalse = node.WhenFalse.Accept(this);
+        // A conditional's common type can differ from its selected branch type.
+        // Keep it unless both branches are literals with the same built-in type.
+        if (cond is not BoolLiteralNode || !SameLiteralType(whenTrue, whenFalse))
+            return cond == node.Condition && whenTrue == node.WhenTrue && whenFalse == node.WhenFalse
+                ? node
+                : new ConditionalExpressionNode(node.Span, cond, whenTrue, whenFalse);
 
         // (? true t f) → t
         if (cond is BoolLiteralNode { Value: true })
@@ -702,6 +620,15 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     #endregion
 
     #region Expression nodes that recursively simplify children
+
+    private static bool SameLiteralType(ExpressionNode left, ExpressionNode right) => (left, right) switch
+    {
+        (BoolLiteralNode, BoolLiteralNode) => true,
+        (IntLiteralNode l, IntLiteralNode r) => l.Width == r.Width && l.Signedness == r.Signedness,
+        (FloatLiteralNode l, FloatLiteralNode r) => l.IsSingle == r.IsSingle && l.IsDecimal == r.IsDecimal,
+        (DecimalLiteralNode, DecimalLiteralNode) => true,
+        _ => false
+    };
 
     public ExpressionNode Visit(ArrayAccessNode node)
     {
