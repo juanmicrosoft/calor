@@ -8172,7 +8172,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     || condition.IsKind(SyntaxKind.GreaterThanOrEqualExpression) && bound > int.MinValue);
             var flow = _semanticModel.AnalyzeDataFlow(node.Statement);
             return safeCondition && flow is { Succeeded: true }
-                && !flow.WrittenInside.Contains(variable, SymbolEqualityComparer.Default);
+                && !flow.WrittenInside.Contains(variable, SymbolEqualityComparer.Default)
+                && !flow.UnsafeAddressTaken.Contains(variable, SymbolEqualityComparer.Default)
+                // Readonly references can still escape to unsafe callees. Dataflow's
+                // write set does not see those writes, including implicit `in` calls.
+                && !node.Statement.DescendantNodesAndSelf().Any(syntax =>
+                    syntax is RefExpressionSyntax
+                    || syntax is ArgumentSyntax argument
+                        && _semanticModel.GetOperation(argument) is
+                            Microsoft.CodeAnalysis.Operations.IArgumentOperation
+                            { Parameter.RefKind: not RefKind.None }
+                    || syntax is InvocationExpressionSyntax invocation
+                        && _semanticModel.GetSymbolInfo(invocation).Symbol is IMethodSymbol
+                            { ReducedFrom: { } extension }
+                        && extension.Parameters[0].RefKind != RefKind.None);
         }
 
         // Hoist complex from/to/step expressions to temp bindings.

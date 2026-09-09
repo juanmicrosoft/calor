@@ -38,11 +38,41 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (int i = 0; i < ExplodingBound(); i++) count++; return count;", "throws:InvalidOperationException:BBB", false)]
     [InlineData("int count = 0; for (int i = int.MaxValue; i <= int.MaxValue; i++) { count++; if (count == 2) break; } return count;", "2", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
+        => AssertEquivalent(body, expected, native);
+
+    [Theory]
+    [InlineData("Change(in i);")]
+    [InlineData("Change(i);")]
+    [InlineData("ref readonly int alias = ref i; Change(in alias);")]
+    public void ReadonlyReferenceEscape_DoesNotClaimNativeOverflowEquivalence(string mutation)
+    {
+        AssertEquivalent($$"""
+            int count = 0;
+            for (int i = 0; i < 3; i++)
+            {
+                count++;
+                if (count == 2) break;
+                unchecked { {{mutation}} }
+            }
+            return count;
+            """, "2", native: false, """
+            private static unsafe void Change(in int value)
+            {
+                unchecked
+                {
+                    fixed (int* pointer = &value) { *pointer = int.MaxValue; }
+                }
+            }
+            """);
+    }
+
+    private static void AssertEquivalent(string body, string expected, bool native, string members = "")
     {
         var source = $$"""
             public static class Migrated
             {
                 public static string Trace = "";
+                {{members}}
                 private static int Bound() { Trace += "B"; return 3; }
                 private static int Step() { Trace += "S"; return 1; }
                 private static int ExplodingBound()
@@ -77,7 +107,7 @@ public class ForLoopConditionSemanticsTests
     {
         var compilation = CSharpCompilation.Create("ForOracle_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.True(emit.Success, string.Join("; ", emit.Diagnostics) + "\n" + source);
