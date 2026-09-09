@@ -23,12 +23,13 @@ public class DictionaryInitializerSemanticsTests
     [InlineData("var d = new System.Collections.Generic.Dictionary<int, int> { [1] = 2, [1] = 3 }; return d[1].ToString();", "3", true)]
     [InlineData("var d = new D { {1, 2}, {1, 3} }; return d[1].ToString();", "throws:ArgumentException", true)]
     [InlineData("var d = (object)new Dictionary<int, int> { {1, 2}, {1, 3} }; return d;", "throws:ArgumentException", true)]
-    [InlineData("var d = false ? new Dictionary<int, int> { {1, 2}, {1, 3} } : new Dictionary<int, int>(); return d.Count.ToString();", "0", true)]
+    [InlineData("var d = false ? new Dictionary<int, int> { {1, 2}, {1, 3} } : new Dictionary<int, int>(); return d.Count.ToString();", "0", true, "conditional-expression-hoisting")]
     [InlineData("var d = new Dictionary<int, int>(new Dictionary<int, int> { {1, 2}, {1, 3} }); return d;", "throws:ArgumentException", true)]
     [InlineData("Dictionary<int, int> d = null; d = new Dictionary<int, int> { {1, 2}, {1, 3} }; return d;", "throws:ArgumentException", false)]
-    public void Migration_PreservesDictionaryObservations(string body, string expected, bool preserved)
+    public void Migration_PreservesDictionaryObservations(
+        string body, string expected, bool preserved, string preservedFeature = "dictionary-initializer")
     {
-        AssertEquivalent(body, expected, preserved);
+        AssertEquivalent(body, expected, preserved, preservedFeature: preservedFeature);
     }
 
     [Theory]
@@ -89,7 +90,9 @@ public class DictionaryInitializerSemanticsTests
             """);
     }
 
-    private static void AssertEquivalent(string body, string expected, bool preserved, string? members = null)
+    private static void AssertEquivalent(
+        string body, string expected, bool preserved, string? members = null,
+        string preservedFeature = "dictionary-initializer")
     {
         var source = $$"""
             using System;
@@ -111,7 +114,7 @@ public class DictionaryInitializerSemanticsTests
         Assert.DoesNotContain(conversion.Losses, loss => loss.Kind == ConversionLossKind.Dropped);
         if (preserved)
             Assert.Contains(conversion.Losses, loss =>
-                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "dictionary-initializer");
+                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == preservedFeature);
         else
             Assert.Contains("§DICT", conversion.CalorSource);
         var compiled = Program.Compile(conversion.CalorSource!, "dictionary.calr", new CompilationOptions

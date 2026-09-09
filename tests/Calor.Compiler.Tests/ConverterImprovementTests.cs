@@ -19,7 +19,7 @@ public class ConverterImprovementTests
     #region A1: Throw Expressions
 
     [Fact]
-    public void Migration_ThrowExpressionInCoalesce_HoistsNullGuard()
+    public void Migration_ThrowExpressionInCoalesce_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -33,30 +33,11 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        var method = Assert.Single(cls.Methods);
-
-        // Should hoist an if-null-throw guard before the return
-        Assert.Equal(2, method.Body.Count);
-        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
-
-        // Guard condition: (== input null)
-        var nullCheck = Assert.IsType<BinaryOperationNode>(guard.Condition);
-        Assert.Equal(BinaryOperator.Equal, nullCheck.Operator);
-
-        // Guard body: throw with preserved exception type
-        Assert.Single(guard.ThenBody);
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        Assert.IsType<NewExpressionNode>(throwStmt.Exception);
-
-        // Return is just the variable reference (no conditional wrapper)
-        Assert.IsType<ReferenceNode>(ret.Expression);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
-    public void Migration_CoalesceThrow_Assignment_HoistsNullGuard()
+    public void Migration_CoalesceThrow_Assignment_PreservesConditionalThrow()
     {
         var csharp = """
             public class Config
@@ -71,23 +52,11 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        var ctor = Assert.Single(cls.Constructors);
-
-        // Should hoist an if-null-throw guard before the assignment
-        Assert.Equal(2, ctor.Body.Count);
-        var guard = Assert.IsType<IfStatementNode>(ctor.Body[0]);
-        Assert.IsType<AssignmentStatementNode>(ctor.Body[1]);
-
-        // Guard body preserves ArgumentNullException type
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        var newExpr = Assert.IsType<NewExpressionNode>(throwStmt.Exception);
-        Assert.Contains("ArgumentNullException", newExpr.TypeName);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
-    public void Migration_CoalesceThrow_LocalDeclaration_HoistsNullGuard()
+    public void Migration_CoalesceThrow_LocalDeclaration_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -101,14 +70,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        var method = Assert.Single(cls.Methods);
-
-        // Should hoist an if-null-throw guard before the binding
-        Assert.Equal(2, method.Body.Count);
-        Assert.IsType<IfStatementNode>(method.Body[0]);
-        Assert.IsType<BindStatementNode>(method.Body[1]);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
@@ -161,7 +123,7 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void Migration_CoalesceThrow_MethodCall_HoistsToTempVariable()
+    public void Migration_CoalesceThrow_MethodCall_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -176,20 +138,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        // GetName is first method, Process is second
-        var method = cls.Methods[1];
-
-        // Should hoist: temp bind, then if-null-throw guard, then return temp ref
-        Assert.Equal(3, method.Body.Count);
-        Assert.IsType<BindStatementNode>(method.Body[0]);
-        Assert.IsType<IfStatementNode>(method.Body[1]);
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[2]);
-
-        // Return should reference the temp variable, not the original call
-        var returnRef = Assert.IsType<ReferenceNode>(ret.Expression);
-        Assert.StartsWith("_nct", returnRef.Name);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
@@ -207,20 +156,11 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        var method = Assert.Single(cls.Methods);
-
-        // The inner (b ?? throw) is handled first, hoisting a guard for b.
-        // The outer (a ?? <inner>) becomes a regular conditional since <inner> returns b.
-        // Expect: if-null-throw guard for b, then return with conditional for a.
-        Assert.True(method.Body.Count >= 2,
-            $"Expected at least 2 statements, got {method.Body.Count}");
-        Assert.IsType<IfStatementNode>(method.Body[0]);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
-    public void Migration_ThrowExpressionInTernary_HoistsGuard()
+    public void Migration_ThrowExpressionInTernary_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -234,19 +174,36 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
+        AssertNativeConditionalThrow(result);
+    }
+
+    private static void AssertNativeConditionalThrow(ConversionResult result)
+    {
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var method = Assert.Single(cls.Methods);
-
-        // Ternary throw is now hoisted to a guard: if (!flag) throw ...
-        Assert.Equal(2, method.Body.Count);
-        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        Assert.IsType<NewExpressionNode>(throwStmt.Exception);
-
-        // Return statement has the value directly (no conditional)
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
-        Assert.IsType<IntLiteralNode>(ret.Expression);
+        Assert.Empty(cls.InteropBlocks);
+        var nodes = new List<AstNode>();
+        var pending = new Stack<AstNode>();
+        pending.Push(cls);
+        while (pending.TryPop(out var node))
+        {
+            nodes.Add(node);
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+                pending.Push(child);
+        }
+        Assert.Contains(nodes, node => node is ThrowExpressionNode or ThrowStatementNode);
+        foreach (var guard in nodes.OfType<IfStatementNode>())
+        {
+            var negation = Assert.IsType<UnaryOperationNode>(guard.Condition);
+            Assert.Equal(UnaryOperator.Not, negation.Operator);
+            var identity = Assert.IsType<TypeOperationNode>(negation.Operand);
+            Assert.Equal(TypeOp.Is, identity.Operation);
+            Assert.Equal("object", identity.TargetType);
+            Assert.IsType<ReferenceNode>(identity.Operand);
+        }
+        Assert.Contains("§TH", result.CalorSource);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+        Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
     #endregion
@@ -401,10 +358,12 @@ public class ConverterImprovementTests
         var cls = Assert.Single(result.Ast!.Classes);
         var getNameMethod = cls.Methods[0];
 
-        // Should contain a NullConditionalNode in the return statement
         var ret = Assert.IsType<ReturnStatementNode>(getNameMethod.Body[0]);
-        var nullCond = Assert.IsType<NullConditionalNode>(ret.Expression);
-        Assert.Contains("ToString(", nullCond.MemberName);
+        var call = Assert.IsType<ExpressionCallNode>(ret.Expression);
+        var conditionalTarget = Assert.IsType<NullConditionalNode>(call.TargetExpression);
+        Assert.Equal("ToString", conditionalTarget.MemberName);
+        Assert.Equal("x", Assert.IsType<ReferenceNode>(Assert.Single(call.Arguments)).Name);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     #endregion
@@ -509,7 +468,7 @@ public class ConverterImprovementTests
     #region Edge Cases: Throw Expression with Existing Variable
 
     [Fact]
-    public void Migration_ThrowExpressionWithVariable_HoistsNullGuard()
+    public void Migration_ThrowExpressionWithVariable_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -523,21 +482,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        var method = Assert.Single(cls.Methods);
-
-        // ?? throw ex now hoists a null guard before the return
-        Assert.Equal(2, method.Body.Count);
-        var guard = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var ret = Assert.IsType<ReturnStatementNode>(method.Body[1]);
-
-        // Guard body: throw with the variable reference
-        var throwStmt = Assert.IsType<ThrowStatementNode>(guard.ThenBody[0]);
-        Assert.IsType<ReferenceNode>(throwStmt.Exception);
-
-        // Return is just the variable reference
-        Assert.IsType<ReferenceNode>(ret.Expression);
+        AssertNativeConditionalThrow(result);
     }
 
     #endregion
@@ -624,11 +569,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        // The AST should not contain any FallbackExpressionNode for throw expressions
-        var cls = Assert.Single(result.Ast!.Classes);
-        var method = Assert.Single(cls.Methods);
-        AssertNoFallbackExpressions(method.Body);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
@@ -2026,7 +1967,7 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void Migration_TargetTypedNew_InThrowExpression_InfersException()
+    public void Migration_TargetTypedNew_InThrowExpression_PreservesConditionalThrow()
     {
         var csharp = """
             using System;
@@ -2042,10 +1983,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        Assert.True(result.Success, GetErrorMessage(result));
-        var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
-        Assert.Contains("NEW{Exception}", emitted);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]

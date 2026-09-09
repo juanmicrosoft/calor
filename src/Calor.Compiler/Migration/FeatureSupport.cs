@@ -190,6 +190,20 @@ public static class FeatureSupport
         },
 
         // Partially supported features
+        ["conditional-access-shape"] = new FeatureInfo
+        {
+            Name = "conditional-access-shape",
+            Support = SupportLevel.Partial,
+            Description = "Conditional member and positional invocation chains convert natively. Conditional indexing, named/ref arguments, generic conditional calls and unsupported grouping preserve the original expression as counted C# interop",
+            Workaround = "Keep the counted interop, or express the null check and dependent operations as explicit statements"
+        },
+        ["conditional-expression-hoisting"] = new FeatureInfo
+        {
+            Name = "conditional-expression-hoisting",
+            Support = SupportLevel.Partial,
+            Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
+            Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
+        },
         ["linq-method"] = new FeatureInfo
         {
             Name = "linq-method",

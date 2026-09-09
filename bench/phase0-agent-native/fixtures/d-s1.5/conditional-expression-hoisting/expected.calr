@@ -1,0 +1,28 @@
+§M{m001:Fixture:overflow=unchecked}
+  §CL{c001:ConditionalExpressionFixture:pub:stat}
+    §MT{m002:Run:pub:stat} () -> i32
+      §B{~i:i32} 0
+      §B{~gate:bool} false
+      §B{bool:ignored} (&& gate (> (post-inc i) 0))
+      §IF{if003} (|| ignored (!= i 0))
+        §R (- 1)
+      §ASSIGN gate true
+      §B{~selectedAnd:bool} (&& gate (== (post-inc i) 0))
+      §IF{if004} (|| (! selectedAnd) (!= i 1))
+        §R (- 2)
+      §B{~skippedOr:bool} (|| gate (> (inc i) 0))
+      §IF{if005} (|| (! skippedOr) (!= i 1))
+        §R (- 3)
+      §ASSIGN gate false
+      §B{~selectedOr:bool} (|| gate (== (inc i) 2))
+      §IF{if006} (|| (! selectedOr) (!= i 2))
+        §R (- 4)
+      §ASSIGN gate true
+      §B{i32:selected} (? gate (post-inc i) (inc i))
+      §IF{if007} (|| (!= selected 2) (!= i 3))
+        §R (- 5)
+      §ASSIGN gate false
+      §B{i32:alternate} (? gate (inc i) 9)
+      §IF{if008} (|| (!= alternate 9) (!= i 3))
+        §R (- 6)
+      §R (+ (+ (* i 100) (* selected 10)) alternate)

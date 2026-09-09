@@ -1538,10 +1538,12 @@ public class Calor0425CorpusLedgerTests
         var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
         Assert.True(enforcedNow >= EnforcedAfterR2,
             $"ModulesEnforced fell to {enforcedNow}, below the {EnforcedAfterR2} R2 left it at.");
-        const int EnforcedAfterR3AndRound4 = 324;
-        Assert.True(enforcedNow == EnforcedAfterR3AndRound4,
-            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterR3AndRound4} recorded for the "
-            + "R3 + round-4 commit. This is an EXACT pin: a move — in either direction — regenerates "
+        // #1191 later exposes PropertyToken and StreetNumberComparer to effects.
+        // This does not change any historical R2/R3 measurement or verdict.
+        const int EnforcedAfterConditionalPreservation = 326;
+        Assert.True(enforcedNow == EnforcedAfterConditionalPreservation,
+            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterConditionalPreservation} recorded for "
+            + "#1191. This is an EXACT pin: a move — in either direction — regenerates "
             + "the ledger IN THIS PR with the change named, and updates §3.1's outcome record. It "
             + "does not reopen PP-R1 leg 1, which is closed as a MISS on R2's own 15.");
     }

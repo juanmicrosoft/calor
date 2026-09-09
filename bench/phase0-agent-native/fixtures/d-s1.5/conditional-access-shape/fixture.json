@@ -1,0 +1,13 @@
+{
+  "featureKey": "conditional-access-shape",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 117,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 117,
+  "convertedExpectedDefinedInt": 117,
+  "definedSymbols": []
+}
