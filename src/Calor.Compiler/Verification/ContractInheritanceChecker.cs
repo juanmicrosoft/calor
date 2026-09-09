@@ -760,7 +760,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             // Nearer types also shadow farther values. Do not flatten enclosing
             // or base scopes into one undifferentiated set of protected names.
             foreach (var declaration in _enclosingDeclarations.Keys.Where(declaration =>
-                         _enclosingDeclarations[declaration] == scope.Declaration))
+                         _enclosingDeclarations[declaration] == scope.Declaration
+                         && DeclarationParameters(declaration).Count == 0))
                 hiddenNames.Add(DeclarationName(declaration));
             var bases = scope.Declaration switch
             {
