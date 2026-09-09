@@ -7,11 +7,15 @@ by `.github/workflows/publish-nuget.yml` before packages can be published.
 ## Ratchets
 
 - `eng/coverage-baselines.json` records line and branch floors for verifier, emitter,
-  binder, migration, dataflow, taint, and effects. `scripts/check_coverage.py` merges
+  binder, migration, dataflow, taint, effects, parsing, and type checking. `scripts/check_coverage.py` merges
   Cobertura reports by source line so duplicate coverage from multiple suites is not
   double-counted.
-- `eng/mutation-baselines.json` defines one compiling, deterministic mutant for each
-  safety-critical component. `scripts/run_mutation_gate.py` only credits an assertion
+- `eng/mutation-baselines.json` defines a small set of compiling, deterministic mutants.
+  Migration-emitter brace escaping is labeled separately from native C# generation.
+  Native mutants exercise distinct arithmetic operands, side-effect evaluation order,
+  and parser conditional-arm selection through executable production-path regressions.
+  These hand-selected probes are not an estimate of general mutation coverage.
+  `scripts/run_mutation_gate.py` only credits an assertion
   failure as a kill; build and infrastructure failures fail the gate without improving
   the score.
 - `eng/performance-baselines.json` records the performance ceiling and noise policy.
@@ -21,6 +25,29 @@ by `.github/workflows/publish-nuget.yml` before packages can be published.
 Each ratchet has a negative self-test that proves a regression is rejected. Raise a
 baseline only after a verified improvement; lowering one requires an explicit review of
 the corresponding report and rationale in the pull request.
+
+### Frontend floor provenance (#1197)
+
+The new floors were selected after a corpus-enabled Release measurement of compiler
+baseline `2c316156` using .NET SDK 10.0.400 on macOS. The collection used the same five
+projects as `quality-ratchets` (Compiler, Conversion, Enforcement, Semantics, Verification),
+the shared two-part compiler filter, and all three pinned corpus submodules. All 9,635
+cases completed: 9,631 passed and four compiler cases skipped. No existing floor failed.
+This is CI-comparable collection, not a claim that macOS and Linux coverage are identical.
+
+| Component | Covered/total lines | Measured line | Covered/total branches | Measured branch | Line/branch floors |
+|---|---|---|---|---|---|
+| Parsing | 8,326/9,966 | 83.54% | 6,117/8,254 | 74.11% | 82% / 73% |
+| TypeChecking | 665/915 | 72.68% | 701/956 | 73.33% | 71% / 72% |
+
+Each new floor is the measured percentage rounded down to an integer, minus one
+percentage point for modest variation in collection and compiler changes. Existing
+binder, migration, and other floors are unchanged. The coverage self-test independently
+drops line and branch coverage in each frontend component while all other components
+stay green, and requires the corresponding gate to fail.
+
+Pull requests targeting `release/**` run the same test workflow as those targeting
+`main`; release integration is not exempt from the coverage or mutation ratchets.
 
 ## Published reports
 
