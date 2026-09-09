@@ -135,7 +135,7 @@ public static class Formatting
 
         var output = compilationResult.GeneratedCode;
         Assert.Contains("$\"Hello, {name}!\"", output);
-        Assert.Contains("$\"{a} + {b} = {a + b}\"", output);
+        Assert.Contains("$\"{a} + {b} = {checked(a + b)}\"", output);
     }
 
     [Fact]

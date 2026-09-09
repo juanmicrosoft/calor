@@ -436,7 +436,7 @@ public class TypeOperationTests
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
-        Assert.Contains("(int)(x + 1)", code);
+        Assert.Contains("checked((int)(checked(x + 1)))", code);
     }
 
     [Fact]
@@ -470,7 +470,7 @@ public class TypeOperationTests
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
-        Assert.Contains("(int)((double)x)", code);
+        Assert.Contains("checked((int)(checked((double)x)))", code);
     }
 
     [Fact]

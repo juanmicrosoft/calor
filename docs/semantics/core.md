@@ -192,16 +192,30 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§BIND{name=max}{type=INT} INT:2147483647
-§BIND{name=result}{type=INT} §OP{kind=ADD} §REF{name=max} INT:1
-// Throws OverflowException
+§M{m1:Overflow}
+  §F{f1:Increment:pub} (i32:value) -> i32
+    §E{}
+    §R (+ value INT:1)
+// Increment(int.MaxValue) throws OverflowException.
 ```
 
 **Rationale:** Safety-first philosophy aligns with the contracts design. Silent wraparound can hide bugs.
 
-**Compiler Flag:** `--overflow=[trap|wrap]`
-- `trap` (default): Overflow throws `OverflowException`
-- `wrap`: Overflow wraps around (two's complement)
+Native addition, subtraction, multiplication, negation, increment/decrement,
+and narrowing casts emit explicit C# `checked` contexts. Dynamic operations
+outside the destination type's range throw `OverflowException`, including
+floating-point-to-integer and integer-to-character casts. Widening conversions
+retain their normal behavior. Floating-point arithmetic still uses IEEE 754;
+`checked` does not turn floating-point infinity into an exception.
+
+Generated-C# validation and the projects used by `calor run` and `calor test`
+also enable overflow checking. The source-level checks preserve the native
+policy when generated C# is compiled separately with ordinary Roslyn settings.
+
+There is currently no `--overflow` switch. The earlier reference to that flag
+described an unimplemented option, not a supported wrap mode. This implementation
+corrects the backend to the existing semantics 2.0 TRAP policy; it does not
+introduce an intentionally different default policy.
 
 **Test Reference:** `S7: IntegerOverflow_Traps`
 

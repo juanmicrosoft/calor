@@ -315,6 +315,7 @@ internal static class ExecutionWorkspace
                 <TargetFramework>net10.0</TargetFramework>
                 <ImplicitUsings>enable</ImplicitUsings>
                 <Nullable>enable</Nullable>
+                <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
                 <AssemblyName>{projectName}</AssemblyName>
               </PropertyGroup>
 

@@ -3944,6 +3944,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(BinaryOperationNode node)
     {
+        var expression = EmitBinaryOperation(node);
+        return node.Operator is BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
+            ? $"checked({expression})"
+            : expression;
+    }
+
+    private string EmitBinaryOperation(BinaryOperationNode node)
+    {
         // C# definite assignment recognizes the pattern itself, not `pattern == true`.
         if (TryUnwrapPatternComparison(node, out var patternOperand, out var negated))
         {
@@ -3989,6 +3997,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     public string Visit(UnaryOperationNode node)
+    {
+        var expression = EmitUnaryOperation(node);
+        return node.Operator is UnaryOperator.Negate or UnaryOperator.PreIncrement
+            or UnaryOperator.PreDecrement or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
+            ? $"checked({expression})"
+            : expression;
+    }
+
+    private string EmitUnaryOperation(UnaryOperationNode node)
     {
         if (node.Operator is UnaryOperator.PreIncrement
                 or UnaryOperator.PreDecrement
@@ -6783,6 +6800,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CompoundAssignmentStatementNode node)
     {
+        var statement = EmitCompoundAssignment(node);
+        return node.Operator is CompoundAssignmentOperator.Add or CompoundAssignmentOperator.Subtract
+            or CompoundAssignmentOperator.Multiply
+            ? $"checked {{ {statement} }}"
+            : statement;
+    }
+
+    private string EmitCompoundAssignment(CompoundAssignmentStatementNode node)
+    {
         var op = node.Operator switch
         {
             CompoundAssignmentOperator.Add => "+=",
@@ -8663,7 +8689,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // Extraction
             CharOp.CharAt => $"{args[0]}[{args[1]}]",
             CharOp.CharCode => $"(int){args[0]}",
-            CharOp.CharFromCode => $"(char){args[0]}",
+            CharOp.CharFromCode => $"checked((char){(IsAtomicOperand(node.Arguments[0]) ? args[0] : $"({args[0]})")})",
 
             // Classification
             CharOp.IsLetter => $"char.IsLetter({args[0]})",
@@ -8717,7 +8743,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var csharpType = MapTypeName(node.TargetType);
         return node.Operation switch
         {
-            TypeOp.Cast => $"({csharpType}){operand}",
+            TypeOp.Cast => $"checked(({csharpType}){operand})",
             TypeOp.Is => $"{operand} is {csharpType}",
             TypeOp.As => $"{operand} as {csharpType}",
             _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
@@ -10138,6 +10164,7 @@ public static class GeneratedCSharpCompiler
         var compilationOptions =
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
                 context.OutputKind,
+                checkOverflow: true,
                 allowUnsafe: context.AllowUnsafe,
                 nullableContextOptions: context.NullableContextOptions,
                 generalDiagnosticOption: context.TreatWarningsAsErrors

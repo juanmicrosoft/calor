@@ -43,7 +43,7 @@ public class SiblingRebindCodegenTests
 
         // Declared once, reassigned inside the loop (no shadowing re-declaration).
         Assert.Single(Regex.Matches(cs, @"\b(var|int) result = 1"));
-        Assert.Contains("result = result * i", cs);
-        Assert.DoesNotContain("int result = result * i", cs);
+        Assert.Contains("result = checked(result * i)", cs);
+        Assert.DoesNotContain("int result = checked(result * i)", cs);
     }
 }
