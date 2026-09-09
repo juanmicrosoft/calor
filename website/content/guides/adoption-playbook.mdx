@@ -144,7 +144,9 @@ compiles and executes the result to pin these degradation rules:
 |:----------------|:------------|
 | `§Q` | Runtime `ContractViolationException` guard |
 | `§S` | Runtime guard on return; conversion itself does not perform proof-based elision |
-| `§S` on an early/nested-return body | Loud `Calor1001`; no silently misplaced guard |
+| `§S` on a structured early/nested-return body | Shared postcondition exit when runtime checks are enabled |
+| `§S` on an opaque raw-C# body | Rejected with `Calor1001` |
+| `§S` on an iterator | Rejected with `Calor1004`; iterator postconditions have no defined semantics |
 | `--contract-mode off` | Checks are stripped because the waiver requested it |
 | `§E` | No runtime footprint; the compile-time discipline disappears |
 | Refinement obligation | Still analysis-only; no runtime guard is invented |

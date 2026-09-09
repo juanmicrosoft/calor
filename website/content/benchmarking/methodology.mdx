@@ -13,15 +13,19 @@ How the Calor evaluation framework measures language effectiveness for AI agents
 
 The framework compares Calor and C# implementations of the same programs across multiple dimensions. It combines deterministic static analysis with optional LLM-based evaluation for a comprehensive assessment.
 
-The **published v0.12 dashboard** is narrower than the full framework: it uses
+The **published historical dashboard** is narrower than the full framework: it uses
 217 paired programs and eight deterministic metrics. Optional LLM suites are
 separate artifacts and do not contribute to the 1.32x headline.
+
+Its recorded source is `82a7c653`, which declares compiler `0.15.0`; the exact
+executed measurement binary was not independently recorded. The corpus is
+`tests/TestData/Benchmarks`. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
 ### Statistical Rigor
 
 All metrics support statistical analysis mode:
 - Multiple runs (default: n=30) for variance measurement
-- 95% confidence intervals for all ratios. In the v0.12 artifact the 30
+- 95% confidence intervals for all ratios. In the historical artifact the 30
   deterministic repetitions are identical, so these intervals have zero width
   and do not estimate uncertainty over the program corpus.
 - Cohen's d effect size calculations
@@ -36,7 +40,7 @@ dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
 
 ## Test Corpus
 
-### Current Scale
+### Published Snapshot Scale
 
 - **217 programs** across 14 manifest categories
 - Each program has paired Calor (.calr) and C# (.cs) implementations
@@ -113,7 +117,7 @@ Both implementations must:
 - Input/output annotations (`§I{`, `§O{`)
 - Effect declarations (`§E{`)
 - Contracts (`§Q`, `§S`)
-- Indented body lines (the v0.12 structural-completeness signal)
+- Indented body lines (the structural-completeness signal)
 
 **C# factors:**
 - Namespace declarations
@@ -331,7 +335,7 @@ No bonus for contracts - we measure task completion fairly.
 | Test Pass Rate | 100% | 100% |
 
 That historical 1.00x run shows parity for its task set and model invocation.
-It does not establish model-independent learnability or feed into the v0.12
+It does not establish model-independent learnability or feed into the historical
 static dashboard.
 
 ### Contract Usage (Qualitative)

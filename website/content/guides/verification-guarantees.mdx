@@ -112,10 +112,12 @@ runtime check on a false proof.
 
 A sound static proof and correct runtime-check placement are different
 problems. v0.12 fixed a quantified-contract lowering bug that had discarded
-part of an implication. Bodies with early, nested, or raw-C# returns remain a
-known stopgap: the emitter reports `Calor1001` and does not emit postcondition
-runtime checks for that body shape. It fails loudly rather than placing a check
-incorrectly.
+part of an implication. Current lowering routes structured returns, including
+early and nested returns, through a shared postcondition exit when checks are
+enabled. Opaque raw-C# bodies are rejected with `Calor1001`, because their returns
+cannot be identified structurally. Iterator postconditions are rejected with
+`Calor1004`; their semantics across `yield` are not defined. These diagnostics
+are not successful enforcement or proof.
 
 ## Type and Effect Defaults
 
@@ -145,7 +147,7 @@ what it does and does not waive.
 3. Read every named assumption on `assumed` results.
 4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their
    remedies differ.
-5. Check for `Calor1001` before relying on postcondition runtime enforcement.
+5. Check for `Calor1001` and `Calor1004` before relying on postcondition runtime enforcement.
 6. Record any effect or contract waiver in review.
 
 Use [calor verify](/docs/cli/verify/) for raw results and

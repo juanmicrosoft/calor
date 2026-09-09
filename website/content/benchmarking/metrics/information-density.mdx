@@ -6,7 +6,9 @@ order: 9
 
 
 **Category:** Information Density
-**v0.12 result:** C# narrowly wins (0.98x Calor/C# across 217 programs)
+**Historical dashboard result:** C# narrowly wins (0.98x Calor/C# across 217 programs)
+
+See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully) for the recorded source, corpus, and measurement method.
 **What it measures:** Semantic elements per token
 
 ---
@@ -193,7 +195,7 @@ Effect declarations / total tokens
 
 ## Interpretation Nuance
 
-The v0.12 ratio is 0.98x, so the aggregate difference is small. Its meaning
+The historical ratio is 0.98x, so the aggregate difference is small. Its meaning
 still depends on what the calculator counts:
 
 ### Calor's "Extra" Semantics
@@ -230,8 +232,8 @@ This metric captures Calor's fundamental tradeoff:
 
 | Approach | Density | Explicitness |
 |:---------|:--------|:-------------|
-| C# | Slightly higher in the v0.12 corpus | More implicit |
-| Calor | Slightly lower in the v0.12 corpus | More explicit |
+| C# | Slightly higher in the historical corpus | More implicit |
+| Calor | Slightly lower in the historical corpus | More explicit |
 
 Calor deliberately trades density for explicitness.
 

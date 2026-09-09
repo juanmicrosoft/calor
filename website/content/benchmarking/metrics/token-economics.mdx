@@ -6,8 +6,10 @@ order: 8
 
 
 **Category:** Token Economics
-**Result:** Calor wins (composite)
+**Historical dashboard result:** Calor wins (composite)
 **What it measures:** Composite compactness — the geometric mean of the token, character, and line ratios between equivalent Calor and C# programs
+
+See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully) for the recorded source, corpus, and measurement method.
 
 ---
 
@@ -23,7 +25,7 @@ usage and lower edit cost.
 > "C# wins" using a **raw token count only**. The calculator computed the composite
 > (token × char × line) and then discarded it, reporting the token ratio alone. That
 > bug is fixed: the category now reports the composite it always computed. On the
-> representative benchmark corpus the composite **favors Calor** (currently **1.42×**),
+> historical benchmark corpus the composite **favors Calor** (**1.42×**),
 > because Calor's character- and line-level compactness outweighs its higher raw token
 > count. Raw token count *alone* — especially on tiny programs — still tends to favor
 > C# (see the per-program examples below, which illustrate that single dimension).
