@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Menu, X, Github, Moon, Sun, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/Drawer';
+import { useTheme } from '@/hooks/useTheme';
 import { cn, getBasePath, normalizePathname } from '@/lib/utils';
 import { SITE_VERSION } from '@/lib/version';
 import { trackDarkModeToggle, trackOutboundLink, trackAskCalorClick } from '@/lib/analytics';
@@ -29,13 +30,10 @@ export function Header() {
     return path === target || path.startsWith(`${target}/`);
   })?.href;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
 
   const toggleDarkMode = () => {
-    const newMode = isDark ? 'light' : 'dark';
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
-    trackDarkModeToggle(newMode);
+    trackDarkModeToggle(toggleTheme());
   };
 
   return (
@@ -93,13 +91,12 @@ export function Header() {
           </div>
 
           <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
-            <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
+            <Button variant="ghost" size="icon" onClick={toggleDarkMode} aria-label="Dark mode" aria-pressed={isDark}>
               {isDark ? (
                 <Sun className="h-5 w-5" />
               ) : (
                 <Moon className="h-5 w-5" />
               )}
-              <span className="sr-only">Toggle dark mode</span>
             </Button>
             <Button variant="ghost" size="icon" asChild>
               <a
@@ -166,7 +163,7 @@ export function Header() {
                   ))}
                 </div>
                 <div className="flex items-center gap-4 py-6">
-                  <Button variant="ghost" size="icon" onClick={toggleDarkMode} aria-label="Toggle dark mode">
+                  <Button variant="ghost" size="icon" onClick={toggleDarkMode} aria-label="Dark mode" aria-pressed={isDark}>
                     {isDark ? (
                       <Sun className="h-5 w-5" />
                     ) : (
