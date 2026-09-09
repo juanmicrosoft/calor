@@ -10,6 +10,73 @@ namespace Calor.Compiler.Tests;
 
 public class ProductionOverflowRuntimeTests
 {
+    [Fact]
+    public void UnsignedConditional_BodySafetyCannotExcludeValidNormalReturns()
+    {
+        const string source = """
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (u32:value) -> u32
+                §E{}
+                §S (&& (== result result) (!= value 2147483647))
+                §R (+ (? true value value) 1)
+            """;
+        foreach (var elide in new[] { false, true })
+        {
+            var options = VerifiedOptions(elide);
+            var compiled = Program.Compile(source, "overflow.calr", options);
+            Assert.DoesNotContain(compiled.Diagnostics, diagnostic =>
+                diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
+            var execution = TestHarness.Execute(source, "Probe", [2147483647u], options);
+            Assert.IsType<Calor.Runtime.ContractViolationException>(execution.Exception);
+        }
+    }
+
+    [Fact]
+    public void UnsignedConditional_IdentityCannotElideOverflowingCheck()
+    {
+        const string source = """
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (u32:value) -> u32
+                §E{}
+                §S (== (+ (? true value value) 1) (+ value 1))
+                §R value
+            """;
+        foreach (var elide in new[] { false, true })
+            Assert.IsType<OverflowException>(
+                TestHarness.Execute(source, "Probe", [uint.MaxValue], VerifiedOptions(elide)).Exception);
+    }
+
+    [Fact]
+    public void IntLocalPromotions_CannotExcludeUnsignedNormalReturnStates()
+    {
+        foreach (var binding in new[]
+        {
+            "§B{one:i32} 1\n    §B{unused} (+ value one)",
+            "§B{one} 1\n    §B{unused} (+ value one)",
+            "§B{one:i32} 1\n    §B{alias:i32} one\n    §B{unused} (+ value alias)",
+            "§B{one:i32} 1\n    §IF{i1} (> value 0)\n      §B{unused} (+ value one)"
+        })
+        {
+            var source = $$"""
+                §M{m1:Overflow}
+                  §F{f1:Probe:pub} (u32:value) -> i32
+                    §E{}
+                    §S (&& (== result 0) (!= value 4294967295))
+                    {{binding}}
+                    §R 0
+                """;
+            foreach (var elide in new[] { false, true })
+            {
+                var options = VerifiedOptions(elide);
+                var compiled = Program.Compile(source, "overflow.calr", options);
+                Assert.DoesNotContain(compiled.Diagnostics, diagnostic =>
+                    diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
+                Assert.IsType<Calor.Runtime.ContractViolationException>(
+                    TestHarness.Execute(source, "Probe", [uint.MaxValue], options).Exception);
+            }
+        }
+    }
+
     [Theory]
     [InlineData("(== (- (+ value 1) 1) value)", int.MaxValue)]
     [InlineData("(== (- (- value 1) -1) value)", int.MinValue)]
@@ -267,13 +334,13 @@ public class ProductionOverflowRuntimeTests
         StatusWriter = TextWriter.Null
     };
 
-    private static CompilationOptions VerifiedOptions() => new()
+    private static CompilationOptions VerifiedOptions(bool elide = true) => new()
     {
         EnableTypeChecking = true,
         EnforceEffects = true,
         VerifyContracts = true,
         VerifyRefinements = true,
-        ElideProvenGuards = true,
+        ElideProvenGuards = elide,
         Verbose = true,
         ContractMode = ContractMode.Debug,
         StatusWriter = TextWriter.Null,

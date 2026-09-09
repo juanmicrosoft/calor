@@ -446,6 +446,8 @@ public sealed class Z3Verifier : IDisposable
             solver.Set("timeout", _timeoutMs);
 
             // Assert all preconditions
+            foreach (var binding in translator.BindingConstraints)
+                solver.Assert(binding);
             foreach (var preExpr in preconditionExprs)
             {
                 solver.Assert(preExpr);
@@ -1255,9 +1257,14 @@ public static class FunctionBodyEncoder
                 if (substInit == null)
                     return (null, initReason);
 
+                // An int local is not a constant expression: uint + intVariable
+                // promotes to long, while uint + positiveIntLiteral promotes to uint.
+                var boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
+                    ? translator.BindInt32Constant(literal)
+                    : substInit;
                 var extended = new Dictionary<string, ExpressionNode>(env, StringComparer.Ordinal)
                 {
-                    [bind.Name] = substInit
+                    [bind.Name] = boundValue
                 };
                 var result = EncodeSequence(
                     translator, ctx, statements, index + 1, extended, depth, continuation, arithmeticSafetyOnly);

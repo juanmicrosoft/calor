@@ -69,6 +69,19 @@ public sealed class ContractTranslator
     private readonly Context _ctx;
     private readonly Dictionary<string, (Expr Expr, string Type)> _variables = new();
     private readonly Stack<Dictionary<string, (Expr Expr, string Type)>> _scopeStack = new();
+    private readonly List<BoolExpr> _bindingConstraints = [];
+
+    internal IReadOnlyList<BoolExpr> BindingConstraints => _bindingConstraints;
+
+    internal ReferenceNode BindInt32Constant(IntLiteralNode value)
+    {
+        var ordinal = _bindingConstraints.Count;
+        string name;
+        do { name = $"__calor_bound_{ordinal++}"; } while (_variables.ContainsKey(name));
+        DeclareVariable(name, "i32");
+        _bindingConstraints.Add(_ctx.MkEq(_variables[name].Expr, TranslateIntLiteral(value)));
+        return new ReferenceNode(value.Span, name);
+    }
 
     /// <summary>
     /// Tracks metadata for bit-vector expressions (width and signedness).
@@ -809,6 +822,14 @@ public sealed class ContractTranslator
         if (condition == null || whenTrue == null || whenFalse == null)
             return null;
 
+        if (whenTrue is BitVecExpr trueInteger && whenFalse is BitVecExpr falseInteger)
+        {
+            var width = trueInteger.SortSize;
+            var signed = IsSigned(trueInteger);
+            if (width != falseInteger.SortSize || signed != IsSigned(falseInteger))
+                return Refuse("conditional integer branches with different executable types are not yet modeled");
+            return TrackBitVec((BitVecExpr)_ctx.MkITE(condition, trueInteger, falseInteger), width, signed);
+        }
         return _ctx.MkITE(condition, whenTrue, whenFalse);
     }
 
