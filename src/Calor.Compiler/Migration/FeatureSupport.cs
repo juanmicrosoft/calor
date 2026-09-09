@@ -225,8 +225,8 @@ public static class FeatureSupport
         ["dictionary-initializer"] = new FeatureInfo
         {
             Name = "dictionary-initializer",
-            Support = SupportLevel.Full,
-            Description = "Dictionary initializers ({ key, value } and [key] = value syntax) are supported for Dictionary, SortedDictionary, ConcurrentDictionary, FrozenDictionary, and ImmutableDictionary"
+            Support = SupportLevel.Partial,
+            Description = "Literal Add-style Dictionary initializers use §DICT. Index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as C# interop to retain their operations and evaluation order."
         },
         ["list-initializer"] = new FeatureInfo
         {

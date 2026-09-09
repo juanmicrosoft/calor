@@ -9748,6 +9748,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
+        if (HasDictionaryInitializerOperations(implicitNew.Initializer))
+            throw EscalateExpression(implicitNew, "dictionary-initializer");
+
         // Try to infer the target type from the surrounding syntax context
         var inferredType = InferTargetType(implicitNew);
 
@@ -11093,6 +11096,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
 
+        // §DICT represents Dictionary.Add, not indexer assignment or arbitrary
+        // concrete collections. Preserve the complete boundary before converting
+        // any operands so constructors, comparers and evaluation order stay intact.
+        var simpleDictionary = objCreation.Type is GenericNameSyntax dictionaryName
+            && dictionaryName.Identifier.ValueText == "Dictionary"
+            && dictionaryName.TypeArgumentList.Arguments.Count == 2
+            && objCreation.ArgumentList?.Arguments.Count is not > 0
+            && objCreation.Initializer?.Expressions.All(expr =>
+                expr is InitializerExpressionSyntax entry
+                && entry.Expressions.Count == 2
+                && entry.Expressions.All(value => value is LiteralExpressionSyntax)) == true;
+        var collectionName = objCreation.Type switch
+        {
+            GenericNameSyntax generic => generic.Identifier.ValueText,
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
+            _ => typeName
+        };
+        if (!simpleDictionary && objCreation.Initializer?.Expressions.Count > 0
+            && (IsDictionaryType(collectionName)
+                || HasDictionaryInitializerOperations(objCreation.Initializer)))
+            throw EscalateExpression(objCreation, "dictionary-initializer");
+
         if (objCreation.Type is GenericNameSyntax genericName)
         {
             typeName = genericName.Identifier.Text;
@@ -11112,7 +11138,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 return ConvertListCreation(objCreation, typeArgs[0]);
             }
-            else if (IsDictionaryType(typeName) && typeArgs.Count == 2 && !hasCtorArgs && hasInitializer == true)
+            else if (simpleDictionary && hasInitializer == true)
             {
                 return ConvertDictionaryCreation(objCreation, typeArgs[0], typeArgs[1]);
             }
@@ -11443,6 +11469,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         typeName is "Dictionary" or "SortedDictionary" or "ConcurrentDictionary"
             or "FrozenDictionary" or "ImmutableDictionary" or "ImmutableSortedDictionary";
 
+    private static bool HasDictionaryInitializerOperations(InitializerExpressionSyntax? initializer) =>
+        initializer?.Expressions.Any(expr =>
+            expr is InitializerExpressionSyntax
+            || expr is AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax }) == true;
+
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
     {
         var id = _context.GenerateId("dict");
@@ -11462,25 +11493,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     // Convert block-level collections to inline for dict values
                     if (IsBlockLevelCollection(value))
                         value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(kvInit.Expressions[1]));
-                    entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
-                }
-                else if (expr is AssignmentExpressionSyntax assignment)
-                {
-                    // [key] = value syntax
-                    ExpressionNode key;
-                    if (assignment.Left is ImplicitElementAccessSyntax implicitAccess &&
-                        implicitAccess.ArgumentList.Arguments.Count > 0)
-                    {
-                        key = ConvertExpression(implicitAccess.ArgumentList.Arguments[0].Expression);
-                    }
-                    else
-                    {
-                        key = ConvertExpression(assignment.Left);
-                    }
-                    var value = ConvertExpression(assignment.Right);
-                    // Convert block-level collections to inline for dict values
-                    if (IsBlockLevelCollection(value))
-                        value = ConvertBlockLevelCollectionToNew(value, ExtractTypeHint(assignment.Right));
                     entries.Add(new KeyValuePairNode(GetTextSpan(expr), key, value));
                 }
             }
