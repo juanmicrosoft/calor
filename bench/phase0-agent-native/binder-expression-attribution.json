@@ -1,0 +1,3439 @@
+{
+  "Issue": "#1191",
+  "BeforeRevision": "639fa93a",
+  "AfterRevision": "2738d99b",
+  "Scope": "Roslyn selected-active Preview/Regular/Parse, empty symbols; the same 364 pinned corpus files",
+  "Metric": "Binder.BindExpression visits; includes opaque expressions and generated references, not faithful native source expressions",
+  "Method": "Count-only instrumentation immediately after ExpressionsBound++; count expression runtime type and ReferenceNode.Name; no new AST nodes",
+  "GeneratedReferenceDefinition": "ReferenceNode name starts with underscore and is absent from every source IdentifierToken.ValueText in that file",
+  "SourceMappingDefinition": "Input CRLF is normalized to LF, then the production Roslyn active-branch stripper selects source. ExpressionSyntax identity is UTF-16 start/end in SELECTED source and Roslyn syntax kind. Original and selected source hashes are separately pinned by binder-source-coverage.json. native-exact means an exact non-raw Calor ExpressionNode span outside opaque boundaries, NOT semantic fidelity; unmapped is not necessarily omitted (e.g. callee strings/type names)",
+  "FilesSeenBefore": 364,
+  "FilesSeenAfter": 364,
+  "BeforeBinderAttempts": 34942,
+  "AfterBinderAttempts": 34734,
+  "BeforeGeneratedReferenceAttempts": 4405,
+  "AfterGeneratedReferenceAttempts": 4282,
+  "AttemptDeltaByNodeKind": {
+    "BinaryOperationNode": -27,
+    "BoolLiteralNode": -2,
+    "CallExpressionNode": -29,
+    "ConditionalExpressionNode": 5,
+    "ExpressionCallNode": 21,
+    "FieldAccessNode": 6,
+    "IntLiteralNode": -1,
+    "InterpolatedStringNode": 1,
+    "IsPatternNode": 25,
+    "LambdaExpressionNode": -4,
+    "NameOfExpressionNode": 1,
+    "NewExpressionNode": 3,
+    "NullCoalesceNode": 1,
+    "NullConditionalNode": -1,
+    "RawCSharpExpressionNode": 19,
+    "ReferenceNode": -235,
+    "StringLiteralNode": 4,
+    "ThrowExpressionNode": 9,
+    "TypeOfExpressionNode": 1,
+    "TypeOperationNode": -12,
+    "UnaryOperationNode": 7
+  },
+  "SourceExpressionTransitions": {
+    "native-exact -> opaque": 79,
+    "native-exact -> unmapped": 72,
+    "unmapped -> native-exact": 87,
+    "unmapped -> opaque": 101
+  },
+  "BeforeConverterReportedFailures": 274,
+  "AfterConverterReportedFailures": 272,
+  "BeforeLossCounts": {
+    "Dropped": 2,
+    "EmitterFallback": 7,
+    "FallbackTodo": 1,
+    "InteropPreserved": 45,
+    "PreprocessorStripped": 390
+  },
+  "AfterLossCounts": {
+    "Dropped": 2,
+    "EmitterFallback": 7,
+    "FallbackTodo": 1,
+    "InteropPreserved": 65,
+    "PreprocessorStripped": 390
+  },
+  "BeforeProbeSha256": "a365a263f73bd81c6ca9336c33b53c092995bc23315c6dd0fff6ac5a5b8d8d63",
+  "AfterProbeSha256": "628807b21955979f70f973d6b4fb15f4e6f7ed968ffdac07551c155c93459620",
+  "Files": {
+    "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceCollectionExtensions.cs": {
+      "BeforeBinderAttempts": 43,
+      "AfterBinderAttempts": 44,
+      "BinderAttemptDelta": 1,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 3,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 5545,
+          "End": 5571,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 5552,
+          "End": 5571,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 5552,
+          "End": 5559,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 5560,
+          "End": 5570,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation.Tests.Benchmarks/AccessorCacheBenchmark.cs": {
+      "BeforeBinderAttempts": 20,
+      "AfterBinderAttempts": 18,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1311,
+          "End": 1335,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 1482,
+          "End": 1506,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation.Tests/AccessorCacheTests.cs": {
+      "BeforeBinderAttempts": 122,
+      "AfterBinderAttempts": 114,
+      "BinderAttemptDelta": -8,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -8
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 4,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1395,
+          "End": 1416,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 1495,
+          "End": 1516,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 1867,
+          "End": 1888,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 1939,
+          "End": 1960,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 2143,
+          "End": 2164,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 2481,
+          "End": 2503,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3683,
+          "End": 3704,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3805,
+          "End": 3826,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation.Tests/DefaultValidatorExtensionTester.cs": {
+      "BeforeBinderAttempts": 213,
+      "AfterBinderAttempts": 213,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {},
+      "BeforeGeneratedReferenceAttempts": 47,
+      "AfterGeneratedReferenceAttempts": 47,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 7972,
+          "End": 8014,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 8004,
+          "End": 8014,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs": {
+      "BeforeBinderAttempts": 1199,
+      "AfterBinderAttempts": 1205,
+      "BinderAttemptDelta": 6,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 2,
+        "NullConditionalNode": 2,
+        "ReferenceNode": 2
+      },
+      "BeforeGeneratedReferenceAttempts": 233,
+      "AfterGeneratedReferenceAttempts": 235,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 7171,
+          "End": 7197,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 7180,
+          "End": 7190,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 7191,
+          "End": 7197,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 7191,
+          "End": 7195,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 7589,
+          "End": 7615,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 7598,
+          "End": 7608,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 7609,
+          "End": 7615,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 7609,
+          "End": 7613,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation.Tests/StreetNumberComparer.cs": {
+      "BeforeBinderAttempts": 41,
+      "AfterBinderAttempts": 38,
+      "BinderAttemptDelta": -3,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -1,
+        "ConditionalExpressionNode": 1,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -4,
+        "ThrowExpressionNode": 1,
+        "UnaryOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 7,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 1149,
+          "End": 1203,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1149,
+          "End": 1203,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1149,
+          "End": 1169,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1170,
+          "End": 1180,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1170,
+          "End": 1174,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1175,
+          "End": 1180,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1186,
+          "End": 1202,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1186,
+          "End": 1189,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1227,
+          "End": 1282,
+          "Kind": "ThrowExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation.Tests/TestValidatorWithPreValidate.cs": {
+      "BeforeBinderAttempts": 7,
+      "AfterBinderAttempts": 9,
+      "BinderAttemptDelta": 2,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "ReferenceNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 386,
+          "End": 428,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 404,
+          "End": 428,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 404,
+          "End": 411,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 412,
+          "End": 419,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 421,
+          "End": 427,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/AbstractValidator.cs": {
+      "BeforeBinderAttempts": 241,
+      "AfterBinderAttempts": 230,
+      "BinderAttemptDelta": -11,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -1,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -9,
+        "StringLiteralNode": -1,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 18,
+      "AfterGeneratedReferenceAttempts": 17,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 9,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 7386,
+          "End": 7458,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 3396,
+          "End": 3416,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3637,
+          "End": 3657,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 7386,
+          "End": 7458,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 7386,
+          "End": 7421,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 7386,
+          "End": 7409,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 7386,
+          "End": 7393,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 7394,
+          "End": 7409,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 7410,
+          "End": 7421,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 7422,
+          "End": 7444,
+          "Kind": "StringLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 7450,
+          "End": 7457,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 7450,
+          "End": 7453,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 8602,
+          "End": 8628,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 9283,
+          "End": 9318,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 14551,
+          "End": 14565,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 14916,
+          "End": 14930,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/AssemblyScanner.cs": {
+      "BeforeBinderAttempts": 77,
+      "AfterBinderAttempts": 76,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 7,
+      "AfterGeneratedReferenceAttempts": 6,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs": {
+      "BeforeBinderAttempts": 714,
+      "AfterBinderAttempts": 694,
+      "BinderAttemptDelta": -20,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "FieldAccessNode": 1,
+        "ReferenceNode": -21,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 84,
+      "AfterGeneratedReferenceAttempts": 84,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 17883,
+          "End": 17899,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 19081,
+          "End": 19097,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 22166,
+          "End": 22182,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 23333,
+          "End": 23349,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 38030,
+          "End": 38046,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 39234,
+          "End": 39250,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 40539,
+          "End": 40555,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 41746,
+          "End": 41762,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 43030,
+          "End": 43046,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 44240,
+          "End": 44256,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 45542,
+          "End": 45558,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 46746,
+          "End": 46762,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 48026,
+          "End": 48042,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 49212,
+          "End": 49228,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 50498,
+          "End": 50514,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 51694,
+          "End": 51710,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 52988,
+          "End": 53004,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 54199,
+          "End": 54215,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 55511,
+          "End": 55527,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 56822,
+          "End": 56838,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 71918,
+          "End": 71948,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 71925,
+          "End": 71948,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 71925,
+          "End": 71946,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 71925,
+          "End": 71930,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/DefaultValidatorExtensions_Validate.cs": {
+      "BeforeBinderAttempts": 20,
+      "AfterBinderAttempts": 18,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1433,
+          "End": 1453,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 2117,
+          "End": 2137,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/DefaultValidatorOptions.cs": {
+      "BeforeBinderAttempts": 341,
+      "AfterBinderAttempts": 325,
+      "BinderAttemptDelta": -16,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -8,
+        "ReferenceNode": -8
+      },
+      "BeforeGeneratedReferenceAttempts": 40,
+      "AfterGeneratedReferenceAttempts": 40,
+      "BeforeOpaqueSourceExpressions": 106,
+      "AfterOpaqueSourceExpressions": 106,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 9738,
+          "End": 9758,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 10824,
+          "End": 10844,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 17185,
+          "End": 17205,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 18330,
+          "End": 18350,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/IValidationContext.cs": {
+      "BeforeBinderAttempts": 174,
+      "AfterBinderAttempts": 170,
+      "BinderAttemptDelta": -4,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2,
+        "TypeOperationNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 6,
+      "AfterGeneratedReferenceAttempts": 6,
+      "BeforeOpaqueSourceExpressions": 2,
+      "AfterOpaqueSourceExpressions": 2,
+      "BeforeSerializedRawExpressions": 1,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Internal/AccessorCache.cs": {
+      "BeforeBinderAttempts": 93,
+      "AfterBinderAttempts": 92,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 9,
+      "AfterGeneratedReferenceAttempts": 8,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs": {
+      "BeforeBinderAttempts": 193,
+      "AfterBinderAttempts": 192,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 10,
+      "AfterGeneratedReferenceAttempts": 10,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2550,
+          "End": 2566,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Internal/ExtensionsInternal.cs": {
+      "BeforeBinderAttempts": 107,
+      "AfterBinderAttempts": 103,
+      "BinderAttemptDelta": -4,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -4
+      },
+      "BeforeGeneratedReferenceAttempts": 5,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Internal/MemberNameValidatorSelector.cs": {
+      "BeforeBinderAttempts": 92,
+      "AfterBinderAttempts": 91,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 3,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs": {
+      "BeforeBinderAttempts": 41,
+      "AfterBinderAttempts": 42,
+      "BinderAttemptDelta": 1,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "FieldAccessNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 5,
+      "AfterGeneratedReferenceAttempts": 4,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 1,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2862,
+          "End": 2879,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 2868,
+          "End": 2879,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 2868,
+          "End": 2877,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Internal/PropertyRule.cs": {
+      "BeforeBinderAttempts": 124,
+      "AfterBinderAttempts": 123,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 6,
+      "AfterGeneratedReferenceAttempts": 6,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1685,
+          "End": 1701,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Internal/RuleBase.cs": {
+      "BeforeBinderAttempts": 219,
+      "AfterBinderAttempts": 213,
+      "BinderAttemptDelta": -6,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "ReferenceNode": -7
+      },
+      "BeforeGeneratedReferenceAttempts": 8,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 6754,
+          "End": 6774,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 6951,
+          "End": 6987,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 6971,
+          "End": 6987,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6971,
+          "End": 6978,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6979,
+          "End": 6986,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Internal/RuleComponent.cs": {
+      "BeforeBinderAttempts": 128,
+      "AfterBinderAttempts": 128,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 2,
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 6,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 6200,
+          "End": 6244,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 6221,
+          "End": 6244,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6221,
+          "End": 6228,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6229,
+          "End": 6236,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6238,
+          "End": 6243,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6753,
+          "End": 6796,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 6774,
+          "End": 6796,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6774,
+          "End": 6781,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6782,
+          "End": 6786,
+          "Kind": "NullLiteralExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6788,
+          "End": 6795,
+          "Kind": "DefaultLiteralExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Internal/TrackingCollection.cs": {
+      "BeforeBinderAttempts": 45,
+      "AfterBinderAttempts": 45,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 5,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1148,
+          "End": 1157,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/TestHelper/TestValidationResult.cs": {
+      "BeforeBinderAttempts": 140,
+      "AfterBinderAttempts": 140,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 7,
+      "AfterGeneratedReferenceAttempts": 6,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 2,
+      "AfterSerializedRawExpressions": 2,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 3094,
+          "End": 3107,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3101,
+          "End": 3107,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 3101,
+          "End": 3105,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs": {
+      "BeforeBinderAttempts": 370,
+      "AfterBinderAttempts": 357,
+      "BinderAttemptDelta": -13,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -4,
+        "ExpressionCallNode": 2,
+        "LambdaExpressionNode": -2,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -11,
+        "TypeOperationNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 36,
+      "AfterGeneratedReferenceAttempts": 29,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 15,
+      "BeforeSerializedRawExpressions": 1,
+      "AfterSerializedRawExpressions": 2,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 1961,
+          "End": 2063,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1518,
+          "End": 1546,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 1541,
+          "End": 1546,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 1961,
+          "End": 2063,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1961,
+          "End": 2061,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1961,
+          "End": 2047,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1961,
+          "End": 2029,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1961,
+          "End": 2016,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1961,
+          "End": 1994,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1961,
+          "End": 1971,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1972,
+          "End": 1994,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1995,
+          "End": 2015,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 2023,
+          "End": 2029,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 2030,
+          "End": 2046,
+          "Kind": "SimpleLambdaExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 2035,
+          "End": 2046,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 2035,
+          "End": 2036,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 2037,
+          "End": 2046,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 2054,
+          "End": 2061,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3946,
+          "End": 3966,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 5058,
+          "End": 5078,
+          "Kind": "GenericName",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 5939,
+          "End": 5970,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 5959,
+          "End": 5970,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 5959,
+          "End": 5968,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8271,
+          "End": 8329,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 8280,
+          "End": 8329,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8280,
+          "End": 8287,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8288,
+          "End": 8307,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8288,
+          "End": 8295,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8309,
+          "End": 8328,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/ValidatorOptions.cs": {
+      "BeforeBinderAttempts": 65,
+      "AfterBinderAttempts": 69,
+      "BinderAttemptDelta": 4,
+      "AttemptDeltaByNodeKind": {
+        "NameOfExpressionNode": 1,
+        "NewExpressionNode": 1,
+        "NullCoalesceNode": 1,
+        "ThrowExpressionNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 0,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2549,
+          "End": 2604,
+          "Kind": "CoalesceExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 2558,
+          "End": 2604,
+          "Kind": "ThrowExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 2564,
+          "End": 2604,
+          "Kind": "ObjectCreationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 2590,
+          "End": 2603,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 4472,
+          "End": 4488,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 4483,
+          "End": 4488,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Validators/ChildValidatorAdaptor.cs": {
+      "BeforeBinderAttempts": 102,
+      "AfterBinderAttempts": 101,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 3607,
+          "End": 3623,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3616,
+          "End": 3623,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "FluentValidation/src/FluentValidation/Validators/EmailValidator.cs": {
+      "BeforeBinderAttempts": 45,
+      "AfterBinderAttempts": 44,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Validators/EmptyValidator.cs": {
+      "BeforeBinderAttempts": 43,
+      "AfterBinderAttempts": 36,
+      "BinderAttemptDelta": -7,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -4,
+        "TypeOperationNode": -3
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Validators/ExclusiveBetweenValidator.cs": {
+      "BeforeBinderAttempts": 17,
+      "AfterBinderAttempts": 15,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Validators/InclusiveBetweenValidator.cs": {
+      "BeforeBinderAttempts": 17,
+      "AfterBinderAttempts": 15,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Validators/NotEmptyValidator.cs": {
+      "BeforeBinderAttempts": 45,
+      "AfterBinderAttempts": 38,
+      "BinderAttemptDelta": -7,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -4,
+        "TypeOperationNode": -3
+      },
+      "BeforeGeneratedReferenceAttempts": 3,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "FluentValidation/src/FluentValidation/Validators/PolymorphicValidator.cs": {
+      "BeforeBinderAttempts": 86,
+      "AfterBinderAttempts": 85,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -2,
+        "ExpressionCallNode": 1,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -2,
+        "TypeOperationNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 10,
+      "BeforeSerializedRawExpressions": 1,
+      "AfterSerializedRawExpressions": 2,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 5432,
+          "End": 5512,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 5432,
+          "End": 5512,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 5432,
+          "End": 5462,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5432,
+          "End": 5450,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5451,
+          "End": 5462,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5463,
+          "End": 5478,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 5463,
+          "End": 5476,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5463,
+          "End": 5468,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5469,
+          "End": 5476,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5484,
+          "End": 5511,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 5484,
+          "End": 5487,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 6265,
+          "End": 6297,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 6274,
+          "End": 6297,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6274,
+          "End": 6281,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6282,
+          "End": 6289,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6291,
+          "End": 6296,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "MediatR/src/MediatR/Internal/HandlersOrderer.cs": {
+      "BeforeBinderAttempts": 73,
+      "AfterBinderAttempts": 71,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 11,
+      "AfterGeneratedReferenceAttempts": 9,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "MediatR/src/MediatR/Internal/ObjectDetails.cs": {
+      "BeforeBinderAttempts": 144,
+      "AfterBinderAttempts": 148,
+      "BinderAttemptDelta": 4,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "InterpolatedStringNode": 1,
+        "ReferenceNode": 1,
+        "StringLiteralNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 641,
+          "End": 714,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 672,
+          "End": 714,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 672,
+          "End": 680,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 681,
+          "End": 699,
+          "Kind": "InterpolatedStringExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 684,
+          "End": 696,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 701,
+          "End": 713,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "MediatR/src/MediatR/Mediator.cs": {
+      "BeforeBinderAttempts": 257,
+      "AfterBinderAttempts": 255,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -6,
+        "IsPatternNode": 6,
+        "ReferenceNode": -8,
+        "UnaryOperationNode": 6
+      },
+      "BeforeGeneratedReferenceAttempts": 24,
+      "AfterGeneratedReferenceAttempts": 22,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "MediatR/src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs": {
+      "BeforeBinderAttempts": 93,
+      "AfterBinderAttempts": 90,
+      "BinderAttemptDelta": -3,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -2,
+        "IsPatternNode": 1,
+        "NullCoalesceNode": 1,
+        "ReferenceNode": -5,
+        "ThrowExpressionNode": 1,
+        "UnaryOperationNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 11,
+      "AfterGeneratedReferenceAttempts": 8,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2077,
+          "End": 2189,
+          "Kind": "ThrowExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "MediatR/src/MediatR/Pipeline/RequestExceptionProcessorBehavior.cs": {
+      "BeforeBinderAttempts": 103,
+      "AfterBinderAttempts": 100,
+      "BinderAttemptDelta": -3,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -2,
+        "IsPatternNode": 1,
+        "NullCoalesceNode": 1,
+        "ReferenceNode": -5,
+        "ThrowExpressionNode": 1,
+        "UnaryOperationNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 11,
+      "AfterGeneratedReferenceAttempts": 8,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2174,
+          "End": 2262,
+          "Kind": "ThrowExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "MediatR/src/MediatR/Registration/ServiceRegistrar.cs": {
+      "BeforeBinderAttempts": 533,
+      "AfterBinderAttempts": 533,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -1,
+        "ConditionalExpressionNode": 2,
+        "ExpressionCallNode": 2,
+        "FieldAccessNode": 1,
+        "IsPatternNode": 2,
+        "NewExpressionNode": 2,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -14,
+        "StringLiteralNode": 2,
+        "ThrowExpressionNode": 2,
+        "TypeOperationNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 57,
+      "AfterGeneratedReferenceAttempts": 43,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 7,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 14766,
+          "End": 14814,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 8082,
+          "End": 8291,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 8239,
+          "End": 8291,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8239,
+          "End": 8289,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8239,
+          "End": 8261,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8239,
+          "End": 8259,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 14766,
+          "End": 14814,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 14766,
+          "End": 14812,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 14766,
+          "End": 14787,
+          "Kind": "SuppressNullableWarningExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 14766,
+          "End": 14786,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 14766,
+          "End": 14777,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 14778,
+          "End": 14786,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 14788,
+          "End": 14812,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Capturing/PropertyBinder.cs": {
+      "BeforeBinderAttempts": 129,
+      "AfterBinderAttempts": 128,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 5,
+      "AfterGeneratedReferenceAttempts": 4,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Capturing/PropertyValueConverter.cs": {
+      "BeforeBinderAttempts": 468,
+      "AfterBinderAttempts": 457,
+      "BinderAttemptDelta": -11,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "FieldAccessNode": 1,
+        "ReferenceNode": -13
+      },
+      "BeforeGeneratedReferenceAttempts": 32,
+      "AfterGeneratedReferenceAttempts": 19,
+      "BeforeOpaqueSourceExpressions": 173,
+      "AfterOpaqueSourceExpressions": 173,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 17619,
+          "End": 17652,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 17637,
+          "End": 17652,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 17637,
+          "End": 17647,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 17637,
+          "End": 17645,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Capturing/TrimConfiguration.cs": {
+      "BeforeBinderAttempts": 0,
+      "AfterBinderAttempts": 0,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {},
+      "BeforeGeneratedReferenceAttempts": 0,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 7,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 516,
+          "End": 605,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 516,
+          "End": 605,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 516,
+          "End": 539,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 516,
+          "End": 526,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 527,
+          "End": 539,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 540,
+          "End": 585,
+          "Kind": "StringLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 591,
+          "End": 604,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 591,
+          "End": 594,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs": {
+      "BeforeBinderAttempts": 94,
+      "AfterBinderAttempts": 93,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 9,
+      "AfterGeneratedReferenceAttempts": 8,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Configuration/LoggerSinkConfiguration.cs": {
+      "BeforeBinderAttempts": 198,
+      "AfterBinderAttempts": 195,
+      "BinderAttemptDelta": -3,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -3
+      },
+      "BeforeGeneratedReferenceAttempts": 12,
+      "AfterGeneratedReferenceAttempts": 9,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Core/Enrichers/ConditionalEnricher.cs": {
+      "BeforeBinderAttempts": 16,
+      "AfterBinderAttempts": 15,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Core/LevelOverrideMap.cs": {
+      "BeforeBinderAttempts": 71,
+      "AfterBinderAttempts": 70,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 3,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Core/Logger.cs": {
+      "BeforeBinderAttempts": 537,
+      "AfterBinderAttempts": 528,
+      "BinderAttemptDelta": -9,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "NullCoalesceNode": -2,
+        "NullConditionalNode": -2,
+        "RawCSharpExpressionNode": 2,
+        "ReferenceNode": -6,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 28,
+      "AfterGeneratedReferenceAttempts": 28,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 12,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 2,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 15415,
+          "End": 15450,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 15452,
+          "End": 15486,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 15415,
+          "End": 15450,
+          "Kind": "CoalesceExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15415,
+          "End": 15439,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15415,
+          "End": 15430,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15431,
+          "End": 15439,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 15432,
+          "End": 15439,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 15443,
+          "End": 15450,
+          "Kind": "DefaultLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15452,
+          "End": 15486,
+          "Kind": "CoalesceExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15452,
+          "End": 15475,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15452,
+          "End": 15467,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 15468,
+          "End": 15475,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 15469,
+          "End": 15475,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 15479,
+          "End": 15486,
+          "Kind": "DefaultLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 64928,
+          "End": 64936,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Core/LoggingLevelSwitch.cs": {
+      "BeforeBinderAttempts": 18,
+      "AfterBinderAttempts": 17,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2051,
+          "End": 2070,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Core/Sinks/Batching/BatchingSink.cs": {
+      "BeforeBinderAttempts": 258,
+      "AfterBinderAttempts": 256,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -3,
+        "BoolLiteralNode": -2,
+        "CallExpressionNode": -2,
+        "ConditionalExpressionNode": 2,
+        "IsPatternNode": 3,
+        "NullCoalesceNode": 1,
+        "RawCSharpExpressionNode": 6,
+        "ReferenceNode": -13,
+        "StringLiteralNode": 2,
+        "ThrowExpressionNode": 3,
+        "TypeOperationNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 22,
+      "AfterGeneratedReferenceAttempts": 18,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 41,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 6,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 3567,
+          "End": 3598,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 3645,
+          "End": 3701,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 3751,
+          "End": 3802,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 5935,
+          "End": 5970,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 8701,
+          "End": 8736,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 9910,
+          "End": 9949,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 3446,
+          "End": 3498,
+          "Kind": "ThrowExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 3567,
+          "End": 3598,
+          "Kind": "IsPatternExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3567,
+          "End": 3585,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3567,
+          "End": 3574,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3575,
+          "End": 3585,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3645,
+          "End": 3701,
+          "Kind": "ObjectCreationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3649,
+          "End": 3670,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3671,
+          "End": 3676,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3678,
+          "End": 3701,
+          "Kind": "ObjectInitializerExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3680,
+          "End": 3699,
+          "Kind": "SimpleAssignmentExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3680,
+          "End": 3692,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3695,
+          "End": 3699,
+          "Kind": "TrueLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3751,
+          "End": 3802,
+          "Kind": "ObjectCreationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3755,
+          "End": 3778,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3779,
+          "End": 3802,
+          "Kind": "ObjectInitializerExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3781,
+          "End": 3800,
+          "Kind": "SimpleAssignmentExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3781,
+          "End": 3793,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3796,
+          "End": 3800,
+          "Kind": "TrueLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 5935,
+          "End": 5970,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 5935,
+          "End": 5956,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5935,
+          "End": 5948,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5935,
+          "End": 5941,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5942,
+          "End": 5948,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5949,
+          "End": 5956,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 5961,
+          "End": 5969,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 5961,
+          "End": 5964,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 6258,
+          "End": 6325,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6277,
+          "End": 6290,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6277,
+          "End": 6283,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6292,
+          "End": 6301,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6303,
+          "End": 6324,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6303,
+          "End": 6318,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 8701,
+          "End": 8736,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 8701,
+          "End": 8722,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 8701,
+          "End": 8714,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 8701,
+          "End": 8707,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 8708,
+          "End": 8714,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 8715,
+          "End": 8722,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 8727,
+          "End": 8735,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 8727,
+          "End": 8730,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 9910,
+          "End": 9949,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 9910,
+          "End": 9931,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 9910,
+          "End": 9923,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 9910,
+          "End": 9916,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 9917,
+          "End": 9923,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 9924,
+          "End": 9931,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 9936,
+          "End": 9948,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 9936,
+          "End": 9939,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Core/Sinks/ConditionalSink.cs": {
+      "BeforeBinderAttempts": 15,
+      "AfterBinderAttempts": 14,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs": {
+      "BeforeBinderAttempts": 40,
+      "AfterBinderAttempts": 37,
+      "BinderAttemptDelta": -3,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -3,
+        "IsPatternNode": 3,
+        "ReferenceNode": -3
+      },
+      "BeforeGeneratedReferenceAttempts": 3,
+      "AfterGeneratedReferenceAttempts": 3,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Core/Sinks/RestrictedSink.cs": {
+      "BeforeBinderAttempts": 16,
+      "AfterBinderAttempts": 15,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs": {
+      "BeforeBinderAttempts": 15,
+      "AfterBinderAttempts": 14,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Debugging/SelfLog.cs": {
+      "BeforeBinderAttempts": 49,
+      "AfterBinderAttempts": 44,
+      "BinderAttemptDelta": -5,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "NullCoalesceNode": -1,
+        "NullConditionalNode": -1,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -2,
+        "StringLiteralNode": -1,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 2,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 8,
+      "BeforeSerializedRawExpressions": 2,
+      "AfterSerializedRawExpressions": 3,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 3247,
+          "End": 3285,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2846,
+          "End": 2847,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 3247,
+          "End": 3285,
+          "Kind": "CoalesceExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3247,
+          "End": 3260,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3247,
+          "End": 3253,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3254,
+          "End": 3260,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3255,
+          "End": 3260,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3264,
+          "End": 3285,
+          "Kind": "CastExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3265,
+          "End": 3271,
+          "Kind": "PredefinedType",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3272,
+          "End": 3285,
+          "Kind": "StringLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Events/EventProperty.cs": {
+      "BeforeBinderAttempts": 43,
+      "AfterBinderAttempts": 39,
+      "BinderAttemptDelta": -4,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -3,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Events/LogEvent.cs": {
+      "BeforeBinderAttempts": 137,
+      "AfterBinderAttempts": 135,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "FieldAccessNode": 1,
+        "ReferenceNode": -2,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 6,
+      "AfterGeneratedReferenceAttempts": 5,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Events/ScalarValue.cs": {
+      "BeforeBinderAttempts": 62,
+      "AfterBinderAttempts": 61,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "ReferenceNode": -2,
+        "TypeOfExpressionNode": 1,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 2777,
+          "End": 2828,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 2792,
+          "End": 2828,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 2792,
+          "End": 2802,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 2803,
+          "End": 2827,
+          "Kind": "TypeOfExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Filters/Matching.cs": {
+      "BeforeBinderAttempts": 66,
+      "AfterBinderAttempts": 60,
+      "BinderAttemptDelta": -6,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -1,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -6
+      },
+      "BeforeGeneratedReferenceAttempts": 7,
+      "AfterGeneratedReferenceAttempts": 3,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 9,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 3136,
+          "End": 3197,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 3136,
+          "End": 3197,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3136,
+          "End": 3160,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3136,
+          "End": 3148,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3136,
+          "End": 3137,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3138,
+          "End": 3148,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3149,
+          "End": 3160,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 3161,
+          "End": 3173,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3179,
+          "End": 3196,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 3179,
+          "End": 3182,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs": {
+      "BeforeBinderAttempts": 135,
+      "AfterBinderAttempts": 135,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 2,
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 1,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 3342,
+          "End": 3370,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3359,
+          "End": 3370,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 3359,
+          "End": 3368,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 3536,
+          "End": 3563,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 3552,
+          "End": 3563,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 3552,
+          "End": 3561,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 6312,
+          "End": 6321,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 6315,
+          "End": 6321,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs": {
+      "BeforeBinderAttempts": 93,
+      "AfterBinderAttempts": 93,
+      "BinderAttemptDelta": 0,
+      "AttemptDeltaByNodeKind": {
+        "ExpressionCallNode": 1,
+        "ReferenceNode": -2,
+        "StringLiteralNode": 1
+      },
+      "BeforeGeneratedReferenceAttempts": 9,
+      "AfterGeneratedReferenceAttempts": 7,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 994,
+          "End": 1015,
+          "Kind": "ConditionalAccessExpression",
+          "Transition": "native-exact -> unmapped"
+        },
+        {
+          "Start": 1001,
+          "End": 1015,
+          "Kind": "InvocationExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 1001,
+          "End": 1010,
+          "Kind": "MemberBindingExpression",
+          "Transition": "unmapped -> native-exact"
+        },
+        {
+          "Start": 1011,
+          "End": 1014,
+          "Kind": "StringLiteralExpression",
+          "Transition": "unmapped -> native-exact"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+      "BeforeBinderAttempts": 364,
+      "AfterBinderAttempts": 362,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 4,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Log.cs": {
+      "BeforeBinderAttempts": 297,
+      "AfterBinderAttempts": 296,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -1,
+        "IsPatternNode": 1,
+        "ReferenceNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 1,
+      "AfterGeneratedReferenceAttempts": 1,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Parsing/MessageTemplateParser.cs": {
+      "BeforeBinderAttempts": 561,
+      "AfterBinderAttempts": 555,
+      "BinderAttemptDelta": -6,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -6
+      },
+      "BeforeGeneratedReferenceAttempts": 18,
+      "AfterGeneratedReferenceAttempts": 12,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Parsing/PropertyToken.cs": {
+      "BeforeBinderAttempts": 66,
+      "AfterBinderAttempts": 60,
+      "BinderAttemptDelta": -6,
+      "AttemptDeltaByNodeKind": {
+        "CallExpressionNode": -1,
+        "RawCSharpExpressionNode": 1,
+        "ReferenceNode": -6
+      },
+      "BeforeGeneratedReferenceAttempts": 3,
+      "AfterGeneratedReferenceAttempts": 2,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 13,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 1,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 1944,
+          "End": 2037,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 1944,
+          "End": 2037,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1944,
+          "End": 1956,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1944,
+          "End": 1947,
+          "Kind": "PredefinedType",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1948,
+          "End": 1956,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1957,
+          "End": 1969,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1971,
+          "End": 1988,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1971,
+          "End": 1983,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1984,
+          "End": 1988,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 1990,
+          "End": 2018,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 1990,
+          "End": 2001,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 2002,
+          "End": 2018,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 2024,
+          "End": 2036,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 2024,
+          "End": 2027,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Parsing/TextToken.cs": {
+      "BeforeBinderAttempts": 18,
+      "AfterBinderAttempts": 16,
+      "BinderAttemptDelta": -2,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -1,
+        "TypeOperationNode": -1
+      },
+      "BeforeGeneratedReferenceAttempts": 0,
+      "AfterGeneratedReferenceAttempts": 0,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs": {
+      "BeforeBinderAttempts": 54,
+      "AfterBinderAttempts": 53,
+      "BinderAttemptDelta": -1,
+      "AttemptDeltaByNodeKind": {
+        "FieldAccessNode": 1,
+        "ReferenceNode": -2
+      },
+      "BeforeGeneratedReferenceAttempts": 6,
+      "AfterGeneratedReferenceAttempts": 4,
+      "BeforeOpaqueSourceExpressions": 0,
+      "AfterOpaqueSourceExpressions": 0,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    },
+    "serilog/src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs": {
+      "BeforeBinderAttempts": 246,
+      "AfterBinderAttempts": 220,
+      "BinderAttemptDelta": -26,
+      "AttemptDeltaByNodeKind": {
+        "BinaryOperationNode": -2,
+        "CallExpressionNode": -8,
+        "IntLiteralNode": -1,
+        "LambdaExpressionNode": -2,
+        "RawCSharpExpressionNode": 3,
+        "ReferenceNode": -16
+      },
+      "BeforeGeneratedReferenceAttempts": 32,
+      "AfterGeneratedReferenceAttempts": 23,
+      "BeforeOpaqueSourceExpressions": 110,
+      "AfterOpaqueSourceExpressions": 152,
+      "BeforeSerializedRawExpressions": 1,
+      "AfterSerializedRawExpressions": 4,
+      "NewOpaqueBoundaries": [
+        {
+          "Start": 4108,
+          "End": 4184,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 4200,
+          "End": 4268,
+          "Kind": "RawCSharpExpressionNode"
+        },
+        {
+          "Start": 12625,
+          "End": 12806,
+          "Kind": "RawCSharpExpressionNode"
+        }
+      ],
+      "SourceExpressionTransitions": [
+        {
+          "Start": 4108,
+          "End": 4184,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 4108,
+          "End": 4130,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4108,
+          "End": 4118,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4119,
+          "End": 4130,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4131,
+          "End": 4152,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 4158,
+          "End": 4183,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 4158,
+          "End": 4161,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4200,
+          "End": 4268,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 4200,
+          "End": 4213,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4200,
+          "End": 4204,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4205,
+          "End": 4213,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 4214,
+          "End": 4235,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 4241,
+          "End": 4267,
+          "Kind": "DeclarationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 4241,
+          "End": 4254,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12806,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12683,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12650,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12647,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12642,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12640,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12625,
+          "End": 12626,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12627,
+          "End": 12640,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12643,
+          "End": 12647,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12648,
+          "End": 12649,
+          "Kind": "NumericLiteralExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12680,
+          "End": 12683,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12684,
+          "End": 12805,
+          "Kind": "SimpleLambdaExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12689,
+          "End": 12805,
+          "Kind": "LogicalOrExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12689,
+          "End": 12706,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12689,
+          "End": 12690,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12691,
+          "End": 12706,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12748,
+          "End": 12805,
+          "Kind": "InvocationExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12748,
+          "End": 12774,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12748,
+          "End": 12770,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12771,
+          "End": 12774,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12775,
+          "End": 12804,
+          "Kind": "SimpleLambdaExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12780,
+          "End": 12804,
+          "Kind": "EqualsExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12780,
+          "End": 12794,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12780,
+          "End": 12781,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12782,
+          "End": 12794,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        },
+        {
+          "Start": 12798,
+          "End": 12804,
+          "Kind": "SimpleMemberAccessExpression",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12798,
+          "End": 12799,
+          "Kind": "IdentifierName",
+          "Transition": "native-exact -> opaque"
+        },
+        {
+          "Start": 12800,
+          "End": 12804,
+          "Kind": "IdentifierName",
+          "Transition": "unmapped -> opaque"
+        }
+      ]
+    },
+    "serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs": {
+      "BeforeBinderAttempts": 196,
+      "AfterBinderAttempts": 193,
+      "BinderAttemptDelta": -3,
+      "AttemptDeltaByNodeKind": {
+        "ReferenceNode": -3
+      },
+      "BeforeGeneratedReferenceAttempts": 16,
+      "AfterGeneratedReferenceAttempts": 13,
+      "BeforeOpaqueSourceExpressions": 40,
+      "AfterOpaqueSourceExpressions": 40,
+      "BeforeSerializedRawExpressions": 0,
+      "AfterSerializedRawExpressions": 0,
+      "NewOpaqueBoundaries": [],
+      "SourceExpressionTransitions": []
+    }
+  }
+}

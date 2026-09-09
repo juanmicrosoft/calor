@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -10,7 +13,7 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// #762 B1: the incomplete-fraction instrument (freeze registration F-2 as amended
 /// 2026-08-10). Parses and binds every `.calr` under the F-2 in-repo corpus roots and
-/// counts Calor0259 (AnalysisIncomplete) against the bound-expression denominator.
+/// counts Calor0259 (AnalysisIncomplete) against binder expression attempts.
 /// The committed baseline is a RATCHET, and parse coverage is asserted too:
 /// - the incomplete count may only move DOWN as family PRs land (update the baseline in
 ///   the same PR — an unrecorded improvement also fails, so the baseline tracks reality);
@@ -69,13 +72,21 @@ public class BinderIncompleteRatchetTests
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
     private const string ScopeText =
-        "in-repo F-2 plus selected-active native conversion and preserve-all opaque coverage; "
+        "in-repo F-2 plus selected-active conversion binding and preserve-all opaque coverage; "
         + "Roslyn-selected conversion uses genuinely empty default symbols with "
         + "C# Preview/regular/parse options; legacy source-order 18005 is informational. "
         + "#1189 preserves unchecked blocks in serilog/src/Serilog/Events/EventProperty.cs "
         + "and FluentValidation/src/FluentValidation/Internal/AccessorCache.cs: "
         + "previously unconverted files 2 -> 0, accounted opaque boundaries 89 -> 91 "
-        + "and opaque expressions 6423 -> 6471; native incomplete count remains zero";
+        + "and opaque expressions 6423 -> 6471; incomplete diagnostics remain zero. "
+        + "#1191: RoslynSelectedAttempted counts binder visits, including generated "
+        + "references and opaque expressions, NOT faithful native source expressions. "
+        + "34942 -> 34734 is reconciled per file in binder-expression-attribution.json; "
+        + "expression interop is now included in opaque coverage. "
+        + "binder-source-coverage.json separately pins source and representation identities";
+
+    private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
+        "bench", "phase0-agent-native", "binder-source-coverage.json");
 
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
@@ -186,11 +197,15 @@ public class BinderIncompleteRatchetTests
         var preserve = new PreserveConversionCoverage();
         var opaqueIdentities = new HashSet<string>(StringComparer.Ordinal);
         var unconvertedIdentities = new HashSet<string>(StringComparer.Ordinal);
+        var sourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(StringComparer.Ordinal);
 
         foreach (var file in files)
         {
-            var source = File.ReadAllText(file);
+            var source = File.ReadAllText(file).Replace("\r\n", "\n");
             MeasureNative(file, source, native);
+            var relative = Path.GetRelativePath(Path.Combine(root, "bench", "corpus"), file)
+                .Replace('\\', '/');
+            sourceCoverage.Add(relative, native.LastSourceCoverage!);
             MeasurePreserve(
                 file,
                 source,
@@ -206,6 +221,13 @@ public class BinderIncompleteRatchetTests
 
         var measuredNative = native.ToRecord();
         var measuredPreserve = preserve.ToRecord();
+        Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
+        Assert.Equal(measuredPreserve.OpaqueBoundaries, measuredPreserve.OpaqueIdentityCount);
+        Assert.Equal(measuredPreserve.UnconvertedFiles, measuredPreserve.UnconvertedIdentityCount);
+        Assert.Equal(files.Length, measuredNative.ConvertedAndBound);
+        Assert.Equal(0, measuredNative.ConvertExceptions);
+        Assert.Equal(0, measuredNative.EmptyOutput);
+        Assert.Equal(0, measuredNative.OutputParseFailures);
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
             var baseline = File.Exists(BaselinePath())
@@ -219,6 +241,9 @@ public class BinderIncompleteRatchetTests
                     Scope = ScopeText
                 },
                 new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            File.WriteAllText(SourceCoveragePath(),
+                JsonSerializer.Serialize(sourceCoverage,
+                    new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
 
@@ -229,13 +254,17 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(
             LegacySourceOrderAttempted,
             measuredNative.LegacySourceOrderAttempted);
-        Assert.True(
-            measuredNative.RoslynSelectedAttempted
-                >= recorded.Conversion.RoslynSelectedAttempted,
-            $"Roslyn-selected attempted count regressed: "
-            + $"{measuredNative.RoslynSelectedAttempted} < "
-            + $"{recorded.Conversion.RoslynSelectedAttempted}.");
+        // Binder visits include lowering artifacts and opaque expressions. Exact equality
+        // still catches drift; a monotonic lower bound would reward unnecessary temporaries.
         Assert.Equal(recorded.Conversion, measuredNative);
+        var recordedSources = JsonSerializer.Deserialize<
+            SortedDictionary<string, SourceCoverageRecord>>(
+                File.ReadAllText(SourceCoveragePath()))!;
+        Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal), sourceCoverage.Keys);
+        foreach (var (file, measured) in sourceCoverage)
+            Assert.True(recordedSources[file] == measured,
+                $"Source representation changed in {file}: {recordedSources[file]} -> {measured}. "
+                + "Audit source identities and expression interop, not just the binder-visit total.");
         Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
         Assert.Equal(
             measuredPreserve.OpaqueBoundaries,
@@ -251,6 +280,100 @@ public class BinderIncompleteRatchetTests
             + $"vs baseline {recorded.PreserveCoverage}.");
         Assert.Equal(recorded.PreserveCoverage, measuredPreserve);
     }
+
+    [Fact]
+    public void ExpressionInterop_IsOpaqueAndSurvivesSerialization()
+    {
+        const string source = "class C { int F() => Call(1); }";
+        var start = source.IndexOf("Call(1)", StringComparison.Ordinal);
+        var expression = new RawCSharpExpressionNode(new TextSpan(start, 7, 1, start + 1), "Call(1)");
+        var module = MeasurementModule(expression);
+        var coverage = MeasureSourceCoverage(module,
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source),
+            source, "expression.cs", 1);
+        Assert.Equal(1, coverage.OpaqueBoundaries);
+        Assert.Equal(3, coverage.OpaqueSourceExpressions); // Invocation, callee, argument.
+        Assert.Equal(0, coverage.ExactExpressionSourceSpans);
+
+        var calor = new Compiler.Migration.CalorEmitter().Emit(module);
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parser(new Lexer(calor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors);
+        AssertOpaqueSerializationPreserved(module, reparsed, "expression.cs");
+        Assert.Throws<Xunit.Sdk.TrueException>(() =>
+            AssertOpaqueSerializationPreserved(module, MeasurementModule(), "dropped.cs"));
+        Assert.Throws<Xunit.Sdk.TrueException>(() =>
+            AssertOpaqueSerializationPreserved(module,
+                MeasurementModule(new RawCSharpExpressionNode(expression.Span, "Call(2)")), "changed.cs"));
+        Assert.Throws<Xunit.Sdk.TrueException>(() =>
+            CollectOpaqueSpans(
+                MeasurementModule(new RawCSharpExpressionNode(expression.Span, "Call(2)")),
+                source, "misattributed.cs", new PreserveConversionCoverage()));
+        Assert.Throws<Xunit.Sdk.TrueException>(() =>
+            AssertOpaqueSerializationPreserved(
+                MeasurementModule(new RawCSharpExpressionNode(default,
+                    "F(\n#if A\n1\n#else\n2\n#endif\n)")),
+                MeasurementModule(new RawCSharpExpressionNode(default,
+                    "F(\n#if A\n3\n#else\n2\n#endif\n)")),
+                "inactive-branch.cs"));
+    }
+
+    [Fact]
+    public void SourceIdentityGuard_DetectsEqualCountSwapsAndNativeToOpaque()
+    {
+        const string source = "class C { int F() => 1 + 2; }";
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source);
+        var literals = tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax>().ToArray();
+        var first = literals[0].Span;
+        var second = literals[1].Span;
+        var firstSpan = new TextSpan(first.Start, first.Length, 1, first.Start + 1);
+        var secondSpan = new TextSpan(second.Start, second.Length, 1, second.Start + 1);
+        var before = MeasureSourceCoverage(MeasurementModule(new IntLiteralNode(firstSpan, 1)),
+            tree, source, "identity.cs", 1);
+        var swapped = MeasureSourceCoverage(MeasurementModule(new IntLiteralNode(secondSpan, 2)),
+            tree, source, "identity.cs", 1);
+        Assert.Equal(before.BinderAttempts, swapped.BinderAttempts);
+        Assert.Equal(before.ExactExpressionSourceSpans, swapped.ExactExpressionSourceSpans);
+        Assert.NotEqual(before.ExactExpressionSourceIdentityHash, swapped.ExactExpressionSourceIdentityHash);
+        var opaque = MeasureSourceCoverage(MeasurementModule(new RawCSharpExpressionNode(firstSpan, "1")),
+            tree, source, "identity.cs", 1);
+        Assert.Equal(before.BinderAttempts, opaque.BinderAttempts);
+        Assert.Equal(0, opaque.ExactExpressionSourceSpans);
+        Assert.Equal(1, opaque.OpaqueSourceExpressions);
+        Assert.NotEqual(before, opaque);
+    }
+
+    [Theory]
+    [InlineData("return gate && Check();")]
+    [InlineData("return gate || Check();")]
+    [InlineData("return gate ? Check() : false;")]
+    public void NativeMeasurementControls_RejectInteropAndEmitterFallback(string body)
+    {
+        var conversion = new Compiler.Migration.CSharpToCalorConverter().Convert(
+            "public static class C { static bool Check() => true; "
+            + "public static bool Run(bool gate) { " + body + " } }");
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues));
+        Assert.DoesNotContain(conversion.Losses, loss =>
+            loss.Kind is Compiler.Migration.ConversionLossKind.InteropPreserved
+                or Compiler.Migration.ConversionLossKind.EmitterFallback);
+        Assert.NotNull(conversion.Ast);
+        Assert.Empty(OpaqueCodeIdentities(conversion.Ast));
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parser(new Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors);
+        Assert.Empty(OpaqueCodeIdentities(reparsed));
+    }
+
+    private static ModuleNode MeasurementModule(params ExpressionNode[] expressions) =>
+        new(default, "m1", "Measurement", [],
+            [new FunctionNode(default, "f1", "Run", Visibility.Public, [],
+                new OutputNode(default, "i32"), null,
+                expressions.Select(expression =>
+                    (StatementNode)new ReturnStatementNode(expression.Span, expression)).ToArray(),
+                new AttributeCollection())],
+            new AttributeCollection());
 
     [Fact]
     public void SelectedBranchMode_UsesRoslynBooleanConditions()
@@ -313,6 +436,7 @@ public class BinderIncompleteRatchetTests
         NativeConversionCoverage coverage)
     {
         coverage.FilesSeen++;
+        coverage.LastSourceCoverage = null;
         var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
             Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
             Microsoft.CodeAnalysis.DocumentationMode.Parse,
@@ -358,6 +482,26 @@ public class BinderIncompleteRatchetTests
         var bindDiagnostics = new DiagnosticBag();
         var binder = new Binder(bindDiagnostics);
         binder.Bind(module);
+        Assert.NotNull(conversion.Ast);
+        // Branch selection removes trivia/text and shifts offsets. Conversion AST spans
+        // belong to this selected source, not the original file.
+        var selectedSource = Compiler.Migration.PreprocessorStripper
+            .SelectActiveBranchLossy(source, parseOptions).Source;
+        var sourceTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(selectedSource, parseOptions);
+        var serializedOpaque = OpaqueCodeIdentities(module).ToArray();
+        coverage.LastSourceCoverage = MeasureSourceCoverage(
+            conversion.Ast, sourceTree, selectedSource, file, binder.ExpressionsBound) with
+        {
+            SourceHash = Hash(source),
+            SelectedSourceHash = Hash(selectedSource),
+            SerializedOpaqueBoundaries = serializedOpaque.Length,
+            SerializedOpaqueCodeHash = HashIdentities(serializedOpaque),
+            ConversionReportedSuccess = conversion.Success,
+            LossIdentityHash = HashIdentities(conversion.Losses
+                .Select(loss => $"{loss.Kind}:{loss.Line}:{loss.Feature}:{loss.Description}")
+                .Order(StringComparer.Ordinal))
+        };
+        AssertOpaqueSerializationPreserved(conversion.Ast, module, file);
         coverage.ConvertedAndBound++;
         coverage.RoslynSelectedAttempted +=
             binder.ExpressionsBound;
@@ -425,7 +569,7 @@ public class BinderIncompleteRatchetTests
         else
         {
             var diagnostics = new DiagnosticBag();
-            _ = new Parser(
+            var reparsed = new Parser(
                 new Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser(),
                 diagnostics).Parse();
             if (diagnostics.HasErrors)
@@ -433,6 +577,8 @@ public class BinderIncompleteRatchetTests
                 coverage.OutputParseFailures++;
                 unconverted = true;
             }
+            else if (conversion.Ast != null)
+                AssertOpaqueSerializationPreserved(conversion.Ast, reparsed, file);
         }
         if (conversion is { Success: false })
             unconverted = true;
@@ -468,6 +614,9 @@ public class BinderIncompleteRatchetTests
                 case Calor.Compiler.Ast.RawCSharpNode raw:
                     entries.Add((node, raw.CSharpCode));
                     break;
+                case Calor.Compiler.Ast.RawCSharpExpressionNode expression:
+                    entries.Add((node, expression.CSharpCode));
+                    break;
             }
             foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker
                          .GetAllChildren(node))
@@ -485,6 +634,9 @@ public class BinderIncompleteRatchetTests
                 coverage.OpaqueUnmapped++;
                 continue;
             }
+            if (entry.Node is RawCSharpExpressionNode)
+                AssertRawExpressionSourcePreserved(
+                    entry.Code, source[mapped.Value.Start..mapped.Value.End], file);
             if (used.Any(existing => mapped.Value.Start >= existing.Start
                 && mapped.Value.End <= existing.End))
                 continue;
@@ -536,6 +688,136 @@ public class BinderIncompleteRatchetTests
 
     private const int LegacySourceOrderAttempted = 18005;
 
+    private static void AssertRawExpressionSourcePreserved(string code, string source, string file)
+    {
+        static IEnumerable<string> Tokens(string text)
+        {
+            var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(text);
+            Assert.False(expression.ContainsDiagnostics, "Opaque expression must parse in full.");
+            while (expression is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax parenthesized)
+                expression = parenthesized.Expression;
+            return expression.DescendantTokens().Select(token => $"{token.RawKind}:{token.Text}");
+        }
+
+        Assert.True(Tokens(code).SequenceEqual(Tokens(source)),
+            $"Opaque expression is not the source expression at its recorded span in {file}.");
+    }
+
+    // Exact source-span matches are provenance, not a semantic-fidelity certificate:
+    // some callees live in strings and generated references can reuse source spans.
+    // Pinning identities (not only cardinalities) detects loss/swaps even at equal totals.
+    private static SourceCoverageRecord MeasureSourceCoverage(
+        ModuleNode module,
+        Microsoft.CodeAnalysis.SyntaxTree sourceTree,
+        string source,
+        string file,
+        int binderAttempts)
+    {
+        var opaqueCoverage = new PreserveConversionCoverage();
+        var opaque = CollectOpaqueSpans(module, source, file, opaqueCoverage);
+        Assert.Equal(0, opaqueCoverage.OpaqueUnmapped);
+        var mapped = Walk(module).OfType<ExpressionNode>()
+            .Where(node => node is not RawCSharpExpressionNode)
+            .Select(node => (node.Span.Start, node.Span.End)).ToHashSet();
+        var expressions = sourceTree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax>()
+            .ToArray();
+        var representedIdentities = new List<string>();
+        var opaqueIdentities = new List<string>();
+        foreach (var expression in expressions)
+        {
+            var identity = $"{expression.Span.Start}:{expression.Span.End}:{expression.RawKind}";
+            if (opaque.Any(span =>
+                    span.Start <= expression.Span.Start && span.End >= expression.Span.End))
+                opaqueIdentities.Add(identity);
+            else if (mapped.Contains((expression.Span.Start, expression.Span.End)))
+                representedIdentities.Add(identity);
+        }
+        return new SourceCoverageRecord(
+            Hash(source), binderAttempts, expressions.Length,
+            representedIdentities.Count, HashIdentities(representedIdentities),
+            opaqueIdentities.Count, HashIdentities(opaqueIdentities),
+            opaque.Count, HashIdentities(opaque.Select(span => $"{span.Start}:{span.End}")));
+    }
+
+    private static void AssertOpaqueSerializationPreserved(
+        ModuleNode converted, ModuleNode reparsed, string file)
+    {
+        // The emitter can introduce additional raw expressions. They are separately
+        // pinned in SourceCoverageRecord, never silently counted as native source.
+        var remaining = OpaqueCodeIdentities(reparsed).ToList();
+        foreach (var identity in OpaqueCodeIdentities(converted))
+            Assert.True(remaining.Remove(identity),
+                $"Opaque C# changed or disappeared during Calor serialization in {file}.");
+    }
+
+    private static IEnumerable<string> OpaqueCodeIdentities(ModuleNode module) =>
+        Walk(module).Select(node => node switch
+                {
+                    RawCSharpExpressionNode expression => expression.CSharpCode,
+                    RawCSharpNode statement => statement.CSharpCode,
+                    CSharpInteropBlockNode block => block.CSharpCode,
+                    _ => null
+                })
+                .Where(code => code != null)
+                .Select(code => HashIdentities(OpaqueTokens(code!)))
+                .Order(StringComparer.Ordinal);
+
+    private static IEnumerable<string> OpaqueTokens(string code)
+    {
+        static IEnumerable<string> Directives(Microsoft.CodeAnalysis.SyntaxTriviaList triviaList) =>
+            triviaList.Where(trivia => trivia.IsDirective
+                    || trivia.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.DisabledTextTrivia)
+                .Select(trivia =>
+                    $"trivia:{trivia.RawKind}:{trivia.ToFullString().Replace("\r\n", "\n").Trim()}");
+
+        foreach (var token in Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(code))
+        {
+            foreach (var trivia in Directives(token.LeadingTrivia))
+                yield return trivia;
+            yield return $"{token.RawKind}:{token.Text}";
+            foreach (var trivia in Directives(token.TrailingTrivia))
+                yield return trivia;
+        }
+    }
+
+    private static IEnumerable<AstNode> Walk(AstNode root)
+    {
+        var stack = new Stack<AstNode>();
+        var seen = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        stack.Push(root);
+        while (stack.TryPop(out var node))
+        {
+            if (!seen.Add(node))
+                continue;
+            yield return node;
+            foreach (var child in Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+                stack.Push(child);
+        }
+    }
+
+    private static string Hash(string text) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+
+    private static string HashIdentities(IEnumerable<string> identities) =>
+        Hash(string.Join("\n", identities));
+
+    private sealed record SourceCoverageRecord(
+        string SourceHash,
+        int BinderAttempts,
+        int SourceExpressions,
+        int ExactExpressionSourceSpans,
+        string ExactExpressionSourceIdentityHash,
+        int OpaqueSourceExpressions,
+        string OpaqueSourceExpressionIdentityHash,
+        int OpaqueBoundaries,
+        string OpaqueBoundaryIdentityHash,
+        int SerializedOpaqueBoundaries = 0,
+        string SerializedOpaqueCodeHash = "",
+        string LossIdentityHash = "",
+        bool ConversionReportedSuccess = false,
+        string SelectedSourceHash = "");
+
     private sealed class NativeConversionCoverage
     {
         public int Incomplete;
@@ -545,6 +827,7 @@ public class BinderIncompleteRatchetTests
         public int ConvertExceptions;
         public int EmptyOutput;
         public int OutputParseFailures;
+        public SourceCoverageRecord? LastSourceCoverage;
         public NativeConversionLeg ToRecord() => new(
             Incomplete,
             LegacySourceOrderAttempted,
