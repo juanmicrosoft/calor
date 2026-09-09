@@ -727,7 +727,13 @@ public static class DocDriftChecker
         {
             if (line.InForeignFence)
                 continue;
-            var normalized = line.Text.Replace("*", "", StringComparison.Ordinal).Replace("`", "", StringComparison.Ordinal);
+            var normalized = line.Text;
+            string previous;
+            do
+            {
+                previous = normalized;
+                normalized = Regex.Replace(normalized, @"(\*\*|__|\*|_|`)(.*?)\1", "$2");
+            } while (normalized != previous);
             var match = claim.Match(normalized);
             foundClaim |= match.Success;
             if (match.Success && match.Groups["version"].Value != expected)
