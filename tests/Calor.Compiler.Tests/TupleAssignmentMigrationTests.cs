@@ -53,6 +53,13 @@ public class TupleAssignmentMigrationTests
         yield return Case("assignment-value", "int a = 1; int b = 2; var result = ((a, b) = (b, a)); return result.Item1 * 100 + a * 10 + b;", "221");
         yield return Case("expression-body-value", "var result = Swap(); return result.Item1 * 100 + a * 10 + b;", "221",
             "static int a = 1; static int b = 2; static (int, int) Swap() => (a, b) = (b, a);");
+        yield return Case("operator-value", "var result = new Subject() + new Subject(); return result.Item1 * 10 + result.Item2;", "21",
+            "static int a = 1; static int b = 2; public static (int, int) operator +(Subject x, Subject y) => (a, b) = (b, a);");
+        yield return Case("conversion-operator-value", "var result = ((int, int))new Subject(); return result.Item1 * 10 + result.Item2;", "21",
+            "static int a = 1; static int b = 2; public static explicit operator (int, int)(Subject x) => (a, b) = (b, a);");
+        yield return Case("for-incrementor", "int a = 1; int b = 2; for (int i = 0; i < 1; (a, b) = (b, a)) { i++; } return a * 10 + b;", "21");
+        yield return Case("for-continue", "int a = 1; int b = 2; for (int i = 0; i < 1; (a, b) = (b, a)) { i++; continue; } return a * 10 + b;", "21");
+        yield return Case("for-initializer", "int a = 1; int b = 2; for ((a, b) = (b, a); a < 3; a++) { } return a * 10 + b;", "31");
         yield return Case("custom-indexer", "var box = new Box(); (box[0], box[1]) = (box[1], box[0]); return log + \":\" + box.Snapshot();", "ggss:21",
             """
             static string log = "";

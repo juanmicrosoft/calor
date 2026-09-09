@@ -4498,8 +4498,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 if (IsTupleAssignment(exprAssign))
                 {
-                    if (expressionBody.Parent is MethodDeclarationSyntax method
-                        && method.ReturnType.ToString() != "void")
+                    if (expressionBody.Parent is OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax
+                        || expressionBody.Parent is MethodDeclarationSyntax method
+                            && method.ReturnType.ToString() != "void")
                         throw EscalateExpression(exprAssign, "tuple-deconstruction");
                     return [ConvertTupleAssignmentStatement(exprAssign, GetTextSpan(expressionBody))];
                 }
@@ -8050,6 +8051,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("for");
         _context.IncrementConverted();
+
+        // A tuple incrementor is not a numeric step. Preserve the entire loop
+        // rather than moving it into a while body, where continue would skip it.
+        if (node.Initializers.Concat(node.Incrementors)
+            .Any(expression => expression.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment)))
+        {
+            _context.RecordFeatureUsage("tuple-deconstruction");
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
+                "For loop preserved to retain atomic tuple assignment and continue semantics.",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return [new RawCSharpNode(GetTextSpan(node), node.ToString())];
+        }
 
         var id = _context.GenerateId("for");
         var span = GetTextSpan(node);
