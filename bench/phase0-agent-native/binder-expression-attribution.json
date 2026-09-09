@@ -3436,8 +3436,8 @@
       "SourceExpressionTransitions": []
     }
   },
-  "CandidateValidationRevision": "000d2f38",
-  "CandidateValidationNote": "The complete candidate src/ tree was installed in the isolated worktree and rebuilt. Every per-file binder attempt and selected-source classification matches the original 2738d99b attribution; only documentation self-check source changed between those revisions. Binding errors below were separately remeasured on clean release639fa93a and candidate000d2f38. Binding-error positions refer to reparsed Calor output, NOT C# source identities.",
+  "CandidateValidationRevision": "67d4c259",
+  "CandidateValidationNote": "The complete candidate67d4c259 src/ tree was installed in isolation and rebuilt. Original639fa93a-to-2738d99b type attribution and the000d2f38 binding-failure review remain historical records. The EagerOperandFollowup accounts for the final additional -31 visits; every selected-source classification, converter AST kind count, opaque boundary and loss matches000d2f38. Binding-error positions are reparsed Calor coordinates, not C# source identities.",
   "BindingFailureReview": {
     "BeforeRevision": "639fa93a",
     "AfterRevision": "000d2f38",
@@ -4173,6 +4173,240 @@
         "AfterPropagatedErrors": 3,
         "BeforePropagatedErrorIdentityHash": "a9987e5fc777824f8edbac0d70697ba140cefc712d65b2e37bf89558590083c4",
         "AfterPropagatedErrorIdentityHash": "3b1437dba54725dff431e8802d339257116cb3d00a80a9f773a47544bfc098ac"
+      }
+    }
+  },
+  "EagerOperandFollowup": {
+    "BeforeRevision": "000d2f38",
+    "AfterRevision": "67d4c259",
+    "BeforeBinderAttempts": 34734,
+    "AfterBinderAttempts": 34703,
+    "BeforeRawBindingErrors": 4964,
+    "AfterRawBindingErrors": 4962,
+    "BeforeFilesWithRawBindingErrors": 254,
+    "AfterFilesWithRawBindingErrors": 254,
+    "BeforePropagatedBindingErrors": 109,
+    "AfterPropagatedBindingErrors": 109,
+    "AfterFilesWithPropagatedBindingErrors": 38,
+    "SelectedSourceClassificationsUnchanged": true,
+    "ConverterAstKindsUnchanged": true,
+    "ConverterOpaqueBoundariesUnchanged": true,
+    "ConversionLossesUnchanged": true,
+    "Method": "Same conversion/binder probe, no count instrumentation. Parsed AST deltas are NOT independently counted binder calls; for every changed file ReferenceNode + FieldAccessNode deltas equal the independently observed Binder.ExpressionsBound delta. The only production pipeline change removes eager-operand HoistToTempVar calls.",
+    "BeforeProbeSha256": "41c2876c061024837f055f005e359d6d09f956f2fb2b3309999c39148447954b",
+    "AfterProbeSha256": "0935a1ae18ab2c051d98ff1276b8a80d2f6b584eabe195b084f7b1d9d6be0cda",
+    "ChangedFiles": {
+      "FluentValidation/src/FluentValidation.Tests/AbstractValidatorTester.cs": {
+        "BeforeBinderAttempts": 563,
+        "AfterBinderAttempts": 562,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "FieldAccessNode": 1,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 103,
+        "AfterRawBindingErrors": 102
+      },
+      "FluentValidation/src/FluentValidation.Tests/ConditionTests.cs": {
+        "BeforeBinderAttempts": 543,
+        "AfterBinderAttempts": 541,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 85,
+        "AfterRawBindingErrors": 85
+      },
+      "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs": {
+        "BeforeBinderAttempts": 1205,
+        "AfterBinderAttempts": 1203,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 229,
+        "AfterRawBindingErrors": 229
+      },
+      "FluentValidation/src/FluentValidation.Tests/RuleDependencyTests.cs": {
+        "BeforeBinderAttempts": 488,
+        "AfterBinderAttempts": 484,
+        "BinderAttemptDelta": -4,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -4,
+          "ReferenceNode": -4
+        },
+        "BeforeRawBindingErrors": 67,
+        "AfterRawBindingErrors": 67
+      },
+      "FluentValidation/src/FluentValidation.Tests/SharedConditionTests.cs": {
+        "BeforeBinderAttempts": 1032,
+        "AfterBinderAttempts": 1030,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 78,
+        "AfterRawBindingErrors": 78
+      },
+      "FluentValidation/src/FluentValidation/Internal/AccessorCache.cs": {
+        "BeforeBinderAttempts": 92,
+        "AfterBinderAttempts": 90,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 10,
+        "AfterRawBindingErrors": 10
+      },
+      "FluentValidation/src/FluentValidation/TestHelper/TestValidationResult.cs": {
+        "BeforeBinderAttempts": 140,
+        "AfterBinderAttempts": 139,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 20,
+        "AfterRawBindingErrors": 20
+      },
+      "FluentValidation/src/FluentValidation/Validators/GreaterThanOrEqualValidator.cs": {
+        "BeforeBinderAttempts": 21,
+        "AfterBinderAttempts": 20,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 3,
+        "AfterRawBindingErrors": 3
+      },
+      "FluentValidation/src/FluentValidation/Validators/GreaterThanValidator.cs": {
+        "BeforeBinderAttempts": 21,
+        "AfterBinderAttempts": 20,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 3,
+        "AfterRawBindingErrors": 3
+      },
+      "FluentValidation/src/FluentValidation/Validators/LessThanOrEqualValidator.cs": {
+        "BeforeBinderAttempts": 21,
+        "AfterBinderAttempts": 20,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 3,
+        "AfterRawBindingErrors": 3
+      },
+      "FluentValidation/src/FluentValidation/Validators/LessThanValidator.cs": {
+        "BeforeBinderAttempts": 21,
+        "AfterBinderAttempts": 20,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 3,
+        "AfterRawBindingErrors": 3
+      },
+      "FluentValidation/src/FluentValidation/Validators/PrecisionScaleValidator.cs": {
+        "BeforeBinderAttempts": 67,
+        "AfterBinderAttempts": 66,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 5,
+        "AfterRawBindingErrors": 5
+      },
+      "MediatR/src/MediatR/Registration/ServiceRegistrar.cs": {
+        "BeforeBinderAttempts": 533,
+        "AfterBinderAttempts": 532,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 72,
+        "AfterRawBindingErrors": 72
+      },
+      "serilog/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs": {
+        "BeforeBinderAttempts": 93,
+        "AfterBinderAttempts": 92,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 10,
+        "AfterRawBindingErrors": 10
+      },
+      "serilog/src/Serilog/Events/EventProperty.cs": {
+        "BeforeBinderAttempts": 39,
+        "AfterBinderAttempts": 37,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 4,
+        "AfterRawBindingErrors": 4
+      },
+      "serilog/src/Serilog/Formatting/Display/LevelOutputFormat.cs": {
+        "BeforeBinderAttempts": 108,
+        "AfterBinderAttempts": 105,
+        "BinderAttemptDelta": -3,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -3,
+          "ReferenceNode": -3
+        },
+        "BeforeRawBindingErrors": 11,
+        "AfterRawBindingErrors": 11
+      },
+      "serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs": {
+        "BeforeBinderAttempts": 93,
+        "AfterBinderAttempts": 92,
+        "BinderAttemptDelta": -1,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -1,
+          "ReferenceNode": -1
+        },
+        "BeforeRawBindingErrors": 20,
+        "AfterRawBindingErrors": 20
+      },
+      "serilog/src/Serilog/Parsing/MessageTemplateParser.cs": {
+        "BeforeBinderAttempts": 555,
+        "AfterBinderAttempts": 553,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 43,
+        "AfterRawBindingErrors": 43
+      },
+      "serilog/src/Serilog/Rendering/MessageTemplateRenderer.cs": {
+        "BeforeBinderAttempts": 71,
+        "AfterBinderAttempts": 69,
+        "BinderAttemptDelta": -2,
+        "ParsedAstNodeDeltas": {
+          "BindStatementNode": -2,
+          "ElseIfClauseNode": 1,
+          "IfStatementNode": -1,
+          "ReferenceNode": -2
+        },
+        "BeforeRawBindingErrors": 7,
+        "AfterRawBindingErrors": 7
       }
     }
   }

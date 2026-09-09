@@ -81,7 +81,8 @@ public class BinderIncompleteRatchetTests
         + "and opaque expressions 6423 -> 6471; incomplete diagnostics remain zero. "
         + "#1191: RoslynSelectedAttempted counts binder visits, including generated "
         + "references and opaque expressions, NOT faithful native source expressions. "
-        + "34942 -> 34734 is reconciled per file in binder-expression-attribution.json; "
+        + "34942 -> 34734 -> 34703 is reconciled per file in binder-expression-attribution.json "
+        + "(the last step preserves eager operand regions in 67d4c259); "
         + "expression interop is now included in opaque coverage. "
         + "binder-source-coverage.json separately pins source and representation identities";
 

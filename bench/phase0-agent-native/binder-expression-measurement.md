@@ -10,8 +10,9 @@ artifact rather than preserve coverage.
 
 Keep the exact baseline equality, incomplete-diagnostic ratchet, named parse
 failures, file counts, conversion exception/empty-output/parse-failure counters,
-and preserve-mode identity checks. Amend the visit count from **34,942 to 34,734**
-only with the independent source/opacity checks below. This is an explicit
+and preserve-mode identity checks. Amend the visit count from **34,942 to 34,703**
+(through the intermediate 34,734 measurement) only with the independent
+source/opacity checks below. This is an explicit
 measurement amendment, **not an improvement in native coverage**.
 
 The comparison used clean release commit `639fa93a` and #1191 commit `2738d99b`
@@ -28,16 +29,17 @@ preprocessor symbols, and `SelectActiveBranchLossy`. CRLF is normalized to LF.
 The separately built baseline reproduces the earlier 34,942 probe log. The old
 34,442 current-counts log is stale and is not used.
 
-**Final candidate verification:** the complete `src/` tree of `000d2f38` was
+**Initial review verification:** the complete `src/` tree of `000d2f38` was
 installed in the isolated worktree and rebuilt. Every file's binder-attempt
 count and selected-source classification matched the `2738d99b` attribution.
 The intervening production changes only affect documentation self-checks.
-The binding-failure comparison below was independently measured again on clean
-`639fa93a` and this exact candidate, without count instrumentation.
+The first binding-failure comparison below was independently measured again on
+clean `639fa93a` and this exact candidate, without count instrumentation.
+The subsequent `67d4c259` verification is recorded separately below.
 
 ## What changed
 
-`binder-expression-attribution.json` records every changed file, exact
+The initial section of `binder-expression-attribution.json` records every changed file, exact
 `BindExpression`-visit deltas by runtime node type, generated-reference attempts,
 new opaque boundaries, and source-expression identity transitions. Its 59 files
 with changed visit totals sum to **-208**. Another eight files have
@@ -48,6 +50,9 @@ after the existing `ExpressionsBound++` and separately counted `ReferenceNode.Na
 The sum of type counts was checked against `ExpressionsBound` for every file on
 both revisions. No nodes, bindings, or binding behavior were added. The
 instrumentation is not a production change.
+
+The following table is the **initial 639fa93a → 2738d99b/000d2f38 comparison**,
+not the later eager-operand result:
 
 | Instrument | Before | After | Delta |
 |---|---:|---:|---:|
@@ -111,6 +116,33 @@ source expressions **6,471 → 6,598**. Enclosing preserve-all blocks absorb som
 expression boundaries, so this is not the selected-mode +20/+180.
 Unmapped opaque spans, unconverted files, conversion exceptions, empty outputs,
 and output parse failures remain zero.
+
+## Final eager-operand follow-up: 67d4c259
+
+The final production repair keeps eager binary operands inside their execution
+regions during Calor serialization, rather than hoisting a right-hand operand
+ahead of the left. Its complete `src/` tree was installed and rebuilt in
+isolation before measurement.
+
+This changes **34,734 → 34,703** visits across **19 files**. All 364 files retain
+exactly the same selected-source classifications, converter AST kind counts,
+converter opaque boundaries, and conversion losses as `000d2f38`. No additional
+source expression is made opaque or loses its provenance mapping.
+
+The reparsed Calor AST loses 32 reference nodes and 32 bindings, and gains one
+field-access expression. For every changed file, the reference/field-access
+delta equals the independently measured binder-visit delta: **-32 +1 = -31**.
+`MessageTemplateRenderer.cs` additionally represents an `else if` directly
+rather than as a nested `if`; that statement-shape change adds no expression
+attempts. Parsed-node counts are not presented as independent instrumentation
+of `BindExpression`. The JSON's `EagerOperandFollowup` names every file and
+records both quantities.
+
+Raw binding errors change **4,964 → 4,962**, still across 254 files. Propagated
+errors remain **109 across 38 files**. The final comparison with release639fa93a
+is therefore **34,942 → 34,703 visits**, **5,085 → 4,962 raw errors**, and
+**117 → 109 propagated errors**. The source-identity ledger pins this final
+candidate; the earlier measurements remain explicit historical records.
 
 ## New safeguards and limits
 
