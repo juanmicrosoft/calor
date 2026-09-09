@@ -36,11 +36,11 @@ public static class SelfCheckCommand
 
         var fixOption = new Option<bool>(
             aliases: ["--fix"],
-            description: "Regenerate generated mirror docs (AGENTS.md from CLAUDE.md) instead of only reporting drift");
+            description: "Regenerate AGENTS.md and the schema-derived AST inventory, then run all drift checks");
 
         var docsCommand = new Command("docs",
             "Check agent-facing docs against the compiler implementation. " +
-            "Covered files: CLAUDE.md, docs/syntax-reference/*.md, and docs/cli/*.md " +
+            "Covered files: CLAUDE.md, docs/syntax-reference/*.md, docs/cli/*.md, and undated docs/semantics/*.md " +
             "(plus docs/**/*.md for the version scan). Checks: (1) every documented §-keyword " +
             "exists in the lexer; (2) every cited CalorNNNN diagnostic code exists (and cited " +
             "bands are non-empty); (3) effect codes in docs/syntax-reference/effects.md match " +
@@ -49,6 +49,7 @@ public static class SelfCheckCommand
             "(6) every fenced ```calor example that declares a complete program (first non-blank " +
             "line starts with §M) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it); " +
             "(8) every complete program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) and no copyable line binds an array-returning call to a generic collection (the E1a trap). " +
+            "(9) normative semantics-version claims match the implemented language version; (10) the AST inventory matches eng/ast-schema.json. " +
             "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
             "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {
@@ -79,6 +80,13 @@ public static class SelfCheckCommand
 
         if (fix)
         {
+            var inventoryErrors = new List<Diagnostic>();
+            if (!DocDriftChecker.RegenerateAstInventory(resolvedRoot, inventoryErrors))
+            {
+                foreach (var error in inventoryErrors)
+                    Console.Error.WriteLine(error);
+                return 2;
+            }
             // Regenerate mirror docs, then fall through to the full check so --fix
             // never silently skips the other drift checks (keywords, codes, effects,
             // versions, examples) and reports success. A source-missing error is fatal;

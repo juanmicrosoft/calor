@@ -166,7 +166,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1322` | Docs drift: documented diagnostic band contains no implemented codes |
 | `Calor1323` | Docs drift: documented effect code is unknown to the effect registry |
 | `Calor1324` | Docs drift: implemented effect code missing from the effect-code docs |
-| `Calor1325` | Docs drift: doc file hardcodes the current compiler version |
+| `Calor1325` | Docs drift: hardcoded compiler package version or stale normative semantics-version claim |
 | `Calor1326` | Docs drift: a file or doc section the self-check needs is missing |
 | `Calor1327` | Docs drift: CLI diagnostic code missing from this table |
 | `Calor1328` | Docs drift: fenced ```` ```calor ```` example (complete program starting with `§M`) no longer parses |

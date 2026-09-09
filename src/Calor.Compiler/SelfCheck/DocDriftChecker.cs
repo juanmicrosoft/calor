@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using System.Text;
+using System.Text.Json;
 using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.SelfCheck;
@@ -67,6 +69,12 @@ public sealed class DocDriftInputs
 
     /// <summary>Docs scanned for a hardcoded current version string.</summary>
     public IReadOnlyList<DocFile> VersionScanDocs { get; init; } = [];
+
+    /// <summary>Current language semantics, independently of the compiler package version.</summary>
+    public string SemanticsVersion { get; init; } = global::Calor.Compiler.SemanticsVersion.VersionString;
+
+    /// <summary>Normative pages whose current semantics-version claims must match the implementation.</summary>
+    public IReadOnlyList<DocFile> SemanticsVersionDocs { get; init; } = [];
 
     /// <summary>
     /// Mirror docs that must equal a deterministic transform of a single source
@@ -170,6 +178,11 @@ public static class DocDriftChecker
             CheckHardcodedVersion(doc, inputs.Version, diagnostics);
         }
 
+        foreach (var doc in inputs.SemanticsVersionDocs)
+        {
+            CheckSemanticsVersion(doc, inputs.SemanticsVersion, diagnostics);
+        }
+
         foreach (var mirror in inputs.MirrorDocs)
         {
             CheckMirror(mirror, diagnostics);
@@ -204,6 +217,13 @@ public static class DocDriftChecker
 
         var syntaxDocs = LoadDocsInDirectory(root, Path.Combine("docs", "syntax-reference"), loadErrors);
         var cliDocs = LoadDocsInDirectory(root, Path.Combine("docs", "cli"), loadErrors);
+        var semanticsDocs = LoadDocsInDirectory(root, Path.Combine("docs", "semantics"), loadErrors)
+            .Where(doc => !Regex.IsMatch(Path.GetFileName(doc.Path), @"^\d{4}-\d{2}-\d{2}"))
+            .ToList();
+        if (!semanticsDocs.Any(doc => Path.GetFileName(doc.Path) == "README.md"))
+            loadErrors.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                "Required normative semantics overview is missing",
+                Path.Combine("docs", "semantics", "README.md"), 1, 1));
         // Exemplar sheets are load-bearing agent infrastructure (E1a: agents
         // copy their lines verbatim) and get full drift treatment.
         var exemplarDoc = LoadDoc(root, Path.Combine("src", "Calor.Compiler", "Resources", "agent-syntax-exemplar.md"), loadErrors);
@@ -215,6 +235,7 @@ public static class DocDriftChecker
             .Concat(NonNull(copilotInstructions))
             .Concat(syntaxDocs)
             .Concat(cliDocs)
+            .Concat(semanticsDocs)
             .Concat(NonNull(exemplarDoc))
             .ToList();
 
@@ -231,6 +252,9 @@ public static class DocDriftChecker
         // scan sets — that would double-report every finding already raised on
         // CLAUDE.md; the mirror check covers it instead.
         var mirrorDocs = new List<MirrorDoc>();
+        var inventory = LoadAstInventoryMirror(root, loadErrors);
+        if (inventory != null)
+            mirrorDocs.Add(inventory);
         if (claudeMd is { } claude)
         {
             if (TryAgentsMdFromClaudeMd(claude.Content, out var expected))
@@ -271,6 +295,7 @@ public static class DocDriftChecker
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,
             VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs).ToList(),
+            SemanticsVersionDocs = semanticsDocs,
             MirrorDocs = mirrorDocs,
             ExemplarDoc = exemplarDoc,
         };
@@ -278,6 +303,65 @@ public static class DocDriftChecker
 
     /// <summary>Repo-relative path of the generated agent-manual mirror.</summary>
     public const string MirrorAgentsRelativePath = "AGENTS.md";
+
+    public static string AstInventoryRelativePath => Path.Combine("docs", "semantics", "inventory.md");
+
+    public static string GenerateAstInventory(string schemaJson)
+    {
+        using var schema = JsonDocument.Parse(schemaJson);
+        if (schema.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
+            throw new InvalidDataException("Unsupported AST schema version");
+        var nodes = schema.RootElement.GetProperty("nodes").EnumerateArray()
+            .Select(node => (Name: node.GetProperty("name").GetString()!, Source: node.GetProperty("source").GetString()!))
+            .OrderBy(node => node.Name, StringComparer.Ordinal).ToArray();
+        if (nodes.Length == 0 || nodes.Select(node => node.Name).Distinct(StringComparer.Ordinal).Count() != nodes.Length
+            || nodes.Any(node => node.Name == null || !Regex.IsMatch(node.Name, @"^[A-Za-z_][A-Za-z0-9_]*$")
+                || node.Source == null || !Regex.IsMatch(node.Source, @"^[A-Za-z0-9_.-]+\.cs$")))
+            throw new InvalidDataException("AST schema must contain unique named nodes and C# source filenames");
+        var text = new StringBuilder();
+        text.Append("# Calor AST Construct Inventory\n\n");
+        text.Append("<!-- Generated from eng/ast-schema.json by calor self-check docs --fix. Do not edit by hand. -->\n\n");
+        text.Append($"The AST schema contains **{nodes.Length}** node types. This is a structural inventory, not a claim that every node supports every compiler stage.\n\n");
+        text.Append("Regenerate with `calor self-check docs --fix`. The drift gate compares this entire page with the schema-derived output.\n\n");
+        text.Append("| Node type | Source file |\n|---|---|\n");
+        foreach (var node in nodes)
+            text.Append($"| `{node.Name}` | [`{node.Source}`](../../src/Calor.Compiler/Ast/{node.Source}) |\n");
+        return text.ToString();
+    }
+
+    private static MirrorDoc? LoadAstInventoryMirror(string root, List<Diagnostic> diagnostics)
+    {
+        var schemaPath = Path.Combine("eng", "ast-schema.json");
+        var schema = LoadDoc(root, schemaPath, diagnostics);
+        if (schema == null)
+            return null;
+        try
+        {
+            var expected = GenerateAstInventory(schema.Content);
+            var path = Path.Combine(root, AstInventoryRelativePath);
+            return new MirrorDoc(AstInventoryRelativePath, schemaPath,
+                File.Exists(path) ? File.ReadAllText(path) : null, expected);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or FormatException
+            or InvalidOperationException or KeyNotFoundException)
+        {
+            diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                $"Cannot generate AST inventory: {exception.Message}", schemaPath, 1, 1));
+            return null;
+        }
+    }
+
+    public static bool RegenerateAstInventory(string root, List<Diagnostic> diagnostics)
+    {
+        var mirror = LoadAstInventoryMirror(root, diagnostics);
+        if (mirror == null)
+            return false;
+        var path = Path.Combine(root, mirror.MirrorPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        if (mirror.Actual?.Replace("\r\n", "\n") != mirror.Expected)
+            File.WriteAllText(path, mirror.Expected);
+        return true;
+    }
 
     /// <summary>The CLAUDE.md H1 the AGENTS.md transform anchors on.</summary>
     public const string ClaudeTitleAnchor = "# CLAUDE.md — Calor Compiler";
@@ -463,7 +547,7 @@ public static class DocDriftChecker
             var firstContent = block.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
             if (block.Suppressed ||
                 firstContent == null ||
-                !firstContent.TrimStart().StartsWith("§M", StringComparison.Ordinal))
+                !Regex.IsMatch(firstContent.TrimStart(), @"^§M(?:\s|\{|$)"))
             {
                 continue;
             }
@@ -632,6 +716,27 @@ public static class DocDriftChecker
                     doc.Path, tableLine, 1));
             }
         }
+    }
+
+    private static void CheckSemanticsVersion(DocFile doc, string expected, List<Diagnostic> diagnostics)
+    {
+        var claim = new Regex(@"^\s*(?:#{1,6}\s+)?(?:\*\*)?(?:Semantics\s+Version|Version)\s*:\s*[*`]*(?<version>[^\s*`]+)",
+            RegexOptions.IgnoreCase);
+        var foundClaim = false;
+        foreach (var line in ClassifyLines(doc))
+        {
+            if (line.InForeignFence)
+                continue;
+            var match = claim.Match(line.Text);
+            foundClaim |= match.Success;
+            if (match.Success && match.Groups["version"].Value != expected)
+                diagnostics.Add(Drift(DiagnosticCode.DocDriftHardcodedVersion,
+                    $"Normative semantics version '{match.Groups["version"].Value}' differs from implemented semantics '{expected}' (not the compiler package version)",
+                    doc.Path, line.Number, match.Groups["version"].Index + 1));
+        }
+        if (!foundClaim && doc.Path.Replace('\\', '/') == "docs/semantics/README.md")
+            diagnostics.Add(Drift(DiagnosticCode.DocDriftHardcodedVersion,
+                $"Normative overview must declare Semantics Version: {expected}", doc.Path, 1, 1));
     }
 
     private static void CheckHardcodedVersion(
