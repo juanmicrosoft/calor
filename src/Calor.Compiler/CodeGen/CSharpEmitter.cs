@@ -4730,13 +4730,31 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             : $"Calor.Runtime.Result.Err<object, {literalType}>({error})";
     }
 
+    private static bool IsSupportedMatchExpressionArm(MatchCaseNode arm) =>
+        arm.Body is [ReturnStatementNode { Expression: not null }];
+
+    private static void ReportUnsupportedMatchExpressionArm(
+        MatchCaseNode arm, Diagnostics.DiagnosticBag diagnostics) =>
+        diagnostics.ReportError(arm.Span, Diagnostics.DiagnosticCode.ExpressionMatchBlockUnsupported,
+            "Expression-match arms must contain exactly one value-return expression. "
+            + "Multi-statement, empty, and valueless arms are not supported; use a statement match instead.");
+
+    internal static void ValidateMatchExpressions(AstNode node, Diagnostics.DiagnosticBag diagnostics)
+    {
+        if (node is MatchExpressionNode match)
+            foreach (var arm in match.Cases.Where(arm => !IsSupportedMatchExpressionArm(arm)))
+                ReportUnsupportedMatchExpressionArm(arm, diagnostics);
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+            ValidateMatchExpressions(child, diagnostics);
+    }
+
     public string Visit(MatchExpressionNode node)
     {
-        var unsupportedArms = node.Cases.Where(arm => !Analysis.MatchExpressionValidator.IsSupported(arm)).ToArray();
+        var unsupportedArms = node.Cases.Where(arm => !IsSupportedMatchExpressionArm(arm)).ToArray();
         if (unsupportedArms.Length > 0)
         {
             foreach (var arm in unsupportedArms)
-                Analysis.MatchExpressionValidator.ReportUnsupported(arm, EmissionDiagnostics);
+                ReportUnsupportedMatchExpressionArm(arm, EmissionDiagnostics);
             return "throw new System.NotSupportedException(\"Expression-match block arms are unsupported\")";
         }
 

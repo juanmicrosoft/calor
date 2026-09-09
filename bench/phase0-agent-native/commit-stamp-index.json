@@ -19,10 +19,10 @@
     },
     {
       "ledger": "higher-order-demand-ledger.json",
-      "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
-      "resolvableOnMain": "a307ccf0080c2edaf514718c898af92176d4af88",
-      "basis": "identical-src-tree",
-      "note": "Same measured commit as the Calor0425 ledger; same verified equivalent."
+      "measuredCommit": "487682479ef5a01fda4aadec06a00f1091762e35",
+      "resolvableOnMain": "743723cd83e6fa1690ee59c5c2de820a6dc777bd",
+      "basis": "measured-on-top-of",
+      "note": "#1188: both legs were regenerated at branch commit 487682479ef5a01fda4aadec06a00f1091762e35, with this PR's expression-match validation applied to release/v0.19 commit 743723cd. D-A lists one additional early rejection, the already-invalid conversion fixture 13-10.approved.calr; total demand remains 3123. The named release ancestor is the reproducible base, not a claim of an identical compiler tree."
     },
     {
       "ledger": "effect-rows-probe-ledger.json",

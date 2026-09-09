@@ -757,7 +757,7 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
-        MatchExpressionValidator.Validate(ast, diagnostics);
+        CSharpEmitter.ValidateMatchExpressions(ast, diagnostics);
         if (diagnostics.HasErrors)
         {
             TrackDiagnostics(telemetry, diagnostics);
