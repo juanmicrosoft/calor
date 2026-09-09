@@ -27,7 +27,7 @@ Calor has a simple type system with primitives, optionals, and results.
 
 ### Input Parameters
 
-```
+```calor
 §I{i32:count}       // int count
 §I{str:name}        // string name
 §I{f64:price}       // double price
@@ -36,7 +36,7 @@ Calor has a simple type system with primitives, optionals, and results.
 
 ### Output Types
 
-```
+```calor
 §O{i32}             // returns int
 §O{str}             // returns string
 §O{void}            // returns nothing
@@ -56,7 +56,7 @@ Options represent values that may be absent.
 
 ### Examples
 
-```
+```calor
 §F{f001:Find:pub}
   §I{str:key}
   §O{?str}              // might return a string, might return nothing
@@ -70,14 +70,14 @@ Options represent values that may be absent.
 
 ### Creating Option Values
 
-```
+```calor
 §SM value           // Some(value) - has a value
 §NN                 // None - no value
 ```
 
 ### Example
 
-```
+```calor
 §F{f001:FindUser:pub}
   §I{i32:id}
   §O{?User}
@@ -101,7 +101,7 @@ T!E                 // Result: either T (success) or E (error)
 
 ### Examples
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -114,7 +114,7 @@ T!E                 // Result: either T (success) or E (error)
 
 ### Creating Result Values
 
-```
+```calor
 §OK value           // Ok(value) - success
 §ERR "message"      // Err(message) - failure
 ```
@@ -122,7 +122,7 @@ T!E                 // Result: either T (success) or E (error)
 ### Common Patterns
 
 **Parse integer:**
-```
+```calor
 §F{f001:ParseInt:pub}
   §I{str:text}
   §O{i32!str}
@@ -130,7 +130,7 @@ T!E                 // Result: either T (success) or E (error)
 ```
 
 **File read:**
-```
+```calor
 §F{f001:ReadFile:pub}
   §I{str:path}
   §O{str!str}
@@ -155,7 +155,7 @@ Func<T, U>              // Function from T to U
 
 ### Examples
 
-```
+```calor
 §I{List<i32>:numbers}           // List<int> parameter
 §I{Dictionary<str, i32>:scores} // Dictionary<string, int>
 §O{IEnumerable<str>}            // Returns IEnumerable<string>
@@ -166,7 +166,7 @@ Func<T, U>              // Function from T to U
 
 Generic types can be nested.
 
-```
+```calor
 §I{Dictionary<str, List<i32>>:data}     // Dictionary<string, List<int>>
 §O{List<Tuple<str, i32>>}               // List<(string, int)>
 ```
@@ -175,7 +175,7 @@ Generic types can be nested.
 
 When defining generic functions or classes, type parameters (like `T`, `U`) can be used as types.
 
-```
+```calor
 §F{f001:First:pub}<T>
   §I{List<T>:items}
   §O{T}
@@ -192,7 +192,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 ### List Creation
 
-```
+```calor
 §LIST{name:elementType}
   element1
   element2
@@ -204,7 +204,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 | `elementType` | Type of elements (`i32`, `str`, etc.) |
 
 **Example:**
-```
+```calor
 §LIST{numbers:i32}
   1
   2
@@ -213,7 +213,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 ### Dictionary Creation
 
-```
+```calor
 §DICT{name:keyType:valueType}
   §KV key1 value1
   §KV key2 value2
@@ -227,7 +227,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 | `§KV` | Key-value pair entry |
 
 **Example:**
-```
+```calor
 §DICT{ages:str:i32}
   §KV "alice" 30
   §KV "bob" 25
@@ -235,14 +235,14 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 ### HashSet Creation
 
-```
+```calor
 §HSET{name:elementType}
   element1
   element2
 ```
 
 **Example:**
-```
+```calor
 §HSET{tags:str}
   "urgent"
   "review"
@@ -260,7 +260,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 | Clear collection | `§C{coll.Clear} §/C` | `collection.Clear()` |
 
 **Example:**
-```
+```calor
 §PUSH{numbers} 4              // numbers.Add(4)
 §PUT{ages} "charlie" 35       // ages["charlie"] = 35
 §SETIDX{numbers} 0 10         // numbers[0] = 10
@@ -276,7 +276,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 | Collection count | `§CNT{coll}` | `i32` |
 
 **Example:**
-```
+```calor
 §IF §HAS{numbers} 5 → §P "Found 5"
 
 §B{count} §CNT{ages}
@@ -288,7 +288,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 
 Types matter in contracts for proper comparisons:
 
-```
+```calor
 §F{f001:Clamp:pub}
   §I{i32:value}
   §I{i32:min}

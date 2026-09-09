@@ -124,7 +124,7 @@ condition ? whenTrue : whenFalse
 
 Calor uses **lexical scoping** with parent chain lookup.
 
-```
+```calor
 §B{x} INT:1
 §IF{if1} BOOL:true
   §B{x} INT:2   // Shadows outer x
@@ -154,7 +154,7 @@ Inner scope bindings **shadow** outer bindings with the same name.
 
 Return statements in nested scopes must correctly unwind to the function boundary.
 
-```
+```calor
 §IF{if1} BOOL:true
   §R INT:42   // Returns from function, not just if block
 ```
@@ -169,7 +169,7 @@ Return statements in nested scopes must correctly unwind to the function boundar
 
 **Default Behavior:** TRAP (throw `OverflowException`)
 
-```
+```calor
 §B{max} INT:2147483647
 §B{result} (+ max INT:1)
 // Throws OverflowException
@@ -191,7 +191,7 @@ Return statements in nested scopes must correctly unwind to the function boundar
 | FLOAT to INT | Explicit required | Potential precision loss |
 | Narrowing | Explicit required | Data may be lost |
 
-```
+```calor
 §B{i} INT:42
 §B{f} i           // OK: implicit widening to float
 §B{j} §CAST{INT} f  // Required: explicit narrowing
@@ -213,7 +213,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ### 5.1 Preconditions (REQUIRES)
 
-```
+```calor
 §Q (> x INT:0)
 ```
 
@@ -227,7 +227,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ### 5.2 Postconditions (ENSURES)
 
-```
+```calor
 §S (> result INT:0)
 ```
 

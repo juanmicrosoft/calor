@@ -137,7 +137,7 @@ public async Task<User> GetUser(int id)
 
 In Calor, effects are explicit in the signature:
 
-```
+```calor
 §F{f001:GetUser:pub}
   §I{i32:id}
   §O{User}
@@ -175,7 +175,7 @@ explicitly disabled with `--contract-mode off`. Postconditions are also emitted
 unless verification produces a clean, non-vacuous `proven` result. Conditional
 or unsupported proofs keep their checks:
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -213,7 +213,7 @@ error Calor0410: Function 'ProcessOrder' uses effect 'network'
 
 The compiler traces effect violations through any depth of calls. You can't hide a side effect by burying it in helper functions.
 
-```
+```calor
 §F{f001:ProcessOrder:pub}
   §I{Order:order}
   §O{bool}

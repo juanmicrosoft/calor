@@ -35,7 +35,7 @@ Every caller must remember to pass valid values. Every callee must remember to v
 
 In Calor, constraints are part of the parameter declaration:
 
-```
+```calor
 §F{f001:ConfigureServer:pub}
   §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
   §I{str:hostname} | (> (len #) INT:0)
@@ -48,7 +48,7 @@ In Calor, constraints are part of the parameter declaration:
 
 For reusable constraints, define named refinement types:
 
-```
+```calor
 §M{m001:Server}
 
   §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
@@ -98,7 +98,7 @@ A transfer function where:
 - Balances must be non-negative
 - After a transfer, the balance must remain non-negative
 
-```
+```calor
 §M{m001:Banking}
 
   §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
@@ -131,7 +131,7 @@ Z3 proves it: given `balance >= amount` and `amount > 0`, then `balance - amount
 
 Remove the precondition:
 
-```
+```calor
 §F{f002:UnsafeTransfer:pub}
   §I{NonNegBalance:balance}
   §I{PositiveAmount:amount}
@@ -160,7 +160,7 @@ This is where refinement types and MCP tools combine. Instead of manually diagno
 
 An agent has written code with unconstrained parameters:
 
-```
+```calor
 §M{m001:Calculator}
 
   §F{f001:Divide:pub}

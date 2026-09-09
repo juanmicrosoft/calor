@@ -66,7 +66,7 @@ Base score: 0.30, cap at 0.90
 
 ### Calor with Contracts
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -110,7 +110,7 @@ public static int Divide(int a, int b)
 ### Null Reference
 
 **Calor detection:**
-```
+```calor
 §Q (!= input null)    // Explicit null check requirement
 ```
 
@@ -124,7 +124,7 @@ input ?? throw new ArgumentNullException();
 ### Bounds Check
 
 **Calor detection:**
-```
+```calor
 §Q (>= index 0)
 §Q (< index (len array))
 ```
@@ -174,7 +174,7 @@ Given this buggy call:
 
 ### Calor Code
 
-```
+```calor
 §F{f001:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}

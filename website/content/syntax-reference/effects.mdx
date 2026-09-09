@@ -19,7 +19,7 @@ In traditional languages, you must read the entire implementation to know if a f
 
 Calor requires explicit effect declarations:
 
-```
+```calor
 §F{f001:SaveUser:pub}
   §I{User:user}
   §O{bool}
@@ -33,14 +33,14 @@ Now an agent knows immediately what side effects to expect.
 
 ## Effect Syntax
 
-```
+```calor
 §E{code1,code2,...}
 §E{}                      // No effects (pure function)
 ```
 
 Place the effect declaration after the output type:
 
-```
+```calor
 §F{id:name:vis}
   §I{...}
   §O{...}
@@ -198,7 +198,7 @@ boundary.
 
 ### Pure Function (No Effects)
 
-```
+```calor
 §F{f001:Add:pub}
   §I{i32:a}
   §I{i32:b}
@@ -209,7 +209,7 @@ boundary.
 
 Or explicitly:
 
-```
+```calor
 §F{f001:Add:pub}
   §I{i32:a}
   §I{i32:b}
@@ -220,7 +220,7 @@ Or explicitly:
 
 ### Console Output
 
-```
+```calor
 §F{f001:Greet:pub}
   §I{str:name}
   §O{void}
@@ -230,7 +230,7 @@ Or explicitly:
 
 ### File Operations
 
-```
+```calor
 §F{f001:CopyFile:pub}
   §I{str:source}
   §I{str:dest}
@@ -241,7 +241,7 @@ Or explicitly:
 
 ### Network Call
 
-```
+```calor
 §F{f001:FetchData:pub}
   §I{str:url}
   §O{str!str}
@@ -251,7 +251,7 @@ Or explicitly:
 
 ### Database with Logging
 
-```
+```calor
 §F{f001:CreateUser:pub}
   §I{User:user}
   §O{i32}
@@ -261,7 +261,7 @@ Or explicitly:
 
 ### Multiple Effects
 
-```
+```calor
 §F{f001:ProcessOrder:pub}
   §I{Order:order}
   §O{bool}
@@ -294,7 +294,7 @@ Or explicitly:
 
 ### Interactive Console
 
-```
+```calor
 §F{f001:Prompt:pub}
   §I{str:question}
   §O{str}
@@ -317,7 +317,7 @@ Or explicitly:
 ### 2. Refactoring Safety
 
 "This function should be pure, but it has effects":
-```
+```calor
 §F{f001:Calculate:pub}
   §O{i32}
   §E{cw}                  // Wait, why is Calculate logging?

@@ -31,7 +31,7 @@ In traditional languages, side effects are implicit. You have to read the entire
 
 Calor requires explicit effect declarations:
 
-```
+```calor
 §F{f001:SaveUser:pub}
   §I{User:user}
   §O{bool}
@@ -63,7 +63,7 @@ Calor requires explicit effect declarations:
 
 Preconditions and postconditions aren't comments or assertions buried in code - they're first-class syntax elements:
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -93,7 +93,7 @@ Preconditions and postconditions aren't comments or assertions buried in code - 
 
 Every structural element has a unique identifier that persists across refactoring:
 
-```
+```calor
 §M{m001:Calculator}           // Module ID: m001
   §F{f001:Add:pub}              // Function ID: f001
     §L{for1:i:1:100:1}          // Loop ID: for1
@@ -129,7 +129,7 @@ Blocks are delimited by **indentation** (Python-style). Each opening
 tag introduces a block whose body must indent further; the block ends
 at the next line that dedents back to the parent column.
 
-```
+```calor
 §M{Example}
   §F{Main:pub}
     §L{i:1:10:1}
