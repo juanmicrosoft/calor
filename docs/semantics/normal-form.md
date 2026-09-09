@@ -1,8 +1,13 @@
 # Calor Normal Form (CNF) Specification
 
-Version: 1.0.0
+Design revision: 1.0.0
 
 This document specifies the Calor Normal Form (CNF), an intermediate representation that makes evaluation semantics explicit.
+
+**Status: unintegrated design.** The production compiler calls
+`CSharpEmitter.Emit(ast)` directly after analyses; it does not lower through
+CNF. The pipeline and guarantees below describe design goals, not guarantees
+established by the shipped compiler.
 
 ---
 
@@ -34,9 +39,11 @@ CNF is an intermediate representation (IR) between the Calor AST and backend cod
 3. **Linearize control flow** - Branch/label/goto instead of structured control
 4. **Remove implicit conversions** - All conversions are explicit nodes
 
-By lowering to CNF before emitting backend code, we guarantee that **Calor semantics are enforced regardless of backend**.
+The design aims to enforce the modeled rules before backend emission. That
+requires complete, validated lowering and backend integration; neither follows
+merely from having a CNF representation.
 
-### 1.2 Pipeline Position
+### 1.2 Proposed Pipeline Position (Not the Production Path)
 
 ```
 Source → Parser → AST → TypeChecker → Binder → [CNF Lowering] → CNF → [Backend] → Output
@@ -278,7 +285,7 @@ Every complex expression is decomposed into a sequence of assignments to tempora
 
 **Source:**
 ```calor
-§R §OP{kind=ADD} §OP{kind=MUL} §REF{name=a} §REF{name=b} §REF{name=c}
+§R (+ (* a b) c)
 // return (a * b) + c
 ```
 
@@ -479,9 +486,9 @@ match_end:
 
 **Source:**
 ```calor
-§F{f1:myFunc}
-  §REQUIRES{message="x must be positive"} §OP{kind=GT} x 0
-  body
+§F{f1:myFunc:pub} (i32:x) -> i32
+  §Q (> x 0)
+  §R x
 ```
 
 **CNF:**
@@ -498,8 +505,8 @@ precond_ok:
 
 **Source:**
 ```calor
-§F{f1:myFunc}
-  §ENSURES{message="result positive"} §OP{kind=GT} result 0
+§F{f1:myFunc:pub} (i32:expr) -> i32
+  §S (> result 0)
   §R expr
 ```
 
@@ -627,8 +634,8 @@ public interface ICnfVisitor<T>
 §F{f1:sumIfPositive:pub}
   §I{i32:a} §I{i32:b}
   §O{i32}
-  §REQUIRES §OP{kind=AND} §OP{kind=GT} a 0 §OP{kind=GT} b 0
-  §R §OP{kind=ADD} a b
+  §Q (&& (> a 0) (> b 0))
+  §R (+ a b)
 ```
 
 ### CNF
