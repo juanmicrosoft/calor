@@ -192,11 +192,29 @@ public sealed class ContractInheritanceChecker : IDisposable
             }
             if (scope == null)
             {
-                return !globalReference && _moduleNamespace.Length > 0
-                    && reference.StartsWith(_moduleNamespace + ".", StringComparison.Ordinal)
-                    ? ResolveDeclaration("global::" + reference, owner, substitutions, memberLookup,
-                        resolvingBases, typeArguments, argumentsAlreadyBound)
-                    : null;
+                if (!globalReference)
+                {
+                    // Namespace names are relative to each enclosing namespace,
+                    // after lexical type lookup has had its chance to shadow them.
+                    for (var prefix = _moduleNamespace; ; )
+                    {
+                        var qualified = prefix.Length == 0 ? reference : prefix + "." + reference;
+                        if (_moduleNamespace.Length > 0
+                            && qualified.StartsWith(_moduleNamespace + ".", StringComparison.Ordinal))
+                        {
+                            var resolved = ResolveDeclaration("global::" + qualified, owner,
+                                substitutions, memberLookup, resolvingBases, typeArguments,
+                                argumentsAlreadyBound);
+                            if (resolved != null)
+                                return resolved;
+                        }
+                        if (prefix.Length == 0)
+                            break;
+                        var separator = prefix.LastIndexOf('.');
+                        prefix = separator < 0 ? "" : prefix[..separator];
+                    }
+                }
+                return null;
             }
             scope = _enclosingDeclarations[scope];
         }
@@ -654,7 +672,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                 source.TypeSubstitutions, memberLookup: true,
                 typeArguments: source.Resolution.TypeArguments, argumentsAlreadyBound: true);
             return declaration == null ? null : QualifiedTypeName(declaration);
-        });
+        }, source.Parameters.Select(parameter => parameter.Name)
+            .Append("result").Append("this").ToHashSet(StringComparer.Ordinal));
 
         return source with
         {
@@ -693,7 +712,7 @@ public sealed class ContractInheritanceChecker : IDisposable
     {
         if (expression is ReferenceNode reference)
         {
-            var rewritten = RewriteReferenceName(reference.Name, replacements);
+            var rewritten = RewriteValueReference(reference.Name, replacements, typeReplacements);
             return rewritten.Equals(reference.Name, StringComparison.Ordinal)
                 ? reference
                 : new ReferenceNode(reference.Span, rewritten);
@@ -704,7 +723,9 @@ public sealed class ContractInheritanceChecker : IDisposable
                 binary.Span,
                 binary.Operator,
                 RewriteReferences(binary.Left, replacements, typeReplacements),
-                RewriteReferences(binary.Right, replacements, typeReplacements));
+                RewriteReferences(binary.Right, replacements, WithBoundValues(typeReplacements,
+                    EnumerateDescendantsAndSelf(binary.Left).OfType<IsPatternNode>()
+                        .Select(pattern => pattern.VariableName).OfType<string>())));
         }
         if (expression is UnaryOperationNode unary)
         {
@@ -867,7 +888,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             return new NameOfExpressionNode(
                 nameOf.Span,
-                RewriteReferenceName(nameOf.Name, replacements));
+                RewriteValueReference(nameOf.Name, replacements, typeReplacements));
         }
         if (expression is SomeExpressionNode some)
         {
@@ -963,7 +984,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             return new CallExpressionNode(
                 call.Span,
-                RewriteReferenceName(call.Target, replacements),
+                RewriteValueReference(call.Target, replacements, typeReplacements),
                 call.Arguments
                     .Select(argument => RewriteReferences(
                         argument,
@@ -1050,7 +1071,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             return new ForallExpressionNode(
                 forall.Span,
                 RewriteQuantifierTypes(boundVariables, typeReplacements),
-                RewriteReferences(body, nested, typeReplacements));
+                RewriteReferences(body, nested, WithBoundValues(typeReplacements,
+                    boundVariables.Select(variable => variable.Name))));
         }
         if (expression is ExistsExpressionNode exists)
         {
@@ -1068,7 +1090,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             return new ExistsExpressionNode(
                 exists.Span,
                 RewriteQuantifierTypes(boundVariables, typeReplacements),
-                RewriteReferences(body, nested, typeReplacements));
+                RewriteReferences(body, nested, WithBoundValues(typeReplacements,
+                    boundVariables.Select(variable => variable.Name))));
         }
         return expression;
     }
@@ -1086,6 +1109,33 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
         return name;
     }
+
+    private static string RewriteValueReference(
+        string name,
+        IReadOnlyDictionary<string, string> replacements,
+        TypeRebindings? typeBindings)
+    {
+        var root = name.Split('.')[0];
+        if (replacements.ContainsKey(root) || typeBindings?.Values?.Contains(root) == true)
+            return RewriteReferenceName(name, replacements);
+        if (typeBindings == null)
+            return name;
+        for (var end = name.Length; end > 0; end = name.LastIndexOf('.', end - 1))
+        {
+            var prefix = name[..end];
+            var rewritten = RewriteTypeName(prefix, typeBindings);
+            if (!rewritten.Equals(prefix, StringComparison.Ordinal))
+                return rewritten + name[end..];
+        }
+        return name;
+    }
+
+    private static TypeRebindings? WithBoundValues(TypeRebindings? bindings, IEnumerable<string> names) =>
+        bindings == null ? null : bindings with
+        {
+            Values = (bindings.Values ?? Enumerable.Empty<string>())
+                .Concat(names).ToHashSet(StringComparer.Ordinal)
+        };
 
     private static ExpressionNode AvoidPatternCapture(
         ExpressionNode expression,
@@ -1136,7 +1186,8 @@ public sealed class ContractInheritanceChecker : IDisposable
 
     private sealed record TypeRebindings(
         IReadOnlyDictionary<string, string> Parameters,
-        Func<string, string?> Qualify);
+        Func<string, string?> Qualify,
+        IReadOnlySet<string>? Values = null);
 
     private static string RewriteTypeName(string typeName, TypeRebindings? replacements)
     {

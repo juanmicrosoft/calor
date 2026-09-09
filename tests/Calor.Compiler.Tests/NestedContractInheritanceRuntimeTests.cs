@@ -599,6 +599,99 @@ public sealed class NestedContractInheritanceRuntimeTests
         AssertGuards(shadowAssembly.GetType("Scope.Container+Absolute")!, 1, -1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RelativeNamespaceInterfaces_PreserveGuards(bool verify)
+    {
+        foreach (var reference in new[] { "Outer.IValue", "Leaf.Outer.IValue",
+                     "Deep.Leaf.Outer.IValue", "N.Deep.Leaf.Outer.IValue",
+                     "global::N.Deep.Leaf.Outer.IValue" })
+        foreach (var contract in new[] { "§Q (> x INT:0)", "§S (> result INT:0)" })
+        {
+            var source = $$"""
+                §M{m1:N.Deep.Leaf}
+                  §CL{c1:Outer:pub}
+                    §IFACE{i1:IValue}
+                      §MT{im1:Get} (i32:x) -> i32
+                        {{contract}}
+                    §CL{c2:Impl:pub}
+                      §IMPL{ {{reference}} }
+                      §MT{mt1:Get:pub} (i32:x) -> i32
+                        §E{}
+                        §R x
+                """;
+            AssertGuards(Compile(source, verify).GetType("N.Deep.Leaf.Outer+Impl")!, 1, -1);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InheritedStaticMemberPredicates_KeepSourceScope(bool verify)
+    {
+        foreach (var depth in new[] { 0, 1, 2 })
+        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        {
+            var implementation = """
+                §CL{c4:Impl:pub}
+                  §IMPL{Outer.IValue}
+                  §MT{mt1:Get:pub} (i32:value) -> i32
+                    §E{}
+                    §R value
+                """;
+            var typeName = "Scope.";
+            for (var level = 0; level < depth; level++)
+            {
+                implementation = $"§CL{{c{5 + level}:Container{level}:pub}}\n" + Indent(implementation);
+                typeName = "Scope." + $"Container{level}+" + typeName["Scope.".Length..];
+            }
+            var source = $$"""
+                §M{m1:Scope}
+                  §CL{c1:Outer:pub}
+                    §CL{c2:Limits:pub}
+                      §FLD{i32:Min:pub:stat} INT:0
+                    §IFACE{i1:IValue}
+                      §MT{im1:Get} (i32:x) -> i32
+                        {{contract}}
+                  §CL{c3:Limits:pub}
+                    §FLD{i32:Min:pub:stat} INT:-10
+                {{Indent(implementation)}}
+                """;
+            AssertGuards(Compile(source, verify).GetType(typeName + "Impl")!, 1, -1, -11);
+        }
+
+        foreach (var parameter in new[] { "Limits", "value" })
+        {
+            var source = $$"""
+                §M{m1:Scope}
+                  §CL{c1:Outer:pub}
+                    §CL{c2:Limits:pub}
+                      §FLD{i32:Min:pub:stat} INT:-10
+                    §IFACE{i1:IValue}
+                      §MT{im1:Check} (Payload:Limits) -> i32
+                        §Q (> Limits.Min INT:0)
+                  §CL{c3:Payload:pub}
+                    §FLD{i32:Min:pub} INT:0
+                  §CL{c4:Impl:pub}
+                    §IMPL{Outer.IValue}
+                    §MT{mt1:Check:pub} (Payload:{{parameter}}) -> i32
+                      §E{}
+                      §R {{parameter}}.Min
+                """;
+            var assembly = Compile(source, verify);
+            var payload = Activator.CreateInstance(assembly.GetType("Scope.Payload")!)!;
+            var field = payload.GetType().GetField("Min")!;
+            var implementation = Activator.CreateInstance(assembly.GetType("Scope.Impl")!);
+            var method = implementation!.GetType().GetMethod("Check")!;
+            field.SetValue(payload, 1);
+            Assert.Equal(1, method.Invoke(implementation, [payload]));
+            field.SetValue(payload, -1);
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(implementation, [payload]));
+            Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+        }
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions
