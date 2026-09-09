@@ -3435,5 +3435,745 @@
       "NewOpaqueBoundaries": [],
       "SourceExpressionTransitions": []
     }
+  },
+  "CandidateValidationRevision": "000d2f38",
+  "CandidateValidationNote": "The complete candidate src/ tree was installed in the isolated worktree and rebuilt. Every per-file binder attempt and selected-source classification matches the original 2738d99b attribution; only documentation self-check source changed between those revisions. Binding errors below were separately remeasured on clean release639fa93a and candidate000d2f38. Binding-error positions refer to reparsed Calor output, NOT C# source identities.",
+  "BindingFailureReview": {
+    "BeforeRevision": "639fa93a",
+    "AfterRevision": "000d2f38",
+    "BeforeRawErrors": 5085,
+    "AfterRawErrors": 4964,
+    "BeforeFilesWithRawErrors": 258,
+    "AfterFilesWithRawErrors": 254,
+    "BeforePropagatedErrors": 117,
+    "AfterPropagatedErrors": 109,
+    "BeforeFilesWithPropagatedErrors": 40,
+    "AfterFilesWithPropagatedErrors": 38,
+    "BeforeExactExpressionsWithOpaqueDescendants": 0,
+    "AfterExactExpressionsWithOpaqueDescendants": 25,
+    "BeforeProbeSha256": "c986efd94cb0f5ae37c98c6b5cf8643230340a3f0d1f1e80eceafdfccd85b289",
+    "AfterProbeSha256": "41c2876c061024837f055f005e359d6d09f956f2fb2b3309999c39148447954b",
+    "ChangedFiles": {
+      "FluentValidation/src/FluentValidation.DependencyInjectionExtensions/ServiceCollectionExtensions.cs": {
+        "BeforeRawErrors": 5,
+        "AfterRawErrors": 5,
+        "BeforeRawErrorIdentityHash": "d9e7f12a059a3c8393a719b75417ca3d3316f5f185669366cc67be23522c94d3",
+        "AfterRawErrorIdentityHash": "e136713897fa47eebcecfecc1c9df2679b5e5244902c9e2fcee0e2c89038a561",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation.Tests.Benchmarks/AccessorCacheBenchmark.cs": {
+        "BeforeRawErrors": 3,
+        "AfterRawErrors": 1,
+        "BeforeRawErrorIdentityHash": "eba3f658d734b82f52830ad0529f6a568396faf48552d6c7fae48fa526e8cc5f",
+        "AfterRawErrorIdentityHash": "18cbe3331ca91b28519d5823c1521187c451244a9bb7cfbe3a8c0ca403ee5792",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation.Tests/AccessorCacheTests.cs": {
+        "BeforeRawErrors": 25,
+        "AfterRawErrors": 17,
+        "BeforeRawErrorIdentityHash": "e6756ca415098bc03387b3eda83e5a320c8d46fcef8b2397215f66a9f10a6f9b",
+        "AfterRawErrorIdentityHash": "f9d65f99be9d0646b7138cc10d11ed8758bb02fcf975965a1cf708d524128d6c",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation.Tests/ConditionTests.cs": {
+        "BeforeRawErrors": 85,
+        "AfterRawErrors": 85,
+        "BeforeRawErrorIdentityHash": "3606d5b3fbb129504ea747a295f01d8b3db9a92730ac685d5a20bdc8ce6bb0cd",
+        "AfterRawErrorIdentityHash": "acd4a668a218c612dffd2c833c7430b3d4b74c4902764be9da304eabb1607379",
+        "BeforePropagatedErrors": 2,
+        "AfterPropagatedErrors": 2,
+        "BeforePropagatedErrorIdentityHash": "1fd384dd43cc606230b6498ebdbf6f10d74ce09e2e86c71b005fa39b1e3960a3",
+        "AfterPropagatedErrorIdentityHash": "f9fb115c26695b46dcdf9039dd764c2748a197d621e7288699b54cefc4dd4b8b"
+      },
+      "FluentValidation/src/FluentValidation.Tests/DependencyInjectionExtensions/ServiceCollectionExtensionsTests.cs": {
+        "BeforeRawErrors": 20,
+        "AfterRawErrors": 20,
+        "BeforeRawErrorIdentityHash": "5e54ffc7002004ea2ab320d007d463e95e6da3ed16d9c80132f8193f76d8bda9",
+        "AfterRawErrorIdentityHash": "87e797621c938b08540f7fd4691188f0867a777de457b729e71e61c21bdd88a4",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation.Tests/ForEachRuleTests.cs": {
+        "BeforeRawErrors": 229,
+        "AfterRawErrors": 229,
+        "BeforeRawErrorIdentityHash": "f65d7a763dd6673db4cbb5da0e57d78183bdbfea155349cd547415cbd3d3089d",
+        "AfterRawErrorIdentityHash": "f88074dfd35a02ef412f865467fde591cb64bae825cb431772e5e34958120b95",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation.Tests/NotEqualValidatorTests.cs": {
+        "BeforeRawErrors": 53,
+        "AfterRawErrors": 53,
+        "BeforeRawErrorIdentityHash": "71f245df8d692191dff2006f4e035863ed8447010f0af05e59315a9fae2a64a4",
+        "AfterRawErrorIdentityHash": "bfccd6b797d3ad802ead70c350bee7c7fc8bd40aa7afafc08f085ae20c3f646d",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation.Tests/StreetNumberComparer.cs": {
+        "BeforeRawErrors": 4,
+        "AfterRawErrors": 3,
+        "BeforeRawErrorIdentityHash": "a7d786a16832a763f72fd78cd2f639be2a759e73932919ca2ef22f18836b4f12",
+        "AfterRawErrorIdentityHash": "22898dcf673fefce9c873c08bea36045e38cd6cf0e7f6461b0ad022456b5b532",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "cb2822d419ac7c0720670ba4076bf818d272290645c09d24cd7987ae30b853bc",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/AbstractValidator.cs": {
+        "BeforeRawErrors": 33,
+        "AfterRawErrors": 25,
+        "BeforeRawErrorIdentityHash": "8f85b5c684d674c0b24f25f7c272449b16cb1aa63369461027177a19f2625aa5",
+        "AfterRawErrorIdentityHash": "8d4e015be138e5a9912adc29b8698d16f2d3129f254f2979dd242b9b1ddc26c0",
+        "BeforePropagatedErrors": 6,
+        "AfterPropagatedErrors": 5,
+        "BeforePropagatedErrorIdentityHash": "ea85120d3ebc9b73b7db792fa301928b2cfa6b2fdd4301eef4ef39f5ab9fee57",
+        "AfterPropagatedErrorIdentityHash": "a4673f4912aed47528e64fceb5bd8bc26e206ffcd02ff891d67dd3857eb81940"
+      },
+      "FluentValidation/src/FluentValidation/AssemblyScanner.cs": {
+        "BeforeRawErrors": 10,
+        "AfterRawErrors": 10,
+        "BeforeRawErrorIdentityHash": "f6cf8ccc06de5eac7edc1ea8dcb3f8a7e04ab6de6dbb2d1b52704ff2aff547e0",
+        "AfterRawErrorIdentityHash": "0d049c2f6abaa8eff0a48ce40088a01fc81f3fa53c7362bfa3265f97911dc656",
+        "BeforePropagatedErrors": 3,
+        "AfterPropagatedErrors": 3,
+        "BeforePropagatedErrorIdentityHash": "3fc03c3f0f48c67161951d99b3817d472182756ff38d9b800a3cf3c3e45d99c6",
+        "AfterPropagatedErrorIdentityHash": "3fc03c3f0f48c67161951d99b3817d472182756ff38d9b800a3cf3c3e45d99c6"
+      },
+      "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs": {
+        "BeforeRawErrors": 78,
+        "AfterRawErrors": 58,
+        "BeforeRawErrorIdentityHash": "3d3ba894bc10341d60d7f33a6e7d8844abbb96163ef52025846ed5d06b192b36",
+        "AfterRawErrorIdentityHash": "1b31ab5cdd2ba6890df36cd243fedd51ea817fb8011b09844cbfa971e601b628",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "07e4b877f851302a3786379a9e14ddbf99100f8f1c355e65d652f6f81d7e18f9",
+        "AfterPropagatedErrorIdentityHash": "c3f6320b48866f2b3624c8aa89809dcdad97b06c179e6fca5ff6fbb4ef773985"
+      },
+      "FluentValidation/src/FluentValidation/DefaultValidatorExtensions_Validate.cs": {
+        "BeforeRawErrors": 2,
+        "AfterRawErrors": 0,
+        "BeforeRawErrorIdentityHash": "6c265adb3d015221bfd909ce290556ed7f5d7f1378ff5f7f941f602ea4e4837d",
+        "AfterRawErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/DefaultValidatorOptions.cs": {
+        "BeforeRawErrors": 58,
+        "AfterRawErrors": 50,
+        "BeforeRawErrorIdentityHash": "d29b9faa501949a4dc32a03e70c66b69d550709925e5ec9efb6934ddae7686bc",
+        "AfterRawErrorIdentityHash": "bc202efab7762204bbf17ec558dacf9304d898ce6e1cac70597571e7b7b1426a",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "d2955a06e6f99ad6c65e639522cc950352d611cdc95044e4a8f3bc72d46bec01",
+        "AfterPropagatedErrorIdentityHash": "aa95be6c3e258b81023227a07d2ac3e42435d1668fa35718ccce52bae06e8488"
+      },
+      "FluentValidation/src/FluentValidation/IValidationContext.cs": {
+        "BeforeRawErrors": 36,
+        "AfterRawErrors": 36,
+        "BeforeRawErrorIdentityHash": "af64c45ff422e2c5e54b1d71bb33d1357e6c474b028ad646ed84481726cbc46f",
+        "AfterRawErrorIdentityHash": "0653edfd87c26088ce4b6ccbabc5c06a74506e07d1c6ec4c0dd800b2e1764d52",
+        "BeforePropagatedErrors": 2,
+        "AfterPropagatedErrors": 2,
+        "BeforePropagatedErrorIdentityHash": "0f84ba419388dce2e16e756bddd4a443e8fcbf097de5cb9ddabd3448bcd1787b",
+        "AfterPropagatedErrorIdentityHash": "0f84ba419388dce2e16e756bddd4a443e8fcbf097de5cb9ddabd3448bcd1787b"
+      },
+      "FluentValidation/src/FluentValidation/Internal/AccessorCache.cs": {
+        "BeforeRawErrors": 10,
+        "AfterRawErrors": 10,
+        "BeforeRawErrorIdentityHash": "6cb14c5a684a4401bc6275290538a8e909e574b49bca63bb9451cfcd49954854",
+        "AfterRawErrorIdentityHash": "90ad00192c60ef7181bb82627ba2c55e9260dfa0c0156fa336b368c310debe05",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs": {
+        "BeforeRawErrors": 41,
+        "AfterRawErrors": 40,
+        "BeforeRawErrorIdentityHash": "019f70527a55eb8c03ae75700b786f41b46a111011cad86924f5537e7239d23a",
+        "AfterRawErrorIdentityHash": "6efa27478d75fee31a576050c1cc19c9e4f371433a7a42ff0b1eb791e6c7b0c6",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Internal/ExtensionsInternal.cs": {
+        "BeforeRawErrors": 9,
+        "AfterRawErrors": 9,
+        "BeforeRawErrorIdentityHash": "111d31c41588710d936d028e750450cfe8562e4ed927872251ec4edeeaf68caa",
+        "AfterRawErrorIdentityHash": "12ee9f6df7606d39b21b5feba5ac273f15dd523f31ea0a2a8c4408b6982ae6e2",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "83c6f0b57834d3b60c7b77a4c6176c7116dc89bdecee75af9e20634ad0379a9e",
+        "AfterPropagatedErrorIdentityHash": "17b063a8baed0b6559830289e61e2ff90d062dd749ee458e082ad5de6d376aed"
+      },
+      "FluentValidation/src/FluentValidation/Internal/MemberNameValidatorSelector.cs": {
+        "BeforeRawErrors": 7,
+        "AfterRawErrors": 6,
+        "BeforeRawErrorIdentityHash": "03ca828626ec0a9bb3f3aa7871a1687920604da510a3a743ce50d2cb84497ff7",
+        "AfterRawErrorIdentityHash": "b37f0cc0a414fcfd97c0e03bb96d1503f3effd95d15623906438372e92e26315",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs": {
+        "BeforeRawErrors": 13,
+        "AfterRawErrors": 12,
+        "BeforeRawErrorIdentityHash": "afc97ca599e6d9dec610ad94c59ed9079084f25d93b9edb08f8c776bc4bba8b5",
+        "AfterRawErrorIdentityHash": "508958da0897d55594bce039005dd4cd8a4ff952e00ce19c5fee30c082aff999",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "b083c77d511aa0d8169f5e43b3a44523b1e168af7a63de935ab6bd13b32b91b6",
+        "AfterPropagatedErrorIdentityHash": "edd4b8fb1a1beb7aa92846eec35b17ea6033589e0c71eacb2494aef1b14fc74f"
+      },
+      "FluentValidation/src/FluentValidation/Internal/PropertyRule.cs": {
+        "BeforeRawErrors": 30,
+        "AfterRawErrors": 29,
+        "BeforeRawErrorIdentityHash": "03a948aaaba70852b08a3c69111eb3cb81affe35cca9b666ba58362e5431fe60",
+        "AfterRawErrorIdentityHash": "6f9b4f4d333c0ebe767caaef0c92686ed3da14b95e47335976f0f2d2b9141045",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Internal/RuleBase.cs": {
+        "BeforeRawErrors": 48,
+        "AfterRawErrors": 41,
+        "BeforeRawErrorIdentityHash": "682ab34ca3e67d84c55e98657cb73997b7709eae7d48b8b5832ccb64875a3f50",
+        "AfterRawErrorIdentityHash": "0d35bd1681f3aefd40762e2e7e744a0d272350297638ccb462166255463a82d5",
+        "BeforePropagatedErrors": 4,
+        "AfterPropagatedErrors": 4,
+        "BeforePropagatedErrorIdentityHash": "819faa2c08d4000974f80adc9f2d7497998d7c3e5432d5920ff9231a4fb74440",
+        "AfterPropagatedErrorIdentityHash": "2cf794b27c5ec4ce9c1ea51432dce8d02b60e1f841e87e9cef9c02228c67f5cd"
+      },
+      "FluentValidation/src/FluentValidation/Internal/RuleComponent.cs": {
+        "BeforeRawErrors": 22,
+        "AfterRawErrors": 18,
+        "BeforeRawErrorIdentityHash": "94ffef3b99b51be9186acdd9f872ed6dcf832cff74f479c06a354ae5b7bf48f6",
+        "AfterRawErrorIdentityHash": "f9665c7dd49b8fbd86a85a1bcf9cb6762a5f5ec8606d2dbd47a3f6d05779f821",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Internal/RulesetValidatorSelector.cs": {
+        "BeforeRawErrors": 18,
+        "AfterRawErrors": 18,
+        "BeforeRawErrorIdentityHash": "3b98b7cda38047d82db865f35b857289bb771ba13f12a7b6584146ea7c8ca46d",
+        "AfterRawErrorIdentityHash": "acd3e3859abd5ec2f289d3556dde9bc28d8a0bbc4669f1f5cec422b1a16f7cf0",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Internal/TrackingCollection.cs": {
+        "BeforeRawErrors": 16,
+        "AfterRawErrors": 15,
+        "BeforeRawErrorIdentityHash": "e226ade66d2f37d064d2ad4fa04ce3e6fdeab9b8e1d391554bf4e27a239a741c",
+        "AfterRawErrorIdentityHash": "254e7895a8049816a4dabc7587e80ea4224868da818ad4986d1ff5bb4fcb9b52",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/TestHelper/TestValidationResult.cs": {
+        "BeforeRawErrors": 20,
+        "AfterRawErrors": 20,
+        "BeforeRawErrorIdentityHash": "59132a952cfc972fe43d1fff140d26961a81da1dd0fe644b0576786ae97b1814",
+        "AfterRawErrorIdentityHash": "927cf1cab35e67ac67203dca5596f5cdf5a8d6b348a23ed7440220614631f0f8",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs": {
+        "BeforeRawErrors": 58,
+        "AfterRawErrors": 55,
+        "BeforeRawErrorIdentityHash": "d9dd9ab85e89eaf948a7a89500f0784e7fd74c3865083b6e8c016c1b6f972941",
+        "AfterRawErrorIdentityHash": "c1f35d86b778d4f8db9cfb32ea92c5f9a8b002959dd09044748b94b9fda1cf6e",
+        "BeforePropagatedErrors": 3,
+        "AfterPropagatedErrors": 3,
+        "BeforePropagatedErrorIdentityHash": "40507c4ef9d460bd005b2889e9555419a39b3e4bbddd4235397588e5e441e1d5",
+        "AfterPropagatedErrorIdentityHash": "02e6992120a1a6f59a8209efd3b3ab1590b60f1e34f4aaddd83eb9d3bb278e79"
+      },
+      "FluentValidation/src/FluentValidation/ValidatorOptions.cs": {
+        "BeforeRawErrors": 11,
+        "AfterRawErrors": 11,
+        "BeforeRawErrorIdentityHash": "39a956d360a48674d2f4be50b3d0a96fb9038301de27ac57e37f5f20e6c62746",
+        "AfterRawErrorIdentityHash": "b3503e54547cae36cb412ec4da4659e95aa1e3a0d102e57a016a41e7b6e41617",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/AbstractComparisonValidator.cs": {
+        "BeforeRawErrors": 15,
+        "AfterRawErrors": 15,
+        "BeforeRawErrorIdentityHash": "c126886bb947b1a74534c7ef7d188c5045cae16be421d27892bfffd3f38e0846",
+        "AfterRawErrorIdentityHash": "47c2946107aec7b702de160a4f2906c3afd360610fb4410bb89976ed7645650c",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "710619526a1b253bc9879a8fc70a06f09db41c690598b885d1d238b657c19c57",
+        "AfterPropagatedErrorIdentityHash": "710619526a1b253bc9879a8fc70a06f09db41c690598b885d1d238b657c19c57"
+      },
+      "FluentValidation/src/FluentValidation/Validators/ChildValidatorAdaptor.cs": {
+        "BeforeRawErrors": 13,
+        "AfterRawErrors": 13,
+        "BeforeRawErrorIdentityHash": "ddee88f4b7c675730568abb8ce950465e362e77b846ac1b5a639b2a6439e4713",
+        "AfterRawErrorIdentityHash": "abea8632cc10b5dc6f447a71a76cbcbf6c9b83561f51e67ed17ff2fffabd0e67",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/EmailValidator.cs": {
+        "BeforeRawErrors": 4,
+        "AfterRawErrors": 4,
+        "BeforeRawErrorIdentityHash": "1228b45c37acc60abe1835f296e691726a48e65f8a8d934d1ff5370aafe058c6",
+        "AfterRawErrorIdentityHash": "6da586402797c882df2967595ba8be98912cf42a1ea1e9dd6ca27bfe862149db",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/EmptyValidator.cs": {
+        "BeforeRawErrors": 7,
+        "AfterRawErrors": 4,
+        "BeforeRawErrorIdentityHash": "d203e9a2fc01ad52f267939f2f39ffd1d7e7f1ef9582057645ff76324fe7e55a",
+        "AfterRawErrorIdentityHash": "02342b796845774d9e21131a59a17f837756864a3115082e97611c8f118bb7ec",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/ExclusiveBetweenValidator.cs": {
+        "BeforeRawErrors": 2,
+        "AfterRawErrors": 2,
+        "BeforeRawErrorIdentityHash": "8a91213fdcc37fd87a9468860942057306a6c37265fc499e40a4814823dccb7a",
+        "AfterRawErrorIdentityHash": "787dd2adf05e4533ac62ae9c8731b67dac8abff121feb3888e890d6c27617fbf",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/InclusiveBetweenValidator.cs": {
+        "BeforeRawErrors": 2,
+        "AfterRawErrors": 2,
+        "BeforeRawErrorIdentityHash": "456eb340e76b18a8af14377434f2d1e1b356de49338a2ee800d509268016e6dd",
+        "AfterRawErrorIdentityHash": "228ad28d7bfd7a487d10fa5400364d4bbe526d8beb0de9bf917ed0c3453fa07f",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/NotEmptyValidator.cs": {
+        "BeforeRawErrors": 7,
+        "AfterRawErrors": 4,
+        "BeforeRawErrorIdentityHash": "bfad25b260d34367e08459002348263c6b27add633311763fdf96643e84f94aa",
+        "AfterRawErrorIdentityHash": "bcc6fa77f6a99978f01d834dc03ed9a17618481d12bedeb91403e4a87f505b51",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "FluentValidation/src/FluentValidation/Validators/PolymorphicValidator.cs": {
+        "BeforeRawErrors": 21,
+        "AfterRawErrors": 19,
+        "BeforeRawErrorIdentityHash": "becb4eb79b724d96fb652a766f4ddc86ada9de1ff44741e9213fd28efe188bb1",
+        "AfterRawErrorIdentityHash": "33aed7e51e48d210cde5c1cdc8a5a01b3f3ac0d992620b0e481842f5b4fafc2a",
+        "BeforePropagatedErrors": 2,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "5e41751a838926b1f3884dce3be7d51e52245454bf0d6d3b3a39cdabf3ce09b7",
+        "AfterPropagatedErrorIdentityHash": "d6562a441adaa18c429038a96d7ebf8ae6834086699077187bfe6107baf8ac8d"
+      },
+      "FluentValidation/src/FluentValidation/Validators/RegularExpressionValidator.cs": {
+        "BeforeRawErrors": 5,
+        "AfterRawErrors": 5,
+        "BeforeRawErrorIdentityHash": "a8ebc99101be0d03fb191157b6b87d56e6437ccd9f3db989385f5d7e392a71b2",
+        "AfterRawErrorIdentityHash": "762a8ab3aaef5fb38abf41f474cfa294832ebcb8816847336e848520c2bf13b0",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "6183ec6759a116b13b988405a4aa9955d3d113d80833461e2619ce5fc00c57d8",
+        "AfterPropagatedErrorIdentityHash": "6183ec6759a116b13b988405a4aa9955d3d113d80833461e2619ce5fc00c57d8"
+      },
+      "MediatR/src/MediatR/Internal/HandlersOrderer.cs": {
+        "BeforeRawErrors": 12,
+        "AfterRawErrors": 12,
+        "BeforeRawErrorIdentityHash": "72289e3d28d4a586e467f8c4e7311350e132f234b61785ddd87e688401146166",
+        "AfterRawErrorIdentityHash": "bb8d4983f5f6f1839e610b4f38438d1e8eb7ebcfa5da7469013f0ddbd336f252",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "MediatR/src/MediatR/Internal/ObjectDetails.cs": {
+        "BeforeRawErrors": 43,
+        "AfterRawErrors": 43,
+        "BeforeRawErrorIdentityHash": "6aeef312b85ea3c336723e4d84c15b61252fda6a84f2a35962de23a2b276ea45",
+        "AfterRawErrorIdentityHash": "693033fa8b6d2c0e7a41a50a09117f698dd0844b330c83caf21ad63ba777b64d",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "MediatR/src/MediatR/Mediator.cs": {
+        "BeforeRawErrors": 23,
+        "AfterRawErrors": 17,
+        "BeforeRawErrorIdentityHash": "d9b701d2da44579dfa7ad39519b1638482c684b41579402a9e1578c2f34d24f2",
+        "AfterRawErrorIdentityHash": "75441612e4d907b0a953a0ef5f8db0e657bb4cf7ae617aca9b9e96922ce5c667",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "MediatR/src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs": {
+        "BeforeRawErrors": 10,
+        "AfterRawErrors": 8,
+        "BeforeRawErrorIdentityHash": "7e0b0b785a4f9cdbc580814ded917d404806cccf26dc10bd6ac06d2c34d7f82b",
+        "AfterRawErrorIdentityHash": "ab2cfb01fe2d224f53b5aaa00014a62f60d34c6a5de652ec13bdec7961e42717",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "415c4c64731989a2624a6c4711e6622c4e60a7f283e794aaf610f897277248fc",
+        "AfterPropagatedErrorIdentityHash": "1841ff0c9e14fc08c602323e25db14a3a442b474439011c12a1439452ce93780"
+      },
+      "MediatR/src/MediatR/Pipeline/RequestExceptionProcessorBehavior.cs": {
+        "BeforeRawErrors": 14,
+        "AfterRawErrors": 12,
+        "BeforeRawErrorIdentityHash": "c27fe176257988d3d619a2b67050ba98602e418eed61e62ce5724dac9af2eccc",
+        "AfterRawErrorIdentityHash": "dad706341c147eb84ae18065753e034eb70b5bd98bfa0b82c9fe9fd4c36ee56a",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "d6e7aac432d754876ac2d08a2677009933eb0f60bcddb2bbb0030de27b9b2dec",
+        "AfterPropagatedErrorIdentityHash": "512eb07da06ba6fc98d423290d85fe6c8df7a61399b47f89e1ced3baf97968e1"
+      },
+      "MediatR/src/MediatR/Registration/ServiceRegistrar.cs": {
+        "BeforeRawErrors": 72,
+        "AfterRawErrors": 72,
+        "BeforeRawErrorIdentityHash": "e6ce200d9d0fd628321742c9001135e4ed9f5320e9d2efe60b1ef2b5690a4b7b",
+        "AfterRawErrorIdentityHash": "bf6f990c2eda67ccfff9b49c1ad3220406e027b68ae4379f9692d68425fea4c1",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Capturing/PropertyBinder.cs": {
+        "BeforeRawErrors": 14,
+        "AfterRawErrors": 14,
+        "BeforeRawErrorIdentityHash": "90b0ae989588a54ec3f6bd7c6b4f105604a39104918bf3a1a0c03a048aea80b2",
+        "AfterRawErrorIdentityHash": "16450fe418ed72d0004a151c5e6173adab205687f61b6ea0dca8c4c5aef4a962",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "fbd836d26cea379796b93409343f671b8fcf4e13058eaa4000c512d547d79a5e",
+        "AfterPropagatedErrorIdentityHash": "03cad77007719f4a088f781fea2c6799a7b043061aebd8c85462f808e86d94c4"
+      },
+      "serilog/src/Serilog/Capturing/PropertyValueConverter.cs": {
+        "BeforeRawErrors": 60,
+        "AfterRawErrors": 60,
+        "BeforeRawErrorIdentityHash": "3c10522da8f381b639b37892670b7071192f20e5f8368f532a640225e321e920",
+        "AfterRawErrorIdentityHash": "a3166c667946ef16a75c2a697d05d9418590ef76f03cce57f734bd8b93c6c68a",
+        "BeforePropagatedErrors": 7,
+        "AfterPropagatedErrors": 7,
+        "BeforePropagatedErrorIdentityHash": "663e4cd85e983097af0ddb8ef57412f73b7bacccaa25e238b2cce25b579c13d6",
+        "AfterPropagatedErrorIdentityHash": "440ba45009c463377aba2f60939531f49faf5178addc2b7a809b52dee76b9ed6"
+      },
+      "serilog/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs": {
+        "BeforeRawErrors": 10,
+        "AfterRawErrors": 10,
+        "BeforeRawErrorIdentityHash": "ba3ebe06cdbd650ecacabe71fe0c602d1eed0a9c3ab80ce8b23dcc57b99f4ceb",
+        "AfterRawErrorIdentityHash": "39df3113094495a45e7a97a21580751c42d93b48084f4822f1d416bfb7f8609c",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "3cf3172c8b1c9a1e2ee3c992154454ce0cce4fb30e24306333ba13fc121fb328",
+        "AfterPropagatedErrorIdentityHash": "5497094b9236dbd16a85403156871010fb37b0be36ad1db15521cc3bc6f16c78"
+      },
+      "serilog/src/Serilog/Configuration/LoggerSinkConfiguration.cs": {
+        "BeforeRawErrors": 15,
+        "AfterRawErrors": 15,
+        "BeforeRawErrorIdentityHash": "e96c9223a48b612e659dbb398e7d734171fbe4c195b181a10af82ca151d9b2e6",
+        "AfterRawErrorIdentityHash": "d63ac51e7f024e279580e24269f1aa46569c40afefd7eddf00724b34ba0f93ab",
+        "BeforePropagatedErrors": 4,
+        "AfterPropagatedErrors": 4,
+        "BeforePropagatedErrorIdentityHash": "43763721c2789b29f698793ec02660aef78b42141613182aba324bd2f632615b",
+        "AfterPropagatedErrorIdentityHash": "97aaf0f372b762f6f7fec6d96ab446155caab053d60d2968d64686b8395cf12d"
+      },
+      "serilog/src/Serilog/Core/Enrichers/ConditionalEnricher.cs": {
+        "BeforeRawErrors": 1,
+        "AfterRawErrors": 0,
+        "BeforeRawErrorIdentityHash": "69b171c8852f34c10d7392a83ba5604f2385cb7beb8ffb14c93342276fff6499",
+        "AfterRawErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Core/LevelOverrideMap.cs": {
+        "BeforeRawErrors": 16,
+        "AfterRawErrors": 16,
+        "BeforeRawErrorIdentityHash": "033946b0182aea2151fe67278c2a121511333f89e4eaa52b3cb72799ce9c127f",
+        "AfterRawErrorIdentityHash": "57b702a106ea3f462f83ee6ef1365fb3b4219ac84db236b0767b7624f1e669a7",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Core/Logger.cs": {
+        "BeforeRawErrors": 92,
+        "AfterRawErrors": 88,
+        "BeforeRawErrorIdentityHash": "a3119dc8bee44893784bf1cadc65e7e0097c700f6d6d957bc3380ba01e655cc0",
+        "AfterRawErrorIdentityHash": "a1ed56e8dce6d7d6eb38cfcd6dc9bd2d3c806711aa1bb147dace0950e2f8c4d1",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "a1a743828fc9ae46d84f80a7240fd1f5e6f27fff57a157d1de4eccd616b704eb",
+        "AfterPropagatedErrorIdentityHash": "af7c919c3d3a1c0e4d815a32c6bfd7de72c6139d4216b9560ddcbbbc21ac2db1"
+      },
+      "serilog/src/Serilog/Core/LoggingLevelSwitch.cs": {
+        "BeforeRawErrors": 2,
+        "AfterRawErrors": 1,
+        "BeforeRawErrorIdentityHash": "053a4e405d9cd16f07df7434a76166b75092c18a2abac841df984dcfe62f72f5",
+        "AfterRawErrorIdentityHash": "7d7f9516f146ab49476c067e2276142d43e38adbdfb781ae320050ce8e7d56f8",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Core/Sinks/Batching/BatchingSink.cs": {
+        "BeforeRawErrors": 62,
+        "AfterRawErrors": 56,
+        "BeforeRawErrorIdentityHash": "b902781d41116579c0fa12b3f740635f88fad62ed36ea4ee0a6b364ef12137f8",
+        "AfterRawErrorIdentityHash": "b985a4ea29b28c30663825f3a8d01f5ddb0cfee6e6d8042df421ad29e4b44f6d",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "baab7755709637b8152c2c8f1a0a8debc09be623caed89711f68c939033f834b",
+        "AfterPropagatedErrorIdentityHash": "c837ecd2dd9eb6a66ed6da76aabb0f5e10461e497eaec76dce675f4945482356"
+      },
+      "serilog/src/Serilog/Core/Sinks/ConditionalSink.cs": {
+        "BeforeRawErrors": 1,
+        "AfterRawErrors": 0,
+        "BeforeRawErrorIdentityHash": "94316d20771c27d0bcf3866455f68b96b97b60d1127a47d118162ff02d69ac45",
+        "AfterRawErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs": {
+        "BeforeRawErrors": 7,
+        "AfterRawErrors": 4,
+        "BeforeRawErrorIdentityHash": "9e422bd51a07b4dc7835f684cc0fbe723196763d74d85fb9fc2123a5cbb14a77",
+        "AfterRawErrorIdentityHash": "9d9289805fc16f52c552a48cfbbef6e05774af16ff661760a520209d3ae4fb0a",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Core/Sinks/RestrictedSink.cs": {
+        "BeforeRawErrors": 3,
+        "AfterRawErrors": 2,
+        "BeforeRawErrorIdentityHash": "51e84c0670a929a8aa86d4e807882fc71922f4b9c70a337af116a43a96175227",
+        "AfterRawErrorIdentityHash": "2b8bf2c43f173a08ed6bb5a711ea033debc42794ed604b25e032e0f04c782371",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs": {
+        "BeforeRawErrors": 1,
+        "AfterRawErrors": 0,
+        "BeforeRawErrorIdentityHash": "2136a0439bc48d35e7daa497c0d85ccae11bc2a7c8fe7edcf5780097bd918951",
+        "AfterRawErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Data/LogEventPropertyValueRewriter.cs": {
+        "BeforeRawErrors": 16,
+        "AfterRawErrors": 16,
+        "BeforeRawErrorIdentityHash": "24fdc6340571fe06832edf394c27e26903b3ce4d72f960c76e68b876f4fe5cc2",
+        "AfterRawErrorIdentityHash": "b3e78d93fae75cf22fdb2c02ef8f3c49372f7923ae3078a7c0f7b4fc5b787de2",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Debugging/SelfLog.cs": {
+        "BeforeRawErrors": 9,
+        "AfterRawErrors": 8,
+        "BeforeRawErrorIdentityHash": "f7bd79e0aa72b8df8f9e93982a131ac7f86222182ff3b6456144bb1fa3101943",
+        "AfterRawErrorIdentityHash": "eadaf47e0382e12d4362d5cceeccdbf43bb99aac34398f3b62e676103295625b",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Events/EventProperty.cs": {
+        "BeforeRawErrors": 4,
+        "AfterRawErrors": 4,
+        "BeforeRawErrorIdentityHash": "f125a3c2454287bc984b09835d50670c61ce84084b644fca6c3fb5fe280f8bc0",
+        "AfterRawErrorIdentityHash": "20a7b1be6cd59525c27993e242e87ba6a014c538a85cf14e0930bfefe5d0b2a9",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Events/LogEvent.cs": {
+        "BeforeRawErrors": 20,
+        "AfterRawErrors": 19,
+        "BeforeRawErrorIdentityHash": "09f1b199e01ca6020e90f66e3821f919a0e091d7df542328b8d6dce1eff2fd57",
+        "AfterRawErrorIdentityHash": "b84a28205b7c7f40d40746f532265228a4527d7673df39c4d5950096451697bd",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Events/ScalarValue.cs": {
+        "BeforeRawErrors": 6,
+        "AfterRawErrors": 6,
+        "BeforeRawErrorIdentityHash": "00c0b345e0d4c561c1e57d77a744773cf3bbceadba21db799638245e121d1ae6",
+        "AfterRawErrorIdentityHash": "05b95a096c9e31f4347cca676c80fb8009656843908314c5f139839545660322",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Filters/Matching.cs": {
+        "BeforeRawErrors": 10,
+        "AfterRawErrors": 9,
+        "BeforeRawErrorIdentityHash": "50fc512e8dcec7aa3c598ee68b6236b8b3aa56f76256d9a5dd8f171f1de1f73d",
+        "AfterRawErrorIdentityHash": "532f49622957c4910d858fc8b96a15ea817d3e645d5c0f5ce5d0eb66c914646b",
+        "BeforePropagatedErrors": 2,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "7bbbcecb87787a110bdd44898f1fd7f7abb924ad65ecd90b96696b3ef3dcdc92",
+        "AfterPropagatedErrorIdentityHash": "ced0c80497bb8b0c90402bfbdaa7b3c1788907da53fc6c4f9d20a8bbae46193b"
+      },
+      "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs": {
+        "BeforeRawErrors": 57,
+        "AfterRawErrors": 57,
+        "BeforeRawErrorIdentityHash": "6a0ab342755878a27dd6898545915a826ba229750c901292713fc8a9e2f04a7c",
+        "AfterRawErrorIdentityHash": "9772b275f1064c5f88d910f8f28e2a21726c7770e55a29a385fc695ab3b5fd38",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 1,
+        "BeforePropagatedErrorIdentityHash": "25c728ecbfdf80de33b16698a4bf1703ea7af0d7e768a63391c2a2638f360796",
+        "AfterPropagatedErrorIdentityHash": "2e40c2ac7302a1558d1e13c918f434a456d51208a521bc367d572a4cda24ac77"
+      },
+      "serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs": {
+        "BeforeRawErrors": 20,
+        "AfterRawErrors": 20,
+        "BeforeRawErrorIdentityHash": "d91340db78d00a79a364d2a470bddbf6d4da6a0337b1aa3f363986dc8c654b9a",
+        "AfterRawErrorIdentityHash": "f82ad74135529b79b170b92027499463eff9eb00376e91c9dd47c3dd0617c79e",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+        "BeforeRawErrors": 53,
+        "AfterRawErrors": 53,
+        "BeforeRawErrorIdentityHash": "8d500383e7e624a5e0cfe8e2a19523c5b3668101eb398b4d9ede9763a431dddf",
+        "AfterRawErrorIdentityHash": "8e48343999260c95268cb26f51e7726a209bb616057d1b0e9f19cdd46d36e7f6",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Log.cs": {
+        "BeforeRawErrors": 50,
+        "AfterRawErrors": 49,
+        "BeforeRawErrorIdentityHash": "28843e41d1f2424c199829b51706963b2e53655552a3037b37e303022b34de21",
+        "AfterRawErrorIdentityHash": "439998fa0fc9fc9857fc9983b5c82c62775816f896ab0cd93e2e1184c6d822a3",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Parsing/MessageTemplateParser.cs": {
+        "BeforeRawErrors": 45,
+        "AfterRawErrors": 43,
+        "BeforeRawErrorIdentityHash": "c2c2e3a893434147cc7a2b4c4a0a99f09e8002c4d7e1cc6923e040bd61d66953",
+        "AfterRawErrorIdentityHash": "b6a1e864ad8419e5dd61c3c4927d81b1657bde9054a45514f9756be19ddca2aa",
+        "BeforePropagatedErrors": 9,
+        "AfterPropagatedErrors": 7,
+        "BeforePropagatedErrorIdentityHash": "18e70de01d3b5882299b13a0ff85eb221a74d607c57112ae3f5b277244e78655",
+        "AfterPropagatedErrorIdentityHash": "341385fa47121f1f657221a3f37e0b9fc896a5b213007cec50ce9c74bab2c4ac"
+      },
+      "serilog/src/Serilog/Parsing/PropertyToken.cs": {
+        "BeforeRawErrors": 12,
+        "AfterRawErrors": 9,
+        "BeforeRawErrorIdentityHash": "fdbace52788e059b59ddd161ea4b5d8967882959e4bed0af5fa5387a3907efe6",
+        "AfterRawErrorIdentityHash": "8133835572e76304682207828096a6dad2a0ae5a850b300b6640776231701ca0",
+        "BeforePropagatedErrors": 1,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "4eeef7ddcddc1a48743ebe3b4b7d2305cfcb4e6920b60e1c581758fd2f6708d7",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Parsing/TextToken.cs": {
+        "BeforeRawErrors": 1,
+        "AfterRawErrors": 1,
+        "BeforeRawErrorIdentityHash": "9c0f1dfbc380fcf107d58cbbd520b8da354c9783bad28bf5526ae5f6b4417e21",
+        "AfterRawErrorIdentityHash": "abad46a28c2b4a89714ddb9335afadb6eaec471edd1a08708c2b84282619b15a",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Rendering/ReusableStringWriter.cs": {
+        "BeforeRawErrors": 6,
+        "AfterRawErrors": 6,
+        "BeforeRawErrorIdentityHash": "358e1fe6ad33f25b5dbd60e4b3afcf2d98d50b020f2976871f682c7322a41929",
+        "AfterRawErrorIdentityHash": "e68fad630d6f2b1e26355daf9b71a37b9a7c7ab580088b65a2317ccf503ea995",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs": {
+        "BeforeRawErrors": 11,
+        "AfterRawErrors": 10,
+        "BeforeRawErrorIdentityHash": "d643f6112b27b15c62e1f758c4b30c3af6dc165320e711c4edf2619f52072b2a",
+        "AfterRawErrorIdentityHash": "2cc8b7acf77b25f84710f968862e17b562095ac346fe1e6aecde7434248a151c",
+        "BeforePropagatedErrors": 0,
+        "AfterPropagatedErrors": 0,
+        "BeforePropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "AfterPropagatedErrorIdentityHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "serilog/src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs": {
+        "BeforeRawErrors": 58,
+        "AfterRawErrors": 51,
+        "BeforeRawErrorIdentityHash": "aea96eb3620eeb7335f7cdd98d589bafa3d83f924b8f6897c8241bcb6af516b8",
+        "AfterRawErrorIdentityHash": "f69f26e5475bed6ba5392080917838bcc2d46fc63b8c2e578465c497a5931561",
+        "BeforePropagatedErrors": 9,
+        "AfterPropagatedErrors": 8,
+        "BeforePropagatedErrorIdentityHash": "823fbd725f177797bb22280201704942d668a04b9f281b051b027722ef9abaf1",
+        "AfterPropagatedErrorIdentityHash": "b78ca5c6bb541e216269c66bacf3ad0d842ebf99c875e772d96c8f46bb24cc12"
+      },
+      "serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs": {
+        "BeforeRawErrors": 41,
+        "AfterRawErrors": 41,
+        "BeforeRawErrorIdentityHash": "2993398e1ecd5c1079506a3e060e1de019da461d9169068be88bd6b96734b37a",
+        "AfterRawErrorIdentityHash": "c142d9ef06de41ab2a7f70b3ee9463032de089041ff4bc818ef47e16e87295cd",
+        "BeforePropagatedErrors": 3,
+        "AfterPropagatedErrors": 3,
+        "BeforePropagatedErrorIdentityHash": "a9987e5fc777824f8edbac0d70697ba140cefc712d65b2e37bf89558590083c4",
+        "AfterPropagatedErrorIdentityHash": "3b1437dba54725dff431e8802d339257116cb3d00a80a9f773a47544bfc098ac"
+      }
+    }
   }
 }

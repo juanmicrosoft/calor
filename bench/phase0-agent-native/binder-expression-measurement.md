@@ -28,6 +28,13 @@ preprocessor symbols, and `SelectActiveBranchLossy`. CRLF is normalized to LF.
 The separately built baseline reproduces the earlier 34,942 probe log. The old
 34,442 current-counts log is stale and is not used.
 
+**Final candidate verification:** the complete `src/` tree of `000d2f38` was
+installed in the isolated worktree and rebuilt. Every file's binder-attempt
+count and selected-source classification matched the `2738d99b` attribution.
+The intervening production changes only affect documentation self-checks.
+The binding-failure comparison below was independently measured again on clean
+`639fa93a` and this exact candidate, without count instrumentation.
+
 ## What changed
 
 `binder-expression-attribution.json` records every changed file, exact
@@ -50,10 +57,14 @@ instrumentation is not a production change.
 | Incomplete diagnostics | 0 | 0 | 0 |
 | Selected source `ExpressionSyntax` nodes | 88,158 | 88,158 | 0 |
 | Exact non-opaque expression-span matches² | 32,276 | 32,212 | -64 |
+| Exact matches containing opaque descendants (subset) | 0 | 25 | +25 |
 | Source expressions covered by opaque spans | 3,149 | 3,329 | +180 |
+| Source expressions without an exact/opaque mapping | 52,733 | 52,617 | -116 |
 | Converter interop boundaries / `InteropPreserved` losses | 45 | 65 | +20 |
 | Serialized raw expressions | 17 | 37 | +20 |
 | `EmitterFallback` losses | 7 | 7 | 0 |
+| Raw binder errors / files containing them | 5,085 / 258 | 4,964 / 254 | -121 / -4 |
+| Propagated binder errors / files containing them | 117 / 40 | 109 / 38 | -8 / -2 |
 
 ¹ A generated-reference name starts with `_` and is absent from all Roslyn source
 identifier tokens in that file. The remaining reference-visit delta is -112;
@@ -109,13 +120,18 @@ and output parse failures remain zero.
   removes text; conversion AST spans refer to the **selected** source. Comparing
   them to original-file offsets produces incorrect attributions.
 * Binder attempts, source expression count, exact-expression source identities,
-  opaque expression identities, and opaque boundary identities. Equal-count
-  source swaps or a move from represented to opaque/unmapped still fail.
+  opaque expression identities, unmapped identities, and opaque boundary
+  identities. Exact matches enclosing opaque descendants are identified
+  separately, not presented as fully native. Equal-count source swaps or a move
+  from represented to opaque/unmapped still fail.
 * Serialized opaque-code token hashes and multiplicities, including raw
   expressions introduced by the emitter rather than the converter AST.
   Preprocessor directives and disabled-branch text are included, not discarded
   with ordinary trivia.
 * Structured conversion-loss identities and the converter's reported success.
+* Raw binder-error counts and identities, separately from errors propagated by
+  `BindingDiagnosticPolicy.PropagateCompilationErrors`. These diagnostic
+  positions belong to reparsed **Calor output**; they are not C# source identities.
 
 Additionally, every converter raw expression must token-match the expression at
 its selected/original source span, as appropriate to the conversion mode. Extra
@@ -130,9 +146,15 @@ conversion failure despite having parseable, bindable output. That fact is now
 recorded per file rather than hidden behind “364 native conversions.”
 The existing two `Dropped` and one `FallbackTodo` losses remain present and
 unchanged. Do not describe this ledger as a zero-loss conversion benchmark.
+Likewise, “364 modules bound” means the binder returned for 364 modules, **not**
+that they all bound successfully: 254 current files have raw binder errors, and
+38 contain errors the shipping compiler propagates. Failure identities and
+counts now participate in exact per-file equality; they cannot silently change
+while the visit total stays constant.
 
 Mutation controls detect deleted/changed/misattributed raw expressions,
-equal-count source-identity swaps, and a native-to-opaque substitution.
+equal-count source-identity swaps, a native-to-opaque substitution, mixed
+native/opaque ancestry, and binding failures at unchanged attempt counts.
 Three native conditional controls reject **both** `InteropPreserved` and
 `EmitterFallback` and require no raw nodes before or after serialization.
 

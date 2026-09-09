@@ -336,12 +336,30 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(before.BinderAttempts, swapped.BinderAttempts);
         Assert.Equal(before.ExactExpressionSourceSpans, swapped.ExactExpressionSourceSpans);
         Assert.NotEqual(before.ExactExpressionSourceIdentityHash, swapped.ExactExpressionSourceIdentityHash);
+        Assert.Equal(before.UnmappedSourceExpressions, swapped.UnmappedSourceExpressions);
+        Assert.NotEqual(before.UnmappedSourceIdentityHash, swapped.UnmappedSourceIdentityHash);
         var opaque = MeasureSourceCoverage(MeasurementModule(new RawCSharpExpressionNode(firstSpan, "1")),
             tree, source, "identity.cs", 1);
         Assert.Equal(before.BinderAttempts, opaque.BinderAttempts);
         Assert.Equal(0, opaque.ExactExpressionSourceSpans);
         Assert.Equal(1, opaque.OpaqueSourceExpressions);
         Assert.NotEqual(before, opaque);
+        var binarySpan = TextSpan.FromBounds(first.Start, second.End, 1, first.Start + 1);
+        var mixed = MeasureSourceCoverage(MeasurementModule(
+                new BinaryOperationNode(binarySpan, BinaryOperator.Add,
+                    new RawCSharpExpressionNode(firstSpan, "1"), new IntLiteralNode(secondSpan, 2))),
+            tree, source, "mixed.cs", 3);
+        Assert.Equal(1, mixed.OpaqueSourceExpressions);
+        Assert.Equal(2, mixed.ExactExpressionSourceSpans);
+        Assert.Equal(1, mixed.ExactExpressionsWithOpaqueDescendants);
+        Assert.Equal(mixed.SourceExpressions,
+            mixed.ExactExpressionSourceSpans + mixed.OpaqueSourceExpressions + mixed.UnmappedSourceExpressions);
+
+        var bindDiagnostics = new DiagnosticBag();
+        new Binder(bindDiagnostics).Bind(MeasurementModule(new ReferenceNode(firstSpan, "missing")));
+        var failedBinding = WithBindingCoverage(before, bindDiagnostics);
+        Assert.True(failedBinding.BindingErrorCount > 0);
+        Assert.NotEqual(WithBindingCoverage(before, new DiagnosticBag()), failedBinding);
     }
 
     [Theory]
@@ -489,7 +507,7 @@ public class BinderIncompleteRatchetTests
             .SelectActiveBranchLossy(source, parseOptions).Source;
         var sourceTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(selectedSource, parseOptions);
         var serializedOpaque = OpaqueCodeIdentities(module).ToArray();
-        coverage.LastSourceCoverage = MeasureSourceCoverage(
+        coverage.LastSourceCoverage = WithBindingCoverage(MeasureSourceCoverage(
             conversion.Ast, sourceTree, selectedSource, file, binder.ExpressionsBound) with
         {
             SourceHash = Hash(source),
@@ -500,7 +518,7 @@ public class BinderIncompleteRatchetTests
             LossIdentityHash = HashIdentities(conversion.Losses
                 .Select(loss => $"{loss.Kind}:{loss.Line}:{loss.Feature}:{loss.Description}")
                 .Order(StringComparer.Ordinal))
-        };
+        }, bindDiagnostics);
         AssertOpaqueSerializationPreserved(conversion.Ast, module, file);
         coverage.ConvertedAndBound++;
         coverage.RoslynSelectedAttempted +=
@@ -724,6 +742,8 @@ public class BinderIncompleteRatchetTests
             .ToArray();
         var representedIdentities = new List<string>();
         var opaqueIdentities = new List<string>();
+        var unmappedIdentities = new List<string>();
+        var mixedIdentities = new List<string>();
         foreach (var expression in expressions)
         {
             var identity = $"{expression.Span.Start}:{expression.Span.End}:{expression.RawKind}";
@@ -731,13 +751,43 @@ public class BinderIncompleteRatchetTests
                     span.Start <= expression.Span.Start && span.End >= expression.Span.End))
                 opaqueIdentities.Add(identity);
             else if (mapped.Contains((expression.Span.Start, expression.Span.End)))
+            {
                 representedIdentities.Add(identity);
+                if (opaque.Any(span =>
+                        expression.Span.Start <= span.Start && expression.Span.End >= span.End))
+                    mixedIdentities.Add(identity);
+            }
+            else
+                unmappedIdentities.Add(identity);
         }
         return new SourceCoverageRecord(
             Hash(source), binderAttempts, expressions.Length,
             representedIdentities.Count, HashIdentities(representedIdentities),
             opaqueIdentities.Count, HashIdentities(opaqueIdentities),
-            opaque.Count, HashIdentities(opaque.Select(span => $"{span.Start}:{span.End}")));
+            opaque.Count, HashIdentities(opaque.Select(span => $"{span.Start}:{span.End}")))
+        {
+            UnmappedSourceExpressions = unmappedIdentities.Count,
+            UnmappedSourceIdentityHash = HashIdentities(unmappedIdentities),
+            ExactExpressionsWithOpaqueDescendants = mixedIdentities.Count,
+            MixedExpressionSourceIdentityHash = HashIdentities(mixedIdentities)
+        };
+    }
+
+    private static SourceCoverageRecord WithBindingCoverage(
+        SourceCoverageRecord coverage, DiagnosticBag diagnostics)
+    {
+        static string ErrorIdentities(DiagnosticBag bag) => HashIdentities(bag.Errors
+            .Select(error => $"{error.Code}:{error.Span.Start}:{error.Span.End}:{error.Message}")
+            .Order(StringComparer.Ordinal));
+        var propagated = new DiagnosticBag();
+        BindingDiagnosticPolicy.PropagateCompilationErrors(diagnostics, propagated);
+        return coverage with
+        {
+            BindingErrorCount = diagnostics.Errors.Count(),
+            BindingErrorIdentityHash = ErrorIdentities(diagnostics),
+            PropagatedBindingErrorCount = propagated.Errors.Count(),
+            PropagatedBindingErrorIdentityHash = ErrorIdentities(propagated)
+        };
     }
 
     private static void AssertOpaqueSerializationPreserved(
@@ -816,7 +866,15 @@ public class BinderIncompleteRatchetTests
         string SerializedOpaqueCodeHash = "",
         string LossIdentityHash = "",
         bool ConversionReportedSuccess = false,
-        string SelectedSourceHash = "");
+        string SelectedSourceHash = "",
+        int BindingErrorCount = 0,
+        string BindingErrorIdentityHash = "",
+        int PropagatedBindingErrorCount = 0,
+        string PropagatedBindingErrorIdentityHash = "",
+        int UnmappedSourceExpressions = 0,
+        string UnmappedSourceIdentityHash = "",
+        int ExactExpressionsWithOpaqueDescendants = 0,
+        string MixedExpressionSourceIdentityHash = "");
 
     private sealed class NativeConversionCoverage
     {
