@@ -14429,7 +14429,7 @@ public sealed class Parser
             if (int.TryParse(sizeStr, out var s))
                 size = new IntLiteralNode(startToken.Span, s);
             else
-                size = new ReferenceNode(startToken.Span, sizeStr);
+                size = ParseEmbeddedExpression(sizeStr, startToken.Span);
         }
         else
         {

@@ -3009,6 +3009,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return expr.Contains('§');
     }
 
+    private string EmitSizeAttribute(ExpressionNode expression)
+    {
+        var size = expression.Accept(this);
+        if (!ContainsSectionMarker(size) && !size.Contains('(') && !size.Contains(',')
+            && !size.Contains(':') && !size.Contains("0x"))
+            return size;
+
+        size = HoistToTempVar(size);
+        return _memberBodyDepth == 0 || _conditionalExpressionDepth > 0
+            ? new StringLiteralNode(expression.Span, size).Accept(this)
+            : size;
+    }
+
     private string AcceptInConditionalRegion(ExpressionNode expression)
     {
         _conditionalExpressionDepth++;
@@ -3538,20 +3551,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Size != null)
         {
-            var size = node.Size.Accept(this);
-            // Use a temporary in ordinary statement regions, or a quoted
-            // embedded expression when evaluation must remain inline.
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':') || size.Contains("0x"))
-            {
-                size = HoistToTempVar(size);
-                // A quoted embedded expression can remain inside a lazy operand
-                // or field initializer; do not mislabel Calor text as raw C#.
-                if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
-                {
-                    var embedded = new StringLiteralNode(node.Span, size).Accept(this);
-                    return $"§ARR{{{elementType}:{id}:{embedded}}}";
-                }
-            }
+            var size = EmitSizeAttribute(node.Size);
             return $"§ARR{{{elementType}:{id}:{size}}}";
         }
         else
@@ -5093,9 +5093,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
         if (node.Size != null)
         {
-            var size = node.Size.Accept(this);
-            if (ContainsSectionMarker(size) || size.Contains(':'))
-                size = HoistToTempVar(size);
+            var size = EmitSizeAttribute(node.Size);
             return $"§SALLOC{{{elementType}:{size}}}";
         }
         else if (node.Initializer.Count > 0)

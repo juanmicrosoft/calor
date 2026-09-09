@@ -36,6 +36,20 @@ public class ConditionalEvaluationMigrationTests
             7, false, members: "public static int Mutate(ref int value) { value = 9; return 0; }");
     }
 
+    [Theory]
+    [InlineData(ConversionFidelity.Lossless)]
+    [InlineData(ConversionFidelity.Lossy)]
+    public void StackAllocationSize_RemainsInsideTheRightOperand(ConversionFidelity fidelity)
+    {
+        AssertRoundTrip("int ignored = Trace(1) + Consume(stackalloc int[Size()]); return Calls;",
+            123, false, members: """
+                private static int Calls;
+                public static int Trace(int id) { Calls = Calls * 10 + id; return id; }
+                public static int Size() { return Trace(2); }
+                public static int Consume(System.ReadOnlySpan<int> values) { return Trace(3); }
+                """, fidelity: fidelity);
+    }
+
     [Fact]
     public void FieldInitializers_RetainSourceOrder()
     {
@@ -576,7 +590,8 @@ public class ConditionalEvaluationMigrationTests
 
     private static void AssertRoundTrip(
         string body, int expected, bool expectInterop,
-        ConversionMode mode = ConversionMode.Standard, string members = "", bool expectEmitterFallback = false)
+        ConversionMode mode = ConversionMode.Standard, string members = "", bool expectEmitterFallback = false,
+        ConversionFidelity fidelity = ConversionFidelity.Lossless)
     {
         var original = $$"""
             public static class Probe
@@ -589,7 +604,7 @@ public class ConditionalEvaluationMigrationTests
             }
             """;
         Assert.Equal(expected, Execute(original));
-        var conversion = new CSharpToCalorConverter(new ConversionOptions { Mode = mode }).Convert(original);
+        var conversion = new CSharpToCalorConverter(new ConversionOptions { Mode = mode, Fidelity = fidelity }).Convert(original);
         Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
         Assert.NotNull(conversion.CalorSource);
         // Migration does not synthesize effect declarations; keep the production
