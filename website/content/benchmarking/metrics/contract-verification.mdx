@@ -53,8 +53,13 @@ Contracts use the schema 2.0 seven-status vocabulary:
 
 The metric tracks the distribution across these categories. Runtime checks
 separately require supported lowering and an enabled contract mode.
-`--contract-mode off` emits no checks. See
+`--contract-mode off` emits no contract guards; it does not disable integer
+overflow traps. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
+
+Historical benchmark snapshots retain their recorded compiler provenance.
+The current behavior described here is not a remeasurement of those results.
+See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
 ---
 
@@ -97,11 +102,11 @@ claim that verification proves arbitrary preconditions at every call site.
 | Negative index | `§Q (>= index 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
 | Out of bounds | `§Q (< index len)` | Array facts are conservatively `assumed` where models diverge |
 | Invalid range | `§S (>= result 0)` | Postcondition receives one of the seven statuses |
-| Integer overflow | `§S (< result MAX_INT)` | Checked with fixed-width semantics in supported forms |
+| Integer overflow | `§Q (&& (>= x 0) (<= x 46340))` for squaring `x` | Preconditions can bound arithmetic; a normal-return postcondition proof alone does not exclude exceptions |
 
 ### Postcondition Verification
 
-An integer signature alone does not make this contract true:
+A postcondition constrains normal returns, not whether every call returns:
 
 ```calor
 §F{f001:Square:pub} (i32:x) -> i32
@@ -111,9 +116,15 @@ An integer signature alone does not make this contract true:
   §R (* x x)
 ```
 
-For `x = 46341`, multiplication wraps to `-2147479015`, violating the
-postcondition. This is a refutable obligation, not a successful proof.
-An additional upper bound of `46340` would prevent this overflow.
+Native Calor uses checked integer arithmetic by default. For `x = 46341`,
+multiplication throws `OverflowException` before a return or postcondition
+check. It does not return a wrapped negative value.
+
+Proving `result >= 0` does not establish absence of overflow.
+An additional upper bound of `46340` prevents overflow in this square.
+The explicit module policy `overflow=unchecked` instead selects wrapping
+arithmetic; C# migration records its source policy. Proof results and cache
+identity distinguish these policies.
 
 ---
 
@@ -138,7 +149,10 @@ Z3 verification supports:
 | `(\|\| p q)` | `p ∨ q` | Logical or |
 | `(! p)` | `¬p` | Logical not |
 
-Integers use fixed-width bit-vectors and supported C# promotion rules. Selected
+Integers use fixed-width bit-vectors, checked-arithmetic safety conditions for
+the checked policy, and supported C# promotion rules. A predicate proof that
+requires an unestablished safety condition carries a `checked-arithmetic`
+assumption and cannot authorize guard removal. Selected
 boolean, string, array, quantifier, implication, and registered user-field
 forms are also modeled.
 
