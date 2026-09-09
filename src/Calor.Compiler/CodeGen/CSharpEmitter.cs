@@ -4730,8 +4730,34 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             : $"Calor.Runtime.Result.Err<object, {literalType}>({error})";
     }
 
+    private static bool IsSupportedMatchExpressionArm(MatchCaseNode arm) =>
+        arm.Body is [ReturnStatementNode { Expression: not null }];
+
+    private static void ReportUnsupportedMatchExpressionArm(
+        MatchCaseNode arm, Diagnostics.DiagnosticBag diagnostics) =>
+        diagnostics.ReportError(arm.Span, Diagnostics.DiagnosticCode.ExpressionMatchBlockUnsupported,
+            "Expression-match arms must contain exactly one value-return expression. "
+            + "Multi-statement, empty, and valueless arms are not supported; use a statement match instead.");
+
+    internal static void ValidateMatchExpressions(AstNode node, Diagnostics.DiagnosticBag diagnostics)
+    {
+        if (node is MatchExpressionNode match)
+            foreach (var arm in match.Cases.Where(arm => !IsSupportedMatchExpressionArm(arm)))
+                ReportUnsupportedMatchExpressionArm(arm, diagnostics);
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+            ValidateMatchExpressions(child, diagnostics);
+    }
+
     public string Visit(MatchExpressionNode node)
     {
+        var unsupportedArms = node.Cases.Where(arm => !IsSupportedMatchExpressionArm(arm)).ToArray();
+        if (unsupportedArms.Length > 0)
+        {
+            foreach (var arm in unsupportedArms)
+                ReportUnsupportedMatchExpressionArm(arm, EmissionDiagnostics);
+            return "throw new System.NotSupportedException(\"Expression-match block arms are unsupported\")";
+        }
+
         // Generate as switch expression
         var target = node.Target.Accept(this);
         var sb = new System.Text.StringBuilder();
@@ -4752,17 +4778,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Emit guard clause if present
                 var guard = matchCase.Guard != null ? $" when {matchCase.Guard.Accept(this)}" : "";
 
-                // For expression match, the body should yield a value
-                // Take the last statement if it's a return, otherwise default
-                var body = "default";
-                if (matchCase.Body.Count > 0)
-                {
-                    var lastStmt = matchCase.Body[^1];
-                    if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
-                    {
-                        body = ret.Expression.Accept(this);
-                    }
-                }
+                var body = ((ReturnStatementNode)matchCase.Body[0]).Expression!.Accept(this);
                 sb.Append($"{pattern}{guard} => {body}");
                 if (i < node.Cases.Count - 1) sb.Append(", ");
             }
