@@ -854,12 +854,53 @@ public sealed class NestedContractInheritanceRuntimeTests
                       §MT{mt3:Get:pub:over} (i32:value) -> i32
                         §E{}
                         §R value
+                  §CL{c9:Container:pub}
+                    §CL{c10:Impl:pub}
+                      §EXT{Outer.Base}
+                      §MT{mt5:Get:pub:over} (i32:value) -> i32
+                        §E{}
+                        §R value
                 """;
             var assembly = Compile(source, verify);
             assembly.GetType("Scope.Outer")!.GetField("Limits")!.SetValue(null,
                 Activator.CreateInstance(assembly.GetType("Scope.Payload")!));
             AssertGuards(assembly.GetType("Scope.Outer+Base")!, 1, -1, -11);
             AssertGuards(assembly.GetType("Scope.Outer+Impl")!, 1, -1, -11);
+            AssertGuards(assembly.GetType("Scope.Container+Impl")!, 1, -1, -11);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InaccessibleInheritedTypes_DoNotHideLexicalTypes(bool verify)
+    {
+        foreach (var privateName in new[] { "Limits", "Other" })
+        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        {
+            var source = $$"""
+                §M{m1:Scope}
+                  §CL{c1:Limits:pub}
+                    §FLD{i32:Min:pub:stat} INT:0
+                  §CL{c2:Storage:pub}
+                    §CL{c3:{{privateName}}:pri}
+                      §FLD{i32:Min:pub:stat} INT:-10
+                  §CL{c4:Outer:pub}
+                    §CL{c5:Base:pub}
+                      §EXT{Storage}
+                      §MT{mt1:Get:pub:virt} (i32:x) -> i32
+                        §E{}
+                        {{contract}}
+                        §R x
+                    §CL{c6:Impl:pub}
+                      §EXT{Base}
+                      §MT{mt2:Get:pub:over} (i32:value) -> i32
+                        §E{}
+                        §R value
+                """;
+            var assembly = Compile(source, verify);
+            AssertGuards(assembly.GetType("Scope.Outer+Base")!, 1, -1);
+            AssertGuards(assembly.GetType("Scope.Outer+Impl")!, 1, -1);
         }
     }
 

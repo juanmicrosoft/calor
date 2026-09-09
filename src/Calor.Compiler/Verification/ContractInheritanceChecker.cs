@@ -224,12 +224,14 @@ public sealed class ContractInheritanceChecker : IDisposable
         AstNode? scope,
         TypeReference reference,
         IReadOnlyDictionary<AstNode, IReadOnlyList<string>> typeArguments,
-        HashSet<AstNode> resolvingBases)
+        HashSet<AstNode> resolvingBases,
+        bool inherited = false)
     {
         var declaration = _enclosingDeclarations.Keys.FirstOrDefault(candidate =>
             _enclosingDeclarations[candidate] == scope
             && DeclarationName(candidate).Equals(reference.Name, StringComparison.Ordinal)
-            && DeclarationParameters(candidate).Count == reference.Arguments.Count);
+            && DeclarationParameters(candidate).Count == reference.Arguments.Count
+            && !(inherited && candidate is ClassDefinitionNode { Visibility: Visibility.Private }));
         if (declaration != null)
         {
             var arguments = new Dictionary<AstNode, IReadOnlyList<string>>(typeArguments)
@@ -249,7 +251,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                 resolvingBases: resolvingBases, typeArguments: typeArguments);
             return baseType?.Declaration is ClassDefinitionNode
                 ? FindNestedDeclaration(baseType.Declaration, reference,
-                    baseType.TypeArguments, resolvingBases)
+                    baseType.TypeArguments, resolvingBases, inherited: true)
                 : null;
         }
         finally
@@ -672,8 +674,10 @@ public sealed class ContractInheritanceChecker : IDisposable
                 source.TypeSubstitutions, memberLookup: true,
                 typeArguments: source.Resolution.TypeArguments, argumentsAlreadyBound: true);
             return declaration == null ? null : QualifiedTypeName(declaration);
-        }, SourceValueNames(source.Resolution).Concat(source.Parameters.Select(parameter => parameter.Name))
-            .Append("result").Append("this").ToHashSet(StringComparer.Ordinal));
+        }, source.Parameters.Select(parameter => parameter.Name)
+            .Append("result").Append("this").ToHashSet(StringComparer.Ordinal),
+            SourceValueBindings(source.Resolution).ToDictionary(pair => pair.Key, pair => pair.Value,
+                StringComparer.Ordinal));
 
         return source with
         {
@@ -705,7 +709,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         };
     }
 
-    private IEnumerable<string> SourceValueNames(ResolvedDeclaration source)
+    private IEnumerable<KeyValuePair<string, string>> SourceValueBindings(ResolvedDeclaration source)
     {
         var hiddenNames = new HashSet<string>(StringComparer.Ordinal);
         var visited = new HashSet<AstNode>();
@@ -719,7 +723,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                 DeclarationSubstitutions(enclosing, scope.TypeArguments), scope.TypeArguments);
         }
 
-        IEnumerable<string> FromType(ResolvedDeclaration scope, bool inherited)
+        IEnumerable<KeyValuePair<string, string>> FromType(ResolvedDeclaration scope, bool inherited)
         {
             if (!visited.Add(scope.Declaration))
                 yield break;
@@ -756,7 +760,18 @@ public sealed class ContractInheritanceChecker : IDisposable
                     _ => null
                 };
                 if (name != null && hiddenNames.Add(name))
-                    yield return name;
+                {
+                    var isStatic = member switch
+                    {
+                        ClassFieldNode field => field.IsStatic || field.Modifiers.HasFlag(MethodModifiers.Const),
+                        PropertyNode property => property.IsStatic,
+                        MethodNode method => method.Modifiers.HasFlag(MethodModifiers.Static),
+                        _ => false
+                    };
+                    yield return KeyValuePair.Create(name, isStatic
+                        ? Migration.TypeMapper.CalorToCSharp(QualifiedTypeName(scope)) + "." + name
+                        : name);
+                }
             }
             // Nearer types also shadow farther values. Do not flatten enclosing
             // or base scopes into one undifferentiated set of protected names.
@@ -1215,6 +1230,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             return RewriteReferenceName(name, replacements);
         if (typeBindings == null)
             return name;
+        if (typeBindings.ValueReplacements?.TryGetValue(root, out var value) == true)
+            return value + name[root.Length..];
         for (var end = name.Length; end > 0; end = name.LastIndexOf('.', end - 1))
         {
             var prefix = name[..end];
@@ -1282,7 +1299,8 @@ public sealed class ContractInheritanceChecker : IDisposable
     private sealed record TypeRebindings(
         IReadOnlyDictionary<string, string> Parameters,
         Func<string, string?> Qualify,
-        IReadOnlySet<string>? Values = null);
+        IReadOnlySet<string>? Values = null,
+        IReadOnlyDictionary<string, string>? ValueReplacements = null);
 
     private static string RewriteTypeName(string typeName, TypeRebindings? replacements)
     {
