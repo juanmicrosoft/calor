@@ -10154,6 +10154,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("tuple-deconstruction");
         _context.IncrementConverted();
 
+        if (TryConvertTupleDeclaration(assignment, span) is { } declaration)
+            return declaration;
+
         // Keep the assignment atomic: C# evaluates targets, then RHS values and
         // conversions, then writes. Splitting it loses aliases and struct storage.
         // Only operands the Calor serializer never hoists are certified here.
@@ -10171,6 +10174,51 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             "Tuple assignment preserved atomically to retain target evaluation, conversions and writes.",
             assignment.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
         return new RawCSharpNode(span, assignment.ToString() + ";");
+    }
+
+    private AssignmentStatementNode? TryConvertTupleDeclaration(
+        AssignmentExpressionSyntax assignment, TextSpan span)
+    {
+        // Scalar local declarations themselves have no evaluation effects. Bind
+        // their actual Roslyn-inferred types, then let one C# tuple assignment
+        // perform deconstruction (including a user-defined Deconstruct method).
+        if (_semanticModel == null
+            || assignment.Parent is not ExpressionStatementSyntax
+            || assignment.Left is not DeclarationExpressionSyntax
+            {
+                Type: IdentifierNameSyntax { Identifier.ValueText: "var" },
+                Designation: ParenthesizedVariableDesignationSyntax designation
+            }
+            || !(assignment.Right is IdentifierNameSyntax
+                || assignment.Right is InvocationExpressionSyntax
+                {
+                    Expression: IdentifierNameSyntax,
+                    ArgumentList.Arguments.Count: 0
+                }))
+            return null;
+
+        var locals = new List<(string Name, string Type)>();
+        foreach (var variable in designation.Variables)
+        {
+            if (variable is not SingleVariableDesignationSyntax single
+                || _semanticModel.GetDeclaredSymbol(single) is not ILocalSymbol local
+                || local.Type.SpecialType is not (SpecialType.System_Int32
+                    or SpecialType.System_String or SpecialType.System_Double
+                    or SpecialType.System_Boolean))
+                return null;
+            locals.Add((single.Identifier.ValueText,
+                TypeMapper.CSharpToCalor(local.Type.ToDisplayString())));
+        }
+
+        foreach (var local in locals)
+        {
+            _pendingStatements.Add(new BindStatementNode(span, local.Name, local.Type,
+                isMutable: true, initializer: null, new AttributeCollection()));
+        }
+        return new AssignmentStatementNode(span,
+            new TupleLiteralNode(span, locals.Select(local =>
+                (ExpressionNode)new ReferenceNode(span, local.Name)).ToList()),
+            ConvertExpression(assignment.Right));
     }
 
     private ExpressionNode ConvertAssignmentExpression(AssignmentExpressionSyntax assignment)

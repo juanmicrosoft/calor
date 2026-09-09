@@ -45,6 +45,21 @@ public class TupleAssignmentMigrationTests
         yield return Case("nested-declaration", "var (a, (b, c)) = (1, (2, 3)); return a * 100 + b * 10 + c;", "123");
         yield return Case("custom-deconstruct", "var (a, b) = new Pair(); return a * 10 + b;", "21",
             "public class Pair { public void Deconstruct(out int a, out int b) { a = 2; b = 1; } }");
+        yield return Case("native-custom-deconstruct", "var (a, b) = pair; return a * 10 + b;", "21",
+            "static Pair pair = new Pair(); public class Pair { public void Deconstruct(out int a, out int b) { a = 2; b = 1; } }", native: true);
+        yield return Case("native-tuple-declaration", "var (a, b) = GetPair(); return a * 10 + b;", "21",
+            "static (int, int) GetPair() { return (2, 1); }", native: true);
+        yield return Case("native-escaped-declaration", "var (@class, @event) = GetPair(); return @class * 10 + @event;", "21",
+            "static (int, int) GetPair() { return (2, 1); }", native: true);
+        yield return Case("native-scalar-declaration", "var (a, b) = GetPair(); return a && b == \"ok\";", "True",
+            "static (bool, string) GetPair() { return (true, \"ok\"); }", native: true);
+        yield return Case("native-deconstruct-effects", "var (a, b) = pair; return log + \":\" + a + b;", "d:21",
+            """
+            static string log = ""; static Pair pair = new Pair();
+            public class Pair { public void Deconstruct(out int a, out int b) { log += "d"; a = 2; b = 1; } }
+            """, native: true);
+        yield return Case("uncertified-declaration-type", "var (a, b) = pair; return a.X * 10 + b;", "21",
+            "static (Cell, int) pair = (new Cell(), 1); public struct Cell { public int X => 2; }");
         yield return Case("mixed-declaration", "int a = 0; (a, int b) = (2, 1); return a * 10 + b;", "21");
         yield return Case("setter", "Set = 0; return a * 10 + b;", "21",
             "static int a = 1; static int b = 2; public static int Set { set => (a, b) = (b, a); }", native: true);

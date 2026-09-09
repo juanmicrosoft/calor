@@ -1452,10 +1452,11 @@ public class Example
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        Assert.Contains("var (a, b) = GetPair();", calor);
+        Assert.Contains("§ASSIGN (a, b)", calor);
         Assert.DoesNotContain("_tup", calor);
-        Assert.Contains(result.Losses, loss =>
-            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "tuple-deconstruction");
+        Assert.DoesNotContain("Item1", calor);
+        Assert.DoesNotContain("Item2", calor);
+        Assert.DoesNotContain(result.Losses, loss => loss.Feature == "tuple-deconstruction");
     }
 
     [Fact]

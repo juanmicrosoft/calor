@@ -993,7 +993,7 @@ public static class FeatureSupport
         {
             Name = "tuple-deconstruction",
             Support = SupportLevel.Partial,
-            Description = "Flat identifier tuple assignments stay atomic; declarations, complex operands and expression-valued assignments use counted C# interop to preserve evaluation order and Deconstruct semantics"
+            Description = "Flat identifier tuple assignments and certified scalar declarations stay atomic; other declarations, complex operands and expression-valued assignments use counted C# interop to preserve evaluation order and Deconstruct semantics"
         },
         ["span"] = new FeatureInfo
         {
