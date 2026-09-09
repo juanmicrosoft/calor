@@ -720,14 +720,15 @@ public static class DocDriftChecker
 
     private static void CheckSemanticsVersion(DocFile doc, string expected, List<Diagnostic> diagnostics)
     {
-        var claim = new Regex(@"^\s*(?:#{1,6}\s+)?(?:\*\*)?(?:Semantics\s+Version|Version)\s*:\s*[*`]*(?<version>[^\s*`]+)",
+        var claim = new Regex(@"^\s*(?:#{1,6}\s+)?(?:(?:Semantics|Current)\s+)?Version\s*:\s*(?<version>\S*)",
             RegexOptions.IgnoreCase);
         var foundClaim = false;
         foreach (var line in ClassifyLines(doc))
         {
             if (line.InForeignFence)
                 continue;
-            var match = claim.Match(line.Text);
+            var normalized = line.Text.Replace("*", "", StringComparison.Ordinal).Replace("`", "", StringComparison.Ordinal);
+            var match = claim.Match(normalized);
             foundClaim |= match.Success;
             if (match.Success && match.Groups["version"].Value != expected)
                 diagnostics.Add(Drift(DiagnosticCode.DocDriftHardcodedVersion,

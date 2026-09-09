@@ -48,6 +48,10 @@ public class DocDriftCheckerTests
     [InlineData("Version: 1.0.0")]
     [InlineData("Semantics Version: 0.9.9")]
     [InlineData("## Semantics Version: invalid")]
+    [InlineData("**Current Version:** 1.0.0")]
+    [InlineData("**Semantics Version:** `1.0.0`")]
+    [InlineData("Semantics Version:")]
+    [InlineData("**Version:**")]
     public void StaleNormativeSemanticsVersion_FailsIndependentlyOfPackageVersion(string claim)
     {
         var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(
