@@ -140,16 +140,28 @@ public sealed class ContractInheritanceChecker : IDisposable
         IReadOnlyDictionary<string, string>? substitutions = null,
         bool memberLookup = false,
         HashSet<AstNode>? resolvingBases = null,
-        IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? typeArguments = null)
+        IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? typeArguments = null,
+        bool argumentsAlreadyBound = false)
     {
-        substitutions ??= new Dictionary<string, string>(StringComparer.Ordinal);
+        typeArguments ??= new Dictionary<AstNode, IReadOnlyList<string>>();
+        resolvingBases ??= new HashSet<AstNode>();
+        var callerBindings = DeclarationSubstitutions(owner, typeArguments);
+        if (substitutions != null)
+        {
+            foreach (var pair in substitutions)
+                callerBindings[pair.Key] = pair.Value;
+        }
+        var argumentBindings = new TypeRebindings(callerBindings, name =>
+        {
+            var declaration = ResolveDeclaration(name, owner, callerBindings, memberLookup,
+                resolvingBases, typeArguments, argumentsAlreadyBound: true);
+            return declaration == null ? null : QualifiedTypeName(declaration);
+        });
         // Every argument in the reference belongs to the caller's lexical scope,
         // not to a target type introduced by an earlier qualified segment.
         var segments = ParseQualifiedTypeReference(reference).Select(segment =>
             new TypeReference(segment.Name, segment.Arguments.Select(argument =>
-                SubstituteTypeName(argument, substitutions)).ToArray())).ToArray();
-        typeArguments ??= new Dictionary<AstNode, IReadOnlyList<string>>();
-        resolvingBases ??= new HashSet<AstNode>();
+                argumentsAlreadyBound ? argument : RewriteTypeName(argument, argumentBindings)).ToArray())).ToArray();
         // A base/interface list is outside its own type body. Explicit interface
         // members, in contrast, resolve names from inside that body.
         var scope = memberLookup ? owner : _enclosingDeclarations[owner];
@@ -622,7 +634,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             var declaration = ResolveDeclaration(name, source.Resolution.Declaration,
                 source.TypeSubstitutions, memberLookup: true,
-                typeArguments: source.Resolution.TypeArguments);
+                typeArguments: source.Resolution.TypeArguments, argumentsAlreadyBound: true);
             return declaration == null ? null : QualifiedTypeName(declaration);
         });
 
@@ -1114,16 +1126,17 @@ public sealed class ContractInheritanceChecker : IDisposable
             return typeName;
         if (replacements.Parameters.TryGetValue(typeName, out var parameter))
             return parameter;
-        if (replacements.Qualify(typeName) is { } qualified)
-            return qualified;
+        if (Migration.TypeMapper.IsPrimitiveType(typeName))
+            return typeName;
         if (typeName.EndsWith('?') || typeName.EndsWith('*'))
             return RewriteTypeName(typeName[..^1], replacements) + typeName[^1];
         if (typeName.EndsWith(']') && typeName.LastIndexOf('[') is var arrayStart && arrayStart >= 0)
             return RewriteTypeName(typeName[..arrayStart], replacements) + typeName[arrayStart..];
-        return string.Join(".", ParseQualifiedTypeReference(typeName).Select(reference =>
+        var rewritten = string.Join(".", ParseQualifiedTypeReference(typeName).Select(reference =>
             reference.Arguments.Count == 0 ? reference.Name : reference.Name + "<"
                 + string.Join(",", reference.Arguments.Select(argument =>
                     RewriteTypeName(argument, replacements))) + ">"));
+        return replacements.Qualify(rewritten) ?? rewritten;
     }
 
     private static IReadOnlyList<QuantifierVariableNode> RewriteQuantifierTypes(

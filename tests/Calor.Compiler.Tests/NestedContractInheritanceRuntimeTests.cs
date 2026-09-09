@@ -306,6 +306,102 @@ public sealed class NestedContractInheritanceRuntimeTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConstructedPredicateArguments_PreserveNamedTypeScope(bool verify)
+    {
+        foreach (var contracts in new[] { "§Q (is x Box<Marker>)", "§S (is result Box<Marker>)", "§Q (is x Box<Marker>)\n§S (is result Box<Marker>)" })
+        {
+            var source = $$"""
+                §M{m1:NestedContracts}
+                  §CL{c1:Outer:pub}
+                    §CL{c2:Marker:pub}
+                      §MT{mm1:Tag:pub} () -> i32
+                        §E{}
+                        §R INT:1
+                    §CL{c3:Box:pub}<T>
+                      §MT{mm2:Tag:pub} () -> i32
+                        §E{}
+                        §R INT:2
+                    §IFACE{i1:IValue}
+                      §MT{im1:Check} (object:x) -> object
+                {{Indent(Indent(Indent(Indent(contracts))))}}
+                  §CL{c4:Marker:pub}
+                    §MT{mm3:Tag:pub} () -> i32
+                      §E{}
+                      §R INT:3
+                  §CL{c5:Impl:pub}
+                    §IMPL{Outer.IValue}
+                    §MT{mt1:Check:pub} (object:value) -> object
+                      §E{}
+                      §R value
+                """;
+            var assembly = Compile(source, verify);
+            var box = assembly.GetType("NestedContracts.Outer+Box`1")!;
+            var valid = Activator.CreateInstance(box.MakeGenericType(assembly.GetType("NestedContracts.Outer+Marker")!));
+            var invalid = Activator.CreateInstance(box.MakeGenericType(assembly.GetType("NestedContracts.Marker")!));
+            AssertObjectGuard(assembly.GetType("NestedContracts.Impl")!, valid, invalid);
+
+            var headerScoped = source.Replace("§CL{c1:Outer:pub}", "§CL{c1:Outer:pub}<V>")
+                .Replace("Box<Marker>", "Box<V>")
+                .Replace("§IMPL{Outer.IValue}", "§IMPL{Outer<Marker>.IValue}\n    §CL{c6:Marker:pub}\n      §MT{mm4:Tag:pub} () -> i32\n        §E{}\n        §R INT:4");
+            assembly = Compile(headerScoped, verify);
+            var outerMarker = assembly.GetType("NestedContracts.Marker")!;
+            var innerMarker = assembly.GetType("NestedContracts.Impl+Marker")!;
+            box = assembly.GetType("NestedContracts.Outer`1+Box`1")!;
+            valid = Activator.CreateInstance(box.MakeGenericType(outerMarker, outerMarker));
+            invalid = Activator.CreateInstance(box.MakeGenericType(outerMarker, innerMarker));
+            AssertObjectGuard(assembly.GetType("NestedContracts.Impl")!, valid, invalid);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConstructedPredicateArguments_RespectMethodGenericRenaming(bool verify)
+    {
+        foreach (var contracts in new[] { "§Q (is x Box<T>)", "§S (is result Box<T>)", "§Q (is x Box<T>)\n§S (is result Box<T>)" })
+        foreach (var parameter in new[] { "T", "W" })
+        {
+            var source = $$"""
+                §M{m1:NestedContracts}
+                  §CL{c1:Outer:pub}<T>
+                    §CL{c2:Box:pub}<U>
+                      §MT{mm1:Tag:pub} () -> i32
+                        §E{}
+                        §R INT:1
+                    §IFACE{i1:IValue}
+                      §MT{im1:Check}<{{parameter}}> (object:x) -> object
+                {{Indent(Indent(Indent(Indent(contracts.Replace("Box<T>", $"Box<{parameter}>")))))}}
+                  §CL{c3:Impl:pub}
+                    §IMPL{Outer<i32>.IValue}
+                    §MT{mt1:Check:pub}<V> (object:value) -> object
+                      §E{}
+                      §R value
+                """;
+            var assembly = Compile(source, verify);
+            var type = assembly.GetType("NestedContracts.Impl")!;
+            var method = type.GetMethod("Check")!.MakeGenericMethod(typeof(string));
+            var instance = Activator.CreateInstance(type);
+            var box = assembly.GetType("NestedContracts.Outer`1+Box`1")!;
+            var valid = Activator.CreateInstance(box.MakeGenericType(typeof(int), typeof(string)));
+            var invalid = Activator.CreateInstance(box.MakeGenericType(typeof(int), typeof(int)));
+            Assert.Same(valid, method.Invoke(instance, [valid]));
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [invalid]));
+            Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+        }
+    }
+
+    private static void AssertObjectGuard(Type type, object? valid, object? invalid)
+    {
+        var instance = Activator.CreateInstance(type);
+        var method = type.GetMethod("Check")!;
+        Assert.Same(valid, method.Invoke(instance, [valid]));
+        var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [invalid]));
+        Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions
