@@ -1,4 +1,4 @@
-§M{m001:Test_13_04}
+§M{m001:Test_13_04:overflow=unchecked}
   §CL{c001:Result<T>:pub:abs}
 
   §CL{c002:Ok<T>:pub}

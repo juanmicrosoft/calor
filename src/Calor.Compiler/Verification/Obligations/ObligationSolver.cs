@@ -13,6 +13,7 @@ public sealed class ObligationSolver : IDisposable
 {
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private bool _checkIntegerOverflow = true;
     private bool _disposed;
 
     public ObligationSolver(Context ctx, uint timeoutMs = VerificationOptions.DefaultTimeoutMs)
@@ -28,6 +29,7 @@ public sealed class ObligationSolver : IDisposable
         ObligationTracker tracker,
         ModuleNode module)
     {
+        _checkIntegerOverflow = module.ShouldCheckIntegerOverflow();
         // Build a lookup of function info for parameter declarations
         var functionInfo = BuildFunctionInfo(module);
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
@@ -188,7 +190,8 @@ public sealed class ObligationSolver : IDisposable
                 }
             }
 
-            var arithmeticSafety = translator.GetCheckedArithmeticSafety(obligation.Condition);
+            var arithmeticSafety = _checkIntegerOverflow
+                ? translator.GetCheckedArithmeticSafety(obligation.Condition) : _ctx.MkTrue();
             if (arithmeticSafety == null)
             {
                 obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(

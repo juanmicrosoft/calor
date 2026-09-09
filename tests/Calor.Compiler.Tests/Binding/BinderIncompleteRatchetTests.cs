@@ -71,7 +71,11 @@ public class BinderIncompleteRatchetTests
     private const string ScopeText =
         "in-repo F-2 plus selected-active native conversion and preserve-all opaque coverage; "
         + "Roslyn-selected conversion uses genuinely empty default symbols with "
-        + "C# Preview/regular/parse options; legacy source-order 18005 is informational";
+        + "C# Preview/regular/parse options; legacy source-order 18005 is informational. "
+        + "#1189 preserves unchecked blocks in serilog/src/Serilog/Events/EventProperty.cs "
+        + "and FluentValidation/src/FluentValidation/Internal/AccessorCache.cs: "
+        + "previously unconverted files 2 -> 0, accounted opaque boundaries 89 -> 91 "
+        + "and opaque expressions 6423 -> 6471; native incomplete count remains zero";
 
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()

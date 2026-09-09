@@ -1,4 +1,4 @@
-§M{m001:Test_12_03}
+§M{m001:Test_12_03:overflow=unchecked}
   §CL{s001:Vector2:pub:struct}
     §FLD{f32:X:pub}
     §FLD{f32:Y:pub}

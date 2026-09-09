@@ -1,4 +1,4 @@
-§M{m001:Test_04_04}
+§M{m001:Test_04_04:overflow=unchecked}
   §U{global:System}
   §U{global:Collections:System.Collections.Generic}
   §U{global:static:System.Math}

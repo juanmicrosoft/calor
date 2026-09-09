@@ -69,6 +69,7 @@ public sealed class Z3Verifier : IDisposable
 
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private readonly bool _checkIntegerOverflow;
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
@@ -92,10 +93,12 @@ public sealed class Z3Verifier : IDisposable
     public Z3Verifier(
         Context ctx,
         uint timeoutMs = VerificationOptions.DefaultTimeoutMs,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? userTypeRegistry = null)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? userTypeRegistry = null,
+        bool checkIntegerOverflow = true)
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         _timeoutMs = timeoutMs;
+        _checkIntegerOverflow = checkIntegerOverflow;
         _userTypeRegistry = userTypeRegistry
             ?? new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
     }
@@ -381,14 +384,17 @@ public sealed class Z3Verifier : IDisposable
                     Duration: sw.Elapsed);
             }
             resultBinding = _ctx.MkEq(resultVar, encoded);
-            var (bodySafety, safetyReason) = FunctionBodyEncoder.TryEncodeResult(
-                translator, _ctx, body, parameterNames, arithmeticSafetyOnly: true);
-            if (bodySafety is not BoolExpr safety)
-                return ContractVerificationResult.FromOutcome(
-                    ProofOutcome.Assign(ProofEvidence.Unsupported(
-                        $"The body's checked arithmetic cannot be modeled: {safetyReason}. Runtime check kept.")),
-                    Duration: sw.Elapsed);
-            bodyArithmeticSafety = safety;
+            if (_checkIntegerOverflow)
+            {
+                var (bodySafety, safetyReason) = FunctionBodyEncoder.TryEncodeResult(
+                    translator, _ctx, body, parameterNames, arithmeticSafetyOnly: true);
+                if (bodySafety is not BoolExpr safety)
+                    return ContractVerificationResult.FromOutcome(
+                        ProofOutcome.Assign(ProofEvidence.Unsupported(
+                            $"The body's checked arithmetic cannot be modeled: {safetyReason}. Runtime check kept.")),
+                        Duration: sw.Elapsed);
+                bodyArithmeticSafety = safety;
+            }
 
             // Division/modulo in the body: Z3 totalizes x/0 (bvsdiv(x,0) = -1), so a model
             // exercising a zero divisor is not runtime-reproducible — at runtime that path
@@ -430,7 +436,8 @@ public sealed class Z3Verifier : IDisposable
                     Duration: sw.Elapsed);
             }
             contractDivisorConditions.AddRange(contractConstraints);
-            var arithmeticSafety = translator.GetCheckedArithmeticSafety(contractExpr);
+            var arithmeticSafety = _checkIntegerOverflow
+                ? translator.GetCheckedArithmeticSafety(contractExpr) : _ctx.MkTrue();
             if (arithmeticSafety == null)
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.Unsupported(

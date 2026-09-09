@@ -1,4 +1,4 @@
-§M{m001:Test_13_05}
+§M{m001:Test_13_05:overflow=unchecked}
   §CL{c001:PatternDemo:pub}
     §MT{m002:Classify:pub} (any:obj) -> str
       §W{match003:expr} obj

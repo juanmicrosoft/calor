@@ -168,6 +168,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly Verification.Obligations.ObligationPolicy _obligationPolicy;
     private readonly Diagnostics.DiagnosticBag? _diagnostics;
     private readonly Diagnostics.DiagnosticBag _standaloneDiagnostics = new();
+    private string _overflowContext = "checked";
 
     public Diagnostics.DiagnosticBag EmissionDiagnostics
         => _diagnostics ?? _standaloneDiagnostics;
@@ -1435,6 +1436,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ModuleNode node)
     {
+        _overflowContext = node.ShouldCheckIntegerOverflow() ? "checked" : "unchecked";
         var compilationUnitInterop =
             GetWholeCompilationUnitInterop(node);
         if (compilationUnitInterop != null)
@@ -3946,7 +3948,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var expression = EmitBinaryOperation(node);
         return node.Operator is BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
-            ? $"checked({expression})"
+            ? $"{_overflowContext}({expression})"
             : expression;
     }
 
@@ -4001,7 +4003,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var expression = EmitUnaryOperation(node);
         return node.Operator is UnaryOperator.Negate or UnaryOperator.PreIncrement
             or UnaryOperator.PreDecrement or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
-            ? $"checked({expression})"
+            ? $"{_overflowContext}({expression})"
             : expression;
     }
 
@@ -6832,10 +6834,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(CompoundAssignmentStatementNode node)
     {
         var statement = EmitCompoundAssignment(node);
-        return node.Operator is CompoundAssignmentOperator.Add or CompoundAssignmentOperator.Subtract
-            or CompoundAssignmentOperator.Multiply
-            ? $"checked {{ {statement} }}"
-            : statement;
+        return $"{_overflowContext} {{ {statement} }}";
     }
 
     private string EmitCompoundAssignment(CompoundAssignmentStatementNode node)
@@ -8717,7 +8716,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // Extraction
             CharOp.CharAt => $"{args[0]}[{args[1]}]",
             CharOp.CharCode => $"(int){args[0]}",
-            CharOp.CharFromCode => $"checked((char){(IsAtomicOperand(node.Arguments[0]) ? args[0] : $"({args[0]})")})",
+            CharOp.CharFromCode => $"{_overflowContext}((char){(IsAtomicOperand(node.Arguments[0]) ? args[0] : $"({args[0]})")})",
 
             // Classification
             CharOp.IsLetter => $"char.IsLetter({args[0]})",
@@ -8771,7 +8770,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var csharpType = MapTypeName(node.TargetType);
         return node.Operation switch
         {
-            TypeOp.Cast => $"checked(({csharpType}){operand})",
+            TypeOp.Cast => $"{_overflowContext}(({csharpType}){operand})",
             TypeOp.Is => $"{operand} is {csharpType}",
             TypeOp.As => $"{operand} as {csharpType}",
             _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
@@ -10192,7 +10191,7 @@ public static class GeneratedCSharpCompiler
         var compilationOptions =
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
                 context.OutputKind,
-                checkOverflow: true,
+                checkOverflow: false,
                 allowUnsafe: context.AllowUnsafe,
                 nullableContextOptions: context.NullableContextOptions,
                 generalDiagnosticOption: context.TreatWarningsAsErrors

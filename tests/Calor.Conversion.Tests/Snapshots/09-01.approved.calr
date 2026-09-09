@@ -1,4 +1,4 @@
-§M{m001:Test_09_01}
+§M{m001:Test_09_01:overflow=unchecked}
   §CL{c001:RangeDemo:pub}
     §MT{m002:Slice:pub} (i32[]:array) -> i32[]
       §R §IDX{array} §RANGE 0 5

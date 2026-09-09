@@ -97,6 +97,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     public ModuleNode Convert(CompilationUnitSyntax root, string moduleName)
     {
+        var moduleAttributes = new AttributeCollection();
+        var checkOverflow = (_semanticModel?.Compilation.Options as CSharpCompilationOptions)?.CheckOverflow ?? false;
+        moduleAttributes.Add("overflow", checkOverflow ? "checked" : "unchecked");
         _cancellationToken.ThrowIfCancellationRequested();
         // Sanitize module name: strip backtick (C# generic arity indicator e.g. MyType`2)
         // and @ prefix to avoid lexer conflicts
@@ -213,7 +216,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 [],
                 [],
                 [],
-                new AttributeCollection(),
+                moduleAttributes,
                 Array.Empty<IssueNode>(),
                 Array.Empty<AssumeNode>(),
                 Array.Empty<InvariantNode>(),
@@ -281,7 +284,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             Array.Empty<EnumExtensionNode>(),
             _delegates,
             functions,
-            new AttributeCollection(),
+            moduleAttributes,
             Array.Empty<IssueNode>(),
             Array.Empty<AssumeNode>(),
             Array.Empty<InvariantNode>(),
@@ -6881,8 +6884,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // Comment first (correct semantic order: annotation before body)
         var keyword = node.IsKind(SyntaxKind.CheckedStatement) ? "checked" : "unchecked";
-        if (_context.PassthroughOnError)
+        if (_context.ShouldPreserveCSharp)
         {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "checked-block",
+                $"{keyword} overflow block preserved verbatim",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
             result.Add(new RawCSharpNode(GetTextSpan(node), node.ToFullString()));
             return result;
         }
@@ -9690,11 +9696,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             : "unchecked";
         _context.RecordFeatureUsage($"{keyword}-expression");
         _context.RecordLoss(
-            ConversionLossKind.Dropped,
+            ConversionLossKind.InteropPreserved,
             $"{keyword}-expression",
-            $"{keyword} overflow semantics were stripped",
+            $"{keyword} overflow expression preserved verbatim",
             expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return ConvertExpression(expression.Expression);
+        return new RawCSharpExpressionNode(GetTextSpan(expression), expression.ToString());
     }
 
     private string? InferTypeFromExpression(ExpressionSyntax expr)

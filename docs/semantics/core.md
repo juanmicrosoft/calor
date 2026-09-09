@@ -209,8 +209,15 @@ retain their normal behavior. Floating-point arithmetic still uses IEEE 754;
 `checked` does not turn floating-point infinity into an exception.
 
 Generated-C# validation and the projects used by `calor run` and `calor test`
-also enable overflow checking. The source-level checks preserve the native
-policy when generated C# is compiled separately with ordinary Roslyn settings.
+retain ordinary C# backend settings, so preserved C# interop keeps its own
+semantics. Explicit source-level checks enforce the native policy, including
+when generated C# is compiled separately with ordinary Roslyn settings.
+
+An explicit module attribute, `overflow=unchecked`, selects C#-compatible
+wrapping integer arithmetic and narrowing casts. C# migration records its
+source policy in this attribute; explicit C# `checked`/`unchecked` expressions
+remain preserved interop. Omitting the attribute, or using `overflow=checked`,
+selects TRAP. The verifier and proof cache distinguish these policies.
 
 Contract verification checks whether arithmetic in a predicate can overflow.
 If its safety follows from the preconditions and lazy evaluation paths, a proof

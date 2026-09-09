@@ -1,4 +1,4 @@
-§M{m001:Test_13_08}
+§M{m001:Test_13_08:overflow=unchecked}
   §U{System.Collections.Generic}
 
   §CL{c001:CollectionHoistDemo:pub}
@@ -21,4 +21,3 @@
 
     §MT{m007:Format:priv} (str:s) -> str
       §R (upper s)
-

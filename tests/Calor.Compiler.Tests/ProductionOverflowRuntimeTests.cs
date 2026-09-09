@@ -1,15 +1,129 @@
 using System.Diagnostics;
+using System.Reflection;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
 using Calor.Enforcement.Tests;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 public class ProductionOverflowRuntimeTests
 {
+    [Theory]
+    [InlineData("wrap")]
+    [InlineData("true")]
+    [InlineData("unchecked-typo")]
+    public void UnknownOverflowPolicy_IsRejectedRatherThanSilentlyChanged(string policy)
+    {
+        var result = Program.Compile($$"""
+            §M{m1:Overflow:overflow={{policy}}}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §R (+ value 1)
+            """, "overflow.calr", Options());
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Contains(result.Diagnostics.Errors, error => error.Message.Contains("overflow policy"));
+    }
+
+    [Theory]
+    [InlineData("int", "return value + 1;", int.MaxValue)]
+    [InlineData("int", "return value - 1;", int.MinValue)]
+    [InlineData("int", "return value * 2;", int.MaxValue)]
+    [InlineData("long", "return (int)value;", 2147483648L)]
+    [InlineData("int", "value++; return value;", int.MaxValue)]
+    [InlineData("int", "value += 1; return value;", int.MaxValue)]
+    [InlineData("int", "return checked(value + 1);", int.MaxValue)]
+    [InlineData("int", "return unchecked(value + 1);", int.MaxValue)]
+    [InlineData("int", "checked { return value + 1; }", int.MaxValue)]
+    [InlineData("int", "unchecked { return value + 1; }", int.MaxValue)]
+    [InlineData("int", "return checked(unchecked(value + 1) - 1);", int.MaxValue)]
+    public void LosslessMigration_PreservesCSharpOverflowContext(string type, string body, object input)
+    {
+        var csharp = $$"""
+            public static class Migrated
+            {
+                public static int Probe({{type}} value) { {{body}} }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(csharp);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.DoesNotContain(conversion.Losses, loss => loss.Kind == ConversionLossKind.Dropped);
+        Assert.Contains("overflow=unchecked", conversion.CalorSource);
+        var compiled = Program.Compile(conversion.CalorSource!, "migration.calr", Options());
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        var actual = InvokeCSharp(compiled.GeneratedCode, input);
+        var expected = InvokeCSharp(csharp, input);
+        Assert.True(expected.Error?.GetType() == actual.Error?.GetType(),
+            $"Expected {expected.Error?.GetType().Name ?? "no exception"}; actual: {actual.Error}\n{conversion.CalorSource}");
+        Assert.Equal(expected.Value, actual.Value);
+    }
+
+    [Fact]
+    public void OverflowPolicy_RoundTripsAndSeparatesWarmProofCaches()
+    {
+        const string source = """
+            §M{m1:Overflow:overflow=unchecked}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §S (== (- (+ value 1) 1) value)
+                §R value
+            """;
+        var directory = Path.Combine(AppContext.BaseDirectory, "overflow-cache-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            CompilationOptions OptionsWithCache() => new()
+            {
+                VerifyContracts = true,
+                ElideProvenGuards = true,
+                Verbose = true,
+                StatusWriter = TextWriter.Null,
+                VerificationCacheOptions = new VerificationCacheOptions { Enabled = true, ProjectDirectory = directory }
+            };
+            var uncheckedCompile = Program.Compile(source, "overflow.calr", OptionsWithCache());
+            Assert.False(uncheckedCompile.HasErrors, string.Join("; ", uncheckedCompile.Diagnostics.Errors));
+            Assert.Contains(uncheckedCompile.Diagnostics, diagnostic =>
+                diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
+            Assert.Contains("overflow=unchecked", new CalorEmitter().Emit(uncheckedCompile.Ast!));
+            Assert.Null(TestHarness.Execute(source, "Probe", [int.MaxValue], OptionsWithCache()).Exception);
+            var checkedSource = source.Replace(":overflow=unchecked", "");
+            Assert.IsType<OverflowException>(
+                TestHarness.Execute(checkedSource, "Probe", [int.MaxValue], OptionsWithCache()).Exception);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static (object? Value, Exception? Error) InvokeCSharp(string source, object input)
+    {
+        var compilation = CSharpCompilation.Create(
+            "OverflowOracle_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emit = compilation.Emit(image);
+        Assert.True(emit.Success, string.Join("; ", emit.Diagnostics));
+        var assembly = Assembly.Load(image.ToArray());
+        try
+        {
+            return (assembly.GetTypes().Single(type => type.Name == "Migrated")
+                .GetMethod("Probe")!.Invoke(null, [input]), null);
+        }
+        catch (TargetInvocationException exception)
+        {
+            return (null, exception.InnerException);
+        }
+    }
+
     [Fact]
     public void UnsignedConditional_BodySafetyCannotExcludeValidNormalReturns()
     {
@@ -254,7 +368,7 @@ public class ProductionOverflowRuntimeTests
     }
 
     [Fact]
-    public async Task ShippedExecutionProject_EnforcesNativeAndBackendOverflow()
+    public async Task ShippedExecutionProject_TrapsNativeOverflowAndPreservesCSharpInterop()
     {
         const string source = """
             §M{m1:Overflow}
@@ -282,9 +396,9 @@ public class ProductionOverflowRuntimeTests
                         {
                             try { Overflow.OverflowModule.Probe(int.MaxValue); return 1; }
                             catch (OverflowException) { }
-                            try { var value = long.Parse("2147483648"); _ = (int)value; return 2; }
-                            catch (OverflowException) { }
-                            Console.WriteLine("checked-native-and-backend");
+                            var value = long.Parse("2147483648");
+                            if ((int)value != int.MinValue) return 2;
+                            Console.WriteLine("checked-native-and-compatible-csharp");
                             return 0;
                         }
                     }
@@ -313,7 +427,7 @@ public class ProductionOverflowRuntimeTests
                     process.Kill(entireProcessTree: true);
             }
             Assert.True(process.ExitCode == 0, await stdout + Environment.NewLine + await stderr);
-            Assert.Contains("checked-native-and-backend", await stdout);
+            Assert.Contains("checked-native-and-compatible-csharp", await stdout);
         }
         finally
         {
