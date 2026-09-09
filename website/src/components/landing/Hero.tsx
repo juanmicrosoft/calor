@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Github, ArrowRight, Pause, Play } from 'lucide-react';
 import { getBasePath } from '@/lib/utils';
@@ -12,17 +12,67 @@ const basePath = getBasePath();
 
 export function Hero() {
   const heroRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Mutable: the callback ref below assigns it, so it cannot be a readonly RefObject.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [allowVideo, setAllowVideo] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // Whether the whole file has arrived. This decides what a PAUSE means.
+  //
+  // Pausing used to unmount the element unconditionally, which aborts the download —
+  // right when bytes are still coming, wrong once they have all landed: resuming then
+  // re-fetched the full 2 MB (measured: a second request of 2,093,841 bytes, the entire
+  // file, on every resume). On a real connection that is seconds of frozen poster after
+  // pressing play, and five toggles cost 10 MB.
+  //
+  // So: paused mid-download still tears the element down and abandons the transfer,
+  // because those bytes are not spent yet and stopping genuinely saves them. Paused
+  // after the file is complete keeps the element and merely pauses it — the bytes are
+  // already spent, and throwing them away buys nothing. Resuming is then instant and
+  // costs nothing. Every CONSTRAINT (reduced motion, narrow viewport, Save-Data, 2g/3g)
+  // clears allowVideo, which unmounts regardless of this flag, so the data protections
+  // are untouched.
+  const [downloaded, setDownloaded] = useState(false);
   // Records a DELIBERATE pause, so that a later media-query change — resizing back
   // across the md breakpoint, a connection event — re-enables the control without
   // restarting a video the visitor chose to stop.
   const userChosePlayback = useRef(false);
 
+  // Teardown belongs to the ELEMENT's lifetime, not to a state change, so it hangs off
+  // a callback ref: React invokes this with null exactly when the video leaves the DOM.
+  // Stripping the source and calling load() is what aborts a download still in flight.
+  const attachVideo = useCallback((node: HTMLVideoElement | null) => {
+    const previous = videoRef.current;
+    videoRef.current = node;
+    if (node || !previous) return;
+    previous.pause();
+    previous.removeAttribute('src');
+    previous.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
+    previous.load();
+  }, []);
+
+  // Answered at the moment the decision is made — when pause is pressed — rather than
+  // tracked from media events. Trying to track it was a race: no single event is
+  // reliable (the last `progress` can arrive while `duration` is still NaN, and
+  // `canplaythrough` fires well before the transfer ends), so the flag could stay false
+  // on a video that had in fact finished. Asking `buffered` directly at click time has
+  // no such window.
+  //
+  // Note `canplaythrough` would be the wrong question anyway: it means "enough buffered
+  // to play to the end at this rate", not "the bytes are spent".
+  const isFullyDownloaded = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(video.duration)) return false;
+    const buffered = video.buffered;
+    return buffered.length > 0 && buffered.end(buffered.length - 1) >= video.duration - 0.25;
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    if (!playing) {
+      video.pause();
+      return;
+    }
     // The `autoPlay` attribute is not a guarantee, so playback is also started
     // explicitly. Measured in Chrome: with the tab rendered but NOT focused
     // (document.hasFocus() === false), the attribute left the video at
@@ -35,8 +85,6 @@ export function Hero() {
     //
     // Retrying on `canplay` and `visibilitychange` covers the element mounting
     // before it has data, and the background tab that is only looked at later.
-    // The element exists only while `playing` is true, so this can never fight a
-    // deliberate pause — pausing unmounts it.
     const start = () => { void video.play().catch(() => {}); };
     start();
     video.addEventListener('canplay', start);
@@ -44,12 +92,8 @@ export function Hero() {
     return () => {
       video.removeEventListener('canplay', start);
       document.removeEventListener('visibilitychange', start);
-      video.pause();
-      video.removeAttribute('src');
-      video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
-      video.load();
     };
-  }, [allowVideo, playing]);
+  }, [allowVideo, playing, downloaded]);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -66,8 +110,12 @@ export function Hero() {
       // not on a 2g/3g connection — so the click that used to be required on top of it
       // meant the animation effectively never ran. Every constrained visitor still
       // fetches nothing; see the tests in tests/assets.spec.ts.
-      if (!allowed) setPlaying(false);
-      else if (!userChosePlayback.current) setPlaying(true);
+      if (!allowed) {
+        setPlaying(false);
+        setDownloaded(false);
+      } else if (!userChosePlayback.current) {
+        setPlaying(true);
+      }
     };
     update();
     motion.addEventListener('change', update);
@@ -97,9 +145,9 @@ export function Hero() {
           style={{ backgroundImage: `url(${basePath}/calor-lava-poster.jpg)` }}
           aria-hidden="true"
         />
-      {allowVideo && playing && (
+      {allowVideo && (playing || downloaded) && (
         <video
-          ref={videoRef}
+          ref={attachVideo}
           autoPlay
           loop
           muted
@@ -199,7 +247,12 @@ export function Hero() {
       {allowVideo && (
         <button
           type="button"
-          onClick={() => { userChosePlayback.current = true; setPlaying(!playing); }}
+          onClick={() => {
+            userChosePlayback.current = true;
+            // Retain the element on pause only when its bytes are already spent.
+            if (playing) setDownloaded(isFullyDownloaded());
+            setPlaying(!playing);
+          }}
           // The accessible name stays the full sentence even though the control is now
           // an icon. It is what a screen reader announces, and what the browser tests
           // select on (tests/assets.spec.ts) — an icon-only button with no name would

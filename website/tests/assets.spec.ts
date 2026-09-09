@@ -82,15 +82,38 @@ test('video plays by default on unconstrained desktop, and is never requested un
         { message: 'video must start on its own' }).toBe(true);
       await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime),
         { message: 'playback must actually advance' }).toBeGreaterThan(0);
-      // Pausing is honoured and tears the element down.
+      // Pausing is honoured. Once the whole file has arrived the element is RETAINED and
+      // simply paused: resuming must be immediate and must not re-fetch. It used to
+      // unmount unconditionally, so every resume re-downloaded the entire 2 MB —
+      // measured as a second request for all 2,093,841 bytes — which on a real
+      // connection is seconds of frozen poster after pressing play. The other case,
+      // pausing while bytes are still in flight, still tears down and abandons the
+      // transfer; that is what the abort test below covers.
+      // Wait for the transfer to actually finish first — that is the case being
+      // described. Pausing before it does is the OTHER case, and is meant to tear down.
+      await expect.poll(() => video.evaluate(element => {
+        const media = element as HTMLVideoElement;
+        return media.buffered.length > 0 && Number.isFinite(media.duration)
+          && media.buffered.end(media.buffered.length - 1) >= media.duration - 0.25;
+      }), { message: 'the video must finish downloading before this case applies' }).toBe(true);
       await page.getByRole('button', { name: 'Pause background animation' }).click();
-      await expect(page.locator('video')).toHaveCount(0);
+      await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).paused),
+        { message: 'pause must stop playback' }).toBe(true);
+      const fetchedBeforeResume = videos.length;
+      await page.getByRole('button', { name: 'Play background animation' }).click();
+      await expect.poll(() => video.evaluate(element => !(element as HTMLVideoElement).paused),
+        { message: 'resume must play again' }).toBe(true);
+      await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime),
+        { message: 'resumed playback must advance' }).toBeGreaterThan(0);
+      expect(videos.length, 'resuming must not re-download the video').toBe(fetchedBeforeResume);
       // And a deliberate pause STAYS paused. Drive the gate away and back — this
       // branch has no navigator.connection to dispatch on, so use the media query the
       // effect actually listens to; a connection event here would be a no-op and the
       // assertion would pass without testing anything.
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await expect(play).toHaveCount(0);
+      // A constraint discards the element outright, retained-and-paused or not.
+      await expect(page.locator('video')).toHaveCount(0);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       await expect(play).toBeVisible();
       await expect(page.locator('video')).toHaveCount(0);
