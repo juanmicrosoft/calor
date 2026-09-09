@@ -6734,7 +6734,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _ => HandleUnsupportedStatement(statement)
             };
         }
-        catch (Exception ex) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp &&
+            ex is not MemberInteropEscalationException { PreserveMember: true })
         {
             // In C#-preserving modes an escalated (or crashed) expression is
             // contained at the nearest statement boundary: the statement is
@@ -7383,71 +7384,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        // Handle null-conditional expression statements (e.g., _writer?.Close(), handler?.Invoke(args))
         if (expr is ConditionalAccessExpressionSyntax condAccess)
         {
-            _context.RecordFeatureUsage("null-conditional");
-            var targetExpr = condAccess.Expression.ToString().Replace("!", "");
-            var targetSpan = GetTextSpan(node);
-
-            // If the target contains indexers, method calls, or other complex expressions,
-            // hoist to temp binding so the condition and call target are simple references.
-            // Method calls like this.GetLayoutManager() have parentheses that break Lisp expressions.
-            string conditionRef = targetExpr;
-            if (ContainsElementAccess(condAccess.Expression)
-                || condAccess.Expression is InvocationExpressionSyntax
-                || targetExpr.Contains('(') || targetExpr.Contains('['))
-            {
-                var convertedTarget = ConvertExpression(condAccess.Expression);
-                var tempName = _context.GenerateId("_nullcond");
-                _pendingStatements.Add(new BindStatementNode(
-                    targetSpan, tempName, null, false, convertedTarget, new AttributeCollection()));
-                conditionRef = tempName;
-            }
-
-            // Decompose into: §IF{id} (!= target null)  §C{target.Method} §A args §/C  §/I{id}
-            var condId = _context.GenerateId("if", "nullcond");
-
-            // Build the non-null call
-            string callTarget;
-            var callArgs = new List<ExpressionNode>();
-            if (condAccess.WhenNotNull is InvocationExpressionSyntax inv
-                && inv.Expression is MemberBindingExpressionSyntax mb)
-            {
-                callTarget = $"{conditionRef}.{mb.Name.Identifier.Text}";
-                callArgs = inv.ArgumentList.Arguments
-                    .Select(a => ConvertExpression(a.Expression))
-                    .ToList();
-            }
-            else
-            {
-                var memberName = condAccess.WhenNotNull.ToString().TrimStart('.');
-                callTarget = $"{conditionRef}.{memberName}";
-            }
-
-            // Hoist complex arguments (§NEW, §LAM, etc.) that the parser can't handle nested inside §C
-            HoistComplexArguments(callArgs);
-
-            var nullCheck = new IfStatementNode(
-                GetTextSpan(node),
-                condId,
-                new BinaryOperationNode(GetTextSpan(node), BinaryOperator.NotEqual,
-                    new ReferenceNode(GetTextSpan(node), conditionRef),
-                    new ReferenceNode(GetTextSpan(node), "null")),
-                new StatementNode[]
-                {
-                    new CallStatementNode(
-                        GetTextSpan(node),
-                        callTarget,
-                        fallible: false,
-                        callArgs,
-                        new AttributeCollection())
-                },
-                Array.Empty<ElseIfClauseNode>(),
-                null,
-                new AttributeCollection());
-
-            return nullCheck;
+            // Desugaring ?. into != null can invoke overloaded equality, repeat
+            // property getters, and hoist arguments outside the non-null branch.
+            throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
         }
 
         // Default: wrap as call statement
@@ -8804,6 +8745,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 LiteralExpressionSyntax literal => ConvertLiteral(literal),
                 IdentifierNameSyntax identifier => new ReferenceNode(GetTextSpan(identifier), identifier.Identifier.ValueText),
+                BinaryExpressionSyntax binary when binary.IsKind(SyntaxKind.LogicalAndExpression) ||
+                    binary.IsKind(SyntaxKind.LogicalOrExpression) || binary.IsKind(SyntaxKind.CoalesceExpression) =>
+                    ConvertConditionalRegion(binary, () => ConvertBinaryExpression(binary)),
                 BinaryExpressionSyntax binary => ConvertBinaryExpression(binary),
                 PrefixUnaryExpressionSyntax addrOf when addrOf.IsKind(SyntaxKind.AddressOfExpression) => ConvertAddressOfExpression(addrOf),
                 PrefixUnaryExpressionSyntax deref when deref.IsKind(SyntaxKind.PointerIndirectionExpression) => ConvertPointerDereferenceExpression(deref),
@@ -8816,14 +8760,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ObjectCreationExpressionSyntax objCreation => ConvertObjectCreation(objCreation),
                 ThisExpressionSyntax => new ThisExpressionNode(GetTextSpan(expression)),
                 BaseExpressionSyntax => new BaseExpressionNode(GetTextSpan(expression)),
-                ConditionalExpressionSyntax conditional => ConvertConditionalExpression(conditional),
+                ConditionalExpressionSyntax conditional =>
+                    ConvertConditionalRegion(conditional, () => ConvertConditionalExpression(conditional)),
                 ArrayCreationExpressionSyntax arrayCreation => ConvertArrayCreation(arrayCreation),
                 ImplicitArrayCreationExpressionSyntax implicitArray => ConvertImplicitArrayCreation(implicitArray),
                 ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
                 LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
                 AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
                 InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
-                ConditionalAccessExpressionSyntax condAccess => ConvertConditionalAccess(condAccess),
+                ConditionalAccessExpressionSyntax condAccess =>
+                    ConvertConditionalRegion(condAccess, () => ConvertConditionalAccess(condAccess)),
                 CastExpressionSyntax cast => ConvertCastExpression(cast),
                 IsPatternExpressionSyntax isPattern => ConvertIsPatternExpression(isPattern),
                 CollectionExpressionSyntax collection => ConvertCollectionExpression(collection),
@@ -8870,6 +8816,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // verbatim (#770), instead of emitting parse-valid §ERR poison.
             _context.IncrementSkipped();
             throw EscalateExpression(expression, "conversion-error");
+        }
+    }
+
+    private ExpressionNode ConvertConditionalRegion(ExpressionSyntax expression, Func<ExpressionNode> convert)
+    {
+        var enclosingPending = _pendingStatements.ToList();
+        _pendingStatements.Clear();
+        var succeeded = false;
+        try
+        {
+            var result = convert();
+            if (_pendingStatements.Count != 0)
+            {
+                // A statement prelude cannot represent a conditionally evaluated
+                // operand. Preserve its member rather than execute it eagerly.
+                throw EscalateExpression(expression, "conditional-expression-hoisting", preserveMember: true);
+            }
+            succeeded = true;
+            return result;
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            if (succeeded)
+                _pendingStatements.AddRange(enclosingPending);
         }
     }
 
@@ -12255,6 +12226,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("null-conditional");
 
+        if (condAccess.WhenNotNull is not MemberBindingExpressionSyntax &&
+            condAccess.WhenNotNull is not InvocationExpressionSyntax
+            {
+                Expression: MemberBindingExpressionSyntax { Name: IdentifierNameSyntax }
+            })
+        {
+            throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
+        }
+
         var target = ConvertExpression(condAccess.Expression);
 
         // When WhenNotNull is a method call (e.g., obj?.Method(x)),
@@ -12262,6 +12242,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (condAccess.WhenNotNull is InvocationExpressionSyntax invocation
             && invocation.Expression is MemberBindingExpressionSyntax memberBinding)
         {
+            if (invocation.ArgumentList.Arguments.Any(argument =>
+                argument.NameColon != null || argument.RefKindKeyword != default))
+            {
+                throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
+            }
             _context.RecordFeatureUsage("null-conditional-method");
             var methodName = memberBinding.Name.Identifier.Text;
             var convertedArgs = invocation.ArgumentList.Arguments
@@ -12683,7 +12668,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// expressions must never become parse-valid §ERR "TODO" poison or silent
     /// semantic substitutions inside otherwise-native output.
     /// </summary>
-    private MemberInteropEscalationException EscalateExpression(SyntaxNode node, string featureName)
+    private MemberInteropEscalationException EscalateExpression(
+        SyntaxNode node, string featureName, bool preserveMember = false)
     {
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
@@ -12701,7 +12687,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new MemberInteropEscalationException(featureName, line,
-            $"Unsupported {featureName} escalated to containing member: {code}");
+            $"Unsupported {featureName} escalated to containing member: {code}", preserveMember);
     }
 
     /// <summary>
@@ -13116,11 +13102,13 @@ internal sealed class MemberInteropEscalationException : NotSupportedException
 {
     public string FeatureName { get; }
     public int Line { get; }
+    public bool PreserveMember { get; }
 
-    public MemberInteropEscalationException(string featureName, int line, string message)
+    public MemberInteropEscalationException(string featureName, int line, string message, bool preserveMember = false)
         : base(message)
     {
         FeatureName = featureName;
         Line = line;
+        PreserveMember = preserveMember;
     }
 }
