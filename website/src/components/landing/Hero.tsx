@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Github, ArrowRight } from 'lucide-react';
+import { Github, ArrowRight, Pause, Play } from 'lucide-react';
 import { getBasePath } from '@/lib/utils';
 import { trackCtaClick, trackOutboundLink } from '@/lib/analytics';
 
@@ -12,20 +12,88 @@ const basePath = getBasePath();
 
 export function Hero() {
   const heroRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Mutable: the callback ref below assigns it, so it cannot be a readonly RefObject.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [allowVideo, setAllowVideo] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // Whether the whole file has arrived. This decides what a PAUSE means.
+  //
+  // Pausing used to unmount the element unconditionally, which aborts the download —
+  // right when bytes are still coming, wrong once they have all landed: resuming then
+  // re-fetched the full 2 MB (measured: a second request of 2,093,841 bytes, the entire
+  // file, on every resume). On a real connection that is seconds of frozen poster after
+  // pressing play, and five toggles cost 10 MB.
+  //
+  // So: paused mid-download still tears the element down and abandons the transfer,
+  // because those bytes are not spent yet and stopping genuinely saves them. Paused
+  // after the file is complete keeps the element and merely pauses it — the bytes are
+  // already spent, and throwing them away buys nothing. Resuming is then instant and
+  // costs nothing. Every CONSTRAINT (reduced motion, narrow viewport, Save-Data, 2g/3g)
+  // clears allowVideo, which unmounts regardless of this flag, so the data protections
+  // are untouched.
+  const [downloaded, setDownloaded] = useState(false);
+  // Records a DELIBERATE pause, so that a later media-query change — resizing back
+  // across the md breakpoint, a connection event — re-enables the control without
+  // restarting a video the visitor chose to stop.
+  const userChosePlayback = useRef(false);
+
+  // Teardown belongs to the ELEMENT's lifetime, not to a state change, so it hangs off
+  // a callback ref: React invokes this with null exactly when the video leaves the DOM.
+  // Stripping the source and calling load() is what aborts a download still in flight.
+  const attachVideo = useCallback((node: HTMLVideoElement | null) => {
+    const previous = videoRef.current;
+    videoRef.current = node;
+    if (node || !previous) return;
+    previous.pause();
+    previous.removeAttribute('src');
+    previous.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
+    previous.load();
+  }, []);
+
+  // Answered at the moment the decision is made — when pause is pressed — rather than
+  // tracked from media events. Trying to track it was a race: no single event is
+  // reliable (the last `progress` can arrive while `duration` is still NaN, and
+  // `canplaythrough` fires well before the transfer ends), so the flag could stay false
+  // on a video that had in fact finished. Asking `buffered` directly at click time has
+  // no such window.
+  //
+  // Note `canplaythrough` would be the wrong question anyway: it means "enough buffered
+  // to play to the end at this rate", not "the bytes are spent".
+  const isFullyDownloaded = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(video.duration)) return false;
+    const buffered = video.buffered;
+    return buffered.length > 0 && buffered.end(buffered.length - 1) >= video.duration - 0.25;
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    return () => {
+    if (!playing) {
       video.pause();
-      video.removeAttribute('src');
-      video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
-      video.load();
+      return;
+    }
+    // The `autoPlay` attribute is not a guarantee, so playback is also started
+    // explicitly. Measured in Chrome: with the tab rendered but NOT focused
+    // (document.hasFocus() === false), the attribute left the video at
+    // `paused: true, currentTime: 0` even at readyState 4 — fully buffered and
+    // simply never started — while an explicit play() on the same element
+    // resolved without rejection. That is the cmd-click / open-in-background-tab
+    // / session-restore path, and it is the same failure shape as the hero
+    // stagger documented in globals.css: the decoration silently never runs for
+    // whoever did not arrive by a focused top-level navigation.
+    //
+    // Retrying on `canplay` and `visibilitychange` covers the element mounting
+    // before it has data, and the background tab that is only looked at later.
+    const start = () => { void video.play().catch(() => {}); };
+    start();
+    video.addEventListener('canplay', start);
+    document.addEventListener('visibilitychange', start);
+    return () => {
+      video.removeEventListener('canplay', start);
+      document.removeEventListener('visibilitychange', start);
     };
-  }, [allowVideo, playing]);
+  }, [allowVideo, playing, downloaded]);
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -37,7 +105,17 @@ export function Hero() {
       const allowed = !motion.matches && desktop.matches && !connection?.saveData
         && !['slow-2g', '2g', '3g'].includes(connection?.effectiveType || '');
       setAllowVideo(allowed);
-      if (!allowed) setPlaying(false);
+      // Play by default wherever playback is allowed at all. `allowed` is already the
+      // conservative gate — desktop only, no prefers-reduced-motion, no Save-Data and
+      // not on a 2g/3g connection — so the click that used to be required on top of it
+      // meant the animation effectively never ran. Every constrained visitor still
+      // fetches nothing; see the tests in tests/assets.spec.ts.
+      if (!allowed) {
+        setPlaying(false);
+        setDownloaded(false);
+      } else if (!userChosePlayback.current) {
+        setPlaying(true);
+      }
     };
     update();
     motion.addEventListener('change', update);
@@ -50,42 +128,31 @@ export function Hero() {
     };
   }, []);
 
-  useEffect(() => {
-    const el = heroRef.current;
-    if (!el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    // Stagger hero elements on load
-    const children = el.querySelectorAll('[data-hero-animate]');
-    children.forEach((child, i) => {
-      const htmlChild = child as HTMLElement;
-      htmlChild.style.opacity = '0';
-      htmlChild.style.transform = 'translateY(24px)';
-      htmlChild.style.transition = 'opacity 0.7s ease-out, transform 0.7s ease-out';
-      htmlChild.style.transitionDelay = `${200 + i * 150}ms`;
-      requestAnimationFrame(() => {
-        htmlChild.style.opacity = '1';
-        htmlChild.style.transform = 'translateY(0)';
-      });
-    });
-  }, []);
+  // The entrance stagger lives in CSS (`[data-hero-animate]` in globals.css) and
+  // animates transform only, never opacity. It used to live here, setting opacity to
+  // 0 and restoring it in a requestAnimationFrame; rAF does not fire in a hidden tab,
+  // and the restore did not survive the re-render when allowVideo resolves, so the
+  // hero could render as an empty card. See the keyframes comment for why the CSS
+  // version must not fade opacity either. Per-element delays are set below.
 
   return (
     <section className="relative overflow-hidden py-8 sm:py-12">
-      {/* Poster is the default: no decorative video request before explicit opt-in. */}
+      {/* The poster paints first and sits behind the video, so the hero is never blank
+          while the video loads — and it stays the only asset fetched wherever the gate
+          above says no. */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
           style={{ backgroundImage: `url(${basePath}/calor-lava-poster.jpg)` }}
           aria-hidden="true"
         />
-      {allowVideo && playing && (
+      {allowVideo && (playing || downloaded) && (
         <video
-          ref={videoRef}
+          ref={attachVideo}
           autoPlay
           loop
           muted
           playsInline
-          preload="none"
+          preload="auto"
           className="absolute inset-0 w-full h-full object-cover -z-20"
           poster={`${basePath}/calor-lava-poster.jpg`}
           aria-hidden="true"
@@ -93,6 +160,32 @@ export function Hero() {
           <source src={`${basePath}/calor-lava.mp4`} type="video/mp4" />
         </video>
       )}
+
+      {/* Both edges of the video are softened into the page background, so the hero
+          neither starts nor ends on a hard horizontal line where the footage is cut
+          off. The ramp is 30px on each edge.
+
+          The colour is `background` at both ends and that is correct in both themes:
+          below the hero is the page itself, and above it is the header, which is
+          `bg-background/95` (Header.tsx) sitting at the top of that same page.
+
+          Sizes differ for one reason. The top element is exactly the 30px ramp. The
+          bottom is 54px — the same 30px ramp, then a hard stop that stays opaque for
+          another 24px. That tail is not decoration: the divider below is a WAVY path,
+          not a rectangle, so it covers only part of its own 24px band and roughly 10px
+          of video showed through above the curve. Going opaque before that band and
+          staying opaque through it covers the gap at every x position. Shrinking the
+          bottom element to a bare 30px brings that strip of video straight back. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[30px]"
+        style={{ background: 'linear-gradient(to top, transparent, hsl(var(--background)) 30px)' }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[54px]"
+        style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--background)) 30px, hsl(var(--background)))' }}
+        aria-hidden="true"
+      />
 
       {/* Gradient overlay — navy at top/bottom, transparent center */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-calor-navy/80 via-calor-navy/20 to-calor-navy/90" />
@@ -108,7 +201,7 @@ export function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           {/* Frosted glass card */}
           <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-6 sm:px-10 sm:py-8 shadow-2xl">
-            <div className="flex justify-center mb-4" data-hero-animate>
+            <div className="flex justify-center mb-4" data-hero-animate style={{ animationDelay: '200ms' }}>
               <Image
                 src={`${basePath}/calor-logo-256.webp`}
                 alt="Calor logo"
@@ -118,17 +211,17 @@ export function Hero() {
                 priority
               />
             </div>
-            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl font-display" data-hero-animate>
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl font-display" data-hero-animate style={{ animationDelay: '350ms' }}>
               Calor
             </h1>
-            <p className="mt-3 text-base font-medium text-white/90 sm:text-xl font-body" data-hero-animate>
+            <p className="mt-3 text-base font-medium text-white/90 sm:text-xl font-body" data-hero-animate style={{ animationDelay: '500ms' }}>
               A language for coding agents, compiled to C# and .NET.
             </p>
-            <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate>
+            <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate style={{ animationDelay: '650ms' }}>
               Inspect explicit contracts, declared effects, and stable IDs.
             </p>
 
-            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate>
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate style={{ animationDelay: '800ms' }}>
               <Button asChild size="lg" className="bg-gradient-to-r from-calor-pink to-calor-salmon hover:from-calor-pink/90 hover:to-calor-salmon/90 text-white border-0 shadow-lg shadow-calor-pink/25">
                 <Link href="/docs/getting-started/hello-world/" onClick={() => trackCtaClick('get_started')}>
                   Get Started
@@ -152,9 +245,25 @@ export function Hero() {
       </div>
 
       {allowVideo && (
-        <button type="button" onClick={() => setPlaying(!playing)}
-          className="absolute bottom-4 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
-          {playing ? 'Pause background animation' : 'Play background animation'}
+        <button
+          type="button"
+          onClick={() => {
+            userChosePlayback.current = true;
+            // Retain the element on pause only when its bytes are already spent.
+            if (playing) setDownloaded(isFullyDownloaded());
+            setPlaying(!playing);
+          }}
+          // The accessible name stays the full sentence even though the control is now
+          // an icon. It is what a screen reader announces, and what the browser tests
+          // select on (tests/assets.spec.ts) — an icon-only button with no name would
+          // read as "button" and break both at once.
+          aria-label={playing ? 'Pause background animation' : 'Play background animation'}
+          title={playing ? 'Pause background animation' : 'Play background animation'}
+          className="absolute bottom-8 right-6 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/30 bg-calor-navy/70 text-white backdrop-blur-sm transition-colors hover:bg-calor-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          {playing
+            ? <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+            : <Play className="h-3.5 w-3.5" aria-hidden="true" />}
         </button>
       )}
 
