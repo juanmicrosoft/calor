@@ -49,24 +49,8 @@ public class RuntimeValidationTests
                 BinOp(BinaryOperator.Add, Ref("x"), Int(1)),
                 Ref("x")));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        // Extract counterexample
-        var counterexample = ExtractIntCounterexample(result, "x");
-        _output.WriteLine($"Verifier counterexample: x = {counterexample}");
-
-        // Validate at runtime - the contract should actually fail
-        unchecked
-        {
-            int x = counterexample;
-            int xPlusOne = x + 1;
-            bool contractHolds = xPlusOne > x;
-
-            _output.WriteLine($"Runtime: x = {x}, x + 1 = {xPlusOne}, (x + 1 > x) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}: {xPlusOne} > {x} should be false");
-        }
+        var x = int.MaxValue;
+        AssertConditionalOverflow(result, () => checked(x + 1) > x);
     }
 
     #endregion
@@ -95,23 +79,8 @@ public class RuntimeValidationTests
                 BinOp(BinaryOperator.Subtract, Ref("x"), Int(1)),
                 Ref("x")));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        // Fallback to INT_MIN which is the underflow case
-        var counterexample = ExtractIntCounterexample(result, "x", fallback: int.MinValue);
-        _output.WriteLine($"Verifier counterexample: x = {counterexample}");
-
-        unchecked
-        {
-            int x = counterexample;
-            int xMinusOne = x - 1;
-            bool contractHolds = xMinusOne < x;
-
-            _output.WriteLine($"Runtime: x = {x}, x - 1 = {xMinusOne}, (x - 1 < x) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}: {xMinusOne} < {x} should be false");
-        }
+        var x = int.MinValue;
+        AssertConditionalOverflow(result, () => checked(x - 1) < x);
     }
 
     #endregion
@@ -140,25 +109,8 @@ public class RuntimeValidationTests
                 BinOp(BinaryOperator.Multiply, Ref("x"), Int(2)),
                 Ref("x")));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        var counterexample = ExtractIntCounterexample(result, "x");
-        _output.WriteLine($"Verifier counterexample: x = {counterexample}");
-
-        // Verify precondition holds
-        Assert.True(counterexample > 0, "Counterexample should satisfy precondition x > 0");
-
-        unchecked
-        {
-            int x = counterexample;
-            int xTimes2 = x * 2;
-            bool contractHolds = xTimes2 > x;
-
-            _output.WriteLine($"Runtime: x = {x}, x * 2 = {xTimes2}, (x * 2 > x) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}: {xTimes2} > {x} should be false");
-        }
+        var x = int.MaxValue;
+        AssertConditionalOverflow(result, () => checked(x * 2) > x);
     }
 
     #endregion
@@ -187,25 +139,8 @@ public class RuntimeValidationTests
                 BinOp(BinaryOperator.Multiply, Ref("x"), Ref("x")),
                 Int(0)));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        var counterexample = ExtractIntCounterexample(result, "x");
-        _output.WriteLine($"Verifier counterexample: x = {counterexample}");
-
-        // Verify precondition holds
-        Assert.True(counterexample >= 0, "Counterexample should satisfy precondition x >= 0");
-
-        unchecked
-        {
-            int x = counterexample;
-            int xSquared = x * x;
-            bool contractHolds = xSquared >= 0;
-
-            _output.WriteLine($"Runtime: x = {x}, x * x = {xSquared}, (x * x >= 0) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}: {xSquared} >= 0 should be false");
-        }
+        var x = int.MaxValue;
+        AssertConditionalOverflow(result, () => checked(x * x) >= 0);
     }
 
     #endregion
@@ -234,26 +169,8 @@ public class RuntimeValidationTests
                 UnaryOp(UnaryOperator.Negate, Ref("x")),
                 Int(0)));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        // Fallback to INT_MIN which is the only negative value where -x == x
-        var counterexample = ExtractIntCounterexample(result, "x", fallback: int.MinValue);
-        _output.WriteLine($"Verifier counterexample: x = {counterexample}");
-
-        // Verify precondition holds
-        Assert.True(counterexample < 0, "Counterexample should satisfy precondition x < 0");
-
-        unchecked
-        {
-            int x = counterexample;
-            int negX = -x;
-            bool contractHolds = negX > 0;
-
-            _output.WriteLine($"Runtime: x = {x}, -x = {negX}, (-x > 0) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}: {negX} > 0 should be false");
-        }
+        var x = int.MinValue;
+        AssertConditionalOverflow(result, () => checked(-x) > 0);
     }
 
     #endregion
@@ -282,32 +199,8 @@ public class RuntimeValidationTests
                 BinOp(BinaryOperator.Subtract, Ref("x"), Int(1)),
                 Ref("x")));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        // Fallback to 0 which is the wraparound case (0 - 1 = uint.MaxValue)
-        var counterexample = ExtractUIntCounterexample(result, "x", fallback: 0);
-        _output.WriteLine($"Verifier counterexample: x = {counterexample}");
-
-        // If the counterexample isn't 0, we still test it but explain
-        if (counterexample != 0)
-        {
-            _output.WriteLine("Note: Verifier found a different counterexample than expected.");
-            _output.WriteLine("The classic wraparound case is x=0, where x-1 wraps to uint.MaxValue.");
-            _output.WriteLine("Using x=0 to demonstrate the wraparound behavior:");
-            counterexample = 0;
-        }
-
-        unchecked
-        {
-            uint x = counterexample;
-            uint xMinusOne = x - 1;
-            bool contractHolds = xMinusOne < x;
-
-            _output.WriteLine($"Runtime: x = {x}, x - 1 = {xMinusOne}, (x - 1 < x) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}: {xMinusOne} < {x} should be false");
-        }
+        uint x = 0;
+        AssertConditionalOverflow(result, () => checked(x - 1) < x);
     }
 
     #endregion
@@ -348,28 +241,9 @@ public class RuntimeValidationTests
 
         var result = verifier.VerifyPostcondition(parameters, "i32", preconditions, postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
-
-        var xVal = ExtractIntCounterexample(result, "x");
-        var yVal = ExtractIntCounterexample(result, "y");
-        _output.WriteLine($"Verifier counterexample: x = {xVal}, y = {yVal}");
-
-        // Verify preconditions hold
-        Assert.True(xVal > 0, "Counterexample should satisfy precondition x > 0");
-        Assert.True(yVal > 0, "Counterexample should satisfy precondition y > 0");
-
-        unchecked
-        {
-            int x = xVal;
-            int y = yVal;
-            int sum = x + y;
-            bool contractHolds = sum > 0;
-
-            _output.WriteLine($"Runtime: x = {x}, y = {y}, x + y = {sum}, (x + y > 0) = {contractHolds}");
-
-            Assert.False(contractHolds,
-                $"Contract should fail at runtime with x={x}, y={y}: {sum} > 0 should be false");
-        }
+        var x = int.MaxValue;
+        var y = 1;
+        AssertConditionalOverflow(result, () => checked(x + y) > 0);
     }
 
     #endregion
@@ -455,6 +329,13 @@ public class RuntimeValidationTests
     }
 
     #endregion
+
+    private static void AssertConditionalOverflow(ContractVerificationResult result, Func<bool> predicate)
+    {
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
+        Assert.Throws<OverflowException>(() => predicate());
+    }
 
     #region Summary Test
 

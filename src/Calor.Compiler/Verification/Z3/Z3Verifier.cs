@@ -36,6 +36,9 @@ public sealed class Z3Verifier : IDisposable
     public const string ContractExpressionDivisionAssumption =
         "exceptional-paths:contract-division — every division/modulo divisor inside §Q/§S on a verified state is nonzero; a zero divisor makes the runtime contract check itself throw";
 
+    public const string CheckedArithmeticAssumption =
+        "checked-arithmetic — modeled integer operations complete without overflow; overflowing operations throw and runtime guards are retained";
+
     /// <summary>
     /// The array / user-type sibling of <see cref="StringModelAssumption"/>, D14. Same defect one
     /// sort over: Z3's array and uninterpreted sorts are TOTAL and non-null, while C#'s <c>T[]</c>
@@ -68,6 +71,23 @@ public sealed class Z3Verifier : IDisposable
     private readonly uint _timeoutMs;
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
+
+    internal static bool ArithmeticSafetyEntailed(Context context, Solver solver, IEnumerable<BoolExpr> conditions)
+    {
+        var safety = (BoolExpr)context.MkAnd(conditions.ToArray()).Simplify();
+        if (safety.IsTrue)
+            return true;
+        solver.Push();
+        try
+        {
+            solver.Assert(context.MkNot(safety));
+            return solver.Check() == Status.UNSATISFIABLE;
+        }
+        finally
+        {
+            solver.Pop();
+        }
+    }
 
     public Z3Verifier(
         Context ctx,
@@ -330,6 +350,7 @@ public sealed class Z3Verifier : IDisposable
         // "refuted" with a fabricated model. Bodies outside the encodable surface make the
         // obligation honestly Unsupported instead.
         BoolExpr? resultBinding = null;
+        BoolExpr? bodyArithmeticSafety = null;
         IReadOnlyList<BoolExpr> pathConditions = Array.Empty<BoolExpr>();
         if (!string.IsNullOrEmpty(outputType)
             && FunctionBodyEncoder.ReferencesResult(postcondition.Condition))
@@ -360,6 +381,14 @@ public sealed class Z3Verifier : IDisposable
                     Duration: sw.Elapsed);
             }
             resultBinding = _ctx.MkEq(resultVar, encoded);
+            var (bodySafety, safetyReason) = FunctionBodyEncoder.TryEncodeResult(
+                translator, _ctx, body, parameterNames, arithmeticSafetyOnly: true);
+            if (bodySafety is not BoolExpr safety)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"The body's checked arithmetic cannot be modeled: {safetyReason}. Runtime check kept.")),
+                    Duration: sw.Elapsed);
+            bodyArithmeticSafety = safety;
 
             // Division/modulo in the body: Z3 totalizes x/0 (bvsdiv(x,0) = -1), so a model
             // exercising a zero divisor is not runtime-reproducible — at runtime that path
@@ -388,6 +417,7 @@ public sealed class Z3Verifier : IDisposable
         // is demoted to Assumed below (never elides), and a refutation model becomes
         // runtime-genuine (its divisors are nonzero).
         var contractDivisorConditions = new List<BoolExpr>();
+        var checkedArithmeticConditions = new List<BoolExpr>();
         foreach (var contractExpr in preconditions.Select(p => p.Condition).Append(postcondition.Condition))
         {
             var (contractConstraints, contractDivFailure) =
@@ -400,6 +430,13 @@ public sealed class Z3Verifier : IDisposable
                     Duration: sw.Elapsed);
             }
             contractDivisorConditions.AddRange(contractConstraints);
+            var arithmeticSafety = translator.GetCheckedArithmeticSafety(contractExpr);
+            if (arithmeticSafety == null)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        "Contract checked-arithmetic safety could not be modeled. Runtime check kept.")),
+                    Duration: sw.Elapsed);
+            checkedArithmeticConditions.Add(arithmeticSafety);
         }
 
         // Create solver and perform verification
@@ -447,6 +484,18 @@ public sealed class Z3Verifier : IDisposable
                 }
             }
 
+            if (bodyArithmeticSafety != null)
+                solver.Assert(bodyArithmeticSafety);
+            var checkedArithmeticAssumed = !ArithmeticSafetyEntailed(_ctx, solver, checkedArithmeticConditions);
+            foreach (var condition in checkedArithmeticConditions)
+                solver.Assert(condition);
+            if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })
+                && solver.Check() == Status.UNSATISFIABLE)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        "No overflow-free execution satisfies the modeled assumptions. Runtime check kept.")),
+                    Duration: sw.Elapsed);
+
             // Assert the negation of the postcondition
             // If this is UNSAT, the postcondition always holds when preconditions hold
             solver.Assert(_ctx.MkNot(postconditionExpr));
@@ -482,10 +531,15 @@ public sealed class Z3Verifier : IDisposable
 
             if (status == Status.UNSATISFIABLE
                 && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed
-                    || referenceModelAssumed))
+                    || referenceModelAssumed || checkedArithmeticAssumed))
             {
                 var assumptions = new List<string>();
                 var reasons = new List<string>();
+                if (checkedArithmeticAssumed)
+                {
+                    assumptions.Add(CheckedArithmeticAssumption);
+                    reasons.Add("checked arithmetic completes without overflow");
+                }
                 if (pathConditions.Count > 0)
                 {
                     assumptions.Add(ExceptionalPathDivisionAssumption);
@@ -698,7 +752,8 @@ public static class FunctionBodyEncoder
         ContractTranslator translator,
         Context ctx,
         IReadOnlyList<StatementNode>? body,
-        IReadOnlyCollection<string> declaredParameters)
+        IReadOnlyCollection<string> declaredParameters,
+        bool arithmeticSafetyOnly = false)
     {
         if (body == null || body.Count == 0)
             return (null, "the function body is empty or unavailable");
@@ -731,7 +786,8 @@ public static class FunctionBodyEncoder
             translator, ctx, body, 0,
             env: new Dictionary<string, ExpressionNode>(StringComparer.Ordinal),
             depth: 0,
-            continuation: null);
+            continuation: null,
+            arithmeticSafetyOnly);
     }
 
     /// <summary>
@@ -1144,7 +1200,8 @@ public static class FunctionBodyEncoder
         int index,
         Dictionary<string, ExpressionNode> env,
         int depth,
-        Func<(Expr?, string?)>? continuation)
+        Func<(Expr?, string?)>? continuation,
+        bool arithmeticSafetyOnly)
     {
         if (depth > MaxEncodeDepth)
             return (null, $"branch nesting exceeds the encoder's bound ({MaxEncodeDepth})");
@@ -1163,7 +1220,9 @@ public static class FunctionBodyEncoder
                 var (substituted, substReason) = SubstituteBindings(ret.Expression, env);
                 if (substituted == null)
                     return (null, substReason);
-                var value = translator.Translate(substituted);
+                var value = arithmeticSafetyOnly
+                    ? translator.GetCheckedArithmeticSafety(substituted)
+                    : translator.Translate(substituted);
                 return value != null
                     ? (value, null)
                     : (null, translator.DiagnoseTranslationFailure(substituted)
@@ -1200,7 +1259,14 @@ public static class FunctionBodyEncoder
                 {
                     [bind.Name] = substInit
                 };
-                return EncodeSequence(translator, ctx, statements, index + 1, extended, depth, continuation);
+                var result = EncodeSequence(
+                    translator, ctx, statements, index + 1, extended, depth, continuation, arithmeticSafetyOnly);
+                if (!arithmeticSafetyOnly || result.Result == null)
+                    return result;
+                var initializerSafety = translator.GetCheckedArithmeticSafety(substInit);
+                return initializerSafety == null
+                    ? (null, "binding initializer arithmetic safety is outside the modeled surface")
+                    : (ctx.MkAnd(initializerSafety, (BoolExpr)result.Result), null);
             }
 
             case IfStatementNode ifStmt:
@@ -1212,10 +1278,11 @@ public static class FunctionBodyEncoder
                 // The captured env is the PRE-branch environment by construction.
                 (Expr?, string?)? fallThroughMemo = null;
                 Func<(Expr?, string?)> fallThrough = () =>
-                    fallThroughMemo ??= EncodeSequence(translator, ctx, statements, index + 1, env, depth, continuation);
+                    fallThroughMemo ??= EncodeSequence(
+                        translator, ctx, statements, index + 1, env, depth, continuation, arithmeticSafetyOnly);
 
                 var (elseValue, elseReason) = ifStmt.ElseBody != null
-                    ? EncodeSequence(translator, ctx, ifStmt.ElseBody, 0, env, depth + 1, fallThrough)
+                    ? EncodeSequence(translator, ctx, ifStmt.ElseBody, 0, env, depth + 1, fallThrough, arithmeticSafetyOnly)
                     : fallThrough();
                 if (elseValue == null)
                     return (null, elseReason);
@@ -1229,12 +1296,20 @@ public static class FunctionBodyEncoder
                     var clauseCond = translator.TranslateBoolExpr(clauseCondSubst);
                     if (clauseCond == null)
                         return (null, "an elseif condition is outside the modeled surface");
-                    var (clauseValue, clauseReason) = EncodeSequence(translator, ctx, clause.Body, 0, env, depth + 1, fallThrough);
+                    var (clauseValue, clauseReason) = EncodeSequence(
+                        translator, ctx, clause.Body, 0, env, depth + 1, fallThrough, arithmeticSafetyOnly);
                     if (clauseValue == null)
                         return (null, clauseReason);
                     if (!clauseValue.Sort.Equals(elseValue.Sort))
                         return (null, "branches return values of different solver sorts");
                     elseValue = ctx.MkITE(clauseCond, clauseValue, elseValue);
+                    if (arithmeticSafetyOnly)
+                    {
+                        var clauseSafety = translator.GetCheckedArithmeticSafety(clauseCondSubst);
+                        if (clauseSafety == null)
+                            return (null, "elseif arithmetic safety is outside the modeled surface");
+                        elseValue = ctx.MkAnd(clauseSafety, (BoolExpr)elseValue);
+                    }
                 }
 
                 var (condSubst, condReason) = SubstituteBindings(ifStmt.Condition, env);
@@ -1243,13 +1318,20 @@ public static class FunctionBodyEncoder
                 var cond = translator.TranslateBoolExpr(condSubst);
                 if (cond == null)
                     return (null, "an if condition is outside the modeled surface");
-                var (thenValue, thenReason) = EncodeSequence(translator, ctx, ifStmt.ThenBody, 0, env, depth + 1, fallThrough);
+                var (thenValue, thenReason) = EncodeSequence(
+                    translator, ctx, ifStmt.ThenBody, 0, env, depth + 1, fallThrough, arithmeticSafetyOnly);
                 if (thenValue == null)
                     return (null, thenReason);
                 if (!thenValue.Sort.Equals(elseValue.Sort))
                     return (null, "branches return values of different solver sorts");
 
-                return (ctx.MkITE(cond, thenValue, elseValue), null);
+                var combined = ctx.MkITE(cond, thenValue, elseValue);
+                if (!arithmeticSafetyOnly)
+                    return (combined, null);
+                var conditionSafety = translator.GetCheckedArithmeticSafety(condSubst);
+                return conditionSafety == null
+                    ? (null, "if arithmetic safety is outside the modeled surface")
+                    : (ctx.MkAnd(conditionSafety, (BoolExpr)combined), null);
             }
 
             default:

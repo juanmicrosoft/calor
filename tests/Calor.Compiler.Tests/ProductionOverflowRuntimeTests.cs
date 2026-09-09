@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Verification;
+using Calor.Compiler.Verification.Z3;
+using Calor.Compiler.Verification.Z3.Cache;
 using Calor.Enforcement.Tests;
 using Xunit;
 
@@ -7,6 +10,112 @@ namespace Calor.Compiler.Tests;
 
 public class ProductionOverflowRuntimeTests
 {
+    [Theory]
+    [InlineData("(== (- (+ value 1) 1) value)", int.MaxValue)]
+    [InlineData("(== (- (- value 1) -1) value)", int.MinValue)]
+    [InlineData("(== (* value 2) (* 2 value))", int.MaxValue)]
+    [InlineData("(== (- (- value)) value)", int.MinValue)]
+    public void Verification_CannotElideOverflowingIdentityGuard(string predicate, int boundary)
+    {
+        var source = $$"""
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §S {{predicate}}
+                §R value
+            """;
+        var options = VerifiedOptions();
+        var compiled = Program.Compile(source, "overflow.calr", options);
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Verification is { Status: ProofStatus.Assumed } outcome
+            && outcome.Assumptions.Contains(Z3Verifier.CheckedArithmeticAssumption));
+        Assert.IsType<OverflowException>(TestHarness.Execute(source, "Probe", [boundary], options).Exception);
+        var safe = TestHarness.Execute(source, "Probe", [0], options);
+        Assert.Null(safe.Exception);
+        Assert.Equal(0, safe.ReturnValue);
+    }
+
+    [Fact]
+    public void VerifiedBody_NormalReturnProofDoesNotSuppressBodyOverflow()
+    {
+        const string source = """
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §Q (>= value 0)
+                §S (>= result 0)
+                §R (* value value)
+            """;
+        var options = VerifiedOptions();
+        var compiled = Program.Compile(source, "overflow.calr", options);
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
+        Assert.IsType<OverflowException>(TestHarness.Execute(source, "Probe", [int.MaxValue], options).Exception);
+        var safe = TestHarness.Execute(source, "Probe", [3], options);
+        Assert.Null(safe.Exception);
+        Assert.Equal(9, safe.ReturnValue);
+    }
+
+    [Theory]
+    [InlineData("(forall ((i i32)) (-> (&& (>= i 0) (< i 1)) (== (- (+ value 1) 1) value)))")]
+    [InlineData("(exists ((i i32)) (&& (&& (>= i 0) (< i 1)) (== (- (+ value 1) 1) value)))")]
+    public void QuantifiedIdentity_KeepsOverflowingRuntimePredicate(string predicate)
+    {
+        var source = $$"""
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §S {{predicate}}
+                §R value
+            """;
+        var options = VerifiedOptions();
+        Assert.IsType<OverflowException>(TestHarness.Execute(source, "Probe", [int.MaxValue], options).Exception);
+        var safe = TestHarness.Execute(source, "Probe", [0], options);
+        Assert.Null(safe.Exception);
+        Assert.Equal(0, safe.ReturnValue);
+    }
+
+    [Theory]
+    [InlineData("(-> (< value 2147483647) (== (- (+ value 1) 1) value))")]
+    [InlineData("(|| (== value 2147483647) (== (- (+ value 1) 1) value))")]
+    [InlineData("(== (? (< value 2147483647) (== (- (+ value 1) 1) value) true) true)")]
+    public void GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow(string predicate)
+    {
+        var source = $$"""
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §S {{predicate}}
+                §R value
+            """;
+        var options = VerifiedOptions();
+        var compiled = Program.Compile(source, "overflow.calr", options);
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.Contains(compiled.Diagnostics, diagnostic =>
+            diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
+        var execution = TestHarness.Execute(source, "Probe", [int.MaxValue], options);
+        Assert.Null(execution.Exception);
+        Assert.Equal(int.MaxValue, execution.ReturnValue);
+    }
+
+    [Fact]
+    public void ObligationSolver_CannotElideOverflowingIdentity()
+    {
+        const string source = """
+            §M{m1:Overflow}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §PROOF{p1:checked} (== (- (+ value 1) 1) value)
+                §R value
+            """;
+        var options = VerifiedOptions();
+        Assert.IsType<OverflowException>(TestHarness.Execute(source, "Probe", [int.MaxValue], options).Exception);
+        var safe = TestHarness.Execute(source, "Probe", [0], options);
+        Assert.Null(safe.Exception);
+        Assert.Equal(0, safe.ReturnValue);
+    }
+
     [Theory]
     [InlineData("+", int.MaxValue, 1, 3, 4, 7)]
     [InlineData("-", int.MinValue, 1, 7, 4, 3)]
@@ -156,5 +265,18 @@ public class ProductionOverflowRuntimeTests
         EnableTypeChecking = true,
         EnforceEffects = true,
         StatusWriter = TextWriter.Null
+    };
+
+    private static CompilationOptions VerifiedOptions() => new()
+    {
+        EnableTypeChecking = true,
+        EnforceEffects = true,
+        VerifyContracts = true,
+        VerifyRefinements = true,
+        ElideProvenGuards = true,
+        Verbose = true,
+        ContractMode = ContractMode.Debug,
+        StatusWriter = TextWriter.Null,
+        VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
     };
 }

@@ -212,6 +212,13 @@ Generated-C# validation and the projects used by `calor run` and `calor test`
 also enable overflow checking. The source-level checks preserve the native
 policy when generated C# is compiled separately with ordinary Roslyn settings.
 
+Contract verification checks whether arithmetic in a predicate can overflow.
+If its safety follows from the preconditions and lazy evaluation paths, a proof
+can still remove that guard. Otherwise a conditional proof reports the
+`checked-arithmetic` assumption and keeps the runtime check. Postconditions
+describe normal returns: overflow in the function body still throws before a
+postcondition is evaluated.
+
 There is currently no `--overflow` switch. The earlier reference to that flag
 described an unimplemented option, not a supported wrap mode. This implementation
 corrects the backend to the existing semantics 2.0 TRAP policy; it does not
