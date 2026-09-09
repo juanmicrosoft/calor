@@ -237,6 +237,21 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
     }
 
     [Fact]
+    public void NestedRightOperandControl_PreservesLeftEffect()
+    {
+        var sample = NumberLeaves(new Sample("expression",
+            new Term("+", Left: new Term("literal", int.MinValue),
+                Right: new Term("/", Left: new Term("literal", int.MaxValue),
+                    Right: new Term("literal", 6))),
+            new Term("literal"), 0, 42));
+        var expected = Evaluate(sample);
+        Assert.Equal(-1789569707, expected.Value);
+        Assert.Null(expected.ExceptionType);
+        Assert.Equal(new[] { 1, 2, 3 }, expected.Trace);
+        CheckSample(sample);
+    }
+
+    [Fact]
     public void LeftExceptionControl_SuppressesRightOperandEffects()
     {
         var sample = NumberLeaves(new Sample("loop",
