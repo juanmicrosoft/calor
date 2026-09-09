@@ -11410,15 +11410,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .FirstOrDefault(type => type is not null && type.TypeKind != TypeKind.Error);
             var body = ConvertExpression(expression);
             if (_pendingStatements.Count > 0
-                || expression.DescendantNodes().Any(node => node is InvocationExpressionSyntax)
-                || expression.DescendantNodesAndSelf().Any(node =>
-                    node is BaseObjectCreationExpressionSyntax or AnonymousObjectCreationExpressionSyntax
-                        or ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax
-                        or CollectionExpressionSyntax or AssignmentExpressionSyntax
-                    || node.IsKind(SyntaxKind.PreIncrementExpression)
-                    || node.IsKind(SyntaxKind.PostIncrementExpression)
-                    || node.IsKind(SyntaxKind.PreDecrementExpression)
-                    || node.IsKind(SyntaxKind.PostDecrementExpression))
+                || !IsInlineNativeQuerySelector(expression)
                 || parameterReferences.Count > 0 && parameterType == null)
             {
                 // Query selectors are deferred, and IQueryable also requires an
@@ -11437,6 +11429,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _pendingStatements.AddRange(savedPending);
         }
     }
+
+    private static bool IsInlineNativeQuerySelector(ExpressionSyntax expression) =>
+        expression.DescendantNodesAndSelf().OfType<ExpressionSyntax>().All(node => node switch
+        {
+            IdentifierNameSyntax or LiteralExpressionSyntax or BinaryExpressionSyntax
+                or ParenthesizedExpressionSyntax => true,
+            PrefixUnaryExpressionSyntax unary => unary.IsKind(SyntaxKind.UnaryMinusExpression)
+                || unary.IsKind(SyntaxKind.UnaryPlusExpression)
+                || unary.IsKind(SyntaxKind.LogicalNotExpression)
+                || unary.IsKind(SyntaxKind.BitwiseNotExpression),
+            InvocationExpressionSyntax { Expression: IdentifierNameSyntax } => node == expression,
+            _ => false
+        });
 
     /// <summary>
     /// Creates a single-parameter lambda expression node for LINQ operations.

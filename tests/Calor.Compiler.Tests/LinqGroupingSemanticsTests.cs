@@ -29,6 +29,8 @@ public class LinqGroupingSemanticsTests
     [InlineData("from n in values group new Box(n).Item by n % 2", "1:1|0:2", "CC", true)]
     [InlineData("from n in values group new Box(Element(n)).Item by Key(n)", "1:10|0:20", "K1E1CK2E2C", true)]
     [InlineData("from n in values group new Box(-1).Item by n % 2", "throws:InvalidOperationException", "C", true)]
+    [InlineData("from n in values group values[n - 1] + 10 by n % 2", "1:11|0:12", "", true)]
+    [InlineData("from n in values group values[3] + n by n % 2", "throws:IndexOutOfRangeException", "", true)]
     public void Grouping_PreservesElementsAndDeferredRepeatedEnumeration(
         string query, string expectedGroups, string tracePerEnumeration, bool preserved)
     {
@@ -48,6 +50,13 @@ public class LinqGroupingSemanticsTests
     {
         AssertEquivalent("from n in Source(values) group Element(n) by Key(n)",
             "before=S;first=1:10|0:20:SK1E1K2E2;second=1:10|0:20:SK1E1K2E2K1E1K2E2", preserved: false);
+    }
+
+    [Fact]
+    public void Grouping_DoesNotSnapshotIndexedStateBeforeEnumeration()
+    {
+        AssertEquivalent("from n in values group values[0] + n by n % 2",
+            "before=;first=0:20,12:;second=0:20,12:", preserved: true, mutateInput: true);
     }
 
     [Fact]
@@ -95,7 +104,7 @@ public class LinqGroupingSemanticsTests
         Assert.IsType<Action>(Compile(compiled.GeneratedCode).GetMethod("Build")!.Invoke(null, null));
     }
 
-    private static void AssertEquivalent(string query, string expected, bool preserved)
+    private static void AssertEquivalent(string query, string expected, bool preserved, bool mutateInput = false)
     {
         var source = $$"""
             using System;
@@ -148,17 +157,20 @@ public class LinqGroupingSemanticsTests
             StatusWriter = TextWriter.Null
         });
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
-        Assert.Equal(expected, Observe(source));
-        Assert.Equal(expected, Observe(compiled.GeneratedCode));
+        Assert.Equal(expected, Observe(source, mutateInput));
+        Assert.Equal(expected, Observe(compiled.GeneratedCode, mutateInput));
     }
 
-    private static string Observe(string source)
+    private static string Observe(string source, bool mutateInput)
     {
         var type = Compile(source);
+        var values = new[] {1, 2};
         var query = (IEnumerable<IGrouping<int, int>>)type.GetMethod("Build")!
-            .Invoke(null, [new[] {1, 2}])!;
+            .Invoke(null, [values])!;
         var trace = type.GetField("Trace")!;
         var before = trace.GetValue(null);
+        if (mutateInput)
+            values[0] = 10;
         type.GetField("Factor")!.SetValue(null, 20);
         var first = Enumerate(query) + ":" + trace.GetValue(null);
         type.GetField("Factor")!.SetValue(null, 30);
