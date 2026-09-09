@@ -436,7 +436,7 @@ public class TypeOperationTests
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
-        Assert.Contains("(int)x + 1", code);
+        Assert.Contains("(int)(x + 1)", code);
     }
 
     [Fact]
@@ -470,13 +470,13 @@ public class TypeOperationTests
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
-        Assert.Contains("(int)(double)x", code);
+        Assert.Contains("(int)((double)x)", code);
     }
 
     [Fact]
     public void Parse_IsNestedInCast_Works()
     {
-        // Unusual but valid: (cast i32 (is x str)) — cast bool result to int
+        // Parsing preserves this composition; C# validation rejects bool-to-int casts.
         var source = WrapInFunction("§R (cast i32 (is x str))");
         var module = Parse(source, out var diagnostics);
 
@@ -490,7 +490,7 @@ public class TypeOperationTests
 
         var emitter = new CSharpEmitter();
         var code = emitter.Emit(module);
-        Assert.Contains("(int)x is string", code);
+        Assert.Contains("(int)(x is string)", code);
     }
 
     [Fact]

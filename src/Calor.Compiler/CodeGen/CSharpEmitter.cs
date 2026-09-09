@@ -8216,6 +8216,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(TypeOperationNode node)
     {
         var operand = node.Operand.Accept(this);
+        if (!IsAtomicOperand(node.Operand) || operand.StartsWith('-'))
+            operand = $"({operand})";
         var csharpType = MapTypeName(node.TargetType);
         return node.Operation switch
         {

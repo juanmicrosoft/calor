@@ -15,6 +15,20 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void PreservedArithmetic_StaysInsideCast(bool verify)
+    {
+        var equal = Compile(Function("f64", "(== (cast i32 (- x x)) INT:0)"), verify);
+        var unequal = Compile(Function("f64", "(!= (cast i32 (- x x)) INT:0)"), verify);
+        foreach (var value in new[] { 1.5, -1.5, 0.0, 10.0 })
+        {
+            Assert.Equal(7, Invoke(equal, value));
+            AssertContractViolation(() => Invoke(unequal, value));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void PreservedBinaryOperators_GroupNullableOperands(bool verify)
     {
         var right = Compile(Function("bool?", "(&& true (?? x false))"), verify);
