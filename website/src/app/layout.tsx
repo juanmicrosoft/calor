@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { WhatsNewBanner } from '@/components/landing/WhatsNewBanner';
 import './globals.css';
+import { themeScript } from '@/lib/theme';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -73,6 +74,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
       <body className={`${dmSans.variable} ${displayFont.variable} ${jetbrainsMono.variable} ${vt323.variable} font-body antialiased`}>
         <div className="relative flex min-h-screen flex-col">
           <WhatsNewBanner />
