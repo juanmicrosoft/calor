@@ -8,8 +8,7 @@ namespace DomainProblems
         public static List<string[]> Parse(string csv)
         {
             var result = new List<string[]>();
-            var lines = csv.Split('
-');
+            var lines = csv.Split('\n');
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
