@@ -151,6 +151,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentYieldRefinement;
     private int _inlineReturnGuardCounter;
     private ReturnLoweringContext? _currentReturnLowering;
+    private string? _currentReturnValueType;
     private string? _postconditionResultIdentifier;
     private int _postconditionResultShadowDepth;
     private int _returnLoweringCounter;
@@ -1090,6 +1091,30 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     private void EmitCallableBody(
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        IReadOnlyList<PostconditionEmission> postconditions,
+        string declarationName,
+        Parsing.TextSpan declarationSpan,
+        CallableReturnShape returnShape,
+        string returnRefinementType,
+        bool isIterator)
+    {
+        var previousReturnValueType = _currentReturnValueType;
+        _currentReturnValueType = returnShape.ValueType;
+        try
+        {
+            EmitCallableBodyCore(body, parameters, typeParameters, postconditions,
+                declarationName, declarationSpan, returnShape, returnRefinementType, isIterator);
+        }
+        finally
+        {
+            _currentReturnValueType = previousReturnValueType;
+        }
+    }
+
+    private void EmitCallableBodyCore(
         IReadOnlyList<StatementNode> body,
         IReadOnlyList<ParameterNode> parameters,
         IReadOnlyList<TypeParameterNode> typeParameters,
@@ -3069,7 +3094,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 return $"goto {lowering.ExitLabel};";
             }
 
-            var loweredExpression = node.Expression.Accept(this);
+            var loweredExpression = EmitTypedExpression(node.Expression, _currentReturnValueType);
             if (lowering.ResultIdentifier == null)
             {
                 return $"return {loweredExpression};";
@@ -3087,7 +3112,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return "return;";
         }
 
-        var expr = node.Expression.Accept(this);
+        var expr = EmitTypedExpression(node.Expression, _currentReturnValueType);
         if (_currentInlineReturnRefinement != null
             && _refinementTypes.TryGetValue(
                 _currentInlineReturnRefinement,
@@ -3381,6 +3406,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     public string Visit(ConditionalExpressionNode node)
+        => EmitConditionalExpression(node, null);
+
+    private string EmitConditionalExpression(ConditionalExpressionNode node, string? expectedType)
     {
         var condition = node.Condition.Accept(this);
         var previousShadowDepth = _postconditionResultShadowDepth;
@@ -3391,7 +3419,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 _postconditionResultShadowDepth++;
             }
-            whenTrue = node.WhenTrue.Accept(this);
+            whenTrue = EmitTypedExpression(node.WhenTrue, expectedType);
         }
         finally
         {
@@ -3407,7 +3435,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 _postconditionResultShadowDepth++;
             }
-            whenFalse = node.WhenFalse.Accept(this);
+            whenFalse = EmitTypedExpression(node.WhenFalse, expectedType);
         }
         finally
         {
@@ -4016,8 +4044,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         UnaryOperationNode { Operator: UnaryOperator.Not } unary => IsBooleanPatternExpression(unary.Operand),
         BinaryOperationNode { Operator: BinaryOperator.And or BinaryOperator.Or } binary =>
             IsBooleanPatternExpression(binary.Left) && IsBooleanPatternExpression(binary.Right),
-        BinaryOperationNode { Operator: BinaryOperator.Equal or BinaryOperator.NotEqual } binary =>
-            TryUnwrapPatternComparison(binary, out _, out _),
+        BinaryOperationNode { Operator: BinaryOperator.Equal or BinaryOperator.NotEqual
+            or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
+            or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual } => true,
         _ => false
     };
 
@@ -4442,6 +4471,28 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return literalType == null
             ? $"Calor.Runtime.Result.Ok({value})"
             : $"Calor.Runtime.Result.Ok<{literalType}, string>({value})";
+    }
+
+    private string EmitTypedExpression(ExpressionNode expression, string? expectedType)
+    {
+        var typeSyntax = expectedType == null ? null : SyntaxFactory.ParseTypeName(expectedType);
+        var generic = typeSyntax switch
+        {
+            GenericNameSyntax name => name,
+            QualifiedNameSyntax { Right: GenericNameSyntax name } => name,
+            _ => null
+        };
+        if (generic is not { Identifier.ValueText: "Result", TypeArgumentList.Arguments.Count: 2 })
+            return expression.Accept(this);
+
+        return expression switch
+        {
+            OkExpressionNode ok => $"Calor.Runtime.Result.Ok<{generic.TypeArgumentList.Arguments[0]}, {generic.TypeArgumentList.Arguments[1]}>({EmitTypedExpression(ok.Value, generic.TypeArgumentList.Arguments[0].ToString())})",
+            ErrExpressionNode err => $"Calor.Runtime.Result.Err<{generic.TypeArgumentList.Arguments[0]}, {generic.TypeArgumentList.Arguments[1]}>({EmitTypedExpression(err.Error, generic.TypeArgumentList.Arguments[1].ToString())})",
+            ConditionalExpressionNode conditional =>
+                EmitConditionalExpression(conditional, expectedType),
+            _ => expression.Accept(this)
+        };
     }
 
     public string Visit(ErrExpressionNode node)
@@ -6825,11 +6876,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var previousInlineReturnRefinement = _currentInlineReturnRefinement;
         var previousYieldRefinement = _currentYieldRefinement;
         var previousReturnLowering = _currentReturnLowering;
+        var previousReturnValueType = _currentReturnValueType;
         var previousPostconditionResultShadowDepth =
             _postconditionResultShadowDepth;
         _currentInlineReturnRefinement = null;
         _currentYieldRefinement = null;
         _currentReturnLowering = null;
+        _currentReturnValueType = null;
         if (node.Parameters.Any(parameter =>
                 parameter.Name.Equals("result", StringComparison.Ordinal)))
         {
@@ -6883,6 +6936,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _currentInlineReturnRefinement = previousInlineReturnRefinement;
             _currentYieldRefinement = previousYieldRefinement;
             _currentReturnLowering = previousReturnLowering;
+            _currentReturnValueType = previousReturnValueType;
             _postconditionResultShadowDepth =
                 previousPostconditionResultShadowDepth;
         }
@@ -9215,7 +9269,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             case BinaryOperator.GreaterThan when isVarLeft:
             case BinaryOperator.LessThan when isVarRight:
                 // i > start => lower bound is start + 1
-                lowerBound ??= $"({otherStr} + 1)";
+                lowerBound ??= $"Calor.Runtime.ContractQuantifier.Successor({otherStr})";
                 break;
             case BinaryOperator.LessThan when isVarLeft:
             case BinaryOperator.GreaterThan when isVarRight:
@@ -9225,7 +9279,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             case BinaryOperator.LessOrEqual when isVarLeft:
             case BinaryOperator.GreaterOrEqual when isVarRight:
                 // i <= end => upper bound is end + 1
-                upperBound ??= $"({otherStr} + 1)";
+                upperBound ??= $"Calor.Runtime.ContractQuantifier.Successor({otherStr})";
                 break;
         }
     }

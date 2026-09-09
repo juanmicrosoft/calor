@@ -556,7 +556,7 @@ public class QuantifierTests
 
         // Should generate runtime check with (n + 1) as upper bound
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
-        Assert.Contains("(n + 1)", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Successor(n)", result);
     }
 
     [Fact]
@@ -585,7 +585,7 @@ public class QuantifierTests
 
         // Should generate runtime check with (0 + 1) as lower bound
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
-        Assert.Contains("(0 + 1)", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Successor(0)", result);
     }
 
     [Fact]

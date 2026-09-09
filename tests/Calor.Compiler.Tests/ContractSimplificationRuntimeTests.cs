@@ -56,6 +56,23 @@ public class ContractSimplificationRuntimeTests
             Calor.Runtime.ContractQuantifier.Range(int.MinValue, int.MaxValue).Take(3));
         Assert.Equal(new[] { int.MaxValue - 1 },
             Calor.Runtime.ContractQuantifier.Range(int.MaxValue - 1, int.MaxValue));
+        Assert.Equal(new[] { int.MaxValue },
+            Calor.Runtime.ContractQuantifier.Range(int.MaxValue, (long)int.MaxValue + 1));
+        Assert.Empty(Calor.Runtime.ContractQuantifier.Range((long)int.MaxValue + 1, long.MaxValue));
+
+        var inclusive = Compile(Function("i32",
+            "(forall ((i i32)) (-> (&& (>= i x) (<= i x)) (< i INT:0)))"), verify);
+        AssertContractViolation(() => Invoke(inclusive, int.MaxValue));
+        AssertContractViolation(() => Invoke(inclusive, int.MaxValue - 1));
+        Assert.Equal(7, Invoke(inclusive, int.MinValue));
+        var strict = Compile(Function("i32",
+            "(exists ((i i32)) (&& (> i x) (<= i INT:2147483647)))"), verify);
+        AssertContractViolation(() => Invoke(strict, int.MaxValue));
+        Assert.Equal(7, Invoke(strict, int.MaxValue - 1));
+        var wideEndpoint = Compile(Function("i64",
+            "(forall ((i i32)) (-> (&& (>= i INT:0) (<= i x)) (< i INT:0)))"), verify);
+        AssertContractViolation(() => Invoke(wideEndpoint, long.MaxValue));
+        Assert.Equal(7, Invoke(wideEndpoint, long.MinValue));
     }
 
     [Theory]
@@ -88,6 +105,32 @@ public class ContractSimplificationRuntimeTests
             var assembly = Compile(Function("i32", $"(== {predicate} true)"), verify);
             Assert.Equal(7, Invoke(assembly, 3));
         }
+
+        foreach (var body in new[]
+        {
+            "§R §OK x",
+            """§R (? (> x INT:0) §OK x §ERR "negative")"""
+        })
+        {
+            var source = $$"""
+                §M{m1:TypedContracts}
+                  §F{f1:Check:pub} (i32:x) -> Result<object,str>
+                    §E{}
+                    §S true
+                    {{body}}
+                """;
+            var assembly = Compile(source, verify);
+            Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<object, string>>(Invoke(assembly, 3)).Unwrap());
+        }
+
+        var nested = Compile("""
+            §M{m1:TypedContracts}
+              §F{f1:Check:pub} (i32:x) -> Result<Result<object,str>,str>
+                §E{}
+                §R §OK §OK x
+            """, verify);
+        Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<Calor.Runtime.Result<object, string>, string>>(
+            Invoke(nested, 3)).Unwrap().Unwrap());
     }
 
     [Theory]
@@ -100,7 +143,9 @@ public class ContractSimplificationRuntimeTests
             "(== (is result i32 result) true)",
             "(!= false (is result i32 result))",
             "(! (== (is result i32 result) false))",
-            "(== (== (is result i32 result) true) true)"
+            "(== (== (is result i32 result) true) true)",
+            "(== (&& (is result i32 result) (> result INT:0)) true)",
+            "(!= false (&& (is result i32 result) (== result INT:5)))"
         ];
         foreach (var wrapper in wrappers)
         {

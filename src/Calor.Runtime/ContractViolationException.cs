@@ -145,10 +145,14 @@ public enum ContractKind
 /// <summary>Runtime enumeration for finite integer contract domains.</summary>
 public static class ContractQuantifier
 {
+    /// <summary>Normalizes strict lower and inclusive upper bounds over the integer domain.</summary>
+    public static long Successor(long bound) => Math.Min(bound, int.MaxValue) + 1;
+
     /// <summary>Enumerates [start, exclusiveEnd), including empty and wide domains.</summary>
-    public static IEnumerable<int> Range(int start, int exclusiveEnd)
+    public static IEnumerable<int> Range(long start, long exclusiveEnd)
     {
-        for (long value = start; value < exclusiveEnd; value++)
+        var end = Math.Min(exclusiveEnd, (long)int.MaxValue + 1);
+        for (var value = Math.Max(start, int.MinValue); value < end; value++)
             yield return (int)value;
     }
 }
