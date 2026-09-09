@@ -8780,7 +8780,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(IsPatternNode node)
     {
         var operand = EmitGroupedOperand(node.Operand);
-        var csharpType = MapTypeName(node.TargetType);
+        var csharpType = node.VariableName != null && node.TargetType == "var"
+            ? "var"
+            : MapTypeName(node.TargetType);
         if (node.VariableName == null)
         {
             return $"{operand} is {csharpType}";

@@ -191,8 +191,16 @@ public class ConverterImprovementTests
             foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
                 pending.Push(child);
         }
-        Assert.Contains(nodes, node => node is ThrowExpressionNode);
-        Assert.DoesNotContain(nodes, node => node is ThrowStatementNode or IfStatementNode);
+        Assert.Contains(nodes, node => node is ThrowExpressionNode or ThrowStatementNode);
+        foreach (var guard in nodes.OfType<IfStatementNode>())
+        {
+            var negation = Assert.IsType<UnaryOperationNode>(guard.Condition);
+            Assert.Equal(UnaryOperator.Not, negation.Operator);
+            var identity = Assert.IsType<TypeOperationNode>(negation.Operand);
+            Assert.Equal(TypeOp.Is, identity.Operation);
+            Assert.Equal("object", identity.TargetType);
+            Assert.IsType<ReferenceNode>(identity.Operand);
+        }
         Assert.Contains("§TH", result.CalorSource);
         Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain("§ERR", result.CalorSource);
@@ -351,10 +359,11 @@ public class ConverterImprovementTests
         var getNameMethod = cls.Methods[0];
 
         var ret = Assert.IsType<ReturnStatementNode>(getNameMethod.Body[0]);
-        var preserved = Assert.IsType<RawCSharpExpressionNode>(ret.Expression);
-        Assert.Equal("(obj?.ToString(x))", preserved.CSharpCode);
-        Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved &&
-            loss.Feature == "conditional-access-shape");
+        var call = Assert.IsType<ExpressionCallNode>(ret.Expression);
+        var conditionalTarget = Assert.IsType<NullConditionalNode>(call.TargetExpression);
+        Assert.Equal("ToString", conditionalTarget.MemberName);
+        Assert.Equal("x", Assert.IsType<ReferenceNode>(Assert.Single(call.Arguments)).Name);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     #endregion

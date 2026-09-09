@@ -3123,7 +3123,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             UnaryOperator.Negate => "-",
             UnaryOperator.Not => "!",
             UnaryOperator.BitwiseNot => "~",
-            _ => "-"
+            UnaryOperator.PreIncrement => "inc",
+            UnaryOperator.PreDecrement => "dec",
+            UnaryOperator.PostIncrement => "post-inc",
+            UnaryOperator.PostDecrement => "post-dec",
+            _ => throw new ArgumentOutOfRangeException(nameof(node.Operator), node.Operator, null)
         };
 
         if (ContainsSectionMarker(operand))
@@ -3134,14 +3138,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FieldAccessNode node)
     {
-        var target = node.Target.Accept(this);
+        var conditional = IsConditionalCallTarget(node.Target);
+        var target = conditional ? AcceptInConditionalRegion(node.Target) : node.Target.Accept(this);
         if (node.Target is ThisExpressionNode)
             target = "this";
         else if (node.Target is BaseExpressionNode)
             target = "base";
         // Hoist call results that contain section markers (e.g., §C{method} §/C.Property)
         // Only hoist when inside an executable body (method, ctor, etc.)
-        else if (ContainsSectionMarker(target) && _memberBodyDepth > 0)
+        else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0)
             target = HoistToTempVar(target);
         var fieldName = node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName;
         return $"{target}.{fieldName}";
@@ -4839,10 +4844,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Args go through inline-sibling context so that nested zero-arg
         // calls keep their explicit §/C closer — see Visit(CallExpressionNode)
         // for the rationale.
-        var target = node.TargetExpression.Accept(this);
-        var args = node.Arguments.Select(a => $" §A {AcceptInInlineSibling(a)}").ToList();
+        var conditional = IsConditionalCallTarget(node.TargetExpression);
+        var target = conditional
+            ? AcceptInConditionalRegion(node.TargetExpression)
+            : node.TargetExpression.Accept(this);
+        var args = node.Arguments.Select(a =>
+            $" §A {(conditional ? AcceptInConditionalRegion(a) : AcceptInInlineSibling(a))}").ToList();
         return $"§C {target}{string.Join("", args)} §/C";
     }
+
+    private static bool IsConditionalCallTarget(ExpressionNode expression) => expression switch
+    {
+        NullConditionalNode => true,
+        FieldAccessNode field => IsConditionalCallTarget(field.Target),
+        ExpressionCallNode call => IsConditionalCallTarget(call.TargetExpression),
+        _ => false
+    };
 
     public string Visit(RawCSharpNode node)
     {

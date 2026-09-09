@@ -202,14 +202,14 @@ public static class FeatureSupport
         {
             Name = "conditional-access-shape",
             Support = SupportLevel.Partial,
-            Description = "Conditional invocations preserve the original expression as counted C# interop. Conditional indexing and other unsupported shapes preserve their containing member",
+            Description = "Conditional member and positional invocation chains convert natively. Conditional indexing, named/ref arguments, generic conditional calls and unsupported grouping preserve the original expression as counted C# interop",
             Workaround = "Keep the counted interop, or express the null check and dependent operations as explicit statements"
         },
         ["conditional-expression-hoisting"] = new FeatureInfo
         {
             Name = "conditional-expression-hoisting",
             Support = SupportLevel.Partial,
-            Description = "Side-effecting conditional operands are preserved in place as counted C# expressions. If conversion requires eager preludes, the original conditional expression is preserved instead",
+            Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
             Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         ["linq-method"] = new FeatureInfo
