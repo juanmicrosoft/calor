@@ -47,6 +47,9 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (int i = 0; i < 0 ? Bound() > 0 : false; i++) count++; return count;", "0", false)]
     [InlineData("int count = 0; for (byte i = 0; i < 3; i++) count++; return count;", "3", false)]
     [InlineData("int count = 0; for (short i = 0; i < 3; i += 1) count++; return count;", "3", false)]
+    [InlineData("int count = 0; for (int i = 0; i == i++;) { count++; if (count == 3) break; } return count;", "3", false)]
+    [InlineData("int count = 0; for (int i = (count = Step()); i < 0; i++) { } return count;", "1:S", false)]
+    [InlineData("int count = 0; for (int i = 0; i < 2; i.ToString(), i.ToString()) { i++; count++; } return count;", "2", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
         => AssertEquivalent(body, expected, native);
 
@@ -83,6 +86,34 @@ public class ForLoopConditionSemanticsTests
             "1", native: false, preserved: true);
 
     [Fact]
+    public void InitializerOutVariable_PreservesHeaderStorage()
+        => AssertEquivalent(
+            "int n = 0; for (int i = Init(out int end); i < end; i++) n++; return n;",
+            "2", native: false, preserved: true, members:
+            "private static int Init(out int end) { end = 2; return 0; }");
+
+    [Fact]
+    public void HeaderCall_DoesNotMoveBeforeEarlierStateRead()
+        => AssertEquivalent(
+            "int n = 0; State = 1; for (; State < Reset(); ) { n++; break; } return n;",
+            "0", native: false, members: """
+            private static int State;
+            private static int Reset() { State = 0; return 1; }
+            """);
+
+    [Fact]
+    public void MultipleAwaitedIncrementors_ExecuteAsStatementsInOrder()
+        => AssertEquivalent(
+            "int i = 0; for (; i < 2; await AsyncTick(), await AsyncTick()) i++; return i;",
+            "2:TTTT", native: false, asyncProbe: true, members: """
+            private static System.Threading.Tasks.Task AsyncTick()
+            {
+                Trace += "T";
+                return System.Threading.Tasks.Task.CompletedTask;
+            }
+            """);
+
+    [Fact]
     public void OverloadedIncrementHeader_DoesNotSubstituteAddition()
         => AssertEquivalent(
             "int n = 0; for (Counter c = new Counter(); c.N < 3; c++) n++; return n;",
@@ -111,8 +142,9 @@ public class ForLoopConditionSemanticsTests
             """);
 
     private static void AssertEquivalent(string body, string expected, bool native, string members = "",
-        bool preserved = false, string types = "")
+        bool preserved = false, string types = "", bool asyncProbe = false)
     {
+        var returnType = asyncProbe ? "async System.Threading.Tasks.Task<int>" : "int";
         var source = $$"""
             public static class Migrated
             {
@@ -133,7 +165,7 @@ public class ForLoopConditionSemanticsTests
                     if (Trace.Length == 3) throw new System.InvalidOperationException();
                     return 3;
                 }
-                public static int Probe() { {{body}} }
+                public static {{returnType}} Probe() { {{body}} }
             }
             {{types}}
             """;
@@ -174,7 +206,13 @@ public class ForLoopConditionSemanticsTests
         string? result;
         try
         {
-            result = type.GetMethod("Probe")!.Invoke(null, null)!.ToString();
+            var value = type.GetMethod("Probe")!.Invoke(null, null)!;
+            if (value is Task task)
+            {
+                task.GetAwaiter().GetResult();
+                value = task.GetType().GetProperty("Result")!.GetValue(task)!;
+            }
+            result = value.ToString();
         }
         catch (TargetInvocationException exception)
         {

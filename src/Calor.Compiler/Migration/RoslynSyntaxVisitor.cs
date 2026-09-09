@@ -8221,8 +8221,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Header-declared aliases/out variables need a storage lifetime that this
         // lowering does not represent. Preserve those unusual headers explicitly.
         if (node.Declaration?.Type is RefTypeSyntax
-            || node.Condition?.DescendantNodesAndSelf().Any(part =>
-                part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax) == true)
+            || node.ChildNodes().Where(part => part != node.Statement)
+                .SelectMany(part => part.DescendantNodesAndSelf())
+                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax))
         {
             _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
                 "For-loop header variable storage preserved verbatim",
@@ -8310,11 +8311,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertForHeaderExpression(ExpressionSyntax expression)
     {
-        if (!HasDeferredForHeaderOperand(expression))
+        if (!RequiresExactForHeaderEvaluation(expression))
             return ConvertExpression(expression);
 
         _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
-            "Lazy for-header expression preserved inline to retain conditional evaluation",
+            "For-header expression preserved inline to retain evaluation order and conditional execution",
             expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
         return new RawCSharpExpressionNode(GetTextSpan(expression), expression.ToString());
     }
@@ -8331,7 +8332,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _ => null
         };
         var type = target == null ? null : _semanticModel?.GetTypeInfo(target).Type;
-        if (HasDeferredForHeaderOperand(expression)
+        if (expression is AwaitExpressionSyntax
+            || expression is InvocationExpressionSyntax { Expression: not IdentifierNameSyntax }
+            || RequiresExactForHeaderEvaluation(expression, statementRoot: true)
             || target != null && (target is not IdentifierNameSyntax || type?.SpecialType is not
                 (SpecialType.System_Int32 or SpecialType.System_Int64 or SpecialType.System_UInt32
                 or SpecialType.System_UInt64 or SpecialType.System_Single or SpecialType.System_Double
@@ -8345,11 +8348,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return ConvertExpressionToStatement(expression, GetTextSpan(expression));
     }
 
-    private static bool HasDeferredForHeaderOperand(ExpressionSyntax expression)
+    private static bool RequiresExactForHeaderEvaluation(ExpressionSyntax expression, bool statementRoot = false)
         => expression.DescendantNodesAndSelf().Any(part =>
             part is ConditionalExpressionSyntax or ConditionalAccessExpressionSyntax
+                or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or ElementAccessExpressionSyntax
             || part.IsKind(SyntaxKind.LogicalAndExpression) || part.IsKind(SyntaxKind.LogicalOrExpression)
-            || part.IsKind(SyntaxKind.CoalesceExpression));
+            || part.IsKind(SyntaxKind.CoalesceExpression)
+            || (!statementRoot || part != expression) && (part is AssignmentExpressionSyntax or InvocationExpressionSyntax
+                || part.IsKind(SyntaxKind.PreIncrementExpression) || part.IsKind(SyntaxKind.PreDecrementExpression)
+                || part.IsKind(SyntaxKind.PostIncrementExpression) || part.IsKind(SyntaxKind.PostDecrementExpression)));
 
     private ForeachStatementNode ConvertForEachStatement(ForEachStatementSyntax node)
     {
