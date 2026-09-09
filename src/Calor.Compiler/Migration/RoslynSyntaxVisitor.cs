@@ -4466,21 +4466,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Setters/init accessors: expression is a statement (assignment, method call, etc.)
             if (accessor.Keyword.IsKind(SyntaxKind.SetKeyword) || accessor.Keyword.IsKind(SyntaxKind.InitKeyword))
             {
-                // Handle tuple deconstruction: set => (a, b) = (x, y)
                 if (accessor.ExpressionBody.Expression is AssignmentExpressionSyntax tupleAssign
-                    && tupleAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
-                    && tupleAssign.Left is TupleExpressionSyntax leftTuple
-                    && tupleAssign.Right is TupleExpressionSyntax rightTuple
-                    && leftTuple.Arguments.Count == rightTuple.Arguments.Count)
+                    && IsTupleAssignment(tupleAssign))
                 {
-                    var stmts = new List<StatementNode>();
-                    for (int i = 0; i < leftTuple.Arguments.Count; i++)
-                    {
-                        stmts.Add(new AssignmentStatementNode(span,
-                            ConvertExpression(leftTuple.Arguments[i].Expression),
-                            ConvertExpression(rightTuple.Arguments[i].Expression)));
-                    }
-                    return stmts;
+                    return [ConvertTupleAssignmentStatement(tupleAssign, span)];
                 }
                 var stmt = ConvertExpressionToStatement(accessor.ExpressionBody.Expression, span);
                 return stmt != null ? new List<StatementNode> { stmt } : Array.Empty<StatementNode>();
@@ -4507,6 +4496,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Check if expression body is an assignment (e.g., void Method() => _field = value)
             if (expressionBody.Expression is AssignmentExpressionSyntax exprAssign)
             {
+                if (IsTupleAssignment(exprAssign))
+                {
+                    if (expressionBody.Parent is MethodDeclarationSyntax method
+                        && method.ReturnType.ToString() != "void")
+                        throw EscalateExpression(exprAssign, "tuple-deconstruction");
+                    return [ConvertTupleAssignmentStatement(exprAssign, GetTextSpan(expressionBody))];
+                }
                 var target = ConvertExpression(exprAssign.Left);
                 var value = ConvertExpression(exprAssign.Right);
                 FlushPendingStatements(result);
@@ -5745,8 +5741,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private static string? GetRequiredCapabilityFeature(Exception exception)
         => exception is MemberInteropEscalationException escalation
-            && SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
-                escalation.FeatureName)
+            && (escalation.FeatureName == "tuple-deconstruction"
+                || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
+                    escalation.FeatureName))
                 ? escalation.FeatureName
                 : null;
 
@@ -6557,59 +6554,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
             }
 
-            // Handle tuple deconstruction assignments: (_a, _b) = (x, y) → §ASSIGN _a x, §ASSIGN _b y
-            if (statement is ExpressionStatementSyntax tupleStmt
-                && tupleStmt.Expression is AssignmentExpressionSyntax tupleAssign
-                && tupleAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
-                && tupleAssign.Left is TupleExpressionSyntax leftTuple
-                && tupleAssign.Right is TupleExpressionSyntax rightTuple
-                && leftTuple.Arguments.Count == rightTuple.Arguments.Count)
-            {
-                _context.RecordFeatureUsage("tuple-deconstruction");
-                for (int i = 0; i < leftTuple.Arguments.Count; i++)
-                {
-                    var leftExpr = ConvertExpression(leftTuple.Arguments[i].Expression);
-                    var rightExpr = ConvertExpression(rightTuple.Arguments[i].Expression);
-                    statements.Add(new AssignmentStatementNode(
-                        GetTextSpan(tupleStmt),
-                        leftExpr,
-                        rightExpr));
-                }
-                FlushPendingStatements(statements);
-                continue;
-            }
-
-            // Handle var (a, b) = expr → bind a temp, then §B for each variable
-            // Roslyn represents this as: AssignmentExpression(DeclarationExpression(ParenthesizedVariableDesignation), expr)
-            if (statement is ExpressionStatementSyntax deconstructStmt
-                && deconstructStmt.Expression is AssignmentExpressionSyntax deconstructAssign
-                && deconstructAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
-                && deconstructAssign.Left is DeclarationExpressionSyntax deconstructDecl
-                && deconstructDecl.Designation is ParenthesizedVariableDesignationSyntax parenDesignation)
-            {
-                _context.RecordFeatureUsage("tuple-deconstruction");
-                _context.IncrementConverted();
-                var rhs = ConvertExpression(deconstructAssign.Right);
-                var tempName = _context.GenerateId("_tup");
-                var span = GetTextSpan(deconstructStmt);
-                // Bind the tuple to a temp: §B _tup expr
-                statements.Add(new BindStatementNode(span, tempName, null, false, rhs, new AttributeCollection()));
-                // Bind each variable: §B a _tup.Item1, §B b _tup.Item2
-                for (int i = 0; i < parenDesignation.Variables.Count; i++)
-                {
-                    var designation = parenDesignation.Variables[i];
-                    if (designation is SingleVariableDesignationSyntax singleVar)
-                    {
-                        var varName = singleVar.Identifier.Text;
-                        statements.Add(new BindStatementNode(span, varName, null, false,
-                            new FieldAccessNode(span, new ReferenceNode(span, tempName), $"Item{i + 1}"),
-                            new AttributeCollection()));
-                    }
-                }
-                FlushPendingStatements(statements);
-                continue;
-            }
-
             // #777 (WS-W4 D4): local functions are never hoisted — the lowering is
             // unsound (orphaned call site build-breaks or silently rebinds to a
             // same-named member). Escalate to §CSHARP interop. The member-body scan
@@ -6959,6 +6903,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         if (expr is AssignmentExpressionSyntax assignment)
         {
+            if (IsTupleAssignment(assignment))
+                return ConvertTupleAssignmentStatement(assignment, span);
             if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
             {
                 return new AssignmentStatementNode(span,
@@ -7016,6 +6962,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Handle assignment expressions
         if (expr is AssignmentExpressionSyntax assignment)
         {
+            if (IsTupleAssignment(assignment))
+                return ConvertTupleAssignmentStatement(assignment, GetTextSpan(node));
             // Handle element access assignments (indexer assignments) - convert to collection operations
             if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
                 assignment.Left is ElementAccessExpressionSyntax elementAccess)
@@ -10177,8 +10125,43 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new TupleLiteralNode(GetTextSpan(tuple), elements);
     }
 
+    private static bool IsTupleAssignment(AssignmentExpressionSyntax assignment)
+        => assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+            && (assignment.Left is TupleExpressionSyntax
+                || assignment.Left is DeclarationExpressionSyntax
+                {
+                    Designation: ParenthesizedVariableDesignationSyntax
+                });
+
+    private StatementNode ConvertTupleAssignmentStatement(AssignmentExpressionSyntax assignment, TextSpan span)
+    {
+        _context.RecordFeatureUsage("tuple-deconstruction");
+        _context.IncrementConverted();
+
+        // Keep the assignment atomic: C# evaluates targets, then RHS values and
+        // conversions, then writes. Splitting it loses aliases and struct storage.
+        // Only operands the Calor serializer never hoists are certified here.
+        if (assignment.Left is TupleExpressionSyntax left
+            && left.Arguments.All(a => a.Expression is IdentifierNameSyntax)
+            && (assignment.Right is IdentifierNameSyntax
+                || assignment.Right is TupleExpressionSyntax right
+                    && right.Arguments.All(a => a.Expression is IdentifierNameSyntax or LiteralExpressionSyntax)))
+        {
+            return new AssignmentStatementNode(span,
+                ConvertExpression(assignment.Left), ConvertExpression(assignment.Right));
+        }
+
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
+            "Tuple assignment preserved atomically to retain target evaluation, conversions and writes.",
+            assignment.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return new RawCSharpNode(span, assignment.ToString() + ";");
+    }
+
     private ExpressionNode ConvertAssignmentExpression(AssignmentExpressionSyntax assignment)
     {
+        // The value of a deconstruction assignment is not its unevaluated RHS.
+        if (IsTupleAssignment(assignment))
+            throw EscalateExpression(assignment, "tuple-deconstruction");
         // Handle assignment expressions in expression context (e.g., chained: a = b = value)
         // Hoist the assignment to _pendingStatements and return the assigned value
         _context.IncrementConverted();

@@ -992,8 +992,8 @@ public static class FeatureSupport
         ["tuple-deconstruction"] = new FeatureInfo
         {
             Name = "tuple-deconstruction",
-            Support = SupportLevel.Full,
-            Description = "Tuple deconstruction var (a, b) = ... is fully supported"
+            Support = SupportLevel.Partial,
+            Description = "Flat identifier tuple assignments stay atomic; declarations, complex operands and expression-valued assignments use counted C# interop to preserve evaluation order and Deconstruct semantics"
         },
         ["span"] = new FeatureInfo
         {
