@@ -25,8 +25,9 @@ export function AskCalor() {
             Ask Calor
           </h2>
           <p className="mt-4 text-lg text-muted-foreground font-body">
-            Have questions about Calor? Chat with our custom GPT to learn about syntax,
-            best practices, and how to get the most out of the language.
+            Ask Calor opens an external ChatGPT conversation and may require a ChatGPT
+            account or plan. It is not documentation search. The docs provide local,
+            account-free search for syntax, commands, and diagnostics.
           </p>
           <div className="mt-8">
             <Button size="lg" asChild className="bg-gradient-to-r from-calor-pink to-calor-salmon hover:from-calor-pink/90 hover:to-calor-salmon/90 text-white border-0 shadow-lg shadow-calor-pink/25 font-body">
@@ -37,7 +38,7 @@ export function AskCalor() {
                 onClick={() => trackAskCalorClick('homepage')}
               >
                 <MessageCircle className="mr-2 h-5 w-5" />
-                Start a Conversation
+                Open ChatGPT (external)
               </a>
             </Button>
           </div>

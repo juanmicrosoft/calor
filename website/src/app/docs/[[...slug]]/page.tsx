@@ -12,6 +12,7 @@ import { TableOfContents } from '@/components/docs/TableOfContents';
 import { Pagination } from '@/components/docs/Pagination';
 import { MobileSidebar } from '@/components/docs/MobileSidebar';
 import { DocsPageTracker } from '@/components/docs/DocsPageTracker';
+import { DocSearch } from '@/components/docs/DocSearch';
 import { mdxComponents } from '@/components/mdx';
 import { Heading, remarkHeadings } from '@/lib/headings';
 
@@ -78,6 +79,7 @@ export default async function DocPage({ params }: DocPageProps) {
         <div className="min-w-0 flex-1">
           {/* Mobile Sidebar */}
           <MobileSidebar sections={sections} />
+          <DocSearch />
 
           <article className="prose dark:prose-invert max-w-none">
             <h1>{doc.title}</h1>
