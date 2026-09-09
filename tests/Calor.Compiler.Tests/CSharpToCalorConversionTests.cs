@@ -3946,7 +3946,7 @@ public class CSharpToCalorConversionTests
     #region Tuple Deconstruction in Setter Tests
 
     [Fact]
-    public void Convert_SetterWithTupleDeconstruction_ProducesMultipleAssignments()
+    public void Convert_SetterWithTupleDeconstruction_PreservesAtomicAssignment()
     {
         var csharpSource = """
             public class Foo
@@ -3965,8 +3965,10 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         var prop = result.Ast!.Classes[0].Properties.First(p => p.Name == "Point");
         Assert.NotNull(prop.Setter);
-        Assert.Equal(2, prop.Setter.Body.Count);
-        Assert.All(prop.Setter.Body, stmt => Assert.IsType<AssignmentStatementNode>(stmt));
+        var assignment = Assert.IsType<RawCSharpNode>(Assert.Single(prop.Setter.Body));
+        Assert.Contains("(_x, _y) = (value.Item1, value.Item2)", assignment.CSharpCode);
+        Assert.Contains(result.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "tuple-deconstruction");
     }
 
     [Fact]
@@ -3990,8 +3992,7 @@ public class CSharpToCalorConversionTests
 
         var csharpOutput = new CSharpEmitter().Emit(result.Ast!);
         Assert.DoesNotContain("return", csharpOutput.Split("set")[1]);
-        Assert.Contains("_x =", csharpOutput);
-        Assert.Contains("_y =", csharpOutput);
+        Assert.Contains("(_x, _y) = (value.Item1, value.Item2);", csharpOutput);
     }
 
     #endregion
