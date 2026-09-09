@@ -18,7 +18,7 @@ Suppose you split your code across two files:
 
 **`OrderService.calr`**
 
-```
+```calor
 §M{m001:OrderService}
 
   §F{f001:SaveOrder:pub}
@@ -31,7 +31,7 @@ Suppose you split your code across two files:
 
 **`Handler.calr`**
 
-```
+```calor
 §M{m002:Handler}
 
   §F{f001:HandleRequest:pub}
@@ -57,7 +57,7 @@ to 'SaveOrder' (in module 'OrderService') but does not declare it.
 
 Fix by adding the effect to the caller:
 
-```
+```calor
 §F{f001:HandleRequest:pub}
   §O{void}
   §E{db:w}                    ← now declared
@@ -99,7 +99,7 @@ and `Calor0421` stay errors under every flag. See
 
 Both forms resolve correctly:
 
-```
+```calor
 §C{SaveOrder}                   ← bare name — resolved if unambiguous across modules
 §C{OrderService.SaveOrder}      ← module-qualified — always resolves
 §C{OrderRepo.Save}              ← class-qualified — resolves to a class method
@@ -167,7 +167,7 @@ Two patterns work:
 
 ### 1. Using directive + bare name
 
-```
+```calor
 §M{m002:Handler}
   §U{OrderService}                ← adds `using OrderService;` to generated C#
 
@@ -180,7 +180,7 @@ Two patterns work:
 
 ### 2. Module-qualified call
 
-```
+```calor
 §F{f001:HandleRequest:pub}
   §O{void}
   §E{db:w}

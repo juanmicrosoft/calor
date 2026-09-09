@@ -24,14 +24,14 @@ Modules are like C# namespaces. They group related functions.
 
 ### Syntax
 
-```
+```calor
 §M{name}
   // contents
 ```
 
 ### Example
 
-```
+```calor
 §M{Calculator}
   // functions go here
 ```
@@ -52,7 +52,7 @@ Functions are the primary code containers.
 
 ### Syntax
 
-```
+```calor
 §F{name:visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (required)
@@ -72,7 +72,7 @@ Functions are the primary code containers.
 ### Examples
 
 **Simple function:**
-```
+```calor
 §F{Add:pub}
   §I{i32:a}
   §I{i32:b}
@@ -81,7 +81,7 @@ Functions are the primary code containers.
 ```
 
 **Function with effects:**
-```
+```calor
 §F{PrintSum:pub}
   §I{i32:a}
   §I{i32:b}
@@ -91,7 +91,7 @@ Functions are the primary code containers.
 ```
 
 **Function with contracts:**
-```
+```calor
 §F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -108,7 +108,7 @@ Async functions use `§AF` instead of `§F` and automatically wrap return types 
 
 ### Syntax
 
-```
+```calor
 §AF{name:visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (auto-wrapped to Task<T>)
@@ -118,7 +118,7 @@ Async functions use `§AF` instead of `§F` and automatically wrap return types 
 ### Examples
 
 **Simple async function:**
-```
+```calor
 §AF{FetchDataAsync:pub}
   §I{str:url}
   §O{str}
@@ -136,7 +136,7 @@ public static async Task<string> FetchDataAsync(string url)
 ```
 
 **Async void function (returns Task):**
-```
+```calor
 §AF{ProcessAsync:pub}
   §O{void}
   §AWAIT §C{Task.Delay} §A 1000 §/C
@@ -159,7 +159,7 @@ Async methods in classes use `§AMT` instead of `§MT`.
 
 ### Syntax
 
-```
+```calor
 §AMT{id:name:visibility}
   §I{type:param}
   §O{type}
@@ -168,7 +168,7 @@ Async methods in classes use `§AMT` instead of `§MT`.
 
 ### Example
 
-```
+```calor
 §CL{c001:DataService:pub}
   §AMT{mt001:GetUserAsync:pub}
     §I{i32:id}
@@ -181,7 +181,7 @@ Async methods in classes use `§AMT` instead of `§MT`.
 
 Async methods support the same modifiers as regular methods:
 
-```
+```calor
 §AMT{mt001:ProcessAsync:pub:virt}    // public virtual async
 §AMT{mt002:HandleAsync:prot:ovr}     // protected override async
 §AMT{mt003:ComputeAsync:pub:stat}    // public static async
@@ -195,7 +195,7 @@ Use `§AWAIT` to await async operations.
 
 ### Syntax
 
-```
+```calor
 §AWAIT expression                    // Simple await
 §AWAIT{false} expression             // await with ConfigureAwait(false)
 §AWAIT{true} expression              // await with ConfigureAwait(true)
@@ -204,12 +204,12 @@ Use `§AWAIT` to await async operations.
 ### Examples
 
 **Simple await:**
-```
+```calor
 §B{data} §AWAIT §C{client.GetAsync} §A url §/C
 ```
 
 **With ConfigureAwait(false) for library code:**
-```
+```calor
 §B{data} §AWAIT{false} §C{client.GetAsync} §A url §/C
 ```
 
@@ -217,7 +217,7 @@ Emits: `var data = await client.GetAsync(url).ConfigureAwait(false);`
 
 ### Using Await in Conditions and Expressions
 
-```
+```calor
 §IF{if1} §AWAIT §C{IsValidAsync} §A id §/C
   §P "Valid"
 
@@ -232,7 +232,7 @@ Lambda expressions create anonymous functions using `§LAM`/`§/LAM` blocks.
 
 ### Syntax
 
-```
+```calor
 §LAM{id:param1:type1}              // single parameter
 §LAM{id:param1:type1:param2:type2} // multiple parameters
 §LAM{id}                           // no parameters
@@ -243,7 +243,7 @@ Parameters without known types use `object` as the default type.
 
 ### Single Parameter
 
-```
+```calor
 §B{doubler} §LAM{lam1:x:i32} (* x 2) §/LAM{lam1}
 ```
 
@@ -253,20 +253,20 @@ Emits: `var doubler = (int x) => x * 2;`
 
 Parameters are listed as consecutive `name:type` pairs:
 
-```
+```calor
 §B{add} §LAM{lam1:a:i32:b:i32} (+ a b) §/LAM{lam1}
 ```
 
 Emits: `var add = (int a, int b) => a + b;`
 
 **Three parameters:**
-```
+```calor
 §B{combine} §LAM{lam1:x:i32:y:str:z:bool} §C{Process} §A x §A y §A z §/C §/LAM{lam1}
 ```
 
 ### No Parameters
 
-```
+```calor
 §B{getTime} §LAM{lam1} §C{DateTime.Now} §/C §/LAM{lam1}
 ```
 
@@ -274,7 +274,7 @@ Emits: `var add = (int a, int b) => a + b;`
 
 Lambdas are commonly used as arguments inside `§C{...}` calls:
 
-```
+```calor
 §C{numbers.Where} §A §LAM{lam1:n:i32} (!= (% n 3) 0) §/LAM{lam1} §/C
 §C{items.Select} §A §LAM{lam2:x:i32} (* x 2) §/LAM{lam2} §/C
 ```
@@ -283,7 +283,7 @@ Lambdas are commonly used as arguments inside `§C{...}` calls:
 
 For multi-statement bodies, include statements between the tags:
 
-```
+```calor
 §B{printer} §LAM{lam1:x:i32}
 §P x
 §P (* x 2)
@@ -294,7 +294,7 @@ For multi-statement bodies, include statements between the tags:
 
 Add `async` after the ID, before parameters:
 
-```
+```calor
 §LAM{lam1:async:x:i32}
 §B{result} §AWAIT §C{ProcessAsync} §A x §/C
 §R result
@@ -313,7 +313,7 @@ Delegates define function signatures that can be passed as values.
 
 ### Syntax
 
-```
+```calor
 §DEL{id:name}
   §I{type:param}       // parameters (0 or more)
   §O{type}             // return type (optional for void)
@@ -323,7 +323,7 @@ Delegates define function signatures that can be passed as values.
 ### Examples
 
 **Calculator delegate:**
-```
+```calor
 §DEL{d001:Calculator}
   §I{i32:a}
   §I{i32:b}
@@ -333,7 +333,7 @@ Delegates define function signatures that can be passed as values.
 Emits: `public delegate int Calculator(int a, int b);`
 
 **Void delegate:**
-```
+```calor
 §DEL{d001:Logger}
   §I{str:message}
 ```
@@ -341,7 +341,7 @@ Emits: `public delegate int Calculator(int a, int b);`
 Emits: `public delegate void Logger(string message);`
 
 **Delegate with effects:**
-```
+```calor
 §DEL{d001:FileProcessor}
   §I{str:path}
   §O{bool}
@@ -356,7 +356,7 @@ Enums define a set of named constants.
 
 ### Syntax
 
-```
+```calor
 §EN{id:Name}
   Member1
   Member2 = 1
@@ -364,7 +364,7 @@ Enums define a set of named constants.
 ```
 
 With underlying type:
-```
+```calor
 §EN{id:Name:underlyingType}
   ...
 ```
@@ -372,7 +372,7 @@ With underlying type:
 ### Examples
 
 **Simple enum:**
-```
+```calor
 §EN{e001:Color}
   Red
   Green
@@ -390,7 +390,7 @@ public enum Color
 ```
 
 **Enum with explicit values:**
-```
+```calor
 §EN{e001:StatusCode}
   Ok = 200
   NotFound = 404
@@ -398,7 +398,7 @@ public enum Color
 ```
 
 **Enum with underlying type:**
-```
+```calor
 §EN{e001:Flags:u8}
   None = 0
   Read = 1
@@ -423,7 +423,7 @@ Extension methods can be added to enums using `§EEXT` (Enum EXTension).
 
 ### Syntax
 
-```
+```calor
 §EEXT{id:EnumName}
   §F{f001:MethodName:pub}
     §I{EnumName:self}
@@ -435,7 +435,7 @@ The first parameter with the enum type (or named `self`) becomes the `this` para
 
 ### Example
 
-```
+```calor
 §EN{e001:Color}
   Red
   Green
@@ -493,7 +493,7 @@ Events allow objects to notify subscribers of state changes.
 
 ### Syntax
 
-```
+```calor
 §EVT{id:name:visibility:delegateType}
 ```
 
@@ -506,7 +506,7 @@ Events allow objects to notify subscribers of state changes.
 
 ### Example
 
-```
+```calor
 §CL{c001:Button:pub}
   §EVT{e001:Click:pub:EventHandler}
     §EVT{e002:ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
@@ -529,7 +529,7 @@ Use `§SUB` and `§UNSUB` to add or remove event handlers.
 
 ### Syntax
 
-```
+```calor
 §SUB eventRef handlerRef      // Subscribe
 §UNSUB eventRef handlerRef    // Unsubscribe
 ```
@@ -537,21 +537,21 @@ Use `§SUB` and `§UNSUB` to add or remove event handlers.
 ### Examples
 
 **Subscribe to event:**
-```
+```calor
 §SUB button.Click OnButtonClick
 ```
 
 Emits: `button.Click += OnButtonClick;`
 
 **Unsubscribe from event:**
-```
+```calor
 §UNSUB button.Click OnButtonClick
 ```
 
 Emits: `button.Click -= OnButtonClick;`
 
 **Subscribe with lambda:**
-```
+```calor
 §SUB button.Click (sender, e) → §P "Clicked!"
 ```
 
@@ -563,13 +563,13 @@ Input parameters define function arguments.
 
 ### Syntax
 
-```
+```calor
 §I{type:name}
 ```
 
 ### Examples
 
-```
+```calor
 §I{i32:x}           // int x
 §I{str:name}        // string name
 §I{bool:flag}       // bool flag
@@ -580,7 +580,7 @@ Input parameters define function arguments.
 
 ### Multiple Parameters
 
-```
+```calor
 §F{f001:Add:pub}
   §I{i32:a}
   §I{i32:b}
@@ -597,13 +597,13 @@ Every function must declare its output type.
 
 ### Syntax
 
-```
+```calor
 §O{type}
 ```
 
 ### Examples
 
-```
+```calor
 §O{void}     // returns nothing
 §O{i32}      // returns int
 §O{str}      // returns string
@@ -621,7 +621,7 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 
 ### Syntax
 
-```
+```calor
 [elementType]         // Single-dimensional array
 [[elementType]]       // Jagged array (array of arrays)
 ```
@@ -638,7 +638,7 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 
 ### Usage in Fields and Methods
 
-```
+```calor
 §CL{c001:DataProcessor}
   §FLD{[u8}:_buffer:priv}       // private byte[] _buffer
   §FLD{[i32}:_indices:priv}     // private int[] _indices
@@ -670,7 +670,7 @@ dedents back to (or past) the parent column.
 
 ### Example
 
-```
+```calor
 §M{Example}
   §F{Main:pub}
     §O{void}
@@ -722,7 +722,7 @@ Calor supports generic functions, classes, interfaces, and methods using angle b
 
 Type parameters are declared using `<T>` suffix syntax after the tag attributes.
 
-```
+```calor
 §F{id:name:vis}<T>         // Generic function with one type parameter
 §F{id:name:vis}<T, U>      // Generic function with two type parameters
 §CL{id:name}<T>            // Generic class
@@ -735,7 +735,7 @@ Type parameters are declared using `<T>` suffix syntax after the tag attributes.
 Type parameter constraints are declared using `§WHERE` clauses.
 
 **New syntax (recommended):**
-```
+```calor
 §WHERE T : class                    // T must be a reference type
 §WHERE T : struct                   // T must be a value type
 §WHERE T : new()                    // T must have parameterless constructor
@@ -744,7 +744,7 @@ Type parameter constraints are declared using `§WHERE` clauses.
 ```
 
 **Legacy syntax (still supported):**
-```
+```calor
 §WR{T:class}                        // T must be a reference type
 §WR{T:IComparable}                  // T must implement interface
 ```
@@ -753,7 +753,7 @@ Type parameter constraints are declared using `§WHERE` clauses.
 
 Generic types are written inline using angle bracket syntax.
 
-```
+```calor
 §I{List<T>:items}                   // Parameter of type List<T>
 §I{Dictionary<str, T>:lookup}       // Nested generic types
 §O{IEnumerable<T>}                  // Generic return type
@@ -763,7 +763,7 @@ Generic types are written inline using angle bracket syntax.
 ### Examples
 
 **Generic identity function:**
-```
+```calor
 §F{f001:Identity:pub}<T>
   §I{T:value}
   §O{T}
@@ -771,7 +771,7 @@ Generic types are written inline using angle bracket syntax.
 ```
 
 **Generic class with constraint:**
-```
+```calor
 §CL{c001:Repository:pub}<T>
   §WHERE T : class
   §FLD{List<T>:_items:pri}
@@ -787,7 +787,7 @@ Generic types are written inline using angle bracket syntax.
 ```
 
 **Generic interface:**
-```
+```calor
 §IFACE{i001:IRepository}<T>
   §WHERE T : class
   §MT{m001:Get}
@@ -801,7 +801,7 @@ an empty `§IFACE` ends at the next **type** opener — `§CL`, `§IFACE`, `§EN
 `§D`, `§DEL`, or a `§CSHARP` block — written at **exactly the same column** as
 the `§IFACE` itself:
 
-```
+```calor
 §M{m001:Demo}
   §IFACE{i001:IMarker}
   §CL{c001:Thing:pub}
@@ -832,7 +832,7 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 
 ### Syntax
 
-```
+```calor
 §CL{id:name}[@AttributeName]
 §CL{id:name}[@AttributeName(args)]
 §MT{id:name:vis}[@Attr1][@Attr2]
@@ -841,13 +841,13 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ### Examples
 
 **Class with routing attributes (ASP.NET Core):**
-```
+```calor
 §CL{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
   §MT{m001:Post:pub}[@HttpPost]
 ```
 
 **Property with validation:**
-```
+```calor
 §PROP{p001:Email:str:pub}[@Required][@EmailAddress]
   §GET
     §SET

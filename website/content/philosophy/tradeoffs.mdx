@@ -55,7 +55,7 @@ Calor's tradeoff pays off when:
 
 ### 1. Agents Need to Reason About Behavior
 
-```
+```calor
 §F{f001:TransferFunds:pub}
   §I{Account:from}
   §I{Account:to}
@@ -77,7 +77,7 @@ An agent can reason about this function's behavior without reading the implement
 
 ### 2. Agents Need to Detect Contract Violations
 
-```
+```calor
 §F{f001:CalculateDiscount:pub}
   §I{f64:price}
   §I{f64:discount_percent}
@@ -97,7 +97,7 @@ An agent can immediately verify:
 
 ### 3. Agents Need to Make Precise Edits
 
-```
+```calor
 // Instruction: "Change the loop in f001 to iterate from 0 instead of 1"
 
 // Before

@@ -26,7 +26,7 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 
 ### Syntax
 
-```
+```calor
 §RTYPE{id:Name:baseType} (predicate)
 ```
 
@@ -37,7 +37,7 @@ Define a refinement type at module level. The predicate uses `#` to refer to the
 
 ### Examples
 
-```
+```calor
 §RTYPE{r1:NatInt:i32} (>= # INT:0)
 §RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
 §RTYPE{r3:NonEmpty:str} (> (len #) INT:0)
@@ -52,7 +52,7 @@ These read as:
 
 Once defined, use the name as a parameter type:
 
-```
+```calor
 §RTYPE{r1:NatInt:i32} (>= # INT:0)
 
   §F{f001:Process:pub}
@@ -71,13 +71,13 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
 
 ### Syntax
 
-```
+```calor
 §I{baseType:paramName} | (predicate)
 ```
 
 ### Examples
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b} | (!= # INT:0)         // b must be non-zero
@@ -85,7 +85,7 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
   §R (/ a b)
 ```
 
-```
+```calor
 §F{f002:SetPort:pub}
   §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
   §O{void}
@@ -96,7 +96,7 @@ For one-off constraints, attach a predicate directly to a parameter with `|`:
 
 Inline refinements can coexist with default parameter values:
 
-```
+```calor
 §I{i32:age} | (>= # INT:0) = INT:18
 ```
 
@@ -106,7 +106,7 @@ Inline refinements can coexist with default parameter values:
 
 The `#` symbol refers to the value being constrained. It is only valid inside refinement predicates:
 
-```
+```calor
 §RTYPE{r1:Positive:i32} (> # INT:0)     // # = the i32 value
 §I{i32:x} | (>= # INT:0)                // # = x
 ```
@@ -121,7 +121,7 @@ A proof obligation asserts that a condition holds at a specific point in the fun
 
 ### Syntax
 
-```
+```calor
 §PROOF{id:description} (boolean-expression)
 §PROOF{id} (boolean-expression)
 ```
@@ -131,7 +131,7 @@ A proof obligation asserts that a condition holds at a specific point in the fun
 
 ### Examples
 
-```
+```calor
 §F{f001:Transfer:pub}
   §I{i32:balance}
   §I{i32:amount} | (> # INT:0)
@@ -229,7 +229,7 @@ Failed obligations emit warnings and guards instead of errors. Use during develo
 
 ## Complete Example
 
-```
+```calor
 §M{m001:Banking}
 
 // Named refinement types
