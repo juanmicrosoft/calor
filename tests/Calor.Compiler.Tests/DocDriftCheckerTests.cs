@@ -21,7 +21,8 @@ public class DocDriftCheckerTests
         DocFile[]? effectDocsForwardOnly = null,
         DocFile? cliCodesDoc = null,
         DocFile[]? versionScanDocs = null,
-        MirrorDoc[]? mirrorDocs = null)
+        MirrorDoc[]? mirrorDocs = null,
+        DocFile[]? semanticsVersionDocs = null)
     {
         return new DocDriftInputs
         {
@@ -38,7 +39,189 @@ public class DocDriftCheckerTests
             CliCodesDoc = cliCodesDoc,
             VersionScanDocs = versionScanDocs ?? [],
             MirrorDocs = mirrorDocs ?? [],
+            SemanticsVersionDocs = semanticsVersionDocs ?? [],
         };
+    }
+
+    [Theory]
+    [InlineData("**Semantics Version: 1.0.0**")]
+    [InlineData("Version: 1.0.0")]
+    [InlineData("Semantics Version: 0.9.9")]
+    [InlineData("## Semantics Version: invalid")]
+    [InlineData("**Current Version:** 1.0.0")]
+    [InlineData("**Semantics Version:** `1.0.0`")]
+    [InlineData("Semantics Version:")]
+    [InlineData("**Version:**")]
+    [InlineData("__Current Version:__ 1.0.0")]
+    [InlineData("__Semantics Version:__")]
+    [InlineData("Semantics Version: 2.0.0_")]
+    public void StaleNormativeSemanticsVersion_FailsIndependentlyOfPackageVersion(string claim)
+    {
+        var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(
+            semanticsVersionDocs: [new DocFile("docs/semantics/core.md", claim)])));
+        Assert.Equal(DiagnosticCode.DocDriftHardcodedVersion, finding.Code);
+        Assert.Contains($"implemented semantics '{SemanticsVersion.VersionString}'", finding.Message);
+        Assert.Contains("not the compiler package version", finding.Message);
+    }
+
+    [Fact]
+    public void CurrentSemanticsVersionAndHistoricalCompatibilityExample_Pass()
+    {
+        var doc = new DocFile("docs/semantics/versioning.md",
+            $"**Semantics Version: {SemanticsVersion.VersionString}**\nEarlier §SEMVER{{1.0.0}} modules are rejected.\n");
+        Assert.Empty(DocDriftChecker.Check(BaseInputs(semanticsVersionDocs: [doc])));
+    }
+
+    [Fact]
+    public void NormativeOverview_CannotDeleteItsCurrentVersionClaim()
+    {
+        var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(
+            semanticsVersionDocs: [new DocFile("docs/semantics/README.md", "# Semantics\n")])));
+        Assert.Equal(DiagnosticCode.DocDriftHardcodedVersion, finding.Code);
+    }
+
+    private const string InventorySchema = """
+        {"schemaVersion":1,"nodes":[
+          {"name":"SecondNode","source":"Statements.cs"},
+          {"name":"FirstNode","source":"Expressions.cs"}
+        ]}
+        """;
+
+    [Fact]
+    public void MethodFragment_IsNotMisclassifiedAsModuleExample()
+    {
+        var doc = new DocFile("docs/semantics/inheritance.md",
+            "```calor\n§MT{method:Example:pub} () -> i32\n  §R 1\n```\n");
+        Assert.Empty(DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc])));
+    }
+
+    [Fact]
+    public void InventoryGeneration_DerivesFullSortedContentsAndCountFromSchema()
+    {
+        var generated = DocDriftChecker.GenerateAstInventory(InventorySchema);
+        Assert.Contains("**2** node types", generated);
+        Assert.Contains("`FirstNode`", generated);
+        Assert.Contains("`SecondNode`", generated);
+        Assert.True(generated.IndexOf("`FirstNode`", StringComparison.Ordinal)
+            < generated.IndexOf("`SecondNode`", StringComparison.Ordinal));
+        Assert.Equal(generated, DocDriftChecker.GenerateAstInventory(InventorySchema));
+    }
+
+    [Theory]
+    [InlineData("count")]
+    [InlineData("node")]
+    public void InventoryDrift_RejectsCountAndContentMutations(string mutation)
+    {
+        var expected = DocDriftChecker.GenerateAstInventory(InventorySchema);
+        var changed = mutation == "count"
+            ? expected.Replace("**2**", "**134**", StringComparison.Ordinal)
+            : expected.Replace("FirstNode", "WrongNode", StringComparison.Ordinal);
+        var findings = DocDriftChecker.Check(BaseInputs(mirrorDocs:
+            [new MirrorDoc(DocDriftChecker.AstInventoryRelativePath, "eng/ast-schema.json", changed, expected)]));
+        Assert.Equal(DiagnosticCode.DocDriftMirrorOutOfSync, Assert.Single(findings).Code);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"schemaVersion\":99,\"nodes\":[]}")]
+    [InlineData("{\"schemaVersion\":1,\"nodes\":[{\"name\":\"X\",\"source\":\"A.cs\"},{\"name\":\"X\",\"source\":\"B.cs\"}]}")]
+    public void MalformedInventorySource_IsNotSilentlyRegenerated(string schema)
+    {
+        var root = CreateFakeRepo();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "eng"));
+            Directory.CreateDirectory(Path.Combine(root, "docs", "semantics"));
+            File.WriteAllText(Path.Combine(root, "eng", "ast-schema.json"), schema);
+            var inventory = Path.Combine(root, DocDriftChecker.AstInventoryRelativePath);
+            File.WriteAllText(inventory, "preserve existing document");
+            var errors = new List<Diagnostic>();
+            Assert.False(DocDriftChecker.RegenerateAstInventory(root, errors));
+            Assert.Equal("preserve existing document", File.ReadAllText(inventory));
+            Assert.Equal(DiagnosticCode.DocDriftMissingInput, Assert.Single(errors).Code);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void InventoryRegeneration_IsIdempotentAndRestoresSchemaDerivedPage()
+    {
+        var root = CreateFakeRepo();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "eng"));
+            File.WriteAllText(Path.Combine(root, "eng", "ast-schema.json"), InventorySchema);
+            var errors = new List<Diagnostic>();
+            Assert.True(DocDriftChecker.RegenerateAstInventory(root, errors));
+            Assert.Empty(errors);
+            var path = Path.Combine(root, DocDriftChecker.AstInventoryRelativePath);
+            var timestamp = File.GetLastWriteTimeUtc(path);
+            Assert.True(DocDriftChecker.RegenerateAstInventory(root, errors));
+            Assert.Equal(timestamp, File.GetLastWriteTimeUtc(path));
+            Assert.Equal(DocDriftChecker.GenerateAstInventory(InventorySchema), File.ReadAllText(path));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData("README.md")]
+    [InlineData("core.md")]
+    [InlineData("dotnet-backend.md")]
+    public void RepositoryScan_RejectsStaleNormativeVersionKeywordAndExample(string name)
+    {
+        var root = CreateFakeRepo();
+        Directory.CreateDirectory(Path.Combine(root, "docs", "semantics"));
+        File.WriteAllText(Path.Combine(root, "docs", "semantics", name), """
+            Semantics Version: 1.0.0
+            Use §BOGUS.
+            ```calor
+            §M{m:BadExample}
+              §F{f:Probe:pub} () -> i32
+                §R (+ 1)
+            ```
+            """);
+        var findings = CheckFakeRepo(root).Where(finding =>
+            finding.FilePath == Path.Combine("docs", "semantics", name)).ToArray();
+        Assert.Contains(findings, finding => finding.Code == DiagnosticCode.DocDriftHardcodedVersion);
+        Assert.Contains(findings, finding => finding.Code == DiagnosticCode.DocDriftUnknownKeyword);
+        Assert.Contains(findings, finding => finding.Code == DiagnosticCode.DocDriftExampleParseError);
+    }
+
+    [Fact]
+    public void RepositoryScan_RejectsStaleInventoryAgainstLoadedSchema()
+    {
+        var root = CreateFakeRepo();
+        Directory.CreateDirectory(Path.Combine(root, "eng"));
+        Directory.CreateDirectory(Path.Combine(root, "docs", "semantics"));
+        File.WriteAllText(Path.Combine(root, "eng", "ast-schema.json"), InventorySchema);
+        File.WriteAllText(Path.Combine(root, DocDriftChecker.AstInventoryRelativePath),
+            DocDriftChecker.GenerateAstInventory(InventorySchema).Replace("**2**", "**134**", StringComparison.Ordinal));
+        Assert.Contains(CheckFakeRepo(root), finding =>
+            finding.FilePath == DocDriftChecker.AstInventoryRelativePath
+            && finding.Code == DiagnosticCode.DocDriftMirrorOutOfSync);
+    }
+
+    [Fact]
+    public void RepositoryScan_ExcludesDatedAndNestedPlanningRecordsFromNormativeChecks()
+    {
+        var root = CreateFakeRepo();
+        var directory = Path.Combine(root, "docs", "semantics");
+        Directory.CreateDirectory(Path.Combine(directory, "plans"));
+        const string historical = "Semantics Version: 1.0.0\nHistorical §BOGUS\n";
+        File.WriteAllText(Path.Combine(directory, "2026-01-01-plan.md"), historical);
+        File.WriteAllText(Path.Combine(directory, "plans", "future.md"), historical);
+        Assert.DoesNotContain(CheckFakeRepo(root), finding =>
+            finding.Code is DiagnosticCode.DocDriftUnknownKeyword or DiagnosticCode.DocDriftHardcodedVersion);
+    }
+
+    [Fact]
+    public void RepositoryScan_MissingNormativeOverviewIsAnError()
+    {
+        var root = CreateFakeRepo();
+        Directory.CreateDirectory(Path.Combine(root, "docs", "semantics"));
+        Assert.Contains(CheckFakeRepo(root), finding =>
+            finding.Code == DiagnosticCode.DocDriftMissingInput
+            && finding.FilePath == Path.Combine("docs", "semantics", "README.md"));
     }
 
     // --- Mirror-doc drift (AGENTS.md single-sourced from CLAUDE.md, #708) ---
@@ -539,7 +722,7 @@ public class DocDriftCheckerTests
         string structureTagsContent = "# Structure Tags\n",
         string syntaxIndexContent = "# Syntax Reference\n")
     {
-        var root = Path.Combine(Path.GetTempPath(), "calor-drift-probe-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(AppContext.BaseDirectory, "calor-drift-probe-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "docs", "syntax-reference"));
         Directory.CreateDirectory(Path.Combine(root, "docs", "cli"));
         Directory.CreateDirectory(Path.Combine(root, ".github"));
