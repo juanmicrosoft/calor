@@ -5679,8 +5679,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Set current class name for constructor emission after saving the outer
         // context so nested types restore it correctly.
         _currentClassName = name;
+        var identitySegment = node.TypeParameters.Count == 0
+            ? node.Name : $"{node.Name}`{node.TypeParameters.Count}";
         _currentClassIdentity = _currentClassIdentity == null
-            ? node.Name : $"{_currentClassIdentity}.{node.Name}";
+            ? identitySegment : $"{_currentClassIdentity}.{identitySegment}";
         _currentClassMemberNames = node.Methods.Select(m => m.Name)
             .Concat(node.Fields.Select(f => f.Name))
             .Concat(node.Properties.Select(pr => pr.Name))
