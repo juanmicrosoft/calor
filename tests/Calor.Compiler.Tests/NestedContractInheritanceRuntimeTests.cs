@@ -776,6 +776,47 @@ public sealed class NestedContractInheritanceRuntimeTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NearerSourceTypes_ShadowEnclosingValuesInInheritedGuards(bool verify)
+    {
+        foreach (var outerField in new[] { false, true })
+        foreach (var inheritedType in new[] { false, true })
+        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        {
+            const string limits = """
+                §CL{c3:Limits:pub}
+                  §FLD{i32:Min:pub:stat} INT:0
+                """;
+            var declarations = inheritedType
+                ? "§CL{c2:Storage:pub}\n" + Indent(limits) + "\n§CL{c4:Base:pub}\n  §EXT{Storage}"
+                : "§CL{c4:Base:pub}\n" + Indent(limits);
+            declarations += "\n" + Indent($$"""
+                §MT{mt1:Get:pub:virt} (i32:x) -> i32
+                  §E{}
+                  {{contract}}
+                  §R x
+                """);
+            var source = $$"""
+                §M{m1:Scope}
+                  §CL{c1:Outer:pub}
+                {{(outerField ? "    §FLD{i32:Limits:pub:stat} INT:10\n" : "")}}{{Indent(Indent(declarations))}}
+                  §CL{c5:Container:pub}
+                    §CL{c6:Impl:pub}
+                      §EXT{Outer.Base}
+                      §CL{c7:Limits:pub}
+                        §FLD{i32:Min:pub:stat} INT:-10
+                      §MT{mt2:Get:pub:over} (i32:value) -> i32
+                        §E{}
+                        §R value
+                """;
+            var assembly = Compile(source, verify);
+            AssertGuards(assembly.GetType("Scope.Outer+Base")!, 1, -1, -11);
+            AssertGuards(assembly.GetType("Scope.Container+Impl")!, 1, -1, -11);
+        }
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions

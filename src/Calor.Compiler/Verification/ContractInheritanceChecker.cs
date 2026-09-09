@@ -707,13 +707,24 @@ public sealed class ContractInheritanceChecker : IDisposable
 
     private IEnumerable<string> SourceValueNames(ResolvedDeclaration source)
     {
-        var pending = new Stack<ResolvedDeclaration>();
-        pending.Push(source);
+        var hiddenNames = new HashSet<string>(StringComparer.Ordinal);
         var visited = new HashSet<AstNode>();
-        while (pending.TryPop(out var scope))
+        for (var scope = source; ;)
+        {
+            foreach (var name in FromType(scope, inherited: false))
+                yield return name;
+            if (_enclosingDeclarations[scope.Declaration] is not { } enclosing)
+                break;
+            scope = new ResolvedDeclaration(enclosing,
+                DeclarationSubstitutions(enclosing, scope.TypeArguments), scope.TypeArguments);
+        }
+
+        IEnumerable<string> FromType(ResolvedDeclaration scope, bool inherited)
         {
             if (!visited.Add(scope.Declaration))
-                continue;
+                yield break;
+            foreach (var parameter in DeclarationParameters(scope.Declaration))
+                hiddenNames.Add(parameter.Name);
             IEnumerable<AstNode> members = scope.Declaration switch
             {
                 ClassDefinitionNode cls => cls.Fields.Cast<AstNode>().Concat(cls.Properties)
@@ -722,9 +733,18 @@ public sealed class ContractInheritanceChecker : IDisposable
                     .Concat(iface.Methods).Concat(iface.PreprocessorBlocks),
                 _ => []
             };
-            foreach (var member in members.SelectMany(member => member is MemberPreprocessorBlockNode
-                         ? EnumerateDescendantsAndSelf(member) : [member]))
+            foreach (var member in ExpandContainers(members))
             {
+                var visibility = member switch
+                {
+                    ClassFieldNode field => field.Visibility,
+                    PropertyNode property => property.Visibility,
+                    MethodNode method => method.Visibility,
+                    EventDefinitionNode evt => evt.Visibility,
+                    _ => Visibility.Public
+                };
+                if (inherited && visibility == Visibility.Private)
+                    continue;
                 var name = member switch
                 {
                     ClassFieldNode field => field.Name,
@@ -734,12 +754,14 @@ public sealed class ContractInheritanceChecker : IDisposable
                     EventDefinitionNode evt => evt.Name,
                     _ => null
                 };
-                if (name != null)
+                if (name != null && hiddenNames.Add(name))
                     yield return name;
             }
-            if (_enclosingDeclarations[scope.Declaration] is { } enclosing)
-                pending.Push(new ResolvedDeclaration(enclosing,
-                    DeclarationSubstitutions(enclosing, scope.TypeArguments), scope.TypeArguments));
+            // Nearer types also shadow farther values. Do not flatten enclosing
+            // or base scopes into one undifferentiated set of protected names.
+            foreach (var declaration in _enclosingDeclarations.Keys.Where(declaration =>
+                         _enclosingDeclarations[declaration] == scope.Declaration))
+                hiddenNames.Add(DeclarationName(declaration));
             var bases = scope.Declaration switch
             {
                 ClassDefinitionNode { BaseClass: { } baseName } => [baseName],
@@ -751,7 +773,23 @@ public sealed class ContractInheritanceChecker : IDisposable
                 var parent = ResolveDeclaration(baseName, scope.Declaration, scope.Substitutions,
                     typeArguments: scope.TypeArguments);
                 if (parent != null)
-                    pending.Push(parent);
+                    foreach (var name in FromType(parent, inherited: true))
+                        yield return name;
+            }
+        }
+
+        static IEnumerable<AstNode> ExpandContainers(IEnumerable<AstNode> members)
+        {
+            foreach (var member in members)
+            {
+                if (member is MemberPreprocessorBlockNode)
+                {
+                    foreach (var child in ExpandContainers(
+                                 Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(member)))
+                        yield return child;
+                }
+                else
+                    yield return member;
             }
         }
     }
