@@ -19,7 +19,7 @@ public class ConverterImprovementTests
     #region A1: Throw Expressions
 
     [Fact]
-    public void Migration_ThrowExpressionInCoalesce_PreservesMember()
+    public void Migration_ThrowExpressionInCoalesce_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -33,11 +33,11 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
-    public void Migration_CoalesceThrow_Assignment_PreservesMember()
+    public void Migration_CoalesceThrow_Assignment_PreservesConditionalThrow()
     {
         var csharp = """
             public class Config
@@ -52,11 +52,11 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
-    public void Migration_CoalesceThrow_LocalDeclaration_PreservesMember()
+    public void Migration_CoalesceThrow_LocalDeclaration_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -70,7 +70,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void Migration_CoalesceThrow_MethodCall_PreservesMember()
+    public void Migration_CoalesceThrow_MethodCall_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -138,7 +138,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
@@ -156,11 +156,11 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
-    public void Migration_ThrowExpressionInTernary_PreservesMember()
+    public void Migration_ThrowExpressionInTernary_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -174,17 +174,27 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
-    private static void AssertInteropPreservesSource(ConversionResult result, string source)
+    private static void AssertNativeConditionalThrow(ConversionResult result)
     {
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
-        var preserved = Assert.Single(cls.InteropBlocks);
-        Assert.Contains(preserved.CSharpCode.Trim(), source);
-        Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains(result.Issues, issue => issue.Feature == "conditional-expression-hoisting");
+        Assert.Empty(cls.InteropBlocks);
+        var nodes = new List<AstNode>();
+        var pending = new Stack<AstNode>();
+        pending.Push(cls);
+        while (pending.TryPop(out var node))
+        {
+            nodes.Add(node);
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+                pending.Push(child);
+        }
+        Assert.Contains(nodes, node => node is ThrowExpressionNode);
+        Assert.DoesNotContain(nodes, node => node is ThrowStatementNode or IfStatementNode);
+        Assert.Contains("§TH", result.CalorSource);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
@@ -340,10 +350,11 @@ public class ConverterImprovementTests
         var cls = Assert.Single(result.Ast!.Classes);
         var getNameMethod = cls.Methods[0];
 
-        // Should contain a NullConditionalNode in the return statement
         var ret = Assert.IsType<ReturnStatementNode>(getNameMethod.Body[0]);
-        var nullCond = Assert.IsType<NullConditionalNode>(ret.Expression);
-        Assert.Contains("ToString(", nullCond.MemberName);
+        var preserved = Assert.IsType<RawCSharpExpressionNode>(ret.Expression);
+        Assert.Equal("(obj?.ToString(x))", preserved.CSharpCode);
+        Assert.Contains(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved &&
+            loss.Feature == "conditional-access-shape");
     }
 
     #endregion
@@ -448,7 +459,7 @@ public class ConverterImprovementTests
     #region Edge Cases: Throw Expression with Existing Variable
 
     [Fact]
-    public void Migration_ThrowExpressionWithVariable_PreservesMember()
+    public void Migration_ThrowExpressionWithVariable_PreservesConditionalThrow()
     {
         var csharp = """
             public class Service
@@ -462,7 +473,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     #endregion
@@ -549,7 +560,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]
@@ -1951,7 +1962,7 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void Migration_TargetTypedNew_InThrowExpression_PreservesMember()
+    public void Migration_TargetTypedNew_InThrowExpression_PreservesConditionalThrow()
     {
         var csharp = """
             using System;
@@ -1967,7 +1978,7 @@ public class ConverterImprovementTests
 
         var result = _converter.Convert(csharp);
 
-        AssertInteropPreservesSource(result, csharp);
+        AssertNativeConditionalThrow(result);
     }
 
     [Fact]

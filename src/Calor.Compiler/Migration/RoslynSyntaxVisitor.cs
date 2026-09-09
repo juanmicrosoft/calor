@@ -55,6 +55,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// ConvertBlock and VisitGlobalStatement flush these before the containing statement.
     /// </summary>
     private readonly List<StatementNode> _pendingStatements = new();
+    private int _conditionalRegionDepth;
 
     /// <summary>
     /// Maps variable names to their resolved type names for effect inference.
@@ -7386,9 +7387,51 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         if (expr is ConditionalAccessExpressionSyntax condAccess)
         {
-            // Desugaring ?. into != null can invoke overloaded equality, repeat
-            // property getters, and hoist arguments outside the non-null branch.
-            throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
+            if (condAccess.WhenNotNull is not InvocationExpressionSyntax
+                {
+                    Expression: MemberBindingExpressionSyntax member
+                } conditionalInvocation)
+            {
+                throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
+            }
+
+            _context.RecordFeatureUsage("null-conditional");
+            var span = GetTextSpan(node);
+            var receiverName = _context.GenerateId("_nullcond");
+            var receiver = ConvertExpression(condAccess.Expression);
+            _pendingStatements.Add(new BindStatementNode(
+                span, receiverName, null, false, receiver, new AttributeCollection()));
+
+            var receiverType = _semanticModel?.GetTypeInfo(condAccess.Expression).Type;
+            var callReceiver = receiverType is INamedTypeSymbol
+                {
+                    OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+                }
+                ? $"{receiverName}.Value"
+                : receiverName;
+            var arguments = conditionalInvocation.ArgumentList.Arguments;
+            var convertedArguments = arguments.Select(argument =>
+                ConvertConditionalRegion(argument.Expression, () =>
+                    argument.Expression is LambdaExpressionSyntax or CollectionExpressionSyntax ||
+                    argument.Expression is ObjectCreationExpressionSyntax { Initializer: not null } ||
+                    argument.Expression is ImplicitObjectCreationExpressionSyntax { Initializer: not null }
+                        ? PreserveConditionalOperand(argument.Expression)
+                        : ConvertExpression(argument.Expression))).ToList();
+            var names = arguments.Any(argument => argument.NameColon != null)
+                ? arguments.Select(argument => argument.NameColon?.Name.Identifier.ValueText).ToList()
+                : null;
+            var typeArguments = member.Name is GenericNameSyntax generic
+                ? generic.TypeArgumentList.Arguments.Select(type =>
+                    TypeMapper.CSharpToCalor(type.ToString())).ToList()
+                : null;
+            var call = new CallStatementNode(span, $"{callReceiver}.{member.Name.Identifier.Text}",
+                false, convertedArguments, new AttributeCollection(), names,
+                ExtractArgumentModifiers(arguments), typeArguments: typeArguments);
+            // A type test is null identity, not an overloaded equality operator.
+            var condition = new TypeOperationNode(span, TypeOp.Is,
+                new ReferenceNode(span, receiverName), "object");
+            return new IfStatementNode(span, _context.GenerateId("if"), condition,
+                [call], Array.Empty<ElseIfClauseNode>(), null, new AttributeCollection());
         }
 
         // Default: wrap as call statement
@@ -8739,6 +8782,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.Stats.ExpressionsConverted++;
 
+        if (_conditionalRegionDepth > 0 &&
+            (expression is AssignmentExpressionSyntax ||
+             expression is ObjectCreationExpressionSyntax { Initializer: not null } ||
+             expression is ImplicitObjectCreationExpressionSyntax { Initializer: not null } ||
+             expression.IsKind(SyntaxKind.PostIncrementExpression) ||
+             expression.IsKind(SyntaxKind.PostDecrementExpression) ||
+             expression.IsKind(SyntaxKind.PreIncrementExpression) ||
+             expression.IsKind(SyntaxKind.PreDecrementExpression)))
+        {
+            return PreserveConditionalOperand(expression);
+        }
+
         try
         {
             return expression switch
@@ -8824,24 +8879,69 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var enclosingPending = _pendingStatements.ToList();
         _pendingStatements.Clear();
         var succeeded = false;
+        var enclosingDepth = _conditionalRegionDepth++;
         try
         {
             var result = convert();
-            if (_pendingStatements.Count != 0)
+            var safeRootDecomposition = enclosingDepth == 0 &&
+                expression is ConditionalExpressionSyntax &&
+                IsCompleteStatementValue(expression) &&
+                _pendingStatements is
+                [BindStatementNode binding, IfStatementNode] &&
+                result is ReferenceNode reference && binding.Name == reference.Name;
+            if (_pendingStatements.Count != 0 && !safeRootDecomposition)
             {
-                // A statement prelude cannot represent a conditionally evaluated
-                // operand. Preserve its member rather than execute it eagerly.
-                throw EscalateExpression(expression, "conditional-expression-hoisting", preserveMember: true);
+                // Keep the original expression's scope and evaluation region
+                // rather than running its generated preludes eagerly.
+                _pendingStatements.Clear();
+                result = PreserveConditionalOperand(expression);
             }
+            var produced = _pendingStatements.ToList();
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(enclosingPending);
+            _pendingStatements.AddRange(produced);
             succeeded = true;
             return result;
         }
         finally
         {
-            _pendingStatements.Clear();
-            if (succeeded)
-                _pendingStatements.AddRange(enclosingPending);
+            _conditionalRegionDepth = enclosingDepth;
+            if (!succeeded)
+                _pendingStatements.Clear();
         }
+    }
+
+    private static bool IsCompleteStatementValue(ExpressionSyntax expression)
+    {
+        SyntaxNode root = expression;
+        while (root.Parent is ParenthesizedExpressionSyntax parent)
+            root = parent;
+        return root.Parent is ReturnStatementSyntax ||
+            root.Parent is EqualsValueClauseSyntax
+            {
+                Parent: VariableDeclaratorSyntax
+                {
+                    Parent: VariableDeclarationSyntax
+                    {
+                        Variables.Count: 1,
+                        Parent: LocalDeclarationStatementSyntax
+                    }
+                }
+            };
+    }
+
+    private RawCSharpExpressionNode PreserveConditionalOperand(
+        ExpressionSyntax expression, string feature = "conditional-expression-hoisting")
+    {
+        var line = expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, feature,
+            $"Conditional operand preserved in place as C#: {TruncateForMessage(expression.ToString())}", line);
+        _context.AddWarning("Conditional operand preserved in place to retain evaluation order",
+            feature: feature, line: line, suggestion: FeatureSupport.GetWorkaround(feature));
+        var code = expression is ThrowExpressionSyntax
+            ? expression.ToString()
+            : $"({expression})";
+        return new RawCSharpExpressionNode(GetTextSpan(expression), code);
     }
 
     private ExpressionNode ConvertLiteral(LiteralExpressionSyntax literal)
@@ -8951,40 +9051,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new TypeOperationNode(GetTextSpan(binary), TypeOp.Is, left, typeName);
         }
 
-        // Handle null-coalescing with throw: x ?? throw new E(args) → hoist null guard, return x
+        // Keep exception construction inside the conditional operand.
         if (binary.IsKind(SyntaxKind.CoalesceExpression) && binary.Right is ThrowExpressionSyntax throwExpr)
         {
             _context.RecordFeatureUsage("null-coalescing-throw");
             _context.IncrementConverted();
-            var left = ConvertExpression(binary.Left);
-            var exceptionExpr = ConvertExpression(throwExpr.Expression);
-
-            // If the left side is not a simple reference (e.g., a method call),
-            // hoist it to a temp variable to avoid double evaluation.
-            var valueRef = left;
-            if (left is not ReferenceNode)
-            {
-                var tempName = _context.GenerateId("_nct");
-                _pendingStatements.Add(new BindStatementNode(
-                    left.Span, tempName, null, false, left, new AttributeCollection()));
-                valueRef = new ReferenceNode(left.Span, tempName);
-            }
-
-            var nullCheck = new BinaryOperationNode(
-                GetTextSpan(binary), BinaryOperator.Equal,
-                valueRef, new ReferenceNode(GetTextSpan(binary), "null"));
-            var throwStmt = new ThrowStatementNode(GetTextSpan(throwExpr), exceptionExpr);
-            var guard = new IfStatementNode(
-                GetTextSpan(binary),
-                _context.GenerateId("if"),
-                nullCheck,
-                new List<StatementNode> { throwStmt },
-                Array.Empty<ElseIfClauseNode>(),
-                null,
-                new AttributeCollection());
-
-            _pendingStatements.Add(guard);
-            return valueRef;
+            return new NullCoalesceNode(GetTextSpan(binary),
+                ConvertExpression(binary.Left), ConvertThrowExpression(throwExpr));
         }
 
         // Handle null-coalescing operator: x ?? y → (?? x y)
@@ -10271,6 +10344,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         for (int i = 0; i < args.Count; i++)
         {
+            if (_conditionalRegionDepth > 0 && args[i] is NewExpressionNode { Initializers.Count: 0 })
+                continue;
             if (args[i] is NewExpressionNode newNode)
             {
                 var tempName = _context.GenerateId("_new", newNode.TypeName);
@@ -10344,6 +10419,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private ExpressionNode HoistIfComplex(ExpressionNode node, TextSpan span)
     {
+        if (_conditionalRegionDepth > 0 && node is NewExpressionNode { Initializers.Count: 0 })
+            return node;
         if (node is NewExpressionNode newNode && (newNode.Initializers.Count > 0 || newNode.Arguments.Count > 0))
         {
             var tempName = _context.GenerateId("_new", newNode.TypeName);
@@ -10676,7 +10753,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && memberAccess.Expression is not MemberAccessExpressionSyntax
                 && memberAccess.Expression is not ThisExpressionSyntax
                 && memberAccess.Expression is not BaseExpressionSyntax
-                && memberAccess.Expression is not PredefinedTypeSyntax)
+                && memberAccess.Expression is not PredefinedTypeSyntax
+                && memberAccess.Expression is not GenericNameSyntax)
             {
                 var complexConverted = targetExpr;
                 var tempName = _context.GenerateId("_expr");
@@ -11465,51 +11543,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var span = GetTextSpan(conditional);
 
-        // Handle ternary with throw in false branch: flag ? value : throw new E(...)
-        // Hoist to: if (!flag) throw new E(...); return value;
-        if (conditional.WhenFalse is ThrowExpressionSyntax throwFalse)
+        if (conditional.WhenFalse is ThrowExpressionSyntax ||
+            conditional.WhenTrue is ThrowExpressionSyntax)
         {
             _context.RecordFeatureUsage("ternary-throw");
             _context.IncrementConverted();
-            var condition = ConvertExpression(conditional.Condition);
-            var exceptionExpr = ConvertExpression(throwFalse.Expression);
-
-            var negatedCondition = new UnaryOperationNode(span, UnaryOperator.Not, condition);
-            var throwStmt = new ThrowStatementNode(GetTextSpan(throwFalse), exceptionExpr);
-            var guard = new IfStatementNode(
-                span,
-                _context.GenerateId("if"),
-                negatedCondition,
-                new List<StatementNode> { throwStmt },
-                Array.Empty<ElseIfClauseNode>(),
-                null,
-                new AttributeCollection());
-
-            _pendingStatements.Add(guard);
-            return ConvertExpression(conditional.WhenTrue);
-        }
-
-        // Handle ternary with throw in true branch: flag ? throw new E(...) : value
-        // Hoist to: if (flag) throw new E(...); return value;
-        if (conditional.WhenTrue is ThrowExpressionSyntax throwTrue)
-        {
-            _context.RecordFeatureUsage("ternary-throw");
-            _context.IncrementConverted();
-            var condition = ConvertExpression(conditional.Condition);
-            var exceptionExpr = ConvertExpression(throwTrue.Expression);
-
-            var throwStmt = new ThrowStatementNode(GetTextSpan(throwTrue), exceptionExpr);
-            var guard = new IfStatementNode(
-                span,
-                _context.GenerateId("if"),
-                condition,
-                new List<StatementNode> { throwStmt },
-                Array.Empty<ElseIfClauseNode>(),
-                null,
-                new AttributeCollection());
-
-            _pendingStatements.Add(guard);
-            return ConvertExpression(conditional.WhenFalse);
+            return new ConditionalExpressionNode(span,
+                ConvertExpression(conditional.Condition),
+                ConvertExpression(conditional.WhenTrue),
+                ConvertExpression(conditional.WhenFalse));
         }
 
         // Deeply nested ternaries (depth > 2) → decompose into if/else with a result variable
@@ -12222,41 +12264,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Replace("}}", "}", StringComparison.Ordinal);
     }
 
-    private NullConditionalNode ConvertConditionalAccess(ConditionalAccessExpressionSyntax condAccess)
+    private ExpressionNode ConvertConditionalAccess(ConditionalAccessExpressionSyntax condAccess)
     {
         _context.RecordFeatureUsage("null-conditional");
 
-        if (condAccess.WhenNotNull is not MemberBindingExpressionSyntax &&
-            condAccess.WhenNotNull is not InvocationExpressionSyntax
-            {
-                Expression: MemberBindingExpressionSyntax { Name: IdentifierNameSyntax }
-            })
+        if (condAccess.WhenNotNull is InvocationExpressionSyntax)
+            return PreserveConditionalOperand(condAccess, "conditional-access-shape");
+
+        if (condAccess.WhenNotNull is not MemberBindingExpressionSyntax)
         {
             throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
         }
 
         var target = ConvertExpression(condAccess.Expression);
-
-        // When WhenNotNull is a method call (e.g., obj?.Method(x)),
-        // decompose and convert args through the AST pipeline
-        if (condAccess.WhenNotNull is InvocationExpressionSyntax invocation
-            && invocation.Expression is MemberBindingExpressionSyntax memberBinding)
-        {
-            if (invocation.ArgumentList.Arguments.Any(argument =>
-                argument.NameColon != null || argument.RefKindKeyword != default))
-            {
-                throw EscalateExpression(condAccess, "conditional-access-shape", preserveMember: true);
-            }
-            _context.RecordFeatureUsage("null-conditional-method");
-            var methodName = memberBinding.Name.Identifier.Text;
-            var convertedArgs = invocation.ArgumentList.Arguments
-                .Select(a => ConvertExpression(a.Expression));
-            var csharpEmitter = new CSharpEmitter();
-            var argsStr = string.Join(", ", convertedArgs.Select(a => a.Accept(csharpEmitter)));
-            // Escape inner double quotes so the member string doesn't break the lexer
-            var escapedArgsStr = argsStr.Replace("\"", "\\\"");
-            return new NullConditionalNode(GetTextSpan(condAccess), target, $"{methodName}({escapedArgsStr})");
-        }
 
         // When WhenNotNull is a chained access with method calls containing string args,
         // use Roslyn's ToString() but escape inner double quotes

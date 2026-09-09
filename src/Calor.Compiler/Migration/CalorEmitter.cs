@@ -18,6 +18,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private readonly List<string> _pendingHoistedLines = new();
     private int _ternaryCounter;
     private int _hoistCounter;
+    private int _conditionalExpressionDepth;
     private int _memberBodyDepth;
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
@@ -2978,9 +2979,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // so a nested zero-arg call without explicit §/C would absorb the next operand.
         // For the §IF expression form we keep it too — the condition slot is followed by
         // " → whenTrue", and a bare §C{X} could absorb the → as a primary token.
-        var condition = AcceptInInlineSibling(node.Condition);
-        var whenTrue = AcceptInInlineSibling(node.WhenTrue);
-        var whenFalse = AcceptInInlineSibling(node.WhenFalse);
+        var condition = AcceptInConditionalRegion(node.Condition);
+        var whenTrue = AcceptInConditionalRegion(node.WhenTrue);
+        var whenFalse = AcceptInConditionalRegion(node.WhenFalse);
 
         // If either branch contains section markers (§C, §NEW, §LAM, etc.) or commas
         // (tuple literals), decompose into §IF/§EL/§/I expression form.
@@ -3002,6 +3003,19 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private static bool ContainsSectionMarker(string expr)
     {
         return expr.Contains('§');
+    }
+
+    private string AcceptInConditionalRegion(ExpressionNode expression)
+    {
+        _conditionalExpressionDepth++;
+        try
+        {
+            return AcceptInInlineSibling(expression);
+        }
+        finally
+        {
+            _conditionalExpressionDepth--;
+        }
     }
 
     /// <summary>
@@ -3059,7 +3073,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
         // Hoisting at class/module scope would leak §B bindings between members.
-        if (_memberBodyDepth == 0)
+        if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
             return expr;
 
         var varName = $"_hoist{_hoistCounter++:D3}";
@@ -3085,15 +3099,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // After AcceptInInlineSibling the inner §/C is kept, then hoisting moves the
         // §-bearing operand to a temp var (within method bodies). At class/module scope
         // where HoistToTempVar is a no-op, the explicit §/C is what keeps parsing safe.
-        var left = AcceptInInlineSibling(node.Left);
-        var right = AcceptInInlineSibling(node.Right);
+        var conditional = node.Operator is BinaryOperator.And or BinaryOperator.Or;
+        var left = conditional ? AcceptInConditionalRegion(node.Left) : AcceptInInlineSibling(node.Left);
+        var right = conditional ? AcceptInConditionalRegion(node.Right) : AcceptInInlineSibling(node.Right);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
 
         // Hoist operands containing section markers or commas (tuples) out of Lisp expression.
         // § markers and commas are invalid inside (op ...) expressions.
-        if (ContainsSectionMarker(left) || left.Contains(','))
+        if (!conditional && (ContainsSectionMarker(left) || left.Contains(',')))
             left = HoistToTempVar(left);
-        if (ContainsSectionMarker(right) || right.Contains(','))
+        if (!conditional && (ContainsSectionMarker(right) || right.Contains(',')))
             right = HoistToTempVar(right);
 
         return $"({opSymbol} {left} {right})";
@@ -3732,8 +3747,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // AcceptInInlineSibling: operands in Lisp (?? a b) form are space-separated,
         // so a nested zero-arg call without explicit §/C would absorb b as its inline arg.
-        var left = AcceptInInlineSibling(node.Left);
-        var right = AcceptInInlineSibling(node.Right);
+        var left = AcceptInConditionalRegion(node.Left);
+        var right = AcceptInConditionalRegion(node.Right);
         return $"(?? {left} {right})";
     }
 
@@ -3743,7 +3758,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // from the member string literal. A naked zero-arg §C{Get} target would absorb the
         // string literal as its inline argument on re-parse (Parser.IsExpressionStart accepts
         // StrLiteral). Defect: v0.6.1 loop-5 devil's-advocate finding.
-        var target = AcceptInInlineSibling(node.Target);
+        var target = AcceptInConditionalRegion(node.Target);
         // Sanitize member name: collapse whitespace/newlines to single space
         // (multi-line C# chains from converter can produce newlines in member names)
         var memberName = System.Text.RegularExpressions.Regex.Replace(node.MemberName, @"\s+", " ").Trim();

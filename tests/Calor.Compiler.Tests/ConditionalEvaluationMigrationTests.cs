@@ -31,6 +31,30 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Theory]
+    [InlineData("false && Tick()", 0)]
+    [InlineData("true && Tick()", 1)]
+    [InlineData("true || Tick()", 0)]
+    [InlineData("false || Tick()", 1)]
+    public void NativeCalls_StayInsideLazyOperands(string expression, int expected)
+    {
+        AssertRoundTrip($"bool ignored = {expression}; return Calls;", expected, false,
+            members: "private static int Calls; public static bool Tick() { Calls++; return true; }");
+    }
+
+    [Theory]
+    [InlineData("false && Fail()", 0)]
+    [InlineData("true && Fail()", 123)]
+    [InlineData("true || Fail()", 0)]
+    [InlineData("false || Fail()", 123)]
+    public void NativeCalls_PreserveSkippedExceptions(string expression, int expected)
+    {
+        AssertRoundTrip(
+            $"try {{ bool ignored = {expression}; }} catch (System.InvalidOperationException) {{ return 123; }} return 0;",
+            expected, false,
+            members: "public static bool Fail() { throw new System.InvalidOperationException(); }");
+    }
+
+    [Theory]
     [InlineData("7", 0)]
     [InlineData("null", 1)]
     public void Coalescing_PreservesConditionalIncrement(string value, int expected)
@@ -131,7 +155,7 @@ public class ConditionalEvaluationMigrationTests
     [Fact]
     public void ConditionalCallStatement_EvaluatesPropertyReceiverOnce()
     {
-        AssertRoundTrip("Target?.ToString(); return Calls;", 1, true,
+        AssertRoundTrip("Target?.ToString(); return Calls;", 1, false,
             members: "private static int Calls; public static string Target { get { Calls++; return \"abc\"; } }");
     }
 
@@ -158,7 +182,7 @@ public class ConditionalEvaluationMigrationTests
     [Theory]
     [InlineData(ConversionMode.Standard)]
     [InlineData(ConversionMode.Interop)]
-    public void HoistingPreservesWholeMemberInEveryMode(ConversionMode mode)
+    public void ConditionalOperandInteropIsCountedInEveryMode(ConversionMode mode)
     {
         AssertRoundTrip(
             "int i = 0; bool ignored = false && i++ > 0; return ignored ? 9 : i;",
@@ -168,8 +192,8 @@ public class ConditionalEvaluationMigrationTests
     [Fact]
     public void FailedMember_DoesNotLeakEarlierOperandPreludes()
     {
-        AssertRoundTrip("return Other();", 1, true,
-            members: "public static int Other() { int i = 0; bool gate = false; return i++ + (gate ? i++ : i++); }");
+        AssertRoundTrip("return Other();", 0, true,
+            members: "public static int Other() { int i = 0; int[] target = null; return i++ + (target?[i++] ?? 0); }");
     }
 
     [Theory]
@@ -204,7 +228,9 @@ public class ConditionalEvaluationMigrationTests
         var compilation = Program.Compile(conversion.CalorSource, "conditional-migration.calr",
             new Calor.Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
-        Assert.Equal(expected, Execute(compilation.GeneratedCode));
+        var actual = Execute(compilation.GeneratedCode);
+        Assert.True(expected == actual,
+            $"Expected {expected}, actual {actual}\n{conversion.CalorSource}\n{compilation.GeneratedCode}");
         Assert.Equal(expectInterop,
             conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));
         if (expectInterop)

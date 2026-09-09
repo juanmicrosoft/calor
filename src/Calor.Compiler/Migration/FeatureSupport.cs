@@ -202,15 +202,15 @@ public static class FeatureSupport
         {
             Name = "conditional-access-shape",
             Support = SupportLevel.Partial,
-            Description = "Conditional-access statements, indexing, chained access, generic calls and named/ref arguments preserve their containing member as counted C# interop",
-            Workaround = "Keep the interop member, or express the null check and dependent operations as explicit statements"
+            Description = "Conditional invocations preserve the original expression as counted C# interop. Conditional indexing and other unsupported shapes preserve their containing member",
+            Workaround = "Keep the counted interop, or express the null check and dependent operations as explicit statements"
         },
         ["conditional-expression-hoisting"] = new FeatureInfo
         {
             Name = "conditional-expression-hoisting",
             Support = SupportLevel.Partial,
-            Description = "Conditional expressions that require statement preludes preserve their containing member as counted C# interop, including &&, ||, ??, ?: and ?. operands",
-            Workaround = "Keep the interop member, or express conditional side effects as explicit statements before converting"
+            Description = "Side-effecting conditional operands are preserved in place as counted C# expressions. If conversion requires eager preludes, the original conditional expression is preserved instead",
+            Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         ["linq-method"] = new FeatureInfo
         {
