@@ -90,8 +90,8 @@ public class BinderIncompleteRatchetTests
         + "Combined migration measurement compares accepted 7d218c59 with exact 46baabf8: "
         + "34703 -> 35179 binder visits; binder-combined-integration.json records the separate "
         + "additional 11 opaque boundaries/268 source expressions and four generated lambda carrier "
-        + "renames. The additional opacity requires parent evidence review; it is not covered by "
-        + "the accepted M1 budget";
+        + "renames. The additional opacity was separately accepted after parent per-site evidence "
+        + "review; it is not folded into the earlier M1 budget or an independent-review claim";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");

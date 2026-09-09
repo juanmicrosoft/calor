@@ -15,7 +15,8 @@
     "Status": "Accepted; superseded +130 is not an outstanding decision"
   },
   "CombinedOpacityDecision": {
-    "Status": "New delta for parent evidence review, not authorized by the M1 decision",
+    "Status": "Accepted separately by the parent after inspecting all eleven source/payload pairs and four carrier-definition changes; not authorized by or folded into the earlier M1 decision",
+    "DecisionEvidence": "https://github.com/juanmicrosoft/calor/pull/1252#issuecomment-5604729878",
     "AddedBoundaries": 11,
     "AddedSourceExpressions": 268,
     "FormerlyExact": 139,

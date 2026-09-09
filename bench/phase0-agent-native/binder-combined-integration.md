@@ -10,11 +10,14 @@ explicitly authorized in [the parent decision](https://github.com/juanmicrosoft/
 `binder-expression-attribution.json` is byte-for-byte unchanged. This report
 does not reopen that decision or reuse its authorization for the new sites.
 
-**New decision for parent review:** the combined candidate adds **11 opaque
+**Separate accepted decision:** the combined candidate adds **11 opaque
 boundaries covering 268 source expressions**, across five files. Of these
 expressions, 139 previously had an exact non-opaque AST span and 129 were
-unmapped. The refreshed baselines record the candidate, not approval of this
-additional opacity.
+unmapped. After inspecting every source/payload pair and all four renamed
+carrier definitions, the parent explicitly accepted this additional opacity in
+[PR1252 comment5604729878](https://github.com/juanmicrosoft/calor/pull/1252#issuecomment-5604729878).
+This decision is separate from the earlier M1 budget and from independent
+implementation review.
 
 ## Counts and interpretation
 
@@ -148,8 +151,8 @@ original/selected source identities, raw/propagated error pins, unmapped/mixed
 identities, native controls rejecting interop and emitter fallback, and the
 preprocessing-offset regression remain active.
 
-The report does not claim whole-corpus semantic equivalence, zero losses, or
-approval of the new opacity. Companion diagnostic ledgers, their index and
+The report does not claim whole-corpus semantic equivalence or zero losses.
+Companion diagnostic ledgers, their index and
 documentation, production sources, and the feature manifest are outside this
-measurement change. Parent review of the 11 new sites and final independent
-review remain separate from these measurements.
+measurement change. The parent decision for the 11 new sites is recorded above;
+final independent review remains a separate gate.
