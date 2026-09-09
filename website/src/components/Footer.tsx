@@ -93,10 +93,10 @@ export function Footer() {
         </div>
 
         <div className="mt-12 border-t border-white/10 pt-8 flex flex-col sm:flex-row justify-between items-center gap-2">
-          <p className="text-sm text-white/40 font-body">
+          <p className="text-sm text-white/60 font-body">
             Calor is open source. Licensed under Apache 2.0.
           </p>
-          <p className="text-sm text-white/40 font-mono">
+          <p className="text-sm text-white/60 font-mono">
             v{packageJson.version}
           </p>
         </div>

@@ -56,9 +56,14 @@ export function CatchBugs() {
             <div ref={errorRef} className="rounded-lg overflow-hidden animate-pulse-glow"
               style={{ animationDelay: '1s' }}
             >
-              <div className="rounded-lg border-2 border-calor-pink/40 bg-calor-navy overflow-hidden">
+              {/* lg:pb-6 keeps the scroll box clear of the explanation card below,
+                  which overlaps by 16px (`lg:-mt-4`) at `z-10`. Without it the card is
+                  the topmost element over this <pre>'s horizontal scrollbar — measured
+                  with elementFromPoint — so the scrollbar cannot be grabbed even though
+                  the diagnostic is 31px wider than its box and needs scrolling. */}
+              <div className="rounded-lg border-2 border-calor-pink/40 bg-calor-navy overflow-hidden lg:pb-6">
                 <div className="border-b border-calor-pink/30 px-4 py-2 bg-calor-pink/10">
-                  <span className="text-sm text-calor-pink font-mono font-bold">
+                  <span className="text-sm text-calor-salmon font-mono font-bold">
                     Illustrative diagnostic (abridged)
                   </span>
                 </div>

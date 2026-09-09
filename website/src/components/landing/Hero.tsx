@@ -15,6 +15,9 @@ export function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [allowVideo, setAllowVideo] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // Set once the visitor uses the control, so a later media-query change (resizing
+  // across the md breakpoint, a connection change) never restarts a video they paused.
+  const userChosePlayback = useRef(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -37,7 +40,12 @@ export function Hero() {
       const allowed = !motion.matches && desktop.matches && !connection?.saveData
         && !['slow-2g', '2g', '3g'].includes(connection?.effectiveType || '');
       setAllowVideo(allowed);
+      // Play by default wherever it is allowed at all. `allowed` is already the
+      // conservative gate: desktop only, no prefers-reduced-motion, no Save-Data,
+      // and not on a 2g/3g connection. Requiring a click on top of that meant the
+      // animation effectively never played.
       if (!allowed) setPlaying(false);
+      else if (!userChosePlayback.current) setPlaying(true);
     };
     update();
     motion.addEventListener('change', update);
@@ -50,29 +58,18 @@ export function Hero() {
     };
   }, []);
 
-  useEffect(() => {
-    const el = heroRef.current;
-    if (!el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    // Stagger hero elements on load
-    const children = el.querySelectorAll('[data-hero-animate]');
-    children.forEach((child, i) => {
-      const htmlChild = child as HTMLElement;
-      htmlChild.style.opacity = '0';
-      htmlChild.style.transform = 'translateY(24px)';
-      htmlChild.style.transition = 'opacity 0.7s ease-out, transform 0.7s ease-out';
-      htmlChild.style.transitionDelay = `${200 + i * 150}ms`;
-      requestAnimationFrame(() => {
-        htmlChild.style.opacity = '1';
-        htmlChild.style.transform = 'translateY(0)';
-      });
-    });
-  }, []);
+  // The entrance stagger lives in CSS (`[data-hero-animate]` in globals.css) and
+  // animates transform only, never opacity. It used to live here, setting opacity to
+  // 0 and restoring it in a requestAnimationFrame; rAF does not fire in a hidden tab,
+  // and the restore did not survive the re-render when allowVideo resolves, so the
+  // hero could render as an empty card. See the keyframes comment for why the CSS
+  // version must not fade opacity either. Per-element delays are set below.
 
   return (
     <section className="relative overflow-hidden py-8 sm:py-12">
-      {/* Poster is the default: no decorative video request before explicit opt-in. */}
+      {/* Poster paints first and stays behind the video, so the hero is never blank
+          while the video loads — and remains the only asset fetched wherever the
+          gate above says no. */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
           style={{ backgroundImage: `url(${basePath}/calor-lava-poster.jpg)` }}
@@ -85,7 +82,7 @@ export function Hero() {
           loop
           muted
           playsInline
-          preload="none"
+          preload="auto"
           className="absolute inset-0 w-full h-full object-cover -z-20"
           poster={`${basePath}/calor-lava-poster.jpg`}
           aria-hidden="true"
@@ -108,7 +105,7 @@ export function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           {/* Frosted glass card */}
           <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-6 sm:px-10 sm:py-8 shadow-2xl">
-            <div className="flex justify-center mb-4" data-hero-animate>
+            <div className="flex justify-center mb-4" data-hero-animate style={{ animationDelay: '200ms' }}>
               <Image
                 src={`${basePath}/calor-logo-256.webp`}
                 alt="Calor logo"
@@ -118,17 +115,17 @@ export function Hero() {
                 priority
               />
             </div>
-            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl font-display" data-hero-animate>
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl font-display" data-hero-animate style={{ animationDelay: '350ms' }}>
               Calor
             </h1>
-            <p className="mt-3 text-base font-medium text-white/90 sm:text-xl font-body" data-hero-animate>
+            <p className="mt-3 text-base font-medium text-white/90 sm:text-xl font-body" data-hero-animate style={{ animationDelay: '500ms' }}>
               A language for coding agents, compiled to C# and .NET.
             </p>
-            <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate>
+            <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate style={{ animationDelay: '650ms' }}>
               Inspect explicit contracts, declared effects, and stable IDs.
             </p>
 
-            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate>
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate style={{ animationDelay: '800ms' }}>
               <Button asChild size="lg" className="bg-gradient-to-r from-calor-pink to-calor-salmon hover:from-calor-pink/90 hover:to-calor-salmon/90 text-white border-0 shadow-lg shadow-calor-pink/25">
                 <Link href="/docs/getting-started/hello-world/" onClick={() => trackCtaClick('get_started')}>
                   Get Started
@@ -152,7 +149,7 @@ export function Hero() {
       </div>
 
       {allowVideo && (
-        <button type="button" onClick={() => setPlaying(!playing)}
+        <button type="button" onClick={() => { userChosePlayback.current = true; setPlaying(!playing); }}
           className="absolute bottom-4 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
           {playing ? 'Pause background animation' : 'Play background animation'}
         </button>
