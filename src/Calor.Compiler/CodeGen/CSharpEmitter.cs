@@ -4088,7 +4088,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             or BoolLiteralNode or StringLiteralNode or DecimalLiteralNode or SelfRefNode
             or ThisExpressionNode or BaseExpressionNode or NewExpressionNode
             or CallExpressionNode or ExpressionCallNode or FieldAccessNode
-            or NullConditionalNode or ArrayAccessNode or MultiDimArrayAccessNode;
+            or NullConditionalNode or ArrayAccessNode or MultiDimArrayAccessNode
+            or StringOperationNode
+            or CharOperationNode { Operation: not (CharOp.CharCode or CharOp.CharFromCode) };
 
     private bool TryUnwrapPatternComparison(
         BinaryOperationNode node, out ExpressionNode operand, out bool negated)
@@ -4844,14 +4846,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             OkPatternNode op => $"{{ IsOk: true, Value: {EmitPattern(op.InnerPattern)} }}",
             ErrPatternNode ep => $"{{ IsErr: true, Error: {EmitPattern(ep.InnerPattern)} }}",
             ListPatternNode lp => Visit(lp),
-            NegatedPatternNode np => $"not {EmitPattern(np.Inner)}",
-            OrPatternNode orp => $"{EmitPattern(orp.Left)} or {EmitPattern(orp.Right)}",
-            AndPatternNode andp => $"{EmitPattern(andp.Left)} and {EmitPattern(andp.Right)}",
+            NegatedPatternNode np => $"not {EmitPatternOperand(np.Inner, 3)}",
+            OrPatternNode orp => $"{EmitPatternOperand(orp.Left, 1)} or {EmitPatternOperand(orp.Right, 1)}",
+            AndPatternNode andp => $"{EmitPatternOperand(andp.Left, 2)} and {EmitPatternOperand(andp.Right, 2)}",
             // #774: no silent wildcard fallback — an unhandled pattern node would
             // broaden the arm to match everything. Fail loud instead.
             _ => throw new ArgumentOutOfRangeException(nameof(pattern),
                 $"Unhandled pattern node in C# emitter: {pattern.GetType().Name}")
         };
+    }
+
+    private string EmitPatternOperand(PatternNode pattern, int parentPrecedence)
+    {
+        var precedence = pattern switch
+        {
+            OrPatternNode => 1,
+            AndPatternNode => 2,
+            NegatedPatternNode => 3,
+            _ => 4
+        };
+        var text = EmitPattern(pattern);
+        return precedence < parentPrecedence ? $"({text})" : text;
     }
 
     public string Visit(MatchCaseNode node)
@@ -7368,7 +7383,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(AwaitExpressionNode node)
     {
-        var awaited = node.Awaited.Accept(this);
+        var awaited = EmitGroupedOperand(node.Awaited);
 
         // Handle ConfigureAwait if specified
         if (node.ConfigureAwait.HasValue)
@@ -7496,6 +7511,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
+        if (GetOperandPrecedence(node.Left) <= 2)
+            left = $"({left})";
+        if (GetOperandPrecedence(node.Right) < 2 && node.Right is not ThrowExpressionNode)
+            right = $"({right})";
         return $"{left} ?? {right}";
     }
 
@@ -7601,20 +7620,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return node.Value.Accept(this);
     }
 
-    public string Visit(NegatedPatternNode node)
-    {
-        return $"not {EmitPattern(node.Inner)}";
-    }
+    public string Visit(NegatedPatternNode node) => EmitPattern(node);
 
-    public string Visit(OrPatternNode node)
-    {
-        return $"{EmitPattern(node.Left)} or {EmitPattern(node.Right)}";
-    }
+    public string Visit(OrPatternNode node) => EmitPattern(node);
 
-    public string Visit(AndPatternNode node)
-    {
-        return $"{EmitPattern(node.Left)} and {EmitPattern(node.Right)}";
-    }
+    public string Visit(AndPatternNode node) => EmitPattern(node);
 
     #region Extended Features Visit Methods
 
@@ -8587,7 +8597,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(StringOperationNode node)
     {
-        var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+        var args = node.Arguments.Select((argument, index) =>
+            index == 0 ? EmitGroupedOperand(argument) : argument.Accept(this)).ToList();
         var compMode = node.ComparisonMode?.ToCSharpName();
 
         return node.Operation switch
@@ -8642,7 +8653,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CharOperationNode node)
     {
-        var args = node.Arguments.Select(a => a.Accept(this)).ToList();
+        var args = node.Arguments.Select((argument, index) =>
+            index == 0 ? EmitGroupedOperand(argument) : argument.Accept(this)).ToList();
 
         return node.Operation switch
         {
