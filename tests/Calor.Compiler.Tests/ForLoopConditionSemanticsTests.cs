@@ -44,6 +44,7 @@ public class ForLoopConditionSemanticsTests
     [InlineData("Change(in i);")]
     [InlineData("Change(i);")]
     [InlineData("ref readonly int alias = ref i; Change(in alias);")]
+    [InlineData("System.TypedReference alias = __makeref(i); __refvalue(alias, int) = int.MaxValue;")]
     public void ReadonlyReferenceEscape_DoesNotClaimNativeOverflowEquivalence(string mutation)
     {
         AssertEquivalent($$"""

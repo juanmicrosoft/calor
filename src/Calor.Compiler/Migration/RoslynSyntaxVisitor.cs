@@ -8177,7 +8177,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 // Readonly references can still escape to unsafe callees. Dataflow's
                 // write set does not see those writes, including implicit `in` calls.
                 && !node.Statement.DescendantNodesAndSelf().Any(syntax =>
-                    syntax is RefExpressionSyntax
+                    syntax is RefExpressionSyntax or MakeRefExpressionSyntax
                     || syntax is ArgumentSyntax argument
                         && _semanticModel.GetOperation(argument) is
                             Microsoft.CodeAnalysis.Operations.IArgumentOperation
