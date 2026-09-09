@@ -66,6 +66,22 @@ test('video plays by default on unconstrained desktop, and is never requested un
       await expect(page.locator('video')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Pause background animation' })).toBeVisible();
       await expect.poll(() => videos.length).toBeGreaterThan(0);
+      // It must actually be PLAYING, not merely mounted and fetched. Both assertions
+      // above held in a real Chrome while the video sat at paused/currentTime 0 at
+      // readyState 4 — the `autoPlay` attribute is skipped when the window is not
+      // OS-focused — so on their own they do not observe the thing this test is named
+      // for. Advancing currentTime is what does.
+      //
+      // Scope, stated plainly: Playwright always runs a focused page, so this cannot
+      // reproduce the unfocused-window case itself. That case was verified by hand in
+      // Chrome (document.hasFocus() === false, currentTime advancing) after Hero.tsx
+      // stopped relying on the attribute alone. What CI pins is the weaker but still
+      // useful claim: a regression to "mounts but never starts" fails here.
+      const video = page.locator('video');
+      await expect.poll(() => video.evaluate(element => !(element as HTMLVideoElement).paused),
+        { message: 'video must start on its own' }).toBe(true);
+      await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime),
+        { message: 'playback must actually advance' }).toBeGreaterThan(0);
       // Pausing is honoured and tears the element down.
       await page.getByRole('button', { name: 'Pause background animation' }).click();
       await expect(page.locator('video')).toHaveCount(0);

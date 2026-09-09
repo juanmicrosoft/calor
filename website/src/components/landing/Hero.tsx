@@ -23,7 +23,27 @@ export function Hero() {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    // The `autoPlay` attribute is not a guarantee, so playback is also started
+    // explicitly. Measured in Chrome: with the tab rendered but NOT focused
+    // (document.hasFocus() === false), the attribute left the video at
+    // `paused: true, currentTime: 0` even at readyState 4 — fully buffered and
+    // simply never started — while an explicit play() on the same element
+    // resolved without rejection. That is the cmd-click / open-in-background-tab
+    // / session-restore path, and it is the same failure shape as the hero
+    // stagger documented in globals.css: the decoration silently never runs for
+    // whoever did not arrive by a focused top-level navigation.
+    //
+    // Retrying on `canplay` and `visibilitychange` covers the element mounting
+    // before it has data, and the background tab that is only looked at later.
+    // The element exists only while `playing` is true, so this can never fight a
+    // deliberate pause — pausing unmounts it.
+    const start = () => { void video.play().catch(() => {}); };
+    start();
+    video.addEventListener('canplay', start);
+    document.addEventListener('visibilitychange', start);
     return () => {
+      video.removeEventListener('canplay', start);
+      document.removeEventListener('visibilitychange', start);
       video.pause();
       video.removeAttribute('src');
       video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
@@ -93,17 +113,17 @@ export function Hero() {
         </video>
       )}
 
-      {/* Fades the video into the page background over its last visible 24px, so the
-          hero does not end on a hard horizontal edge where the footage is cut off.
+      {/* Fades the video into the page background so the hero does not end on a hard
+          horizontal edge where the footage is cut off.
 
-          It sits directly ABOVE the shaped divider rather than behind it: the divider
-          is 24px tall, opaque (`fill-background`) and at z-10, so a fade occupying the
-          same band is simply painted over and does nothing. Ending the gradient exactly
-          at the divider's top edge means it reaches full background colour precisely
-          where the divider takes over — no step between the two. `bottom-6` matches the
-          divider's height; they move together. */}
+          Spans the last 48px and reaches full background colour by the halfway point
+          (`via-background` at 50%), so the top 24px is the fade and the bottom 24px is
+          solid. The solid half is why: the divider below is a WAVY path, not a
+          rectangle, so it only covers part of its own 24px band and roughly 10px of
+          video showed through above the curve. Fading to opaque before that band and
+          staying opaque through it covers the gap at every x position. */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-6 z-0 h-6 bg-gradient-to-b from-transparent to-background"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-12 bg-gradient-to-b from-transparent via-background to-background"
         aria-hidden="true"
       />
 

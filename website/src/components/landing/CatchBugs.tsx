@@ -56,18 +56,20 @@ export function CatchBugs() {
             <div ref={errorRef} className="rounded-lg overflow-hidden animate-pulse-glow"
               style={{ animationDelay: '1s' }}
             >
-              {/* lg:pb-6 keeps the scroll box clear of the explanation card below,
-                  which overlaps by 16px (`lg:-mt-4`) at `z-10`. Without it the card is
-                  the topmost element over this <pre>'s horizontal scrollbar — measured
-                  with elementFromPoint — so the scrollbar cannot be grabbed even though
-                  the diagnostic is 31px wider than its box and needs scrolling. */}
-              <div className="rounded-lg border-2 border-calor-pink/40 bg-calor-navy overflow-hidden lg:pb-6">
+              <div className="rounded-lg border-2 border-calor-pink/40 bg-calor-navy overflow-hidden">
                 <div className="border-b border-calor-pink/30 px-4 py-2 bg-calor-pink/10">
                   <span className="text-sm text-calor-salmon font-mono font-bold">
                     Illustrative diagnostic (abridged)
                   </span>
                 </div>
-                <pre className="p-5 text-sm leading-6 overflow-x-auto">
+                {/* No horizontal scrolling. The longest line is 58 characters, which
+                    needs ~487px at text-sm and had only ~456px of content box — the
+                    31px overflow that produced the scrollbar. 13px type plus tighter
+                    padding on small screens fits it, and `whitespace-pre-wrap` is the
+                    guarantee: at any width too narrow for the line, it wraps instead of
+                    scrolling. `overflow-x-auto` stays only as a fallback for an
+                    unbreakable token; in normal use nothing overflows. */}
+                <pre className="p-4 sm:p-5 text-[13px] leading-6 whitespace-pre-wrap break-words overflow-x-auto">
                   <code className="text-calor-salmon font-mono">{errorOutput}</code>
                 </pre>
               </div>
@@ -75,7 +77,10 @@ export function CatchBugs() {
           </div>
 
           {/* Explanation — overlapping card */}
-          <div className="mt-6 lg:-mt-4 relative z-10 mx-auto max-w-3xl">
+          {/* Sits BELOW the code panels rather than overlapping them. It used to carry
+              `lg:-mt-4 z-10`, which pulled it 16px over the diagnostic and made it the
+              topmost element there. */}
+          <div className="mt-8 relative mx-auto max-w-3xl">
             <div className="p-6 rounded-lg border bg-background shadow-lg">
               <p className="text-muted-foreground font-body">
                 <strong className="text-foreground">What happened:</strong> Your AI wrote code that calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">NotifyCustomer</code>, which
@@ -103,7 +108,10 @@ export function CatchBugs() {
               <div className="border-b border-white/10 px-4 py-2">
                 <span className="text-sm text-calor-cyan/70 font-mono">$ calor --analyze --input NullPropagationTransform.calr</span>
               </div>
-              <pre className="p-5 text-sm leading-7 overflow-x-auto">
+              {/* Same treatment as the diagnostic panel above, for the same reason:
+                  the longest line here is 62 characters and overflowed its content box
+                  by 13px at a ~600px viewport, producing a horizontal scrollbar. */}
+              <pre className="p-4 sm:p-5 text-[13px] leading-6 whitespace-pre-wrap break-words overflow-x-auto">
                 <code className="font-mono">
                   <span className="text-calor-salmon">{'warning Calor0922: Potential unsafe unwrap without prior\n'}</span>
                   <span className="text-calor-salmon">{'                   Option/Result check\n'}</span>
