@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-09-09T12:59:10.810264Z",
-  "commitHash": "44975013",
+  "timestamp": "2026-09-09T13:16:46.616774Z",
+  "commitHash": "fb18fe7d",
   "version": "1.0",
   "total": 100,
-  "fullyConverted": 92,
-  "partiallyConverted": 8,
+  "fullyConverted": 93,
+  "partiallyConverted": 7,
   "blocked": 0,
   "crashed": 0,
   "roundTripPassing": 97,
@@ -1013,13 +1013,13 @@
     },
     "deconstruction": {
       "total": 1,
-      "passed": 0,
-      "rate": 0
+      "passed": 1,
+      "rate": 1
     },
     "tuple_deconstruct": {
       "total": 1,
-      "passed": 0,
-      "rate": 0
+      "passed": 1,
+      "rate": 1
     },
     "with_expression": {
       "total": 1,
@@ -3653,7 +3653,7 @@
         "deconstruction",
         "tuple_deconstruct"
       ],
-      "status": "PartiallyConverted",
+      "status": "FullyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
       "conversionWarnings": 3,
@@ -3667,15 +3667,12 @@
       "compilationDiagnostics": [],
       "cSharpSyntaxSuccess": true,
       "cSharpCompilationSuccess": true,
-      "conversionDuration": "00:00:00.0231143",
-      "compilationDuration": "00:00:00.0053688",
+      "conversionDuration": "00:00:00.0239601",
+      "compilationDuration": "00:00:00.0040316",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
-      "interopPreservationCount": 2,
-      "interopPreservationDiagnostics": [
-        "[InteropPreserved] Level5_Advanced/099_Deconstruction.cs:30 [tuple-deconstruction] Tuple assignment preserved atomically to retain target evaluation, conversions and writes.",
-        "[InteropPreserved] Level5_Advanced/099_Deconstruction.cs:36 [tuple-deconstruction] Tuple assignment preserved atomically to retain target evaluation, conversions and writes."
-      ],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {
