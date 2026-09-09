@@ -218,6 +218,11 @@ wrapping integer arithmetic and narrowing casts. C# migration records its
 source policy in this attribute; explicit C# `checked`/`unchecked` expressions
 remain preserved interop. Omitting the attribute, or using `overflow=checked`,
 selects TRAP. The verifier and proof cache distinguish these policies.
+Migration rejects globally checked source compilations with unscoped opaque
+C# interop, including whole-compilation-unit passthrough. A module attribute
+cannot safely restore that implicit context inside preserved code. Native
+lowering and explicit `checked`/`unchecked` expressions and blocks remain
+supported.
 
 Contract verification checks whether arithmetic in a predicate can overflow.
 If its safety follows from the preconditions and lazy evaluation paths, a proof

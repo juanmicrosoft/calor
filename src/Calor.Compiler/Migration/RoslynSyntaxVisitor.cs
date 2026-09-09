@@ -205,7 +205,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _wholeCompilationUnitReason
                     ?? "Compilation unit preserved verbatim",
                 root.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return new ModuleNode(
+            return ValidateSourceOverflowPolicy(new ModuleNode(
                 GetTextSpan(root),
                 "m001",
                 "_global",
@@ -223,7 +223,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 Array.Empty<DecisionNode>(),
                 null,
                 interopBlocks: [interop],
-                items: [interop]);
+                items: [interop]), checkOverflow);
         }
 
         _cancellationToken.ThrowIfCancellationRequested();
@@ -273,7 +273,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.MethodsConverted++;
         }
 
-        return new ModuleNode(
+        return ValidateSourceOverflowPolicy(new ModuleNode(
             GetTextSpan(root),
             moduleId,
             moduleName,
@@ -295,7 +295,30 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             indexedTypes: null,
             typePreprocessorBlocks: _typePreprocessorBlocks.Count > 0 ? _typePreprocessorBlocks.ToList() : null,
             items: _moduleItems.Count > 0 ? _moduleItems.ToList() : null,
-            namespaceScopes: _namespaceScopes.ToList());
+            namespaceScopes: _namespaceScopes.ToList()), checkOverflow);
+    }
+
+    private ModuleNode ValidateSourceOverflowPolicy(ModuleNode module, bool checkOverflow)
+    {
+        if (!checkOverflow || !HasUnscopedInterop(module))
+            return module;
+
+        const string reason =
+            "Globally checked C# with unscoped opaque interop cannot preserve overflow semantics under ordinary backend settings";
+        _context.RecordLoss(ConversionLossKind.Dropped, "checked-compilation-interop", reason, module.Span.Line);
+        _context.AddError(reason, "checked-compilation-interop", module.Span.Line);
+        return module;
+
+        static bool HasUnscopedInterop(AstNode node)
+        {
+            if (node is CSharpInteropBlockNode)
+                return true;
+            if (node is RawCSharpExpressionNode expression)
+                return SyntaxFactory.ParseExpression(expression.CSharpCode) is not CheckedExpressionSyntax;
+            if (node is RawCSharpNode statement)
+                return SyntaxFactory.ParseStatement(statement.CSharpCode) is not CheckedStatementSyntax;
+            return Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).Any(HasUnscopedInterop);
+        }
     }
 
     private void AnalyzeUnsupportedConditionalPlacements(

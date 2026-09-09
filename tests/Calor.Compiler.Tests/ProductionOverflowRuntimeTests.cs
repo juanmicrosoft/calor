@@ -15,6 +15,58 @@ namespace Calor.Compiler.Tests;
 
 public class ProductionOverflowRuntimeTests
 {
+    [Fact]
+    public void GloballyCheckedOpaqueCompilation_IsRejectedWithExplicitLoss()
+    {
+        const string source = """
+            [assembly: System.Reflection.AssemblyTitle("Overflow")]
+            public static class Migrated
+            {
+                public static int Probe(int value) => value + 1;
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("CheckedSource", [tree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: true));
+        var context = new ConversionContext { SourceFile = "checked.cs" };
+        new RoslynSyntaxVisitor(context, compilation.GetSemanticModel(tree))
+            .Convert(tree.GetCompilationUnitRoot(), "Migrated");
+
+        Assert.IsType<OverflowException>(InvokeCSharp(source, int.MaxValue, checkOverflow: true).Error);
+        Assert.True(context.HasErrors);
+        Assert.Contains(context.Losses, loss =>
+            loss.Kind == ConversionLossKind.Dropped && loss.Feature == "checked-compilation-interop");
+    }
+
+    [Theory]
+    [InlineData("return value + 1;")]
+    [InlineData("return checked(value + 1);")]
+    [InlineData("return unchecked(value + 1);")]
+    [InlineData("checked { return value + 1; }")]
+    [InlineData("unchecked { return value + 1; }")]
+    public void GloballyCheckedNativeAndExplicitContexts_PreserveRuntimeSemantics(string body)
+    {
+        var source = $$"""
+            public static class Migrated
+            {
+                public static int Probe(int value) { {{body}} }
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("CheckedSource", [tree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: true));
+        var context = new ConversionContext { SourceFile = "checked.cs" };
+        var module = new RoslynSyntaxVisitor(context, compilation.GetSemanticModel(tree))
+            .Convert(tree.GetCompilationUnitRoot(), "Migrated");
+        Assert.False(context.HasErrors, string.Join("; ", context.Issues.Select(issue => issue.Message)));
+        var compiled = Program.Compile(new CalorEmitter().Emit(module), "checked.calr", Options());
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        var actual = InvokeCSharp(compiled.GeneratedCode, int.MaxValue);
+        var expected = InvokeCSharp(source, int.MaxValue, checkOverflow: true);
+        Assert.Equal(expected.Error?.GetType(), actual.Error?.GetType());
+        Assert.Equal(expected.Value, actual.Value);
+    }
+
     [Theory]
     [InlineData("wrap")]
     [InlineData("true")]
@@ -102,13 +154,13 @@ public class ProductionOverflowRuntimeTests
         }
     }
 
-    private static (object? Value, Exception? Error) InvokeCSharp(string source, object input)
+    private static (object? Value, Exception? Error) InvokeCSharp(string source, object input, bool checkOverflow = false)
     {
         var compilation = CSharpCompilation.Create(
             "OverflowOracle_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(source)],
             GeneratedCSharpCompiler.References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: checkOverflow));
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.True(emit.Success, string.Join("; ", emit.Diagnostics));
