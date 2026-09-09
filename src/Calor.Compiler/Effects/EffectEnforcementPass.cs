@@ -3232,10 +3232,8 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCompoundAssignment(CompoundAssignmentStatementNode compound)
         {
-            var effects = InferFromExpression(compound.Value);
-            if (compound.Target is FieldAccessNode)
-                effects = effects.Union(EffectSet.From("mut"));
-            return effects;
+            return InferFromAssignmentTarget(compound.Target, readValue: true)
+                .Union(InferFromExpression(compound.Value));
         }
 
         /// <summary>
@@ -5500,22 +5498,33 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromAssignment(AssignmentStatementNode assign)
         {
-            var effects = InferFromExpression(assign.Value);
+            return InferFromAssignmentTarget(assign.Target, readValue: false)
+                .Union(InferFromExpression(assign.Value));
+        }
 
-            // Check if this is a mutation (writing to non-local object)
-            if (assign.Target is FieldAccessNode)
+        private EffectSet InferFromAssignmentTarget(ExpressionNode target, bool readValue)
+        {
+            if (target is FieldAccessNode field)
             {
-                effects = effects.Union(EffectSet.From("mut"));
-                effects = effects.Union(InferSetterEffects((FieldAccessNode)assign.Target));
+                var effects = readValue
+                    ? InferFromFieldAccess(field)
+                    : InferFromExpression(field.Target);
+                return effects.Union(EffectSet.From("mut")).Union(InferSetterEffects(field));
             }
-            else if (assign.Target is ReferenceNode reference
-                     && TrySplitMemberReference(reference.Name, out var receiver, out var member))
+            if (target is ReferenceNode reference
+                && TrySplitMemberReference(reference.Name, out var receiver, out var member))
             {
-                effects = effects.Union(EffectSet.From("mut"));
-                effects = effects.Union(InferSetterEffects(receiver, member, reference.Span));
+                var effects = InferFromReference(readValue
+                    ? reference
+                    : new ReferenceNode(reference.Span, receiver));
+                return effects.Union(EffectSet.From("mut"))
+                    .Union(InferSetterEffects(receiver, member, reference.Span));
             }
 
-            return effects;
+            var targetEffects = InferFromExpression(target);
+            return target is ArrayAccessNode or MultiDimArrayAccessNode
+                ? targetEffects.Union(EffectSet.From("mut"))
+                : targetEffects;
         }
 
         private EffectSet InferFromExpression(ExpressionNode expr)
