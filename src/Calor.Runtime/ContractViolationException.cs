@@ -141,3 +141,93 @@ public enum ContractKind
     /// </summary>
     Invariant
 }
+
+/// <summary>Runtime enumeration for finite integer contract domains.</summary>
+public static class ContractQuantifier
+{
+    /// <summary>Fails explicitly if a consumer ignores an unsupported-lowering diagnostic.</summary>
+    public static bool Unsupported() =>
+        throw new NotSupportedException("The quantified contract has no certified finite runtime lowering.");
+
+    /// <summary>A certified, ordered constraint used to discover a finite domain.</summary>
+    public sealed class Constraint
+    {
+        private readonly Func<decimal>? _endpoint;
+        private readonly Func<bool>? _guard;
+        private readonly bool _lower;
+        private readonly bool _offset;
+
+        private Constraint(Func<decimal>? endpoint, Func<bool>? guard, bool lower, bool offset)
+        {
+            _endpoint = endpoint;
+            _guard = guard;
+            _lower = lower;
+            _offset = offset;
+        }
+
+        /// <summary>Creates a lower bound, optionally excluding its endpoint.</summary>
+        public static Constraint Lower(Func<decimal> endpoint, bool strict = false) =>
+            new(endpoint ?? throw new ArgumentNullException(nameof(endpoint)), null, true, strict);
+
+        /// <summary>Creates an upper bound, optionally including its endpoint.</summary>
+        public static Constraint Upper(Func<decimal> endpoint, bool inclusive = false) =>
+            new(endpoint ?? throw new ArgumentNullException(nameof(endpoint)), null, false, inclusive);
+
+        /// <summary>Creates a stable scalar guard that may exclude the remaining domain.</summary>
+        public static Constraint Guard(Func<bool> predicate) =>
+            new(null, predicate ?? throw new ArgumentNullException(nameof(predicate)), false, false);
+
+        internal bool Apply(ref decimal lower, ref decimal upper)
+        {
+            if (_guard != null)
+                return _guard();
+            var endpoint = _endpoint!();
+            endpoint = _offset ? decimal.Floor(endpoint) + 1 : decimal.Ceiling(endpoint);
+            if (_lower)
+                lower = Math.Max(lower, endpoint);
+            else
+                upper = Math.Min(upper, endpoint);
+            return lower < upper;
+        }
+    }
+
+    /// <summary>Discovers a domain in source order, stopping before unreachable constraints.</summary>
+    public static IEnumerable<T> Range<T>(IReadOnlyList<Constraint> constraints)
+        where T : System.Numerics.IBinaryInteger<T>, System.Numerics.IMinMaxValue<T>
+    {
+        var lower = decimal.CreateChecked(T.MinValue);
+        var upper = decimal.CreateChecked(T.MaxValue) + 1;
+        foreach (var constraint in constraints)
+        {
+            if (lower >= upper || !constraint.Apply(ref lower, ref upper))
+                yield break;
+        }
+        for (var value = lower; value < upper; value++)
+            yield return T.CreateChecked(value);
+    }
+
+    /// <summary>Normalizes strict lower and inclusive upper bounds over the integer domain.</summary>
+    public static long Successor(long bound) => Math.Min(bound, int.MaxValue) + 1;
+
+    /// <summary>Enumerates [start, exclusiveEnd), including empty and wide domains.</summary>
+    public static IEnumerable<int> Range(long start, long exclusiveEnd)
+    {
+        var end = Math.Min(exclusiveEnd, (long)int.MaxValue + 1);
+        for (var value = Math.Max(start, int.MinValue); value < end; value++)
+            yield return (int)value;
+    }
+
+    /// <summary>Normalizes a bound using the quantified variable's integer domain.</summary>
+    public static decimal Successor<T>(decimal bound)
+        where T : System.Numerics.IBinaryInteger<T>, System.Numerics.IMinMaxValue<T>
+        => decimal.Floor(Math.Min(bound, decimal.CreateChecked(T.MaxValue))) + 1;
+
+    /// <summary>Enumerates a declared integer domain without overflowing its endpoints.</summary>
+    public static IEnumerable<T> Range<T>(decimal start, decimal exclusiveEnd)
+        where T : System.Numerics.IBinaryInteger<T>, System.Numerics.IMinMaxValue<T>
+    {
+        var end = Math.Min(decimal.Ceiling(exclusiveEnd), decimal.CreateChecked(T.MaxValue) + 1);
+        for (var value = Math.Max(decimal.Ceiling(start), decimal.CreateChecked(T.MinValue)); value < end; value++)
+            yield return T.CreateChecked(value);
+    }
+}

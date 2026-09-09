@@ -171,6 +171,12 @@ public readonly struct Result<T, E> : IEquatable<Result<T, E>>
 /// </summary>
 public static class Result
 {
+    /// <summary>Creates a successful result with an inferred value type and string error type.</summary>
+    public static Result<T, string> Ok<T>(T value) => Result<T, string>.Ok(value);
+
+    /// <summary>Creates an error result with an inferred error type and object value type.</summary>
+    public static Result<object, E> Err<E>(E error) => Result<object, E>.Err(error);
+
     /// <summary>
     /// Creates a successful result.
     /// </summary>

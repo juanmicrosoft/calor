@@ -77,7 +77,9 @@ public sealed class VerificationCacheEntry
     // validity rules to hold from the first warm read.
     // 1.15: parameter-only postconditions require a state-preserving body.
     // Evict entry-state-only proofs produced before the exit-state gate (#1183).
-    public const string CurrentFormatVersion = "1.15";
+    // 1.16: contract simplification preserves typed evaluation and IEEE equality.
+    // Recheck proofs made from predicates rewritten by the former untyped rules.
+    public const string CurrentFormatVersion = "1.16";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even
