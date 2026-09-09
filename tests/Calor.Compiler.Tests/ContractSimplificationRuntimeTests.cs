@@ -208,6 +208,34 @@ public class ContractSimplificationRuntimeTests
             var control = Compile(captured.Replace(quantifier, $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
             var closure = Assert.IsType<Func<int, bool>>(InvokeArguments(control));
             Assert.False(closure(1));
+
+            foreach (var initializer in new[]
+            {
+                $"§ANON Grow = (cast Func<bool> §LAM{{l2}} §E{{}} {mutation} §R true §/LAM{{l2}})"
+            })
+            {
+                var wrappedQuantifier = quantifier.Replace("§A grow", "§A box.Grow");
+                var wrapped = $$"""
+                    §M{m1:TypedContracts}
+                      §F{f2:Invoke:pub} (Func<bool>:action §E{}) -> bool
+                        §E{}
+                        §R §C{action} §/C
+                      §F{f1:Check:pub} () -> Func<i32,bool> §E{alloc}
+                        §E{alloc}
+                        §R §LAM{l1:n:i32} §E{alloc}
+                          §B{box} {{initializer}}
+                          §R {{wrappedQuantifier}}
+                        §/LAM{l1}
+                    """;
+                var rejected = Program.Compile(wrapped, "wrapped-capture.calr", Options(verify));
+                Assert.True(rejected.Diagnostics.Errors.Any(
+                    error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported),
+                    initializer + Environment.NewLine + string.Join(Environment.NewLine, rejected.Diagnostics.Errors));
+                var scalar = $"(&& {Body("INT:0")} {Body("INT:1")})".Replace("§A grow", "§A box.Grow");
+                var wrappedControl = Compile(wrapped.Replace(wrappedQuantifier, scalar), verify);
+                var wrappedClosure = Assert.IsType<Func<int, bool>>(InvokeArguments(wrappedControl));
+                Assert.False(wrappedClosure(1));
+            }
         }
     }
 

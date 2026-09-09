@@ -89,7 +89,9 @@ public static class AstSchemaMetadata
 
     private static bool CanContainAstNode(Type type)
     {{
-        if (typeof(AstNode).IsAssignableFrom(type))
+        if (typeof(AstNode).IsAssignableFrom(type)
+            || type == typeof(ObjectInitializerAssignment)
+            || type == typeof(InlineRefinementInfo))
             return true;
         if (type == typeof(string))
             return false;
@@ -99,7 +101,7 @@ public static class AstSchemaMetadata
             .Where(candidate =>
                 candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
             .Select(candidate => candidate.GetGenericArguments()[0])
-            .Any(typeof(AstNode).IsAssignableFrom);
+            .Any(CanContainAstNode);
     }}
 }}
 
