@@ -3956,8 +3956,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var operand = node.Operand.Accept(this);
         var op = node.Operator.ToCSharpOperator();
-        // Only parenthesize when operand is a binary expression (lower precedence than unary)
-        var needsParens = node.Operand is BinaryOperationNode or IsPatternNode;
+        // Preserve both precedence and token boundaries: -(-x) must not become --x.
+        var needsParens = node.Operand is BinaryOperationNode or IsPatternNode
+            or ConditionalExpressionNode or UnaryOperationNode
+            || operand.StartsWith('-');
         if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
             return needsParens ? $"({operand}){op}" : $"{operand}{op}";
         return needsParens ? $"{op}({operand})" : $"{op}{operand}";

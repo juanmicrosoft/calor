@@ -15,6 +15,19 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void PreservedUnaryOperators_DoNotBecomeMutation(bool verify)
+    {
+        var assembly = Compile(Function("i32", "(== (- (- x)) INT:5)"), verify);
+        Assert.Equal(7, Invoke(assembly, 5));
+        AssertContractViolation(() => Invoke(assembly, 6));
+
+        var longLiteral = Compile(Function("i32", "(== (- INT:-2147483649) INT:2147483649)"), verify);
+        Assert.Equal(7, Invoke(longLiteral, 0));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void FloatingPredicates_AgreeWithIeeeEvaluation(bool verify)
     {
         (string Predicate, Func<double, bool> Expected)[] predicates =
