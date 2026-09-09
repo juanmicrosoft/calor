@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-08-18T18:59:04.881783Z",
-  "commitHash": "76be43c9",
+  "timestamp": "2026-09-09T12:59:10.810264Z",
+  "commitHash": "44975013",
   "version": "1.0",
   "total": 100,
   "fullyConverted": 92,
   "partiallyConverted": 8,
   "blocked": 0,
   "crashed": 0,
-  "roundTripPassing": 96,
+  "roundTripPassing": 97,
   "byLevel": {
     "1": {
       "total": 20,
@@ -31,8 +31,8 @@
     },
     "5": {
       "total": 20,
-      "passed": 17,
-      "rate": 0.85
+      "passed": 18,
+      "rate": 0.9
     }
   },
   "byFeature": {
@@ -3654,25 +3654,29 @@
         "tuple_deconstruct"
       ],
       "status": "PartiallyConverted",
-      "conversionSuccess": false,
-      "conversionErrors": 2,
-      "conversionWarnings": 0,
+      "conversionSuccess": true,
+      "conversionErrors": 0,
+      "conversionWarnings": 3,
       "conversionIssues": [
-        "Error [roundtrip-csharp-validation] (line 71, col 29): Round-tripped C# failed compilation (CS1061): \u0027Point\u0027 does not contain a definition for \u0027Item1\u0027 and no accessible extension method \u0027Item1\u0027 accepting a first argument of type \u0027Point\u0027 could be found (are you missing a using directive or an assembly reference?)",
-        "Error [roundtrip-csharp-validation] (line 74, col 29): Round-tripped C# failed compilation (CS1061): \u0027Point\u0027 does not contain a definition for \u0027Item2\u0027 and no accessible extension method \u0027Item2\u0027 accepting a first argument of type \u0027Point\u0027 could be found (are you missing a using directive or an assembly reference?)"
+        "Warning [tuple-deconstruction]: Feature \u0027tuple-deconstruction\u0027 is partially supported. ",
+        "Warning [tuple-deconstruction]: Feature \u0027tuple-deconstruction\u0027 is partially supported. ",
+        "Warning [tuple-deconstruction]: Feature \u0027tuple-deconstruction\u0027 is partially supported. "
       ],
-      "compilationSuccess": false,
+      "compilationSuccess": true,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
-      "cSharpSyntaxSuccess": false,
-      "cSharpCompilationSuccess": false,
-      "conversionDuration": "00:00:00.0223103",
-      "compilationDuration": "00:00:00",
+      "cSharpSyntaxSuccess": true,
+      "cSharpCompilationSuccess": true,
+      "conversionDuration": "00:00:00.0231143",
+      "compilationDuration": "00:00:00.0053688",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
-      "interopPreservationCount": 0,
-      "interopPreservationDiagnostics": [],
-      "roundTripSuccess": false
+      "interopPreservationCount": 2,
+      "interopPreservationDiagnostics": [
+        "[InteropPreserved] Level5_Advanced/099_Deconstruction.cs:30 [tuple-deconstruction] Tuple assignment preserved atomically to retain target evaluation, conversions and writes.",
+        "[InteropPreserved] Level5_Advanced/099_Deconstruction.cs:36 [tuple-deconstruction] Tuple assignment preserved atomically to retain target evaluation, conversions and writes."
+      ],
+      "roundTripSuccess": true
     },
     {
       "id": "100",
