@@ -31,6 +31,7 @@ public class LinqGroupingSemanticsTests
     [InlineData("from n in values group new Box(-1).Item by n % 2", "throws:InvalidOperationException", "C", true)]
     [InlineData("from n in values group values[n - 1] + 10 by n % 2", "1:11|0:12", "", true)]
     [InlineData("from n in values group values[3] + n by n % 2", "throws:IndexOutOfRangeException", "", true)]
+    [InlineData("from n in values.Select(x => new { Value = x }) group n.Value * 10 by n.Value % 2", "1:10|0:20", "", true)]
     public void Grouping_PreservesElementsAndDeferredRepeatedEnumeration(
         string query, string expectedGroups, string tracePerEnumeration, bool preserved)
     {

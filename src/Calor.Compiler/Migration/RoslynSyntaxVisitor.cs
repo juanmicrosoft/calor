@@ -11408,6 +11408,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .Where(identifier => _semanticModel?.GetSymbolInfo(identifier).Symbol is IRangeVariableSymbol)
                 .Select(identifier => _semanticModel!.GetTypeInfo(identifier).Type)
                 .FirstOrDefault(type => type is not null && type.TypeKind != TypeKind.Error);
+            if (parameterType != null && !CanNameQueryParameterType(parameterType))
+                parameterType = null;
             var body = ConvertExpression(expression);
             if (_pendingStatements.Count > 0
                 || !IsInlineNativeQuerySelector(expression)
@@ -11442,6 +11444,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             InvocationExpressionSyntax { Expression: IdentifierNameSyntax } => node == expression,
             _ => false
         });
+
+    private static bool CanNameQueryParameterType(ITypeSymbol type) => type switch
+    {
+        INamedTypeSymbol named => !named.IsAnonymousType && !named.IsTupleType
+            && named.TypeArguments.All(CanNameQueryParameterType),
+        IArrayTypeSymbol array => CanNameQueryParameterType(array.ElementType),
+        _ => type.CanBeReferencedByName
+    };
 
     /// <summary>
     /// Creates a single-parameter lambda expression node for LINQ operations.
