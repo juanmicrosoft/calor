@@ -164,6 +164,7 @@ body::before {
 
 .gradient-border::before {
   content: '';
+  pointer-events: none;
   position: absolute;
   inset: -1px;
   border-radius: inherit;

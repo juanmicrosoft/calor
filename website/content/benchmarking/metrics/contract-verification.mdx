@@ -41,17 +41,20 @@ These bugs cannot be caught by grammar-constrained generation—syntax doesn't e
 
 Contracts use the schema 2.0 seven-status vocabulary:
 
-| Result | Meaning | Runtime Check |
+| Result | Meaning | Proof-based guard removal |
 |:-------|:--------|:--------------|
-| `proven` | The obligation holds under the modeled semantics | v0.12.1 removes an eligible guard only when non-vacuous and assumption-free |
-| `refuted` | A violation exists | Preserved + counterexample when available |
-| `assumed` | The proof depends on named assumptions | Preserved |
-| `unknown` | Z3 could not decide | Preserved |
-| `timeout` | Solver budget exhausted | Preserved |
-| `unsupported` | Form or runtime semantics outside the model | Preserved |
-| `unavailable` | No solver was available | Preserved |
+| `proven` | The obligation holds under the modeled semantics | Eligible only when non-vacuous and assumption-free |
+| `refuted` | A violation exists | Not authorized; counterexample when available |
+| `assumed` | The proof depends on named assumptions | Not authorized |
+| `unknown` | Z3 could not decide | Not authorized |
+| `timeout` | Solver budget exhausted | Not authorized |
+| `unsupported` | Form or runtime semantics outside the model | Not authorized |
+| `unavailable` | No solver was available | Not authorized |
 
-The metric tracks the distribution across these categories.
+The metric tracks the distribution across these categories. Runtime checks
+separately require supported lowering and an enabled contract mode.
+`--contract-mode off` emits no checks. See
+[verification modes and limits](/docs/guides/verification-guarantees/).
 
 ---
 
@@ -80,7 +83,7 @@ with a `result` binding. The renderer begins that model with `Counterexample:`;
 the exact bindings and formatting are solver-dependent.
 
 This is an implementation-postcondition check. It should not be read as a
-claim that v0.12.1 proves arbitrary preconditions at every call site.
+claim that verification proves arbitrary preconditions at every call site.
 
 ---
 
@@ -98,19 +101,19 @@ claim that v0.12.1 proves arbitrary preconditions at every call site.
 
 ### Postcondition Verification
 
-Z3 can prove that implementations satisfy their postconditions:
+An integer signature alone does not make this contract true:
 
 ```calor
 §F{f001:Square:pub} (i32:x) -> i32
   §E{}
   §Q (>= x 0)
-  §S (>= result 0)         // Candidate for proof within the modeled subset
+  §S (>= result 0)
   §R (* x x)
 ```
 
-```
-// Example outcome: PROVEN, provided the proof is non-vacuous and assumption-free
-```
+For `x = 46341`, multiplication wraps to `-2147479015`, violating the
+postcondition. This is a refutable obligation, not a successful proof.
+An additional upper bound of `46340` would prevent this overflow.
 
 ---
 
@@ -152,13 +155,13 @@ whitelist report `unsupported`.
 |:-------|:-------------|:-----------------|
 | When bugs found | At runtime | At compile time |
 | Verification cost | None | Compile time (cached) |
-| Runtime overhead | Always | v0.12.1 removes eligible clean proven guards; all other guards remain |
-| Coverage | All contracts | Supported constructs |
+| Runtime overhead | Enabled, supported checks | Eligible clean proven guards may be removed |
+| Coverage | Supported runtime lowering | Supported runtime lowering and modeled proof constructs |
 
-Static verification complements runtime checking; it does not replace it. All
-non-proven statuses keep runtime checks. `Calor1001` loudly reports the known
-early/nested-return lowering shape where a postcondition runtime check cannot
-currently be emitted.
+Static verification complements runtime checking; it does not replace it.
+Non-proven statuses never authorize proof-based removal. Structured early and
+nested returns are supported. Opaque raw-C# bodies with postconditions are
+rejected with `Calor1001`; iterator postconditions are rejected with `Calor1004`.
 
 ---
 

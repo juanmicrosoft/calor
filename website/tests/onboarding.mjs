@@ -11,6 +11,7 @@ await mkdir(path.join(workspace, 'scratch'), { recursive: true });
 // Keep this in the worktree without inheriting repository-only MSBuild policy.
 await writeFile(path.join(workspace, 'Directory.Build.props'), '<Project />');
 await writeFile(path.join(workspace, 'Directory.Build.targets'), '<Project />');
+await writeFile(path.join(workspace, 'Directory.Packages.props'), '<Project />');
 const env = { ...process.env, TMPDIR: path.join(workspace, 'scratch'),
   TMP: path.join(workspace, 'scratch'), TEMP: path.join(workspace, 'scratch'),
   CALOR_TELEMETRY: '0', DOTNET_NOLOGO: '1' };

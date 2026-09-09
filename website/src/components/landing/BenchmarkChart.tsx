@@ -11,6 +11,7 @@ import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
+import provenance from '../../../public/data/benchmark-provenance.json';
 
 interface BenchmarkResult {
   category: string;
@@ -48,20 +49,20 @@ const metricDisplayInfo: Record<
   Comprehension: {
     name: 'Understanding Code',
     calorInterpretation: 'The calculator finds more explicit comprehension signals',
-    csharpInterpretation: 'C# familiarity helps AI follow along',
-    tieInterpretation: 'AI understands both languages equally well',
+    csharpInterpretation: 'The comprehension-signal calculator favors C#',
+    tieInterpretation: 'The comprehension-signal scores are equal',
   },
   EditPrecision: {
     name: 'Accurate Edits',
     calorInterpretation: 'Stable IDs improve the measured targeting signals',
-    csharpInterpretation: 'C# editing patterns are well-established',
-    tieInterpretation: 'AI makes equally precise edits in both languages',
+    csharpInterpretation: 'The edit-targeting calculator favors C#',
+    tieInterpretation: 'The edit-targeting scores are equal',
   },
   ErrorDetection: {
     name: 'Finding Bugs',
     calorInterpretation: 'Contracts and effects add explicit detection signals',
-    csharpInterpretation: 'C# has mature debugging tools',
-    tieInterpretation: 'AI spots bugs equally well in both languages',
+    csharpInterpretation: 'The detection-signal calculator favors C#',
+    tieInterpretation: 'The detection-signal scores are equal',
   },
   InformationDensity: {
     name: 'Information Density',
@@ -71,33 +72,33 @@ const metricDisplayInfo: Record<
   },
   TaskCompletion: {
     name: 'Finishing Tasks',
-    calorInterpretation: 'AI completes more tasks successfully',
-    csharpInterpretation: 'More libraries and examples help AI',
-    tieInterpretation: 'AI completes tasks at similar rates',
+    calorInterpretation: 'The task-completion calculator favors Calor',
+    csharpInterpretation: 'The task-completion calculator favors C#',
+    tieInterpretation: 'The task-completion scores are equal',
   },
   RefactoringStability: {
     name: 'Safe Refactoring',
     calorInterpretation: 'ID-based references improve the measured stability score',
-    csharpInterpretation: 'C# has better refactoring tools',
-    tieInterpretation: 'Both languages maintain stability during refactoring',
+    csharpInterpretation: 'The refactoring-stability calculator favors C#',
+    tieInterpretation: 'The refactoring-stability scores are equal',
   },
   Safety: {
     name: 'Bug Catching',
-    calorInterpretation: 'Contracts catch more bugs with better error messages',
-    csharpInterpretation: 'Guard clauses require manual implementation',
-    tieInterpretation: 'Both approaches catch bugs equally well',
+    calorInterpretation: 'The safety calculator favors Calor',
+    csharpInterpretation: 'The safety calculator favors C#',
+    tieInterpretation: 'The safety scores are equal',
   },
   EffectDiscipline: {
     name: 'Side Effect Control',
-    calorInterpretation: 'Effect system prevents hidden side effect bugs',
-    csharpInterpretation: 'Relies on conventions, no enforcement',
-    tieInterpretation: 'Both approaches manage side effects equally',
+    calorInterpretation: 'The effect-discipline calculator favors Calor',
+    csharpInterpretation: 'The effect-discipline calculator favors C#',
+    tieInterpretation: 'The effect-discipline scores are equal',
   },
   Correctness: {
     name: 'Edge Case Handling',
     calorInterpretation: 'Structural correctness signals favor Calor in estimation mode',
-    csharpInterpretation: 'Guard clauses require explicit implementation',
-    tieInterpretation: 'Both languages handle edge cases equally well',
+    csharpInterpretation: 'The correctness-signal calculator favors C#',
+    tieInterpretation: 'The correctness-signal scores are equal',
   },
 };
 
@@ -267,9 +268,12 @@ export function BenchmarkChart() {
           <div className="mt-12 p-6 rounded-xl border bg-gradient-to-br from-calor-pink/5 to-calor-salmon/5">
             <h3 className="font-semibold mb-2 font-display">The Bottom Line</h3>
             <p className="text-muted-foreground font-body leading-relaxed">
-              <strong className="text-foreground">The v0.12 static run favors Calor in seven of eight defined metrics.</strong>{' '}
+              <strong className="text-foreground">This historical static snapshot favors Calor in seven of eight defined metrics.</strong>{' '}
               Its strongest scores come from explicit comprehension and error-detection signals; C# narrowly leads information density.
               These calculators do not directly measure model productivity or production defect rates.
+              {' '}Recorded source {provenance.sourceCommit} declares compiler v{provenance.sourceDeclaredVersion};
+              corpus <code>{provenance.corpus}</code>, {benchmarkData.summary.statisticalRunCount} deterministic repetitions.
+              This is not a measurement of the current docs release.
             </p>
           </div>
 

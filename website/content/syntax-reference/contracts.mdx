@@ -11,8 +11,16 @@ Contract verification has seven explicit outcomes: `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`. Since
 0.15, `--verify` removes the runtime guard by default — but only for a clean,
 non-vacuous, assumption-free `proven` postcondition. `assumed` and every
-inconclusive status always keep the guard. Pass `--keep-proven-guards` to
-keep every guard and use verification as a diagnostic only.
+inconclusive status never authorize proof-based removal. Pass
+`--keep-proven-guards` to retain otherwise-emitted guards and use verification
+as a diagnostic only. `--contract-mode off` emits no contract checks; enabled
+checks still require supported runtime lowering. See
+[verification modes and limits](/docs/guides/verification-guarantees/).
+
+Runtime quantifiers preserve their full predicate and require certified typed
+bounds and evaluation order. Unsupported requested lowering is a fatal
+`Calor0326`, even when proof-based guard removal would otherwise be possible.
+See [runtime quantifier limits](/docs/guides/verification-guarantees/#runtime-quantifier-limits).
 
 ---
 

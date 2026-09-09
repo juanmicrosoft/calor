@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "82a7c653",
+  "sourceDeclaredVersion": "0.15.0",
+  "corpus": "tests/TestData/Benchmarks",
+  "method": "Deterministic static-analysis calculators",
+  "programCount": 217,
+  "metricNames": ["TokenEconomics", "GenerationAccuracy", "Comprehension", "EditPrecision", "ErrorDetection", "InformationDensity", "RefactoringStability", "Correctness"],
+  "limitation": "The recorded source revision declares this compiler version; the exact binary used for the measurement was not independently recorded.",
+  "agentTasks": {
+    "sourceCommit": "107462e",
+    "sourceDeclaredVersion": "0.2.3",
+    "corpus": "tests/E2E/agent-tasks",
+    "method": "Historical single-run Claude task snapshot"
+  },
+  "agentRefactoring": {
+    "sourceCommit": "580e189",
+    "sourceDeclaredVersion": "0.2.3",
+    "corpus": "tests/E2E/agent-tasks",
+    "method": "Historical majority-vote refactoring study (2 of 3 runs)"
+  }
+}

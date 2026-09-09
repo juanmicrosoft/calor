@@ -1,5 +1,6 @@
 'use client';
 import { formatTimestamp } from '@/lib/timestamps';
+import { agentTasks as provenance } from '../../../public/data/benchmark-provenance.json';
 
 import { cn } from '@/lib/utils';
 import { Bot, CheckCircle, XCircle, Target, Layers, TrendingUp } from 'lucide-react';
@@ -148,10 +149,10 @@ export function AgentBenchmarkDashboard() {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6 text-calor-pink" />
-            Agent Task Benchmark
+            Historical Agent Task Benchmark
           </h2>
           <p className="text-muted-foreground mt-1">
-            Testing Claude&apos;s ability to generate correct Calor code from natural language
+            Historical task results, not an evaluation of the current docs release
           </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
@@ -159,6 +160,12 @@ export function AgentBenchmarkDashboard() {
           <div>Commit: <code className="text-xs">{data.commit}</code></div>
         </div>
       </div>
+
+      <p className="text-sm text-muted-foreground">
+        {provenance.method}. Corpus: <code>{provenance.corpus}</code>.
+        {' '}Recorded source <code>{provenance.sourceCommit}</code> declares compiler v{provenance.sourceDeclaredVersion}.
+        The exact measurement binary was not independently recorded.
+      </p>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

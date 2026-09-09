@@ -39,7 +39,7 @@ produces a model. Vacuity is a separate flag.
 
 | Exit | Meaning |
 |:-----|:--------|
-| `0` | No contract was refuted and compilation succeeded; inconclusive outcomes keep their runtime checks |
+| `0` | No contract was refuted and compilation succeeded; inconclusive outcomes may still be present |
 | `1` | A contract was refuted, a file was missing, or compilation failed |
 | `2` | Invalid weakening-check invocation |
 
@@ -71,8 +71,10 @@ proved nothing exits `0` exactly like a run that proved everything.
 ## Reporting, Not Rewriting
 
 `calor verify` reports verdicts; it never rewrites generated code. Guard
-elision happens in `calor compile --verify`, where (since 0.15) a clean
+elision happens in `calor --input file.calr --output file.g.cs --verify`, where a clean
 `proven` verdict drops its runtime guard by default; add
-`--keep-proven-guards` there to keep every guard. See
+`--keep-proven-guards` there to retain otherwise-emitted guards.
+`--contract-mode off` emits no checks, and enabled checks require supported
+runtime lowering. See
 [Verification Guarantees](/docs/guides/verification-guarantees/) before using
 proof results as a gate.
