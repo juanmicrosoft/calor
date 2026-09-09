@@ -27,17 +27,17 @@ namespace SkillSyntax
 
         public static int Add(int a, int b)
         {
-            return a + b;
+            return checked(a + b);
         }
 
         public static int Subtract(int a, int b)
         {
-            return a - b;
+            return checked(a - b);
         }
 
         public static int Multiply(int a, int b)
         {
-            return a * b;
+            return checked(a * b);
         }
 
         private static void TestComparison()

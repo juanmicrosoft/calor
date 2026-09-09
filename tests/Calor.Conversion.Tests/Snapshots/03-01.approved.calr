@@ -1,4 +1,4 @@
-§M{m001:Test_03_01}
+§M{m001:Test_03_01:overflow=unchecked}
   §CL{c001:Guard:pub}
     §MT{m002:Classify:pub} (i32:value) -> str
       §IF{if003} (> value 0)

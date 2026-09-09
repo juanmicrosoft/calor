@@ -185,7 +185,8 @@ public class W1Slice1SoundnessTests
                 BinOp(BinaryOperator.Add, Ref("x"), Int(1)),
                 Int(int.MinValue))));
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.Contains("overflow-free", result.EffectiveOutcome.Reason);
     }
 
     // ---- D10: mixed signedness ----
@@ -383,7 +384,8 @@ public class W1Slice1SoundnessTests
                 BinOp(BinaryOperator.Add, Ref("b"), Ref("x")),
                 Int(0))));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]

@@ -42,6 +42,12 @@ public sealed class ModuleNode : AstNode
     public IReadOnlyList<DelegateDefinitionNode> Delegates { get; }
     public IReadOnlyList<FunctionNode> Functions { get; }
     public AttributeCollection Attributes { get; }
+    public bool ShouldCheckIntegerOverflow() => Attributes["overflow"] switch
+    {
+        null or "checked" => true,
+        "unchecked" => false,
+        var invalid => throw new InvalidOperationException($"Invalid module overflow policy '{invalid}'.")
+    };
 
     // Extended Features: Structured Issues
     public IReadOnlyList<IssueNode> Issues { get; }

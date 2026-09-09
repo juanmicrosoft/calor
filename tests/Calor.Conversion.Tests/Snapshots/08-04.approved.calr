@@ -1,4 +1,4 @@
-§M{m001:Test_08_04}
+§M{m001:Test_08_04:overflow=unchecked}
   §CL{c001:NullDemo:pub}
     §MT{m002:GetValue:pub} (?str:input) -> str
       §R (?? input "default")

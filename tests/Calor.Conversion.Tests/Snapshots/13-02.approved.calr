@@ -1,4 +1,4 @@
-§M{m001:Test_13_02}
+§M{m001:Test_13_02:overflow=unchecked}
   §CL{c001:VerbatimDemo:pub}
     §FLD{i32:object:priv}
     §FLD{str:`class`:priv}

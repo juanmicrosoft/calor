@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
+using ProofStatus = Calor.Compiler.Verification.ProofStatus;
 using Calor.Compiler.Verification.Z3;
 using Xunit;
 using Xunit.Abstractions;
@@ -10,15 +11,8 @@ namespace Calor.Verification.Tests;
 
 /// <summary>
 /// Benchmark tests that validate the soundness of the bit-vector implementation.
-/// These tests verify that contracts which can fail due to overflow are correctly
-/// DISPROVEN (not falsely proven as they would be with unbounded integers).
-///
-/// This benchmark measures the "false proof rate" - contracts that would be incorrectly
-/// proven with unbounded integer semantics but are correctly disproven with bit-vectors.
-///
-/// A sound verifier should:
-/// - DISPROVE all contracts in the "MustBeDisproven" category (overflow possible)
-/// - PROVE all contracts in the "MustBeProven" category (properly bounded)
+/// Overflowing checks must retain their guards under an explicit checked-arithmetic
+/// assumption. Properly bounded operations still prove without that assumption.
 /// </summary>
 public class OverflowSoundnessBenchmark
 {
@@ -45,7 +39,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Add, Ref("x"), Int(1)),
                 Ref("x")));
 
-        AssertDisproven(result, "x + 1 > x (unbounded)");
+        AssertConditionalOverflow(result, "x + 1 > x (unbounded)");
     }
 
     [SkippableFact]
@@ -82,7 +76,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Add, Ref("x"), Ref("y")),
                 Int(0)));
 
-        AssertDisproven(result, "x > 0 && y > 0 => x + y > 0 (unbounded)");
+        AssertConditionalOverflow(result, "x > 0 && y > 0 => x + y > 0 (unbounded)");
     }
 
     [SkippableFact]
@@ -123,7 +117,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Subtract, Ref("x"), Int(1)),
                 Ref("x")));
 
-        AssertDisproven(result, "x - 1 < x (unbounded)");
+        AssertConditionalOverflow(result, "x - 1 < x (unbounded)");
     }
 
     [SkippableFact]
@@ -163,7 +157,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Multiply, Ref("x"), Int(2)),
                 Ref("x")));
 
-        AssertDisproven(result, "x > 0 => x * 2 > x (unbounded)");
+        AssertConditionalOverflow(result, "x > 0 => x * 2 > x (unbounded)");
     }
 
     [SkippableFact]
@@ -200,7 +194,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Multiply, Ref("x"), Ref("x")),
                 Int(0)));
 
-        AssertDisproven(result, "x >= 0 => x * x >= 0 (unbounded)");
+        AssertConditionalOverflow(result, "x >= 0 => x * x >= 0 (unbounded)");
     }
 
     [SkippableFact]
@@ -243,7 +237,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Divide, Ref("x"), Ref("y")),
                 Ref("x")));
 
-        AssertDisproven(result, "y != 0 => x / y >= x (INT_MIN / -1 case)");
+        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
     }
 
     #endregion
@@ -265,7 +259,7 @@ public class OverflowSoundnessBenchmark
                 UnaryOp(UnaryOperator.Negate, Ref("x")),
                 Int(0)));
 
-        AssertDisproven(result, "x < 0 => -x > 0 (INT_MIN case)");
+        AssertConditionalOverflow(result, "x < 0 => -x > 0 (INT_MIN case)");
     }
 
     [SkippableFact]
@@ -318,7 +312,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Subtract, Ref("x"), Int(1)),
                 Ref("x")));
 
-        AssertDisproven(result, "u32: x - 1 < x (wraps at 0)");
+        AssertConditionalOverflow(result, "u32: x - 1 < x (throws at 0)");
     }
 
     #endregion
@@ -338,7 +332,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Add, Ref("x"), Int(1)),
                 Ref("x")));
 
-        AssertDisproven(result, "i64: x + 1 > x (unbounded)");
+        AssertConditionalOverflow(result, "i64: x + 1 > x (unbounded)");
     }
 
     #endregion
@@ -357,7 +351,7 @@ public class OverflowSoundnessBenchmark
     {
         var sw = Stopwatch.StartNew();
 
-        var mustBeDisproven = new (string Name, Func<ContractVerificationResult> Test)[]
+        var mustBeConditional = new (string Name, Func<ContractVerificationResult> Test)[]
         {
             ("x + 1 > x", () => VerifySimple("i32", null, "(> (+ x 1) x)")),
             ("x - 1 < x", () => VerifySimple("i32", null, "(< (- x 1) x)")),
@@ -377,13 +371,15 @@ public class OverflowSoundnessBenchmark
 
         _output.WriteLine("=== Overflow Soundness Benchmark ===\n");
 
-        int disproven = 0, falseProofs = 0;
-        _output.WriteLine("Contracts that MUST be DISPROVEN (overflow possible):");
-        foreach (var (name, test) in mustBeDisproven)
+        int conditional = 0, falseProofs = 0;
+        _output.WriteLine("Contracts that MUST be ASSUMED (overflow possible):");
+        foreach (var (name, test) in mustBeConditional)
         {
             var result = test();
-            var status = result.Status == ContractVerificationStatus.Disproven ? "PASS" : "FAIL (FALSE PROOF!)";
-            if (result.Status == ContractVerificationStatus.Disproven) disproven++;
+            var matches = result.EffectiveOutcome.Status == ProofStatus.Assumed
+                && result.EffectiveOutcome.Assumptions.Contains(Z3Verifier.CheckedArithmeticAssumption);
+            var status = matches ? "PASS" : "FAIL (WRONG PROOF STATUS)";
+            if (matches) conditional++;
             else falseProofs++;
             _output.WriteLine($"  [{status}] {name}");
         }
@@ -402,7 +398,7 @@ public class OverflowSoundnessBenchmark
         sw.Stop();
 
         _output.WriteLine($"\n=== Summary ===");
-        _output.WriteLine($"Correctly disproven: {disproven}/{mustBeDisproven.Length}");
+        _output.WriteLine($"Correctly conditional: {conditional}/{mustBeConditional.Length}");
         _output.WriteLine($"Correctly proven: {proven}/{mustBeProven.Length}");
         _output.WriteLine($"False proofs (UNSOUND): {falseProofs}");
         _output.WriteLine($"Missed proofs: {missedProofs}");
@@ -410,6 +406,7 @@ public class OverflowSoundnessBenchmark
 
         // Assert soundness - no false proofs allowed
         Assert.Equal(0, falseProofs);
+        Assert.Equal(0, missedProofs);
     }
 
     #endregion
@@ -510,14 +507,15 @@ public class OverflowSoundnessBenchmark
         return parts;
     }
 
-    private void AssertDisproven(ContractVerificationResult result, string description)
+    private void AssertConditionalOverflow(ContractVerificationResult result, string description)
     {
         _output.WriteLine($"[{result.Status}] {description}");
         if (result.Status == ContractVerificationStatus.Proven)
         {
             _output.WriteLine("  WARNING: This is a FALSE PROOF - would fail at runtime!");
         }
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     private void AssertProven(ContractVerificationResult result, string description)

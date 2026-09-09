@@ -1,4 +1,4 @@
-§M{m001:Test_12_02}
+§M{m001:Test_12_02:overflow=unchecked}
   §CL{c001:Parser:pub}
     §MT{m002:TryParse:pub} (str:input, i32:result:out) -> bool
       §ASSIGN result 0

@@ -1,4 +1,4 @@
-§M{m001:Test_04_01}
+§M{m001:Test_04_01:overflow=unchecked}
   §CL{c001:Box<T>:pub}
     §WHERE T : notnull
 

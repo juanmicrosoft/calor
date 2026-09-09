@@ -871,9 +871,8 @@ public class StringOperationsE2ETests
     }
 
     [Fact]
-    public void E2E_CharFromCode_NegativeCode_ReturnsChar()
+    public void E2E_CharFromCode_NegativeCode_Traps()
     {
-        // Negative values wrap around in char conversion (implementation-defined behavior)
         var source = """
             §M{m001:Test}
               §F{f001:CharFromCode:pub}
@@ -882,11 +881,9 @@ public class StringOperationsE2ETests
                   §R (char-from-code code)
             """;
 
-        // -1 wraps to 65535 (0xFFFF) in unchecked char conversion
         var result = Execute(source, "CharFromCode", new object[] { -1 });
 
-        Assert.Null(result.Exception);
-        Assert.Equal((char)65535, result.ReturnValue);
+        Assert.IsType<OverflowException>(result.Exception);
     }
 
     #endregion

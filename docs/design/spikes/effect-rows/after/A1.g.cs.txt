@@ -50,7 +50,7 @@ namespace AllowlistAudit
 
             #line default
             #line 22 "<source>.calr"
-            return text.Substring(m - n, n) == suffix;
+            return text.Substring(checked(m - n), n) == suffix;
             #line default
         }
 
@@ -120,7 +120,7 @@ namespace AllowlistAudit
         private static void Report(string entry, string problem)
         {
             #line 48 "<source>.calr"
-            Console.WriteLine("  " + (entry + (" — " + problem)));
+            Console.WriteLine(checked("  " + (checked(entry + (checked(" — " + problem))))));
             #line default
         }
 
@@ -184,7 +184,7 @@ namespace AllowlistAudit
                     string entry = raw.Trim();
                     #line default
                     #line 78 "<source>.calr"
-                    entries = entries + 1;
+                    entries = checked(entries + 1);
                     #line default
                     #line 80 "<source>.calr"
                     bool wild = entry.Contains("*");
@@ -196,7 +196,7 @@ namespace AllowlistAudit
                         Report(entry, "contains a wildcard; the allowlist requires specific paths");
                         #line default
                         #line 83 "<source>.calr"
-                        findings = findings + 1;
+                        findings = checked(findings + 1);
                         #line default
                     }
 
@@ -211,7 +211,7 @@ namespace AllowlistAudit
                         Report(entry, "is not a .cs path, so the guard can never match it");
                         #line default
                         #line 88 "<source>.calr"
-                        findings = findings + 1;
+                        findings = checked(findings + 1);
                         #line default
                     }
 
@@ -223,7 +223,7 @@ namespace AllowlistAudit
                         Report(entry, "is listed more than once");
                         #line default
                         #line 92 "<source>.calr"
-                        findings = findings + 1;
+                        findings = checked(findings + 1);
                         #line default
                     }
 
@@ -241,7 +241,7 @@ namespace AllowlistAudit
                         Report(entry, "is under a structurally exempt tree, so the entry grants nothing and misleads");
                         #line default
                         #line 98 "<source>.calr"
-                        findings = findings + 1;
+                        findings = checked(findings + 1);
                         #line default
                     }
 
@@ -265,7 +265,7 @@ namespace AllowlistAudit
                                     Report(entry, "is marked pending but now exists; remove the pending marker");
                                     #line default
                                     #line 113 "<source>.calr"
-                                    findings = findings + 1;
+                                    findings = checked(findings + 1);
                                     #line default
                                 }
 
@@ -280,7 +280,7 @@ namespace AllowlistAudit
                                 if (pending)
                                 {
                                     #line 116 "<source>.calr"
-                                    Console.WriteLine("  " + (entry + " — pending: pre-registered, file not merged yet"));
+                                    Console.WriteLine(checked("  " + (checked(entry + " — pending: pre-registered, file not merged yet"))));
                                     #line default
                                 }
 
@@ -292,7 +292,7 @@ namespace AllowlistAudit
                                     Report(entry, "does not exist; a stale entry keeps permission alive for a path nothing occupies");
                                     #line default
                                     #line 119 "<source>.calr"
-                                    findings = findings + 1;
+                                    findings = checked(findings + 1);
                                     #line default
                                 }
 
@@ -316,7 +316,7 @@ namespace AllowlistAudit
 
             #line default
             #line 124 "<source>.calr"
-            Console.WriteLine("allowlist-audit: " + entries + " entries, " + findings + " finding(s)");
+            Console.WriteLine(checked(checked(checked(checked("allowlist-audit: " + entries) + " entries, ") + findings) + " finding(s)"));
             #line default
             #line 125 "<source>.calr"
             if (findings > 0)

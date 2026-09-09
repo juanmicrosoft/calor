@@ -1,4 +1,4 @@
-§M{m001:Test_11_03}
+§M{m001:Test_11_03:overflow=unchecked}
   §CL{c001:Container:pub}
     §MT{m005:GetStatus:pub} () -> Status
       §R Status.Active

@@ -734,6 +734,12 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.Module);
         var attrs = ParseAttributes();
+        var overflowModifier = attrs["_pos2"];
+        if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
+            attrs.Add("overflow", overflowModifier["overflow=".Length..].Trim());
+        if (attrs["overflow"] is { } overflow && overflow is not ("checked" or "unchecked"))
+            _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                $"Module overflow policy must be 'checked' or 'unchecked', not '{overflow}'.");
 
         var (id, moduleName) = AttributeHelper.InterpretModuleAttributes(attrs);
         var moduleNameKey = "_pos1";
