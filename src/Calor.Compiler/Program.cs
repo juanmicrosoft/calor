@@ -757,6 +757,13 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        MatchExpressionValidator.Validate(ast, diagnostics);
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
         // Type checking (optional)
         if (options.EnableTypeChecking && !options.UnsafeTranspileOnly)
         {

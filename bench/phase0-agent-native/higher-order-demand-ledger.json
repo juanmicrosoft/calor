@@ -16,9 +16,9 @@
   },
   "demandTotal": 3123,
   "dA": {
-    "measuredCommit": "4767668a64906b955e1caed92408d74427c5b0d2",
+    "measuredCommit": "7dcd1d3b514504bda3c1dd397795483b5d39c25e",
     "fileCount": 936,
-    "filesNotReachingEffectPass": 44,
+    "filesNotReachingEffectPass": 45,
     "notReachingEffectPassNote": "Known state at registration, not a filter: bench/mcp/tasks/*/expected.calr and input.calr are MCP benchmark fixtures that are deliberately broken or written against older syntax (30 of 33 die on Calor0830 legacy closing tags, two on Calor0006, one on Calor0403), benchmarks/* entries are the #901 stale subjects, and tests/TestData/LintScenarios/10_error_cases/* are error fixtures.",
     "notReachingEffectPass": [
       {
@@ -184,6 +184,10 @@
       {
         "file": "benchmarks/security/sql-injection.calr",
         "firstError": "Calor0102"
+      },
+      {
+        "file": "tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr",
+        "firstError": "Calor1006"
       },
       {
         "file": "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",

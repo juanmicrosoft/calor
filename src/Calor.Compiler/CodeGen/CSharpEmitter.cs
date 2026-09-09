@@ -4725,6 +4725,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MatchExpressionNode node)
     {
+        var unsupportedArms = node.Cases.Where(arm => !Analysis.MatchExpressionValidator.IsSupported(arm)).ToArray();
+        if (unsupportedArms.Length > 0)
+        {
+            foreach (var arm in unsupportedArms)
+                Analysis.MatchExpressionValidator.ReportUnsupported(arm, EmissionDiagnostics);
+            return "throw new System.NotSupportedException(\"Expression-match block arms are unsupported\")";
+        }
+
         // Generate as switch expression
         var target = node.Target.Accept(this);
         var sb = new System.Text.StringBuilder();
@@ -4745,17 +4753,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Emit guard clause if present
                 var guard = matchCase.Guard != null ? $" when {matchCase.Guard.Accept(this)}" : "";
 
-                // For expression match, the body should yield a value
-                // Take the last statement if it's a return, otherwise default
-                var body = "default";
-                if (matchCase.Body.Count > 0)
-                {
-                    var lastStmt = matchCase.Body[^1];
-                    if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
-                    {
-                        body = ret.Expression.Accept(this);
-                    }
-                }
+                var body = ((ReturnStatementNode)matchCase.Body[0]).Expression!.Accept(this);
                 sb.Append($"{pattern}{guard} => {body}");
                 if (i < node.Cases.Count - 1) sb.Append(", ");
             }
