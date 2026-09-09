@@ -76,10 +76,11 @@ its wrapping behavior; it does not inherit native Calor's default.
 Explicit checked/unchecked contexts remain distinct. Unscoped raw C# from a
 globally checked compilation is rejected, not silently treated as unchecked.
 
-Verification follows the selected policy. Unproven arithmetic-definedness
-conditions can produce `assumed`; they are not a clean proof that execution
-cannot throw. Read the reported status and assumptions rather than treating
-`--verify` as a universal overflow-safety guarantee.
+Verification follows the selected policy. A predicate proof that depends on an
+unestablished arithmetic-safety condition carries the named `checked-arithmetic`
+assumption and cannot authorize proof-based guard removal. Read the reported
+status and assumptions rather than treating `--verify` as a universal
+overflow-safety guarantee.
 
 Floating-point `NaN`, infinities, overflow, overloaded operators, and repeated
 property evaluation need their own semantics. Identities such as `x == x` or

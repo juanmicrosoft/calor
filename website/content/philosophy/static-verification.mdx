@@ -10,7 +10,8 @@ result is one of seven statuses. With optional `--verify`, the compiler
 removes an eligible runtime guard only for a clean, non-vacuous,
 assumption-free `proven` result. Other results never authorize proof-based
 removal. Runtime checks depend separately on contract mode and supported lowering;
-`--contract-mode off` emits none. See
+`--contract-mode off` emits no contract guards; it does not disable checked
+arithmetic. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ---
@@ -290,8 +291,9 @@ Z3 verification results are automatically cached to disk. When you recompile a f
 - **Deterministic cache keys**: The same normalized obligation, settings,
   compiler semantics, and solver version reuse the same result
 
-The cache includes contract and parameter shape, compiler and semantics
-versions, verification settings, and a format version. v0.12 bumped the format
+The cache includes contract and parameter shape, relevant function-body context,
+module overflow policy, compiler and semantics versions, verification settings,
+and a format version. v0.12 bumped the format
 as proof semantics changed so older `proven` entries could not be reused.
 
 To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, use `--clear-cache`.
