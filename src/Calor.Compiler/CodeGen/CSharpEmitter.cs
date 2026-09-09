@@ -352,6 +352,34 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         _declScopes[^1].Add(name);
+        InvalidateDeclaredType(name);
+    }
+
+    private void InvalidateDeclaredType(string name)
+    {
+        var normalized = SanitizeIdentifier(name);
+        foreach (var key in _parameterTypes.Keys.Where(key =>
+            SanitizeIdentifier(key).Equals(normalized, StringComparison.Ordinal)).ToArray())
+            _parameterTypes.Remove(key);
+    }
+
+    private void InvalidateScopeDeclarations(AstNode scope)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        void Collect(AstNode node)
+        {
+            if (!ReferenceEquals(node, scope)
+                && node is LambdaExpressionNode or ForallExpressionNode or ExistsExpressionNode)
+                return;
+            if (node is not (ReferenceNode or ParameterNode or LambdaParameterNode
+                or TypeParameterNode or QuantifierVariableNode or LabelStatementNode))
+                AddReservedIdentifiers(names, node);
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+                Collect(child);
+        }
+        Collect(scope);
+        foreach (var name in names)
+            InvalidateDeclaredType(name);
     }
 
     private void DeclareRefinementInScope(string name, RefinementConstraint? constraint)
@@ -7070,6 +7098,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (parameter.TypeName != null)
                 _parameterTypes[parameter.Name] = TypeMapper.CalorToCSharp(parameter.TypeName);
         }
+        InvalidateScopeDeclarations(node);
         var previousPostconditionResultShadowDepth =
             _postconditionResultShadowDepth;
         _currentInlineReturnRefinement = null;
@@ -7142,7 +7171,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var parameter in parameters)
         {
             var name = SanitizeIdentifier(parameter.Name);
+            var known = _parameterTypes.TryGetValue(parameter.Name, out var type);
             DeclareVarInScope(name);
+            if (known)
+                _parameterTypes[parameter.Name] = type!;
             DeclareRefinementInScope(name, null);
             DeclareIndexedBoundInScope(name, null);
         }
@@ -8280,6 +8312,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _parameterTypes = new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal);
         foreach (var variable in node.BoundVariables)
             _parameterTypes[variable.Name] = MapTypeName(variable.TypeName);
+        InvalidateScopeDeclarations(node);
         var previousShadowDepth = _postconditionResultShadowDepth;
         if (node.BoundVariables.Any(variable =>
                 variable.Name.Equals("result", StringComparison.Ordinal)))
@@ -8351,6 +8384,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _parameterTypes = new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal);
         foreach (var variable in node.BoundVariables)
             _parameterTypes[variable.Name] = MapTypeName(variable.TypeName);
+        InvalidateScopeDeclarations(node);
         var previousShadowDepth = _postconditionResultShadowDepth;
         if (node.BoundVariables.Any(variable =>
                 variable.Name.Equals("result", StringComparison.Ordinal)))

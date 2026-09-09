@@ -145,6 +145,24 @@ public class ContractSimplificationRuntimeTests
                 : "(-> (&& false x) false)";
             var control = Compile(overloaded.Replace(predicate, scalar), verify);
             AssertContractViolation(() => Invoke(control, null));
+
+            var lambdaHeader = overloaded.Replace("(Probe:x) -> i32", "(bool:x, object:o) -> Func<bool>")
+                .Replace("\n    §R INT:7", "");
+            var patternShadow = lambdaHeader.Replace($"§Q {predicate}",
+                $"§R §LAM{{l1}} §R (? (is o Probe x) {predicate} true) §/LAM{{l1}}");
+            var localShadow = lambdaHeader.Replace($"§Q {predicate}",
+                $"§R §LAM{{l1}} §B{{x:Probe}} §NEW{{Probe}} §R {predicate} §/LAM{{l1}}")
+                .Replace("§E{}", "§E{alloc}");
+            foreach (var shadowed in new[] { patternShadow, localShadow })
+            {
+                var rejected = Program.Compile(shadowed, "shadowed-logic.calr", Options(verify));
+                Assert.Contains(rejected.Diagnostics.Errors,
+                    error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+                var scalarControl = Compile(shadowed.Replace(predicate, scalar), verify);
+                var probe = Activator.CreateInstance(scalarControl.GetType("TypedContracts.Probe")!);
+                var closure = Assert.IsType<Func<bool>>(InvokeArguments(scalarControl, false, probe));
+                Assert.False(closure());
+            }
         }
     }
 
