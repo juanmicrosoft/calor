@@ -9749,7 +9749,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private ExpressionNode ConvertImplicitObjectCreation(ImplicitObjectCreationExpressionSyntax implicitNew)
     {
         if (HasDictionaryInitializerOperations(implicitNew.Initializer))
-            throw EscalateExpression(implicitNew, "dictionary-initializer");
+            return PreserveDictionaryInitializer(implicitNew);
 
         // Try to infer the target type from the surrounding syntax context
         var inferredType = InferTargetType(implicitNew);
@@ -11096,12 +11096,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var typeName = objCreation.Type.ToString();
         var typeArgs = new List<string>();
 
-        // §DICT represents Dictionary.Add, not indexer assignment or arbitrary
-        // concrete collections. Preserve the complete boundary before converting
-        // any operands so constructors, comparers and evaluation order stay intact.
+        // §DICT represents Dictionary.Add and emits a statement-level binding.
+        // Keep other contexts inline: hoisting can change exception timing, and
+        // escalating fields to member interop can reorder type initialization.
         var simpleDictionary = objCreation.Type is GenericNameSyntax dictionaryName
             && dictionaryName.Identifier.ValueText == "Dictionary"
             && dictionaryName.TypeArgumentList.Arguments.Count == 2
+            && _semanticModel?.GetTypeInfo(objCreation).Type is INamedTypeSymbol dictionaryType
+            && dictionaryType.ContainingNamespace.ToDisplayString() == "System.Collections.Generic"
+            && (objCreation.Parent is ReturnStatementSyntax
+                || objCreation.Parent is EqualsValueClauseSyntax
+                {
+                    Parent: VariableDeclaratorSyntax
+                    {
+                        Parent: VariableDeclarationSyntax { Parent: LocalDeclarationStatementSyntax }
+                    }
+                }
+                || objCreation.Parent is AssignmentExpressionSyntax
+                {
+                    Left: IdentifierNameSyntax,
+                    Parent: ExpressionStatementSyntax
+                } localAssignment
+                && localAssignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && _semanticModel.GetSymbolInfo(localAssignment.Left).Symbol is ILocalSymbol)
             && objCreation.ArgumentList?.Arguments.Count is not > 0
             && objCreation.Initializer?.Expressions.All(expr =>
                 expr is InitializerExpressionSyntax entry
@@ -11117,7 +11134,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (!simpleDictionary && objCreation.Initializer?.Expressions.Count > 0
             && (IsDictionaryType(collectionName)
                 || HasDictionaryInitializerOperations(objCreation.Initializer)))
-            throw EscalateExpression(objCreation, "dictionary-initializer");
+            return PreserveDictionaryInitializer(objCreation);
 
         if (objCreation.Type is GenericNameSyntax genericName)
         {
@@ -11473,6 +11490,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         initializer?.Expressions.Any(expr =>
             expr is InitializerExpressionSyntax
             || expr is AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax }) == true;
+
+    private ExpressionNode PreserveDictionaryInitializer(BaseObjectCreationExpressionSyntax creation)
+    {
+        _context.RecordFeatureUsage("dictionary-initializer");
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "dictionary-initializer",
+            "Dictionary construction and initializer operations preserved verbatim",
+            creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
+    }
 
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
     {

@@ -2,6 +2,13 @@
   §U{System.Collections.Generic}
 
   §CL{c001:CollectionHoistDemo:pub}
+    §MT{m002:GetValues:pub} () -> Dict<str, i32>
+      §R §CS{new Dictionary<string, int>
+        {
+            { "a", Compute(1) },
+            { "b", Compute(2) }
+        }}
+
     §MT{m003:GetNames:pub} () -> Set<str>
       §E{alloc}
       §HSET{set004:str}
@@ -14,13 +21,3 @@
 
     §MT{m006:Format:priv} (str:s) -> str
       §R (upper s)
-
-    §CSHARP{    public Dictionary<string, int> GetValues()
-    {
-        return new Dictionary<string, int>
-        {
-            { "a", Compute(1) },
-            { "b", Compute(2) }
-        };
-    }
-    }§/CSHARP

@@ -226,7 +226,7 @@ public static class FeatureSupport
         {
             Name = "dictionary-initializer",
             Support = SupportLevel.Partial,
-            Description = "Literal Add-style Dictionary initializers use §DICT. Index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as C# interop to retain their operations and evaluation order."
+            Description = "Literal Add-style Dictionary initializers in direct local bindings and returns use §DICT. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as inline C# interop to retain their operations, type initialization order and evaluation timing."
         },
         ["list-initializer"] = new FeatureInfo
         {
