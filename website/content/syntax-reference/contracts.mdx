@@ -17,6 +17,11 @@ as a diagnostic only. `--contract-mode off` emits no contract checks; enabled
 checks still require supported runtime lowering. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
+Runtime quantifiers preserve their full predicate and require certified typed
+bounds and evaluation order. Unsupported requested lowering is a fatal
+`Calor0326`, even when proof-based guard removal would otherwise be possible.
+See [runtime quantifier limits](/docs/guides/verification-guarantees/#runtime-quantifier-limits).
+
 ---
 
 ## Preconditions (`§Q`)

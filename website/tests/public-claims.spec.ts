@@ -50,7 +50,9 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
   const article = page.locator('article');
   for (const text of ['--contract-mode debug', '--contract-mode release', '--contract-mode off',
     '--keep-proven-guards', 'unsupported', 'Parameter mutation and numeric limits', 'NaN',
-    'early and nested returns', 'shared postcondition exit', 'Calor1001', 'Calor1004']) {
+    'early and nested returns', 'shared postcondition exit', 'Calor1001', 'Calor1004',
+    'preserves unknown operands', 'Runtime quantifier limits', 'Calor0326',
+    'no silent static-only fallback', 'Contract proofs do not establish effect completeness']) {
     await expect(article).toContainText(text);
   }
   await page.goto(`${base}/docs/benchmarking/results/`);

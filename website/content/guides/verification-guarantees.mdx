@@ -64,11 +64,26 @@ proof. Read the returned status and retain runtime checks where supported.
 
 Floating-point `NaN`, infinities, overflow, overloaded operators, and repeated
 property evaluation need their own semantics. Identities such as `x == x` or
-`x - x == 0` are not universal .NET laws. A supported literal fold is not a
-general symbolic proof. The September soundness audit tracks these boundaries
+`x - x == 0` are not universal .NET laws. The untyped simplifier preserves
+unknown operands and their evaluations instead of assuming IEEE reflexivity,
+built-in operators, or purity. A supported literal fold is not a general
+symbolic proof. The September soundness audit tracks these boundaries
 in [parameter poststate](https://github.com/juanmicrosoft/calor/issues/1183) and
 [typed simplification](https://github.com/juanmicrosoft/calor/issues/1184).
 Their regression suites are bounded checks, not whole-program guarantees.
+
+## Runtime quantifier limits
+
+Runtime quantifiers retain the full predicate, including short-circuit guards
+and observable evaluations. Finite-domain lowering preserves the declared
+integer type and evaluation order only when the compiler can certify the
+required bounds and their stability. It does not move an unknown getter ahead
+of another condition to discover a range.
+
+When a requested runtime check cannot be lowered faithfully, compilation fails
+with `Calor0326` before proof-based guard removal. There is no silent static-only
+fallback, and even a `proven` result does not authorize unsupported runtime
+lowering. Disabling runtime contracts is a separate, explicit mode choice.
 
 ## What Changed in v0.12
 
@@ -132,6 +147,11 @@ error: the compiler reads the callback's own `§E{…}` and charges it to the
 caller. `Calor0418` is reserved for invoking something that is provably not a
 function at all.
 
+Contract proofs do not establish effect completeness. The separate
+[indexed-assignment audit](https://github.com/juanmicrosoft/calor/issues/1185)
+tracks mutation accounting and effects from evaluating assignment receivers
+and indexes; do not infer coverage of every effect path from a clean contract result.
+
 `--no-enforce-effects` disables the gate. `--permissive-effects` assumes a call
 the compiler cannot look up does nothing, so `Calor0411` and `Calor0425` go
 unreported and `Calor0410` is demoted to a warning; it never waives
@@ -147,7 +167,7 @@ what it does and does not waive.
 3. Read every named assumption on `assumed` results.
 4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their
    remedies differ.
-5. Check for `Calor1001` and `Calor1004` before relying on postcondition runtime enforcement.
+5. Check for `Calor0326`, `Calor1001`, and `Calor1004` before relying on runtime enforcement.
 6. Record any effect or contract waiver in review.
 
 Use [calor verify](/docs/cli/verify/) for raw results and

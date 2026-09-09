@@ -162,6 +162,11 @@ are enabled. Opaque raw-C# bodies with postconditions are rejected with
 `Calor1001`; iterator postconditions are rejected with `Calor1004`. Static
 verification is separate from these runtime-lowering boundaries.
 
+Runtime quantifiers also require a faithful finite domain and evaluation order.
+If those cannot be certified, `Calor0326` fails compilation before guard elision;
+there is no silent static-only fallback. See the
+[runtime quantifier limits](/docs/guides/verification-guarantees/#runtime-quantifier-limits).
+
 ---
 
 ## Best Practices
