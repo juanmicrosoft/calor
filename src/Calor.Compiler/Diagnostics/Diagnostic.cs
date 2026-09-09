@@ -1029,6 +1029,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string MalformedNamespaceTopology = "Calor1005";
 
+    /// <summary>
+    /// Error: an expression-match arm cannot be lowered without discarding statements.
+    /// </summary>
+    public const string ExpressionMatchBlockUnsupported = "Calor1006";
+
     // C# Interop diagnostics (Calor1010-1019)
 
     /// <summary>
