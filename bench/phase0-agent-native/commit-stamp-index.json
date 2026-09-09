@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
-      "resolvableOnMain": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
+      "measuredCommit": "44454cde6608e3fd80c5a9931d585f31a717a09e",
+      "resolvableOnMain": "28c01bc0b74c3a0058b267fcbd69fc4eb3ecb843",
       "basis": "measured-on-top-of",
-      "note": "Regenerated in the PR that gives property accessors an effect contract (#1176). The stamp names the base the change was applied to. What moved: serilog Calor0411Sites 534 -> 538, because this.-qualified property reads became visible and four of them resolve to unknown externals; and one module per subject moved its first stop from Calor0410 to Calor0422/0423."
+      "note": "#1194 / PR #1270: regenerated at branch commit 44454cde6608e3fd80c5a9931d585f31a717a09e with reevaluated-loop lowering applied to release ancestor 28c01bc0. All corpus effect measurements and thresholds are unchanged; only the new measurement stamp moved. The named release ancestor is the reproducible base, not a claim of an identical compiler tree."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
