@@ -60,6 +60,9 @@ public class TupleAssignmentMigrationTests
         yield return Case("for-incrementor", "int a = 1; int b = 2; for (int i = 0; i < 1; (a, b) = (b, a)) { i++; } return a * 10 + b;", "21");
         yield return Case("for-continue", "int a = 1; int b = 2; for (int i = 0; i < 1; (a, b) = (b, a)) { i++; continue; } return a * 10 + b;", "21");
         yield return Case("for-initializer", "int a = 1; int b = 2; for ((a, b) = (b, a); a < 3; a++) { } return a * 10 + b;", "31");
+        yield return Case("for-condition", "int a = 1; int b = 2; int n = 0; for (int i = 0; ((a, b) = (b, a)).Item1 + i < 4; i++) { n++; } return a * 100 + b * 10 + n;", "212");
+        yield return Case("action-lambda", "int[] data = new int[] { 1, 2 }; System.Action swap = () => (data[0], data[1]) = (data[1], data[0]); swap(); return data[0] * 10 + data[1];", "21");
+        yield return Case("value-lambda", "int a = 1; int b = 2; System.Func<(int, int)> swap = () => (a, b) = (b, a); var result = swap(); return result.Item1 * 100 + a * 10 + b;", "221");
         yield return Case("custom-indexer", "var box = new Box(); (box[0], box[1]) = (box[1], box[0]); return log + \":\" + box.Snapshot();", "ggss:21",
             """
             static string log = "";

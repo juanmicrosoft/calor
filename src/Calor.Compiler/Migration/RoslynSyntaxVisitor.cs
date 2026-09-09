@@ -8056,7 +8056,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // rather than moving it into a while body, where continue would skip it.
         if (node.Initializers.Concat(node.Incrementors)
             .Any(expression => expression.DescendantNodesAndSelf()
-                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment)))
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment))
+            || node.Condition?.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment) == true)
         {
             _context.RecordFeatureUsage("tuple-deconstruction");
             _context.RecordLoss(ConversionLossKind.InteropPreserved, "tuple-deconstruction",
@@ -12124,6 +12126,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // Check if expression body is an assignment (e.g., x => obj.Prop = x)
             if (lambda.ExpressionBody is AssignmentExpressionSyntax lambdaAssign)
             {
+                // The contextual delegate may require the assignment's value;
+                // without certifying that context, retain the complete C# lambda.
+                if (IsTupleAssignment(lambdaAssign))
+                    throw EscalateExpression(lambdaAssign, "tuple-deconstruction");
                 var assignTarget = ConvertExpression(lambdaAssign.Left);
                 var assignValue = ConvertExpression(lambdaAssign.Right);
                 stmtBody = new List<StatementNode>
