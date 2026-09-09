@@ -3112,7 +3112,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: preprocessorBlocks.Count > 0
+            items: preprocessorBlocks.Count > 0 || HasDictionaryMemberInitializer(node)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -3657,7 +3657,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            items: preprocessorBlocks.Count > 0
+            items: preprocessorBlocks.Count > 0 || HasDictionaryMemberInitializer(node)
                 ? BuildSourceOrderedClassItems(
                     fields,
                     properties,
@@ -11110,8 +11110,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     Parent: VariableDeclaratorSyntax
                     {
                         Parent: VariableDeclarationSyntax { Parent: LocalDeclarationStatementSyntax }
-                    }
+                    } local
                 }
+                && _semanticModel.GetDeclaredSymbol(local) is ILocalSymbol localSymbol
+                && SymbolEqualityComparer.Default.Equals(localSymbol.Type, dictionaryType)
                 || objCreation.Parent is AssignmentExpressionSyntax
                 {
                     Left: IdentifierNameSyntax,
@@ -11490,6 +11492,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         initializer?.Expressions.Any(expr =>
             expr is InitializerExpressionSyntax
             || expr is AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax }) == true;
+
+    private static bool HasDictionaryMemberInitializer(TypeDeclarationSyntax type) =>
+        type.Members.SelectMany(member => member switch
+        {
+            FieldDeclarationSyntax field => field.Declaration.Variables
+                .Select(variable => variable.Initializer),
+            PropertyDeclarationSyntax property => [property.Initializer],
+            _ => Enumerable.Empty<EqualsValueClauseSyntax?>()
+        }).Where(initializer => initializer != null)
+            .SelectMany(initializer => initializer!.DescendantNodes()
+                .OfType<BaseObjectCreationExpressionSyntax>())
+            .Any(creation => HasDictionaryInitializerOperations(creation.Initializer));
 
     private ExpressionNode PreserveDictionaryInitializer(BaseObjectCreationExpressionSyntax creation)
     {

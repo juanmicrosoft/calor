@@ -65,9 +65,28 @@ public class DictionaryInitializerSemanticsTests
     [InlineData("private static int Before = Capacity(); private static Dictionary<int, int> D = new Dictionary<int, int> { [Key()] = Value() }; private static int After = Capacity(); public static object Probe() => Trace;", "CKVC")]
     [InlineData("private static int Before { get; } = Capacity(); private static Dictionary<int, int> D { get; } = new Dictionary<int, int> { [Key()] = Value() }; private static int After { get; } = Capacity(); public static object Probe() => Trace;", "CKVC")]
     [InlineData("private int Before = Capacity(); private Dictionary<int, int> D = new Dictionary<int, int> { [Key()] = Value() }; private int After = Capacity(); public static object Probe() { var value = new Migrated(); return Trace; }", "CKVC")]
+    [InlineData("private static Dictionary<int, int> D { get; } = new Dictionary<int, int> { [1] = 2 }; private static int Count = D.Count; public static object Probe() => Count.ToString();", "1")]
+    [InlineData("private static int Before { get; } = Capacity(); private static Dictionary<int, int> D = new Dictionary<int, int> { [Key()] = Value() }; private static int After { get; } = Capacity(); public static object Probe() => Trace;", "CKVC")]
+    [InlineData("private int Before { get; } = Capacity(); private Dictionary<int, int> D = new Dictionary<int, int> { [Key()] = Value() }; private int After { get; } = Capacity(); public static object Probe() { var value = new Migrated(); return Trace; }", "CKVC")]
     public void Migration_PreservesTypeInitializerOrder(string members, string expected)
     {
         AssertEquivalent("", expected, preserved: true, members);
+    }
+
+    [Theory]
+    [InlineData("object")]
+    [InlineData("IDictionary<int, int>")]
+    public void Migration_PreservesDeclaredLocalTypeAndOverloadResolution(string type)
+    {
+        AssertEquivalent("", "declared", preserved: true, $$"""
+            private static string Pick({{type}} value) => "declared";
+            private static string Pick(Dictionary<int, int> value) => "concrete";
+            public static object Probe()
+            {
+                {{type}} d = new Dictionary<int, int> { {1, 2} };
+                return Pick(d);
+            }
+            """);
     }
 
     private static void AssertEquivalent(string body, string expected, bool preserved, string? members = null)
