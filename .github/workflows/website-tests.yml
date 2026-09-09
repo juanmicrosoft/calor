@@ -33,6 +33,7 @@ jobs:
         base-path: ['', '/calor']
     env:
       NEXT_PUBLIC_BASE_PATH: ${{ matrix.base-path }}
+      NEXT_PUBLIC_SITE_ORIGIN: ${{ matrix.base-path == '/calor' && 'https://juanmicrosoft.github.io' || 'https://calor.dev' }}
     defaults:
       run:
         working-directory: website
