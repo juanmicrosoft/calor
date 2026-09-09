@@ -10,7 +10,8 @@ result is one of seven statuses. With optional `--verify`, the compiler
 removes an eligible runtime guard only for a clean, non-vacuous,
 assumption-free `proven` result. Other results never authorize proof-based
 removal. Runtime checks depend separately on contract mode and supported lowering;
-`--contract-mode off` emits none. See
+`--contract-mode off` emits no contract guards; it does not disable checked
+arithmetic. See
 [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ---
@@ -26,11 +27,17 @@ When you write contracts in Calor:
   §R (* x x)
 ```
 
-This contract is false under fixed-width integer semantics. `x = 46341`
-satisfies the precondition, but its square wraps to `-2147479015`.
-Verification can expose this counterexample; it must not report a clean proof
-that the result is always nonnegative. Restricting `x` to `0..46340` avoids this
-overflow. Even a valid proof covers only its modeled obligation, not the whole program.
+Native Calor checks this integer multiplication for overflow. `x = 46340`
+returns `2147395600`. `x = 46341` satisfies the precondition, but multiplication
+throws `OverflowException` instead of returning a wrapped negative value.
+The postcondition constrains normal returns; it does not promise that every
+allowed input returns successfully.
+
+Restricting `x` to `0..46340` avoids this multiplication overflow.
+`--contract-mode off` disables contract checks, not checked arithmetic.
+Optional `--verify` does not make this example return successfully for `46341`.
+See [integer overflow policy](/docs/guides/verification-guarantees/#integer-overflow-policy)
+for the distinction between native Calor and imported C#.
 
 ---
 
@@ -86,7 +93,9 @@ Z3 verification supports:
 | `(! p)` | `¬p` | Logical not |
 
 Integer arithmetic is modeled with fixed-width bit-vectors and C#-compatible
-promotion rules where supported—not arbitrary-precision integers. Boolean,
+promotion rules where supported—not arbitrary-precision integers. Verification
+also follows the module's overflow policy; bit-vectors do not imply that native
+execution wraps on overflow. Boolean,
 integer, selected string, array, quantifier, implication, and registered
 user-field forms are modeled with the restrictions below.
 
@@ -282,8 +291,9 @@ Z3 verification results are automatically cached to disk. When you recompile a f
 - **Deterministic cache keys**: The same normalized obligation, settings,
   compiler semantics, and solver version reuse the same result
 
-The cache includes contract and parameter shape, compiler and semantics
-versions, verification settings, and a format version. v0.12 bumped the format
+The cache includes contract and parameter shape, relevant function-body context,
+module overflow policy, compiler and semantics versions, verification settings,
+and a format version. v0.12 bumped the format
 as proof semantics changed so older `proven` entries could not be reused.
 
 To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, use `--clear-cache`.
