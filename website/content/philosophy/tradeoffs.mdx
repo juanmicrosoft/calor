@@ -29,9 +29,9 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 | Quality | Calor Approach | Result |
 |:--------|:--------------|:-------|
-| **Comprehension** | Explicit structure and contracts | 1.84x in the v0.12 calculator |
-| **Error Detection** | First-class preconditions/postconditions | 1.49x in the v0.12 calculator |
-| **Edit Precision** | Optional stable IDs for structural targets | 1.36x in the v0.12 calculator |
+| **Comprehension** | Explicit structure and contracts | 1.84x in the static calculator |
+| **Error Detection** | First-class preconditions/postconditions | 1.49x in the static calculator |
+| **Edit Precision** | Optional stable IDs for structural targets | 1.36x in the static calculator |
 | **Parseability** | Indentation + prefix notation | Regular, compiler-defined grammar |
 | **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
 
@@ -42,7 +42,7 @@ This is a fundamental design choice, not a flaw to be fixed.
 | Quality | Impact | Mitigation |
 |:--------|:-------|:-----------|
 | **Raw Token Count** | Calor pays a premium on small programs | Evaluate the full token/character/line composite |
-| **Information Density** | 0.98x vs C# | Near parity; C# narrowly leads |
+| **Information Density** | 0.97x vs C# | C# scores higher in the calculator |
 | **Human Readability** | Unfamiliar syntax | Not the target audience |
 | **Ecosystem** | .NET interop may require manifests or preserved C# | Import, effect manifests, and interop blocks |
 | **Tooling** | No bundled editor extension | Use the CLI, or point any LSP-capable editor at `calor lsp` |
@@ -150,12 +150,14 @@ If you need to prove arbitrary mathematical properties—cryptographic protocols
 
 ## Measuring the Tradeoff
 
-Our evaluation framework measures both sides:
+The static calculator reports the following scores. Source pairs are not all
+behaviorally equivalent, so these ratios cannot establish a language or agent
+advantage. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
 | Metric | Measures | Calor Result |
 |:-------|:---------|:------------|
 | Token Economics | Token/character/line composite | 1.42x (Calor wins; raw tokens still cost more) |
-| Information Density | Semantic content per token | 0.98x (C# wins) |
+| Information Density | Semantic content per token | 0.97x (C# wins) |
 | Comprehension | Benefit of explicitness | 1.84x (Calor wins) |
 | Error Detection | Contract signals | 1.49x (Calor wins) |
 | Edit Precision | ID-based targeting | 1.36x (Calor wins) |

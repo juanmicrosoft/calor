@@ -25,6 +25,16 @@ test('current version and explicitly historical result provenance cannot silentl
   expect(results).toContain(provenance.sourceCommit);
   expect(results).toContain(provenance.sourceDeclaredVersion);
   expect(results).toContain('not all behaviorally equivalent');
+  for (const path of ['philosophy/index', 'philosophy/tradeoffs']) {
+    const source = await readFile(`content/${path}.mdx`, 'utf8');
+    const densityClaims = source.split('\n').filter(line =>
+      line.includes('Information Density') && /\d+\.\d+x/.test(line));
+    expect(densityClaims.length).toBeGreaterThan(0);
+    for (const claim of densityClaims) {
+      expect(claim).toContain(`${data.metrics.InformationDensity.ratio.toFixed(2)}x`);
+    }
+    expect(source.replace(/\s+/g, ' ')).toContain('not all behaviorally equivalent');
+  }
   for (const path of ['methodology', ...metricPages.map(name => `metrics/${name}`)]) {
     const source = await readFile(`content/benchmarking/${path}.mdx`, 'utf8');
     expect(source).not.toMatch(/v0\.12(?:\.1)?\s+(?:dashboard|result|aggregate|ratio|corpus)/i);
