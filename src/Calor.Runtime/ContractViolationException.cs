@@ -141,3 +141,14 @@ public enum ContractKind
     /// </summary>
     Invariant
 }
+
+/// <summary>Runtime enumeration for finite integer contract domains.</summary>
+public static class ContractQuantifier
+{
+    /// <summary>Enumerates [start, exclusiveEnd), including empty and wide domains.</summary>
+    public static IEnumerable<int> Range(int start, int exclusiveEnd)
+    {
+        for (long value = start; value < exclusiveEnd; value++)
+            yield return (int)value;
+    }
+}

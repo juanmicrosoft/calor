@@ -38,6 +38,24 @@ public class ContractSimplificationRuntimeTests
             Assert.Equal(7, Invoke(exists, value));
             Assert.Equal(7, Invoke(multi, value));
         }
+
+        var emptyAll = Compile(Function("i32",
+            "(forall ((i i32)) (-> (&& (>= i INT:1) (< i INT:0)) true))"), verify);
+        var emptyAny = Compile(Function("i32",
+            "(exists ((i i32)) (&& (>= i INT:1) (&& (< i INT:0) true)))"), verify);
+        Assert.Equal(7, Invoke(emptyAll, 0));
+        AssertContractViolation(() => Invoke(emptyAny, 0));
+
+        var shortAll = Compile(Function("i32",
+            "(forall ((i i32)) (-> (&& false (&& (>= i (/ INT:1 x)) (< i INT:2))) true))"), verify);
+        var shortAny = Compile(Function("i32",
+            "(exists ((i i32)) (&& false (&& (>= i (/ INT:1 x)) (< i INT:2))))"), verify);
+        Assert.Equal(7, Invoke(shortAll, 0));
+        AssertContractViolation(() => Invoke(shortAny, 0));
+        Assert.Equal(new[] { int.MinValue, int.MinValue + 1, int.MinValue + 2 },
+            Calor.Runtime.ContractQuantifier.Range(int.MinValue, int.MaxValue).Take(3));
+        Assert.Equal(new[] { int.MaxValue - 1 },
+            Calor.Runtime.ContractQuantifier.Range(int.MaxValue - 1, int.MaxValue));
     }
 
     [Theory]
@@ -48,6 +66,9 @@ public class ContractSimplificationRuntimeTests
         var assembly = Compile(Function("bool", "(== (is (== x x) bool) false)"), verify);
         AssertContractViolation(() => Invoke(assembly, false));
         AssertContractViolation(() => Invoke(assembly, true));
+        var compound = Compile(Function("object", "(&& (== (|| (is x i32) false) true) false)"), verify);
+        AssertContractViolation(() => Invoke(compound, 5));
+        AssertContractViolation(() => Invoke(compound, "text"));
     }
 
     [Theory]
@@ -78,7 +99,8 @@ public class ContractSimplificationRuntimeTests
         [
             "(== (is result i32 result) true)",
             "(!= false (is result i32 result))",
-            "(! (== (is result i32 result) false))"
+            "(! (== (is result i32 result) false))",
+            "(== (== (is result i32 result) true) true)"
         ];
         foreach (var wrapper in wrappers)
         {
@@ -113,6 +135,42 @@ public class ContractSimplificationRuntimeTests
         var range = Compile(Function("i32", """(== §IDX "abcd" §RANGE (+ x INT:0) INT:4 "d")"""), verify);
         Assert.Equal(7, Invoke(range, 3));
         AssertContractViolation(() => Invoke(range, 2));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PrimaryReceivers_PreserveBaseAndConditionalChains(bool verify)
+    {
+        const string source = """
+            §M{m1:ReceiverChains}
+              §CL{c1:Parent:pub}
+                §FLD{i32:Value:pub}
+              §CL{c2:Derived:pub}
+                §EXT{Parent}
+                §MT{mt1:Read:pub} () -> i32
+                  §R §BASE.Value
+              §CL{c3:Node:pub}
+                §FLD{Node:Child:pub}
+                §FLD{i32:Value:pub}
+              §F{f1:Check:pub} (Node:x) -> i32?
+                §R x?.Child .Value
+            """;
+        const string harness = """
+            public static class Caller
+            {
+                public static object?[] Run()
+                {
+                    var child = new ReceiverChains.Derived { Value = 9 };
+                    var node = new ReceiverChains.Node { Child = new ReceiverChains.Node { Value = 3 } };
+                    return [child.Read(), ReceiverChains.ReceiverChainsModule.Check(null),
+                        ReceiverChains.ReceiverChainsModule.Check(node)];
+                }
+            }
+            """;
+        var assembly = Compile(source, verify, harness);
+        var values = Assert.IsType<object[]>(assembly.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
+        Assert.Equal(new object?[] { 9, null, 3 }, values);
     }
 
     [Theory]

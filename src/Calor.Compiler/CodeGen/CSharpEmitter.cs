@@ -3835,7 +3835,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (TryUnwrapPatternComparison(node, out var patternOperand, out var negated))
         {
             var pattern = patternOperand.Accept(this);
-            return negated ? $"!({pattern})" : pattern;
+            return negated ? $"!({pattern})" : $"({pattern})";
         }
         var left = node.Left.Accept(this);
         var previousShadowDepth = _postconditionResultShadowDepth;
@@ -3977,7 +3977,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private static bool IsAtomicOperand(ExpressionNode expression) =>
         expression is ReferenceNode or IntLiteralNode or FloatLiteralNode
-            or BoolLiteralNode or StringLiteralNode or DecimalLiteralNode or SelfRefNode;
+            or BoolLiteralNode or StringLiteralNode or DecimalLiteralNode or SelfRefNode
+            or ThisExpressionNode or BaseExpressionNode or NewExpressionNode
+            or CallExpressionNode or ExpressionCallNode or FieldAccessNode
+            or NullConditionalNode or ArrayAccessNode or MultiDimArrayAccessNode;
 
     private static bool TryUnwrapPatternComparison(
         BinaryOperationNode node, out ExpressionNode operand, out bool negated)
@@ -4013,6 +4016,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         UnaryOperationNode { Operator: UnaryOperator.Not } unary => IsBooleanPatternExpression(unary.Operand),
         BinaryOperationNode { Operator: BinaryOperator.And or BinaryOperator.Or } binary =>
             IsBooleanPatternExpression(binary.Left) && IsBooleanPatternExpression(binary.Right),
+        BinaryOperationNode { Operator: BinaryOperator.Equal or BinaryOperator.NotEqual } binary =>
+            TryUnwrapPatternComparison(binary, out _, out _),
         _ => false
     };
 
@@ -8043,6 +8048,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string EmitForallExpression(ForallExpressionNode node)
     {
         RequireNamespace("System.Linq");
+        if (TryLiteralBoolean(node.Body, out var constant))
+            return constant ? "true" : "false";
         // Try to extract finite range from the pattern:
         // (forall ((i type)) (-> (&& (>= i 0) (< i n)) body))
         var range = TryExtractFiniteRange(node);
@@ -8061,7 +8068,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     var varRange = range.AllRanges[i];
                     var varName = SanitizeIdentifier(varRange.Name);
-                    result = $"Enumerable.Range({varRange.Start}, ({varRange.End}) - ({varRange.Start})).All({varName} => ({result}))";
+                    result = $"Calor.Runtime.ContractQuantifier.Range({varRange.Start}, {varRange.End}).All({varName} => ({result}))";
                 }
                 return result;
             }
@@ -8070,7 +8077,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Single variable - original behavior
                 var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
                 var body = range.Body.Accept(this);
-                return $"Enumerable.Range({range.Start}, ({range.End}) - ({range.Start})).All({varName} => ({body}))";
+                return $"Calor.Runtime.ContractQuantifier.Range({range.Start}, {range.End}).All({varName} => ({body}))";
             }
         }
 
@@ -8106,6 +8113,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string EmitExistsExpression(ExistsExpressionNode node)
     {
         RequireNamespace("System.Linq");
+        if (TryLiteralBoolean(node.Body, out var constant))
+            return constant ? "true" : "false";
         // Try to extract finite range from the pattern:
         // (exists ((i type)) (&& (>= i 0) (< i n) body))
         var range = TryExtractFiniteRangeForExists(node);
@@ -8124,7 +8133,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     var varRange = range.AllRanges[i];
                     var varName = SanitizeIdentifier(varRange.Name);
-                    result = $"Enumerable.Range({varRange.Start}, ({varRange.End}) - ({varRange.Start})).Any({varName} => ({result}))";
+                    result = $"Calor.Runtime.ContractQuantifier.Range({varRange.Start}, {varRange.End}).Any({varName} => ({result}))";
                 }
                 return result;
             }
@@ -8133,7 +8142,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Single variable - original behavior
                 var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
                 var body = range.Body.Accept(this);
-                return $"Enumerable.Range({range.Start}, ({range.End}) - ({range.Start})).Any({varName} => ({body}))";
+                return $"Calor.Runtime.ContractQuantifier.Range({range.Start}, {range.End}).Any({varName} => ({body}))";
             }
         }
 
@@ -8163,6 +8172,44 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             _postconditionResultShadowDepth = previousShadowDepth;
         }
+    }
+
+    private static bool TryLiteralBoolean(ExpressionNode expression, out bool value)
+    {
+        value = false;
+        if (expression is BoolLiteralNode literal)
+        {
+            value = literal.Value;
+            return true;
+        }
+        if (expression is UnaryOperationNode { Operator: UnaryOperator.Not } unary
+            && TryLiteralBoolean(unary.Operand, out var operand))
+        {
+            value = !operand;
+            return true;
+        }
+        if (expression is BinaryOperationNode { Operator: BinaryOperator.And or BinaryOperator.Or } binary
+            && TryLiteralBoolean(binary.Left, out var left))
+        {
+            if (binary.Operator == BinaryOperator.And && !left
+                || binary.Operator == BinaryOperator.Or && left)
+            {
+                value = left;
+                return true;
+            }
+            return TryLiteralBoolean(binary.Right, out value);
+        }
+        if (expression is ImplicationExpressionNode implication
+            && TryLiteralBoolean(implication.Antecedent, out var antecedent))
+        {
+            if (!antecedent)
+            {
+                value = true;
+                return true;
+            }
+            return TryLiteralBoolean(implication.Consequent, out value);
+        }
+        return false;
     }
 
     // Native String Operations

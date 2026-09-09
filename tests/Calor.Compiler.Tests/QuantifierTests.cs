@@ -334,7 +334,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should generate Enumerable.Range(...).All(...)
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".All(", result);
     }
 
@@ -421,7 +421,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should generate nested Enumerable.Range(...).All(...) calls
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".All(i =>", result);
         Assert.Contains(".All(j =>", result);
     }
@@ -467,7 +467,7 @@ public class QuantifierTests
         var result = exists.Accept(emitter);
 
         // Should generate nested Enumerable.Range(...).Any(...) calls
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".Any(i =>", result);
         Assert.Contains(".Any(j =>", result);
     }
@@ -497,7 +497,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should still generate runtime check
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".All(", result);
     }
 
@@ -526,7 +526,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should generate runtime check
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".All(", result);
     }
 
@@ -555,7 +555,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should generate runtime check with (n + 1) as upper bound
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains("(n + 1)", result);
     }
 
@@ -584,7 +584,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should generate runtime check with (0 + 1) as lower bound
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains("(0 + 1)", result);
     }
 
@@ -619,7 +619,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should generate runtime check with array access
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".All(", result);
         Assert.Contains("arr[i]", result);
     }
@@ -657,7 +657,7 @@ public class QuantifierTests
         var result = exists.Accept(emitter);
 
         // Should generate runtime check with array access
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".Any(", result);
         Assert.Contains("arr[i]", result);
     }
@@ -689,7 +689,7 @@ public class QuantifierTests
 
         // Should have contract checks (either loop or comment)
         Assert.True(
-            result.Contains("Enumerable.Range") || result.Contains("STATIC ONLY"),
+            result.Contains("Calor.Runtime.ContractQuantifier.Range") || result.Contains("STATIC ONLY"),
             "Expected either runtime check or static-only comment"
         );
     }
@@ -748,7 +748,7 @@ public class QuantifierTests
         Assert.Contains("arr[i]", result);
 
         // Should have Enumerable.Range for the quantifier
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
     }
 
     [Fact]
@@ -962,7 +962,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should still generate valid code - Enumerable.Range handles empty ranges correctly
-        Assert.Contains("Enumerable.Range(0, (0) - (0))", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range(0, 0)", result);
         Assert.Contains(".All(", result);
     }
 
@@ -1066,7 +1066,7 @@ public class QuantifierTests
         var result = forall.Accept(emitter);
 
         // Should still extract the first lower bound (0) and generate code
-        Assert.Contains("Enumerable.Range(0,", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range(0,", result);
         Assert.Contains(".All(", result);
     }
 
@@ -1349,7 +1349,7 @@ public class QuantifierTests
 
         // Should have contract checks for the postcondition
         Assert.True(
-            result.Contains("Enumerable.Range") || result.Contains("STATIC ONLY"),
+            result.Contains("Calor.Runtime.ContractQuantifier.Range") || result.Contains("STATIC ONLY"),
             "Expected either runtime check or static-only comment"
         );
 
@@ -1398,7 +1398,7 @@ public class QuantifierTests
         var result = forall.Accept(new CSharpEmitter(EmitContractMode.Debug));
 
         // Still a bounded range check...
-        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
         Assert.Contains(".All(", result);
         // ...but the guard survives into the predicate, as the implication's `!(ante) ||` form.
         Assert.Contains("!(", result);
