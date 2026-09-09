@@ -11889,7 +11889,24 @@ public sealed class Parser
             }
             _position = savedPos; // restore
         }
-        var isStatementToken = ifIsStatement || Check(TokenKind.Bind) || Check(TokenKind.Call)
+        // A single closed call on the header line is an expression lambda.
+        // Retain statement parsing for multiline bodies or multiple statements.
+        var callIsExpression = false;
+        if (Check(TokenKind.Call) && Current.Span.Line == startToken.Span.Line)
+        {
+            var depth = 0;
+            for (var position = _position; position < _tokens.Count - 1; position++)
+            {
+                if (_tokens[position].Kind == TokenKind.Call) depth++;
+                else if (_tokens[position].Kind == TokenKind.EndCall && --depth == 0)
+                {
+                    callIsExpression = _tokens[position + 1].Kind == TokenKind.EndLambda;
+                    break;
+                }
+            }
+        }
+        var callIsStatement = Check(TokenKind.Call) && !callIsExpression;
+        var isStatementToken = ifIsStatement || Check(TokenKind.Bind) || callIsStatement
             || Check(TokenKind.Assign) || Check(TokenKind.Return) || Check(TokenKind.For)
             || Check(TokenKind.Foreach) || Check(TokenKind.While) || Check(TokenKind.Do)
             || Check(TokenKind.Match) || Check(TokenKind.Try) || Check(TokenKind.Throw)
