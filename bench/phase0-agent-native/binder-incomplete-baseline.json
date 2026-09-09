@@ -7,7 +7,7 @@
   "Conversion": {
     "Incomplete": 0,
     "LegacySourceOrderAttempted": 18005,
-    "RoslynSelectedAttempted": 35289,
+    "RoslynSelectedAttempted": 35328,
     "FilesSeen": 364,
     "ConvertedAndBound": 364,
     "ConvertExceptions": 0,

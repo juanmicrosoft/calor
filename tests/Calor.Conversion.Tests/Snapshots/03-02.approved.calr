@@ -2,10 +2,10 @@
   §CL{c001:Loops:pub}
     §MT{m002:Sum:pub} (i32:n) -> i32
       §B{~total:i32} 0
-      §IF{scope007} true
+      §IF{scope008} true
         §B{~i:i32} 0
         §B{~_forFirst003:bool} true
-        §WH{while006} true
+        §WH{while007} true
           §IF{if004} _forFirst003
             §ASSIGN _forFirst003 false
           §EL
@@ -13,7 +13,8 @@
           §IF{if005} (< i n)
           §EL
             §BK
-          §ASSIGN total (+ total i)
+          §IF{body006} true
+            §ASSIGN total (+ total i)
       §R total
 
 

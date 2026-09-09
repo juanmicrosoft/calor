@@ -50,6 +50,7 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (int i = 0; i == i++;) { count++; if (count == 3) break; } return count;", "3", false)]
     [InlineData("int count = 0; for (int i = (count = Step()); i < 0; i++) { } return count;", "1:S", false)]
     [InlineData("int count = 0; for (int i = 0; i < 2; i.ToString(), i.ToString()) { i++; count++; } return count;", "2", false)]
+    [InlineData("int count = 0; for (int i = 0; i < Bound(); i++) { int Bound = 1; Bound++; count += Bound; } return count;", "6:BBBB", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
         => AssertEquivalent(body, expected, native);
 
@@ -100,6 +101,12 @@ public class ForLoopConditionSemanticsTests
             private static int State;
             private static int Reset() { State = 0; return 1; }
             """);
+
+    [Fact]
+    public void BodyLocal_DoesNotShadowFieldUsedByCondition()
+        => AssertEquivalent(
+            "int n = 0; for (int i = 0; i < limit; i++) { int limit = 1; limit++; n += limit; } return n;",
+            "6", native: false, members: "private static int limit = 3;");
 
     [Fact]
     public void MultipleAwaitedIncrementors_ExecuteAsStatementsInOrder()

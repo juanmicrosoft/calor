@@ -8264,8 +8264,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var body = node.Statement is BlockSyntax block
                 ? ConvertBlock(block)
                 : new List<StatementNode> { ConvertStatement(node.Statement)! };
-            FlushPendingStatements(whileBody);
-            whileBody.AddRange(body);
+            var scopedBody = new List<StatementNode>();
+            FlushPendingStatements(scopedBody);
+            scopedBody.AddRange(body);
+            // Body locals must not shadow names used by the relocated header.
+            whileBody.Add(new IfStatementNode(span, _context.GenerateId("body"),
+                new BoolLiteralNode(span, true), scopedBody, [], null, new AttributeCollection()));
             outerBody.Add(new WhileStatementNode(span, _context.GenerateId("while"),
                 new BoolLiteralNode(span, true), whileBody, new AttributeCollection()));
             // Preserve the original for initializer's lexical scope without
