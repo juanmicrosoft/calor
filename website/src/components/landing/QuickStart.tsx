@@ -62,7 +62,7 @@ export function QuickStart() {
         <div className="mt-12 mx-auto max-w-3xl" ref={terminalRef}>
           <div className="relative rounded-xl overflow-hidden shadow-2xl shadow-calor-navy/30">
             {/* CRT container */}
-            <div className="bg-calor-navy crt-curve">
+            <div className="bg-calor-navy crt-curve" role="region" aria-label="Existing-project commands">
               {/* Terminal header */}
               <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
                 <div className="flex gap-1.5">
@@ -70,7 +70,7 @@ export function QuickStart() {
                   <div className="w-3 h-3 rounded-full bg-calor-salmon" />
                   <div className="w-3 h-3 rounded-full bg-calor-cyan" />
                 </div>
-                <div className="flex items-center gap-2 ml-4 text-calor-cyan/50 text-sm font-terminal">
+                <div className="flex items-center gap-2 ml-4 text-calor-cyan text-sm font-terminal">
                   <span>calor-terminal</span>
                 </div>
               </div>
@@ -81,13 +81,13 @@ export function QuickStart() {
                   <div key={index} className="relative group">
                     <div className="flex items-start justify-between p-4 sm:p-5">
                       <div className="space-y-2">
-                        <span className="text-xs text-calor-cyan/40 uppercase tracking-widest font-terminal">
+                        <span className="text-xs text-calor-cyan uppercase tracking-widest font-terminal">
                           {cmd.label}
                         </span>
                         <pre className="text-sm sm:text-base text-white font-terminal whitespace-pre-wrap leading-relaxed">
                           <span className="terminal-glow text-calor-cyan">$</span> {cmd.command}
                         </pre>
-                        <p className="text-xs text-white/30 font-body">{cmd.description}</p>
+                        <p className="text-xs text-white/80 font-body">{cmd.description}</p>
                       </div>
                       <button
                         onClick={() => copyToClipboard(cmd.command, index)}
@@ -95,7 +95,7 @@ export function QuickStart() {
                           'shrink-0 flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors font-body',
                           copiedIndex === index
                             ? 'text-calor-cyan'
-                            : 'text-white/30 hover:text-white/70 hover:bg-white/5'
+                            : 'text-white/80 hover:text-white hover:bg-white/5'
                         )}
                       >
                         {copiedIndex === index ? (
