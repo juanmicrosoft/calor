@@ -24,7 +24,6 @@ public class FeatureCheckCommandTests
     [InlineData("explicit-conversion", SupportLevel.Full)]
     [InlineData("equals-operator", SupportLevel.Full)]
     [InlineData("linq-method", SupportLevel.Full)]
-    [InlineData("linq-query", SupportLevel.Full)]
     [InlineData("goto", SupportLevel.Full)]
     [InlineData("labeled-statement", SupportLevel.Full)]
     [InlineData("postfix-operator", SupportLevel.Full)]
@@ -48,6 +47,7 @@ public class FeatureCheckCommandTests
     [InlineData("ref-parameter", SupportLevel.Partial)]
     [InlineData("dynamic", SupportLevel.Partial)]
     [InlineData("interface", SupportLevel.Partial)]
+    [InlineData("linq-query", SupportLevel.Partial)]
     public void FeatureCheck_PartiallySupported_ReturnsPartialLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);

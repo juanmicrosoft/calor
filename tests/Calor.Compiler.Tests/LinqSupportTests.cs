@@ -467,8 +467,10 @@ public class LinqSupportTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("GroupBy", result.CalorSource);
-        Assert.Contains("Select", result.CalorSource);
+        Assert.Contains("group p by p.Category into g", result.CalorSource);
+        Assert.Contains(result.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "linq-query");
+        Assert.Contains("select g.Key", result.CalorSource);
     }
 
     #endregion
@@ -482,9 +484,10 @@ public class LinqSupportTests
     }
 
     [Fact]
-    public void FeatureSupport_LinqQuery_IsFullySupported()
+    public void FeatureSupport_LinqQuery_ReportsPartialNativeSupport()
     {
-        Assert.True(FeatureSupport.IsFullySupported("linq-query"));
+        Assert.False(FeatureSupport.IsFullySupported("linq-query"));
+        Assert.Equal(SupportLevel.Partial, FeatureSupport.GetSupportLevel("linq-query"));
     }
 
     [Fact]
