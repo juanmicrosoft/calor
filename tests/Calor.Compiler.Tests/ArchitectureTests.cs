@@ -859,4 +859,24 @@ public class ArchitectureTests
             [typeof(Calor.Compiler.Effects.EffectResolverKey)]);
         Assert.NotNull(keyed);
     }
+
+    [Fact]
+    public void UniversalTraversal_IncludesExpressionBearingValueWrappers()
+    {
+        var value = new ReferenceNode(TextSpan.Empty, "captured");
+        var initializer = new ObjectInitializerAssignment("Grow", value);
+        var anonymous = new AnonymousObjectCreationNode(TextSpan.Empty, [initializer]);
+        var ordinary = new NewExpressionNode(TextSpan.Empty, "Holder", [], [], [initializer]);
+        var parameter = new ParameterNode(TextSpan.Empty, "n", "i32", Calor.Compiler.Ast.ParameterModifier.None,
+            new AttributeCollection(), [], null, new InlineRefinementInfo("i32", value));
+
+        foreach (var node in new AstNode[] { anonymous, ordinary, parameter })
+        {
+            Assert.Contains(value, RecursiveAstWalker.GetAllChildren(node));
+            Assert.DoesNotContain(value, RecursiveAstWalker.GetChildren(node));
+        }
+        Assert.Equal("Initializers", Assert.Single(RecursiveAstWalker.GetAllChildEdges(anonymous)).Property.Name);
+        Assert.Contains(RecursiveAstWalker.GetAllChildEdges(parameter),
+            edge => ReferenceEquals(edge.Node, value) && edge.Property.Name == "InlineRefinement");
+    }
 }

@@ -211,10 +211,9 @@ public class VerificationCacheTests : IDisposable
     }
 
     [Fact]
-    public void HashPostcondition_NoResultReference_BodyIndependent()
+    public void HashPostcondition_NoResultReference_BodyDependent()
     {
-        // A postcondition that never mentions `result` is body-independent —
-        // its key must not churn on body edits (cache efficiency, not soundness).
+        // Parameter-only postconditions also observe the body's exit state.
         var hasher = new ContractHasher();
         var parameters = new List<(string Name, string TypeName)> { ("x", "i32") };
 
@@ -238,7 +237,7 @@ public class VerificationCacheTests : IDisposable
         var hash1 = hasher.HashPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), post, bodyReturnX);
         var hash2 = hasher.HashPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), post, bodyReturnZero);
 
-        Assert.Equal(hash1, hash2);
+        Assert.NotEqual(hash1, hash2);
     }
 
     [Fact]

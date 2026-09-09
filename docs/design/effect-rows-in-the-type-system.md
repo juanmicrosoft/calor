@@ -1067,18 +1067,17 @@ Draft v1 chose `!e` by inspecting `ParseValue`. Three executed results kill it:
 CASE X3   §E{!e}          → Calor0403: Unknown effect code '!e'.
 CASE X3b  §E{alloc, !e}   → Calor0403: Unknown effect code '! e'.      ← lossy
 
-CASE Z11  §O{str!str}     → parses through the parser and binder; the only diagnostic is
-  Calor1002: Generated C# failed compilation (CS0029): Cannot implicitly convert type
-  'Calor.Runtime.Result<object, string>' to 'Calor.Runtime.Result<string, string>'
+CASE Z11  §O{str!str}     → Compilation successful
   ← `str!str` really is read as Result<str,str>: `!` is the live fallible-type suffix
 
 CASE Y2b  §B{r:i32!str}   → Compilation successful
   + warning Calor0200: Type 'i32!str' is not known to the Calor type checker.
 ```
 
-(v2 paraphrased the Y2a line as "→ parses". Z11 is the same case with its verbatim output; the
-Calor1002 makes the point *more* strongly, since only a type actually read as `Result<_,_>`
-reaches C# codegen and fails there.)
+(The original Z11 transcript reached C# validation but failed with CS0029 because `§OK s`
+incorrectly constructed `Result<object,string>`. #1184 fixes payload inference independently
+of literal folding; Y2a and Z11 now compile successfully. The regenerated transcripts preserve
+the current result. The conclusion about `!` owning the fallible-type suffix is unchanged.)
 
 `!` is already owned by the type grammar (`T!E`, documented at
 `docs/syntax-reference/effects.md:140`), and X3b shows the attribute round-trip inserts a space,

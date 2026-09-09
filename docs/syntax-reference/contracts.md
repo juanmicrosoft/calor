@@ -248,14 +248,24 @@ Implication `p -> q` is equivalent to `!p || q`.
 
 ### Runtime vs Static Verification
 
-Quantifiers with finite, bounded ranges generate runtime checks using LINQ:
-- `forall` becomes `Enumerable.Range(...).All(...)`
-- `exists` becomes `Enumerable.Range(...).Any(...)`
+Quantifiers with certified finite ranges generate runtime checks:
+- `forall` uses `Calor.Runtime.ContractQuantifier.Range(...).All(...)`.
+- `exists` uses `Calor.Runtime.ContractQuantifier.Range(...).Any(...)`.
 
-Quantifiers over infinite ranges are verified statically using the Z3 SMT solver and generate a comment in the output:
-```csharp
-// STATIC ONLY: forall ((i: i32)) ...
-```
+A certified prefix is a leading sequence of primitive guards and bounds whose
+reads are stable and whose evaluation order the compiler can preserve.
+Potentially throwing bounds stay behind their guards. An empty partial domain
+prevents evaluation of later bounds. Inner bounds may depend on already-bound
+outer variables.
+
+The remaining predicate keeps its original short-circuit structure and observable
+evaluations. The compiler reports `Calor0326` when it cannot produce a faithful
+finite runtime check—for example, when discovering a range would require moving
+an unknown getter ahead of another condition. It does not silently replace that
+check with a static-only comment.
+
+Z3 can also analyze quantified formulas statically. A proof result does not make
+an unsupported requested runtime lowering valid.
 
 ### Supported Variable Types
 
@@ -263,7 +273,8 @@ Quantifier bound variables should use integer types for finite range iteration:
 - `i8`, `i16`, `i32`, `i64`
 - `u8`, `u16`, `u32`, `u64`
 
-Non-integer types will generate a warning, as they may not support finite range enumeration.
+The runtime enumerator preserves each listed type's domain, including its minimum
+and maximum values. Other types are not supported by this finite-domain enumerator.
 
 ### Performance Considerations
 
