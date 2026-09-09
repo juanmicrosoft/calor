@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Github, ArrowRight } from 'lucide-react';
+import { Github, ArrowRight, Pause, Play } from 'lucide-react';
 import { getBasePath } from '@/lib/utils';
 import { trackCtaClick, trackOutboundLink } from '@/lib/analytics';
 
@@ -93,6 +93,20 @@ export function Hero() {
         </video>
       )}
 
+      {/* Fades the video into the page background over its last visible 24px, so the
+          hero does not end on a hard horizontal edge where the footage is cut off.
+
+          It sits directly ABOVE the shaped divider rather than behind it: the divider
+          is 24px tall, opaque (`fill-background`) and at z-10, so a fade occupying the
+          same band is simply painted over and does nothing. Ending the gradient exactly
+          at the divider's top edge means it reaches full background colour precisely
+          where the divider takes over — no step between the two. `bottom-6` matches the
+          divider's height; they move together. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-6 z-0 h-6 bg-gradient-to-b from-transparent to-background"
+        aria-hidden="true"
+      />
+
       {/* Gradient overlay — navy at top/bottom, transparent center */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-calor-navy/80 via-calor-navy/20 to-calor-navy/90" />
 
@@ -151,9 +165,20 @@ export function Hero() {
       </div>
 
       {allowVideo && (
-        <button type="button" onClick={() => { userChosePlayback.current = true; setPlaying(!playing); }}
-          className="absolute bottom-4 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
-          {playing ? 'Pause background animation' : 'Play background animation'}
+        <button
+          type="button"
+          onClick={() => { userChosePlayback.current = true; setPlaying(!playing); }}
+          // The accessible name stays the full sentence even though the control is now
+          // an icon. It is what a screen reader announces, and what the browser tests
+          // select on (tests/assets.spec.ts) — an icon-only button with no name would
+          // read as "button" and break both at once.
+          aria-label={playing ? 'Pause background animation' : 'Play background animation'}
+          title={playing ? 'Pause background animation' : 'Play background animation'}
+          className="absolute bottom-8 right-6 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/30 bg-calor-navy/70 text-white backdrop-blur-sm transition-colors hover:bg-calor-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          {playing
+            ? <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+            : <Play className="h-3.5 w-3.5" aria-hidden="true" />}
         </button>
       )}
 
