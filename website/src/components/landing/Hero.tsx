@@ -71,7 +71,7 @@ export function Hero() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden py-28 sm:py-36 lg:py-44">
+    <section className="relative overflow-hidden py-8 sm:py-12">
       {/* Poster is the default: no decorative video request before explicit opt-in. */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
@@ -107,30 +107,30 @@ export function Hero() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8" ref={heroRef}>
         <div className="mx-auto max-w-3xl text-center">
           {/* Frosted glass card */}
-          <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-8 py-12 sm:px-12 sm:py-16 shadow-2xl">
-            <div className="flex justify-center mb-8" data-hero-animate>
+          <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-6 sm:px-10 sm:py-8 shadow-2xl">
+            <div className="flex justify-center mb-4" data-hero-animate>
               <Image
                 src={`${basePath}/calor-logo-256.webp`}
                 alt="Calor logo"
                 width={120}
                 height={120}
-                className="h-24 w-24 sm:h-32 sm:w-32 drop-shadow-[0_0_30px_rgba(250,61,111,0.4)]"
+                className="h-16 w-16 sm:h-24 sm:w-24 drop-shadow-[0_0_30px_rgba(250,61,111,0.4)]"
                 priority
               />
             </div>
-            <h1 className="text-5xl font-bold tracking-tight text-white sm:text-7xl font-display" data-hero-animate>
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl font-display" data-hero-animate>
               Calor
             </h1>
-            <p className="mt-4 text-xl font-medium text-white/90 sm:text-2xl font-body" data-hero-animate>
-              A programming language for coding agents
+            <p className="mt-3 text-base font-medium text-white/90 sm:text-xl font-body" data-hero-animate>
+              A language for coding agents, compiled to C# and .NET.
             </p>
-            <p className="mt-6 text-lg leading-8 text-white/60 font-body" data-hero-animate>
-              Fewer errors. Better refactors. Cleaner merges.
+            <p className="mt-3 text-sm leading-6 text-white/80 font-body" data-hero-animate>
+              Inspect explicit contracts, declared effects, and stable IDs.
             </p>
 
-            <div className="mt-10 flex items-center justify-center gap-x-4" data-hero-animate>
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3" data-hero-animate>
               <Button asChild size="lg" className="bg-gradient-to-r from-calor-pink to-calor-salmon hover:from-calor-pink/90 hover:to-calor-salmon/90 text-white border-0 shadow-lg shadow-calor-pink/25">
-                <Link href="/docs/getting-started/" onClick={() => trackCtaClick('get_started')}>
+                <Link href="/docs/getting-started/hello-world/" onClick={() => trackCtaClick('get_started')}>
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -153,13 +153,13 @@ export function Hero() {
 
       {allowVideo && (
         <button type="button" onClick={() => setPlaying(!playing)}
-          className="absolute bottom-20 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
+          className="absolute bottom-4 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
           {playing ? 'Pause background animation' : 'Play background animation'}
         </button>
       )}
 
       {/* Shaped bottom divider */}
-      <div className="hero-divider">
+      <div className="hero-divider pointer-events-none" style={{ height: 24 }}>
         <svg viewBox="0 0 1440 80" preserveAspectRatio="none" className="w-full h-full">
           <path
             d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z"
