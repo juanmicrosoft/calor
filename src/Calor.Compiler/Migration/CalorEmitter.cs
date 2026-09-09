@@ -1754,10 +1754,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             bool named = node.ArgumentNames != null
                       && i < node.ArgumentNames.Count
                       && node.ArgumentNames[i] != null;
+            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
+                ? node.ArgumentModifiers[i] : null;
+            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
             var standardWrapped = named
-                ? $"§A[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"§A {argValue}";
-            return (named, standardWrapped, argValue);
+                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
+                : $"{marker} {argValue}";
+            return (named, modifier, standardWrapped, argValue);
         }).ToList();
 
         var target = ConvertVerbatimStringsInTarget(NormalizeCallTarget(node.Target).Replace("->", "."));
@@ -1787,7 +1790,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        if (canElide && rendered.Count == 1 && !rendered[0].named
+        if (canElide && rendered.Count == 1 && !rendered[0].named && rendered[0].modifier == null
             && StartsWithExpressionStarter(rendered[0].argValue))
         {
             AppendLine($"§C{{{target}}} {rendered[0].argValue}");
@@ -3304,10 +3307,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
             bool named = node.ArgumentNames != null
                       && i < node.ArgumentNames.Count
                       && node.ArgumentNames[i] != null;
+            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
+                ? node.ArgumentModifiers[i] : null;
+            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
             var wrapped = named
-                ? $"§A[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"§A {argValue}";
-            return (named, wrapped, argValue);
+                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
+                : $"{marker} {argValue}";
+            return (named, modifier, wrapped, argValue);
         }).ToList();
 
         // RFC v0.6 call-closer-elision §2.1 / §2.2 — expression-context
@@ -3324,7 +3330,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // HoistToTempVar — the same mechanism that protects zero-arg elision.
         // Named args, multi-arg, or args whose first token is not in
         // IsExpressionStart() keep the standard §A ... §/C form.
-        if (args.Count == 1 && !args[0].named)
+        if (args.Count == 1 && !args[0].named && args[0].modifier == null)
         {
             bool canElide = _context?.UseImplicitCallCloser != false
                          && _inInlineSiblingContext == 0

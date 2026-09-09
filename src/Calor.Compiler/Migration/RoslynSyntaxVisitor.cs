@@ -8820,8 +8820,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         if (_conditionalRegionDepth > 0 && expression is InvocationExpressionSyntax conditionalInvocation &&
             conditionalInvocation.ArgumentList.Arguments.Any(argument =>
-                argument.Expression is DeclarationExpressionSyntax ||
-                !argument.RefKindKeyword.IsKind(SyntaxKind.None)))
+                argument.Expression is DeclarationExpressionSyntax))
             return PreserveConditionalOperand(expression);
 
         if (_conditionalRegionDepth > 0 &&

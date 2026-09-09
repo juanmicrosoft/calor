@@ -94,7 +94,7 @@ public class ConditionalEvaluationMigrationTests
     public void CapturedReceivers_PreserveWritableArgumentModifiers(string modifier, string gate, int expected)
     {
         AssertRoundTrip($"int value = 7; bool gate = {gate}; bool ignored = gate && Receiver().Check({modifier} value); return value;",
-            expected, true, members: $$"""
+            expected, false, members: $$"""
                 public sealed class Holder
                 {
                     public bool Check({{modifier}} int value) { value = 9; return true; }
@@ -109,7 +109,7 @@ public class ConditionalEvaluationMigrationTests
     public void CapturedReceivers_PreserveInArgumentModifier(string gate, int expected)
     {
         AssertRoundTrip($"int value = 7; bool gate = {gate}; bool ignored = gate && Receiver().Check(in value); return Calls;",
-            expected, true, members: """
+            expected, false, members: """
                 private static int Calls;
                 public sealed class Holder
                 {
@@ -117,6 +117,50 @@ public class ConditionalEvaluationMigrationTests
                 }
                 public static Holder Receiver() { return new Holder(); }
                 """);
+    }
+
+    [Theory]
+    [InlineData("false", 2)]
+    [InlineData("true", 5)]
+    public void CapturedReceivers_CombineNamesAndModifiers(string gate, int expected)
+    {
+        AssertRoundTrip(
+            $"int first = 2; int second = 3; bool gate = {gate}; bool ignored = gate && Receiver().Check(second: in second, first: ref first); return first;",
+            expected, false, members: """
+                public sealed class Holder
+                {
+                    public bool Check(ref int first, in int second) { first += second; return true; }
+                }
+                public static Holder Receiver() { return new Holder(); }
+                """);
+    }
+
+    [Theory]
+    [InlineData("ref")]
+    [InlineData("out")]
+    public void StatementCalls_PreserveNamedWritableArguments(string modifier)
+    {
+        AssertRoundTrip($"int value = 0; Set(value: {modifier} value); return value;",
+            9, false, members: $"public static void Set({modifier} int value) {{ value = 9; }}");
+    }
+
+    [Theory]
+    [InlineData("§C{Use} §A{readonly} value §/C")]
+    [InlineData("§C{Use} §A{ref:out} value §/C")]
+    [InlineData("§C{Use} §A{} value §/C")]
+    [InlineData("§B{result} §C §C{Get} §/C §A{ref} value §/C")]
+    [InlineData("§B{result} §NEW{Box} §A{ref} value")]
+    public void UnsupportedArgumentModifiers_AreDiagnosed(string statement)
+    {
+        var source = $$"""
+            §M{m:Probe}
+              §F{f:Run:pub} () -> void
+                {{statement}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        new Calor.Compiler.Parsing.Parser(
+            new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier);
     }
 
     [Theory]
@@ -494,8 +538,9 @@ public class ConditionalEvaluationMigrationTests
         var actual = Execute(compilation.GeneratedCode);
         Assert.True(expected == actual,
             $"Expected {expected}, actual {actual}\n{conversion.CalorSource}\n{compilation.GeneratedCode}");
-        Assert.Equal(expectInterop,
-            conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));
+        Assert.True(expectInterop ==
+            conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved),
+            $"Unexpected interop accounting:\n{string.Join(Environment.NewLine, conversion.Issues)}\n{conversion.CalorSource}");
         if (!expectInterop)
         {
             Assert.DoesNotContain(conversion.Losses,

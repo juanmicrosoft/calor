@@ -2627,6 +2627,7 @@ public sealed class Parser
 
         // Standard format with explicit §A and (optionally) §/C
         var argumentNames = new List<string?>();
+        var argumentModifiers = new List<string?>();
         while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
         {
             if (Check(TokenKind.Arg))
@@ -2634,8 +2635,9 @@ public sealed class Parser
                 _inOuterCallArgDepth++;
                 try
                 {
-                    arguments.Add(ParseArgument(out var argName));
+                    arguments.Add(ParseArgument(out var argName, out var argModifier));
                     argumentNames.Add(argName);
+                    argumentModifiers.Add(argModifier);
                 }
                 finally
                 {
@@ -2684,7 +2686,7 @@ public sealed class Parser
             arguments,
             attrs,
             hasNames ? argumentNames : null,
-            argumentModifiers: null,
+            argumentModifiers.Any(m => m != null) ? argumentModifiers : null,
             calleeSpan: calleeSpan,
             receiverSpan: receiverSpan,
             typeArguments: typeArguments);
@@ -2692,13 +2694,26 @@ public sealed class Parser
 
     private ExpressionNode ParseArgument()
     {
-        return ParseArgument(out _);
+        var argument = ParseArgument(out _, out var modifier);
+        if (modifier != null)
+            _diagnostics.ReportError(argument.Span, DiagnosticCode.InvalidModifier,
+                "Argument modifiers are only supported on named-target calls.");
+        return argument;
     }
 
-    private ExpressionNode ParseArgument(out string? argumentName)
+    private ExpressionNode ParseArgument(out string? argumentName, out string? argumentModifier)
     {
-        Expect(TokenKind.Arg);
+        var startToken = Expect(TokenKind.Arg);
         argumentName = null;
+        argumentModifier = null;
+        if (Check(TokenKind.OpenBrace))
+        {
+            var attributes = ParseAttributes();
+            argumentModifier = attributes["_pos0"];
+            if (attributes["_posCount"] != "1" || argumentModifier is not ("ref" or "out" or "in"))
+                _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,
+                    "Call argument modifier must be ref, out, or in.");
+        }
 
         // Check for named argument syntax: §A[name] value
         if (Check(TokenKind.OpenBracket))
@@ -10020,6 +10035,7 @@ public sealed class Parser
 
         var arguments = new List<ExpressionNode>();
         var argumentNames = new List<string?>();
+        var argumentModifiers = new List<string?>();
         TextSpan finalSpan;
 
         // Phase 1 (v0.6 call-closer-elision): try implicit-close forms first.
@@ -10065,6 +10081,7 @@ public sealed class Parser
             var argExpr = ParseExpression();
             arguments.Add(argExpr);
             argumentNames.Add(null);
+            argumentModifiers.Add(null);
 
             // Decide whether to consume a trailing §/C. The §/C may belong to
             // this call (top-level) or to a pending outer call's §A. The rule:
@@ -10143,8 +10160,9 @@ public sealed class Parser
                     _inOuterCallArgDepth++;
                     try
                     {
-                        arguments.Add(ParseArgument(out var argName));
+                        arguments.Add(ParseArgument(out var argName, out var argModifier));
                         argumentNames.Add(argName);
+                        argumentModifiers.Add(argModifier);
                     }
                     finally
                     {
@@ -10157,6 +10175,7 @@ public sealed class Parser
                     // Preserved for backward compatibility (§C{f} x §/C).
                     arguments.Add(ParseExpression());
                     argumentNames.Add(null);
+                    argumentModifiers.Add(null);
                 }
                 else
                 {
@@ -10178,7 +10197,7 @@ public sealed class Parser
             target,
             arguments,
             hasNames ? argumentNames : null,
-            argumentModifiers: null,
+            argumentModifiers.Any(m => m != null) ? argumentModifiers : null,
             typeArguments: typeArguments,
             calleeSpan: calleeSpan,
             receiverSpan: receiverSpan);
