@@ -200,6 +200,9 @@ public class Calor0270CorpusVolumeTests
     /// <para>v0.19 #1191: conditional receiver preservation changes 302 -> 299
     /// diagnostics (serilog 34 -> 33, FluentValidation 251 -> 249).
     /// The regenerated ledger still covers all 364 modules.</para>
+    /// <para>#1195 also preserves unsupported query regions explicitly. A receiver
+    /// hidden behind interop is not newly resolved native analysis; overlapping
+    /// preservation changes must not be counted as independent reductions.</para>
     private const int AggregateDiagnostics = 299;
     private const int AggregateModulesWithDiagnostics = 35;
     private const int PreK1AggregateModulesBound = 364;

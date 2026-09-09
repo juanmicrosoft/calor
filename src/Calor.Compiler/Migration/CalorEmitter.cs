@@ -275,7 +275,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         LambdaExpressionNode node, string header, string lambdaRow, out string inline, out List<string> stmts)
     {
         var shortCandidate = node.StatementBody!.Count <= 2
-            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode);
+            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
+            // A lone call on the header line denotes an expression body. Keep
+            // discarded-return statement lambdas unambiguously block-bodied.
+            && !(node.StatementBody.Count == 1 && node.StatementBody[0] is CallStatementNode);
         stmts = CaptureLambdaStatements(node, inlineSibling: shortCandidate);
         if (shortCandidate && CanInlineLambdaStatements(node, stmts))
         {

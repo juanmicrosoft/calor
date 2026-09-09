@@ -213,8 +213,8 @@ public static class FeatureSupport
         ["linq-query"] = new FeatureInfo
         {
             Name = "linq-query",
-            Support = SupportLevel.Full,
-            Description = "LINQ query syntax is desugared to equivalent method chains"
+            Support = SupportLevel.Partial,
+            Description = "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. Complex or unresolved selectors remain inline and deferred."
         },
         ["array-initializer"] = new FeatureInfo
         {
