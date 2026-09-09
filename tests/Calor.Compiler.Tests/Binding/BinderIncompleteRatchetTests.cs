@@ -75,7 +75,10 @@ public class BinderIncompleteRatchetTests
         + "#1189 preserves unchecked blocks in serilog/src/Serilog/Events/EventProperty.cs "
         + "and FluentValidation/src/FluentValidation/Internal/AccessorCache.cs: "
         + "previously unconverted files 2 -> 0, accounted opaque boundaries 89 -> 91 "
-        + "and opaque expressions 6423 -> 6471; native incomplete count remains zero";
+        + "and opaque expressions 6423 -> 6471; native incomplete count remains zero. "
+        + "#1195 represents value-returning call lambdas as expressions and preserves unsupported "
+        + "deferred query regions explicitly; the bound-expression population changes without "
+        + "adding corpus files";
 
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
