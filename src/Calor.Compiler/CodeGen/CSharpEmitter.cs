@@ -210,12 +210,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private void ResetDeclScopes(
         IReadOnlyList<ParameterNode>? parameters = null,
-        IReadOnlyList<StatementNode>? body = null)
+        AstNode? callable = null)
     {
         _parameterTypes.Clear();
         _capturedParameterNames.Clear();
-        if (body != null && parameters != null)
-            _capturedParameterNames.UnionWith(FindCapturedNames(body, parameters.Select(parameter => parameter.Name)));
+        if (callable != null && parameters != null)
+            _capturedParameterNames.UnionWith(FindCapturedNames(
+                Analysis.RecursiveAstWalker.GetAllChildren(callable),
+                parameters.Select(parameter => parameter.Name)));
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         _refinementDeclScopes.Clear();
@@ -2762,7 +2764,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new function scope
-        ResetDeclScopes(node.Parameters, node.Body);
+        ResetDeclScopes(node.Parameters, node);
 
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
@@ -4513,7 +4515,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Track current function ID for contract emission
         _currentFunctionId = method.Id;
         _currentPostconditionIndex = 0;
-        ResetDeclScopes(method.Parameters, method.Body);
+        ResetDeclScopes(method.Parameters, method);
 
         // Emit extended metadata as documentation comments
         foreach (var issue in method.Issues)
@@ -5894,7 +5896,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new method scope
-        ResetDeclScopes(node.Parameters, node.Body);
+        ResetDeclScopes(node.Parameters, node);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -6566,7 +6568,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new constructor scope
-        ResetDeclScopes(node.Parameters, node.Body);
+        ResetDeclScopes(node.Parameters, node);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -6667,7 +6669,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentFunctionId = node.Id;
         _currentPostconditionIndex = 0;
 
-        ResetDeclScopes(node.Parameters, node.Body);
+        ResetDeclScopes(node.Parameters, node);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 

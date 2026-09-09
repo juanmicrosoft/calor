@@ -209,6 +209,29 @@ public class ContractSimplificationRuntimeTests
             var closure = Assert.IsType<Func<int, bool>>(InvokeArguments(control));
             Assert.False(closure(1));
 
+            foreach (var contractMarker in new[] { "§Q", "§S" })
+            {
+                var contractCapture = $$"""
+                    §M{m1:TypedContracts}
+                      §CL{c1:Domain:pub}
+                        §MT{mt2:Invoke:pub} (Func<bool>:action §E{}) -> bool
+                          §E{}
+                          §R §C{action} §/C
+                        §MT{mt1:Check:pub} (i32:n) -> i32
+                          §E{}
+                          {{contractMarker}} (&& (is (cast Func<bool> §LAM{l1} §E{} {{mutation}} §R true §/LAM{l1}) Func<bool> grow) {{quantifier}})
+                          §R INT:7
+                    """;
+                var rejectedContract = Program.Compile(contractCapture, "contract-capture.calr", Options(verify));
+                Assert.Contains(rejectedContract.Diagnostics.Errors,
+                    error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+                var scalarContract = Compile(contractCapture.Replace(quantifier,
+                    $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
+                var domainType = scalarContract.GetType("TypedContracts.Domain")!;
+                var domain = Activator.CreateInstance(domainType);
+                AssertContractViolation(() => domainType.GetMethod("Check")!.Invoke(domain, [1]));
+            }
+
             foreach (var initializer in new[]
             {
                 $"§ANON Grow = (cast Func<bool> §LAM{{l2}} §E{{}} {mutation} §R true §/LAM{{l2}})"
