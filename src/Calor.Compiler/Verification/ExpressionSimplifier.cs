@@ -5,10 +5,9 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Verification;
 
 /// <summary>
-/// Visitor that simplifies contract expressions by applying algebraic transformations.
-/// Supports constant folding (int and float), boolean identity, double negation elimination,
-/// tautology/contradiction detection, quantifier simplification, De Morgan's laws,
-/// arithmetic identities, and commutativity-aware redundancy elimination.
+/// Simplifies contract expressions using known built-in literal types.
+/// Untyped operands retain their evaluations and operators: this AST pass cannot
+/// establish IEEE reflexivity, purity, overload resolution, or absence of exceptions.
 /// </summary>
 public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
 {
@@ -51,7 +50,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var right = node.Right.Accept(this);
 
         // Constant folding for integers
-        if (left is IntLiteralNode li && right is IntLiteralNode ri)
+        if (left is IntLiteralNode { IsLong: false, IsUnsigned: false } li
+            && right is IntLiteralNode { IsLong: false, IsUnsigned: false } ri)
         {
             var folded = TryFoldIntegerBinaryOp(node.Span, node.Operator, li.Value, ri.Value);
             if (folded != null)
@@ -63,7 +63,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         // Constant folding for floats
-        if (left is FloatLiteralNode lf && right is FloatLiteralNode rf)
+        if (left is FloatLiteralNode { IsSingle: false, IsDecimal: false } lf
+            && right is FloatLiteralNode { IsSingle: false, IsDecimal: false } rf)
         {
             var folded = TryFoldFloatBinaryOp(node.Span, node.Operator, lf.Value, rf.Value);
             if (folded != null)
@@ -75,8 +76,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         // Mixed int/float constant folding (promote int to float)
-        if ((left is IntLiteralNode lmi && right is FloatLiteralNode rmf) ||
-            (left is FloatLiteralNode lmf && right is IntLiteralNode rmi))
+        if ((left is IntLiteralNode { IsLong: false, IsUnsigned: false }
+                && right is FloatLiteralNode { IsSingle: false, IsDecimal: false }) ||
+            (left is FloatLiteralNode { IsSingle: false, IsDecimal: false }
+                && right is IntLiteralNode { IsLong: false, IsUnsigned: false }))
         {
             double leftVal = left is IntLiteralNode li2 ? li2.Value : ((FloatLiteralNode)left).Value;
             double rightVal = right is IntLiteralNode ri2 ? ri2.Value : ((FloatLiteralNode)right).Value;
@@ -89,34 +92,36 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             }
         }
 
-        // Algebraic identity simplifications
-        var algebraic = TrySimplifyAlgebraicIdentity(node.Span, node.Operator, left, right);
-        if (algebraic != null)
-        {
-            Changed = true;
-            return algebraic;
-        }
+        // This pass runs on the unbound AST. Structural equality cannot establish
+        // IEEE reflexivity, built-in operators, purity, or absence of exceptions.
+        // Only literals whose runtime types are known may erase an operand.
+        if (left is not BoolLiteralNode lb || right is not BoolLiteralNode rb)
+            return MaybeNewNode(node, left, right);
 
         // Boolean simplification
         return node.Operator switch
         {
-            BinaryOperator.And => SimplifyAnd(node.Span, left, right),
-            BinaryOperator.Or => SimplifyOr(node.Span, left, right),
-            BinaryOperator.Equal => SimplifyEqual(node.Span, left, right),
-            BinaryOperator.NotEqual => SimplifyNotEqual(node.Span, left, right),
+            BinaryOperator.And => SimplifyAnd(node.Span, lb, rb),
+            BinaryOperator.Or => SimplifyOr(node.Span, lb, rb),
+            BinaryOperator.Equal => SimplifyEqual(node.Span, lb, rb),
+            BinaryOperator.NotEqual => SimplifyNotEqual(node.Span, lb, rb),
             _ => MaybeNewNode(node, left, right)
         };
     }
 
     private ExpressionNode? TryFoldIntegerBinaryOp(TextSpan span, BinaryOperator op, long left, long right)
     {
-        return op switch
+        var l = checked((int)left);
+        var r = checked((int)right);
+        try
         {
-            BinaryOperator.Add => new IntLiteralNode(span, left + right),
-            BinaryOperator.Subtract => new IntLiteralNode(span, left - right),
-            BinaryOperator.Multiply => new IntLiteralNode(span, left * right),
-            BinaryOperator.Divide when right != 0 => new IntLiteralNode(span, left / right),
-            BinaryOperator.Modulo when right != 0 => new IntLiteralNode(span, left % right),
+            return op switch
+            {
+            BinaryOperator.Add => new IntLiteralNode(span, checked(l + r)),
+            BinaryOperator.Subtract => new IntLiteralNode(span, checked(l - r)),
+            BinaryOperator.Multiply => new IntLiteralNode(span, checked(l * r)),
+            BinaryOperator.Divide when r != 0 => new IntLiteralNode(span, l / r),
+            BinaryOperator.Modulo when r != 0 => new IntLiteralNode(span, l % r),
             BinaryOperator.LessThan => new BoolLiteralNode(span, left < right),
             BinaryOperator.LessOrEqual => new BoolLiteralNode(span, left <= right),
             BinaryOperator.GreaterThan => new BoolLiteralNode(span, left > right),
@@ -126,142 +131,41 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             BinaryOperator.BitwiseAnd => new IntLiteralNode(span, left & right),
             BinaryOperator.BitwiseOr => new IntLiteralNode(span, left | right),
             BinaryOperator.BitwiseXor => new IntLiteralNode(span, left ^ right),
-            BinaryOperator.LeftShift => new IntLiteralNode(span, left << (int)right),
-            BinaryOperator.RightShift => new IntLiteralNode(span, left >> (int)right),
+            BinaryOperator.LeftShift => new IntLiteralNode(span, l << r),
+            BinaryOperator.RightShift => new IntLiteralNode(span, l >> r),
             _ => null
-        };
+            };
+        }
+        catch (OverflowException)
+        {
+            // Preserve the original operation and its checked/exceptional behavior.
+            return null;
+        }
     }
 
     private ExpressionNode? TryFoldFloatBinaryOp(TextSpan span, BinaryOperator op, double left, double right)
     {
-        return op switch
+        ExpressionNode? folded = op switch
         {
             BinaryOperator.Add => new FloatLiteralNode(span, left + right),
             BinaryOperator.Subtract => new FloatLiteralNode(span, left - right),
             BinaryOperator.Multiply => new FloatLiteralNode(span, left * right),
-            BinaryOperator.Divide when Math.Abs(right) > double.Epsilon => new FloatLiteralNode(span, left / right),
-            BinaryOperator.Modulo when Math.Abs(right) > double.Epsilon => new FloatLiteralNode(span, left % right),
+            BinaryOperator.Divide when right != 0 => new FloatLiteralNode(span, left / right),
+            BinaryOperator.Modulo when right != 0 => new FloatLiteralNode(span, left % right),
             BinaryOperator.Power => new FloatLiteralNode(span, Math.Pow(left, right)),
             BinaryOperator.LessThan => new BoolLiteralNode(span, left < right),
             BinaryOperator.LessOrEqual => new BoolLiteralNode(span, left <= right),
             BinaryOperator.GreaterThan => new BoolLiteralNode(span, left > right),
             BinaryOperator.GreaterOrEqual => new BoolLiteralNode(span, left >= right),
-            BinaryOperator.Equal => new BoolLiteralNode(span, Math.Abs(left - right) < double.Epsilon),
-            BinaryOperator.NotEqual => new BoolLiteralNode(span, Math.Abs(left - right) >= double.Epsilon),
+            BinaryOperator.Equal => new BoolLiteralNode(span, left == right),
+            BinaryOperator.NotEqual => new BoolLiteralNode(span, left != right),
             _ => null
         };
+        // Non-finite values do not have a numeric C# literal spelling.
+        return folded is FloatLiteralNode value && !double.IsFinite(value.Value) ? null : folded;
     }
 
-    /// <summary>
-    /// Simplifies algebraic identities like x + 0 → x, x * 1 → x, x - x → 0, etc.
-    /// </summary>
-    private ExpressionNode? TrySimplifyAlgebraicIdentity(TextSpan span, BinaryOperator op, ExpressionNode left, ExpressionNode right)
-    {
-        // x + 0 → x, 0 + x → x
-        if (op == BinaryOperator.Add)
-        {
-            if (IsZero(right))
-            {
-                ReportSimplified(span, "x + 0 -> x");
-                return left;
-            }
-            if (IsZero(left))
-            {
-                ReportSimplified(span, "0 + x -> x");
-                return right;
-            }
-        }
-
-        // x - 0 → x
-        if (op == BinaryOperator.Subtract)
-        {
-            if (IsZero(right))
-            {
-                ReportSimplified(span, "x - 0 -> x");
-                return left;
-            }
-            // x - x → 0 (also handles commutative equality like (+ a b) - (+ b a))
-            if (AreStructurallyEqualOrCommutative(left, right))
-            {
-                ReportSimplified(span, "x - x -> 0");
-                return new IntLiteralNode(span, 0);
-            }
-        }
-
-        // x * 1 → x, 1 * x → x
-        if (op == BinaryOperator.Multiply)
-        {
-            if (IsOne(right))
-            {
-                ReportSimplified(span, "x * 1 -> x");
-                return left;
-            }
-            if (IsOne(left))
-            {
-                ReportSimplified(span, "1 * x -> x");
-                return right;
-            }
-            // x * 0 → 0, 0 * x → 0
-            if (IsZero(right))
-            {
-                ReportSimplified(span, "x * 0 -> 0");
-                return right;
-            }
-            if (IsZero(left))
-            {
-                ReportSimplified(span, "0 * x -> 0");
-                return left;
-            }
-        }
-
-        // x / 1 → x
-        if (op == BinaryOperator.Divide)
-        {
-            if (IsOne(right))
-            {
-                ReportSimplified(span, "x / 1 -> x");
-                return left;
-            }
-            // Note: x / x → 1 is NOT safe in general (x could be 0)
-            // We only do this for known non-zero constants
-            if (left is IntLiteralNode li && right is IntLiteralNode ri && li.Value == ri.Value && li.Value != 0)
-            {
-                ReportSimplified(span, "n / n -> 1");
-                return new IntLiteralNode(span, 1);
-            }
-        }
-
-        // x % 1 → 0 (for integers)
-        if (op == BinaryOperator.Modulo && IsOne(right) && left is IntLiteralNode or ReferenceNode)
-        {
-            ReportSimplified(span, "x % 1 -> 0");
-            return new IntLiteralNode(span, 0);
-        }
-
-        return null;
-    }
-
-    private bool IsZero(ExpressionNode node)
-    {
-        return node switch
-        {
-            IntLiteralNode i => i.Value == 0,
-            FloatLiteralNode f => Math.Abs(f.Value) < double.Epsilon,
-            _ => false
-        };
-    }
-
-    private bool IsOne(ExpressionNode node)
-    {
-        return node switch
-        {
-            IntLiteralNode i => i.Value == 1,
-            FloatLiteralNode f => Math.Abs(f.Value - 1.0) < double.Epsilon,
-            _ => false
-        };
-    }
-
-    private ExpressionNode SimplifyAnd(TextSpan span, ExpressionNode left, ExpressionNode right)
+    private ExpressionNode SimplifyAnd(TextSpan span, BoolLiteralNode left, BoolLiteralNode right)
     {
         // (&& true x) → x
         if (left is BoolLiteralNode { Value: true })
@@ -279,42 +183,12 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             return left;
         }
 
-        // (&& false x) → false
-        if (left is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportContradiction(span, "(&& false x) is always false");
-            return left;
-        }
-
-        // (&& x false) → false
-        if (right is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportContradiction(span, "(&& x false) is always false");
-            return right;
-        }
-
-        // (&& x x) → x (redundant) - also check commutative equality
-        if (AreStructurallyEqualOrCommutative(left, right))
-        {
-            Changed = true;
-            ReportSimplified(span, "(&& x x) -> x");
-            return left;
-        }
-
-        // (&& x (! x)) → false (contradiction)
-        if (IsNegationOf(left, right) || IsNegationOf(right, left))
-        {
-            Changed = true;
-            ReportContradiction(span, "(&& x (! x)) is a contradiction");
-            return new BoolLiteralNode(span, false);
-        }
-
-        return MaybeNewBinaryNode(span, BinaryOperator.And, left, right);
+        Changed = true;
+        ReportContradiction(span, "(&& false x) is always false");
+        return left;
     }
 
-    private ExpressionNode SimplifyOr(TextSpan span, ExpressionNode left, ExpressionNode right)
+    private ExpressionNode SimplifyOr(TextSpan span, BoolLiteralNode left, BoolLiteralNode right)
     {
         // (|| true x) → true
         if (left is BoolLiteralNode { Value: true })
@@ -332,45 +206,14 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             return right;
         }
 
-        // (|| false x) → x
-        if (left is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(span, "(|| false x) -> x");
-            return right;
-        }
-
-        // (|| x false) → x
-        if (right is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(span, "(|| x false) -> x");
-            return left;
-        }
-
-        // (|| x x) → x (redundant) - also check commutative equality
-        if (AreStructurallyEqualOrCommutative(left, right))
-        {
-            Changed = true;
-            ReportSimplified(span, "(|| x x) -> x");
-            return left;
-        }
-
-        // (|| x (! x)) → true (tautology)
-        if (IsNegationOf(left, right) || IsNegationOf(right, left))
-        {
-            Changed = true;
-            ReportTautology(span, "(|| x (! x)) is a tautology");
-            return new BoolLiteralNode(span, true);
-        }
-
-        return MaybeNewBinaryNode(span, BinaryOperator.Or, left, right);
+        Changed = true;
+        ReportSimplified(span, "(|| false x) -> x");
+        return right;
     }
 
-    private ExpressionNode SimplifyEqual(TextSpan span, ExpressionNode left, ExpressionNode right)
+    private ExpressionNode SimplifyEqual(TextSpan span, BoolLiteralNode left, BoolLiteralNode right)
     {
-        // (== x x) → true - also check commutative equality
-        if (AreStructurallyEqualOrCommutative(left, right))
+        if (left.Value == right.Value)
         {
             Changed = true;
             ReportTautology(span, "(== x x) is always true");
@@ -384,41 +227,21 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             ReportSimplified(span, "(== true x) -> x");
             return right;
         }
-        if (right is BoolLiteralNode { Value: true })
-        {
-            Changed = true;
-            ReportSimplified(span, "(== x true) -> x");
-            return left;
-        }
-
-        // (== false x) → (! x), (== x false) → (! x)
-        if (left is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(span, "(== false x) -> (! x)");
-            return new UnaryOperationNode(span, UnaryOperator.Not, right);
-        }
-        if (right is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(span, "(== x false) -> (! x)");
-            return new UnaryOperationNode(span, UnaryOperator.Not, left);
-        }
-
-        return MaybeNewBinaryNode(span, BinaryOperator.Equal, left, right);
+        Changed = true;
+        ReportSimplified(span, "(== x true) -> x");
+        return left;
     }
 
-    private ExpressionNode SimplifyNotEqual(TextSpan span, ExpressionNode left, ExpressionNode right)
+    private ExpressionNode SimplifyNotEqual(TextSpan span, BoolLiteralNode left, BoolLiteralNode right)
     {
-        // (!= x x) → false - also check commutative equality
-        if (AreStructurallyEqualOrCommutative(left, right))
+        if (left.Value == right.Value)
         {
             Changed = true;
             ReportContradiction(span, "(!= x x) is always false");
             return new BoolLiteralNode(span, false);
         }
 
-        return MaybeNewBinaryNode(span, BinaryOperator.NotEqual, left, right);
+        return new BinaryOperationNode(span, BinaryOperator.NotEqual, left, right);
     }
 
     #endregion
@@ -428,6 +251,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(UnaryOperationNode node)
     {
         var operand = node.Operand.Accept(this);
+        if (operand is not BoolLiteralNode
+            && operand is not IntLiteralNode { IsLong: false, IsUnsigned: false }
+            && operand is not FloatLiteralNode { IsSingle: false, IsDecimal: false })
+            return operand == node.Operand ? node : new UnaryOperationNode(node.Span, node.Operator, operand);
 
         if (node.Operator == UnaryOperator.Not)
         {
@@ -447,40 +274,12 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 return new BoolLiteralNode(node.Span, true);
             }
 
-            // (! (! x)) → x (double negation)
-            if (operand is UnaryOperationNode { Operator: UnaryOperator.Not } inner)
-            {
-                Changed = true;
-                ReportSimplified(node.Span, "(! (! x)) -> x");
-                return inner.Operand;
-            }
-
-            // De Morgan's Laws
-            // (! (&& a b)) → (|| (! a) (! b))
-            if (operand is BinaryOperationNode { Operator: BinaryOperator.And } andOp)
-            {
-                Changed = true;
-                ReportSimplified(node.Span, "De Morgan: (! (&& a b)) -> (|| (! a) (! b))");
-                return new BinaryOperationNode(node.Span, BinaryOperator.Or,
-                    new UnaryOperationNode(node.Span, UnaryOperator.Not, andOp.Left),
-                    new UnaryOperationNode(node.Span, UnaryOperator.Not, andOp.Right));
-            }
-
-            // (! (|| a b)) → (&& (! a) (! b))
-            if (operand is BinaryOperationNode { Operator: BinaryOperator.Or } orOp)
-            {
-                Changed = true;
-                ReportSimplified(node.Span, "De Morgan: (! (|| a b)) -> (&& (! a) (! b))");
-                return new BinaryOperationNode(node.Span, BinaryOperator.And,
-                    new UnaryOperationNode(node.Span, UnaryOperator.Not, orOp.Left),
-                    new UnaryOperationNode(node.Span, UnaryOperator.Not, orOp.Right));
-            }
         }
 
         if (node.Operator == UnaryOperator.Negate)
         {
             // (- INT:n) → INT:(-n)
-            if (operand is IntLiteralNode intLit)
+            if (operand is IntLiteralNode intLit && intLit.Value != int.MinValue)
             {
                 Changed = true;
                 ReportSimplified(node.Span, "integer negation folded");
@@ -495,13 +294,6 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 return new FloatLiteralNode(node.Span, -floatLit.Value);
             }
 
-            // (- (- x)) → x (double negation for arithmetic)
-            if (operand is UnaryOperationNode { Operator: UnaryOperator.Negate } innerNeg)
-            {
-                Changed = true;
-                ReportSimplified(node.Span, "(- (- x)) -> x");
-                return innerNeg.Operand;
-            }
         }
 
         if (node.Operator == UnaryOperator.BitwiseNot)
@@ -514,13 +306,6 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 return new IntLiteralNode(node.Span, ~intLit.Value);
             }
 
-            // (~ (~ x)) → x
-            if (operand is UnaryOperationNode { Operator: UnaryOperator.BitwiseNot } innerBnot)
-            {
-                Changed = true;
-                ReportSimplified(node.Span, "(~ (~ x)) -> x");
-                return innerBnot.Operand;
-            }
         }
 
         return operand == node.Operand ? node : new UnaryOperationNode(node.Span, node.Operator, operand);
@@ -534,6 +319,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     {
         var ante = node.Antecedent.Accept(this);
         var cons = node.Consequent.Accept(this);
+        if (ante is not BoolLiteralNode || cons is not BoolLiteralNode)
+            return ante == node.Antecedent && cons == node.Consequent
+                ? node
+                : new ImplicationExpressionNode(node.Span, ante, cons);
 
         // (-> false p) → true
         if (ante is BoolLiteralNode { Value: false })
@@ -544,48 +333,9 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         // (-> true p) → p
-        if (ante is BoolLiteralNode { Value: true })
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(-> true p) -> p");
-            return cons;
-        }
-
-        // (-> p true) → true
-        if (cons is BoolLiteralNode { Value: true })
-        {
-            Changed = true;
-            ReportTautology(node.Span, "(-> p true) is always true");
-            return new BoolLiteralNode(node.Span, true);
-        }
-
-        // (-> p false) → (! p)
-        if (cons is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(-> p false) -> (! p)");
-            return new UnaryOperationNode(node.Span, UnaryOperator.Not, ante);
-        }
-
-        // (-> p p) → true (reflexive implication) - also check commutative equality
-        if (AreStructurallyEqualOrCommutative(ante, cons))
-        {
-            Changed = true;
-            ReportTautology(node.Span, "(-> p p) is always true");
-            return new BoolLiteralNode(node.Span, true);
-        }
-
-        // (-> (! p) p) → p (double negation introduction)
-        if (IsNegationOf(ante, cons))
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(-> (! p) p) -> p");
-            return cons;
-        }
-
-        return ante == node.Antecedent && cons == node.Consequent
-            ? node
-            : new ImplicationExpressionNode(node.Span, ante, cons);
+        Changed = true;
+        ReportSimplified(node.Span, "(-> true p) -> p");
+        return cons;
     }
 
     #endregion
@@ -653,6 +403,12 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var cond = node.Condition.Accept(this);
         var whenTrue = node.WhenTrue.Accept(this);
         var whenFalse = node.WhenFalse.Accept(this);
+        // A conditional's common type can differ from its selected branch type.
+        // Keep it unless both branches are literals with the same built-in type.
+        if (cond is not BoolLiteralNode || !SameLiteralType(whenTrue, whenFalse))
+            return cond == node.Condition && whenTrue == node.WhenTrue && whenFalse == node.WhenFalse
+                ? node
+                : new ConditionalExpressionNode(node.Span, cond, whenTrue, whenFalse);
 
         // (? true t f) → t
         if (cond is BoolLiteralNode { Value: true })
@@ -663,45 +419,23 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         // (? false t f) → f
-        if (cond is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(? false t f) -> f");
-            return whenFalse;
-        }
-
-        // (? c x x) → x
-        if (AreStructurallyEqualOrCommutative(whenTrue, whenFalse))
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(? c x x) -> x");
-            return whenTrue;
-        }
-
-        // (? c true false) → c
-        if (whenTrue is BoolLiteralNode { Value: true } && whenFalse is BoolLiteralNode { Value: false })
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(? c true false) -> c");
-            return cond;
-        }
-
-        // (? c false true) → (! c)
-        if (whenTrue is BoolLiteralNode { Value: false } && whenFalse is BoolLiteralNode { Value: true })
-        {
-            Changed = true;
-            ReportSimplified(node.Span, "(? c false true) -> (! c)");
-            return new UnaryOperationNode(node.Span, UnaryOperator.Not, cond);
-        }
-
-        return cond == node.Condition && whenTrue == node.WhenTrue && whenFalse == node.WhenFalse
-            ? node
-            : new ConditionalExpressionNode(node.Span, cond, whenTrue, whenFalse);
+        Changed = true;
+        ReportSimplified(node.Span, "(? false t f) -> f");
+        return whenFalse;
     }
 
     #endregion
 
     #region Expression nodes that recursively simplify children
+
+    private static bool SameLiteralType(ExpressionNode left, ExpressionNode right) => (left, right) switch
+    {
+        (BoolLiteralNode, BoolLiteralNode) => true,
+        (IntLiteralNode l, IntLiteralNode r) => l.Width == r.Width && l.Signedness == r.Signedness,
+        (FloatLiteralNode l, FloatLiteralNode r) => l.IsSingle == r.IsSingle && l.IsDecimal == r.IsDecimal,
+        (DecimalLiteralNode, DecimalLiteralNode) => true,
+        _ => false
+    };
 
     public ExpressionNode Visit(ArrayAccessNode node)
     {
@@ -1106,154 +840,11 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
 
     #region Helper methods
 
-    private BinaryOperationNode MaybeNewBinaryNode(TextSpan span, BinaryOperator op, ExpressionNode left, ExpressionNode right)
-    {
-        return new BinaryOperationNode(span, op, left, right);
-    }
-
     private ExpressionNode MaybeNewNode(BinaryOperationNode original, ExpressionNode left, ExpressionNode right)
     {
         return left == original.Left && right == original.Right
             ? original
             : new BinaryOperationNode(original.Span, original.Operator, left, right);
-    }
-
-    /// <summary>
-    /// Checks if two expressions are structurally equal (same shape and values).
-    /// </summary>
-    private bool AreStructurallyEqual(ExpressionNode a, ExpressionNode b)
-    {
-        if (ReferenceEquals(a, b)) return true;
-        if (a == null || b == null) return false;
-        if (a.GetType() != b.GetType()) return false;
-
-        return (a, b) switch
-        {
-            (IntLiteralNode ia, IntLiteralNode ib) => ia.Value == ib.Value,
-            (BoolLiteralNode ba, BoolLiteralNode bb) => ba.Value == bb.Value,
-            (StringLiteralNode sa, StringLiteralNode sb) => sa.Value == sb.Value,
-            (FloatLiteralNode fa, FloatLiteralNode fb) => Math.Abs(fa.Value - fb.Value) < double.Epsilon,
-            (ReferenceNode ra, ReferenceNode rb) => ra.Name == rb.Name,
-            (UnaryOperationNode ua, UnaryOperationNode ub) =>
-                ua.Operator == ub.Operator && AreStructurallyEqual(ua.Operand, ub.Operand),
-            (BinaryOperationNode ba, BinaryOperationNode bb) =>
-                ba.Operator == bb.Operator &&
-                AreStructurallyEqual(ba.Left, bb.Left) &&
-                AreStructurallyEqual(ba.Right, bb.Right),
-            (ImplicationExpressionNode ia, ImplicationExpressionNode ib) =>
-                AreStructurallyEqual(ia.Antecedent, ib.Antecedent) &&
-                AreStructurallyEqual(ia.Consequent, ib.Consequent),
-            (ArrayAccessNode aa, ArrayAccessNode ab) =>
-                AreStructurallyEqual(aa.Array, ab.Array) &&
-                AreStructurallyEqual(aa.Index, ab.Index),
-            (ArrayLengthNode ala, ArrayLengthNode alb) =>
-                AreStructurallyEqual(ala.Array, alb.Array),
-            (FieldAccessNode fa, FieldAccessNode fb) =>
-                fa.FieldName == fb.FieldName && AreStructurallyEqual(fa.Target, fb.Target),
-            (ConditionalExpressionNode ca, ConditionalExpressionNode cb) =>
-                AreStructurallyEqual(ca.Condition, cb.Condition) &&
-                AreStructurallyEqual(ca.WhenTrue, cb.WhenTrue) &&
-                AreStructurallyEqual(ca.WhenFalse, cb.WhenFalse),
-            (ForallExpressionNode fa, ForallExpressionNode fb) =>
-                AreQuantifierVariablesEqual(fa.BoundVariables, fb.BoundVariables) &&
-                AreStructurallyEqual(fa.Body, fb.Body),
-            (ExistsExpressionNode ea, ExistsExpressionNode eb) =>
-                AreQuantifierVariablesEqual(ea.BoundVariables, eb.BoundVariables) &&
-                AreStructurallyEqual(ea.Body, eb.Body),
-            (SomeExpressionNode sa, SomeExpressionNode sb) =>
-                AreStructurallyEqual(sa.Value, sb.Value),
-            (NoneExpressionNode, NoneExpressionNode) => true,
-            (OkExpressionNode oa, OkExpressionNode ob) =>
-                AreStructurallyEqual(oa.Value, ob.Value),
-            (ErrExpressionNode ea, ErrExpressionNode eb) =>
-                AreStructurallyEqual(ea.Error, eb.Error),
-            (ThisExpressionNode, ThisExpressionNode) => true,
-            (BaseExpressionNode, BaseExpressionNode) => true,
-            (CallExpressionNode ca, CallExpressionNode cb) =>
-                ca.Target == cb.Target && AreArgumentsEqual(ca.Arguments, cb.Arguments),
-            (CollectionCountNode cca, CollectionCountNode ccb) =>
-                AreStructurallyEqual(cca.Collection, ccb.Collection),
-            (CollectionContainsNode cca, CollectionContainsNode ccb) =>
-                cca.CollectionName == ccb.CollectionName &&
-                cca.Mode == ccb.Mode &&
-                AreStructurallyEqual(cca.KeyOrValue, ccb.KeyOrValue),
-            (NullCoalesceNode na, NullCoalesceNode nb) =>
-                AreStructurallyEqual(na.Left, nb.Left) &&
-                AreStructurallyEqual(na.Right, nb.Right),
-            (NullConditionalNode na, NullConditionalNode nb) =>
-                na.MemberName == nb.MemberName && AreStructurallyEqual(na.Target, nb.Target),
-            (IndexFromEndNode ia, IndexFromEndNode ib) =>
-                AreStructurallyEqual(ia.Offset, ib.Offset),
-            _ => false
-        };
-    }
-
-    private bool AreQuantifierVariablesEqual(IReadOnlyList<QuantifierVariableNode> a, IReadOnlyList<QuantifierVariableNode> b)
-    {
-        if (a.Count != b.Count) return false;
-        for (int i = 0; i < a.Count; i++)
-        {
-            if (a[i].Name != b[i].Name || a[i].TypeName != b[i].TypeName)
-                return false;
-        }
-        return true;
-    }
-
-    private bool AreArgumentsEqual(IReadOnlyList<ExpressionNode> a, IReadOnlyList<ExpressionNode> b)
-    {
-        if (a.Count != b.Count) return false;
-        for (int i = 0; i < a.Count; i++)
-        {
-            if (!AreStructurallyEqual(a[i], b[i]))
-                return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Checks if two expressions are structurally equal, considering commutativity
-    /// for operators like &&, ||, +, *, ==, !=.
-    /// </summary>
-    private bool AreStructurallyEqualOrCommutative(ExpressionNode a, ExpressionNode b)
-    {
-        if (AreStructurallyEqual(a, b)) return true;
-
-        // Check commutative binary operators
-        if (a is BinaryOperationNode ba && b is BinaryOperationNode bb &&
-            ba.Operator == bb.Operator && IsCommutative(ba.Operator))
-        {
-            // Check if left-right swapped
-            return AreStructurallyEqual(ba.Left, bb.Right) &&
-                   AreStructurallyEqual(ba.Right, bb.Left);
-        }
-
-        return false;
-    }
-
-    private static bool IsCommutative(BinaryOperator op)
-    {
-        return op switch
-        {
-            BinaryOperator.Add => true,
-            BinaryOperator.Multiply => true,
-            BinaryOperator.And => true,
-            BinaryOperator.Or => true,
-            BinaryOperator.Equal => true,
-            BinaryOperator.NotEqual => true,
-            BinaryOperator.BitwiseAnd => true,
-            BinaryOperator.BitwiseOr => true,
-            BinaryOperator.BitwiseXor => true,
-            _ => false
-        };
-    }
-
-    /// <summary>
-    /// Checks if 'a' is the negation of 'b' (i.e., a = (! b)).
-    /// </summary>
-    private bool IsNegationOf(ExpressionNode a, ExpressionNode b)
-    {
-        return a is UnaryOperationNode { Operator: UnaryOperator.Not } neg &&
-               AreStructurallyEqualOrCommutative(neg.Operand, b);
     }
 
     private void ReportTautology(TextSpan span, string message)

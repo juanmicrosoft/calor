@@ -122,31 +122,33 @@ public static class RecursiveAstWalker
 
         foreach (var prop in GetAllChildProperties(node.GetType()))
         {
-            object? value;
-            try
+            // Universal analyses must not silently hide a subtree if an AST accessor fails.
+            foreach (var child in UnwrapAstChildren(prop.GetValue(node)))
             {
-                value = prop.GetValue(node);
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (value is AstNode single)
-            {
-                if (yielded.Add(single))
-                    yield return new ChildEdge(single, prop);
-                continue;
-            }
-
-            if (value is not IEnumerable sequence)
-                continue;
-
-            foreach (var item in sequence)
-            {
-                if (item is AstNode child && yielded.Add(child))
+                if (yielded.Add(child))
                     yield return new ChildEdge(child, prop);
             }
+        }
+    }
+
+    private static IEnumerable<AstNode> UnwrapAstChildren(object? value)
+    {
+        switch (value)
+        {
+            case AstNode node:
+                yield return node;
+                break;
+            case ObjectInitializerAssignment initializer:
+                yield return initializer.Value;
+                break;
+            case InlineRefinementInfo refinement:
+                yield return refinement.Predicate;
+                break;
+            case IEnumerable sequence when value is not string:
+                foreach (var item in sequence)
+                    foreach (var child in UnwrapAstChildren(item))
+                        yield return child;
+                break;
         }
     }
 
@@ -217,11 +219,13 @@ public static class RecursiveAstWalker
 
     private static bool CanHoldAnyAstNode(Type propertyType)
     {
-        if (typeof(AstNode).IsAssignableFrom(propertyType))
+        if (typeof(AstNode).IsAssignableFrom(propertyType)
+            || propertyType == typeof(ObjectInitializerAssignment)
+            || propertyType == typeof(InlineRefinementInfo))
             return true;
 
         var element = GetEnumerableElementType(propertyType);
-        return element != null && typeof(AstNode).IsAssignableFrom(element);
+        return element != null && CanHoldAnyAstNode(element);
     }
 
     private static Type? GetEnumerableElementType(Type type)

@@ -1059,9 +1059,9 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void UnboundedInheritedQuantifier_FailsClosedAtRuntime()
+    public void UnboundedInheritedQuantifier_IsRejectedBeforeRuntime()
     {
-        var csharp = Emit("""
+        const string source = """
             §M{m001:Test}
               §RTYPE{r1:NonNegative:i32} (forall ((i i32)) (>= # INT:0))
               §RTYPE{r2:Small:NonNegative} (< # INT:10)
@@ -1069,12 +1069,17 @@ public sealed class ObligationTests
                   §I{Small:value}
                   §O{i32}
                   §R value
-            """);
+            """;
 
-        var exception = InvokeGenerated(csharp, "Use", -1);
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.DoesNotContain("true /* STATIC ONLY:", csharp);
+        Assert.Throws<InvalidOperationException>(() => Emit(source));
+        var result = Program.Compile(source, "unbounded-refinement.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            EnforceEffects = true,
+            ContractMode = ContractMode.Debug
+        });
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
     }
 
     [Fact]
