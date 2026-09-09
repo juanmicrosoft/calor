@@ -58,7 +58,6 @@ public class Issue774ForLoopNonAdditiveIncrementorTests
         var forNodes = method.Body.OfType<ForStatementNode>().ToList();
 
         Assert.Empty(forNodes);
-        Assert.Contains(result.Losses, loss =>
-            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
+        Assert.Contains("§WH{", result.CalorSource);
     }
 }

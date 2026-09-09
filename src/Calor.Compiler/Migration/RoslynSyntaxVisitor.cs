@@ -7005,6 +7005,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         // Fallback: convert expression and wrap as a discarded bind
         var exprNode = ConvertExpression(expr);
+        if (exprNode is CallExpressionNode call)
+            return new CallStatementNode(span, call.Target, false, call.Arguments,
+                new AttributeCollection(), call.ArgumentNames, call.ArgumentModifiers,
+                typeArguments: call.TypeArguments);
         return new BindStatementNode(span, "_", null, false, exprNode, new AttributeCollection());
     }
 
@@ -8105,10 +8109,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         if (!CanUseNativeForRange(node))
         {
-            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
-                "C# for loop preserved to retain condition reevaluation and incrementor/continue behavior",
-                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-            return [new RawCSharpNode(GetTextSpan(node), node.ToFullString())];
+            return [ConvertReevaluatedFor(node)];
         }
 
         var id = _context.GenerateId("for");
@@ -8213,6 +8214,96 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             body,
             new AttributeCollection()));
         return result;
+    }
+
+    private StatementNode ConvertReevaluatedFor(ForStatementSyntax node)
+    {
+        // Header-declared aliases/out variables need a storage lifetime that this
+        // lowering does not represent. Preserve those unusual headers explicitly.
+        if (node.Declaration?.Type is RefTypeSyntax
+            || node.Condition?.DescendantNodesAndSelf().Any(part => part is DeclarationExpressionSyntax) == true)
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+                "For-loop header variable storage preserved verbatim",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
+        }
+
+        var span = GetTextSpan(node);
+        var savedPending = new List<StatementNode>(_pendingStatements);
+        _pendingStatements.Clear();
+        try
+        {
+            var outerBody = new List<StatementNode>();
+            if (node.Declaration != null)
+            {
+                foreach (var variable in node.Declaration.Variables)
+                {
+                    var value = variable.Initializer == null
+                        ? null : ConvertExpression(variable.Initializer.Value);
+                    FlushPendingStatements(outerBody);
+                    outerBody.Add(new BindStatementNode(GetTextSpan(variable), variable.Identifier.ValueText,
+                        node.Declaration.Type.IsVar ? null : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
+                        true, value, new AttributeCollection()));
+                }
+            }
+            foreach (var initializer in node.Initializers)
+            {
+                var statement = ConvertExpressionToStatement(initializer, GetTextSpan(initializer));
+                FlushPendingStatements(outerBody);
+                if (statement != null) outerBody.Add(statement);
+            }
+
+            var whileBody = new List<StatementNode>();
+            if (node.Incrementors.Count > 0)
+            {
+                var first = _context.GenerateId("_forFirst");
+                var sourceNames = node.SyntaxTree.GetRoot().DescendantTokens()
+                    .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+                    .Select(token => token.ValueText).ToHashSet(StringComparer.Ordinal);
+                while (sourceNames.Contains(first)) first += "_";
+                outerBody.Add(new BindStatementNode(span, first, "bool", true,
+                    new BoolLiteralNode(span, true), new AttributeCollection()));
+                var increments = new List<StatementNode>();
+                foreach (var incrementor in node.Incrementors)
+                {
+                    var statement = ConvertExpressionToStatement(incrementor, GetTextSpan(incrementor));
+                    FlushPendingStatements(increments);
+                    if (statement != null) increments.Add(statement);
+                }
+                // Increment at the next iteration's start. This preserves every
+                // continue, including ones inside interop, finally and using scopes.
+                whileBody.Add(new IfStatementNode(span, _context.GenerateId("if"),
+                    new ReferenceNode(span, first),
+                    [new AssignmentStatementNode(span, new ReferenceNode(span, first), new BoolLiteralNode(span, false))],
+                    [], increments, new AttributeCollection()));
+            }
+
+            if (node.Condition != null)
+            {
+                var condition = ConvertExpression(node.Condition);
+                FlushPendingStatements(whileBody);
+                whileBody.Add(new IfStatementNode(span, _context.GenerateId("if"),
+                    new UnaryOperationNode(span, Ast.UnaryOperator.Not, condition),
+                    [new BreakStatementNode(span)], [], null, new AttributeCollection()));
+            }
+            var body = node.Statement is BlockSyntax block
+                ? ConvertBlock(block)
+                : new List<StatementNode> { ConvertStatement(node.Statement)! };
+            FlushPendingStatements(whileBody);
+            whileBody.AddRange(body);
+            outerBody.Add(new WhileStatementNode(span, _context.GenerateId("while"),
+                new BoolLiteralNode(span, true), whileBody, new AttributeCollection()));
+            // Preserve the original for initializer's lexical scope without
+            // adding another loop that could intercept break or continue.
+            return new IfStatementNode(span, _context.GenerateId("scope"),
+                new BoolLiteralNode(span, true), outerBody, [], null, new AttributeCollection());
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(savedPending);
+        }
     }
 
     private ForeachStatementNode ConvertForEachStatement(ForEachStatementSyntax node)

@@ -1210,9 +1210,9 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.Contains("for (int i = 0, j = 10; i < j; i++)", calor);
-        Assert.Contains("var x = i;", calor);
-        Assert.DoesNotContain("§WH{", calor);
+        Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
+        Assert.Contains("§WH{", calor);
+        Assert.DoesNotContain("§RAW", calor);
     }
 
     [Fact]
@@ -1233,9 +1233,9 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.Contains("for (x = 0; x < 10; x++)", calor);
-        Assert.Contains("var y = x;", calor);
-        Assert.DoesNotContain("§WH{", calor);
+        Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
+        Assert.Contains("§WH{", calor);
+        Assert.DoesNotContain("§RAW", calor);
     }
 
     #endregion

@@ -37,6 +37,11 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i += Step()) { if (i == 1) continue; count++; } return count;", "2:BSBSBSB", false)]
     [InlineData("int count = 0; for (int i = 0; i < ExplodingBound(); i++) count++; return count;", "throws:InvalidOperationException:BBB", false)]
     [InlineData("int count = 0; for (int i = int.MaxValue; i <= int.MaxValue; i++) { count++; if (count == 2) break; } return count;", "2", false)]
+    [InlineData("int count = 0; for (int i = 0; i < Bound(); Tick()) { i++; count++; } return count;", "3:BTBTBTB", false)]
+    [InlineData("int count = 0; for (int i = 0; i < Bound(); ThrowingStep()) count++; return count;", "throws:InvalidOperationException:BS", false)]
+    [InlineData("int count = 0; int step = 1; for (int i = 0; i < 10; i += step) { count++; step++; } return count;", "4", false)]
+    [InlineData("int count = 0; int limit = 2; for (int i = 0; i < limit; i++) count++; for (int i = 0; i < limit; i++) count++; return count;", "4", false)]
+    [InlineData("int count = 0; for (int i = 0; i < Bound(); i += Step()) { checked { using (new Scope()) { if (i == 1) continue; count++; } } } return count;", "2:BCDSBCDSBCDSB", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
         => AssertEquivalent(body, expected, native);
 
@@ -76,6 +81,13 @@ public class ForLoopConditionSemanticsTests
                 {{members}}
                 private static int Bound() { Trace += "B"; return 3; }
                 private static int Step() { Trace += "S"; return 1; }
+                private static void Tick() { Trace += "T"; }
+                private static void ThrowingStep() { Trace += "S"; throw new System.InvalidOperationException(); }
+                private sealed class Scope : System.IDisposable
+                {
+                    public Scope() { Trace += "C"; }
+                    public void Dispose() { Trace += "D"; }
+                }
                 private static int ExplodingBound()
                 {
                     Trace += "B";
@@ -91,8 +103,8 @@ public class ForLoopConditionSemanticsTests
         if (native)
             Assert.Contains("§L{", conversion.CalorSource);
         else
-            Assert.Contains(conversion.Losses, loss =>
-                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
+            Assert.True(conversion.CalorSource!.Contains("§WH{"),
+                conversion.CalorSource + "\n" + string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
         var compiled = Program.Compile(conversion.CalorSource!, "for.calr", new CompilationOptions
         {
             EnableTypeChecking = true,

@@ -120,7 +120,7 @@ public static class FeatureSupport
         {
             Name = "for",
             Support = SupportLevel.Partial,
-            Description = "Constant-bound int loops with matching ++/-- steps and an unmodified induction variable use native ranges when termination cannot overflow. Other C# loops are explicitly preserved as interop, retaining condition reevaluation, incrementors, continue paths and overflow behavior."
+            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates the condition after each increment and preserves continue/finally/disposal order. Headers with reference or condition-declared variables are explicitly preserved as interop."
         },
         ["foreach"] = new FeatureInfo
         {

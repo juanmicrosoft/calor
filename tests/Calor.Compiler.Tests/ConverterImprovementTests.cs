@@ -1020,9 +1020,11 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        Assert.IsType<RawCSharpNode>(method.Body[0]);
-        Assert.Contains("i < arr.Length", result.CalorSource);
-        Assert.Contains(result.Losses, loss =>
+        var scope = Assert.IsType<IfStatementNode>(method.Body[0]);
+        var loop = Assert.Single(scope.ThenBody.OfType<WhileStatementNode>());
+        Assert.Contains(loop.Body.OfType<IfStatementNode>(), guard =>
+            guard.Condition is UnaryOperationNode { Operator: UnaryOperator.Not });
+        Assert.DoesNotContain(result.Losses, loss =>
             loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
 
