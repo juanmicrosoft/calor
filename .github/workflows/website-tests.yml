@@ -49,9 +49,12 @@ jobs:
         # Playwright downloads its own pinned Chromium. This unrelated feed can
         # block Ubuntu dependency installation with an inconsistent package index.
         run: |
-          if test -f /etc/apt/sources.list.d/google-chrome.list; then
-            sudo mv /etc/apt/sources.list.d/google-chrome.list "$RUNNER_TEMP/google-chrome.list"
-          fi
+          for source in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if test -f "$source" && grep -Eq 'https?://dl\.google\.com/linux/chrome(-stable)?/deb' "$source"; then
+              echo "Excluding unused Chrome feed: $source"
+              sudo mv "$source" "$RUNNER_TEMP/$(basename "$source")"
+            fi
+          done
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
