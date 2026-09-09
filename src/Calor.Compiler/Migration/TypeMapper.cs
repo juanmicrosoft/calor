@@ -568,12 +568,12 @@ public static class TypeMapper
 
         foreach (var c in typeArgs)
         {
-            if (c == '<')
+            if (c is '<' or '(' or '[')
             {
                 depth++;
                 current += c;
             }
-            else if (c == '>')
+            else if (c is '>' or ')' or ']')
             {
                 depth--;
                 current += c;
@@ -650,7 +650,7 @@ public static class TypeMapper
     /// Extracts the value from a bracket-annotated type like "PREFIX[key=VALUE]".
     /// Returns the value or null if the format doesn't match.
     /// </summary>
-    private static string? ExtractBracketValue(string type, string prefix)
+    internal static string? ExtractBracketValue(string type, string prefix)
     {
         if (!type.StartsWith(prefix, StringComparison.Ordinal))
             return null;
@@ -676,7 +676,7 @@ public static class TypeMapper
     /// <summary>
     /// Extracts ok and err types from expanded RESULT format: RESULT[ok=T][err=E]
     /// </summary>
-    private static (string? OkType, string? ErrType) ExtractResultTypes(string type)
+    internal static (string? OkType, string? ErrType) ExtractResultTypes(string type)
     {
         var okType = ExtractBracketValue(type, "RESULT[ok=");
         if (okType == null)
@@ -775,7 +775,7 @@ public static class TypeMapper
     /// Maps a tuple type string like "(int, string)" or "(int x, string y)" using the provided mapper.
     /// Respects nesting depth for types like "(int, (string, bool))".
     /// </summary>
-    private static string MapTupleType(string tupleType, Func<string, string> mapper)
+    internal static string MapTupleType(string tupleType, Func<string, string> mapper)
     {
         // Strip outer parens
         var inner = tupleType[1..^1];
@@ -787,12 +787,12 @@ public static class TypeMapper
 
         foreach (var c in inner)
         {
-            if (c is '(' or '<')
+            if (c is '(' or '<' or '[')
             {
                 depth++;
                 current += c;
             }
-            else if (c is ')' or '>')
+            else if (c is ')' or '>' or ']')
             {
                 depth--;
                 current += c;
@@ -819,8 +819,8 @@ public static class TypeMapper
             var scanDepth = 0;
             for (int i = 0; i < elem.Length; i++)
             {
-                if (elem[i] is '(' or '<') scanDepth++;
-                else if (elem[i] is ')' or '>') scanDepth--;
+                if (elem[i] is '(' or '<' or '[') scanDepth++;
+                else if (elem[i] is ')' or '>' or ']') scanDepth--;
                 else if (elem[i] == ' ' && scanDepth == 0) lastSpace = i;
             }
 

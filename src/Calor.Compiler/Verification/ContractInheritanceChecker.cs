@@ -143,6 +143,17 @@ public sealed class ContractInheritanceChecker : IDisposable
         IReadOnlyDictionary<AstNode, IReadOnlyList<string>>? typeArguments = null,
         bool argumentsAlreadyBound = false)
     {
+        var globalReference = reference.StartsWith("global::", StringComparison.Ordinal);
+        if (globalReference)
+        {
+            reference = reference["global::".Length..];
+            if (_moduleNamespace.Length > 0)
+            {
+                if (!reference.StartsWith(_moduleNamespace + ".", StringComparison.Ordinal))
+                    return null;
+                reference = reference[(_moduleNamespace.Length + 1)..];
+            }
+        }
         typeArguments ??= new Dictionary<AstNode, IReadOnlyList<string>>();
         resolvingBases ??= new HashSet<AstNode>();
         var callerBindings = DeclarationSubstitutions(owner, typeArguments);
@@ -164,7 +175,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                 argumentsAlreadyBound ? argument : RewriteTypeName(argument, argumentBindings)).ToArray())).ToArray();
         // A base/interface list is outside its own type body. Explicit interface
         // members, in contrast, resolve names from inside that body.
-        var scope = memberLookup ? owner : _enclosingDeclarations[owner];
+        var scope = globalReference ? null : memberLookup ? owner : _enclosingDeclarations[owner];
         while (true)
         {
             var match = FindNestedDeclaration(scope, segments[0], typeArguments, resolvingBases);
@@ -180,7 +191,13 @@ public sealed class ContractInheritanceChecker : IDisposable
                 return match;
             }
             if (scope == null)
-                return null;
+            {
+                return !globalReference && _moduleNamespace.Length > 0
+                    && reference.StartsWith(_moduleNamespace + ".", StringComparison.Ordinal)
+                    ? ResolveDeclaration("global::" + reference, owner, substitutions, memberLookup,
+                        resolvingBases, typeArguments, argumentsAlreadyBound)
+                    : null;
+            }
             scope = _enclosingDeclarations[scope];
         }
     }
@@ -1129,9 +1146,28 @@ public sealed class ContractInheritanceChecker : IDisposable
             return parameter;
         if (Migration.TypeMapper.IsPrimitiveType(typeName))
             return typeName;
+        if (Migration.TypeMapper.ExtractBracketValue(typeName, "ARRAY[element=") is { } element)
+            return RewriteTypeName(element, replacements) + "[]";
+        if (Migration.TypeMapper.ExtractBracketValue(typeName, "OPTION[inner=") is { } inner)
+            return "OPTION[inner=" + RewriteTypeName(inner, replacements) + "]";
+        if (typeName.StartsWith("RESULT[ok=", StringComparison.Ordinal))
+        {
+            var (ok, error) = Migration.TypeMapper.ExtractResultTypes(typeName);
+            if (ok != null && error != null)
+                return "RESULT[ok=" + RewriteTypeName(ok, replacements)
+                    + "][err=" + RewriteTypeName(error, replacements) + "]";
+        }
+        if (typeName.StartsWith('[') && typeName.EndsWith(']'))
+            return RewriteTypeName(typeName[1..^1], replacements) + "[]";
+        if (typeName.StartsWith('?'))
+            return "?" + RewriteTypeName(typeName[1..], replacements);
+        if (typeName.StartsWith('(') && typeName.EndsWith(')'))
+            return Migration.TypeMapper.MapTupleType(typeName, elementType =>
+                RewriteTypeName(elementType, replacements));
         if (typeName.EndsWith('?') || typeName.EndsWith('*'))
             return RewriteTypeName(typeName[..^1], replacements) + typeName[^1];
-        if (typeName.EndsWith(']') && typeName.LastIndexOf('[') is var arrayStart && arrayStart >= 0)
+        if (typeName.EndsWith(']') && typeName.LastIndexOf('[') is var arrayStart && arrayStart >= 0
+            && typeName[(arrayStart + 1)..^1].All(character => character == ','))
             return RewriteTypeName(typeName[..arrayStart], replacements) + typeName[arrayStart..];
         var rewritten = string.Join(".", ParseQualifiedTypeReference(typeName).Select(reference =>
             reference.Arguments.Count == 0 ? reference.Name : reference.Name + "<"
@@ -1753,9 +1789,13 @@ public sealed class ContractInheritanceChecker : IDisposable
             switch (typeName[index])
             {
                 case '<':
+                case '(':
+                case '[':
                     depth++;
                     break;
                 case '>':
+                case ')':
+                case ']':
                     depth--;
                     break;
                 case ',' when depth == 0:

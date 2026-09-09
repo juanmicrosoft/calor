@@ -475,6 +475,130 @@ public sealed class NestedContractInheritanceRuntimeTests
         Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompositeGenericSignatures_PreserveInheritedGuards(bool verify)
+    {
+        foreach (var depth in new[] { 0, 1, 2 })
+        foreach (var path in new[] { "interface", "base", "interface-base" })
+        foreach (var mode in new[] { "pre", "post", "both" })
+        foreach (var shape in new[] { "[T]", "T[]", "(T,i32)", "(T[,],i32)", "?T", "Result<T,str>", "Result<(T,i32),str>" })
+        {
+            var predicate = shape.StartsWith('(') ? "(!= x.Item1 null)"
+                : shape.StartsWith("Result", StringComparison.Ordinal) ? "x.IsOk" : "(!= x null)";
+            var contracts = string.Join("\n", new[]
+            {
+                mode != "post" ? "§Q " + predicate : null,
+                mode != "pre" ? "§S " + predicate.Replace("x", "result") : null
+            }.Where(line => line != null));
+            var declarations = "";
+            if (path != "base")
+            {
+                declarations = $"§IFACE{{i1:IValue}}\n  §MT{{im1:Check}}<T> ({shape}:x) -> {shape}\n    §WHERE T : class\n"
+                    + Indent(Indent(contracts));
+            }
+            if (path != "interface")
+            {
+                declarations += "\n§CL{c1:Base:pub:abs}\n"
+                    + (path == "interface-base" ? "  §IMPL{IValue}\n" : "")
+                    + $"  §MT{{mt1:Check:pub:abs}}<T> ({shape}:x) -> {shape}\n    §WHERE T : class\n    §E{{}}"
+                    + (path == "base" ? "\n" + Indent(Indent(contracts)) : "");
+            }
+            var implementationShape = shape.Replace("T", "U");
+            declarations += "\n" + $$"""
+                §CL{c2:Impl:pub}
+                  {{(path == "interface" ? "§IMPL{IValue}" : "§EXT{Base}")}}
+                  §MT{mt2:Check:pub{{(path == "interface" ? "" : ":over")}}}<U> ({{implementationShape}}:value) -> {{implementationShape}}
+                    §WHERE U : class
+                    §E{}
+                    §R value
+                """;
+            for (var level = depth - 1; level >= 0; level--)
+                declarations = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(declarations);
+            var assembly = Compile("§M{m1:NestedContracts}\n" + Indent(declarations), verify);
+            var name = "NestedContracts." + string.Concat(
+                Enumerable.Range(0, depth).Select(level => $"Outer{level}+")) + "Impl";
+            var type = assembly.GetType(name)!;
+            var instance = Activator.CreateInstance(type);
+            var method = type.GetMethod("Check")!.MakeGenericMethod(typeof(string));
+            object? valid = shape switch
+            {
+                "(T,i32)" => ("valid", 1),
+                "(T[,],i32)" => (new string[1, 1], 1),
+                "?T" => "valid",
+                "Result<T,str>" => Calor.Runtime.Result<string, string>.Ok("valid"),
+                "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Ok(("valid", 1)),
+                _ => new[] { "valid" }
+            };
+            object? invalid = shape switch
+            {
+                "(T,i32)" => ((string?)null, 1),
+                "(T[,],i32)" => ((string[,]?)null, 1),
+                "Result<T,str>" => Calor.Runtime.Result<string, string>.Err("invalid"),
+                "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Err("invalid"),
+                _ => null
+            };
+            Assert.Equal(valid, method.Invoke(instance, [valid]));
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [invalid]));
+            Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NamespaceQualifiedInterfaces_KeepGuardsAndRespectTypeShadowing(bool verify)
+    {
+        foreach (var moduleName in new[] { "NestedContracts", "N.Deep", "_global" })
+        foreach (var global in new[] { false, true })
+        {
+            var namespacePrefix = moduleName == "_global" ? "" : moduleName + ".";
+            var source = $$"""
+                §M{m1:{{moduleName}}}
+                  §CL{c1:Outer:pub}
+                    §IFACE{i1:IValue}
+                      §MT{im1:Check} (object:x) -> object
+                        §Q (!= x null)
+                        §S (!= result null)
+                    §CL{c2:Impl:pub}
+                      §IMPL{ {{(global ? "global::" : "")}}{{namespacePrefix}}Outer.IValue }
+                      §MT{mt1:Check:pub} (object:value) -> object
+                        §E{}
+                        §R value
+                """;
+            var assembly = Compile(source, verify);
+            AssertObjectGuard(assembly.GetType(namespacePrefix + "Outer+Impl")!, "valid", null);
+        }
+
+        const string shadowed = """
+            §M{m1:Scope}
+              §CL{c1:Outer:pub}
+                §IFACE{i1:IValue}
+                  §MT{im1:Get} (i32:x) -> i32
+                    §Q (> x INT:0)
+              §CL{c2:Container:pub}
+                §CL{c3:Scope:pub}
+                  §CL{c4:Outer:pub}
+                    §IFACE{i2:IValue}
+                      §MT{im2:Get} (i32:x) -> i32
+                        §Q (< x INT:0)
+                §CL{c5:Relative:pub}
+                  §IMPL{Scope.Outer.IValue}
+                  §MT{mt1:Get:pub} (i32:x) -> i32
+                    §E{}
+                    §R x
+                §CL{c6:Absolute:pub}
+                  §IMPL{global::Scope.Outer.IValue}
+                  §MT{mt2:Get:pub} (i32:x) -> i32
+                    §E{}
+                    §R x
+            """;
+        var shadowAssembly = Compile(shadowed, verify);
+        AssertGuards(shadowAssembly.GetType("Scope.Container+Relative")!, -1, 1);
+        AssertGuards(shadowAssembly.GetType("Scope.Container+Absolute")!, 1, -1);
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions

@@ -3556,9 +3556,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         if (_postconditionResultIdentifier != null
             && _postconditionResultShadowDepth == 0
-            && node.Name.Equals("result", StringComparison.Ordinal))
+            && (node.Name.Equals("result", StringComparison.Ordinal)
+                || node.Name.StartsWith("result.", StringComparison.Ordinal)))
         {
-            return _postconditionResultIdentifier;
+            return _postconditionResultIdentifier
+                + (node.Name.Length == "result".Length ? ""
+                    : "." + SanitizeIdentifier(node.Name["result.".Length..]));
         }
 
         // Handle C# keywords that are used as literals (not identifiers)
