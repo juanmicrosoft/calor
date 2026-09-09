@@ -515,7 +515,8 @@ public static class TypeMapper
             var suffix = closingIndex + 1 < calorType.Length ? calorType[(closingIndex + 1)..] : "";
             var mappedBase = CalorToCSharpMap.TryGetValue(baseName, out var csharpBase) ? csharpBase : baseName;
             var mappedArgs = MapGenericArguments(typeArgs, CalorToCSharp);
-            return $"{mappedBase}<{mappedArgs}>{CalorToCSharp(suffix)}";
+            var mappedSuffix = suffix.StartsWith('.') ? CalorToCSharp(suffix) : suffix;
+            return $"{mappedBase}<{mappedArgs}>{mappedSuffix}";
         }
 
         // Direct mapping

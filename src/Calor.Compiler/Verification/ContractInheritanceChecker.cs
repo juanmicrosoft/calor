@@ -891,7 +891,10 @@ public sealed class ContractInheritanceChecker : IDisposable
             return new ImplicationExpressionNode(
                 implication.Span,
                 RewriteReferences(implication.Antecedent, replacements, typeReplacements),
-                RewriteReferences(implication.Consequent, replacements, typeReplacements));
+                RewriteReferences(implication.Consequent, replacements,
+                    WithBoundValues(typeReplacements,
+                        EnumerateDescendantsAndSelf(implication.Antecedent).OfType<IsPatternNode>()
+                            .Select(pattern => pattern.VariableName).OfType<string>())));
         }
         if (expression is NullCoalesceNode coalesce)
         {

@@ -483,7 +483,8 @@ public sealed class NestedContractInheritanceRuntimeTests
         foreach (var depth in new[] { 0, 1, 2 })
         foreach (var path in new[] { "interface", "base", "interface-base" })
         foreach (var mode in new[] { "pre", "post", "both" })
-        foreach (var shape in new[] { "[T]", "T[]", "(T,i32)", "(T[,],i32)", "?T", "Result<T,str>", "Result<(T,i32),str>" })
+        foreach (var shape in new[] { "[T]", "T[]", "(T,i32)", "(T[,],i32)", "?T",
+                     "Result<T,str>", "Result<(T,i32),str>", "List<T[]>[,]", "List<T>[,]", "List<T[]>[]" })
         {
             var predicate = shape.StartsWith('(') ? "(!= x.Item1 null)"
                 : shape.StartsWith("Result", StringComparison.Ordinal) ? "x.IsOk" : "(!= x null)";
@@ -529,6 +530,9 @@ public sealed class NestedContractInheritanceRuntimeTests
                 "?T" => "valid",
                 "Result<T,str>" => Calor.Runtime.Result<string, string>.Ok("valid"),
                 "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Ok(("valid", 1)),
+                "List<T[]>[,]" => new List<string[]>[1, 1],
+                "List<T>[,]" => new List<string>[1, 1],
+                "List<T[]>[]" => new List<string[]>[1],
                 _ => new[] { "valid" }
             };
             object? invalid = shape switch
@@ -695,14 +699,16 @@ public sealed class NestedContractInheritanceRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ConditionalPatternReceivers_RemainValuesInInheritedGuards(bool verify)
+    public void ConditionalAndImplicationPatternReceivers_RemainValuesInInheritedGuards(bool verify)
     {
-        foreach (var condition in new[] { "(is x Payload Limits)", "(! (is x Payload Limits))" })
+        foreach (var predicate in new[]
+                 {
+                     "(? (is x Payload Limits) (> Limits.Min INT:0) BOOL:false)",
+                     "(? (! (is x Payload Limits)) BOOL:false (> Limits.Min INT:0))",
+                     "(-> (is x Payload Limits) (> Limits.Min INT:0))"
+                 })
         foreach (var post in new[] { false, true })
         {
-            var predicate = condition.StartsWith("(!", StringComparison.Ordinal)
-                ? $"(? {condition} BOOL:false (> Limits.Min INT:0))"
-                : $"(? {condition} (> Limits.Min INT:0) BOOL:false)";
             var contract = post ? "§S " + predicate.Replace("is x", "is result") : "§Q " + predicate;
             var source = $$"""
                 §M{m1:Scope}
