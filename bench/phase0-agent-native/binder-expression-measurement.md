@@ -236,6 +236,11 @@ while the visit total stays constant.
 Mutation controls detect deleted/changed/misattributed raw expressions,
 equal-count source-identity swaps, a native-to-opaque substitution, mixed
 native/opaque ancestry, and binding failures at unchanged attempt counts.
+The branch-selection test also removes a long inactive prefix and measures the
+same raw conditional operand with and without stripping. It requires different
+original/selected offsets and hashes but identical selected-source opaque and
+exact-expression identities. This corpus-independent regression would fail if
+conversion spans were again applied to original-file coordinates.
 Three native conditional controls reject **both** `InteropPreserved` and
 `EmitterFallback` and require no raw nodes before or after serialization.
 

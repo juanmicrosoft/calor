@@ -429,6 +429,48 @@ public class BinderIncompleteRatchetTests
         AssertSelection(["C"], "SelectedCD");
         AssertSelection(["D"], "SelectedCD");
 
+        // Stripping deletes text: conversion spans cannot be applied to the original file.
+        const string shiftedSource = """
+            #if NOT_DEFINED
+            public class RemovedPrefix { public int LongEnoughToShiftEveryOffset() => 12345; }
+            #endif
+            public class Kept
+            {
+                public static bool Run(bool gate) => gate && int.TryParse("1", out var value);
+            }
+            """;
+        var options = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
+            Microsoft.CodeAnalysis.DocumentationMode.Parse,
+            Microsoft.CodeAnalysis.SourceCodeKind.Regular,
+            preprocessorSymbols: Array.Empty<string>());
+        var selected = Compiler.Migration.PreprocessorStripper
+            .SelectActiveBranchLossy(shiftedSource, options).Source;
+        var originalInvocation = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(shiftedSource, options)
+            .GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>().Single();
+        var selectedInvocation = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(selected, options)
+            .GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>().Single();
+        Assert.NotEqual(originalInvocation.Span.Start, selectedInvocation.Span.Start);
+        var shiftedCoverage = new NativeConversionCoverage();
+        MeasureNative("offset-shift.cs", shiftedSource, shiftedCoverage);
+        var identityCoverage = new NativeConversionCoverage();
+        MeasureNative("offset-selected.cs", selected, identityCoverage);
+        var shifted = Assert.IsType<SourceCoverageRecord>(shiftedCoverage.LastSourceCoverage);
+        var identity = Assert.IsType<SourceCoverageRecord>(identityCoverage.LastSourceCoverage);
+        Assert.Equal(Hash(shiftedSource), shifted.SourceHash);
+        Assert.Equal(Hash(selected), shifted.SelectedSourceHash);
+        Assert.NotEqual(shifted.SourceHash, shifted.SelectedSourceHash);
+        Assert.Equal(identity.SourceHash, identity.SelectedSourceHash);
+        Assert.Equal(1, shifted.OpaqueBoundaries);
+        Assert.Equal(selectedInvocation.DescendantNodesAndSelf()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax>().Count(),
+            shifted.OpaqueSourceExpressions);
+        Assert.Equal(identity.OpaqueSourceExpressionIdentityHash, shifted.OpaqueSourceExpressionIdentityHash);
+        Assert.Equal(identity.OpaqueBoundaryIdentityHash, shifted.OpaqueBoundaryIdentityHash);
+        Assert.Equal(identity.ExactExpressionSourceIdentityHash, shifted.ExactExpressionSourceIdentityHash);
+
         static void AssertSelection(
             IReadOnlyList<string> symbols,
             string expected)
