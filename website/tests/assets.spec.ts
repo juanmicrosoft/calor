@@ -38,7 +38,14 @@ test('cold mobile brand transfer stays within explicit asset budgets', async ({ 
   await context.close();
 });
 
-test('video is an opt-in enhancement and never requested under motion or data constraints', async ({ browser }) => {
+// The decorative video plays by default on an unconstrained desktop, and is never
+// requested otherwise. This changed from opt-in on 2026-09-09 at the maintainer's
+// direction: the gate below (desktop, no reduced-motion, no Save-Data, not 2g/3g) was
+// already doing the protective work, and requiring a click on top of it meant the
+// animation effectively never ran. The cost accepted with that decision is the ~2 MB
+// fetch on every visit that passes the gate; the constrained branches below are what
+// keep it from reaching anyone else, and they are unchanged.
+test('video plays by default on unconstrained desktop, and is never requested under motion or data constraints', async ({ browser }) => {
   for (const constrained of ['none', 'motion', 'save-data', 'slow-network']) {
     const context = await browser.newContext({ viewport: { width: 1366, height: 768 },
       reducedMotion: constrained === 'motion' ? 'reduce' : 'no-preference' });
@@ -55,12 +62,21 @@ test('video is an opt-in enhancement and never requested under motion or data co
     await page.goto(`http://127.0.0.1:4173${base}/`);
     const play = page.getByRole('button', { name: 'Play background animation' });
     if (constrained === 'none') {
-      await expect(play).toBeVisible();
-      expect(videos).toEqual([]);
-      await play.click();
+      // Plays without interaction, and the control offers the opposite action.
       await expect(page.locator('video')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Pause background animation' })).toBeVisible();
       await expect.poll(() => videos.length).toBeGreaterThan(0);
+      // Pausing is honoured and tears the element down.
       await page.getByRole('button', { name: 'Pause background animation' }).click();
+      await expect(page.locator('video')).toHaveCount(0);
+      // And a deliberate pause STAYS paused. Drive the gate away and back — this
+      // branch has no navigator.connection to dispatch on, so use the media query the
+      // effect actually listens to; a connection event here would be a no-op and the
+      // assertion would pass without testing anything.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expect(play).toHaveCount(0);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await expect(play).toBeVisible();
       await expect(page.locator('video')).toHaveCount(0);
     } else {
       await expect(play).toHaveCount(0);
@@ -99,7 +115,9 @@ test('pausing or activating constraints aborts an in-flight media download', asy
         route.continue({ url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/video.mp4` }));
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:4173${base}/`);
-      await page.getByRole('button', { name: 'Play background animation' }).click();
+      // No click: the video autoplays on an unconstrained desktop, so the download is
+      // already in flight. What this test protects is unchanged — that pausing, or any
+      // constraint appearing mid-download, aborts it rather than letting it complete.
       await expect.poll(() => sent).toBeGreaterThan(65536);
       if (action === 'pause') await page.getByRole('button', { name: 'Pause background animation' }).click();
       if (action === 'motion') await page.emulateMedia({ reducedMotion: 'reduce' });

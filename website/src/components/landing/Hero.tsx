@@ -15,6 +15,10 @@ export function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [allowVideo, setAllowVideo] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // Records a DELIBERATE pause, so that a later media-query change — resizing back
+  // across the md breakpoint, a connection event — re-enables the control without
+  // restarting a video the visitor chose to stop.
+  const userChosePlayback = useRef(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -37,7 +41,13 @@ export function Hero() {
       const allowed = !motion.matches && desktop.matches && !connection?.saveData
         && !['slow-2g', '2g', '3g'].includes(connection?.effectiveType || '');
       setAllowVideo(allowed);
+      // Play by default wherever playback is allowed at all. `allowed` is already the
+      // conservative gate — desktop only, no prefers-reduced-motion, no Save-Data and
+      // not on a 2g/3g connection — so the click that used to be required on top of it
+      // meant the animation effectively never ran. Every constrained visitor still
+      // fetches nothing; see the tests in tests/assets.spec.ts.
       if (!allowed) setPlaying(false);
+      else if (!userChosePlayback.current) setPlaying(true);
     };
     update();
     motion.addEventListener('change', update);
@@ -59,7 +69,9 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden py-8 sm:py-12">
-      {/* Poster is the default: no decorative video request before explicit opt-in. */}
+      {/* The poster paints first and sits behind the video, so the hero is never blank
+          while the video loads — and it stays the only asset fetched wherever the gate
+          above says no. */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
           style={{ backgroundImage: `url(${basePath}/calor-lava-poster.jpg)` }}
@@ -72,7 +84,7 @@ export function Hero() {
           loop
           muted
           playsInline
-          preload="none"
+          preload="auto"
           className="absolute inset-0 w-full h-full object-cover -z-20"
           poster={`${basePath}/calor-lava-poster.jpg`}
           aria-hidden="true"
@@ -139,7 +151,7 @@ export function Hero() {
       </div>
 
       {allowVideo && (
-        <button type="button" onClick={() => setPlaying(!playing)}
+        <button type="button" onClick={() => { userChosePlayback.current = true; setPlaying(!playing); }}
           className="absolute bottom-4 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
           {playing ? 'Pause background animation' : 'Play background animation'}
         </button>
