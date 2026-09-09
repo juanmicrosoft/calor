@@ -12,16 +12,48 @@ const basePath = getBasePath();
 
 export function Hero() {
   const heroRef = useRef<HTMLDivElement>(null);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [allowVideo, setAllowVideo] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    setPrefersReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const video = videoRef.current;
+    if (!video) return;
+    return () => {
+      video.pause();
+      video.removeAttribute('src');
+      video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
+      video.load();
+    };
+  }, [allowVideo, playing]);
+
+  useEffect(() => {
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const connection = (navigator as Navigator & {
+      connection?: EventTarget & { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    const update = () => {
+      const allowed = !motion.matches && desktop.matches && !connection?.saveData
+        && !['slow-2g', '2g', '3g'].includes(connection?.effectiveType || '');
+      setAllowVideo(allowed);
+      if (!allowed) setPlaying(false);
+    };
+    update();
+    motion.addEventListener('change', update);
+    desktop.addEventListener('change', update);
+    connection?.addEventListener('change', update);
+    return () => {
+      motion.removeEventListener('change', update);
+      desktop.removeEventListener('change', update);
+      connection?.removeEventListener('change', update);
+    };
   }, []);
 
   useEffect(() => {
     const el = heroRef.current;
     if (!el) return;
-    if (prefersReducedMotion) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     // Stagger hero elements on load
     const children = el.querySelectorAll('[data-hero-animate]');
@@ -40,22 +72,22 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden py-28 sm:py-36 lg:py-44">
-      {/* Video background — replaced by a poster image when the visitor prefers reduced motion */}
-      {prefersReducedMotion ? (
+      {/* Poster is the default: no decorative video request before explicit opt-in. */}
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
-          style={{ backgroundImage: `url(${basePath}/og-image.jpg)` }}
+          style={{ backgroundImage: `url(${basePath}/calor-lava-poster.jpg)` }}
           aria-hidden="true"
         />
-      ) : (
+      {allowVideo && playing && (
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
-          preload="metadata"
+          preload="none"
           className="absolute inset-0 w-full h-full object-cover -z-20"
-          poster={`${basePath}/og-image.jpg`}
+          poster={`${basePath}/calor-lava-poster.jpg`}
           aria-hidden="true"
         >
           <source src={`${basePath}/calor-lava.mp4`} type="video/mp4" />
@@ -78,7 +110,7 @@ export function Hero() {
           <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 px-8 py-12 sm:px-12 sm:py-16 shadow-2xl">
             <div className="flex justify-center mb-8" data-hero-animate>
               <Image
-                src={`${basePath}/calor-logo.png`}
+                src={`${basePath}/calor-logo-256.webp`}
                 alt="Calor logo"
                 width={120}
                 height={120}
@@ -118,6 +150,13 @@ export function Hero() {
           </div>
         </div>
       </div>
+
+      {allowVideo && (
+        <button type="button" onClick={() => setPlaying(!playing)}
+          className="absolute bottom-20 right-6 z-20 rounded border border-white/30 bg-calor-navy/90 px-3 py-2 text-xs text-white">
+          {playing ? 'Pause background animation' : 'Play background animation'}
+        </button>
+      )}
 
       {/* Shaped bottom divider */}
       <div className="hero-divider">
