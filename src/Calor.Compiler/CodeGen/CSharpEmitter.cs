@@ -314,6 +314,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 var reference = node switch
                 {
                     ReferenceNode value => value.Name,
+                    BindStatementNode { IsMutable: true } binding => binding.Name,
                     CallExpressionNode call => call.Target,
                     CallStatementNode call => call.Target,
                     _ => null

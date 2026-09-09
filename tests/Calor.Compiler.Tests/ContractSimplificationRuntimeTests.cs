@@ -181,7 +181,11 @@ public class ContractSimplificationRuntimeTests
             Assert.False(fieldClosure());
         }
 
-        foreach (var endpoint in new[] { "n", "(+ n INT:0)" })
+        foreach (var (endpoint, mutation) in new[]
+        {
+            ("n", "§ASSIGN n INT:3"), ("(+ n INT:0)", "§ASSIGN n INT:3"),
+            ("n", "§B{~n} INT:3"), ("(+ n INT:0)", "§B{~n} INT:3")
+        })
         {
             string Body(string variable) =>
                 $"(-> (&& (>= {variable} INT:0) (< {variable} {endpoint})) (&& (cast bool §C{{Invoke}} §A grow §/C) (== {variable} INT:0)))";
@@ -194,7 +198,7 @@ public class ContractSimplificationRuntimeTests
                   §F{f1:Check:pub} () -> Func<i32,bool> §E{}
                     §E{}
                     §R §LAM{l1:n:i32} §E{}
-                      §B{grow:Func<bool>} §E{} §LAM{l2} §E{} §ASSIGN n INT:3 §R true §/LAM{l2}
+                      §B{grow:Func<bool>} §E{} §LAM{l2} §E{} {{mutation}} §R true §/LAM{l2}
                       §R {{quantifier}}
                     §/LAM{l1}
                 """;
