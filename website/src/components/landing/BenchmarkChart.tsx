@@ -1,4 +1,5 @@
 'use client';
+import { formatTimestamp } from '@/lib/timestamps';
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -142,18 +143,6 @@ function getBarWidth(ratio: number): number {
   return Math.max(ratio * 50, 10);
 }
 
-function formatDate(isoString: string): string {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return '';
-  }
-}
 
 function AnimatedBar({ result }: { result: BenchmarkResult }) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -216,7 +205,7 @@ export function BenchmarkChart() {
           </p>
           <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span className="font-body">Last updated: {formatDate(lastUpdated)}</span>
+            <span className="font-body">Last updated: <time dateTime={lastUpdated}>{formatTimestamp(lastUpdated)}</time></span>
           </div>
         </div>
 
