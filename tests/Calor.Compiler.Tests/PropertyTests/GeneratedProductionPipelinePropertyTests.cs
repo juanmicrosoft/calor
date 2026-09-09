@@ -193,6 +193,66 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
     }
 
     [Fact]
+    public void TraceOracle_RejectsOrderOnlyMutationWithIdenticalOtherObservations()
+    {
+        var sample = NumberLeaves(new Sample("expression",
+            new Term("+", Left: new Term("literal", 8), Right: new Term("literal", 3)),
+            new Term("literal"), 0, 42));
+        CheckSample(sample);
+        var mutant = sample with
+        {
+            Expression = sample.Expression with
+            {
+                Left = sample.Expression.Right,
+                Right = sample.Expression.Left
+            }
+        };
+        var expected = Evaluate(sample);
+        var actual = Execute(Render(mutant));
+        Assert.Equal(expected.Value, actual.Value);
+        Assert.Equal(expected.ExceptionType, actual.ExceptionType);
+        Assert.Equal(expected.Output, actual.Output);
+        Assert.Equal(new[] { 1, 2 }, expected.Trace);
+        Assert.Equal(new[] { 2, 1 }, actual.Trace);
+        Assert.Throws<EqualException>(() => AssertObservationsEqual(expected, actual));
+    }
+
+    [Fact]
+    public void NestedOperandControl_PreservesLeftConditionalBeforeRightArithmetic()
+    {
+        var sample = NumberLeaves(new Sample("match",
+            new Term("-",
+                Left: new Term("or", Left: new Term("literal", 4), Right: new Term("literal", -1)),
+                Right: new Term("or", Left: new Term("literal", -1), Right: new Term("literal", 6))),
+            new Term("/",
+                Left: new Term("conditional", Left: new Term("literal", 2),
+                    Right: new Term("literal", 1), Third: new Term("literal", 6)),
+                Right: new Term("+", Left: new Term("literal", 0), Right: new Term("literal", 4))),
+            2, 601));
+        var expected = Evaluate(sample);
+        Assert.Equal(0, expected.Value);
+        Assert.Null(expected.ExceptionType);
+        Assert.Equal(new[] { 5, 6, 8, 9 }, expected.Trace);
+        CheckSample(sample);
+    }
+
+    [Fact]
+    public void LeftExceptionControl_SuppressesRightOperandEffects()
+    {
+        var sample = NumberLeaves(new Sample("loop",
+            new Term("-",
+                Left: new Term("/", Left: new Term("literal", int.MinValue),
+                    Right: new Term("literal", -1)),
+                Right: new Term("*", Left: new Term("literal", 0),
+                    Right: new Term("literal", int.MinValue))),
+            new Term("literal"), 3, 830));
+        var expected = Evaluate(sample);
+        Assert.Equal(typeof(OverflowException), expected.ExceptionType);
+        Assert.Equal(new[] { 1, 2 }, expected.Trace);
+        CheckSample(sample);
+    }
+
+    [Fact]
     public void EffectsControl_RejectsUndeclaredObservableMutation()
     {
         var source = Render(NumberLeaves(new Sample("expression", new Term("literal", 1),
@@ -272,13 +332,15 @@ public sealed class GeneratedProductionPipelinePropertyTests(ITestOutputHelper o
         Assert.Equal(SemanticTree(first), SemanticTree(second));
         var expected = Evaluate(sample);
         foreach (var executable in new[] { source, pretty })
-        {
-            var actual = Execute(executable);
-            Assert.Equal(expected.Value, actual.Value);
-            Assert.Equal(expected.ExceptionType, actual.ExceptionType);
-            Assert.Equal(expected.Output, actual.Output);
-            Assert.Equal(expected.Trace, actual.Trace);
-        }
+            AssertObservationsEqual(expected, Execute(executable));
+    }
+
+    private static void AssertObservationsEqual(Observation expected, Observation actual)
+    {
+        Assert.Equal(expected.Value, actual.Value);
+        Assert.Equal(expected.ExceptionType, actual.ExceptionType);
+        Assert.Equal(expected.Output, actual.Output);
+        Assert.Equal(expected.Trace, actual.Trace);
     }
 
     internal static (ModuleNode Module, DiagnosticBag Diagnostics) Parse(string source)

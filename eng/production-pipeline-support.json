@@ -62,7 +62,7 @@
       "name": "collection-mutation-and-call-order",
       "stages": [
         { "stage": "parse/pretty/compile/effect-check", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "EffectsControl_RejectsUndeclaredObservableMutation" },
-        { "stage": "execute/trace", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "BehavioralAndStructuralOracles_RejectSameShapeMutants" }
+        { "stage": "execute/trace", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "TraceOracle_RejectsOrderOnlyMutationWithIdenticalOtherObservations" }
       ],
       "fallback": "Trace lists are externally allocated; depth and loop bounds limit appends. The oracle checks exact visited leaf IDs, including traces before exceptions."
     },
