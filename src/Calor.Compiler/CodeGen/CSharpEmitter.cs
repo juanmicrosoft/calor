@@ -108,6 +108,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private EmissionContext _emissionContext = new();
     private HashSet<string> _reservedGeneratedIdentifiers = new(StringComparer.Ordinal);
     private string? _currentClassName;
+    private string? _currentClassIdentity;
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
     private HashSet<string> _allModuleFunctionNames = new(StringComparer.Ordinal);
     private HashSet<string> _allModuleQualifiedFunctionNames = new(StringComparer.Ordinal);
@@ -121,7 +122,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// its whole base chain is local. Empty means every base is opaque, which is
     /// #823's original assumption.</summary>
     private IReadOnlyList<ClassDefinitionNode> _moduleClasses = Array.Empty<ClassDefinitionNode>();
-    private Stack<(string? ClassName, HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
+    private Stack<(string? ClassName, string? ClassIdentity, HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
     private bool _suppressCrossModuleQualification;
     private readonly HashSet<int> _preambleDirectiveStarts = new();
     private readonly HashSet<int> _compilationUnitDirectiveStarts = new();
@@ -553,6 +554,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _emissionContext = new EmissionContext();
         _reservedGeneratedIdentifiers = CollectReservedModuleIdentifiers(module);
         _currentClassName = null;
+        _currentClassIdentity = null;
         _currentModuleFunctionNames = new HashSet<string>(StringComparer.Ordinal);
         _intraModuleFunctionModules =
             CompilationDriver.BuildIntraModuleFunctionMap(module);
@@ -568,7 +570,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
         _moduleClasses = module.Classes;
         _classMemberScopes =
-            new Stack<(string? ClassName, HashSet<string> Members, bool Suppress)>();
+            new Stack<(string? ClassName, string? ClassIdentity, HashSet<string> Members, bool Suppress)>();
         _suppressCrossModuleQualification = false;
         _preambleDirectiveStarts.Clear();
         _compilationUnitDirectiveStarts.Clear();
@@ -5308,11 +5310,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // is the acceptable failure direction, silent wrong code is not.
         _classMemberScopes.Push((
             _currentClassName,
+            _currentClassIdentity,
             _currentClassMemberNames,
             _suppressCrossModuleQualification));
         // Set current class name for constructor emission after saving the outer
         // context so nested types restore it correctly.
         _currentClassName = name;
+        _currentClassIdentity = _currentClassIdentity == null
+            ? node.Name : $"{_currentClassIdentity}.{node.Name}";
         _currentClassMemberNames = node.Methods.Select(m => m.Name)
             .Concat(node.Fields.Select(f => f.Name))
             .Concat(node.Properties.Select(pr => pr.Name))
@@ -5408,6 +5413,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         (_currentClassName,
+            _currentClassIdentity,
             _currentClassMemberNames,
             _suppressCrossModuleQualification) = _classMemberScopes.Pop();
 
@@ -5629,8 +5635,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
 
         // Check for inherited contracts
-        var inheritedContracts = _currentClassName != null && _inheritanceResult != null
-            ? _inheritanceResult.GetInheritedContracts(_currentClassName, node)
+        var inheritedContracts = _currentClassIdentity != null && _inheritanceResult != null
+            ? _inheritanceResult.GetInheritedContracts(_currentClassIdentity, node)
             : null;
 
         // Emit explicit preconditions
