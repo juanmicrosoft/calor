@@ -52,7 +52,8 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
     '--keep-proven-guards', 'unsupported', 'Parameter mutation and numeric limits', 'NaN',
     'early and nested returns', 'shared postcondition exit', 'Calor1001', 'Calor1004',
     'preserves unknown operands', 'Runtime quantifier limits', 'Calor0326',
-    'no silent static-only fallback', 'Contract proofs do not establish effect completeness']) {
+    'no silent static-only fallback', 'Contract proofs do not establish effect completeness',
+    'including compound assignments, charge mut', 'not universally complete effect checking']) {
     await expect(article).toContainText(text);
   }
   await page.goto(`${base}/docs/benchmarking/results/`);

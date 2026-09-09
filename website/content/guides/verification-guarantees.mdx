@@ -147,10 +147,12 @@ error: the compiler reads the callback's own `§E{…}` and charges it to the
 caller. `Calor0418` is reserved for invoking something that is provably not a
 function at all.
 
-Contract proofs do not establish effect completeness. The separate
-[indexed-assignment audit](https://github.com/juanmicrosoft/calor/issues/1185)
-tracks mutation accounting and effects from evaluating assignment receivers
-and indexes; do not infer coverage of every effect path from a clean contract result.
+Contract proofs do not establish effect completeness. Indexed heap stores,
+including compound assignments, charge `mut`. Receiver and index evaluations
+and invoked property accessors contribute their effects; a simple property
+write does not charge a final getter that it never reads. The
+[indexed-assignment fix](https://github.com/juanmicrosoft/calor/issues/1185)
+covers these paths, not universally complete effect checking.
 
 `--no-enforce-effects` disables the gate. `--permissive-effects` assumes a call
 the compiler cannot look up does nothing, so `Calor0411` and `Calor0425` go
