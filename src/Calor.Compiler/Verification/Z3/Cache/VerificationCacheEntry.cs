@@ -79,7 +79,7 @@ public sealed class VerificationCacheEntry
     // Evict entry-state-only proofs produced before the exit-state gate (#1183).
     // 1.16: contract simplification preserves typed evaluation and IEEE equality.
     // Recheck proofs made from predicates rewritten by the former untyped rules.
-    public const string CurrentFormatVersion = "1.16";
+    public const string CurrentFormatVersion = "1.18";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

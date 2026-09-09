@@ -1,4 +1,4 @@
-§M{m001:Test_11_05}
+§M{m001:Test_11_05:overflow=unchecked}
   §U{System.Collections.Generic}
   §U{System.Collections.Immutable}
 
@@ -13,4 +13,3 @@
 
     §MT{m004:GetImmutableScores:pub} () -> ImmutableDictionary<str, i32>
       §R ImmutableDictionary<str, i32>.Empty
-

@@ -1,4 +1,4 @@
-§M{m001:Test_03_02}
+§M{m001:Test_03_02:overflow=unchecked}
   §CL{c001:Loops:pub}
     §MT{m002:Sum:pub} (i32:n) -> i32
       §B{~total:i32} 0

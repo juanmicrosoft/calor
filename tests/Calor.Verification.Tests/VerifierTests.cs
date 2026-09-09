@@ -125,7 +125,8 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -435,7 +436,8 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
         Assert.NotNull(result.CounterexampleDescription);
     }
 
@@ -539,7 +541,8 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================
@@ -718,7 +721,8 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]

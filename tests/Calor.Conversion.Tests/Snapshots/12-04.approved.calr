@@ -1,4 +1,4 @@
-§M{m001:Test_12_04}
+§M{m001:Test_12_04:overflow=unchecked}
   §U{System}
 
   §CL{c001:Utf8Example:pub}

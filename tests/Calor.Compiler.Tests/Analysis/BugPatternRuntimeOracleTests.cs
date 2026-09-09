@@ -151,7 +151,7 @@ public class BugPatternRuntimeOracleTests
             """,
             DiagnosticCode.IndexOutOfBounds,
             7),
-        OracleCase.Wraps(
+        OracleCase.Throws(
             "OverflowUnsafe",
             """
             §M{m:OverflowUnsafe}
@@ -161,7 +161,7 @@ public class BugPatternRuntimeOracleTests
                 §R value
             """,
             DiagnosticCode.IntegerOverflow,
-            int.MinValue),
+            typeof(OverflowException)),
         OracleCase.Returns(
             "OverflowSafe",
             """
@@ -193,16 +193,16 @@ public class BugPatternRuntimeOracleTests
             """,
             DiagnosticCode.IntegerOverflow,
             typeof(OverflowException)),
-        OracleCase.Wraps(
-            "NarrowingIntegralCastWraps",
+        OracleCase.Throws(
+            "NarrowingIntegralCastTraps",
             """
-            §M{m:NarrowingIntegralCastWraps}
+            §M{m:NarrowingIntegralCastTraps}
               §F{f:Run:pub} () -> i32
                 §B{value:i64} INT:2147483648
                 §R (cast i32 value)
             """,
             DiagnosticCode.IntegerOverflow,
-            int.MinValue),
+            typeof(OverflowException)),
         OracleCase.ReturnsWithArguments(
             "SameSymbolSubtraction",
             """

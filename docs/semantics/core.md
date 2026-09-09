@@ -192,16 +192,49 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§BIND{name=max}{type=INT} INT:2147483647
-§BIND{name=result}{type=INT} §OP{kind=ADD} §REF{name=max} INT:1
-// Throws OverflowException
+§M{m1:Overflow}
+  §F{f1:Increment:pub} (i32:value) -> i32
+    §E{}
+    §R (+ value INT:1)
+// Increment(int.MaxValue) throws OverflowException.
 ```
 
 **Rationale:** Safety-first philosophy aligns with the contracts design. Silent wraparound can hide bugs.
 
-**Compiler Flag:** `--overflow=[trap|wrap]`
-- `trap` (default): Overflow throws `OverflowException`
-- `wrap`: Overflow wraps around (two's complement)
+Native addition, subtraction, multiplication, negation, increment/decrement,
+and narrowing casts emit explicit C# `checked` contexts. Dynamic operations
+outside the destination type's range throw `OverflowException`, including
+floating-point-to-integer and integer-to-character casts. Widening conversions
+retain their normal behavior. Floating-point arithmetic still uses IEEE 754;
+`checked` does not turn floating-point infinity into an exception.
+
+Generated-C# validation and the projects used by `calor run` and `calor test`
+retain ordinary C# backend settings, so preserved C# interop keeps its own
+semantics. Explicit source-level checks enforce the native policy, including
+when generated C# is compiled separately with ordinary Roslyn settings.
+
+An explicit module attribute, `overflow=unchecked`, selects C#-compatible
+wrapping integer arithmetic and narrowing casts. C# migration records its
+source policy in this attribute; explicit C# `checked`/`unchecked` expressions
+remain preserved interop. Omitting the attribute, or using `overflow=checked`,
+selects TRAP. The verifier and proof cache distinguish these policies.
+Migration rejects globally checked source compilations with unscoped opaque
+C# interop, including whole-compilation-unit passthrough. A module attribute
+cannot safely restore that implicit context inside preserved code. Native
+lowering and explicit `checked`/`unchecked` expressions and blocks remain
+supported.
+
+Contract verification checks whether arithmetic in a predicate can overflow.
+If its safety follows from the preconditions and lazy evaluation paths, a proof
+can still remove that guard. Otherwise a conditional proof reports the
+`checked-arithmetic` assumption and keeps the runtime check. Postconditions
+describe normal returns: overflow in the function body still throws before a
+postcondition is evaluated.
+
+There is currently no `--overflow` switch. The earlier reference to that flag
+described an unimplemented option, not a supported wrap mode. This implementation
+corrects the backend to the existing semantics 2.0 TRAP policy; it does not
+introduce an intentionally different default policy.
 
 **Test Reference:** `S7: IntegerOverflow_Traps`
 

@@ -195,25 +195,23 @@ public class OutcomeCorpusTests
     }
 
     [SkippableFact]
-    public void RefutedOverflowFixture_CarriesGenuineModels()
+    public void FormerWraparoundFixture_ProvesOnlyNormalReturns()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Honest refutations: with result bound to the body, the only remaining
-        // counterexamples are genuine two's-complement overflows, and each must
-        // carry a concrete model (M-E2).
-        var result = CompileFixture("refuted-overflow.calr");
+        // Keep the historical fixture: overflow now throws before §S, so its
+        // former wraparound counterexamples are not normal-return executions.
+        var result = CompileFixture("refuted-overflow.calr", verbose: true);
 
-        var refuted = ContractDiagnostics(result)
-            .Where(d => d.Code == DiagnosticCode.PostconditionMayBeViolated)
+        var proven = ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionProven)
             .ToList();
-        Assert.Equal(2, refuted.Count);
-        Assert.All(refuted, d =>
+        Assert.Equal(2, proven.Count);
+        Assert.All(proven, d =>
         {
-            Assert.Equal(ProofStatus.Refuted, d.Verification!.Status);
-            var model = d.Verification.Counterexample;
-            Assert.NotNull(model);
-            Assert.Contains(model.Bindings, b => b.Name == "result");
+            Assert.Equal(ProofStatus.Proven, d.Verification!.Status);
+            Assert.False(d.Verification.IsVacuous);
+            Assert.Null(d.Verification.Counterexample);
         });
     }
 
