@@ -152,6 +152,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private int _inlineReturnGuardCounter;
     private ReturnLoweringContext? _currentReturnLowering;
     private string? _currentReturnValueType;
+    private Dictionary<string, string> _parameterTypes = new(StringComparer.Ordinal);
+    private int _contractExpressionDepth;
     private string? _postconditionResultIdentifier;
     private int _postconditionResultShadowDepth;
     private int _returnLoweringCounter;
@@ -205,6 +207,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private void ResetDeclScopes(IReadOnlyList<ParameterNode>? parameters = null)
     {
+        _parameterTypes.Clear();
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         _refinementDeclScopes.Clear();
@@ -223,6 +226,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // into its base scope too (#732).
             foreach (var p in parameters)
             {
+                _parameterTypes[p.Name] = TypeMapper.CalorToCSharp(p.TypeName);
                 var name = SanitizeIdentifier(p.Name);
                 _declScopes[0].Add(name);
                 if (p.Modifier.HasFlag(ParameterModifier.Out))
@@ -891,7 +895,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _ => false
         });
 
-    private static bool ExpressionBindsPatternName(
+    private bool ExpressionBindsPatternName(
         ExpressionNode expression,
         string name,
         bool whenTruth = true)
@@ -903,7 +907,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 .All(outcome => outcome.Bound);
     }
 
-    private static IReadOnlySet<(bool Truth, bool Bound)> AnalyzeBindingOutcomes(
+    private IReadOnlySet<(bool Truth, bool Bound)> AnalyzeBindingOutcomes(
         ExpressionNode expression,
         string name)
     {
@@ -4010,7 +4014,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             or CallExpressionNode or ExpressionCallNode or FieldAccessNode
             or NullConditionalNode or ArrayAccessNode or MultiDimArrayAccessNode;
 
-    private static bool TryUnwrapPatternComparison(
+    private bool TryUnwrapPatternComparison(
         BinaryOperationNode node, out ExpressionNode operand, out bool negated)
     {
         operand = node;
@@ -4031,23 +4035,78 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         else
             return false;
 
-        if (!IsBooleanPatternExpression(operand))
+        if (!DescendantsAndSelf(operand).Any(child => child is IsPatternNode)
+            || !IsBooleanPatternExpression(operand))
             return false;
         negated = literal.Value != (node.Operator == BinaryOperator.Equal);
         return true;
     }
 
-    private static bool IsBooleanPatternExpression(ExpressionNode expression) => expression switch
+    private bool IsBooleanPatternExpression(ExpressionNode expression)
     {
-        IsPatternNode => true,
-        BoolLiteralNode => true,
-        UnaryOperationNode { Operator: UnaryOperator.Not } unary => IsBooleanPatternExpression(unary.Operand),
-        BinaryOperationNode { Operator: BinaryOperator.And or BinaryOperator.Or } binary =>
-            IsBooleanPatternExpression(binary.Left) && IsBooleanPatternExpression(binary.Right),
-        BinaryOperationNode { Operator: BinaryOperator.Equal or BinaryOperator.NotEqual
-            or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
-            or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual } => true,
-        _ => false
+        IReadOnlyDictionary<string, string> types = _contractExpressionDepth > 0
+            ? _parameterTypes : ImmutableDictionary<string, string>.Empty;
+        if (_postconditionResultIdentifier != null && _postconditionResultShadowDepth == 0)
+        {
+            types = new Dictionary<string, string>(types, StringComparer.Ordinal)
+            {
+                ["result"] = _currentReturnValueType ?? ""
+            };
+        }
+        return GetBuiltinExpressionKind(expression, types) == PrimitiveExpressionKind.Boolean;
+    }
+
+    private enum PrimitiveExpressionKind { Unknown, Boolean, Numeric, String }
+
+    private PrimitiveExpressionKind GetBuiltinExpressionKind(
+        ExpressionNode expression, IReadOnlyDictionary<string, string> types)
+    {
+        if (GetLiteralTypeName(expression) is { } literalType)
+            return GetPrimitiveExpressionKind(literalType);
+        if (expression is ReferenceNode reference)
+            return GetPrimitiveExpressionKind(types.TryGetValue(reference.Name, out var type) ? type : null);
+        if (expression is IsPatternNode)
+            return PrimitiveExpressionKind.Boolean;
+        if (expression is UnaryOperationNode { Operator: UnaryOperator.Not } unary)
+            return GetBuiltinExpressionKind(unary.Operand, types) == PrimitiveExpressionKind.Boolean
+                ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
+        if (expression is not BinaryOperationNode binary)
+            return PrimitiveExpressionKind.Unknown;
+
+        var left = GetBuiltinExpressionKind(binary.Left, types);
+        var rightTypes = types;
+        if (binary.Operator is BinaryOperator.And or BinaryOperator.Or)
+        {
+            var scopedTypes = new Dictionary<string, string>(types, StringComparer.Ordinal);
+            foreach (var pattern in DescendantsAndSelf(binary.Left).OfType<IsPatternNode>())
+            {
+                if (pattern.VariableName is { } name
+                    && ExpressionBindsPatternName(binary.Left, name, binary.Operator == BinaryOperator.And))
+                    scopedTypes[name] = TypeMapper.CalorToCSharp(pattern.TargetType);
+            }
+            rightTypes = scopedTypes;
+        }
+        var right = GetBuiltinExpressionKind(binary.Right, rightTypes);
+        if (binary.Operator is BinaryOperator.And or BinaryOperator.Or)
+            return left == PrimitiveExpressionKind.Boolean && right == PrimitiveExpressionKind.Boolean
+                ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
+        var numericOperands = left == PrimitiveExpressionKind.Numeric && right == PrimitiveExpressionKind.Numeric;
+        if (binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual)
+            return numericOperands || left == right && left is PrimitiveExpressionKind.Boolean or PrimitiveExpressionKind.String
+                ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
+        if (binary.Operator is BinaryOperator.LessThan or BinaryOperator.LessOrEqual
+            or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual)
+            return numericOperands ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
+        return numericOperands ? PrimitiveExpressionKind.Numeric : PrimitiveExpressionKind.Unknown;
+    }
+
+    private static PrimitiveExpressionKind GetPrimitiveExpressionKind(string? type) => type switch
+    {
+        "bool" => PrimitiveExpressionKind.Boolean,
+        "string" => PrimitiveExpressionKind.String,
+        "sbyte" or "byte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong"
+            or "float" or "double" or "decimal" or "char" => PrimitiveExpressionKind.Numeric,
+        _ => PrimitiveExpressionKind.Unknown
     };
 
     private string EmitGroupedOperand(ExpressionNode expression)
@@ -4476,12 +4535,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string EmitTypedExpression(ExpressionNode expression, string? expectedType)
     {
         var typeSyntax = expectedType == null ? null : SyntaxFactory.ParseTypeName(expectedType);
+        if (typeSyntax is NullableTypeSyntax nullable)
+            typeSyntax = nullable.ElementType;
         var generic = typeSyntax switch
         {
             GenericNameSyntax name => name,
             QualifiedNameSyntax { Right: GenericNameSyntax name } => name,
             _ => null
         };
+        if (expression is LambdaExpressionNode lambda
+            && generic is { Identifier.ValueText: "Func" }
+            && generic.TypeArgumentList.Arguments.Count > 0)
+            return EmitLambda(lambda, generic.TypeArgumentList.Arguments[^1].ToString());
         if (generic is not { Identifier.ValueText: "Result", TypeArgumentList.Arguments.Count: 2 })
             return expression.Accept(this);
 
@@ -4669,6 +4734,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     // Phase 4: Contracts
 
+    private string EmitContractExpression(ExpressionNode expression)
+    {
+        _contractExpressionDepth++;
+        try
+        {
+            return expression.Accept(this);
+        }
+        finally
+        {
+            _contractExpressionDepth--;
+        }
+    }
+
     public string Visit(RequiresNode node)
     {
         // Off mode: no contract checks
@@ -4678,7 +4756,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         RequireNamespace("Calor.Runtime");
-        var condition = node.Condition.Accept(this);
+        var condition = EmitContractExpression(node.Condition);
         var functionId = _currentFunctionId ?? "unknown";
 
         // Precondition guards are NEVER elided on verification results (#755, guarantees
@@ -4721,7 +4799,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         RequireNamespace("Calor.Runtime");
-        var condition = node.Condition.Accept(this);
+        var condition = EmitContractExpression(node.Condition);
         var functionId = _currentFunctionId ?? "unknown";
 
         // Check verification status if available
@@ -4773,7 +4851,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         RequireNamespace("Calor.Runtime");
-        var condition = node.Condition.Accept(this);
+        var condition = EmitContractExpression(node.Condition);
         var functionId = _currentFunctionId ?? "unknown";
 
         // Release mode: lean exception
@@ -6864,6 +6942,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     public string Visit(LambdaExpressionNode node)
+        => EmitLambda(node, null);
+
+    private string EmitLambda(LambdaExpressionNode node, string? returnValueType)
     {
         var staticMod = node.IsStatic ? "static " : "";
         var async = node.IsAsync ? "async " : "";
@@ -6877,12 +6958,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var previousYieldRefinement = _currentYieldRefinement;
         var previousReturnLowering = _currentReturnLowering;
         var previousReturnValueType = _currentReturnValueType;
+        var previousParameterTypes = _parameterTypes;
+        _parameterTypes = new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal);
+        foreach (var parameter in node.Parameters)
+        {
+            _parameterTypes.Remove(parameter.Name);
+            if (parameter.TypeName != null)
+                _parameterTypes[parameter.Name] = TypeMapper.CalorToCSharp(parameter.TypeName);
+        }
         var previousPostconditionResultShadowDepth =
             _postconditionResultShadowDepth;
         _currentInlineReturnRefinement = null;
         _currentYieldRefinement = null;
         _currentReturnLowering = null;
-        _currentReturnValueType = null;
+        _currentReturnValueType = returnValueType;
         if (node.Parameters.Any(parameter =>
                 parameter.Name.Equals("result", StringComparison.Ordinal)))
         {
@@ -6898,7 +6987,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 string body;
                 try
                 {
-                    body = node.ExpressionBody.Accept(this);
+                    body = EmitTypedExpression(node.ExpressionBody, returnValueType);
                 }
                 finally
                 {
@@ -6937,6 +7026,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _currentYieldRefinement = previousYieldRefinement;
             _currentReturnLowering = previousReturnLowering;
             _currentReturnValueType = previousReturnValueType;
+            _parameterTypes = previousParameterTypes;
             _postconditionResultShadowDepth =
                 previousPostconditionResultShadowDepth;
         }
@@ -8122,7 +8212,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     var varRange = range.AllRanges[i];
                     var varName = SanitizeIdentifier(varRange.Name);
-                    result = $"Calor.Runtime.ContractQuantifier.Range({varRange.Start}, {varRange.End}).All({varName} => ({result}))";
+                    result = $"{EmitVariableRange(varRange)}.All({varName} => ({result}))";
                 }
                 return result;
             }
@@ -8131,7 +8221,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Single variable - original behavior
                 var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
                 var body = range.Body.Accept(this);
-                return $"Calor.Runtime.ContractQuantifier.Range({range.Start}, {range.End}).All({varName} => ({body}))";
+                return $"{EmitVariableRange(range.AllRanges[0])}.All({varName} => ({body}))";
             }
         }
 
@@ -8187,7 +8277,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 {
                     var varRange = range.AllRanges[i];
                     var varName = SanitizeIdentifier(varRange.Name);
-                    result = $"Calor.Runtime.ContractQuantifier.Range({varRange.Start}, {varRange.End}).Any({varName} => ({result}))";
+                    result = $"{EmitVariableRange(varRange)}.Any({varName} => ({result}))";
                 }
                 return result;
             }
@@ -8196,7 +8286,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 // Single variable - original behavior
                 var varName = SanitizeIdentifier(node.BoundVariables[0].Name);
                 var body = range.Body.Accept(this);
-                return $"Calor.Runtime.ContractQuantifier.Range({range.Start}, {range.End}).Any({varName} => ({body}))";
+                return $"{EmitVariableRange(range.AllRanges[0])}.Any({varName} => ({body}))";
             }
         }
 
@@ -9071,15 +9161,24 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private sealed class VariableRange
     {
         public string Name { get; }
+        public string TypeName { get; }
         public string Start { get; }
         public string End { get; }
 
-        public VariableRange(string name, string start, string end)
+        public VariableRange(string name, string start, string end, string typeName)
         {
             Name = name;
+            TypeName = typeName;
             Start = start;
             End = end;
         }
+    }
+
+    private string EmitVariableRange(VariableRange range)
+    {
+        var type = MapTypeName(range.TypeName);
+        var typeArguments = type == "int" ? "" : $"<{type}>";
+        return $"Calor.Runtime.ContractQuantifier.Range{typeArguments}({range.Start}, {range.End})";
     }
 
     /// <summary>
@@ -9127,9 +9226,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var allRanges = new List<VariableRange>();
         foreach (var boundVar in node.BoundVariables)
         {
-            if (!TryExtractBounds(impl.Antecedent, boundVar.Name, out var start, out var end))
+            if (!TryExtractBounds(impl.Antecedent, boundVar.Name, out var start, out var end, boundVar.TypeName))
                 return null;
-            allRanges.Add(new VariableRange(boundVar.Name, start, end));
+            allRanges.Add(new VariableRange(boundVar.Name, start, end, boundVar.TypeName));
         }
 
         // The runtime body is the WHOLE implication, not just the consequent.
@@ -9182,14 +9281,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 if (conjunct is BinaryOperationNode cmp && cmp.Operator != BinaryOperator.And)
                 {
-                    ExtractBound(cmp, boundVar.Name, ref lower, ref upper);
+                    ExtractBound(cmp, boundVar.Name, ref lower, ref upper, boundVar.TypeName);
                 }
             }
 
             if (lower == null || upper == null)
                 return null;
 
-            allRanges.Add(new VariableRange(boundVar.Name, lower, upper));
+            allRanges.Add(new VariableRange(boundVar.Name, lower, upper, boundVar.TypeName));
         }
 
         var firstRange = allRanges[0];
@@ -9201,7 +9300,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// Tries to extract bounds from a conjunction like (&& (>= i 0) (< i n))
     /// Handles arbitrarily nested ANDs.
     /// </summary>
-    private bool TryExtractBounds(ExpressionNode expr, string varName, out string start, out string end)
+    private bool TryExtractBounds(ExpressionNode expr, string varName, out string start, out string end, string typeName = "i32")
     {
         start = "0";
         end = "0";
@@ -9210,7 +9309,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         string? upperBound = null;
 
         // Recursively collect all bound expressions from the conjunction
-        ExtractBoundsRecursive(expr, varName, ref lowerBound, ref upperBound);
+        ExtractBoundsRecursive(expr, varName, ref lowerBound, ref upperBound, typeName);
 
         if (lowerBound != null && upperBound != null)
         {
@@ -9225,20 +9324,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// <summary>
     /// Recursively extracts bounds from nested AND expressions.
     /// </summary>
-    private void ExtractBoundsRecursive(ExpressionNode expr, string varName, ref string? lowerBound, ref string? upperBound)
+    private void ExtractBoundsRecursive(ExpressionNode expr, string varName, ref string? lowerBound, ref string? upperBound, string typeName)
     {
         if (expr is BinaryOperationNode binOp)
         {
             if (binOp.Operator == BinaryOperator.And)
             {
                 // Recursively process both sides of AND
-                ExtractBoundsRecursive(binOp.Left, varName, ref lowerBound, ref upperBound);
-                ExtractBoundsRecursive(binOp.Right, varName, ref lowerBound, ref upperBound);
+                ExtractBoundsRecursive(binOp.Left, varName, ref lowerBound, ref upperBound, typeName);
+                ExtractBoundsRecursive(binOp.Right, varName, ref lowerBound, ref upperBound, typeName);
             }
             else
             {
                 // Try to extract a bound from this comparison
-                ExtractBound(binOp, varName, ref lowerBound, ref upperBound);
+                ExtractBound(binOp, varName, ref lowerBound, ref upperBound, typeName);
             }
         }
     }
@@ -9246,7 +9345,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// <summary>
     /// Tries to extract a single bound from a comparison expression like (>= i 0) or (< i n)
     /// </summary>
-    private void ExtractBound(BinaryOperationNode cmp, string varName, ref string? lowerBound, ref string? upperBound)
+    private void ExtractBound(BinaryOperationNode cmp, string varName, ref string? lowerBound, ref string? upperBound, string typeName = "i32")
     {
         // Check if one operand is the variable
         bool isVarLeft = cmp.Left is ReferenceNode leftRef && leftRef.Name == varName;
@@ -9257,6 +9356,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var otherOperand = isVarLeft ? cmp.Right : cmp.Left;
         var otherStr = otherOperand.Accept(this);
+        var mappedType = MapTypeName(typeName);
+        var typeArguments = mappedType == "int" ? "" : $"<{mappedType}>";
 
         // Determine bound type based on operator and variable position
         switch (cmp.Operator)
@@ -9269,7 +9370,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             case BinaryOperator.GreaterThan when isVarLeft:
             case BinaryOperator.LessThan when isVarRight:
                 // i > start => lower bound is start + 1
-                lowerBound ??= $"Calor.Runtime.ContractQuantifier.Successor({otherStr})";
+                lowerBound ??= $"Calor.Runtime.ContractQuantifier.Successor{typeArguments}({otherStr})";
                 break;
             case BinaryOperator.LessThan when isVarLeft:
             case BinaryOperator.GreaterThan when isVarRight:
@@ -9279,7 +9380,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             case BinaryOperator.LessOrEqual when isVarLeft:
             case BinaryOperator.GreaterOrEqual when isVarRight:
                 // i <= end => upper bound is end + 1
-                upperBound ??= $"Calor.Runtime.ContractQuantifier.Successor({otherStr})";
+                upperBound ??= $"Calor.Runtime.ContractQuantifier.Successor{typeArguments}({otherStr})";
                 break;
         }
     }

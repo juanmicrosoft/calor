@@ -73,6 +73,20 @@ public class ContractSimplificationRuntimeTests
             "(forall ((i i32)) (-> (&& (>= i INT:0) (<= i x)) (< i INT:0)))"), verify);
         AssertContractViolation(() => Invoke(wideEndpoint, long.MaxValue));
         Assert.Equal(7, Invoke(wideEndpoint, long.MinValue));
+        (string Type, object Min, object Max)[] domains =
+        [
+            ("i8", sbyte.MinValue, sbyte.MaxValue), ("u8", byte.MinValue, byte.MaxValue),
+            ("i16", short.MinValue, short.MaxValue), ("u16", ushort.MinValue, ushort.MaxValue),
+            ("i32", int.MinValue, int.MaxValue), ("u32", uint.MinValue, uint.MaxValue),
+            ("i64", long.MinValue, long.MaxValue), ("u64", ulong.MinValue, ulong.MaxValue)
+        ];
+        foreach (var (type, min, max) in domains)
+        {
+            var singleton = Compile(Function(type,
+                $"(forall ((i {type})) (-> (&& (>= i x) (<= i x)) false))"), verify);
+            AssertContractViolation(() => Invoke(singleton, min));
+            AssertContractViolation(() => Invoke(singleton, max));
+        }
     }
 
     [Theory]
@@ -86,6 +100,41 @@ public class ContractSimplificationRuntimeTests
         var compound = Compile(Function("object", "(&& (== (|| (is x i32) false) true) false)"), verify);
         AssertContractViolation(() => Invoke(compound, 5));
         AssertContractViolation(() => Invoke(compound, "text"));
+
+        var overloaded = Compile("""
+            §M{m1:TypedContracts}
+              §CL{c1:Probe:pub}
+                §OP{op1:==:pub}
+                  §I{Probe:a}
+                  §I{Probe:b}
+                  §O{Probe}
+                  §R a
+                §OP{op2:!=:pub}
+                  §I{Probe:a}
+                  §I{Probe:b}
+                  §O{Probe}
+                  §R a
+                §OP{op3:==:pub}
+                  §I{Probe:a}
+                  §I{bool:b}
+                  §O{bool}
+                  §R false
+                §OP{op4:!=:pub}
+                  §I{Probe:a}
+                  §I{bool:b}
+                  §O{bool}
+                  §R true
+                §OP{op5:!:pub}
+                  §I{Probe:a}
+                  §O{bool}
+                  §R false
+              §F{f1:Check:pub} (Probe:x) -> i32
+                §E{}
+                §Q (== (== x (? (is x Probe candidate) x x)) true)
+                §R INT:7
+            """, verify);
+        var probe = Activator.CreateInstance(Assert.Single(overloaded.GetTypes(), type => type.Name == "Probe"));
+        AssertContractViolation(() => Invoke(overloaded, probe));
     }
 
     [Theory]
@@ -131,6 +180,21 @@ public class ContractSimplificationRuntimeTests
             """, verify);
         Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<Calor.Runtime.Result<object, string>, string>>(
             Invoke(nested, 3)).Unwrap().Unwrap());
+        var nullable = Compile("""
+            §M{m1:TypedContracts}
+              §F{f1:Check:pub} (i32:x) -> Result<object,str>?
+                §E{}
+                §R §OK x
+            """, verify);
+        Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<object, string>>(Invoke(nullable, 3)).Unwrap());
+        var lambda = Compile("""
+            §M{m1:TypedContracts}
+              §F{f1:Check:pub} (i32:x) -> Func<Result<object,str>>
+                §E{}
+                §R §LAM{l1} §R §OK x §/LAM{l1}
+            """, verify);
+        var factory = Assert.IsType<Func<Calor.Runtime.Result<object, string>>>(Invoke(lambda, 3));
+        Assert.Equal(3, factory().Unwrap());
     }
 
     [Theory]

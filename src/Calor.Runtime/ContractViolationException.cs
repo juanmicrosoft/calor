@@ -155,4 +155,18 @@ public static class ContractQuantifier
         for (var value = Math.Max(start, int.MinValue); value < end; value++)
             yield return (int)value;
     }
+
+    /// <summary>Normalizes a bound using the quantified variable's integer domain.</summary>
+    public static decimal Successor<T>(decimal bound)
+        where T : System.Numerics.IBinaryInteger<T>, System.Numerics.IMinMaxValue<T>
+        => decimal.Floor(Math.Min(bound, decimal.CreateChecked(T.MaxValue))) + 1;
+
+    /// <summary>Enumerates a declared integer domain without overflowing its endpoints.</summary>
+    public static IEnumerable<T> Range<T>(decimal start, decimal exclusiveEnd)
+        where T : System.Numerics.IBinaryInteger<T>, System.Numerics.IMinMaxValue<T>
+    {
+        var end = Math.Min(decimal.Ceiling(exclusiveEnd), decimal.CreateChecked(T.MaxValue) + 1);
+        for (var value = Math.Max(decimal.Ceiling(start), decimal.CreateChecked(T.MinValue)); value < end; value++)
+            yield return T.CreateChecked(value);
+    }
 }
