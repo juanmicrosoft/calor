@@ -222,14 +222,28 @@ public class ContractSimplificationRuntimeTests
                           {{contractMarker}} (&& (is (cast Func<bool> §LAM{l1} §E{} {{mutation}} §R true §/LAM{l1}) Func<bool> grow) {{quantifier}})
                           §R INT:7
                     """;
-                var rejectedContract = Program.Compile(contractCapture, "contract-capture.calr", Options(verify));
-                Assert.Contains(rejectedContract.Diagnostics.Errors,
-                    error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-                var scalarContract = Compile(contractCapture.Replace(quantifier,
-                    $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
-                var domainType = scalarContract.GetType("TypedContracts.Domain")!;
-                var domain = Activator.CreateInstance(domainType);
-                AssertContractViolation(() => domainType.GetMethod("Check")!.Invoke(domain, [1]));
+                var inheritedCapture = contractCapture
+                    .Replace("§CL{c1:Domain:pub}", "§CL{c0:Base:pub:abs}")
+                    .Replace("§MT{mt1:Check:pub}", "§MT{mt1:Check:pub:abs}")
+                    .Replace("\n      §R INT:7", "") + """
+
+                      §CL{c1:Domain:pub}
+                        §EXT{Base}
+                        §MT{mt3:Check:pub:over} (i32:n) -> i32
+                          §E{}
+                          §R INT:7
+                    """;
+                foreach (var source in new[] { contractCapture, inheritedCapture })
+                {
+                    var rejectedContract = Program.Compile(source, "contract-capture.calr", Options(verify));
+                    Assert.Contains(rejectedContract.Diagnostics.Errors,
+                        error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+                    var scalarContract = Compile(source.Replace(quantifier,
+                        $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
+                    var domainType = scalarContract.GetType("TypedContracts.Domain")!;
+                    var domain = Activator.CreateInstance(domainType);
+                    AssertContractViolation(() => domainType.GetMethod("Check")!.Invoke(domain, [1]));
+                }
             }
 
             foreach (var initializer in new[]

@@ -5995,6 +5995,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var inheritedContracts = _currentClassName != null && _inheritanceResult != null
             ? _inheritanceResult.GetInheritedContracts(_currentClassName, node)
             : null;
+        if (!node.HasContracts && inheritedContracts != null)
+        {
+            _capturedParameterNames.UnionWith(FindCapturedNames(
+                inheritedContracts.Preconditions.Cast<AstNode>().Concat(inheritedContracts.Postconditions),
+                node.Parameters.Select(parameter => parameter.Name)));
+        }
 
         // Emit explicit preconditions
         foreach (var requires in node.Preconditions)
