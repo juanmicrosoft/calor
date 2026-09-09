@@ -7,6 +7,8 @@
     "migration": { "path": "Migration/", "line": 78.0, "branch": 71.0 },
     "dataflow": { "path": "Analysis/Dataflow/", "line": 66.0, "branch": 64.0 },
     "taint": { "path": "Analysis/Security/", "line": 75.0, "branch": 67.0 },
-    "effects": { "path": "Effects/", "line": 51.0, "branch": 47.0 }
+    "effects": { "path": "Effects/", "line": 51.0, "branch": 47.0 },
+    "parsing": { "path": "Parsing/", "line": 82.0, "branch": 73.0 },
+    "typechecking": { "path": "TypeChecking/", "line": 71.0, "branch": 72.0 }
   }
 }

@@ -31,6 +31,8 @@ Findings use the `Calor1320`–`Calor1328` band (see
 - `.github/copilot-instructions.md`
 - every `docs/syntax-reference/*.md`
 - every `docs/cli/*.md`
+- every undated, top-level `docs/semantics/*.md` page; dated planning records
+  and nested planning directories are excluded from normative checks
 - the **version scan only** additionally covers all of `docs/**/*.md`,
   excluding dated records under `docs/plans/`, `docs/experiments/`,
   `docs/design/`, and `docs/process/`
@@ -45,10 +47,11 @@ Findings use the `Calor1320`–`Calor1328` band (see
 | Every effect code in `docs/syntax-reference/effects.md`'s "Effect Codes" table is known to the effect registry | `Calor1323` |
 | Every implemented (non-legacy) effect code appears in that table | `Calor1324` |
 | No covered doc hardcodes the current `Directory.Build.props` version | `Calor1325` |
+| Current normative semantics-version claims match `SemanticsVersion.VersionString`, independently of package versions | `Calor1325` |
 | Required files/sections are present and readable | `Calor1326` |
 | Every implemented `Calor13xx` code is listed in `docs/cli/structured-output.md`'s table | `Calor1327` |
 | Every complete-program example still parses (see below) | `Calor1328` |
-| A generated mirror doc (AGENTS.md) matches its single source (CLAUDE.md) | `Calor1329` |
+| Generated mirrors (`AGENTS.md`, semantics AST inventory) match their sources (`CLAUDE.md`, `eng/ast-schema.json`) | `Calor1329` |
 | Every complete `§M` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
 | The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
 
@@ -127,6 +130,10 @@ drift. It is single-sourced from `CLAUDE.md` and checked by `self-check docs`
 calor self-check docs --fix
 ```
 
-`--fix` rewrites `AGENTS.md` from `CLAUDE.md` (idempotent; writes only on change).
+`--fix` rewrites `AGENTS.md` from `CLAUDE.md` and
+`docs/semantics/inventory.md` from `eng/ast-schema.json` (idempotent; writes
+only on change). The complete node list and count are generated; hand edits
+to either fail the mirror gate. Malformed or missing schema input is an error,
+not an empty generated inventory.
 The CI step "Check agent-facing docs against the implementation (spec drift)" runs `self-check docs` without `--fix`, so an un-regenerated
-`AGENTS.md` fails the build.
+mirror fails the build.

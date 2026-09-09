@@ -1,4 +1,4 @@
-§M{m001:Test_08_01}
+§M{m001:Test_08_01:overflow=unchecked}
   §CL{c001:UserDto:pub}
     §PROP{p002:Name:str:pub:req:get,set}
     §PROP{p003:Age:i32:pub:req:get,set}

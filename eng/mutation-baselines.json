@@ -13,12 +13,39 @@
     },
     {
       "id": "emitter-brace-escaping",
-      "component": "emitter",
+      "component": "migration-emitter",
       "file": "src/Calor.Compiler/Migration/CalorEmitter.cs",
       "before": "if (!input.Contains('{') && !input.Contains('}'))",
       "after": "if (input.Contains('{') && input.Contains('}'))",
       "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "filter": "FullyQualifiedName~CalorEmitterEscapeTests.EscapeBracesInIdentifier_PlainBraces_Escapes"
+    },
+    {
+      "id": "native-codegen-distinct-operands",
+      "component": "native-codegen",
+      "file": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+      "before": "right = node.Right.Accept(this);",
+      "after": "right = node.Left.Accept(this);",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~NativeCodeGenerationMutationTests.Arithmetic_PreservesDistinctOperands"
+    },
+    {
+      "id": "native-codegen-evaluation-order",
+      "component": "native-codegen",
+      "file": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+      "before": "return $\"{left} {op} {right}\";",
+      "after": "return $\"{right} {op} {left}\";",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~NativeCodeGenerationMutationTests.BinaryOperands_ExecuteOnceInSourceOrder"
+    },
+    {
+      "id": "native-parser-conditional-arms",
+      "component": "parsing",
+      "file": "src/Calor.Compiler/Parsing/Parser.cs",
+      "before": "return new ConditionalExpressionNode(span, args[0], args[1], args[2]);",
+      "after": "return new ConditionalExpressionNode(span, args[0], args[2], args[1]);",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~NativeCodeGenerationMutationTests.Conditional_ExecutesOnlySelectedArm"
     },
     {
       "id": "binder-expression-dispatch",

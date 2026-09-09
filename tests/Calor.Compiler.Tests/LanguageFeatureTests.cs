@@ -610,7 +610,7 @@ public class LanguageFeatureTests
                   §R (?? a (+ b 1))
             """;
         var code = CompileToCode(source);
-        Assert.Contains("return a ?? b + 1;", code);
+        Assert.Contains("return a ?? checked(b + 1);", code);
     }
 
     [Fact]

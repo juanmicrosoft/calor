@@ -3,6 +3,7 @@ const nextConfig = {
   output: 'export',
   // basePath is empty for local dev and calor.dev deployment
   // Only set NEXT_PUBLIC_BASE_PATH for GitHub Pages (e.g., /calor)
+  // For another host also set NEXT_PUBLIC_SITE_ORIGIN (e.g., https://juanmicrosoft.github.io).
   basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? '',
   images: {
     unoptimized: true,

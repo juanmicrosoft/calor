@@ -2274,7 +2274,8 @@ public sealed class Binder
     {
         var operand = BindExpression(isPattern.Operand);
         if (isPattern.VariableName != null)
-            DeclarePatternVariable(isPattern.Span, isPattern.VariableName, isPattern.TargetType);
+            DeclarePatternVariable(isPattern.Span, isPattern.VariableName,
+                isPattern.TargetType == "var" ? operand.Type.DisplayString : isPattern.TargetType);
         return new BoundIsPatternExpression(
             isPattern.Span,
             operand,

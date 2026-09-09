@@ -11,8 +11,16 @@ Contract verification has seven explicit outcomes: `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`. Since
 0.15, `--verify` removes the runtime guard by default — but only for a clean,
 non-vacuous, assumption-free `proven` postcondition. `assumed` and every
-inconclusive status always keep the guard. Pass `--keep-proven-guards` to
-keep every guard and use verification as a diagnostic only.
+inconclusive status never authorize proof-based removal. Pass
+`--keep-proven-guards` to retain otherwise-emitted guards and use verification
+as a diagnostic only. `--contract-mode off` emits no contract checks; enabled
+checks still require supported runtime lowering. See
+[verification modes and limits](/docs/guides/verification-guarantees/).
+
+Runtime quantifiers preserve their full predicate and require certified typed
+bounds and evaluation order. Unsupported requested lowering is a fatal
+`Calor0326`, even when proof-based guard removal would otherwise be possible.
+See [runtime quantifier limits](/docs/guides/verification-guarantees/#runtime-quantifier-limits).
 
 ---
 
@@ -22,14 +30,14 @@ Preconditions specify what must be true when calling a function.
 
 ### Syntax
 
-```
+```calor
 §Q condition
 §Q{message="error text"} condition
 ```
 
 ### Examples
 
-```
+```calor
 §Q (>= x 0)                              // x must be non-negative
 §Q (!= divisor 0)                        // divisor must not be zero
 §Q{message="Age must be positive"} (> age 0)
@@ -39,7 +47,7 @@ Preconditions specify what must be true when calling a function.
 
 Functions can have multiple preconditions:
 
-```
+```calor
 §F{f001:CreateUser:pub}
   §I{str:name}
   §I{i32:age}
@@ -59,7 +67,7 @@ Postconditions specify what the function guarantees when it returns.
 
 ### Syntax
 
-```
+```calor
 §S condition
 §S{message="error text"} condition
 ```
@@ -68,7 +76,7 @@ Postconditions specify what the function guarantees when it returns.
 
 In postconditions, `result` refers to the return value:
 
-```
+```calor
 §S (>= result 0)                         // result is non-negative
 §S (!= result null)                      // result is not null
 §S (== result (* x x))                   // result equals x squared
@@ -76,7 +84,7 @@ In postconditions, `result` refers to the return value:
 
 ### Examples
 
-```
+```calor
 §F{f001:Abs:pub}
   §I{i32:x}
   §O{i32}
@@ -89,7 +97,7 @@ In postconditions, `result` refers to the return value:
 
 ## Complete Contract Example
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:dividend}
   §I{i32:divisor}
@@ -112,7 +120,7 @@ In postconditions, `result` refers to the return value:
 
 ### Range Validation
 
-```
+```calor
 §F{f001:Clamp:pub}
   §I{i32:value}
   §I{i32:min}
@@ -126,7 +134,7 @@ In postconditions, `result` refers to the return value:
 
 ### Non-Empty Collection
 
-```
+```calor
 §F{f001:First:pub}
   §I{List:items}
   §O{?Item}
@@ -137,7 +145,7 @@ In postconditions, `result` refers to the return value:
 
 ### State Preservation
 
-```
+```calor
 §F{f001:Increment:pub}
   §I{i32:x}
   §O{i32}
@@ -147,7 +155,7 @@ In postconditions, `result` refers to the return value:
 
 ### Balance Transfers
 
-```
+```calor
 §F{f001:Transfer:pub}
   §I{Account:from}
   §I{Account:to}
@@ -168,7 +176,7 @@ In postconditions, `result` refers to the return value:
 
 An agent can understand function behavior without reading implementation:
 
-```
+```calor
 §F{f001:SquareRoot:pub}
   §I{f64:x}
   §O{f64}
@@ -182,7 +190,7 @@ An agent can understand function behavior without reading implementation:
 
 Contracts surface violations at call sites:
 
-```
+```calor
 // If an agent sees this call:
 §C{SquareRoot} §A -5 §/C
 
@@ -202,7 +210,7 @@ Contracts provide test oracle:
 
 Add context to failures:
 
-```
+```calor
 §Q{message="User ID must be positive"} (> userId 0)
 §Q{message="Email cannot be empty"} (!= email "")
 §S{message="Password hash must be 64 chars"} (== (len hash) 64)
@@ -214,7 +222,7 @@ Add context to failures:
 
 Recommended order in function definition:
 
-```
+```calor
 §F{id:name:vis}
   §I{...}           // 1. Inputs
   §O{...}           // 2. Output

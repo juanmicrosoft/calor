@@ -5,6 +5,9 @@ import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { WhatsNewBanner } from '@/components/landing/WhatsNewBanner';
 import './globals.css';
+import { themeScript } from '@/lib/theme';
+import { canonicalUrl, publicUrl, siteOrigin } from '@/lib/site';
+import { getBasePath } from '@/lib/utils';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -29,6 +32,8 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteOrigin),
+  alternates: { canonical: canonicalUrl('/') },
   title: {
     default: 'Calor - Coding Agent Language for Optimized Reasoning',
     template: '%s | Calor',
@@ -38,19 +43,19 @@ export const metadata: Metadata = {
   keywords: ['Calor', 'programming language', 'AI', 'coding agents', 'compiler', '.NET', 'C#'],
   authors: [{ name: 'Calor Team' }],
   icons: {
-    icon: '/favicon.ico',
+    icon: `${getBasePath()}/favicon.ico`,
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://calor.dev',
+    url: canonicalUrl('/'),
     siteName: 'Calor',
     title: 'Calor - A Programming Language for AI Coding Agents',
     description:
       'Calor is a programming language designed for AI coding agents, compiling to .NET via C#. Build intelligent, optimized agents with ease.',
     images: [
       {
-        url: 'https://calor.dev/og-image.jpg',
+        url: publicUrl('/og-image.jpg'),
         width: 1200,
         height: 630,
         alt: 'Calor - A Programming Language for AI Coding Agents',
@@ -62,7 +67,7 @@ export const metadata: Metadata = {
     title: 'Calor - A Programming Language for AI Coding Agents',
     description:
       'Calor is a programming language designed for AI coding agents, compiling to .NET via C#. Build intelligent, optimized agents with ease.',
-    images: ['https://calor.dev/og-image.jpg'],
+    images: [publicUrl('/og-image.jpg')],
   },
 };
 
@@ -73,6 +78,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
       <body className={`${dmSans.variable} ${displayFont.variable} ${jetbrainsMono.variable} ${vt323.variable} font-body antialiased`}>
         <div className="relative flex min-h-screen flex-col">
           <WhatsNewBanner />

@@ -39,57 +39,37 @@ function transformHref(href: string): string {
 // Custom components for MDX
 export const mdxComponents = {
   // Headings with anchor links
-  h1: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
-    const id = children
-      ?.toString()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  h1: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h1 id={id} {...props}>
         {children}
       </h1>
     );
   },
-  h2: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
-    const id = children
-      ?.toString()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  h2: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h2 id={id} {...props}>
-        <a href={`#${id}`} className="anchor-link">
+        <Link href={`#${id}`} className="anchor-link">
           {children}
-        </a>
+        </Link>
       </h2>
     );
   },
-  h3: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
-    const id = children
-      ?.toString()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  h3: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h3 id={id} {...props}>
-        <a href={`#${id}`} className="anchor-link">
+        <Link href={`#${id}`} className="anchor-link">
           {children}
-        </a>
+        </Link>
       </h3>
     );
   },
-  h4: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
-    const id = children
-      ?.toString()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  h4: ({ children, id, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
     return (
       <h4 id={id} {...props}>
-        <a href={`#${id}`} className="anchor-link">
+        <Link href={`#${id}`} className="anchor-link">
           {children}
-        </a>
+        </Link>
       </h4>
     );
   },

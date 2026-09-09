@@ -1,4 +1,4 @@
-§M{m001:Test_13_06}
+§M{m001:Test_13_06:overflow=unchecked}
   §U{System}
 
   §EN{e001:ThreadAccess:pub:u32}[@Flags]

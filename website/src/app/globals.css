@@ -164,6 +164,7 @@ body::before {
 
 .gradient-border::before {
   content: '';
+  pointer-events: none;
   position: absolute;
   inset: -1px;
   border-radius: inherit;
@@ -356,4 +357,7 @@ pre::-webkit-scrollbar-thumb:hover {
   .scroll-hidden-right {
     transform: translateX(24px);
   }
+}
+article :is(h1, h2, h3, h4)[id] {
+  scroll-margin-top: 6rem;
 }

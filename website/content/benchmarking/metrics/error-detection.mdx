@@ -6,7 +6,9 @@ order: 4
 
 
 **Category:** Error Detection
-**v0.12 result:** Calor wins (1.49x across 217 programs)
+**Historical dashboard result:** Calor wins (1.49x across 217 programs)
+
+See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully) for the recorded source, corpus, and measurement method.
 **What it measures:** Bug identification and contract violation detection
 
 ---
@@ -66,7 +68,7 @@ Base score: 0.30, cap at 0.90
 
 ### Calor with Contracts
 
-```
+```calor
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -110,7 +112,7 @@ public static int Divide(int a, int b)
 ### Null Reference
 
 **Calor detection:**
-```
+```calor
 §Q (!= input null)    // Explicit null check requirement
 ```
 
@@ -124,7 +126,7 @@ input ?? throw new ArgumentNullException();
 ### Bounds Check
 
 **Calor detection:**
-```
+```calor
 §Q (>= index 0)
 §Q (< index (len array))
 ```
@@ -149,7 +151,7 @@ if (index < 0 || index >= array.Length)
 
 Given this buggy call:
 
-```
+```calor
 // Calling Divide with potentially zero divisor
 §B{result} §C{Divide} §A x §A (- y y) §/C    // (y - y) = 0!
 ```
@@ -174,7 +176,7 @@ Given this buggy call:
 
 ### Calor Code
 
-```
+```calor
 §F{f001:SafeDivide:pub}
   §I{i32:a}
   §I{i32:b}
@@ -218,7 +220,7 @@ public static Result<int, string> SafeDivide(int a, int b)
 
 ## Interpretation
 
-The v0.12 aggregate is 1.49x. It shows that the calculator finds more explicit
+The historical aggregate is 1.49x. It shows that the calculator finds more explicit
 bug-detection signals in the paired Calor corpus; it does not by itself prove a
 1.49x reduction in production defects.
 

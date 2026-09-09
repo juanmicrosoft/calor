@@ -68,14 +68,15 @@ clean, non-vacuous proof can remove an emitted runtime check.
 
 Calor is a **verification-first language** that happens to be agent-friendly—not just an "agent DSL." The explicit syntax serves verification: contracts in a structured format can be parsed and proven by Z3.
 
-The 0.13.2 static benchmark (30-run statistical suite) reports:
+The static benchmark rerun for 0.19.0 (30 repetitions) reports:
 
 - **1.49x Error Detection** — more explicit detection signals under the calculator
 - **1.84x Comprehension** — more explicit structural signals
 - **1.42x Token Economics** — a token/character/line composite; Calor still uses more raw tokens on small programs
-- **0.98x Information Density** — the single C# win
+- **0.97x Information Density** — the single C# win
 
-These metrics do not establish proof coverage or production defect rates. Read
+Source pairs are not all behaviorally equivalent. These metrics do not establish
+a language advantage, proof coverage, or production defect rates. Read
 the [results caveats](/docs/benchmarking/results/) alongside the numbers.
 
 ---
@@ -84,7 +85,7 @@ the [results caveats](/docs/benchmarking/results/) alongside the numbers.
 
 Calor deliberately optimizes for machine readability over human aesthetics:
 
-```
+```calor
 §M{m001:Calculator}
   §F{f001:Add:pub}
     §I{i32:a}
@@ -108,19 +109,19 @@ This might look unusual to human programmers, but for an AI agent:
 
 **Hypothesis:** Explicit contracts, effects, and structure markers improve comprehension.
 
-**0.13.2 result:** 1.84x under the deterministic comprehension calculator.
+**Calculator score:** 1.84x under the deterministic comprehension calculator.
 
 ### 2. Can AI agents find bugs more effectively with first-class contracts?
 
 **Hypothesis:** Contracts surface invariant violations that would be hidden in imperative code.
 
-**0.13.2 result:** 1.49x under the deterministic error-detection calculator.
+**Calculator score:** 1.49x under the deterministic error-detection calculator.
 
 ### 3. Can explicit IDs make structural targets easier to identify?
 
 **Hypothesis:** Preserved explicit identifiers make structural targets less ambiguous.
 
-**0.13.2 result:** 1.36x under the deterministic source-pattern calculator. It
+**Calculator score:** 1.36x under the deterministic source-pattern calculator. It
 does not execute agent edits, and it does not model mature C#/Roslyn refactoring
 tools; see the [metric limits](/docs/benchmarking/metrics/edit-precision/).
 
@@ -129,7 +130,7 @@ tools; see the [metric limits](/docs/benchmarking/metrics/edit-precision/).
 **Honest answer:** Calor pays a raw-token premium on small programs. The
 token-economics composite nevertheless favors Calor at 1.42x because it also
 includes characters and lines. Information density narrowly favors C# at
-0.98x.
+0.97x.
 
 ---
 

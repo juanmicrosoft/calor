@@ -116,19 +116,11 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "If statements are converted to Calor IF blocks"
         },
-        // NOTE (#836 m2, pre-existing; #774 follow-up): §L's step is additive,
-        // but compound incrementors currently take the raw RHS — `k *= 2` /
-        // `j >>= 1` / `i -= 2` produce wrong additive steps. Kept at Full for
-        // the common ++/--/+= forms (a Partial level would warn on every for
-        // loop); the limitation is documented here and at the extraction site
-        // in RoslynSyntaxVisitor until the #774 follow-up routes non-additive
-        // incrementors to the while-loop fallback.
         ["for"] = new FeatureInfo
         {
             Name = "for",
-            Support = SupportLevel.Full,
-            Description = "For loops are converted to Calor LOOP blocks. Known limitation (#774 follow-up): non-additive compound incrementors (*=, /=, <<=, >>=, -=) take the raw RHS as an additive §L step, changing loop semantics",
-            Workaround = "Rewrite non-additive incrementors as while loops, or review converted §L steps"
+            Support = SupportLevel.Partial,
+            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations are preserved inline; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
         },
         ["foreach"] = new FeatureInfo
         {
@@ -198,6 +190,20 @@ public static class FeatureSupport
         },
 
         // Partially supported features
+        ["conditional-access-shape"] = new FeatureInfo
+        {
+            Name = "conditional-access-shape",
+            Support = SupportLevel.Partial,
+            Description = "Conditional member and positional invocation chains convert natively. Conditional indexing, named/ref arguments, generic conditional calls and unsupported grouping preserve the original expression as counted C# interop",
+            Workaround = "Keep the counted interop, or express the null check and dependent operations as explicit statements"
+        },
+        ["conditional-expression-hoisting"] = new FeatureInfo
+        {
+            Name = "conditional-expression-hoisting",
+            Support = SupportLevel.Partial,
+            Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
+            Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
+        },
         ["linq-method"] = new FeatureInfo
         {
             Name = "linq-method",
@@ -207,8 +213,8 @@ public static class FeatureSupport
         ["linq-query"] = new FeatureInfo
         {
             Name = "linq-query",
-            Support = SupportLevel.Full,
-            Description = "LINQ query syntax is desugared to equivalent method chains"
+            Support = SupportLevel.Partial,
+            Description = "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. Complex or unresolved selectors remain inline and deferred."
         },
         ["array-initializer"] = new FeatureInfo
         {
@@ -225,8 +231,8 @@ public static class FeatureSupport
         ["dictionary-initializer"] = new FeatureInfo
         {
             Name = "dictionary-initializer",
-            Support = SupportLevel.Full,
-            Description = "Dictionary initializers ({ key, value } and [key] = value syntax) are supported for Dictionary, SortedDictionary, ConcurrentDictionary, FrozenDictionary, and ImmutableDictionary"
+            Support = SupportLevel.Partial,
+            Description = "Literal Add-style Dictionary initializers in direct local bindings and returns use §DICT. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as inline C# interop to retain their operations, type initialization order and evaluation timing."
         },
         ["list-initializer"] = new FeatureInfo
         {
@@ -992,8 +998,8 @@ public static class FeatureSupport
         ["tuple-deconstruction"] = new FeatureInfo
         {
             Name = "tuple-deconstruction",
-            Support = SupportLevel.Full,
-            Description = "Tuple deconstruction var (a, b) = ... is fully supported"
+            Support = SupportLevel.Partial,
+            Description = "Flat identifier tuple assignments and certified scalar declarations stay atomic; other declarations, complex operands and expression-valued assignments use counted C# interop to preserve evaluation order and Deconstruct semantics"
         },
         ["span"] = new FeatureInfo
         {

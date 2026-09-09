@@ -3,13 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
-import { cn, getBasePath } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { cn, normalizePathname, currentDocSection } from '@/lib/utils';
 import { trackSidebarSectionExpand } from '@/lib/analytics';
 import type { DocSection } from '@/lib/docs';
 
-// basePath is needed for pathname comparison since usePathname returns full path
-const basePath = getBasePath();
 
 interface SidebarProps {
   sections: DocSection[];
@@ -17,11 +15,14 @@ interface SidebarProps {
 
 export function Sidebar({ sections }: SidebarProps) {
   const pathname = usePathname();
+  const currentSection = currentDocSection(pathname);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     // Expand the current section by default
-    const currentSection = pathname?.split('/')[3]; // /calor/docs/{section}/...
     return new Set(currentSection ? [currentSection] : sections.map((s) => s.slug));
   });
+  useEffect(() => {
+    if (currentSection) setExpandedSections(previous => new Set([...previous, currentSection]));
+  }, [pathname, currentSection]);
 
   const toggleSection = (slug: string) => {
     setExpandedSections((prev) => {
@@ -37,24 +38,22 @@ export function Sidebar({ sections }: SidebarProps) {
   };
 
   const isActive = (docSlug: string) => {
-    const docPath = `${basePath}/docs/${docSlug}/`;
-    return pathname === docPath || pathname === docPath.slice(0, -1);
+    return normalizePathname(pathname) === normalizePathname(`/docs/${docSlug}/`);
   };
 
   return (
-    <nav className="w-64 shrink-0">
+    <nav aria-label="Documentation" className="w-64 shrink-0">
       <div className="sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto pb-10">
         <ul className="space-y-1">
           {sections.map((section) => {
             const isExpanded = expandedSections.has(section.slug);
-            const sectionHref = `/docs/${section.slug}/`;
-            const sectionPath = `${basePath}/docs/${section.slug}/`; // for pathname comparison
-            const isSectionActive = pathname?.startsWith(sectionPath.slice(0, -1));
+            const isSectionActive = currentSection === section.slug;
 
             return (
               <li key={section.slug}>
                 <button
                   onClick={() => toggleSection(section.slug)}
+                  aria-expanded={isExpanded}
                   className={cn(
                     'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
                     isSectionActive
@@ -80,6 +79,7 @@ export function Sidebar({ sections }: SidebarProps) {
                         <li key={doc.slug}>
                           <Link
                             href={href}
+                            aria-current={active ? 'page' : undefined}
                             className={cn(
                               'block rounded-md px-3 py-1.5 text-sm transition-colors',
                               active

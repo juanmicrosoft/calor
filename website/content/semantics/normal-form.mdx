@@ -89,7 +89,7 @@ CNF expressions are always atomic—they reference either literals, variables, o
 ### Binary Operations
 
 **Source:**
-```
+```calor
 §R (+ (* a b) c)
 ```
 
@@ -105,7 +105,7 @@ The evaluation order is now explicit: `a * b` is computed first, stored in `t1`,
 ### Short-Circuit AND
 
 **Source:**
-```
+```calor
 §R (&& A B)
 ```
 
@@ -125,7 +125,7 @@ Short-circuit semantics are now explicit control flow. If `A` is false, `B` is n
 ### Short-Circuit OR
 
 **Source:**
-```
+```calor
 §R (|| A B)
 ```
 
@@ -145,7 +145,7 @@ If `A` is true, `B` is never evaluated.
 ### Function Call
 
 **Source:**
-```
+```calor
 §R (f (a) (b) (c))
 ```
 

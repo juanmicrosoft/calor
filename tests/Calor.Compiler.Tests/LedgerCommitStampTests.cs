@@ -197,7 +197,9 @@ public class LedgerCommitStampTests
     private static string RepoRoot()
     {
         var dir = AppContext.BaseDirectory;
-        while (dir != null && !Directory.Exists(Path.Combine(dir, ".git")))
+        while (dir != null
+            && !Directory.Exists(Path.Combine(dir, ".git"))
+            && !File.Exists(Path.Combine(dir, ".git")))
             dir = Path.GetDirectoryName(dir);
         Assert.NotNull(dir);
         return dir!;

@@ -6,9 +6,13 @@ order: 4
 
 
 Calor uses Z3 to verify contracts inside an explicitly modeled subset. The
-result is one of seven statuses. In released v0.12.1, `--verify` automatically
+result is one of seven statuses. With optional `--verify`, the compiler
 removes an eligible runtime guard only for a clean, non-vacuous,
-assumption-free `proven` result. Every other result keeps its guard.
+assumption-free `proven` result. Other results never authorize proof-based
+removal. Runtime checks depend separately on contract mode and supported lowering;
+`--contract-mode off` emits no contract guards; it does not disable checked
+arithmetic. See
+[verification modes and limits](/docs/guides/verification-guarantees/).
 
 ---
 
@@ -23,10 +27,17 @@ When you write contracts in Calor:
   §R (* x x)
 ```
 
-For this integer-only signature, the compiler can prove that the postcondition
-holds under the precondition and encoded body. That is a proof of this
-obligation under Calor's modeled semantics—not a proof that the whole program
-is correct.
+Native Calor checks this integer multiplication for overflow. `x = 46340`
+returns `2147395600`. `x = 46341` satisfies the precondition, but multiplication
+throws `OverflowException` instead of returning a wrapped negative value.
+The postcondition constrains normal returns; it does not promise that every
+allowed input returns successfully.
+
+Restricting `x` to `0..46340` avoids this multiplication overflow.
+`--contract-mode off` disables contract checks, not checked arithmetic.
+Optional `--verify` does not make this example return successfully for `46341`.
+See [integer overflow policy](/docs/guides/verification-guarantees/#integer-overflow-policy)
+for the distinction between native Calor and imported C#.
 
 ---
 
@@ -38,23 +49,24 @@ Use the `--verify` flag when compiling:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
-In v0.12.1 this also enables automatic removal of eligible proven guards.
+This also enables removal of eligible proven guards. Add
+`--keep-proven-guards` to retain otherwise-emitted checks.
 
 ---
 
 ## Seven Verification Outcomes
 
-| Status | Meaning | Runtime postcondition check |
+| Status | Meaning | Proof-based postcondition guard removal |
 |:-------|:--------|:----------------------------|
-| `proven` | The obligation holds under the modeled semantics | In v0.12.1, automatically removed only when non-vacuous and free of assumptions |
-| `refuted` | Z3 found a violation; a counterexample is included when available | Kept; `calor verify` exits 1 |
-| `assumed` | The proof depends on a named modeling assumption | Always kept |
-| `unknown` | Z3 could not decide | Kept |
-| `timeout` | The solver exceeded its per-contract budget | Kept |
-| `unsupported` | The expression or runtime semantics are outside the modeled subset | Kept |
-| `unavailable` | Z3 was not available to attempt the proof | Kept |
+| `proven` | The obligation holds under the modeled semantics | Eligible only when non-vacuous and free of assumptions |
+| `refuted` | Z3 found a violation; a counterexample is included when available | Not authorized; `calor verify` exits 1 |
+| `assumed` | The proof depends on a named modeling assumption | Not authorized |
+| `unknown` | Z3 could not decide | Not authorized |
+| `timeout` | The solver exceeded its per-contract budget | Not authorized |
+| `unsupported` | The expression or runtime semantics are outside the modeled subset | Not authorized |
+| `unavailable` | Z3 was not available to attempt the proof | Not authorized |
 
-Vacuous proofs carry a separate flag and keep their runtime checks.
+Vacuous proofs carry a separate flag and do not authorize guard removal.
 Preconditions are never elided on a satisfiability result.
 
 ---
@@ -81,7 +93,9 @@ Z3 verification supports:
 | `(! p)` | `¬p` | Logical not |
 
 Integer arithmetic is modeled with fixed-width bit-vectors and C#-compatible
-promotion rules where supported—not arbitrary-precision integers. Boolean,
+promotion rules where supported—not arbitrary-precision integers. Verification
+also follows the module's overflow policy; bit-vectors do not imply that native
+execution wraps on overflow. Boolean,
 integer, selected string, array, quantifier, implication, and registered
 user-field forms are modeled with the restrictions below.
 
@@ -152,10 +166,15 @@ guessed.
 
 ### Runtime Lowering
 
-Bodies with early, nested, or raw-C# returns can trigger `Calor1001`. In that
-case the compiler leaves the body untransformed and warns that postcondition
-runtime checks were not emitted. Static verification is separate from that
-lowering limitation.
+Structured early and nested returns use a shared postcondition exit when checks
+are enabled. Opaque raw-C# bodies with postconditions are rejected with
+`Calor1001`; iterator postconditions are rejected with `Calor1004`. Static
+verification is separate from these runtime-lowering boundaries.
+
+Runtime quantifiers also require a faithful finite domain and evaluation order.
+If those cannot be certified, `Calor0326` fails compilation before guard elision;
+there is no silent static-only fallback. See the
+[runtime quantifier limits](/docs/guides/verification-guarantees/#runtime-quantifier-limits).
 
 ---
 
@@ -196,12 +215,12 @@ allowed to remove a runtime check.
 | Aspect | Runtime Only | Static + Runtime |
 |:-------|:-------------|:-----------------|
 | Verification cost | 0 | Compile time |
-| Runtime cost | Always | In v0.12.1, eligible proven guards are removed; all others remain |
+| Runtime cost | Enabled, supported checks | Eligible proven guards may be removed; other outcomes do not authorize removal |
 | Bug detection | At runtime | At compile time |
-| Coverage | All contracts | Supported constructs |
+| Coverage | Supported runtime lowering | Supported runtime lowering and modeled proof constructs |
 
 Static verification complements runtime checking—it does not replace it. See
-[Verification Guarantees](/docs/guides/verification-guarantees/) for the v0.12
+[Verification Guarantees](/docs/guides/verification-guarantees/) for the current
 boundary and [calor verify](/docs/cli/verify/) for the command contract.
 
 ---
@@ -213,7 +232,7 @@ Calor is **not** a proof assistant like LEAN, Isabelle, or Rocq. The distinction
 | Aspect | Proof Assistants | Calor |
 |:-------|:-----------------|:------|
 | You write | Proofs (tactics, lemmas) | Contracts (§Q, §S) |
-| Verification | Must complete to compile | Reports seven verdicts; v0.12.1 removes only eligible clean proven guards |
+| Verification | Must complete to compile | Optional; reports seven verdicts and removes only eligible clean proven guards |
 | Scope | Arbitrary mathematical properties | Practical software contracts |
 | Expertise | Type theory, proof tactics | Software engineering |
 
@@ -226,7 +245,7 @@ theorem sqrt_positive (x : ℝ) (h : x ≥ 0) : √x ≥ 0 := by
   exact Real.sqrt_nonneg x
 ```
 
-In Calor, you declare the contract and Z3 attempts verification automatically.
+In Calor, you declare the contract and request Z3 verification with `--verify`.
 This floating-point example reports `unsupported`, which is an honest result:
 
 ```calor
@@ -236,8 +255,9 @@ This floating-point example reports `unsupported`, which is an honest result:
   §R (* x x)
 ```
 
-If Z3 cannot prove it, the runtime check remains where the emitter can lower it.
-Always treat `Calor1001` as a loud exception to that runtime-check guarantee.
+An inconclusive proof does not authorize guard removal. Runtime checks still
+require an enabled contract mode and supported lowering; review `Calor1001`
+and `Calor1004` rather than treating these errors as successful enforcement.
 
 ### Lightweight by Design
 
@@ -271,8 +291,9 @@ Z3 verification results are automatically cached to disk. When you recompile a f
 - **Deterministic cache keys**: The same normalized obligation, settings,
   compiler semantics, and solver version reuse the same result
 
-The cache includes contract and parameter shape, compiler and semantics
-versions, verification settings, and a format version. v0.12 bumped the format
+The cache includes contract and parameter shape, relevant function-body context,
+module overflow policy, compiler and semantics versions, verification settings,
+and a format version. v0.12 bumped the format
 as proof semantics changed so older `proven` entries could not be reused.
 
 To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, use `--clear-cache`.

@@ -83,7 +83,7 @@ public sealed class NumericExecutableSemanticsTests
                 try
                 {
                     dynamic operand = value;
-                    runtimeResult = -operand;
+                    runtimeResult = checked(-operand);
                 }
                 catch (Exception error) when (error is RuntimeBinderException or OverflowException)
                 {
@@ -193,15 +193,14 @@ public sealed class NumericExecutableSemanticsTests
 
     private static object EvaluateDynamic(object left, object right, BinaryOperator op)
     {
-        // Generated Calor C# uses the language default unchecked context for
-        // add/subtract/multiply, so dynamic dispatch is the executable oracle.
+        // Match the checked operations emitted by the production backend.
         dynamic dynamicLeft = left;
         dynamic dynamicRight = right;
         return op switch
         {
-            BinaryOperator.Add => dynamicLeft + dynamicRight,
-            BinaryOperator.Subtract => dynamicLeft - dynamicRight,
-            BinaryOperator.Multiply => dynamicLeft * dynamicRight,
+            BinaryOperator.Add => checked(dynamicLeft + dynamicRight),
+            BinaryOperator.Subtract => checked(dynamicLeft - dynamicRight),
+            BinaryOperator.Multiply => checked(dynamicLeft * dynamicRight),
             BinaryOperator.Divide => dynamicLeft / dynamicRight,
             BinaryOperator.Modulo => dynamicLeft % dynamicRight,
             BinaryOperator.Equal => dynamicLeft == dynamicRight,

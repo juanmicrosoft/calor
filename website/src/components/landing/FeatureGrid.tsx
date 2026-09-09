@@ -7,12 +7,12 @@ import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 const features = [
   {
-    name: 'Rules That Enforce Themselves',
+    name: 'Explicit Contracts',
     description:
-      'Contracts you write are proved by Z3; a clean Proven verdict drops its runtime guard, everything else stays guarded. Pass --keep-proven-guards to keep every guard.',
+      'Contracts declare required inputs and results. Runtime checks depend on contract mode and supported body shapes. Optional --verify asks Z3 to prove supported obligations; inconclusive results are not proofs.',
     icon: Shield,
     code: '§Q (>= x 0)\n§S (>= result 0)',
-    href: '/docs/philosophy/effects-contracts-enforcement/',
+    href: '/docs/guides/verification-guarantees/',
   },
   {
     name: 'Declared Side Effects',
@@ -23,9 +23,9 @@ const features = [
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
-    name: 'Rename Without Breaking',
+    name: 'Stable Declaration IDs',
     description:
-      'Add a stable ID to any declaration and refactoring stops breaking cross-agent references. IDs are optional, preserved through renames when present.',
+      'Optional stable IDs give tools a persistent declaration target across supported renames. They do not replace reference resolution, review, or tests.',
     icon: Fingerprint,
     code: '§F{f001:Process:pub}',
     href: '/docs/philosophy/stable-identifiers/',

@@ -1,24 +1,23 @@
-§M{m001:Test_13_08}
+§M{m001:Test_13_08:overflow=unchecked}
   §U{System.Collections.Generic}
 
   §CL{c001:CollectionHoistDemo:pub}
     §MT{m002:GetValues:pub} () -> Dict<str, i32>
-      §E{alloc}
-      §DICT{dict003:str:i32}
-        §KV "a" §C{Compute} §A 1 §/C
-        §KV "b" §C{Compute} §A 2 §/C
-      §R dict003
+      §R §CS{new Dictionary<string, int>
+        {
+            { "a", Compute(1) },
+            { "b", Compute(2) }
+        }}
 
-    §MT{m004:GetNames:pub} () -> Set<str>
+    §MT{m003:GetNames:pub} () -> Set<str>
       §E{alloc}
-      §HSET{set005:str}
+      §HSET{set004:str}
         §C{Format} §A "x" §/C
         §C{Format} §A "y" §/C
-      §R set005
+      §R set004
 
-    §MT{m006:Compute:priv} (i32:x) -> i32
+    §MT{m005:Compute:priv} (i32:x) -> i32
       §R (* x 2)
 
-    §MT{m007:Format:priv} (str:s) -> str
+    §MT{m006:Format:priv} (str:s) -> str
       §R (upper s)
-

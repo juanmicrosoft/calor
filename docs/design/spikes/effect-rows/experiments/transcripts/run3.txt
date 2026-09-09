@@ -213,7 +213,7 @@ CASE W1c-IFACE-impl-member-typeparams-renamed  args: (none)  exit: 1
 W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementation 'Logging.Handle' of interface method 'IP.Handle' on class 'Logging' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw does not fit the interface's row [pure]. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
 
 ==============================================================================
-CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 1
+CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:Z11}
   §F{f001:Parse:pub}
@@ -222,5 +222,5 @@ CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 1
     §E{}
     §R §OK s
 ------------------------------------------------------------------------------
-Z11-fallible-brace-form-full-output.calr(6,20): error Calor1002: Generated C# failed compilation (CS0029): Cannot implicitly convert type 'Calor.Runtime.Result<object, string>' to 'Calor.Runtime.Result<string, string>'
+Compilation successful: Z11-fallible-brace-form-full-output.g.cs
 

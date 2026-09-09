@@ -461,19 +461,27 @@ Match Result types:
   §K §ERR §VAR{e} → (+ "Error: " e)
 ```
 
-### Block Syntax (`§/K`)
+### Statement Match Blocks
 
-For cases with multiple statements, use block syntax:
+Use a statement-position match for cases with multiple statements. Indentation
+delimits each block:
 
 ```
 §W{sw1} x
-  §K 1 → "one"              // Arrow syntax (single expression)
+  §K 1
+    §R "one"
   §K 2
     §P "matched two"         // Block syntax (multiple statements)
     §R "two"
-    §/K
-  §K _ → "other"
+  §K _
+    §R "other"
 ```
+
+An expression-position match, such as `§R §W{sw1} x` or a binding initializer,
+supports arrow arms and blocks containing exactly one `§R value`. Other block
+shapes produce the fatal diagnostic `Calor1006`: the compiler does not discard
+statements or substitute `default`. This restriction also applies inside lambdas
+and when optional type checking is disabled.
 
 ### Complete Example
 

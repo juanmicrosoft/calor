@@ -1,8 +1,11 @@
 # .NET Backend Specification
 
-Version: 1.0.0
+Semantics Version: 2.0.0
 
 This document specifies how the .NET backend must implement Calor semantics. The backend **conforms to** Calor semantics; it does not **define** them.
+
+The production path calls `CSharpEmitter.Emit(ast)` after AST analyses. It does
+not consume CNF; `normal-form.md` describes separate, unintegrated lowering work.
 
 ---
 
@@ -373,7 +376,7 @@ finally
 
 **Calor catch with filter:**
 ```calor
-§CA{IOException:ex}{when=§OP{kind=EQ} §REF{name=ex.Message} STR:"Not found"}
+§CA{IOException:ex} §WHEN (== ex.Message "Not found")
 ```
 
 **C#:**
@@ -476,10 +479,7 @@ public sealed class Circle : Shape, IDrawable
 
 **Calor:**
 ```calor
-§RECORD{r1:Person}
-§FIELD{Name}{STRING}
-§FIELD{Age}{INT}
-§/RECORD{r1}
+§D{Person} (str:Name, i32:Age)
 ```
 
 **C#:**
@@ -491,7 +491,7 @@ public record Person(string Name, int Age);
 
 **Calor:**
 ```calor
-§WITH §REF{name=person}
+§WITH person
   §SET{Age} 30
 ```
 

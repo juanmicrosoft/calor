@@ -1,4 +1,4 @@
-§M{m001:Test_04_02}
+§M{m001:Test_04_02:overflow=unchecked}
   §CL{c001:Converter:pub}
     §MT{m002:Identity<T>:pub} (T:value) -> T
       §WHERE T : class

@@ -75,7 +75,11 @@ public sealed class VerificationCacheEntry
     // is timeout-DEPENDENT: one cached at 5s must not be reused by a 30s run that might prove).
     // 1.13 entries lack both fields; the bump evicts them, which is required for the new
     // validity rules to hold from the first warm read.
-    public const string CurrentFormatVersion = "1.14";
+    // 1.15: parameter-only postconditions require a state-preserving body.
+    // Evict entry-state-only proofs produced before the exit-state gate (#1183).
+    // 1.16: contract simplification preserves typed evaluation and IEEE equality.
+    // Recheck proofs made from predicates rewritten by the former untyped rules.
+    public const string CurrentFormatVersion = "1.18";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

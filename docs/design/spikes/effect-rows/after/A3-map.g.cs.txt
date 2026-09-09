@@ -64,7 +64,7 @@ namespace MapAfter
         public static int Double(int x)
         {
             #line 12 "<source>.calr"
-            return x * 2;
+            return checked(x * 2);
             #line default
         }
 

@@ -435,9 +435,9 @@ internal static class DifferentialFormRegistry
                     Span,
                     Eq(value, Int(3)),
                     Bin(
-                        BinaryOperator.LessThan,
-                        Bin(BinaryOperator.Multiply, value, Int(int.MaxValue)),
-                        Int(int.MaxValue)))),
+                        BinaryOperator.Equal,
+                        Bin(BinaryOperator.RightShift, value, Int(32)),
+                        value))),
             "u64" => Bin(
                 BinaryOperator.And,
                 Bin(BinaryOperator.GreaterOrEqual, value, Int(0)),

@@ -9,21 +9,10 @@ using Xunit;
 namespace Calor.Compiler.Tests.PropertyTests;
 
 /// <summary>
-/// Property-based smoke tests for parse -> pretty-print -> parse round-trip.
-///
-/// The property being asserted is the weakest useful one for a first cut:
-/// if we take a hand-generated Calor source string that parses cleanly,
-/// re-emit it through <see cref="CalorEmitter"/>, and parse the emitter's
-/// output, the second parse must also succeed with no diagnostics of
-/// severity Error and must produce a <see cref="ModuleNode"/> with the
-/// same module name and same number of top-level functions.
-///
-/// Structural AST equality across the round-trip is a much stronger claim
-/// that the emitter does not (yet) uphold in every corner (the emitter
-/// hoists ternaries, elides some §/C closers, and rewrites certain call
-/// argument shapes). Those refinements are tracked separately; this test
-/// exists to catch regressions where the emitter produces text that the
-/// lexer or parser will reject outright.
+/// Literal smoke coverage for parse -> pretty-print -> parse. Every generated
+/// sample must parse; structural comparison includes values and child structure,
+/// not just counts. GeneratedProductionPipelinePropertyTests adds bounded
+/// production execution, independent behavioral oracles, and explicit rejections.
 /// </summary>
 public class ParsePrettyRoundTripPropertyTests
 {
@@ -103,11 +92,7 @@ public class ParsePrettyRoundTripPropertyTests
     #region Sanity
 
     /// <summary>
-    /// Sanity check that the generator's parseable-sample RATE is above a
-    /// minimum threshold — otherwise the properties below "pass" vacuously
-    /// by short-circuiting on parse failure. Adversarial review flagged
-    /// that the previous check (`parseable > 0`) was satisfied by 1-of-30,
-    /// which still allowed 96% of property samples to skip.
+    /// Every sample in the intentionally well-typed subset must be accepted.
     /// </summary>
     [Fact]
     public void Generator_ProducesMostlyParseableInputs()
@@ -120,12 +105,8 @@ public class ParsePrettyRoundTripPropertyTests
             var (module, diags) = TryParse(sample);
             if (module is not null && !diags.HasErrors) parseable++;
         }
-        // Threshold is deliberately loose (half the samples). Tight enough
-        // that a generator regression that mostly emits garbage fails here
-        // instead of silently gutting the properties; loose enough to tolerate
-        // parser quirks the generator can't anticipate.
-        Assert.True(parseable >= samples.Count() / 2,
-            $"generator produced only {parseable}/{samples.Count()} parseable samples — the properties below would pass vacuously");
+        Assert.True(parseable == samples.Count(),
+            $"accepted={parseable}, rejected={samples.Count() - parseable}, total={samples.Count()}");
     }
 
     #endregion
@@ -135,19 +116,12 @@ public class ParsePrettyRoundTripPropertyTests
     [Property(MaxTest = 50)]
     public Property Parse_Pretty_Parse_ProducesNoErrors()
     {
-        // Property: for any source produced by our small generator, if the
-        // first parse succeeds, the emitter's output must also parse without
-        // errors. This is the minimum guarantee we ask of the pretty printer.
         return Prop.ForAll(SmallCalorPrograms(), source =>
         {
             var (firstModule, firstDiags) = TryParse(source);
 
-            // If our generator produced something the parser rejects, we
-            // skip that sample — the property only holds for parseable
-            // inputs. Report skips as passes so FsCheck's sample count is
-            // preserved. Generator_ProducesMostlyParseableInputs above
-            // guards against the vacuous-mass-skip failure mode.
-            if (firstModule is null || firstDiags.HasErrors) return true;
+            Assert.NotNull(firstModule);
+            Assert.False(firstDiags.HasErrors, string.Join("; ", firstDiags.Errors));
 
             var reemitted = PrettyPrint(firstModule);
             var (secondModule, secondDiags) = TryParse(reemitted);
@@ -159,17 +133,11 @@ public class ParsePrettyRoundTripPropertyTests
     [Property(MaxTest = 50)]
     public Property Parse_Pretty_Parse_PreservesModuleShape()
     {
-        // Property: the round-trip preserves module name, function count,
-        // AND per-function body statement count. Node-for-node AST
-        // equality is out of scope for this smoke test (see the class-level
-        // comment). Body-count assertion added per adversarial review:
-        // without it, an emitter regression that dropped every §P
-        // statement, preserved the module and function shell, and returned
-        // an empty body would still pass.
         return Prop.ForAll(SmallCalorPrograms(), source =>
         {
             var (firstModule, firstDiags) = TryParse(source);
-            if (firstModule is null || firstDiags.HasErrors) return true;
+            Assert.NotNull(firstModule);
+            Assert.False(firstDiags.HasErrors, string.Join("; ", firstDiags.Errors));
 
             var reemitted = PrettyPrint(firstModule);
             var (secondModule, secondDiags) = TryParse(reemitted);
@@ -191,7 +159,8 @@ public class ParsePrettyRoundTripPropertyTests
                 if (firstBody != secondBody) return false;
             }
 
-            return true;
+            return GeneratedProductionPipelinePropertyTests.SemanticTree(firstModule)
+                == GeneratedProductionPipelinePropertyTests.SemanticTree(secondModule);
         });
     }
 
