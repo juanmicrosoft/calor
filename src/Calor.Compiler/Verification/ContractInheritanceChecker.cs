@@ -547,7 +547,7 @@ public sealed class ContractInheritanceChecker : IDisposable
             substitutions = new Dictionary<string, string>(resolved.Substitutions, StringComparer.Ordinal);
             typeArguments = resolved.TypeArguments;
             var baseMethod = baseClass.Methods.FirstOrDefault(method =>
-                MethodsMatch(implementingMethod, method, substitutions));
+                MethodsMatch(implementingMethod, method, classNode, resolved));
             if (baseMethod != null)
             {
                 if (baseMethod.HasContracts)
@@ -577,7 +577,8 @@ public sealed class ContractInheritanceChecker : IDisposable
                                  .Where(pair => MethodsMatch(
                                      implementingMethod,
                                      pair.Method,
-                                     pair.TypeSubstitutions)))
+                                     classNode,
+                                     pair.Resolution)))
                     {
                         yield return new ContractSource(
                             _displayNames[pair.Interface],
@@ -1595,33 +1596,46 @@ public sealed class ContractInheritanceChecker : IDisposable
         return unknownViolation;
     }
 
-    private static bool ParametersMatch(
+    private TypeRebindings SignatureBindings(
+        AstNode owner,
+        IReadOnlyList<TypeParameterNode> methodParameters,
+        ResolvedDeclaration? context = null)
+    {
+        var typeArguments = context?.TypeArguments
+            ?? new Dictionary<AstNode, IReadOnlyList<string>>();
+        var replacements = DeclarationSubstitutions(owner, typeArguments);
+        for (var index = 0; index < methodParameters.Count; index++)
+            replacements[methodParameters[index].Name] = $"!{index}";
+        return new TypeRebindings(replacements, name =>
+        {
+            var resolved = ResolveDeclaration(name, owner, replacements,
+                memberLookup: true, typeArguments: typeArguments, argumentsAlreadyBound: true);
+            return resolved == null ? null : QualifiedTypeName(resolved);
+        });
+    }
+
+    private bool ParametersMatch(
         IReadOnlyList<ParameterNode> impl,
         IReadOnlyList<ParameterNode> contract,
         IReadOnlyList<TypeParameterNode> implementationTypeParameters,
         IReadOnlyList<TypeParameterNode> contractTypeParameters,
-        IReadOnlyDictionary<string, string>? typeSubstitutions = null)
+        AstNode implementationOwner,
+        ResolvedDeclaration contractDeclaration)
     {
         if (impl.Count != contract.Count)
             return false;
 
+        var implementationBindings = SignatureBindings(implementationOwner, implementationTypeParameters);
+        var contractBindings = SignatureBindings(
+            contractDeclaration.Declaration, contractTypeParameters, contractDeclaration);
         for (int i = 0; i < impl.Count; i++)
         {
-            var contractType = typeSubstitutions == null
-                || contractTypeParameters.Any(parameter =>
-                    parameter.Name.Equals(
-                        contract[i].TypeName,
-                        StringComparison.Ordinal))
-                ? contract[i].TypeName
-                : SubstituteTypeName(
-                    contract[i].TypeName,
-                    typeSubstitutions);
             var implementationSignature = TypeIdentity.CanonicalizeSignature(
-                impl[i].TypeName,
-                implementationTypeParameters.Select(parameter => parameter.Name).ToArray());
+                RewriteTypeName(impl[i].TypeName, implementationBindings),
+                Array.Empty<string>());
             var contractSignature = TypeIdentity.CanonicalizeSignature(
-                contractType,
-                contractTypeParameters.Select(parameter => parameter.Name).ToArray());
+                RewriteTypeName(contract[i].TypeName, contractBindings),
+                Array.Empty<string>());
             if (impl[i].Modifier != contract[i].Modifier
                 || !implementationSignature.Equals(
                     contractSignature,
@@ -1632,10 +1646,11 @@ public sealed class ContractInheritanceChecker : IDisposable
         return true;
     }
 
-    private static bool MethodsMatch(
+    private bool MethodsMatch(
         MethodNode implementation,
         MethodSignatureNode contract,
-        IReadOnlyDictionary<string, string>? typeSubstitutions = null) =>
+        AstNode implementationOwner,
+        ResolvedDeclaration contractDeclaration) =>
         implementation.Name.Equals(contract.Name, StringComparison.Ordinal)
         && implementation.TypeParameters.Count == contract.TypeParameters.Count
         && ParametersMatch(
@@ -1643,7 +1658,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             contract.Parameters,
             implementation.TypeParameters,
             contract.TypeParameters,
-            typeSubstitutions);
+            implementationOwner,
+            contractDeclaration);
 
     private bool InterfaceMethodMatches(
         MethodNode implementation,
@@ -1670,13 +1686,15 @@ public sealed class ContractInheritanceChecker : IDisposable
             source.Method.Parameters,
             implementation.TypeParameters,
             source.Method.TypeParameters,
-            source.TypeSubstitutions);
+            owner,
+            source.Resolution);
     }
 
-    private static bool MethodsMatch(
+    private bool MethodsMatch(
         MethodNode implementation,
         MethodNode contract,
-        IReadOnlyDictionary<string, string>? typeSubstitutions = null) =>
+        AstNode implementationOwner,
+        ResolvedDeclaration contractDeclaration) =>
         implementation.Name.Equals(contract.Name, StringComparison.Ordinal)
         && implementation.TypeParameters.Count == contract.TypeParameters.Count
         && ParametersMatch(
@@ -1684,7 +1702,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             contract.Parameters,
             implementation.TypeParameters,
             contract.TypeParameters,
-            typeSubstitutions);
+            implementationOwner,
+            contractDeclaration);
 
     private static string SubstituteTypeName(
         string typeName,

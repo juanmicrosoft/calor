@@ -402,6 +402,79 @@ public sealed class NestedContractInheritanceRuntimeTests
         Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NamedParameterSignatures_MatchAcrossInheritedDeclarationScopes(bool verify)
+    {
+        foreach (var depth in new[] { 0, 1, 2 })
+        foreach (var path in new[] { "interface", "base", "interface-base" })
+        foreach (var contracts in new[] { "§Q (!= x null)", "§S (!= result null)", "§Q (!= x null)\n§S (!= result null)" })
+        foreach (var parameterType in new[] { "Marker", "object" })
+        {
+            var declarations = """
+                §CL{c1:Marker:pub}
+                  §MT{mm1:Tag:pub} () -> i32
+                    §E{}
+                    §R INT:1
+                """;
+            if (path != "base")
+            {
+                declarations += "\n" + """
+                    §IFACE{i1:IValue}<T>
+                      §MT{im1:Check} (T:x) -> T
+                    """ + "\n" + Indent(Indent(contracts));
+            }
+            if (path != "interface")
+            {
+                declarations += "\n" + "§CL{c2:Base:pub:abs}<T>\n"
+                    + (path == "interface-base" ? "  §IMPL{IValue<T>}\n" : "")
+                    + "  §MT{mt1:Check:pub:abs} (T:x) -> T\n    §E{}"
+                    + (path == "base" ? "\n" + Indent(Indent(contracts)) : "");
+            }
+            declarations += "\n" + $$"""
+                §CL{c3:Impl:pub}
+                  {{(path == "interface" ? $"§IMPL{{IValue<{parameterType}>}}" : $"§EXT{{Base<{parameterType}>}}")}}
+                  §MT{mt2:Check:pub{{(path == "interface" ? "" : ":over")}}} ({{parameterType}}:value) -> {{parameterType}}
+                    §E{}
+                    §R value
+                """;
+            for (var level = depth - 1; level >= 0; level--)
+                declarations = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(declarations);
+            var assembly = Compile("§M{m1:NestedContracts}\n" + Indent(declarations), verify);
+            var prefix = "NestedContracts." + string.Concat(
+                Enumerable.Range(0, depth).Select(level => $"Outer{level}+"));
+            var instance = Activator.CreateInstance(assembly.GetType(prefix + "Marker")!);
+            AssertObjectGuard(assembly.GetType(prefix + "Impl")!, instance, null);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SignatureSubstitution_DoesNotCaptureCallerClassParametersAsMethodParameters(bool verify)
+    {
+        const string source = """
+            §M{m1:NestedContracts}
+              §IFACE{i1:IValue}<U>
+                §MT{im1:Check}<T> (U:x) -> U
+                  §Q (!= x null)
+                  §S (!= result null)
+              §CL{c1:Impl:pub}<T>
+                §IMPL{IValue<T>}
+                §MT{mt1:Check:pub}<V> (T:value) -> T
+                  §E{}
+                  §R value
+            """;
+        var assembly = Compile(source, verify);
+        var type = assembly.GetType("NestedContracts.Impl`1")!.MakeGenericType(typeof(string));
+        var instance = Activator.CreateInstance(type);
+        var method = type.GetMethod("Check")!.MakeGenericMethod(typeof(int));
+        Assert.Equal("valid", method.Invoke(instance, ["valid"]));
+        var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(instance, [null]));
+        Assert.Equal("ContractViolationException", error.InnerException!.GetType().Name);
+    }
+
     private static Assembly Compile(string source, bool verify)
     {
         var result = Program.Compile(source, "nested-contracts.calr", new CompilationOptions
