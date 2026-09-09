@@ -303,14 +303,14 @@ Derived classes may **weaken** (but not strengthen) preconditions:
 §MT{mt1:Process:pub:virt}
   §I{i32:value}
   §O{i32}
-  §REQ (> value 0)    // Requires positive
+  §Q (> value 0)      // Requires positive
   §R (* value 2)
 
 // Derived class - OK: accepts wider range
 §MT{mt1:Process:pub:over}
   §I{i32:value}
   §O{i32}
-  §REQ (>= value 0)   // Also accepts zero
+  §Q (>= value 0)     // Also accepts zero
   §R (* value 2)
 ```
 
@@ -322,13 +322,13 @@ Derived classes may **strengthen** (but not weaken) postconditions:
 // Base class
 §MT{mt1:GetValue:pub:virt}
   §O{i32}
-  §ENS (>= result 0)   // Ensures non-negative
+  §S (>= result 0)     // Ensures non-negative
   §R 10
 
 // Derived class - OK: guarantees stronger condition
 §MT{mt1:GetValue:pub:over}
   §O{i32}
-  §ENS (> result 0)    // Ensures strictly positive
+  §S (> result 0)      // Ensures strictly positive
   §R 42
 ```
 

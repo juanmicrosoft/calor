@@ -1,6 +1,6 @@
 # Calor Core Semantics Specification
 
-Version: 1.0.0
+Semantics Version: 2.0.0
 
 This document defines the formal semantics of the Calor programming language. These semantics are **backend-independent** - any backend (including the .NET backend) must conform to these rules.
 
@@ -143,13 +143,11 @@ left ?? right
 Calor uses **lexical scoping** with parent chain lookup. See `src/Calor.Compiler/Binding/Scope.cs:74-82`.
 
 ```calor
-§BIND{name=x}{type=INT} INT:1
-§IF{if1}
-  §COND BOOL:true
-  §THEN
-  §BIND{name=x}{type=INT} INT:2   // Shadows outer x
-  §PRINT §REF{name=x}              // Prints 2
-§PRINT §REF{name=x}                  // Prints 1 (outer x unchanged)
+§B{x:i32} 1
+§IF{if1} true
+  §B{inner:i32} (+ x 1)
+  §P inner                     // Prints 2
+§P x                           // Prints 1 (outer x unchanged)
 ```
 
 ### 3.2 Shadowing
@@ -175,9 +173,7 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF{if1}
-  §COND BOOL:true
-  §THEN
+§IF{if1} true
   §R INT:42   // Returns from function, not just if block
 ```
 
@@ -247,9 +243,9 @@ introduce an intentionally different default policy.
 | Narrowing conversions | Explicit required | Data may be lost |
 
 ```calor
-§BIND{name=i}{type=INT} INT:42
-§BIND{name=f}{type=FLOAT} §REF{name=i}           // OK: implicit widening
-§BIND{name=j}{type=INT} §CAST{INT} §REF{name=f}  // Required: explicit narrowing
+§B{i:i32} 42
+§B{f:f64} i                  // OK: implicit widening
+§B{j:i32} (cast i32 f)       // Required: explicit narrowing
 ```
 
 **Test Reference:** `S8: NumericConversion_IntToFloat`
@@ -277,7 +273,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.1 Preconditions (REQUIRES)
 
 ```calor
-§REQUIRES{message="x must be positive"} §OP{kind=GT} §REF{name=x} INT:0
+§Q (> x 0)
 ```
 
 **Semantics:**
@@ -294,7 +290,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.2 Postconditions (ENSURES)
 
 ```calor
-§ENSURES{message="result must be positive"} §OP{kind=GT} result INT:0
+§S (> result 0)
 ```
 
 **Semantics:**
@@ -307,7 +303,7 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.3 Invariants
 
 ```calor
-§INVARIANT{message="balance must be non-negative"} §OP{kind=GTE} §REF{name=balance} INT:0
+§IV (>= balance 0)
 ```
 
 **Semantics:**
@@ -329,8 +325,8 @@ Contracts are semantic constructs that specify behavioral requirements.
 Represents an optional value: either `Some(value)` or `None`.
 
 ```calor
-§SOME INT:42      // Option<INT> containing 42
-§NONE{INT}        // Option<INT> containing nothing
+§SM INT:42       // Option<i32> containing 42
+§NN              // None, with element type supplied by the surrounding context
 ```
 
 **Semantics:**
@@ -439,7 +435,7 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 
 ### 9.3 Rethrow
 
-`§RETHROW` re-throws the current exception, preserving the original stack trace.
+`§RT` re-throws the current exception, preserving the original stack trace.
 
 ---
 
@@ -457,15 +453,15 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 By default, bindings are immutable:
 
 ```calor
-§BIND{name=x}{type=INT} INT:42
-§SET §REF{name=x} INT:43  // ERROR: x is immutable
+§B{x:i32} 42
+§ASSIGN x 43             // ERROR: x is immutable
 ```
 
 Mutable bindings require explicit declaration:
 
 ```calor
-§BIND{name=x}{type=INT}{mut=true} INT:42
-§SET §REF{name=x} INT:43  // OK
+§B{~x:i32} 42
+§ASSIGN x 43             // OK
 ```
 
 ---
