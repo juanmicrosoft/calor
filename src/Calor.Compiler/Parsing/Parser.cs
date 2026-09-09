@@ -2706,9 +2706,9 @@ public sealed class Parser
         var startToken = Expect(TokenKind.Arg);
         argumentName = null;
         argumentModifier = null;
-        if (Check(TokenKind.OpenBrace))
+        if (Check(TokenKind.OpenBrace) && Current.Span.Start == startToken.Span.End)
         {
-            var attributes = ParseAttributes();
+            var attributes = ParseAttributes(maxGroups: 1);
             argumentModifier = attributes["_pos0"];
             if (attributes["_posCount"] != "1" || argumentModifier is not ("ref" or "out" or "in"))
                 _diagnostics.ReportError(startToken.Span, DiagnosticCode.InvalidModifier,

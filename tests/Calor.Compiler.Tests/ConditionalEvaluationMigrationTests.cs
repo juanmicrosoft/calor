@@ -145,6 +145,51 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Theory]
+    [InlineData("true", 9)]
+    [InlineData("false", 7)]
+    public void ConditionalStatements_SelectTheRefOverload(string gate, int expected)
+    {
+        AssertRoundTrip(
+            $"int value = 7; Holder target = {gate} ? new Holder() : null; target?.Check(ref value); return value;",
+            expected, false, members: """
+                public sealed class Holder
+                {
+                    public void Check(ref int value) { value = 9; }
+                    public void Check(int value) { }
+                }
+                """);
+    }
+
+    [Theory]
+    [InlineData("ref", "true", 9)]
+    [InlineData("ref", "false", 7)]
+    [InlineData("out", "true", 9)]
+    [InlineData("out", "false", 7)]
+    public void ConditionalInterpolation_PreservesWritableOverload(string modifier, string gate, int expected)
+    {
+        AssertRoundTrip(
+            $"int value = 7; bool gate = {gate}; string ignored = gate ? $\"{{Update(value: {modifier} value)}}\" : \"\"; return value;",
+            expected, false, members: $$"""
+                public static int Update({{modifier}} int value) { value = 9; return 0; }
+                public static int Update(int value) { return 0; }
+                """, expectEmitterFallback: true);
+    }
+
+    [Theory]
+    [InlineData("true", 7)]
+    [InlineData("false", 0)]
+    public void ConditionalInterpolation_PreservesInOverload(string gate, int expected)
+    {
+        AssertRoundTrip(
+            $"int value = 7; bool gate = {gate}; string ignored = gate ? $\"{{Update(in value)}}\" : \"\"; return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Update(in int value) { Calls = value; return 0; }
+                public static int Update(int value) { return 0; }
+                """, expectEmitterFallback: true);
+    }
+
+    [Theory]
     [InlineData("§C{Use} §A{readonly} value §/C")]
     [InlineData("§C{Use} §A{ref:out} value §/C")]
     [InlineData("§C{Use} §A{} value §/C")]
@@ -514,7 +559,7 @@ public class ConditionalEvaluationMigrationTests
 
     private static void AssertRoundTrip(
         string body, int expected, bool expectInterop,
-        ConversionMode mode = ConversionMode.Standard, string members = "")
+        ConversionMode mode = ConversionMode.Standard, string members = "", bool expectEmitterFallback = false)
     {
         var original = $$"""
             public static class Probe
@@ -541,11 +586,8 @@ public class ConditionalEvaluationMigrationTests
         Assert.True(expectInterop ==
             conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved),
             $"Unexpected interop accounting:\n{string.Join(Environment.NewLine, conversion.Issues)}\n{conversion.CalorSource}");
-        if (!expectInterop)
-        {
-            Assert.DoesNotContain(conversion.Losses,
-                loss => loss.Kind == ConversionLossKind.EmitterFallback);
-        }
+        Assert.Equal(expectEmitterFallback,
+            conversion.Losses.Any(loss => loss.Kind == ConversionLossKind.EmitterFallback));
         if (expectInterop)
         {
             Assert.Contains(conversion.Issues, issue =>

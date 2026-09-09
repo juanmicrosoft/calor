@@ -3242,9 +3242,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (node.Arguments.Count == 0)
                 return $"{node.Target}{typeArgsSuffix}()";
 
+            if (node.ArgumentModifiers?.Any(modifier => modifier != null) == true)
+                RecordEmitterFallback(node, "interpolation-call-modifiers",
+                    "Modified call arguments are preserved using C# interpolation expression syntax");
             var inlineArgs = node.Arguments.Select((a, i) =>
             {
                 var argValue = a.Accept(this);
+                if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
+                    && node.ArgumentModifiers[i] is { } modifier)
+                    argValue = $"{modifier} {argValue}";
                 if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
                     return $"{node.ArgumentNames[i]}: {argValue}";
                 return argValue;

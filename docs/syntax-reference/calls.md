@@ -45,6 +45,8 @@ Named-target calls retain C# argument modifiers with `§A{ref}`,
 §C{TryRead} §A{out}[result] value §/C
 ```
 
+Modifier braces must touch the marker: `§A{ref}`. A space before the brace
+instead starts a collection argument, as in `§A {1, 2}`.
 The modifier belongs to that argument, not the call. It must keep its
 explicit `§A` marker even for a single argument. These modifiers are not
 supported on expression-target calls or constructor/collection argument
