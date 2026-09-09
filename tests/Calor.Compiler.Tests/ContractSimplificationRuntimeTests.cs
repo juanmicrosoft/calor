@@ -102,6 +102,50 @@ public class ContractSimplificationRuntimeTests
             "forward-bound.calr", Options(verify));
         Assert.Contains(forwardDependent.Diagnostics.Errors,
             error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+        foreach (var predicate in new[]
+        {
+            "(forall ((i i32)) (-> (&& false x) false))",
+            "(forall ((i i8)) (-> (&& (&& (>= i INT:0) (< i INT:1)) x) (== i INT:0)))"
+        })
+        {
+            var overloaded = $$"""
+                §M{m1:TypedContracts}
+                  §CL{c1:Probe:pub}
+                    §OP{op1:implicit:pub}
+                      §I{bool:value}
+                      §O{Probe}
+                      §R §NEW{Probe}
+                    §OP{op2:implicit:pub}
+                      §I{Probe:value}
+                      §O{bool}
+                      §R true
+                    §OP{op3:true:pub}
+                      §I{Probe:value}
+                      §O{bool}
+                      §R true
+                    §OP{op4:false:pub}
+                      §I{Probe:value}
+                      §O{bool}
+                      §R false
+                    §OP{op5:&:pub}
+                      §I{Probe:a}
+                      §I{Probe:b}
+                      §O{Probe}
+                      §R a
+                  §F{f1:Check:pub} (Probe:x) -> i32
+                    §E{}
+                    §Q {{predicate}}
+                    §R INT:7
+                """;
+            var result = Program.Compile(overloaded, "overloaded-logic.calr", Options(verify));
+            Assert.Contains(result.Diagnostics.Errors,
+                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+            var scalar = predicate.Contains("i8", StringComparison.Ordinal)
+                ? "(-> (&& (&& (>= INT:-1 INT:0) (< INT:-1 INT:1)) x) (== INT:-1 INT:0))"
+                : "(-> (&& false x) false)";
+            var control = Compile(overloaded.Replace(predicate, scalar), verify);
+            AssertContractViolation(() => Invoke(control, null));
+        }
     }
 
     [Theory]

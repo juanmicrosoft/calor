@@ -718,12 +718,11 @@ public class QuantifierTests
     [Fact]
     public void Integration_ParseAndEmitQuantifierWithArrayAccess()
     {
-        // Note: Using 'arr' as a regular parameter - array access syntax arr{i} works
-        // in quantifier bodies regardless of the declared parameter type
+        // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
 §M{m001:Test}
   §F{f001:AllNonNegative:pub}
-      §I{i32:arr}
+      §I{i32[]:arr}
       §I{i32:n}
       §O{bool}
       §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
@@ -749,12 +748,11 @@ public class QuantifierTests
     [Fact]
     public void Integration_ParseAndEmitExistsWithArrayAccess()
     {
-        // Note: Using 'arr' as a regular parameter - array access syntax arr{i} works
-        // in quantifier bodies regardless of the declared parameter type
+        // Declared element types provide evidence that the comparisons are built-in.
         var source = @"
 §M{m001:Test}
   §F{f001:ContainsTarget:pub}
-      §I{i32:arr}
+      §I{i32[]:arr}
       §I{i32:n}
       §I{i32:target}
       §O{bool}
@@ -1316,7 +1314,7 @@ public class QuantifierTests
         var source = @"
 §M{m001:Sorting}
   §F{f001:Sort:pub}
-      §I{i32:arr}
+      §I{i32[]:arr}
       §I{i32:n}
       §O{bool}
       §Q (> n INT:0)
@@ -1334,10 +1332,7 @@ public class QuantifierTests
         Assert.Contains("Sort", result);
 
         // Should have contract checks for the postcondition
-        Assert.True(
-            result.Contains("Calor.Runtime.ContractQuantifier.Range") || result.Contains("STATIC ONLY"),
-            "Expected either runtime check or static-only comment"
-        );
+        Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
 
         // Should reference array access
         Assert.Contains("arr[", result);

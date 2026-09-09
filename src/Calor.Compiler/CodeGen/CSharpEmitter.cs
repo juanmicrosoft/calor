@@ -4095,7 +4095,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (IsStableLengthAccess(expression, types, out _))
             return PrimitiveExpressionKind.Numeric;
         if (expression is ReferenceNode reference)
-            return GetPrimitiveExpressionKind(types.TryGetValue(reference.Name, out var type) ? type : null);
+            return GetPrimitiveExpressionKind(GetKnownReferenceType(reference.Name, types));
+        if (expression is TypeOperationNode { Operation: TypeOp.Cast } cast)
+            return GetPrimitiveExpressionKind(MapTypeName(cast.TargetType));
+        if (expression is ArrayAccessNode { Array: ReferenceNode array })
+        {
+            var arrayType = GetKnownReferenceType(array.Name, types)?.TrimEnd('?');
+            if (arrayType == "string")
+                return PrimitiveExpressionKind.Numeric;
+            if (arrayType != null && IsArrayType(arrayType))
+                return GetPrimitiveExpressionKind(arrayType[..arrayType.LastIndexOf('[')]);
+        }
+        if (expression is ImplicationExpressionNode implication)
+            return GetBuiltinExpressionKind(implication.Antecedent, types) == PrimitiveExpressionKind.Boolean
+                && GetBuiltinExpressionKind(implication.Consequent, types) == PrimitiveExpressionKind.Boolean
+                ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
         if (expression is IsPatternNode)
             return PrimitiveExpressionKind.Boolean;
         if (expression is UnaryOperationNode { Operator: UnaryOperator.Not } unary)
@@ -4150,6 +4164,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             => PrimitiveExpressionKind.Reference,
         _ => PrimitiveExpressionKind.Unknown
     };
+
+    private string? GetKnownReferenceType(string name, IReadOnlyDictionary<string, string> types)
+    {
+        if (types.TryGetValue(name, out var type))
+            return type;
+        if (IsVarDeclaredInScope(SanitizeIdentifier(name)) || _currentClassName == null)
+            return null;
+        var classes = _moduleClasses.SelectMany(DescendantsAndSelf).OfType<ClassDefinitionNode>()
+            .Distinct(ReferenceEqualityComparer.Instance).ToArray();
+        var className = _currentClassName;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (className != null && visited.Add(className))
+        {
+            var matches = classes.OfType<ClassDefinitionNode>().Where(candidate => candidate.Name == className).ToArray();
+            if (matches.Length != 1)
+                return null;
+            var current = matches[0];
+            var property = current.Properties.FirstOrDefault(candidate => candidate.Name == name);
+            if (property != null)
+                return MapTypeName(property.TypeName);
+            var field = current.Fields.FirstOrDefault(candidate => candidate.Name == name);
+            if (field != null)
+                return MapTypeName(field.TypeName);
+            className = current.BaseClass;
+        }
+        return null;
+    }
 
     private static bool IsArrayType(string type)
     {
@@ -8261,7 +8302,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         RequireNamespace("System.Linq");
         RequireNamespace("Calor.Runtime");
-        if (TryLiteralBoolean(node.Body, out var constant))
+        if (TryLiteralBoolean(node.Body, GetQuantifierTypes(node.BoundVariables), out var constant))
             return constant ? "true" : "false";
         // Try to extract finite range from the pattern:
         // (forall ((i type)) (-> (&& (>= i 0) (< i n)) body))
@@ -8332,7 +8373,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         RequireNamespace("System.Linq");
         RequireNamespace("Calor.Runtime");
-        if (TryLiteralBoolean(node.Body, out var constant))
+        if (TryLiteralBoolean(node.Body, GetQuantifierTypes(node.BoundVariables), out var constant))
             return constant ? "true" : "false";
         // Try to extract finite range from the pattern:
         // (exists ((i type)) (&& (>= i 0) (< i n) body))
@@ -8405,22 +8446,24 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
     }
 
-    private static bool TryLiteralBoolean(ExpressionNode expression, out bool value)
+    private bool TryLiteralBoolean(ExpressionNode expression, IReadOnlyDictionary<string, string> types, out bool value)
     {
         value = false;
+        if (GetBuiltinExpressionKind(expression, types) != PrimitiveExpressionKind.Boolean)
+            return false;
         if (expression is BoolLiteralNode literal)
         {
             value = literal.Value;
             return true;
         }
         if (expression is UnaryOperationNode { Operator: UnaryOperator.Not } unary
-            && TryLiteralBoolean(unary.Operand, out var operand))
+            && TryLiteralBoolean(unary.Operand, types, out var operand))
         {
             value = !operand;
             return true;
         }
         if (expression is BinaryOperationNode { Operator: BinaryOperator.And or BinaryOperator.Or } binary
-            && TryLiteralBoolean(binary.Left, out var left))
+            && TryLiteralBoolean(binary.Left, types, out var left))
         {
             if (binary.Operator == BinaryOperator.And && !left
                 || binary.Operator == BinaryOperator.Or && left)
@@ -8428,17 +8471,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 value = left;
                 return true;
             }
-            return TryLiteralBoolean(binary.Right, out value);
+            return TryLiteralBoolean(binary.Right, types, out value);
         }
         if (expression is ImplicationExpressionNode implication
-            && TryLiteralBoolean(implication.Antecedent, out var antecedent))
+            && TryLiteralBoolean(implication.Antecedent, types, out var antecedent))
         {
             if (!antecedent)
             {
                 value = true;
                 return true;
             }
-            return TryLiteralBoolean(implication.Consequent, out value);
+            return TryLiteralBoolean(implication.Consequent, types, out value);
         }
         return false;
     }
@@ -9324,11 +9367,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return null;
         var conjuncts = new List<ExpressionNode>();
         FlattenConjunction(conjunction, conjuncts);
-        var types = _contractExpressionDepth > 0 || _statementDepth > 0
-            ? new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal)
-            : new Dictionary<string, string>(StringComparer.Ordinal);
-        if (_postconditionResultIdentifier != null && _postconditionResultShadowDepth == 0)
-            types["result"] = _currentReturnValueType ?? "";
+        var types = GetQuantifierTypes(variables);
         foreach (var variable in variables)
             types.Remove(variable.Name);
         var unstable = FindQuantifierMutations(body, types.Keys.Concat(variables.Select(variable => variable.Name)));
@@ -9336,6 +9375,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var allTypes = new Dictionary<string, string>(types, StringComparer.Ordinal);
         foreach (var variable in variables)
             allTypes[variable.Name] = MapTypeName(variable.TypeName);
+        if (GetBuiltinExpressionKind(body, allTypes) != PrimitiveExpressionKind.Boolean)
+            return null;
 
         // Moving only total, stable constraints past other total scalar expressions is unobservable.
         var lower = new string?[variables.Count];
@@ -9402,6 +9443,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             types[variable.Name] = MapTypeName(variable.TypeName);
         }
         return new FiniteRange("0", "0", body, ordered);
+    }
+
+    private Dictionary<string, string> GetQuantifierTypes(IReadOnlyList<QuantifierVariableNode> variables)
+    {
+        var types = _contractExpressionDepth > 0 || _statementDepth > 0
+            ? new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        if (_postconditionResultIdentifier != null && _postconditionResultShadowDepth == 0)
+            types["result"] = _currentReturnValueType ?? "";
+        foreach (var variable in variables)
+            types[variable.Name] = MapTypeName(variable.TypeName);
+        return types;
     }
 
     private string EmitCertifiedConstraint(ExpressionNode expression)
