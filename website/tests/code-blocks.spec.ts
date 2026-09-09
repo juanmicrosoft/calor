@@ -7,10 +7,25 @@ test('source fences identify Calor examples rather than defaulting to plain text
   for (const file of files.filter(file => file.endsWith('.mdx'))) {
     const content = await readFile(`content/${file}`, 'utf8');
     for (const match of content.matchAll(/^```([^\n]*)\n([\s\S]*?)^```\s*$/gm)) {
-      if (!match[1].trim() && match[2].trimStart().startsWith('§')) missing.push(file);
+      const firstCodeLine = match[2].split('\n').map(line => line.trim())
+        .find(line => line && !line.startsWith('//')) || '';
+      if (!match[1].trim() && /^(§|\([+\-*/%<>=!&|])/.test(firstCodeLine)) missing.push(file);
     }
   }
   expect(missing).toEqual([]);
+});
+
+test('comment-prefixed source examples render with Calor labels', async ({ page }) => {
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  for (const [route, comment] of [
+    ['expressions', '// Check if list contains element'],
+    ['expressions', '// Get count'],
+    ['effects', '// Read-only file operation'],
+  ]) {
+    await page.goto(`${base}/docs/syntax-reference/${route}/`);
+    await expect(page.getByRole('group', { name: 'Calor code example' }).filter({ hasText: comment })).toBeVisible();
+  }
 });
 
 for (const dark of [false, true]) {

@@ -275,7 +275,7 @@ Or explicitly:
 
 ### Read-Only vs Read-Write
 
-```
+```calor
 // Read-only file operation
 §F{f001:LoadConfig:pub}
   §I{str:path}
@@ -333,7 +333,7 @@ Or explicitly:
 
 ### 4. Composition Analysis
 
-```
+```calor
 // If f1 calls f2, f1's effects must include f2's effects
 §F{f001:ProcessAndSave:pub}
   §E{db:rw,cw}            // Must include f002's effects

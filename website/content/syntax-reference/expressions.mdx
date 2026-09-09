@@ -34,7 +34,7 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
 ### Examples
 
-```
+```calor
 (+ 1 2)           // 3
 (- 10 3)          // 7
 (* 4 5)           // 20
@@ -44,7 +44,7 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
 ### Nested Expressions
 
-```
+```calor
 // (1 + 2) * 3 = 9
 (* (+ 1 2) 3)
 
@@ -70,7 +70,7 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
 ### Examples
 
-```
+```calor
 (== x 0)          // x equals 0
 (!= y "")         // y is not empty string
 (< age 18)        // age less than 18
@@ -89,7 +89,7 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
 ### Examples
 
-```
+```calor
 (&& (> x 0) (< x 100))      // x > 0 AND x < 100
 (|| (== a 1) (== a 2))      // a == 1 OR a == 2
 (! (== x 0))                // NOT (x == 0)
@@ -97,7 +97,7 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
 ### Complex Conditions
 
-```
+```calor
 // (x > 0 && x < 100) || y == 0
 (|| (&& (> x 0) (< x 100)) (== y 0))
 
@@ -175,7 +175,7 @@ Check if a collection contains an element.
 | `§HAS{dict} §VAL value` | Value in dictionary | `dict.ContainsValue(value)` |
 
 **Examples:**
-```
+```calor
 // Check if list contains element
 §IF{if1} §HAS{numbers} 5
   §P "Found 5"
@@ -197,7 +197,7 @@ Get the number of elements in a collection.
 | `§CNT{coll}` | `i32` | `coll.Count` |
 
 **Examples:**
-```
+```calor
 // Get count
 §B{size} §CNT{items}
 
@@ -233,7 +233,7 @@ a + b * c    // Is this (a+b)*c or a+(b*c)?
 ```
 
 Calor:
-```
+```calor
 (+ a (* b c))    // Clearly a + (b * c)
 (* (+ a b) c)    // Clearly (a + b) * c
 ```
@@ -252,7 +252,7 @@ Every operation follows the same pattern: `(operator arguments...)`
 
 ### FizzBuzz Check
 
-```
+```calor
 (== (% i 15) 0)    // i divisible by 15
 (== (% i 3) 0)     // i divisible by 3
 (== (% i 5) 0)     // i divisible by 5
@@ -260,19 +260,19 @@ Every operation follows the same pattern: `(operator arguments...)`
 
 ### Range Check
 
-```
+```calor
 (&& (>= x min) (<= x max))    // min <= x <= max
 ```
 
 ### Null Check
 
-```
+```calor
 (!= value null)    // value is not null
 ```
 
 ### Equality with Multiple Values
 
-```
+```calor
 (|| (== x 1) (|| (== x 2) (== x 3)))    // x is 1, 2, or 3
 ```
 
