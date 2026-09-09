@@ -1437,7 +1437,7 @@ public class Example
     #region Batch 7: Tuples, Generic Static Access, Variance
 
     [Fact]
-    public void Convert_TupleDeconstruction_ProducesBindStatements()
+    public void Convert_TupleDeconstruction_PreservesDeclaration()
     {
         var csharp = @"
 public class Example
@@ -1452,12 +1452,11 @@ public class Example
         Assert.NotNull(result.CalorSource);
         var calor = result.CalorSource!;
 
-        // Should produce temp bind and individual item binds
-        Assert.Contains("_tup", calor);
-        Assert.Contains("Item1", calor);
-        Assert.Contains("Item2", calor);
-        // The deconstruction should produce bind statements, not an ERR for "var (a, b)"
-        Assert.DoesNotContain("var (a, b)", calor);
+        Assert.Contains("§ASSIGN (a, b)", calor);
+        Assert.DoesNotContain("_tup", calor);
+        Assert.DoesNotContain("Item1", calor);
+        Assert.DoesNotContain("Item2", calor);
+        Assert.DoesNotContain(result.Losses, loss => loss.Feature == "tuple-deconstruction");
     }
 
     [Fact]
