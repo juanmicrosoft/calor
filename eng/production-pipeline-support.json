@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "scope": "Bounded i32 production parse/pretty/compile/execute oracle, not CNF or general AST-ID canonicalization (#1042). Integer expression depth <= 2, loop trips <= 3, distinct leaf trace IDs, normal production overflow settings.",
+  "testFile": "tests/Calor.Compiler.Tests/PropertyTests/GeneratedProductionPipelinePropertyTests.cs",
+  "sampleAccounting": {
+    "behavioralPropertyAccepted": 60,
+    "validParserSamples": 60,
+    "validParserRejected": 0,
+    "malformedParserSamples": 32,
+    "malformedParserAccepted": 0,
+    "discardPolicy": "A rejected supposedly well-typed sample fails; no success-shaped discard. FsCheck reports replay seeds on failure.",
+    "malformedTimeoutSeconds": 2,
+    "malformedDiagnosticTest": "MalformedGenerator_ReportsRejectionsWithBoundedTermination",
+    "structuralNormalization": "Ignore incidental IDs and expand unique generated _hoist temporaries into expression children. Literal values, operators, names, types, effects and child positions remain compared; runtime observations independently check hoist placement/order."
+  },
+  "constructs": [
+    {
+      "name": "printed-i32-literals",
+      "stages": [
+        { "stage": "parse/pretty/structure", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "BehavioralAndStructuralOracles_RejectSameShapeMutants" },
+        { "stage": "compile/execute/output", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "BehavioralAndStructuralOracles_RejectSameShapeMutants" }
+      ],
+      "fallback": "Other literal types retain existing smoke tests; they are outside this i32 behavioral generator."
+    },
+    {
+      "name": "nested-i32-arithmetic",
+      "stages": [
+        { "stage": "parse/pretty/structure", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "BehavioralAndStructuralOracles_RejectSameShapeMutants" },
+        { "stage": "compile/execute/exception/order", "status": "supported", "positive": "ArithmeticBoundaryControls_ExerciseProductionExceptions", "negative": "BehavioralAndStructuralOracles_RejectSameShapeMutants" }
+      ],
+      "fallback": "Only signed i32 +,-,*,/ are modeled; other numeric types/operators require additional independent evaluator rules, not silent coercion."
+    },
+    {
+      "name": "conditional-expressions",
+      "stages": [
+        { "stage": "parse/pretty/compile/execute", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "ControlFlowControls_RejectChangedIterationOrBranchSemantics" }
+      ],
+      "fallback": "Generated conditions compare i32 to zero; unsupported condition types are not claimed."
+    },
+    {
+      "name": "short-circuit-and-or",
+      "stages": [
+        { "stage": "parse/pretty/compile/execute/exception/order", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "ShortCircuitControls_DoNotEvaluateThrowingRightOperand" }
+      ],
+      "fallback": "Right-operand evaluation is forbidden when short-circuited; no eager fallback."
+    },
+    {
+      "name": "bounded-for-and-mutable-accumulator",
+      "stages": [
+        { "stage": "parse/pretty/compile/execute", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "ControlFlowControls_RejectChangedIterationOrBranchSemantics" }
+      ],
+      "fallback": "Only ascending inclusive ranges of 0..3 iterations are generated; unbounded loops are explicitly rejected by the generator/evaluator."
+    },
+    {
+      "name": "statement-match-literal-default",
+      "stages": [
+        { "stage": "parse/pretty/compile/execute", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "ControlFlowControls_RejectChangedIterationOrBranchSemantics" }
+      ],
+      "fallback": "Only literal-zero and default arms with return expressions are generated; no claim for arbitrary pattern families."
+    },
+    {
+      "name": "collection-mutation-and-call-order",
+      "stages": [
+        { "stage": "parse/pretty/compile/effect-check", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "EffectsControl_RejectsUndeclaredObservableMutation" },
+        { "stage": "execute/trace", "status": "supported", "positive": "GeneratedPrograms_PreserveStructureAndObservableSemantics", "negative": "TraceOracle_RejectsOrderOnlyMutationWithIdenticalOtherObservations" }
+      ],
+      "fallback": "Trace lists are externally allocated; depth and loop bounds limit appends. The oracle checks exact visited leaf IDs, including traces before exceptions."
+    },
+    {
+      "name": "generic-methods-async-raw-csharp-unbounded-loops",
+      "stages": [
+        { "stage": "generator/evaluator", "status": "unsupported", "positive": "UnsupportedGeneratorConstructs_AreExplicitlyRejected", "negative": "UnsupportedGeneratorConstructs_AreExplicitlyRejected" }
+      ],
+      "fallback": "Unsupported generated modes throw NotSupportedException before execution. This is a test-subset boundary, not a production-language support claim. Separate ordinary suites cover these language features."
+    }
+  ]
+}
