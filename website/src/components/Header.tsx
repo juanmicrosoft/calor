@@ -43,7 +43,7 @@ export function Header() {
           <div className="flex lg:flex-1">
             <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2">
               <Image
-                src={`${basePath}/calor-logo.png`}
+                src={`${basePath}/calor-logo-64.webp`}
                 alt="Calor logo"
                 width={32}
                 height={32}
@@ -130,7 +130,7 @@ export function Header() {
             <div className="flex items-center justify-between">
               <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <Image
-                  src={`${basePath}/calor-logo.png`}
+                  src={`${basePath}/calor-logo-64.webp`}
                   alt="Calor logo"
                   width={32}
                   height={32}
