@@ -120,7 +120,7 @@ public static class FeatureSupport
         {
             Name = "for",
             Support = SupportLevel.Partial,
-            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates the condition after each increment and preserves continue/finally/disposal order. Headers with reference or condition-declared variables are explicitly preserved as interop."
+            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations are preserved inline; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
         },
         ["foreach"] = new FeatureInfo
         {
