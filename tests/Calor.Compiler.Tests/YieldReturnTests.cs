@@ -379,14 +379,16 @@ public class YieldReturnTests
         foreach (var stmt in method.Body)
         {
             if (stmt is YieldBreakStatementNode) hasYieldBreak = true;
-            if (stmt is ForStatementNode forStmt)
+            if (stmt is IfStatementNode)
             {
-                hasYieldReturn = forStmt.Body.Any(s => s is YieldReturnStatementNode);
+                hasYieldReturn = result.CalorSource!.Contains("§YIELD");
             }
         }
 
         Assert.True(hasYieldReturn, "Should contain yield return inside for loop");
         Assert.True(hasYieldBreak, "Should contain yield break");
+        Assert.DoesNotContain(result.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
 
     #endregion

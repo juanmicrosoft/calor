@@ -76,6 +76,8 @@ public class BinderIncompleteRatchetTests
         + "and FluentValidation/src/FluentValidation/Internal/AccessorCache.cs: "
         + "previously unconverted files 2 -> 0, accounted opaque boundaries 89 -> 91 "
         + "and opaque expressions 6423 -> 6471; native incomplete count remains zero. "
+        + "#1194 represents reevaluated for loops with native scoped while/first-iteration/guard nodes; "
+        + "the attempted bound-expression population grows without adding corpus files. "
         + "#1195 represents value-returning call lambdas as expressions and preserves unsupported "
         + "deferred query regions explicitly; the bound-expression population changes without "
         + "adding corpus files";
