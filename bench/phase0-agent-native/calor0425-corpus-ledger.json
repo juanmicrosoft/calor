@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "131b983fd29c9195a8e0fbfd8671b8576ba20c65",
+  "MeasuredCommit": "fbd52cd1357b86dff7bb5742b67991a33a145d4a",
   "AggregateDiagnostics": 117,
   "AggregateModulesWithDiagnostics": 47,
   "AggregateModulesEnforced": 326,
@@ -137,8 +137,8 @@
       "RawBagBindFailed": 61,
       "BindFailureCauses": {
         "Calor0201": 1,
-        "Calor0208": 7,
-        "Calor0250": 6
+        "Calor0208": 6,
+        "Calor0250": 7
       },
       "BindFailureModules": [
         "Calor0250 Serilog/Capturing/PropertyBinder.cs",
@@ -152,7 +152,7 @@
         "Calor0208 Serilog/Events/LogEventProperty.cs",
         "Calor0250 Serilog/Filters/Matching.cs",
         "Calor0250 Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
-        "Calor0208 Serilog/Parsing/MessageTemplateParser.cs",
+        "Calor0250 Serilog/Parsing/MessageTemplateParser.cs",
         "Calor0208 Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs",
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],

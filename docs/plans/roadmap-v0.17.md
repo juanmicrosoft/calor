@@ -243,6 +243,19 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   now holds R2's 15 as a CONSTANT — so later work cannot reach back and turn the
   MISS into a pass — and pins today's 324 exactly, so a move in either direction
   regenerates the ledger with the change named.
+- **Later measurement, v0.19 #1191 (not a revised v0.17 outcome).**
+  Preserving conditional evaluation exposes `Serilog/Parsing/PropertyToken.cs`
+  and `FluentValidation.Tests/StreetNumberComparer.cs` to the effect pass:
+  `ModulesEnforced` **324 → 326**, exclusions **40 → 38**, and Calor0425
+  diagnostics **113 → 117**. The four additional diagnostics concern external
+  base members. Native call-argument modifiers also change the first binding
+  stop for `Serilog/Parsing/MessageTemplateParser.cs` from Calor0208 to
+  Calor0250 without changing that file's exclusion status.
+  The separately regenerated Calor0270 ledger changes **302 → 299** diagnostics
+  while all **364** modules remain bound. The exact current pin follows this
+  measurement; R2's frozen **MISS** and v0.17's historical **324** remain intact.
+  Source/opacity limits are recorded in
+  [the #1191 measurement amendment](../../bench/phase0-agent-native/binder-expression-measurement.md).
 - **R2 — the change itself.** Scoped by measurement, not by guess: R1 runs
   first and its answer picks the target. The pre-registered acceptance is a **move in
   `ModulesEnforced`**, published per subject against gate 9's existing floors (250 aggregate;

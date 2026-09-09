@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
-      "resolvableOnMain": "ce6e43ae1deffffea2f9fab324add6060ec79e7d",
+      "measuredCommit": "fbd52cd1357b86dff7bb5742b67991a33a145d4a",
+      "resolvableOnMain": "639fa93a1a240ab16293b12aadc9a080c7fc8164",
       "basis": "measured-on-top-of",
-      "note": "Regenerated in the PR that gives property accessors an effect contract (#1176). The stamp names the base the change was applied to. What moved: serilog Calor0411Sites 534 -> 538, because this.-qualified property reads became visible and four of them resolve to unknown externals; and one module per subject moved its first stop from Calor0410 to Calor0422/0423."
+      "note": "#1191: regenerated at branch commit fbd52cd1357b86dff7bb5742b67991a33a145d4a with conditional-preservation changes applied to release/v0.19 ancestor 639fa93a. This is the reproducible release base, not an identical compiler tree. PropertyToken and StreetNumberComparer newly reach effects: enforced modules 324 -> 326, Calor0425 diagnostics 113 -> 117. Native call modifiers change MessageTemplateParser's first binding stop from Calor0208 to Calor0250 without changing its exclusion status. The historical #1176 measurement remains in git history."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
