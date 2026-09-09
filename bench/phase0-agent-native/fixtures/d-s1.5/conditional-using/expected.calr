@@ -1,4 +1,4 @@
-§M{m001:Fixture}
+§M{m001:Fixture:overflow=unchecked}
   §PP{FEATURE}
     §U{Number:System.Int32}
     §CL{c001:ConditionalValue:pub:stat}
@@ -14,4 +14,3 @@
 
 
   §/PP{FEATURE}
-

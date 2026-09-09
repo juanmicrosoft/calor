@@ -36,7 +36,7 @@ namespace MiddlewareAfter
             int second = g();
             #line default
             #line 6 "<source>.calr"
-            return first + second;
+            return checked(first + second);
             #line default
         }
 

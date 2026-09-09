@@ -148,7 +148,7 @@ public class RoundTripTests
     }
 
     [Fact]
-    public void FullRoundTrip_RejectsCheckedExpressionSemanticLoss()
+    public void FullRoundTrip_PreservesCheckedExpressionSemantics()
     {
         const string source = """
             public static class Overflow
@@ -160,8 +160,8 @@ public class RoundTripTests
         var result = TestHelpers.FullRoundTrip(source, "Overflow");
 
         Assert.True(result.RoslynSuccess);
-        Assert.NotEmpty(result.SemanticLosses);
-        Assert.False(result.FullSuccess);
+        Assert.Empty(result.SemanticLosses);
+        Assert.True(result.FullSuccess);
     }
 
     [Fact]

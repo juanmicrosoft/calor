@@ -1,4 +1,4 @@
-§M{m001:Test_09_03}
+§M{m001:Test_09_03:overflow=unchecked}
   §CL{c001:ListPatternDemo:pub}
     §MT{m002:Classify:pub} (i32[]:list) -> str
       §W{match003:expr} list

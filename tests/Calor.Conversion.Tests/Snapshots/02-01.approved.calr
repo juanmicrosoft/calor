@@ -1,4 +1,4 @@
-§M{m001:Test_02_01}
+§M{m001:Test_02_01:overflow=unchecked}
   §IFACE{i001:IAnimal}
     §PROP{p003:Name:str:pub:get}
     §MT{m002:Speak} () -> str

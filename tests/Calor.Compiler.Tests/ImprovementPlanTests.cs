@@ -350,7 +350,7 @@ public class DataProcessor
     [Fact]
     public void ReducedParens_PrecedenceRespected_NoParensNeeded()
     {
-        // (+ (* a b) c) should generate `a * b + c` (no parens needed since * binds tighter)
+        // Multiplication binds tighter than addition; each native arithmetic operation checks overflow.
         var source = @"
 §M{m001:Test}
   §F{f001:Calc:pub}
@@ -361,15 +361,14 @@ public class DataProcessor
     §R (+ (* a b) c)
 ";
         var csharp = ParseAndEmit(source);
-        Assert.Contains("a * b + c", csharp);
-        // Should NOT have parentheses around (a * b) since multiplication has higher precedence
-        Assert.DoesNotContain("(a * b)", csharp);
+        Assert.Contains("checked(checked(a * b) + c)", csharp);
+        Assert.DoesNotContain("(checked(a * b))", csharp);
     }
 
     [Fact]
     public void ReducedParens_PrecedenceRespected_ParensNeeded()
     {
-        // (* (+ a b) c) should generate `(a + b) * c` (parens needed since + has lower precedence)
+        // Preserve the sum as the complete multiplicand, with checked arithmetic.
         var source = @"
 §M{m001:Test}
   §F{f001:Calc:pub}
@@ -380,7 +379,7 @@ public class DataProcessor
     §R (* (+ a b) c)
 ";
         var csharp = ParseAndEmit(source);
-        Assert.Contains("(a + b) * c", csharp);
+        Assert.Contains("checked((checked(a + b)) * c)", csharp);
     }
 
     #endregion

@@ -1,4 +1,4 @@
-§M{m001:Test_07_01}
+§M{m001:Test_07_01:overflow=unchecked}
   §DEL{del001:MyHandler}
     §I{i32:x}
 

@@ -13,6 +13,7 @@ public sealed class ObligationSolver : IDisposable
 {
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private bool _checkIntegerOverflow = true;
     private bool _disposed;
 
     public ObligationSolver(Context ctx, uint timeoutMs = VerificationOptions.DefaultTimeoutMs)
@@ -28,6 +29,7 @@ public sealed class ObligationSolver : IDisposable
         ObligationTracker tracker,
         ModuleNode module)
     {
+        _checkIntegerOverflow = module.ShouldCheckIntegerOverflow();
         // Build a lookup of function info for parameter declarations
         var functionInfo = BuildFunctionInfo(module);
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
@@ -188,6 +190,23 @@ public sealed class ObligationSolver : IDisposable
                 }
             }
 
+            var arithmeticSafety = _checkIntegerOverflow
+                ? translator.GetCheckedArithmeticSafety(obligation.Condition) : _ctx.MkTrue();
+            if (arithmeticSafety == null)
+            {
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    "Obligation checked-arithmetic safety could not be modeled. Runtime check kept.")));
+                return;
+            }
+            var arithmeticAssumed = !Z3Verifier.ArithmeticSafetyEntailed(_ctx, solver, [arithmeticSafety]);
+            solver.Assert(arithmeticSafety);
+            if (solver.Check() == Status.UNSATISFIABLE)
+            {
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    "No overflow-free state satisfies the modeled obligation assumptions. Runtime check kept.")));
+                return;
+            }
+
             // NEGATE: Assert NOT(obligation condition)
             // If UNSAT -> obligation always holds under preconditions -> Discharged
             solver.Assert(_ctx.MkNot(conditionExpr));
@@ -204,7 +223,7 @@ public sealed class ObligationSolver : IDisposable
             // `(> (len #) INT:0)` is carried by a null-blind, byte-counted model. Assumed maps
             // away from Discharged (ProofOutcome.ToObligationStatus), so the guard survives.
             if (status == Status.UNSATISFIABLE
-                && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort))
+                && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort || arithmeticAssumed))
             {
                 // Name the divergence that ACTUALLY carried the proof. An earlier revision
                 // parameterized the assumption list but left the reason hardcoded to the string
@@ -212,6 +231,11 @@ public sealed class ObligationSolver : IDisposable
                 // model" — on a condition containing no string at all.
                 var assumptions = new List<string>();
                 var reasons = new List<string>();
+                if (arithmeticAssumed)
+                {
+                    assumptions.Add(Z3Verifier.CheckedArithmeticAssumption);
+                    reasons.Add("checked arithmetic completing without overflow");
+                }
                 if (translator.TouchedStringTheory)
                 {
                     assumptions.Add(Z3Verifier.StringModelAssumption);

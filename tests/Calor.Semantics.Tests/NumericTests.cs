@@ -23,7 +23,7 @@ public class NumericTests
       §R (+ max INT:1)
 ";
 
-        var result = SemanticsTestHarness.ExecuteChecked(source, "overflow");
+        var result = SemanticsTestHarness.Execute(source, "overflow");
 
         // Should throw OverflowException
         Assert.False(result.Succeeded, "Overflow should throw an exception");

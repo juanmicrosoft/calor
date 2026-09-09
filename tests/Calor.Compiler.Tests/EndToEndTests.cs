@@ -251,7 +251,7 @@ public class EndToEndTests
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
-        Assert.Contains("Console.WriteLine(x + 10)", result.GeneratedCode);
+        Assert.Contains("Console.WriteLine(checked(x + 10))", result.GeneratedCode);
     }
 
     [Fact]

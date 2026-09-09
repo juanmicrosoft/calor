@@ -1,4 +1,4 @@
-§M{m001:Test_01_01}
+§M{m001:Test_01_01:overflow=unchecked}
   §CL{c001:Calculator:pub}
     §MT{m002:Add:pub} (i32:a, i32:b) -> i32
       §R (+ a b)

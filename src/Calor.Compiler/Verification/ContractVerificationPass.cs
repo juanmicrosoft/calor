@@ -53,13 +53,14 @@ public sealed class ContractVerificationPass
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
 
         using var ctx = Z3ContextFactory.Create();
-        using var verifier = new Z3Verifier(ctx, _options.TimeoutMs, userTypeRegistry);
+        using var verifier = new Z3Verifier(
+            ctx, _options.TimeoutMs, userTypeRegistry, module.ShouldCheckIntegerOverflow());
         // #778: the cache key/validity is solver-config-aware — pass the live timeout
         // so a cached Unproven from a smaller budget is not served to a larger one.
         using var cache = new VerificationCache(
             _options.CacheOptions,
             _options.TimeoutMs,
-            ContractTranslator.BuildUserTypeRegistryCacheScope(userTypeRegistry));
+            $"{ContractTranslator.BuildUserTypeRegistryCacheScope(userTypeRegistry)}|overflow={module.ShouldCheckIntegerOverflow()}");
 
         foreach (var function in EnumerateContractBearers(module))
         {

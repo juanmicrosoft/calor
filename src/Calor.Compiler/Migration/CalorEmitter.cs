@@ -290,7 +290,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
-        AppendLine($"§M{{{node.Id}:{moduleName}}}");
+        var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
+        AppendLine($"§M{{{node.Id}:{moduleName}{overflow}}}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)

@@ -1,4 +1,4 @@
-§M{m001:Test_13_11}
+§M{m001:Test_13_11:overflow=unchecked}
   §CL{c001:ArrayDemo:pub}
     §MT{m002:CreateSized:pub} (i32:n) -> i32[]
       §E{alloc}
@@ -10,4 +10,3 @@
     §MT{m006:Wrap:pub} (str:value) -> any[]
       §E{alloc}
       §R §ARR{arrAny007:any} value §ARR{arrI32008:i32} 1 2 §/ARR{arrI32008} §/ARR{arrAny007}
-

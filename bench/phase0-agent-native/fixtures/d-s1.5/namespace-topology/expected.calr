@@ -1,4 +1,4 @@
-§M{m001:Fixture}
+§M{m001:Fixture:overflow=unchecked}
   §NS{ns001:Alpha}
     §CL{c002:Marker:pub:stat}
 
@@ -7,5 +7,4 @@
     §CL{c004:Value:pub:stat}
       §MT{m005:Get:pub:stat} () -> i32
         §R 42
-
 
