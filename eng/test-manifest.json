@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 8158,
+      "expectedTotal": 8175,
       "expectedSkipped": 4,
       "note": "2026-09-08 (#1173): 8030 -> 8041, +11 from Issue1173ConverterEffectRowTests — the converter now derives its \u00a7E rows from the compiler's own effect inference over the emitted text (5 under-declared constructs as theory rows, plus chain desugaring, interface/override variance repair, the pure-body case, row round-trip, widen-never-narrow, codegen neutrality, and parallel-vs-serial conversion). #1197: 8048 -> 8052, four production-path native arithmetic, operand-order, and conditional-laziness mutation regressions. #1184: 8052 -> 8085, 32 typed contract/runtime interaction cases plus an expression-wrapper traversal architecture regression."
     },
