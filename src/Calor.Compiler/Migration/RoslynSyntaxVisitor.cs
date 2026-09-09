@@ -11411,6 +11411,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var body = ConvertExpression(expression);
             if (_pendingStatements.Count > 0
                 || expression.DescendantNodes().Any(node => node is InvocationExpressionSyntax)
+                || expression.DescendantNodesAndSelf().Any(node =>
+                    node is BaseObjectCreationExpressionSyntax or AnonymousObjectCreationExpressionSyntax
+                        or ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax
+                        or CollectionExpressionSyntax or AssignmentExpressionSyntax
+                    || node.IsKind(SyntaxKind.PreIncrementExpression)
+                    || node.IsKind(SyntaxKind.PostIncrementExpression)
+                    || node.IsKind(SyntaxKind.PreDecrementExpression)
+                    || node.IsKind(SyntaxKind.PostDecrementExpression))
                 || parameterReferences.Count > 0 && parameterType == null)
             {
                 // Query selectors are deferred, and IQueryable also requires an

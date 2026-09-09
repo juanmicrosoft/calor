@@ -25,6 +25,10 @@ public class LinqGroupingSemanticsTests
     [InlineData("from n in values.AsQueryable() group Element(n) by Key(n)", "1:10|0:20", "K1E1K2E2", true)]
     [InlineData("from n in values.AsQueryable() group Element(n).ToString().Length by Key(n)", "1:2|0:2", "K1E1K2E2", true)]
     [InlineData("from n in values group ThrowingElement(n) by Key(n)", "throws:InvalidOperationException", "K1E1K2E2", false)]
+    [InlineData("from n in values group new Box(10).Item by n % 2", "1:10|0:10", "CC", true)]
+    [InlineData("from n in values group new Box(n).Item by n % 2", "1:1|0:2", "CC", true)]
+    [InlineData("from n in values group new Box(Element(n)).Item by Key(n)", "1:10|0:20", "K1E1CK2E2C", true)]
+    [InlineData("from n in values group new Box(-1).Item by n % 2", "throws:InvalidOperationException", "C", true)]
     public void Grouping_PreservesElementsAndDeferredRepeatedEnumeration(
         string query, string expectedGroups, string tracePerEnumeration, bool preserved)
     {
@@ -64,6 +68,33 @@ public class LinqGroupingSemanticsTests
         Assert.Equal(2, lambda.StatementBody!.Count);
     }
 
+    [Fact]
+    public void DiscardedNonVoidCallLambda_RetainsActionRatherThanFunc()
+    {
+        const string source = """
+            public static class Migrated
+            {
+                private static int Value() => 42;
+                public static object Build()
+                {
+                    var action = () => { Value(); };
+                    return action;
+                }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        var compiled = Program.Compile(conversion.CalorSource!, "action.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            EnforceEffects = true,
+            StatusWriter = TextWriter.Null
+        });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.IsType<Action>(Compile(source).GetMethod("Build")!.Invoke(null, null));
+        Assert.IsType<Action>(Compile(compiled.GeneratedCode).GetMethod("Build")!.Invoke(null, null));
+    }
+
     private static void AssertEquivalent(string query, string expected, bool preserved)
     {
         var source = $$"""
@@ -75,6 +106,16 @@ public class LinqGroupingSemanticsTests
                 public static string Trace = "";
                 public static int Factor = 10;
                 private static int[] Source(int[] values) { Trace += "S"; return values; }
+                private class Box
+                {
+                    public int Item;
+                    public Box(int number)
+                    {
+                        Trace += "C";
+                        if (number < 0) throw new InvalidOperationException();
+                        Item = number;
+                    }
+                }
                 private static int Key(int value) { Trace += "K" + value; return value % 2; }
                 private static int Element(int value) { Trace += "E" + value; return value * 10; }
                 private static bool Pass(int value) { Trace += "W" + value; return true; }
@@ -113,13 +154,7 @@ public class LinqGroupingSemanticsTests
 
     private static string Observe(string source)
     {
-        var compilation = CSharpCompilation.Create("GroupingOracle_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var image = new MemoryStream();
-        var emit = compilation.Emit(image);
-        Assert.True(emit.Success, string.Join("; ", emit.Diagnostics) + "\n" + source);
-        var type = Assembly.Load(image.ToArray()).GetTypes().Single(type => type.Name == "Migrated");
+        var type = Compile(source);
         var query = (IEnumerable<IGrouping<int, int>>)type.GetMethod("Build")!
             .Invoke(null, [new[] {1, 2}])!;
         var trace = type.GetField("Trace")!;
@@ -129,6 +164,17 @@ public class LinqGroupingSemanticsTests
         type.GetField("Factor")!.SetValue(null, 30);
         var second = Enumerate(query) + ":" + trace.GetValue(null);
         return $"before={before};first={first};second={second}";
+    }
+
+    private static Type Compile(string source)
+    {
+        var compilation = CSharpCompilation.Create("GroupingOracle_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var image = new MemoryStream();
+        var emit = compilation.Emit(image);
+        Assert.True(emit.Success, string.Join("; ", emit.Diagnostics) + "\n" + source);
+        return Assembly.Load(image.ToArray()).GetTypes().Single(type => type.Name == "Migrated");
     }
 
     private static string Enumerate(IEnumerable<IGrouping<int, int>> query)
