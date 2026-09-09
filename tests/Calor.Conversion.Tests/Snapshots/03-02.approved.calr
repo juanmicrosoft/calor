@@ -10,7 +10,8 @@
             §ASSIGN _forFirst003 false
           §EL
             §ASSIGN i (+ i 1)
-          §IF{if005} (! (< i n))
+          §IF{if005} (< i n)
+          §EL
             §BK
           §ASSIGN total (+ total i)
       §R total

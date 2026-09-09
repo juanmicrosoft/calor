@@ -1023,7 +1023,7 @@ public class ConverterImprovementTests
         var scope = Assert.IsType<IfStatementNode>(method.Body[0]);
         var loop = Assert.Single(scope.ThenBody.OfType<WhileStatementNode>());
         Assert.Contains(loop.Body.OfType<IfStatementNode>(), guard =>
-            guard.Condition is UnaryOperationNode { Operator: UnaryOperator.Not });
+            guard.ElseBody?.SingleOrDefault() is BreakStatementNode);
         Assert.DoesNotContain(result.Losses, loss =>
             loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }

@@ -8221,7 +8221,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Header-declared aliases/out variables need a storage lifetime that this
         // lowering does not represent. Preserve those unusual headers explicitly.
         if (node.Declaration?.Type is RefTypeSyntax
-            || node.Condition?.DescendantNodesAndSelf().Any(part => part is DeclarationExpressionSyntax) == true)
+            || node.Condition?.DescendantNodesAndSelf().Any(part =>
+                part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax) == true)
         {
             _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
                 "For-loop header variable storage preserved verbatim",
@@ -8240,7 +8241,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 foreach (var variable in node.Declaration.Variables)
                 {
                     var value = variable.Initializer == null
-                        ? null : ConvertExpression(variable.Initializer.Value);
+                        ? null : ConvertForHeaderExpression(variable.Initializer.Value);
                     FlushPendingStatements(outerBody);
                     outerBody.Add(new BindStatementNode(GetTextSpan(variable), variable.Identifier.ValueText,
                         node.Declaration.Type.IsVar ? null : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
@@ -8249,7 +8250,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             foreach (var initializer in node.Initializers)
             {
-                var statement = ConvertExpressionToStatement(initializer, GetTextSpan(initializer));
+                var statement = ConvertForHeaderStatement(initializer);
                 FlushPendingStatements(outerBody);
                 if (statement != null) outerBody.Add(statement);
             }
@@ -8267,7 +8268,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 var increments = new List<StatementNode>();
                 foreach (var incrementor in node.Incrementors)
                 {
-                    var statement = ConvertExpressionToStatement(incrementor, GetTextSpan(incrementor));
+                    var statement = ConvertForHeaderStatement(incrementor);
                     FlushPendingStatements(increments);
                     if (statement != null) increments.Add(statement);
                 }
@@ -8281,11 +8282,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             if (node.Condition != null)
             {
-                var condition = ConvertExpression(node.Condition);
+                var condition = ConvertForHeaderExpression(node.Condition);
                 FlushPendingStatements(whileBody);
+                // Test positively: C# conditions may use operator true, which
+                // need not agree with (or even provide) operator !.
                 whileBody.Add(new IfStatementNode(span, _context.GenerateId("if"),
-                    new UnaryOperationNode(span, Ast.UnaryOperator.Not, condition),
-                    [new BreakStatementNode(span)], [], null, new AttributeCollection()));
+                    condition, [], [], [new BreakStatementNode(span)], new AttributeCollection()));
             }
             var body = node.Statement is BlockSyntax block
                 ? ConvertBlock(block)
@@ -8305,6 +8307,49 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _pendingStatements.AddRange(savedPending);
         }
     }
+
+    private ExpressionNode ConvertForHeaderExpression(ExpressionSyntax expression)
+    {
+        if (!HasDeferredForHeaderOperand(expression))
+            return ConvertExpression(expression);
+
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+            "Lazy for-header expression preserved inline to retain conditional evaluation",
+            expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return new RawCSharpExpressionNode(GetTextSpan(expression), expression.ToString());
+    }
+
+    private StatementNode? ConvertForHeaderStatement(ExpressionSyntax expression)
+    {
+        var target = expression switch
+        {
+            PostfixUnaryExpressionSyntax postfix => postfix.Operand,
+            PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression)
+                || prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
+            AssignmentExpressionSyntax assignment when !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                => assignment.Left,
+            _ => null
+        };
+        var type = target == null ? null : _semanticModel?.GetTypeInfo(target).Type;
+        if (HasDeferredForHeaderOperand(expression)
+            || target != null && (target is not IdentifierNameSyntax || type?.SpecialType is not
+                (SpecialType.System_Int32 or SpecialType.System_Int64 or SpecialType.System_UInt32
+                or SpecialType.System_UInt64 or SpecialType.System_Single or SpecialType.System_Double
+                or SpecialType.System_Decimal)))
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+                "For-header operation preserved verbatim to retain overloads, narrowing and evaluation order",
+                expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpNode(GetTextSpan(expression), expression + ";");
+        }
+        return ConvertExpressionToStatement(expression, GetTextSpan(expression));
+    }
+
+    private static bool HasDeferredForHeaderOperand(ExpressionSyntax expression)
+        => expression.DescendantNodesAndSelf().Any(part =>
+            part is ConditionalExpressionSyntax or ConditionalAccessExpressionSyntax
+            || part.IsKind(SyntaxKind.LogicalAndExpression) || part.IsKind(SyntaxKind.LogicalOrExpression)
+            || part.IsKind(SyntaxKind.CoalesceExpression));
 
     private ForeachStatementNode ConvertForEachStatement(ForEachStatementSyntax node)
     {

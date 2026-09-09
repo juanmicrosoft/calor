@@ -42,6 +42,11 @@ public class ForLoopConditionSemanticsTests
     [InlineData("int count = 0; int step = 1; for (int i = 0; i < 10; i += step) { count++; step++; } return count;", "4", false)]
     [InlineData("int count = 0; int limit = 2; for (int i = 0; i < limit; i++) count++; for (int i = 0; i < limit; i++) count++; return count;", "4", false)]
     [InlineData("int count = 0; for (int i = 0; i < Bound(); i += Step()) { checked { using (new Scope()) { if (i == 1) continue; count++; } } } return count;", "2:BCDSBCDSBCDSB", false)]
+    [InlineData("int count = 0; for (int i = 0; i < 0 && Bound() > 0; i++) count++; return count;", "0", false)]
+    [InlineData("int count = 0; for (int i = 0; i < 1 || Bound() > 0; i++) { count++; break; } return count;", "1", false)]
+    [InlineData("int count = 0; for (int i = 0; i < 0 ? Bound() > 0 : false; i++) count++; return count;", "0", false)]
+    [InlineData("int count = 0; for (byte i = 0; i < 3; i++) count++; return count;", "3", false)]
+    [InlineData("int count = 0; for (short i = 0; i < 3; i += 1) count++; return count;", "3", false)]
     public void Migration_PreservesLoopObservations(string body, string expected, bool native)
         => AssertEquivalent(body, expected, native);
 
@@ -72,7 +77,41 @@ public class ForLoopConditionSemanticsTests
             """);
     }
 
-    private static void AssertEquivalent(string body, string expected, bool native, string members = "")
+    [Fact]
+    public void PatternVariableHeader_PreservesBindingAfterSuccessfulMatch()
+        => AssertEquivalent("int n = 0; for (object x = 1; x is int i; x = null) n += i; return n;",
+            "1", native: false, preserved: true);
+
+    [Fact]
+    public void OverloadedIncrementHeader_DoesNotSubstituteAddition()
+        => AssertEquivalent(
+            "int n = 0; for (Counter c = new Counter(); c.N < 3; c++) n++; return n;",
+            "3", native: false, types: """
+            public struct Counter
+            {
+                public int N;
+                public static Counter operator ++(Counter x) => new Counter { N = x.N + 1 };
+                public static Counter operator +(Counter x, int y) => new Counter { N = x.N + 2 };
+            }
+            """);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("public static bool operator !(Truth x) => true;")]
+    public void UserDefinedCondition_UsesTrueOperatorNotNegation(string negation)
+        => AssertEquivalent(
+            "int n = 0; for (Truth t = default; t;) { n++; break; } return n;",
+            "1", native: false, members: $$"""
+            public struct Truth
+            {
+                public static bool operator true(Truth x) => true;
+                public static bool operator false(Truth x) => false;
+                {{negation}}
+            }
+            """);
+
+    private static void AssertEquivalent(string body, string expected, bool native, string members = "",
+        bool preserved = false, string types = "")
     {
         var source = $$"""
             public static class Migrated
@@ -96,11 +135,18 @@ public class ForLoopConditionSemanticsTests
                 }
                 public static int Probe() { {{body}} }
             }
+            {{types}}
             """;
         var conversion = new CSharpToCalorConverter().Convert(source);
         Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
         Assert.DoesNotContain(conversion.Losses, loss => loss.Kind == ConversionLossKind.Dropped);
-        if (native)
+        if (preserved)
+        {
+            Assert.Contains(conversion.Losses, loss =>
+                loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
+            Assert.Contains("for (", conversion.CalorSource);
+        }
+        else if (native)
             Assert.Contains("§L{", conversion.CalorSource);
         else
             Assert.True(conversion.CalorSource!.Contains("§WH{"),
@@ -111,7 +157,7 @@ public class ForLoopConditionSemanticsTests
             EnforceEffects = true,
             StatusWriter = TextWriter.Null
         });
-        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors) + "\n" + conversion.CalorSource);
         Assert.Equal(expected, Observe(source));
         Assert.Equal(expected, Observe(compiled.GeneratedCode));
     }

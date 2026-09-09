@@ -1194,7 +1194,7 @@ public class Test
     }
 
     [Fact]
-    public void Converter_NonStandardForLoop_PreservesInitializersInHeader()
+    public void Converter_NonStandardForLoop_PreservesInitializerScopeBeforeWhile()
     {
         // Non-standard for loop with multiple variables
         var csharp = @"
@@ -1216,7 +1216,7 @@ public class Test
     }
 
     [Fact]
-    public void Converter_ForLoopWithExpressionInit_PreservesInitializerInHeader()
+    public void Converter_ForLoopWithExpressionInit_PreservesInitializerBeforeWhile()
     {
         // For loop with expression initializer (no declaration)
         var csharp = @"
