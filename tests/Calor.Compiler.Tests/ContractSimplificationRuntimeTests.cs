@@ -15,6 +15,23 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void PreservedLogicalNegation_GroupsNullableFallback(bool verify)
+    {
+        foreach (var fallback in new[] { false, true })
+        {
+            var assembly = Compile(Function("bool?", $"(! (! (?? x {fallback.ToString().ToLowerInvariant()})))"), verify);
+            Assert.Equal(7, Invoke(assembly, true));
+            AssertContractViolation(() => Invoke(assembly, false));
+            if (fallback)
+                Assert.Equal(7, Invoke(assembly, null));
+            else
+                AssertContractViolation(() => Invoke(assembly, null));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void PreservedUnaryOperators_DoNotBecomeMutation(bool verify)
     {
         var assembly = Compile(Function("i32", "(== (- (- x)) INT:5)"), verify);
@@ -180,7 +197,7 @@ public class ContractSimplificationRuntimeTests
         return Assembly.Load(stream.ToArray());
     }
 
-    private static object? Invoke(Assembly assembly, object value) =>
+    private static object? Invoke(Assembly assembly, object? value) =>
         Assert.Single(assembly.GetTypes(), t => t.Name == "TypedContractsModule")
             .GetMethod("Check")!.Invoke(null, [value]);
 
