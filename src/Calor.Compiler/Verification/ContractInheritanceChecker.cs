@@ -723,8 +723,9 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             if (!visited.Add(scope.Declaration))
                 yield break;
-            foreach (var parameter in DeclarationParameters(scope.Declaration))
-                hiddenNames.Add(parameter.Name);
+            if (!inherited)
+                foreach (var parameter in DeclarationParameters(scope.Declaration))
+                    hiddenNames.Add(parameter.Name);
             IEnumerable<AstNode> members = scope.Declaration switch
             {
                 ClassDefinitionNode cls => cls.Fields.Cast<AstNode>().Concat(cls.Properties)
@@ -761,7 +762,8 @@ public sealed class ContractInheritanceChecker : IDisposable
             // or base scopes into one undifferentiated set of protected names.
             foreach (var declaration in _enclosingDeclarations.Keys.Where(declaration =>
                          _enclosingDeclarations[declaration] == scope.Declaration
-                         && DeclarationParameters(declaration).Count == 0))
+                         && DeclarationParameters(declaration).Count == 0
+                         && !(inherited && declaration is ClassDefinitionNode { Visibility: Visibility.Private })))
                 hiddenNames.Add(DeclarationName(declaration));
             var bases = scope.Declaration switch
             {

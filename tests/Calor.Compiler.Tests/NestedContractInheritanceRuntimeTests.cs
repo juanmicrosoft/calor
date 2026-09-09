@@ -822,6 +822,7 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void GenericTypeNames_DoNotHideUnparameterizedValueReceivers(bool verify)
     {
+        foreach (var inheritedShadow in new[] { "none", "parameter", "private-type" })
         foreach (var nestedName in new[] { "Limits", "Other" })
         foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
         {
@@ -833,7 +834,13 @@ public sealed class NestedContractInheritanceRuntimeTests
                     §FLD{i32:Min:pub} INT:0
                   §CL{c3:Outer:pub}
                     §FLD{Payload:Limits:pub:stat}
+                    §CL{c7:Storage:pub}<{{(inheritedShadow == "parameter" ? nestedName : "T")}}>
+                      §MT{mt4:Tag:pub} () -> i32
+                        §E{}
+                        §R INT:1
+                {{(inheritedShadow == "private-type" ? $"      §CL{{c8:{nestedName}:pri}}\n        §FLD{{i32:Min:pub:stat}} INT:-20" : "")}}
                     §CL{c4:Base:pub}
+                      §EXT{Storage<i32>}
                       §CL{c5:{{nestedName}}:pub}<T>
                         §MT{mt1:Tag:pub} () -> i32
                           §E{}
