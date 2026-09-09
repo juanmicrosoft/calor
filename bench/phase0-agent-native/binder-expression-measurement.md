@@ -144,6 +144,14 @@ is therefore **34,942 → 34,703 visits**, **5,085 → 4,962 raw errors**, and
 **117 → 109 propagated errors**. The source-identity ledger pins this final
 candidate; the earlier measurements remain explicit historical records.
 
+**Latest-candidate revalidation (`d08d7878`):** after the stack-allocation repair
+and proof-fixture commits, the complete candidate `src/` tree was installed and
+rebuilt in isolation. All eight focused
+ratchet/control tests passed in ordinary mode, **without regeneration**.
+Every per-file source/error identity and count remains unchanged: **34,703
+visits**. The new D-S1.5 fixtures live under `bench/`, outside the registered
+in-repo F-2 roots; they do not silently enlarge that denominator.
+
 ## New safeguards and limits
 
 `binder-source-coverage.json` pins each file independently, including:

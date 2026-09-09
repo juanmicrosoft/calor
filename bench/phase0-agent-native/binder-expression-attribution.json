@@ -3436,8 +3436,8 @@
       "SourceExpressionTransitions": []
     }
   },
-  "CandidateValidationRevision": "67d4c259",
-  "CandidateValidationNote": "The complete candidate67d4c259 src/ tree was installed in isolation and rebuilt. Original639fa93a-to-2738d99b type attribution and the000d2f38 binding-failure review remain historical records. The EagerOperandFollowup accounts for the final additional -31 visits; every selected-source classification, converter AST kind count, opaque boundary and loss matches000d2f38. Binding-error positions are reparsed Calor coordinates, not C# source identities.",
+  "CandidateValidationRevision": "d08d7878",
+  "CandidateValidationNote": "Complete candidate67d4c259 and then d08d7878 src/ trees were installed in isolation and rebuilt. All eight focused ratchet/control tests passed on d08d7878 in ordinary mode, WITHOUT regeneration: the later stack-allocation repair leaves every per-file source/error identity and count unchanged at34703 total visits. Original639fa93a-to-2738d99b type attribution and the000d2f38 binding-failure review remain historical records. The EagerOperandFollowup accounts for the additional -31 visits; every selected-source classification, converter AST kind count, opaque boundary and loss matches000d2f38. Binding-error positions are reparsed Calor coordinates, not C# source identities.",
   "BindingFailureReview": {
     "BeforeRevision": "639fa93a",
     "AfterRevision": "000d2f38",
