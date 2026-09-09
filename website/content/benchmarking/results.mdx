@@ -11,10 +11,16 @@ order: 2
 
 ## Read the Results Carefully
 
-The v0.12 run covers **217 programs**, reports an overall Calor/C# advantage of
+The historical snapshot above covers **217 programs**, reports an overall Calor/C# advantage of
 **1.32x**, and has Calor ahead in seven of eight metrics. Comprehension is
 1.84x, error detection is 1.49x, token economics is 1.42x, and information
 density is 0.98x—the one category where C# leads.
+
+The recorded source revision is `82a7c653`. Its `Directory.Build.props` declares
+compiler `0.15.0`; the JSON's `version: "1.0"` identifies the data format, not the
+compiler release. The corpus is `tests/TestData/Benchmarks`. The exact compiler
+binary used for the measurement was not independently recorded. These are
+historical results, not a rerun against the release shown in the site header.
 
 These measurements need two important caveats:
 

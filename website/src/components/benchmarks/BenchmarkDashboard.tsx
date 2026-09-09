@@ -12,6 +12,7 @@ import { formatTimestamp } from '@/lib/timestamps';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
+import provenance from '../../../public/data/benchmark-provenance.json';
 
 interface BenchmarkData {
   version: string;
@@ -96,7 +97,7 @@ export function BenchmarkDashboard() {
       {/* Header with timestamp */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Live Benchmark Results</h2>
+          <h2 className="text-2xl font-bold">Historical Benchmark Snapshot</h2>
           <p className="text-muted-foreground">
             Evaluated across {data.summary.programCount} programs with {data.summary.metricCount} metrics
           </p>
@@ -110,6 +111,17 @@ export function BenchmarkDashboard() {
             </span>
           )}
         </div>
+      </div>
+
+      <div className="rounded-lg border p-4 text-sm text-muted-foreground" role="note" aria-label="Benchmark provenance">
+        <p>Recorded source revision{' '}
+          <a className="text-primary underline" href={`https://github.com/juanmicrosoft/calor/blob/${provenance.sourceCommit}/Directory.Build.props`}>
+            {provenance.sourceCommit}
+          </a>{' '}declares compiler v{provenance.sourceDeclaredVersion}; this is not a benchmark of the current docs release.
+        </p>
+        <p>Corpus: <code>{provenance.corpus}</code> — {data.programs.length} programs.</p>
+        <p>Method: {provenance.method}, {data.summary.statisticalRunCount} repetitions, {Object.keys(data.metrics).length} metrics.</p>
+        <p>{provenance.limitation}</p>
       </div>
 
       {/* Summary cards */}

@@ -36,7 +36,7 @@ export function CatchBugs() {
             Your AI Forgot a Network Call. The Compiler Didn&apos;t.
           </h2>
           <p className="mt-4 text-lg text-muted-foreground font-body">
-            See exactly what your code does—even when side effects hide in helper functions.
+            Check declared effects across supplied Calor modules and known or manifested calls.
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export function CatchBugs() {
               <div className="rounded-lg border-2 border-calor-pink/40 bg-calor-navy overflow-hidden">
                 <div className="border-b border-calor-pink/30 px-4 py-2 bg-calor-pink/10">
                   <span className="text-sm text-calor-pink font-mono font-bold">
-                    Compiler Output
+                    Illustrative diagnostic (abridged)
                   </span>
                 </div>
                 <pre className="p-5 text-sm leading-6 overflow-x-auto">
@@ -74,8 +74,9 @@ export function CatchBugs() {
             <div className="p-6 rounded-lg border bg-background shadow-lg">
               <p className="text-muted-foreground font-body">
                 <strong className="text-foreground">What happened:</strong> Your AI wrote code that calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">NotifyCustomer</code>, which
-                calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">SendEmail</code>, which makes a network request. The compiler caught that
-                you didn&apos;t declare the network access—before you ran anything. Without effect enforcement, this mismatch would rely on review or tests.
+                calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">SendEmail</code>, which makes a network request.
+                When these calls are resolved in the analyzed inputs, effect enforcement can report the missing declaration.
+                Unknown external calls and raw C# require separate diagnostics, manifests, or review.
               </p>
             </div>
           </div>
@@ -87,7 +88,8 @@ export function CatchBugs() {
             </h3>
             <p className="mt-4 text-lg text-muted-foreground font-body">
               Run <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">calor --analyze</code> to
-              detect null dereferences, injection vulnerabilities, and arithmetic bugs across your entire codebase.
+              look for supported null, taint-flow, and arithmetic patterns in the Calor inputs you supply.
+              This is not whole-codebase coverage or a guarantee that all defects are found.
             </p>
           </div>
 
@@ -110,7 +112,7 @@ export function CatchBugs() {
                   <span className="text-white/50">{'\n'}</span>
                   <span className="text-calor-cyan/70">{'  FtpClient.calr(1201,11)\n'}</span>
                   <span className="text-white/50">{'\n'}</span>
-                  <span className="text-green-400">{'Verified findings only. Use --all-findings for more.\n'}</span>
+                  <span className="text-green-400">{'Illustrative findings; availability depends on analyzed inputs.\n'}</span>
                 </code>
               </pre>
             </div>
