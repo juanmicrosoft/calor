@@ -45,8 +45,8 @@ MAJOR.MINOR.PATCH
 Bumped from `1.0.0` as the v0.14 nullability workstream precursor (task #14) —
 required to unlock the S5 severity flip that promotes `Calor0272/0273/0274`
 from Info to Error under `SemanticsVersion.Major >= 2`. See
-`docs/plans/v0.14-nullability-enforcement-scoping.md` §D7/F-3 and
-`docs/plans/v0.14-metadata-binding-scoping.md` §F-7.
+`docs/plans/v0.14-nullability-enforcement-scoping.md` section D7/F-3 and
+`docs/plans/v0.14-metadata-binding-scoping.md` section F-7.
 
 ---
 
