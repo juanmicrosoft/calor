@@ -1,0 +1,75 @@
+---
+title: "Research Evidence Status"
+section: "benchmarking"
+order: 4
+description: "What the 0.20 planning tranche established, what remains unknown, and why it was not a software release"
+---
+
+Milestone 0.20 reviewed whether Calor had enough evidence and authority for a
+three-arm adopter study: ordinary C#, strong protected C#, and protected Calor.
+It was a planning and evidence tranche, not a compiler release.
+
+## Recorded Outcome
+
+The formal M0 result is **UNADJUDICATED**. The maintainer recorded an
+**administrative stop** because the prerequisites for a scientific decision
+were absent:
+
+- no consenting independent human methods reviewer;
+- no committed adopter or approved recruitment;
+- no accepted scientific resource cap or inquiry deadline;
+- no provenance-bearing source-task inventory or reviewer schedule;
+- no completed joint sizing for the cost, completion, safety, and adoption
+  gates.
+
+Missing inputs were not converted into **NOT FEASIBLE**, zero demand, or a
+successful implementation.
+
+## What M0 Did Establish
+
+- v0.18.0 and v0.19.0 predecessor outcomes and retained limits were
+  reconciled.
+- Plausible cost mechanisms for protected Calor versus protected C#, and
+  protected C# versus ordinary C#, were stated in falsifiable terms.
+- The legacy held-out harness was found to be a useful implementation
+  reference, but not an isolated or independently authorized acceptance
+  service.
+- Recruitment after the 2026-08-04 Call W decision and eligible historical
+  task supply remain unknown.
+- The redesigned PP-W-rows proposal remains deferred and requires its own
+  buildability result, bounded spend, null-result acceptance, and approval.
+
+M0 did not establish an economic advantage, safety advantage, adopter handoff,
+or whole-compiler soundness.
+
+## Release and Work Boundaries
+
+Completing milestone 0.20 did not itself change `Directory.Build.props`, create
+a tag, publish a NuGet package, deploy the website, or consume a software
+version. At the M0 closeout, the current compiler remained v0.19.0. A later
+ordinary software release may include these documentation changes, but that
+release is a separate decision with normal build, review, packaging, and
+publication gates.
+
+The following boundaries remain:
+
+- #1284-#1309 are closed as not planned. They were not implemented.
+- #1311 is independent bounded correctness work.
+- #1254 and #1259 are deferred proposals and receive no funding or activation
+  from M0.
+- No `sd-001` epoch, participant recruitment, prototype service, or paid
+  collection was created.
+
+## Repository Record
+
+The detailed records are:
+
+1. [Predecessor status](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/safe-delegation-m0/predecessor-status.md)
+2. [Authorization boundary](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/safe-delegation-m0/authorization.md)
+3. [Mechanism and resource screen](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/safe-delegation-m0/mechanism-and-resources.md)
+4. [Source-task and recruitment status](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/safe-delegation-m0/supply-status.md)
+5. [M0 disposition](https://github.com/juanmicrosoft/calor/blob/main/docs/plans/safe-delegation-m0/decision.md)
+
+Use the [software changelog](/docs/changelog/) for shipped compiler versions.
+Use this page for the status of the research evidence.
+
