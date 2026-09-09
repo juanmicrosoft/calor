@@ -1,11 +1,11 @@
 {
-  "sourceCommit": "82a7c653",
-  "sourceDeclaredVersion": "0.15.0",
+  "sourceCommit": "3a452b09",
+  "sourceDeclaredVersion": "0.19.0",
   "corpus": "tests/TestData/Benchmarks",
   "method": "Deterministic static-analysis calculators",
   "programCount": 217,
   "metricNames": ["TokenEconomics", "GenerationAccuracy", "Comprehension", "EditPrecision", "ErrorDetection", "InformationDensity", "RefactoringStability", "Correctness"],
-  "limitation": "The recorded source revision declares this compiler version; the exact binary used for the measurement was not independently recorded.",
+  "limitation": "The exact measurement binary and working-tree state were not independently recorded. Source pairs are not all behaviorally equivalent; the reported confidence intervals do not establish sampling uncertainty or a language advantage. See issue #1276.",
   "agentTasks": {
     "sourceCommit": "107462e",
     "sourceDeclaredVersion": "0.2.3",

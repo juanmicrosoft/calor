@@ -268,12 +268,13 @@ export function BenchmarkChart() {
           <div className="mt-12 p-6 rounded-xl border bg-gradient-to-br from-calor-pink/5 to-calor-salmon/5">
             <h3 className="font-semibold mb-2 font-display">The Bottom Line</h3>
             <p className="text-muted-foreground font-body leading-relaxed">
-              <strong className="text-foreground">This historical static snapshot favors Calor in seven of eight defined metrics.</strong>{' '}
+              <strong className="text-foreground">This static snapshot favors Calor in seven of eight defined metrics.</strong>{' '}
               Its strongest scores come from explicit comprehension and error-detection signals; C# narrowly leads information density.
               These calculators do not directly measure model productivity or production defect rates.
+              Source pairs are not all behaviorally equivalent, so the ratios cannot establish a language advantage.
               {' '}Recorded source {provenance.sourceCommit} declares compiler v{provenance.sourceDeclaredVersion};
               corpus <code>{provenance.corpus}</code>, {benchmarkData.summary.statisticalRunCount} deterministic repetitions.
-              This is not a measurement of the current docs release.
+              It is a fixed source comparison, not a live coding-agent study.
             </p>
           </div>
 

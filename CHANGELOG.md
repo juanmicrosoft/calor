@@ -4,6 +4,87 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-09
+
+### Benchmark Results (Statistical: 30 runs)
+
+- **Overall Advantage**: 1.32 (legacy calculator score, not a measured language advantage)
+- **Metrics**: Calor scores higher in 7 categories; C# in 1
+- **Highlights**: Comprehension 1.84x, ErrorDetection 1.49x, TokenEconomics 1.42x;
+  InformationDensity 0.97x, where C# scores higher
+- **Programs Tested**: 217; both inputs pass the runner's parse checks for all 217
+- **Recorded source**: `3a452b09` (declares version 0.19.0)
+- **Reported intervals**: Comprehension has a headline interval of [1.836, 1.836]
+  and a pooled interval of [1.822, 1.850]. ErrorDetection's pooled interval is
+  [1.478, 1.505]; TokenEconomics is [1.403, 1.430].
+- **Interpretation limits**: The headline intervals use singleton aggregates.
+  The pooled intervals repeat deterministic program scores 30 times, not
+  independent samples. Neither establishes sampling uncertainty or an agent
+  productivity or safety benefit. Source pairs are not all behaviorally
+  equivalent; `CsvParser` is one concrete counterexample. These are legacy
+  feature scores, not evidence that Calor beats C#. Follow-up: #1276.
+
+This release closes 16 language-audit findings and 15 website-audit findings.
+The focus is correctness: a successful compilation or proof must not hide a
+changed result, a missing runtime check, or a reordered side effect.
+
+### Fixed
+
+- **The C# CSV benchmark compiles again.** A malformed newline literal was
+  incorrectly penalizing the C# input. Both report formats were regenerated;
+  the broader pair-equivalence and interval limitations are tracked in #1276.
+- **Contract checks survive parameter mutation.** Postcondition proofs no longer
+  assume that a parameter still has its entry value after the body changes it.
+  Contract simplification also respects NaN, numeric types, and evaluation order.
+- **Effect checking includes assignment targets.** Indexed writes and executable
+  receivers, getters, and setters contribute their effects. Nested implementations
+  retain inherited interface contracts in the covered inheritance cases.
+- **Native code preserves expression meaning and scope.** C# emission retains
+  expression and pattern grouping and gives sibling match arms separate scopes.
+  Unsupported expression-match block arms are rejected instead of losing statements.
+- **Migration preserves observable execution in the repaired cases.** Short-circuit
+  operands stay conditional; eager operands keep their evaluation order; tuple
+  right-hand sides are captured before destination writes. Dictionary initializers
+  retain their operations and types, loop conditions are reevaluated, and LINQ
+  grouping retains element selectors and deferred execution.
+- **Website navigation and accessibility work consistently.** Fixes cover benchmark
+  sorting and row expansion, heading anchors and browser history, keyboard-accessible
+  drawers, active-page navigation, theme persistence, contrast, and copy controls.
+  Benchmark timestamps now identify their timezone.
+
+### Added
+
+- **Behavioral regression coverage through the production compiler.** Generated
+  cases compare results, exceptions, output, state, and evaluation traces.
+  Negative controls confirm that the oracles detect deliberately changed behavior.
+- **Frontend coverage floors, native code-generation mutation targets, and
+  specification drift checks.** These complement runtime regressions rather than
+  treating emitted text or AST counts as proof of correctness.
+- **A complete first-run guide and local documentation search.** The website now
+  includes clearer setup instructions, cross-document search, canonical routes,
+  sitemap and robots metadata, and clearer code labels.
+
+### Changed
+
+- **Integer overflow follows the documented module policy in production.**
+  Under the default checked policy, code that previously wrapped accidentally can
+  now throw `OverflowException`. Use the documented unchecked policy when wrapping
+  is intended; disabling contract checks does not disable overflow checks.
+- **Published claims distinguish guarantees from evidence.** Documentation separates
+  runtime contract modes, optional static proofs, effect-checking limits, and
+  static benchmark scores. Decorative website media is optional.
+
+### Known limits
+
+Some migration compositions are preserved as explicitly reported C# interop or
+rejected, rather than translated into native Calor. These fixes do not establish
+whole-language soundness, complete cross-file effect checking, or an advantage
+for coding agents over C#. Earlier roadmap proposals outside these two audits
+are not claimed complete by this release.
+
+The pre-existing optional Tier 2 corpus-workflow defects remain tracked in #1241.
+Historical measurements and their recorded misses remain unchanged.
+
 ## [0.18.0] - 2026-09-08
 
 0.17 was about **reach** — how many of the 364 converted modules the effect checker

@@ -13,11 +13,11 @@ How the Calor evaluation framework measures language effectiveness for AI agents
 
 The framework compares Calor and C# implementations of the same programs across multiple dimensions. It combines deterministic static analysis with optional LLM-based evaluation for a comprehensive assessment.
 
-The **published historical dashboard** is narrower than the full framework: it uses
+The **published static dashboard** is narrower than the full framework: it uses
 217 paired programs and eight deterministic metrics. Optional LLM suites are
 separate artifacts and do not contribute to the 1.32x headline.
 
-Its recorded source is `82a7c653`, which declares compiler `0.15.0`; the exact
+Its recorded source is `3a452b09`, which declares compiler `0.19.0`; the exact
 executed measurement binary was not independently recorded. The corpus is
 `tests/TestData/Benchmarks`. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
@@ -25,15 +25,17 @@ executed measurement binary was not independently recorded. The corpus is
 
 All metrics support statistical analysis mode:
 - Multiple runs (default: n=30) for variance measurement
-- 95% confidence intervals for all ratios. In the historical artifact the 30
-  deterministic repetitions are identical, so these intervals have zero width
-  and do not estimate uncertainty over the program corpus.
+- The exporter labels two different calculations as 95% confidence intervals:
+  singleton category aggregates produce zero-width intervals, while pooled
+  program scores include all 30 deterministic repetitions. Neither establishes
+  sampling uncertainty over the program corpus; repeated observations are not
+  independent samples.
 - Cohen's d effect size calculations
 - Paired t-tests for statistical significance (p &lt; 0.05)
 
 ```bash
 # Run with statistical analysis
-dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
+dotnet run --project tests/Calor.Evaluation -c Release -- run --statistical --runs 30
 ```
 
 ---
@@ -67,12 +69,18 @@ dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
 | PatternMatching | 11 |
 | **Total** | **217** |
 
-### Requirements
+### Intended Requirements
 
-Both implementations must:
+For a meaningful comparison, both implementations must:
 1. Compile successfully
 2. Produce identical output for the same inputs
 3. Have the same logical structure
+
+The published source pairs are **not all behaviorally equivalent**. `CsvParser`
+is a concrete counterexample: C# implements parsing, while Calor supplies only
+helper functions. The current scores do not establish a language advantage.
+Pair equivalence and interval calculations are tracked in
+[issue #1276](https://github.com/juanmicrosoft/calor/issues/1276).
 
 ---
 

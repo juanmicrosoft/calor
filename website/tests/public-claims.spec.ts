@@ -24,6 +24,7 @@ test('current version and explicitly historical result provenance cannot silentl
   const results = await readFile('content/benchmarking/results.mdx', 'utf8');
   expect(results).toContain(provenance.sourceCommit);
   expect(results).toContain(provenance.sourceDeclaredVersion);
+  expect(results).toContain('not all behaviorally equivalent');
   for (const path of ['methodology', ...metricPages.map(name => `metrics/${name}`)]) {
     const source = await readFile(`content/benchmarking/${path}.mdx`, 'utf8');
     expect(source).not.toMatch(/v0\.12(?:\.1)?\s+(?:dashboard|result|aggregate|ratio|corpus)/i);
@@ -61,7 +62,9 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
   await expect(note).toContainText(provenance.sourceCommit);
   await expect(note).toContainText(`v${provenance.sourceDeclaredVersion}`);
   await expect(note).toContainText('not independently recorded');
-  await expect(page.getByRole('heading', { name: 'Historical Benchmark Snapshot' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Static Benchmark Snapshot' })).toBeVisible();
+  await expect(note).toContainText('not an agent-productivity measurement');
+  await expect(note).toContainText('not all behaviorally equivalent');
   expect(data.metrics.InformationDensity.winner).toBe('csharp');
   expect(data.metrics.InformationDensity.ratio).toBeLessThan(1);
   await expect(page.locator('article')).toContainText('where C# leads');

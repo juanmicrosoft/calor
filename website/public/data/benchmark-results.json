@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-01T22:18:14.678262Z",
-  "commit": "82a7c653",
+  "timestamp": "2026-09-09T17:37:35.466817Z",
+  "commit": "3a452b09",
   "frameworkVersion": "1.0.0",
   "summary": {
     "overallAdvantage": 1.32,
@@ -33,7 +33,7 @@
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 0.335,
+      "effectSize": 0.452,
       "effectInterpretation": "small"
     },
     "Comprehension": {
@@ -73,15 +73,15 @@
       "effectInterpretation": "large"
     },
     "InformationDensity": {
-      "ratio": 0.98,
+      "ratio": 0.97,
       "winner": "csharp",
       "ci95": [
-        0.976,
-        0.976
+        0.97,
+        0.97
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": -0.516,
+      "effectSize": -0.528,
       "effectInterpretation": "medium"
     },
     "RefactoringStability": {
@@ -100,12 +100,12 @@
       "ratio": 1.29,
       "winner": "calor",
       "ci95": [
-        1.294,
-        1.294
+        1.295,
+        1.295
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 1.315,
+      "effectSize": 1.323,
       "effectInterpretation": "large"
     }
   },
@@ -2315,17 +2315,17 @@
         "domain_logic"
       ],
       "calorSuccess": true,
-      "cSharpSuccess": false,
-      "advantage": 1.476,
+      "cSharpSuccess": true,
+      "advantage": 1.349,
       "metrics": {
-        "TokenEconomics": 1.25,
+        "TokenEconomics": 1.242,
         "GenerationAccuracy": 1,
         "Comprehension": 1.97,
         "EditPrecision": 1.314,
         "ErrorDetection": 1.667,
-        "InformationDensity": 2.285,
+        "InformationDensity": 1.033,
         "RefactoringStability": 1.321,
-        "Correctness": 1
+        "Correctness": 1.25
       }
     },
     {
@@ -5345,10 +5345,10 @@
       },
       "GenerationAccuracy": {
         "mean": 1.017,
-        "stdDev": 0.038,
+        "stdDev": 0.012,
         "ci95Lower": 1.015,
         "ci95Upper": 1.018,
-        "cohensD": 0.335,
+        "cohensD": 0.452,
         "pValue": 0.0001,
         "significant": true
       },
@@ -5380,11 +5380,11 @@
         "significant": true
       },
       "InformationDensity": {
-        "mean": 0.976,
+        "mean": 0.97,
         "stdDev": 0.025,
-        "ci95Lower": 0.966,
-        "ci95Upper": 0.986,
-        "cohensD": -0.516,
+        "ci95Lower": 0.961,
+        "ci95Upper": 0.98,
+        "cohensD": -0.528,
         "pValue": 0.0001,
         "significant": true
       },
@@ -5398,11 +5398,11 @@
         "significant": true
       },
       "Correctness": {
-        "mean": 1.294,
-        "stdDev": 0.057,
-        "ci95Lower": 1.286,
-        "ci95Upper": 1.301,
-        "cohensD": 1.315,
+        "mean": 1.295,
+        "stdDev": 0.064,
+        "ci95Lower": 1.288,
+        "ci95Upper": 1.302,
+        "cohensD": 1.323,
         "pValue": 0.0001,
         "significant": true
       }
