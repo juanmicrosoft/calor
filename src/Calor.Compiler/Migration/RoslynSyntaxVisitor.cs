@@ -6961,6 +6961,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         // Fallback: convert expression and wrap as a discarded bind
         var exprNode = ConvertExpression(expr);
+        if (exprNode is CallExpressionNode call)
+            return new CallStatementNode(span, call.Target, false, call.Arguments,
+                new AttributeCollection(), call.ArgumentNames, call.ArgumentModifiers,
+                typeArguments: call.TypeArguments);
         return new BindStatementNode(span, "_", null, false, exprNode, new AttributeCollection());
     }
 
@@ -8058,142 +8062,90 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return [new RawCSharpNode(GetTextSpan(node), node.ToString())];
         }
 
+        if (!CanUseNativeForRange(node))
+        {
+            return [ConvertReevaluatedFor(node)];
+        }
+
         var id = _context.GenerateId("for");
         var span = GetTextSpan(node);
         var result = new List<StatementNode>();
 
-        // Try to extract standard for loop pattern: for (var i = from; i <= to; i += step)
-        var varName = (string?)null;
-        ExpressionNode? from = null;
-        ExpressionNode? to = null;
-        ExpressionNode? step = null;
-        bool isStandard = true;
-
-        // Extract variable name and initial value from declaration
-        if (node.Declaration?.Variables.Count > 0)
-        {
-            if (node.Declaration.Variables.Count > 1)
-            {
-                isStandard = false; // Multiple variables — non-standard
-            }
-            var decl = node.Declaration.Variables[0];
-            varName = decl.Identifier.Text;
-            if (decl.Initializer != null)
-            {
-                from = ConvertExpression(decl.Initializer.Value);
-            }
-        }
-        else
-        {
-            isStandard = false; // No variable declaration — non-standard
-        }
-
-        // Extract upper bound from condition
-        if (node.Condition is BinaryExpressionSyntax binExpr)
-        {
-            to = ConvertExpression(binExpr.Right);
-
-            // Calor loops are inclusive (<=), so adjust for exclusive C# bounds
-            if (binExpr.OperatorToken.IsKind(SyntaxKind.LessThanToken))
-            {
-                to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(TextSpan.Empty, 1));
-            }
-            else if (binExpr.OperatorToken.IsKind(SyntaxKind.GreaterThanToken))
-            {
-                to = new BinaryOperationNode(TextSpan.Empty, Ast.BinaryOperator.Add, to, new IntLiteralNode(TextSpan.Empty, 1));
-            }
-        }
-        else
-        {
-            isStandard = false; // No binary condition — non-standard
-        }
-
-        // Extract step from incrementors
-        if (node.Incrementors.Count > 1)
-        {
-            isStandard = false; // Multiple incrementors — non-standard
-        }
-        if (node.Incrementors.Count > 0)
-        {
-            var incrementor = node.Incrementors[0];
-            if (incrementor is PostfixUnaryExpressionSyntax postfix)
-            {
-                step = postfix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
-                    ? new IntLiteralNode(TextSpan.Empty, 1)
-                    : new IntLiteralNode(TextSpan.Empty, -1);
-            }
-            else if (incrementor is PrefixUnaryExpressionSyntax prefix)
-            {
-                step = prefix.OperatorToken.IsKind(SyntaxKind.PlusPlusToken)
-                    ? new IntLiteralNode(TextSpan.Empty, 1)
-                    : new IntLiteralNode(TextSpan.Empty, -1);
-            }
-            else if (incrementor is AssignmentExpressionSyntax assignment)
-            {
-                // KNOWN LIMITATION (#836 m2, pre-existing on main; #774
-                // follow-up): §L's step is ADDITIVE, but this takes the RHS of
-                // any compound assignment — `k *= 2` / `j >>= 1` become
-                // additive step 2 / 1, and `i -= 2` a positive step 2,
-                // changing loop semantics. Documented in the FeatureSupport
-                // "for" entry; the fix is to restrict this to += (negating -=)
-                // and route other compound incrementors to the while-loop
-                // fallback.
-                step = ConvertExpression(assignment.Right);
-            }
-        }
+        var declaration = node.Declaration!.Variables[0];
+        var varName = declaration.Identifier.Text;
+        var from = ConvertExpression(declaration.Initializer!.Value);
+        var condition = (BinaryExpressionSyntax)node.Condition!;
+        var to = ConvertExpression(condition.Right);
+        if (condition.IsKind(SyntaxKind.LessThanExpression))
+            to = new BinaryOperationNode(span, Ast.BinaryOperator.Subtract, to, new IntLiteralNode(span, 1));
+        else if (condition.IsKind(SyntaxKind.GreaterThanExpression))
+            to = new BinaryOperationNode(span, Ast.BinaryOperator.Add, to, new IntLiteralNode(span, 1));
+        var incrementor = node.Incrementors[0];
+        var step = new IntLiteralNode(span,
+            incrementor.IsKind(SyntaxKind.PostIncrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreIncrementExpression) ? 1 : -1);
 
         var body = node.Statement is BlockSyntax block
             ? ConvertBlock(block)
             : new List<StatementNode> { ConvertStatement(node.Statement)! };
 
-        // Fall back to while loop for non-standard for patterns
-        if (!isStandard)
+        bool CanUseNativeForRange(ForStatementSyntax node)
         {
-            var whileBody = new List<StatementNode>();
+            if (_semanticModel == null
+                || node.Declaration?.Variables.Count != 1
+                || node.Declaration.Variables[0] is not { Initializer: { } initializer } declaration
+                || _semanticModel.GetDeclaredSymbol(declaration) is not ILocalSymbol variable
+                || variable.Type.SpecialType != SpecialType.System_Int32
+                || _semanticModel.GetConstantValue(initializer.Value) is not { HasValue: true, Value: int }
+                || node.Condition is not BinaryExpressionSyntax condition
+                || !SymbolEqualityComparer.Default.Equals(
+                    _semanticModel.GetSymbolInfo(condition.Left).Symbol, variable)
+                || _semanticModel.GetConstantValue(condition.Right) is not { HasValue: true, Value: int bound }
+                || node.Incrementors.Count != 1)
+                return false;
 
-            // Prepend initializer(s) directly to result (before the while loop)
-            if (node.Declaration != null)
+            var incrementor = node.Incrementors[0];
+            var operand = incrementor switch
             {
-                foreach (var variable in node.Declaration.Variables)
-                {
-                    var initExpr = variable.Initializer != null
-                        ? ConvertExpression(variable.Initializer.Value)
-                        : new ReferenceNode(span, "default");
-                    result.Add(new BindStatementNode(
-                        span, variable.Identifier.Text,
-                        TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
-                        true, initExpr, new AttributeCollection()));
-                }
-            }
-            else if (node.Initializers.Count > 0)
-            {
-                foreach (var init in node.Initializers)
-                {
-                    var initStmt = ConvertExpressionToStatement(init, span);
-                    if (initStmt != null) result.Add(initStmt);
-                }
-            }
+                PostfixUnaryExpressionSyntax postfix => postfix.Operand,
+                PrefixUnaryExpressionSyntax prefix => prefix.Operand,
+                _ => null
+            };
+            if (operand == null
+                || !SymbolEqualityComparer.Default.Equals(_semanticModel.GetSymbolInfo(operand).Symbol, variable))
+                return false;
 
-            // Body + incrementors
-            whileBody.AddRange(body);
-            foreach (var inc in node.Incrementors)
-            {
-                var incStmt = ConvertExpressionToStatement(inc, span);
-                if (incStmt != null) whileBody.Add(incStmt);
-            }
-
-            var condition = node.Condition != null
-                ? ConvertExpression(node.Condition)
-                : new BoolLiteralNode(span, true);
-
-            result.Add(new WhileStatementNode(span, id, condition, whileBody, new AttributeCollection()));
-            return result;
+            var ascending = incrementor.IsKind(SyntaxKind.PostIncrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreIncrementExpression);
+            var descending = incrementor.IsKind(SyntaxKind.PostDecrementExpression)
+                || incrementor.IsKind(SyntaxKind.PreDecrementExpression);
+            // Native ranges stop at overflow. C# may wrap or throw instead, so the
+            // final increment must remain representable as well as the endpoint.
+            var safeCondition = ascending
+                ? condition.IsKind(SyntaxKind.LessThanExpression) && bound > int.MinValue
+                    || condition.IsKind(SyntaxKind.LessThanOrEqualExpression) && bound < int.MaxValue
+                : descending && (condition.IsKind(SyntaxKind.GreaterThanExpression) && bound < int.MaxValue
+                    || condition.IsKind(SyntaxKind.GreaterThanOrEqualExpression) && bound > int.MinValue);
+            var flow = _semanticModel.AnalyzeDataFlow(node.Statement);
+            return safeCondition && flow is { Succeeded: true }
+                && !flow.WrittenInside.Contains(variable, SymbolEqualityComparer.Default)
+                && !flow.UnsafeAddressTaken.Contains(variable, SymbolEqualityComparer.Default)
+                // Readonly references can still escape to unsafe callees. Dataflow's
+                // write set does not see those writes, including implicit `in` calls.
+                && !node.Statement.DescendantNodesAndSelf().Any(syntax =>
+                    syntax is RefExpressionSyntax or MakeRefExpressionSyntax
+                    || syntax is ArgumentSyntax argument
+                        && _semanticModel.GetOperation(argument) is
+                            Microsoft.CodeAnalysis.Operations.IArgumentOperation
+                            { Parameter.RefKind: not RefKind.None }
+                    || syntax is InvocationExpressionSyntax invocation
+                        && _semanticModel.GetSymbolInfo(invocation).Symbol is IMethodSymbol
+                            { ReducedFrom: { } extension }
+                        && extension.Parameters[0].RefKind != RefKind.None);
         }
 
         // Hoist complex from/to/step expressions to temp bindings.
         // The §L{...} header is colon-delimited — nested section markers (§IDX, §C, §NEW) would break parsing.
-        from ??= new IntLiteralNode(TextSpan.Empty, 0);
-        to ??= new IntLiteralNode(TextSpan.Empty, 10);
         if (ContainsNestedMarker(from))
         {
             var tempFrom = _context.GenerateId("_from");
@@ -8210,7 +8162,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         result.Add(new ForStatementNode(
             span,
             id,
-            varName ?? "i",
+            varName,
             from,
             to,
             step,
@@ -8218,6 +8170,152 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             new AttributeCollection()));
         return result;
     }
+
+    private StatementNode ConvertReevaluatedFor(ForStatementSyntax node)
+    {
+        // Header-declared aliases/out variables need a storage lifetime that this
+        // lowering does not represent. Preserve those unusual headers explicitly.
+        if (node.Declaration?.Type is RefTypeSyntax
+            || node.ChildNodes().Where(part => part != node.Statement)
+                .SelectMany(part => part.DescendantNodesAndSelf())
+                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax))
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+                "For-loop header variable storage preserved verbatim",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
+        }
+
+        var span = GetTextSpan(node);
+        var savedPending = new List<StatementNode>(_pendingStatements);
+        _pendingStatements.Clear();
+        try
+        {
+            var outerBody = new List<StatementNode>();
+            if (node.Declaration != null)
+            {
+                foreach (var variable in node.Declaration.Variables)
+                {
+                    var value = variable.Initializer == null
+                        ? null : ConvertForHeaderExpression(variable.Initializer.Value);
+                    FlushPendingStatements(outerBody);
+                    outerBody.Add(new BindStatementNode(GetTextSpan(variable), variable.Identifier.ValueText,
+                        node.Declaration.Type.IsVar ? null : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString()),
+                        true, value, new AttributeCollection()));
+                }
+            }
+            foreach (var initializer in node.Initializers)
+            {
+                var statement = ConvertForHeaderStatement(initializer);
+                FlushPendingStatements(outerBody);
+                if (statement != null) outerBody.Add(statement);
+            }
+
+            var whileBody = new List<StatementNode>();
+            if (node.Incrementors.Count > 0)
+            {
+                var first = _context.GenerateId("_forFirst");
+                var sourceNames = node.SyntaxTree.GetRoot().DescendantTokens()
+                    .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
+                    .Select(token => token.ValueText).ToHashSet(StringComparer.Ordinal);
+                while (sourceNames.Contains(first)) first += "_";
+                outerBody.Add(new BindStatementNode(span, first, "bool", true,
+                    new BoolLiteralNode(span, true), new AttributeCollection()));
+                var increments = new List<StatementNode>();
+                foreach (var incrementor in node.Incrementors)
+                {
+                    var statement = ConvertForHeaderStatement(incrementor);
+                    FlushPendingStatements(increments);
+                    if (statement != null) increments.Add(statement);
+                }
+                // Increment at the next iteration's start. This preserves every
+                // continue, including ones inside interop, finally and using scopes.
+                whileBody.Add(new IfStatementNode(span, _context.GenerateId("if"),
+                    new ReferenceNode(span, first),
+                    [new AssignmentStatementNode(span, new ReferenceNode(span, first), new BoolLiteralNode(span, false))],
+                    [], increments, new AttributeCollection()));
+            }
+
+            if (node.Condition != null)
+            {
+                var condition = ConvertForHeaderExpression(node.Condition);
+                FlushPendingStatements(whileBody);
+                // Test positively: C# conditions may use operator true, which
+                // need not agree with (or even provide) operator !.
+                whileBody.Add(new IfStatementNode(span, _context.GenerateId("if"),
+                    condition, [], [], [new BreakStatementNode(span)], new AttributeCollection()));
+            }
+            var body = node.Statement is BlockSyntax block
+                ? ConvertBlock(block)
+                : new List<StatementNode> { ConvertStatement(node.Statement)! };
+            var scopedBody = new List<StatementNode>();
+            FlushPendingStatements(scopedBody);
+            scopedBody.AddRange(body);
+            // Body locals must not shadow names used by the relocated header.
+            whileBody.Add(new IfStatementNode(span, _context.GenerateId("body"),
+                new BoolLiteralNode(span, true), scopedBody, [], null, new AttributeCollection()));
+            outerBody.Add(new WhileStatementNode(span, _context.GenerateId("while"),
+                new BoolLiteralNode(span, true), whileBody, new AttributeCollection()));
+            // Preserve the original for initializer's lexical scope without
+            // adding another loop that could intercept break or continue.
+            return new IfStatementNode(span, _context.GenerateId("scope"),
+                new BoolLiteralNode(span, true), outerBody, [], null, new AttributeCollection());
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(savedPending);
+        }
+    }
+
+    private ExpressionNode ConvertForHeaderExpression(ExpressionSyntax expression)
+    {
+        if (!RequiresExactForHeaderEvaluation(expression))
+            return ConvertExpression(expression);
+
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+            "For-header expression preserved inline to retain evaluation order and conditional execution",
+            expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return new RawCSharpExpressionNode(GetTextSpan(expression), expression.ToString());
+    }
+
+    private StatementNode? ConvertForHeaderStatement(ExpressionSyntax expression)
+    {
+        var target = expression switch
+        {
+            PostfixUnaryExpressionSyntax postfix => postfix.Operand,
+            PrefixUnaryExpressionSyntax prefix when prefix.IsKind(SyntaxKind.PreIncrementExpression)
+                || prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
+            AssignmentExpressionSyntax assignment when !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                => assignment.Left,
+            _ => null
+        };
+        var type = target == null ? null : _semanticModel?.GetTypeInfo(target).Type;
+        if (expression is AwaitExpressionSyntax
+            || expression is InvocationExpressionSyntax { Expression: not IdentifierNameSyntax }
+            || RequiresExactForHeaderEvaluation(expression, statementRoot: true)
+            || target != null && (target is not IdentifierNameSyntax || type?.SpecialType is not
+                (SpecialType.System_Int32 or SpecialType.System_Int64 or SpecialType.System_UInt32
+                or SpecialType.System_UInt64 or SpecialType.System_Single or SpecialType.System_Double
+                or SpecialType.System_Decimal)))
+        {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "for",
+                "For-header operation preserved verbatim to retain overloads, narrowing and evaluation order",
+                expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpNode(GetTextSpan(expression), expression + ";");
+        }
+        return ConvertExpressionToStatement(expression, GetTextSpan(expression));
+    }
+
+    private static bool RequiresExactForHeaderEvaluation(ExpressionSyntax expression, bool statementRoot = false)
+        => expression.DescendantNodesAndSelf().Any(part =>
+            part is ConditionalExpressionSyntax or ConditionalAccessExpressionSyntax
+                or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or ElementAccessExpressionSyntax
+            || part.IsKind(SyntaxKind.LogicalAndExpression) || part.IsKind(SyntaxKind.LogicalOrExpression)
+            || part.IsKind(SyntaxKind.CoalesceExpression)
+            || (!statementRoot || part != expression) && (part is AssignmentExpressionSyntax or InvocationExpressionSyntax
+                || part.IsKind(SyntaxKind.PreIncrementExpression) || part.IsKind(SyntaxKind.PreDecrementExpression)
+                || part.IsKind(SyntaxKind.PostIncrementExpression) || part.IsKind(SyntaxKind.PostDecrementExpression)));
 
     private ForeachStatementNode ConvertForEachStatement(ForEachStatementSyntax node)
     {
