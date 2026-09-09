@@ -15,6 +15,98 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void QuantifierDiscovery_PreservesShortCircuitAndEndpointOrder(bool verify)
+    {
+        string Guarded(string predicate) => $$"""
+            §M{m1:TypedContracts}
+              §F{f1:Check:pub} (bool:guard, i32:x) -> i32
+                §E{}
+                §Q {{predicate}}
+                §R INT:7
+            """;
+        var all = Compile(Guarded(
+            "(forall ((i i32)) (-> (&& guard (&& (>= i (/ INT:1 x)) (< i INT:2))) true))"), verify);
+        var any = Compile(Guarded(
+            "(exists ((i i32)) (&& guard (&& (>= i (/ INT:1 x)) (< i INT:2))))"), verify);
+        Assert.Equal(7, InvokeArguments(all, false, 0));
+        AssertContractViolation(() => InvokeArguments(any, false, 0));
+        Assert.Equal(7, InvokeArguments(all, true, 1));
+        Assert.Equal(7, InvokeArguments(any, true, 1));
+        foreach (var assembly in new[] { all, any })
+        {
+            var error = Assert.Throws<TargetInvocationException>(() => InvokeArguments(assembly, true, 0));
+            Assert.IsType<DivideByZeroException>(error.InnerException);
+        }
+
+        var emptyPrefix = Compile(Function("i32",
+            "(forall ((i i32)) (-> (&& (> i INT:2147483647) (< i (/ INT:1 x))) false))"), verify);
+        Assert.Equal(7, Invoke(emptyPrefix, 0));
+        var earlierThrow = Compile(Function("i32",
+            "(forall ((i i32)) (-> (&& (< i (/ INT:1 x)) (> i INT:2147483647)) false))"), verify);
+        Assert.IsType<DivideByZeroException>(
+            Assert.Throws<TargetInvocationException>(() => Invoke(earlierThrow, 0)).InnerException);
+
+        var betweenBounds = Compile(Guarded(
+            "(forall ((i i32)) (-> (&& (>= i INT:0) (&& guard (< i (/ INT:1 x)))) true))"), verify);
+        Assert.Equal(7, InvokeArguments(betweenBounds, false, 0));
+        Assert.IsType<DivideByZeroException>(
+            Assert.Throws<TargetInvocationException>(() => InvokeArguments(betweenBounds, true, 0)).InnerException);
+        var nested = Compile(Function("i32",
+            "(forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (&& (< i x) (&& (>= j (/ INT:1 x)) (< j (+ i INT:2))))) true))"), verify);
+        Assert.Equal(7, Invoke(nested, 0));
+        Assert.Equal(7, Invoke(nested, 2));
+        var nullableArray = Compile("""
+            §M{m1:TypedContracts}
+              §CL{c1:NullableDomain:pub}
+                §MT{mt1:Check:pub} (i32[]?:x) -> i32
+                  §E{}
+                  §Q (forall ((i i32)) (-> (&& (!= x null) (&& (>= i INT:0) (< i x.Length))) true))
+                  §R INT:7
+            """, verify, rejectNullableWarnings: true);
+        var domainType = nullableArray.GetType("TypedContracts.NullableDomain")!;
+        var domain = Activator.CreateInstance(domainType);
+        Assert.Equal(7, domainType.GetMethod("Check")!.Invoke(domain, [null]));
+        Assert.Equal(7, domainType.GetMethod("Check")!.Invoke(domain, [new[] { 1, 2 }]));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UncertifiedQuantifierPrefixes_AreRejectedExplicitly(bool verify)
+    {
+        foreach (var predicate in new[]
+        {
+            "(forall ((i i32)) (-> (&& (> Tick INT:0) (&& (>= i INT:0) (< i INT:3))) true))",
+            "(exists ((i i32)) (&& (>= i Tick) (< i INT:3)))"
+        })
+        {
+            var source = $$"""
+                §M{m1:ContractEffects}
+                  §CL{c1:Counter:pub}
+                    §FLD{i32:Value:pub}
+                    §PROP{p1:Tick:i32:pub}
+                      §GET
+                        §ASSIGN Value (+ Value INT:1)
+                        §R Value
+                    §MT{mt1:Check:pub} () -> i32
+                      §E{}
+                      §Q {{predicate}}
+                      §R INT:7
+                """;
+            var result = Program.Compile(source, "uncertified-quantifier.calr", Options(verify));
+            Assert.Contains(result.Diagnostics.Errors,
+                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+        }
+        var forwardDependent = Program.Compile(Function("i32",
+            "(forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (&& (< i j) (&& (>= j INT:0) (< j x)))) true))"),
+            "forward-bound.calr", Options(verify));
+        Assert.Contains(forwardDependent.Diagnostics.Errors,
+            error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Quantifiers_KeepEveryConjunctAndGroupedBounds(bool verify)
     {
         var falseExists = Compile(Function("i32",
@@ -428,6 +520,14 @@ public class ContractSimplificationRuntimeTests
             """;
         var assembly = Compile(source, verify, harness);
         Assert.Equal(2, assembly.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
+        var quantified = Compile(source.Replace("§Q (== Tick Tick)",
+            "§Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (> Tick INT:0)))"),
+            verify, harness.Replace("return -1;", "return counter.Value + 100;"));
+        Assert.Equal(103, quantified.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
+        var quantifiedFailure = Compile(source.Replace("§Q (== Tick Tick)",
+            "§Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (< Tick INT:2)))"),
+            verify, harness.Replace("return -1;", "return counter.Value + 100;"));
+        Assert.Equal(2, quantifiedFailure.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
     }
 
     [Fact]
@@ -476,18 +576,9 @@ public class ContractSimplificationRuntimeTests
             §R INT:7
         """;
 
-    private static Assembly Compile(string source, bool verify, string? harness = null)
+    private static Assembly Compile(string source, bool verify, string? harness = null, bool rejectNullableWarnings = false)
     {
-        var result = Program.Compile(source, "typed-contract.calr", new CompilationOptions
-        {
-            VerifyContracts = verify,
-            ContractMode = ContractMode.Debug,
-            ElideProvenGuards = true,
-            EnableTypeChecking = true,
-            EnforceEffects = true,
-            StatusWriter = TextWriter.Null,
-            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
-        });
+        var result = Program.Compile(source, "typed-contract.calr", Options(verify));
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
         var compilation = CSharpCompilation.Create(
             "TypedContracts_" + Guid.NewGuid().ToString("N"),
@@ -497,12 +588,28 @@ public class ContractSimplificationRuntimeTests
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        if (rejectNullableWarnings)
+            Assert.DoesNotContain(emit.Diagnostics, diagnostic => diagnostic.Id == "CS8602");
         return Assembly.Load(stream.ToArray());
     }
 
     private static object? Invoke(Assembly assembly, object? value) =>
+        InvokeArguments(assembly, value);
+
+    private static object? InvokeArguments(Assembly assembly, params object?[] values) =>
         Assert.Single(assembly.GetTypes(), t => t.Name == "TypedContractsModule")
-            .GetMethod("Check")!.Invoke(null, [value]);
+            .GetMethod("Check")!.Invoke(null, values);
+
+    private static CompilationOptions Options(bool verify) => new()
+    {
+        VerifyContracts = verify,
+        ContractMode = ContractMode.Debug,
+        ElideProvenGuards = true,
+        EnableTypeChecking = true,
+        EnforceEffects = true,
+        StatusWriter = TextWriter.Null,
+        VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+    };
 
     private static void AssertContractViolation(Action action)
     {

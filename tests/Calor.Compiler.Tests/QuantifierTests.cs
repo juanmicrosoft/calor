@@ -12,6 +12,19 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class QuantifierTests
 {
+    private static string EmitTypedExpression(ExpressionNode expression)
+    {
+        var attributes = new AttributeCollection();
+        var parameters = new[] { "n", "m", "target", "x", "arr" }
+            .Select(name => new ParameterNode(TextSpan.Empty, name, name == "arr" ? "i32[]" : "i32", attributes))
+            .ToArray();
+        var function = new FunctionNode(TextSpan.Empty, "f_context", "Context", Visibility.Public,
+            parameters, new OutputNode(TextSpan.Empty, "bool"), null,
+            [new ReturnStatementNode(TextSpan.Empty, expression)], attributes);
+        return new CSharpEmitter(EmitContractMode.Debug).Emit(
+            new ModuleNode(TextSpan.Empty, "m_context", "Context", [], [function], attributes));
+    }
+
     private static List<Token> Tokenize(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
@@ -210,13 +223,8 @@ public class QuantifierTests
         // Verify they can be visited by the emitter
         var emitter = new CSharpEmitter(EmitContractMode.Debug);
 
-        var forallResult = forall.Accept(emitter);
-        Assert.NotNull(forallResult);
-        Assert.NotEmpty(forallResult);
-
-        var existsResult = exists.Accept(emitter);
-        Assert.NotNull(existsResult);
-        Assert.NotEmpty(existsResult);
+        Assert.Throws<InvalidOperationException>(() => forall.Accept(emitter));
+        Assert.Throws<InvalidOperationException>(() => exists.Accept(emitter));
 
         var implResult = impl.Accept(emitter);
         Assert.NotNull(implResult);
@@ -330,8 +338,7 @@ public class QuantifierTests
         // Build forall
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should generate Enumerable.Range(...).All(...)
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -339,10 +346,10 @@ public class QuantifierTests
     }
 
     [Fact]
-    public void Emitter_EmitsStaticOnlyCommentForInfiniteForall()
+    public void Emitter_RejectsUnboundedRuntimeForall()
     {
         // Create AST: (forall ((i i32)) (>= i INT:0))
-        // No finite range, so should emit static-only comment
+        // A requested runtime check must not become a success-shaped static-only comment.
         var span = new TextSpan(0, 0, 1, 1);
         var boundVar = new QuantifierVariableNode(span, "i", "i32");
         var iRef = new ReferenceNode(span, "i");
@@ -351,18 +358,16 @@ public class QuantifierTests
         var forall = new ForallExpressionNode(span, new[] { boundVar }, body);
 
         var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
-
-        // Should emit a comment indicating static-only verification
-        Assert.Contains("STATIC ONLY", result);
-        Assert.Contains("forall", result);
+        var error = Assert.Throws<InvalidOperationException>(() => forall.Accept(emitter));
+        Assert.Contains("runtime", error.Message);
+        Assert.Contains("forall", error.Message);
     }
 
     [Fact]
-    public void Emitter_EmitsStaticOnlyCommentForInfiniteExists()
+    public void Emitter_RejectsUnboundedRuntimeExists()
     {
         // Create AST: (exists ((i i32)) (== i INT:0))
-        // No finite range, so should emit static-only comment
+        // An unenforced existential condition is not a runtime contract check.
         var span = new TextSpan(0, 0, 1, 1);
         var boundVar = new QuantifierVariableNode(span, "i", "i32");
         var iRef = new ReferenceNode(span, "i");
@@ -371,11 +376,9 @@ public class QuantifierTests
         var exists = new ExistsExpressionNode(span, new[] { boundVar }, body);
 
         var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = exists.Accept(emitter);
-
-        // Should emit a comment indicating static-only verification
-        Assert.Contains("STATIC ONLY", result);
-        Assert.Contains("exists", result);
+        var error = Assert.Throws<InvalidOperationException>(() => exists.Accept(emitter));
+        Assert.Contains("runtime", error.Message);
+        Assert.Contains("exists", error.Message);
     }
 
     [Fact]
@@ -417,8 +420,7 @@ public class QuantifierTests
         // Build forall with two variables
         var forall = new ForallExpressionNode(span, new[] { boundVarI, boundVarJ }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should generate nested Enumerable.Range(...).All(...) calls
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -463,8 +465,7 @@ public class QuantifierTests
         // Build exists with two variables
         var exists = new ExistsExpressionNode(span, new[] { boundVarI, boundVarJ }, body);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = exists.Accept(emitter);
+        var result = EmitTypedExpression(exists);
 
         // Should generate nested Enumerable.Range(...).Any(...) calls
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -493,8 +494,7 @@ public class QuantifierTests
         var impl = new ImplicationExpressionNode(span, antecedent, consequent);
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should still generate runtime check
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -522,8 +522,7 @@ public class QuantifierTests
         var impl = new ImplicationExpressionNode(span, antecedent, consequent);
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should generate runtime check
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -551,8 +550,7 @@ public class QuantifierTests
         var impl = new ImplicationExpressionNode(span, antecedent, consequent);
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should generate runtime check with (n + 1) as upper bound
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -580,8 +578,7 @@ public class QuantifierTests
         var impl = new ImplicationExpressionNode(span, antecedent, consequent);
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should generate runtime check with (0 + 1) as lower bound
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -615,8 +612,7 @@ public class QuantifierTests
         var impl = new ImplicationExpressionNode(span, antecedent, consequent);
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should generate runtime check with array access
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -653,8 +649,7 @@ public class QuantifierTests
 
         var exists = new ExistsExpressionNode(span, new[] { boundVar }, body);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = exists.Accept(emitter);
+        var result = EmitTypedExpression(exists);
 
         // Should generate runtime check with array access
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -967,7 +962,7 @@ public class QuantifierTests
     }
 
     [Fact]
-    public void Emitter_HandlesVariableShadowingInNestedQuantifiers()
+    public void Emitter_RejectsUnboundedShadowingQuantifiers()
     {
         // Test: nested quantifiers with same variable name
         // (forall ((i i32)) (exists ((i i32)) body))
@@ -984,11 +979,7 @@ public class QuantifierTests
         var forall = new ForallExpressionNode(span, new[] { outerVar }, exists);
 
         var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
-
-        // Should generate code - the inner 'i' shadows the outer 'i'
-        // This might generate STATIC ONLY since no finite range is detected
-        Assert.NotEmpty(result);
+        Assert.Throws<InvalidOperationException>(() => forall.Accept(emitter));
     }
 
     [Fact]
@@ -1015,7 +1006,7 @@ public class QuantifierTests
     }
 
     [Fact]
-    public void Emitter_HandlesDeepNestedQuantifiers()
+    public void Emitter_RejectsUnboundedNestedQuantifiers()
     {
         // Test: deeply nested quantifiers (3 levels)
         var span = new TextSpan(0, 0, 1, 1);
@@ -1029,11 +1020,7 @@ public class QuantifierTests
         var outer = new ForallExpressionNode(span, new[] { varI }, middle);
 
         var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = outer.Accept(emitter);
-
-        // Should generate code with STATIC ONLY comment for infinite nested quantifiers
-        Assert.Contains("STATIC ONLY", result);
-        Assert.Contains("forall", result);
+        Assert.Throws<InvalidOperationException>(() => outer.Accept(emitter));
     }
 
     [Fact]
@@ -1062,8 +1049,7 @@ public class QuantifierTests
         var impl = new ImplicationExpressionNode(span, antecedent, consequent);
         var forall = new ForallExpressionNode(span, new[] { boundVar }, impl);
 
-        var emitter = new CSharpEmitter(EmitContractMode.Debug);
-        var result = forall.Accept(emitter);
+        var result = EmitTypedExpression(forall);
 
         // Should still extract the first lower bound (0) and generate code
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range(0,", result);
@@ -1395,7 +1381,7 @@ public class QuantifierTests
         var forall = new ForallExpressionNode(span, new[] { boundVar },
             new ImplicationExpressionNode(span, antecedent, consequent));
 
-        var result = forall.Accept(new CSharpEmitter(EmitContractMode.Debug));
+        var result = EmitTypedExpression(forall);
 
         // Still a bounded range check...
         Assert.Contains("Calor.Runtime.ContractQuantifier.Range", result);
@@ -1432,7 +1418,7 @@ public class QuantifierTests
         var forall = new ForallExpressionNode(span, new[] { boundVar },
             new ImplicationExpressionNode(span, antecedent, consequent));
 
-        var result = forall.Accept(new CSharpEmitter(EmitContractMode.Debug));
+        var result = EmitTypedExpression(forall);
 
         // The discarded second bound must appear in the emitted predicate, not only in the Range.
         Assert.Contains("i < 2", result);

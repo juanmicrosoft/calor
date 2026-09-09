@@ -153,7 +153,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private ReturnLoweringContext? _currentReturnLowering;
     private string? _currentReturnValueType;
     private Dictionary<string, string> _parameterTypes = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _capturedParameterNames = new(StringComparer.Ordinal);
     private int _contractExpressionDepth;
+    private int _statementDepth;
     private string? _postconditionResultIdentifier;
     private int _postconditionResultShadowDepth;
     private int _returnLoweringCounter;
@@ -205,9 +207,32 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private int _indexGuardCounter;
     private int _mutationGuardCounter;
 
-    private void ResetDeclScopes(IReadOnlyList<ParameterNode>? parameters = null)
+    private void ResetDeclScopes(
+        IReadOnlyList<ParameterNode>? parameters = null,
+        IReadOnlyList<StatementNode>? body = null)
     {
         _parameterTypes.Clear();
+        _capturedParameterNames.Clear();
+        if (body != null && parameters != null)
+        {
+            var parameterNames = parameters.Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal);
+            void CollectCaptures(AstNode node, IReadOnlySet<string> shadowed, bool insideLambda)
+            {
+                if (node is LambdaExpressionNode lambda)
+                {
+                    shadowed = shadowed.Concat(lambda.Parameters.Select(parameter => parameter.Name))
+                        .ToHashSet(StringComparer.Ordinal);
+                    insideLambda = true;
+                }
+                if (insideLambda && node is ReferenceNode reference
+                    && parameterNames.Contains(reference.Name) && !shadowed.Contains(reference.Name))
+                    _capturedParameterNames.Add(reference.Name);
+                foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+                    CollectCaptures(child, shadowed, insideLambda);
+            }
+            foreach (var statement in body)
+                CollectCaptures(statement, new HashSet<string>(StringComparer.Ordinal), false);
+        }
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         _refinementDeclScopes.Clear();
@@ -226,7 +251,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // into its base scope too (#732).
             foreach (var p in parameters)
             {
-                _parameterTypes[p.Name] = TypeMapper.CalorToCSharp(p.TypeName);
+                _parameterTypes[p.Name] = MapTypeName(p.TypeName);
                 var name = SanitizeIdentifier(p.Name);
                 _declScopes[0].Add(name);
                 if (p.Modifier.HasFlag(ParameterModifier.Out))
@@ -1281,6 +1306,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var previousContext = _emissionContext;
         _emissionContext = context;
+        _statementDepth++;
         try
         {
             var mapped = TryBeginLineMapping(statement);
@@ -1310,6 +1336,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         finally
         {
+            _statementDepth--;
             _emissionContext = previousContext;
         }
     }
@@ -2688,7 +2715,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new function scope
-        ResetDeclScopes(node.Parameters);
+        ResetDeclScopes(node.Parameters, node.Body);
 
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
@@ -4056,13 +4083,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return GetBuiltinExpressionKind(expression, types) == PrimitiveExpressionKind.Boolean;
     }
 
-    private enum PrimitiveExpressionKind { Unknown, Boolean, Numeric, String }
+    private enum PrimitiveExpressionKind { Unknown, Boolean, Numeric, String, Reference, Null }
 
     private PrimitiveExpressionKind GetBuiltinExpressionKind(
         ExpressionNode expression, IReadOnlyDictionary<string, string> types)
     {
         if (GetLiteralTypeName(expression) is { } literalType)
             return GetPrimitiveExpressionKind(literalType);
+        if (expression is ReferenceNode { Name: "null" })
+            return PrimitiveExpressionKind.Null;
+        if (IsStableLengthAccess(expression, types, out _))
+            return PrimitiveExpressionKind.Numeric;
         if (expression is ReferenceNode reference)
             return GetPrimitiveExpressionKind(types.TryGetValue(reference.Name, out var type) ? type : null);
         if (expression is IsPatternNode)
@@ -4070,7 +4101,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (expression is UnaryOperationNode { Operator: UnaryOperator.Not } unary)
             return GetBuiltinExpressionKind(unary.Operand, types) == PrimitiveExpressionKind.Boolean
                 ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
+        if (expression is UnaryOperationNode { Operator: UnaryOperator.Negate or UnaryOperator.BitwiseNot } numericUnary)
+            return GetBuiltinExpressionKind(numericUnary.Operand, types) == PrimitiveExpressionKind.Numeric
+                ? PrimitiveExpressionKind.Numeric : PrimitiveExpressionKind.Unknown;
         if (expression is not BinaryOperationNode binary)
+            return PrimitiveExpressionKind.Unknown;
+        if (binary.Operator == BinaryOperator.Power)
             return PrimitiveExpressionKind.Unknown;
 
         var left = GetBuiltinExpressionKind(binary.Left, types);
@@ -4093,6 +4129,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var numericOperands = left == PrimitiveExpressionKind.Numeric && right == PrimitiveExpressionKind.Numeric;
         if (binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual)
             return numericOperands || left == right && left is PrimitiveExpressionKind.Boolean or PrimitiveExpressionKind.String
+                || left is PrimitiveExpressionKind.Reference or PrimitiveExpressionKind.String or PrimitiveExpressionKind.Null
+                    && right is PrimitiveExpressionKind.Reference or PrimitiveExpressionKind.String or PrimitiveExpressionKind.Null
                 ? PrimitiveExpressionKind.Boolean : PrimitiveExpressionKind.Unknown;
         if (binary.Operator is BinaryOperator.LessThan or BinaryOperator.LessOrEqual
             or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual)
@@ -4104,10 +4142,35 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         "bool" => PrimitiveExpressionKind.Boolean,
         "string" => PrimitiveExpressionKind.String,
+        "object" => PrimitiveExpressionKind.Reference,
         "sbyte" or "byte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong"
             or "float" or "double" or "decimal" or "char" => PrimitiveExpressionKind.Numeric,
+        { } value when IsArrayType(value)
+            || value.EndsWith('?') && GetPrimitiveExpressionKind(value[..^1]) != PrimitiveExpressionKind.Unknown
+            => PrimitiveExpressionKind.Reference,
         _ => PrimitiveExpressionKind.Unknown
     };
+
+    private static bool IsArrayType(string type)
+    {
+        var bracket = type.LastIndexOf('[');
+        return bracket > 0 && type.EndsWith(']') && type[(bracket + 1)..^1].All(character => character == ',');
+    }
+
+    private static bool IsStableLengthAccess(ExpressionNode expression, IReadOnlyDictionary<string, string> types, out string name)
+    {
+        name = expression switch
+        {
+            FieldAccessNode { FieldName: "Length", Target: ReferenceNode target } => target.Name,
+            ReferenceNode reference when reference.Name.EndsWith(".Length", StringComparison.Ordinal)
+                => reference.Name[..^7],
+            _ => ""
+        };
+        if (!types.TryGetValue(name, out var type))
+            return false;
+        type = type.TrimEnd('?');
+        return type == "string" || IsArrayType(type);
+    }
 
     private string EmitGroupedOperand(ExpressionNode expression)
     {
@@ -4362,7 +4425,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Track current function ID for contract emission
         _currentFunctionId = method.Id;
         _currentPostconditionIndex = 0;
-        ResetDeclScopes(method.Parameters);
+        ResetDeclScopes(method.Parameters, method.Body);
 
         // Emit extended metadata as documentation comments
         foreach (var issue in method.Issues)
@@ -5743,7 +5806,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new method scope
-        ResetDeclScopes(node.Parameters);
+        ResetDeclScopes(node.Parameters, node.Body);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -6415,7 +6478,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new constructor scope
-        ResetDeclScopes(node.Parameters);
+        ResetDeclScopes(node.Parameters, node.Body);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -6516,7 +6579,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentFunctionId = node.Id;
         _currentPostconditionIndex = 0;
 
-        ResetDeclScopes(node.Parameters);
+        ResetDeclScopes(node.Parameters, node.Body);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -8172,6 +8235,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ForallExpressionNode node)
     {
+        var previousTypes = _parameterTypes;
+        _parameterTypes = new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal);
+        foreach (var variable in node.BoundVariables)
+            _parameterTypes[variable.Name] = MapTypeName(variable.TypeName);
         var previousShadowDepth = _postconditionResultShadowDepth;
         if (node.BoundVariables.Any(variable =>
                 variable.Name.Equals("result", StringComparison.Ordinal)))
@@ -8186,12 +8253,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         finally
         {
             _postconditionResultShadowDepth = previousShadowDepth;
+            _parameterTypes = previousTypes;
         }
     }
 
     private string EmitForallExpression(ForallExpressionNode node)
     {
         RequireNamespace("System.Linq");
+        RequireNamespace("Calor.Runtime");
         if (TryLiteralBoolean(node.Body, out var constant))
             return constant ? "true" : "false";
         // Try to extract finite range from the pattern:
@@ -8232,11 +8301,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var hint = node.Body is not ImplicationExpressionNode
             ? " [Hint: Use implication pattern (-> bounds body) for runtime checking]"
             : " [Hint: Could not extract finite bounds from antecedent]";
-        return $"true /* STATIC ONLY: forall (({boundVarsStr})) - verified by Z3.{hint} */";
+        return ReportUnsupportedQuantifier(node.Span, $"forall (({boundVarsStr})){hint}");
     }
 
     public string Visit(ExistsExpressionNode node)
     {
+        var previousTypes = _parameterTypes;
+        _parameterTypes = new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal);
+        foreach (var variable in node.BoundVariables)
+            _parameterTypes[variable.Name] = MapTypeName(variable.TypeName);
         var previousShadowDepth = _postconditionResultShadowDepth;
         if (node.BoundVariables.Any(variable =>
                 variable.Name.Equals("result", StringComparison.Ordinal)))
@@ -8251,12 +8324,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         finally
         {
             _postconditionResultShadowDepth = previousShadowDepth;
+            _parameterTypes = previousTypes;
         }
     }
 
     private string EmitExistsExpression(ExistsExpressionNode node)
     {
         RequireNamespace("System.Linq");
+        RequireNamespace("Calor.Runtime");
         if (TryLiteralBoolean(node.Body, out var constant))
             return constant ? "true" : "false";
         // Try to extract finite range from the pattern:
@@ -8294,7 +8369,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Supported pattern: (exists ((var type)) (&& (>= var lower) (< var upper) body))
         var boundVarsStr = string.Join(", ", node.BoundVariables.Select(bv => $"{bv.Name}: {bv.TypeName}"));
         var hint = " [Hint: Use conjunction pattern (&& bounds body) for runtime checking]";
-        return $"false /* STATIC ONLY: exists (({boundVarsStr})) - verified by Z3.{hint} */";
+        return ReportUnsupportedQuantifier(node.Span, $"exists (({boundVarsStr})){hint}");
+    }
+
+    private string ReportUnsupportedQuantifier(TextSpan span, string description)
+    {
+        var message = $"Cannot preserve runtime evaluation of {description}. "
+            + "Use stable primitive guards and bounds in a certified finite prefix.";
+        if (_diagnostics == null)
+            throw new InvalidOperationException(message);
+        _diagnostics.Add(new Diagnostics.Diagnostic(
+            Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported,
+            message, span, Diagnostics.DiagnosticSeverity.Error));
+        return "Calor.Runtime.ContractQuantifier.Unsupported()";
     }
 
     public string Visit(ImplicationExpressionNode node)
@@ -9164,19 +9251,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         public string TypeName { get; }
         public string Start { get; }
         public string End { get; }
+        public IReadOnlyList<string>? Constraints { get; }
 
-        public VariableRange(string name, string start, string end, string typeName)
+        public VariableRange(string name, string start, string end, string typeName, IReadOnlyList<string>? constraints = null)
         {
             Name = name;
             TypeName = typeName;
             Start = start;
             End = end;
+            Constraints = constraints;
         }
     }
 
     private string EmitVariableRange(VariableRange range)
     {
         var type = MapTypeName(range.TypeName);
+        if (range.Constraints != null)
+            return $"Calor.Runtime.ContractQuantifier.Range<{type}>(new[] {{ {string.Join(", ", range.Constraints)} }})";
         var typeArguments = type == "int" ? "" : $"<{type}>";
         return $"Calor.Runtime.ContractQuantifier.Range{typeArguments}({range.Start}, {range.End})";
     }
@@ -9214,44 +9305,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// </summary>
     private FiniteRange? TryExtractFiniteRange(ForallExpressionNode node)
     {
-        // Must have at least one bound variable
-        if (node.BoundVariables.Count == 0)
-            return null;
-
-        // Body should be an implication
-        if (node.Body is not ImplicationExpressionNode impl)
-            return null;
-
-        // Try to extract bounds for all bound variables
-        var allRanges = new List<VariableRange>();
-        foreach (var boundVar in node.BoundVariables)
-        {
-            if (!TryExtractBounds(impl.Antecedent, boundVar.Name, out var start, out var end, boundVar.TypeName))
-                return null;
-            allRanges.Add(new VariableRange(boundVar.Name, start, end, boundVar.TypeName));
-        }
-
-        // The runtime body is the WHOLE implication, not just the consequent.
-        //
-        // The bounds mined out of the antecedent constrain the Range; they do NOT replace the
-        // antecedent. Emitting only `impl.Consequent` made the runtime check a strictly STRONGER
-        // proposition than the one Z3 proved: every antecedent conjunct that is not a bound on the
-        // loop variable — and every bound after the first, since ExtractBound uses `??=` — was
-        // silently dropped. Z3 proved `∀i. (bounds ∧ G) → P(i)`; the emitter then checked
-        // `∀i ∈ [lo,hi). P(i)`. `Proven && !IsVacuous` deleted that stronger check, so a program
-        // that throws under `calor run` printed cleanly under `calor run --verify`.
-        //
-        // Keeping the full implication is sound in both directions: inside the range the bound
-        // conjuncts hold, so it reduces to the consequent; for any value a too-wide range admits
-        // but the antecedent excludes, the implication is vacuously true. A too-wide range costs
-        // iterations, never soundness — and `??=` can only ever widen.
-        //
-        // This is the seventh false-Proven-elide vector of the v0.12 cycle and the first on the
-        // EMITTER side: the sort-demotion mechanism is structurally blind to it, because nothing
-        // here mints a Z3 sort at all. It also mis-lowered §Q preconditions, which never elide —
-        // there it was a pure false alarm, and it is fixed by the same change.
-        var firstRange = allRanges[0];
-        return new FiniteRange(firstRange.Start, firstRange.End, impl, allRanges);
+        return node.Body is ImplicationExpressionNode implication
+            ? BuildCertifiedRanges(node.BoundVariables, implication.Antecedent, node.Body) : null;
     }
 
     /// <summary>
@@ -9260,40 +9315,204 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// Pattern: (exists ((i type) (j type)) (&& (>= i 0) (< i n) (>= j 0) (< j m) body))
     /// </summary>
     private FiniteRange? TryExtractFiniteRangeForExists(ExistsExpressionNode node)
+        => BuildCertifiedRanges(node.BoundVariables, node.Body, node.Body);
+
+    private FiniteRange? BuildCertifiedRanges(
+        IReadOnlyList<QuantifierVariableNode> variables, ExpressionNode conjunction, ExpressionNode body)
     {
-        // Must have at least one bound variable
-        if (node.BoundVariables.Count == 0)
+        if (variables.Count == 0 || variables.Any(variable => !IsIntegralType(MapTypeName(variable.TypeName))))
             return null;
-
-        // Collect all conjuncts from the body
         var conjuncts = new List<ExpressionNode>();
-        FlattenConjunction(node.Body, conjuncts);
+        FlattenConjunction(conjunction, conjuncts);
+        var types = _contractExpressionDepth > 0 || _statementDepth > 0
+            ? new Dictionary<string, string>(_parameterTypes, StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        if (_postconditionResultIdentifier != null && _postconditionResultShadowDepth == 0)
+            types["result"] = _currentReturnValueType ?? "";
+        foreach (var variable in variables)
+            types.Remove(variable.Name);
+        var unstable = FindQuantifierMutations(body, types.Keys.Concat(variables.Select(variable => variable.Name)));
+        unstable.UnionWith(_capturedParameterNames);
+        var allTypes = new Dictionary<string, string>(types, StringComparer.Ordinal);
+        foreach (var variable in variables)
+            allTypes[variable.Name] = MapTypeName(variable.TypeName);
 
-        // Try to extract bounds for all bound variables
-        var allRanges = new List<VariableRange>();
-
-        foreach (var boundVar in node.BoundVariables)
+        // Moving only total, stable constraints past other total scalar expressions is unobservable.
+        var lower = new string?[variables.Count];
+        var upper = new string?[variables.Count];
+        foreach (var conjunct in conjuncts)
         {
-            string? lower = null;
-            string? upper = null;
-
-            foreach (var conjunct in conjuncts)
+            var acceptedBound = false;
+            var available = new Dictionary<string, string>(types, StringComparer.Ordinal);
+            for (var index = 0; index < variables.Count; index++)
             {
-                if (conjunct is BinaryOperationNode cmp && cmp.Operator != BinaryOperator.And)
+                var variable = variables[index];
+                if (TryGetRangeConstraint(conjunct, variable.Name, out var endpoint, out _, out _)
+                    && IsCertifiedScalar(endpoint, available, unstable, total: true, integral: true))
                 {
-                    ExtractBound(cmp, boundVar.Name, ref lower, ref upper, boundVar.TypeName);
+                    ExtractBound((BinaryOperationNode)conjunct, variable.Name,
+                        ref lower[index], ref upper[index], variable.TypeName);
+                    acceptedBound = true;
+                    break;
                 }
+                available[variable.Name] = MapTypeName(variable.TypeName);
             }
-
-            if (lower == null || upper == null)
-                return null;
-
-            allRanges.Add(new VariableRange(boundVar.Name, lower, upper, boundVar.TypeName));
+            if (!acceptedBound && !IsCertifiedScalar(conjunct, allTypes, unstable, total: true, integral: false))
+                break;
+            if (lower.All(value => value != null) && upper.All(value => value != null))
+            {
+                var direct = variables.Select((variable, index) =>
+                    new VariableRange(variable.Name, lower[index]!, upper[index]!, variable.TypeName)).ToArray();
+                return new FiniteRange(direct[0].Start, direct[0].End, body, direct);
+            }
         }
 
-        var firstRange = allRanges[0];
-        // Bounds select candidates; they do not replace any part of the predicate.
-        return new FiniteRange(firstRange.Start, firstRange.End, node.Body, allRanges);
+        // Potentially throwing endpoints and scalar guards are evaluated in their original prefix order.
+        var cursor = 0;
+        var ordered = new List<VariableRange>();
+        foreach (var variable in variables)
+        {
+            var constraints = new List<string>();
+            var hasLower = false;
+            var hasUpper = false;
+            while (cursor < conjuncts.Count)
+            {
+                var conjunct = conjuncts[cursor];
+                if (TryGetRangeConstraint(conjunct, variable.Name, out var endpoint, out var isLower, out var offset)
+                    && IsCertifiedScalar(endpoint, types, unstable, total: false, integral: true))
+                {
+                    var factory = isLower ? "Lower" : "Upper";
+                    var endpointText = EmitCertifiedConstraint(endpoint);
+                    constraints.Add($"Calor.Runtime.ContractQuantifier.Constraint.{factory}(() => ({endpointText}), {offset.ToString().ToLowerInvariant()})");
+                    hasLower |= isLower;
+                    hasUpper |= !isLower;
+                }
+                else if (GetBuiltinExpressionKind(conjunct, types) == PrimitiveExpressionKind.Boolean
+                    && IsCertifiedScalar(conjunct, types, unstable, total: false, integral: false))
+                {
+                    constraints.Add($"Calor.Runtime.ContractQuantifier.Constraint.Guard(() => ({EmitCertifiedConstraint(conjunct)}))");
+                }
+                else
+                    break;
+                cursor++;
+            }
+            if (!hasLower || !hasUpper)
+                return null;
+            ordered.Add(new VariableRange(variable.Name, "0", "0", variable.TypeName, constraints));
+            types[variable.Name] = MapTypeName(variable.TypeName);
+        }
+        return new FiniteRange("0", "0", body, ordered);
+    }
+
+    private string EmitCertifiedConstraint(ExpressionNode expression)
+    {
+        var syntax = SyntaxFactory.ParseExpression(expression.Accept(this));
+        // Separate constraint lambdas do not share C# nullable flow facts. The suppression
+        // changes no runtime behavior; ordered discovery still protects reachable dereferences.
+        return Microsoft.CodeAnalysis.SyntaxNodeExtensions.ReplaceNodes(
+            syntax,
+            syntax.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>()
+                .Where(member => member.Name.Identifier.ValueText == "Length"),
+            (_, member) => member.WithExpression(SyntaxFactory.PostfixUnaryExpression(
+                SyntaxKind.SuppressNullableWarningExpression,
+                member.Expression))).ToFullString();
+    }
+
+    private static bool IsIntegralType(string? type) => type is
+        "sbyte" or "byte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong";
+
+    private bool IsCertifiedScalar(ExpressionNode expression, IReadOnlyDictionary<string, string> types,
+        IReadOnlySet<string> unstable, bool total, bool integral)
+    {
+        if (expression is IntLiteralNode)
+            return true;
+        if (!integral && expression is BoolLiteralNode or StringLiteralNode or FloatLiteralNode or DecimalLiteralNode)
+            return true;
+        if (IsStableLengthAccess(expression, types, out var receiver))
+            return !total && !unstable.Contains(receiver);
+        if (expression is ReferenceNode reference)
+            return !unstable.Contains(reference.Name) && (reference.Name == "null" && !integral
+                || types.TryGetValue(reference.Name, out var type)
+                    && (integral ? IsIntegralType(type) : GetPrimitiveExpressionKind(type) != PrimitiveExpressionKind.Unknown));
+        if (expression is UnaryOperationNode unary)
+        {
+            if (unary.Operator is not (UnaryOperator.Not or UnaryOperator.Negate or UnaryOperator.BitwiseNot)
+                || total && unary.Operator == UnaryOperator.Negate
+                || integral && unary.Operator == UnaryOperator.Not)
+                return false;
+            return IsCertifiedScalar(unary.Operand, types, unstable, total, integral);
+        }
+        if (expression is not BinaryOperationNode binary)
+            return false;
+        if (integral && binary.Operator is not (BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
+            or BinaryOperator.Divide or BinaryOperator.Modulo or BinaryOperator.BitwiseAnd or BinaryOperator.BitwiseOr
+            or BinaryOperator.BitwiseXor or BinaryOperator.LeftShift or BinaryOperator.RightShift))
+            return false;
+        if (total && binary.Operator is BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
+            or BinaryOperator.Divide or BinaryOperator.Modulo or BinaryOperator.Power)
+            return false;
+        return GetBuiltinExpressionKind(binary, types) != PrimitiveExpressionKind.Unknown
+            && IsCertifiedScalar(binary.Left, types, unstable, total, integral)
+            && IsCertifiedScalar(binary.Right, types, unstable, total, integral);
+    }
+
+    private static bool TryGetRangeConstraint(ExpressionNode expression, string variable,
+        out ExpressionNode endpoint, out bool lower, out bool offset)
+    {
+        endpoint = expression;
+        lower = false;
+        offset = false;
+        if (expression is not BinaryOperationNode comparison
+            || comparison.Operator is not (BinaryOperator.LessThan or BinaryOperator.LessOrEqual
+                or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual))
+            return false;
+        var onLeft = comparison.Left is ReferenceNode left && left.Name == variable;
+        var onRight = comparison.Right is ReferenceNode right && right.Name == variable;
+        if (!onLeft && !onRight)
+            return false;
+        endpoint = onLeft ? comparison.Right : comparison.Left;
+        lower = onLeft
+            ? comparison.Operator is BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual
+            : comparison.Operator is BinaryOperator.LessThan or BinaryOperator.LessOrEqual;
+        offset = lower
+            ? comparison.Operator is BinaryOperator.GreaterThan or BinaryOperator.LessThan
+            : comparison.Operator is BinaryOperator.GreaterOrEqual or BinaryOperator.LessOrEqual;
+        return true;
+    }
+
+    private static HashSet<string> FindQuantifierMutations(ExpressionNode body, IEnumerable<string> names)
+    {
+        var mutations = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in DescendantsAndSelf(body))
+        {
+            ExpressionNode? target = node switch
+            {
+                UnaryOperationNode { Operator: UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+                    or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement } unary => unary.Operand,
+                AssignmentStatementNode assignment => assignment.Target,
+                CompoundAssignmentStatementNode assignment => assignment.Target,
+                _ => null
+            };
+            if (target != null)
+                mutations.UnionWith(DescendantsAndSelf(target).OfType<ReferenceNode>().Select(reference => reference.Name));
+            if (node is BindStatementNode { IsMutable: true } binding)
+                mutations.Add(binding.Name);
+            if (node is CallExpressionNode { ArgumentModifiers: { } modifiers } call)
+            {
+                for (var index = 0; index < Math.Min(modifiers.Count, call.Arguments.Count); index++)
+                    if (modifiers[index] is "ref" or "out")
+                        mutations.UnionWith(DescendantsAndSelf(call.Arguments[index]).OfType<ReferenceNode>().Select(reference => reference.Name));
+            }
+            if (node is CallStatementNode { ArgumentModifiers: { } statementModifiers } statementCall)
+            {
+                for (var index = 0; index < Math.Min(statementModifiers.Count, statementCall.Arguments.Count); index++)
+                    if (statementModifiers[index] is "ref" or "out")
+                        mutations.UnionWith(DescendantsAndSelf(statementCall.Arguments[index]).OfType<ReferenceNode>().Select(reference => reference.Name));
+            }
+            if (node is RawCSharpExpressionNode or RawCSharpNode)
+                mutations.UnionWith(names);
+        }
+        return mutations;
     }
 
     /// <summary>
