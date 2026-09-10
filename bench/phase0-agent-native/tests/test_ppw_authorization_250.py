@@ -143,8 +143,20 @@ class PilotAuthorization250Tests(unittest.TestCase):
         self.assertTrue(current[preserved["prefixByteCount"]:].startswith(b"\n## 12."))
         runtime = assessment["runtimeGuard"]
         self.assertEqual(assessment["assessedAgainstCommit"], runtime["mergeCommit"])
-        for name in ("amendment", "analysisRegistration"):
-            self.assertEqual(digest(BENCH / runtime[name]["path"]), runtime[name]["sha256"])
+        self.assertEqual(digest(BENCH / runtime["amendment"]["path"]),
+                         runtime["amendment"]["sha256"])
+        reference = {"path": runtime["analysisRegistration"]["path"],
+                     "sha256": digest(BENCH / runtime["analysisRegistration"]["path"])}
+        seen = set()
+        while reference["sha256"] != runtime["analysisRegistration"]["sha256"]:
+            self.assertNotIn(reference["sha256"], seen, "analysis lineage cycle")
+            seen.add(reference["sha256"])
+            self.assertFalse(Path(reference["path"]).is_absolute())
+            self.assertNotIn("..", Path(reference["path"]).parts)
+            self.assertEqual(digest(BENCH / reference["path"]), reference["sha256"])
+            reference = load(BENCH / reference["path"])["supersedes"]
+        self.assertEqual(digest(BENCH / reference["path"]),
+                         runtime["analysisRegistration"]["sha256"])
         amendment = load(BENCH / runtime["amendment"]["path"])
         self.assertFalse(amendment["collectionAuthorized"])
         self.assertFalse(amendment["analysisArithmeticChanged"])

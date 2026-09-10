@@ -17,12 +17,16 @@ METHOD = "registrations/ppw-rows-stage1/registration.json"
 MODEL = "registrations/ppw-rows-stage1/model-registration.json"
 TASKS = "registrations/ppw-redesign-task-supersession.json"
 PILOT_PINS = "epochs/w-rows-pilot-001/pins.json"
+GUARDED_PROJECTION = "registrations/ppw-rows-stage1/guarded-analysis-projection.json"
+SPENDING_AMENDMENT = "registrations/ppw-rows-stage1/spending-instrument-amendment.json"
+PRE_PROJECTION_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre-projection-1403.json"
 ARTIFACTS = (
     "ppw-pilot-adjudicate.py", "registrations/ppw-rows-stage1/precision.py",
     "ppw-instrument.py", "ppw-registration.py", "ppw-source-assembly.py",
     "ppw-source-inspection.py", "harness-capture.py", "token-usage.py",
     "telemetry-helpers.py", "ppw-pins.schema.json", "effect-rows-benefit-ledger.json",
     METHOD, MODEL, TASKS, PILOT_PINS,
+    GUARDED_PROJECTION, SPENDING_AMENDMENT, PRE_PROJECTION_MANIFEST,
 )
 CELL_FIELDS = {
     "pair", "arm", "plannedRuns", "validRuns", "invalidRuns", "censoredRuns",
@@ -68,7 +72,65 @@ def validate_analysis_registration():
     require(set(expected) == set(ARTIFACTS), "analysis artifact inventory differs")
     for relative, sha in expected.items():
         require(digest(BENCH / relative) == sha, "analysis artifact changed: " + relative)
+    require(manifest.get("supersedes") == {
+        "path": PRE_PROJECTION_MANIFEST, "sha256": expected[PRE_PROJECTION_MANIFEST]},
+        "prior analysis registration must be explicitly preserved")
+    require(manifest.get("guardedExecutionProjection") == {
+        "path": GUARDED_PROJECTION, "sha256": expected[GUARDED_PROJECTION]},
+        "guarded execution projection is not registered")
+    projection = load(BENCH / GUARDED_PROJECTION)
+    require(projection.get("schemaVersion") == 1
+            and projection.get("kind") == "pp-w-rows-guarded-analysis-projection"
+            and projection.get("stage") == "pilot"
+            and projection.get("collectionAuthorized") is False,
+            "unrecognized guarded analysis projection")
+    require(projection.get("allowedDataKinds") == ["synthetic"]
+            and projection.get("empiricalAdmissionRegistered") is False,
+            "this inactive projection does not register empirical admission")
+    require(projection.get("baselinePins") == {
+        "path": PILOT_PINS, "sha256": expected[PILOT_PINS]},
+        "guarded projection changed the preserved baseline")
+    proof = {"path": SPENDING_AMENDMENT, "sha256": expected[SPENDING_AMENDMENT]}
+    require(projection.get("instrumentAmendment") == proof
+            and manifest.get("instrumentAmendment") == proof,
+            "guarded projection does not bind the registered instrument amendment")
+    amendment = load(BENCH / SPENDING_AMENDMENT)
+    require(amendment.get("schemaVersion") == 1
+            and amendment.get("kind") == "pp-w-prospective-spending-instrument-amendment"
+            and amendment.get("stage") == "pilot"
+            and amendment.get("collectionAuthorized") is False
+            and amendment.get("supersededHarnessArtifacts")
+            == load(BENCH / PILOT_PINS)["harnessArtifacts"],
+            "instrument amendment does not preserve the historical execution inventory")
     return manifest
+
+
+def execution_projection(pins, selected):
+    baseline = load(BENCH / PILOT_PINS)
+    if "instrumentAmendment" not in selected and "spendingPlan" not in selected:
+        require(pins.get("harnessArtifacts") == baseline["harnessArtifacts"],
+                "collection execution artifacts differ from the prospective pins")
+        return {"id": "preserved-eleven-artifact-baseline",
+                "authority": {"path": PILOT_PINS, "sha256": digest(BENCH / PILOT_PINS)}}
+
+    projection = load(BENCH / GUARDED_PROJECTION)
+    proof = selected.get("instrumentAmendment", {})
+    require(isinstance(proof, dict) and set(proof) == {"path", "sha256"},
+            "guarded execution requires a pinned instrument amendment")
+    relative = proof["path"]
+    require(isinstance(relative, str) and relative and not Path(relative).is_absolute()
+            and ".." not in Path(relative).parts,
+            "guarded instrument amendment requires a relative evidence path")
+    require(proof["sha256"] == projection["instrumentAmendment"]["sha256"],
+            "guarded execution selects an unregistered instrument amendment")
+    amendment = load(BENCH / SPENDING_AMENDMENT)
+    require(pins.get("harnessArtifacts") == amendment["replacementHarnessArtifacts"],
+            "guarded execution inventory differs; no downgrade or mixed source inventories")
+    require(pins["dataKind"] in projection["allowedDataKinds"],
+            "guarded empirical analysis is not activated by this prospective projection")
+    return {"id": projection["id"],
+            "authority": {"path": GUARDED_PROJECTION, "sha256": digest(BENCH / GUARDED_PROJECTION)},
+            "instrumentAmendment": projection["instrumentAmendment"]}
 
 
 def validate_scope(pins, registration, method, epoch_id, stage):
@@ -97,8 +159,7 @@ def validate_scope(pins, registration, method, epoch_id, stage):
         require(registration.get(key) == frozen[key], "frozen task registration differs: " + key)
     prospective = load(BENCH / PILOT_PINS)
     require(pins["compiler"] == prospective["compiler"], "prospective shared product pins differ")
-    require(pins.get("harnessArtifacts") == prospective["harnessArtifacts"],
-            "collection execution artifacts differ from the prospective pins")
+    execution_projection(pins, selected)
     require(re.fullmatch(r"[0-9a-f]{40}", pins.get("harnessCommit", "")),
             "collection commit identity is missing")
     return instrument
@@ -259,6 +320,8 @@ def adjudicate(epochs_root, epoch_id, stage="pilot"):
             "analysisArtifacts": manifest["artifacts"],
             "collectionHarnessCommit": pins["harnessCommit"],
             "collectionHarnessArtifacts": pins["harnessArtifacts"],
+            "collectionExecutionProjection": execution_projection(
+                pins, registration["stages"]["pilot"]),
             "modelPin": pins["modelPin"], "agentVersion": pins["agentVersion"],
             "compiler": pins["compiler"],
             "countsSource": "recomputed from this epoch's raw archive by ppw-instrument.analyze",

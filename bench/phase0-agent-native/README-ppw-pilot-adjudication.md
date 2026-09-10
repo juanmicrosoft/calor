@@ -2,8 +2,9 @@
 
 This is the **unpaid analysis integration**, not a collected pilot or issue
 completion. #1267 remains open until genuine authorized collection and its
-adjudication. #1259 still requires activation, a supplied bounded dollar
-ceiling and separate null-result acceptance. Nothing here invokes a model,
+adjudication. #1259 has recorded the real pilot-only USD250 total approval and
+stopping-rule/negative-null acceptance; operational collection remains held
+for a trustworthy bound and a defensible full-pilot plan. Nothing here invokes a model,
 compiler, collector, or payment interface.
 
 ## Explicit read-only command
@@ -96,6 +97,39 @@ match. Method/model/task evidence hashes must match the committed authority.
 The method can be resolved by its verified committed hash even when the
 collector copied its registration without duplicating the referenced
 `admission/` files into the output archive.
+
+### Explicit inactive guarded projection (#1403)
+
+The original eleven-artifact `PILOT_PINS` remain preserved. They are not
+silently treated as the fifteen-artifact inventory emitted by the #1378
+spending collector. `guarded-analysis-projection.json` now registers a
+separate **non-runnable, synthetic-analysis-only** projection of that exact
+reviewed instrument amendment.
+
+An archived selected-stage `instrumentAmendment` must identify the registered
+amendment by relative path and SHA. Its hash resolves against the committed
+authority, like the other copied admission references. The execution
+inventory must equal the amendment's complete replacement map. Missing or
+unregistered references, mixed inventories and downgrades to the old map
+are refused. A spending-plan marker without the amendment is also refused.
+The chosen projection is disclosed in output provenance; no archive or
+source identity is rewritten to force a match.
+
+Current guarded selection accepts **only explicitly synthetic input**.
+An empirical header fails before raw analysis, even before checking for
+contradictory synthetic markers. The original synthetic baseline still works.
+This proves read-only compatibility and unchanged mathematics, not empirical
+collection readiness. Future actual fifteen-artifact admission requires its
+own reviewed operational execution/analysis projection and genuine
+liability-bound/full-444 feasibility evidence. No financial limit, ledger
+path, receipt projection, active pins or experiment is created here.
+
+`analysis-registration.pre-projection-1403.json` preserves the exact preceding
+analysis manifest, including its older supersession. The current manifest
+explicitly supersedes that archive and fingerprints the new selector,
+projection and amendment. The dated #1394 post-guard assessment remains
+byte-identical; its original analysis-manifest hash resolves through this
+preserved lineage rather than pretending it describes the new source.
 
 The raw analyzer validates each scheduled run and its source-bound facts;
 missing, duplicated, misplaced, cross-epoch, wrong-stage or mixed-policy data

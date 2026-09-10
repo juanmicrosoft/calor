@@ -91,7 +91,16 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         for reference in ("supersedes", "instrumentAmendment"):
             proof = analysis[reference]
             self.assertEqual(digest(BENCH / proof["path"]), proof["sha256"])
-        old_analysis = load(BENCH / analysis["supersedes"]["path"])
+        target = amendment["preservedArtifacts"][
+            "registrations/ppw-rows-stage1/analysis-registration.pre-spending-1378.json"]
+        proof, seen = analysis["supersedes"], set()
+        while proof["sha256"] != target:
+            self.assertNotIn(proof["sha256"], seen, "analysis lineage cycle")
+            seen.add(proof["sha256"])
+            self.assertEqual(digest(BENCH / proof["path"]), proof["sha256"])
+            proof = load(BENCH / proof["path"])["supersedes"]
+        self.assertEqual(digest(BENCH / proof["path"]), target)
+        old_analysis = load(BENCH / proof["path"])
         self.assertEqual(old_analysis["artifacts"]["ppw-instrument.py"],
                          self.pins["harnessArtifacts"]["ppw-instrument.py"])
         self.assertFalse(self.registration["collectionAuthorized"])

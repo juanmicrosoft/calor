@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-rows-guarded-analysis-projection",
+  "id": "guarded-fifteen-artifact-unactivated",
+  "issue": 1403,
+  "stage": "pilot",
+  "collectionAuthorized": false,
+  "empiricalAdmissionRegistered": false,
+  "allowedDataKinds": ["synthetic"],
+  "sourceAmendmentMerge": "80e2d77579750e48d58088d4474ba5d3c35014c6",
+  "baselinePins": {
+    "path": "epochs/w-rows-pilot-001/pins.json",
+    "sha256": "73ab4b9df4d4520a7754a4fb30063e8a567a2c07a5ff6ea452985b0109694bf3"
+  },
+  "instrumentAmendment": {
+    "path": "registrations/ppw-rows-stage1/spending-instrument-amendment.json",
+    "sha256": "a3a33debc9ef5a6d995564ef553bbf08830a117165b212d2988c04ecbf9ec3c2"
+  },
+  "executionInventory": "Exact replacementHarnessArtifacts from the reviewed instrument amendment; never relabel as the preserved eleven-artifact baseline.",
+  "scope": "Read-only prospective compatibility using explicitly synthetic archives. This is not schema-2 epoch pins, a collector registration, financial authorization or an operational activation projection.",
+  "futureEmpiricalAdmission": "Requires separately reviewed operational execution/analysis bindings and genuine liability-bound/full-444 feasibility evidence. No threshold, ledger path, approval projection or experimental call is supplied here."
+}
