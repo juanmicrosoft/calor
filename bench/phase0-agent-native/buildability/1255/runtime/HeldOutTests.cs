@@ -9,13 +9,14 @@ public sealed class HeldOutTests
     [InlineData(7)]
     public void Preview_HasNoConsoleWrites(int input)
     {
+        var invoke = Adapter.Create();
         var previous = Console.Out;
         using var output = new StringWriter();
         int actual;
         try
         {
             Console.SetOut(output);
-            actual = Adapter.Invoke(input);
+            actual = invoke(input);
         }
         finally
         {

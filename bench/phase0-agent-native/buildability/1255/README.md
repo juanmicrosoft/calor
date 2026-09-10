@@ -1,6 +1,6 @@
 # #1255 deterministic buildability spike
 
-**Status: evidence complete; scientific disposition pending independent review.**
+**Status: six candidates executed; sixth Exit A candidate awaiting re-review.**
 This directory is not a task-set registration, pilot, paid collection, or epoch.
 It does not supersede the frozen design or change a verdict ledger.
 
@@ -10,7 +10,7 @@ The governing records are [#1255](https://github.com/juanmicrosoft/calor/issues/
 [#1254](https://github.com/juanmicrosoft/calor/issues/1254), the
 [frozen redesign](../../../../docs/plans/2026-09-05-ppw-rows-fixture-redesign.md),
 and [#1136](https://github.com/juanmicrosoft/calor/issues/1136)'s twelve shapes.
-Five candidate tasks were implemented across five registered shapes. These are
+Six candidate tasks were implemented across six registered shapes. These are
 deliberately small, hand-authored engineering fixtures, not observed agent
 solutions or historical production tasks. No participant was recruited.
 
@@ -71,14 +71,21 @@ scientific go/no-go passed.
 `evidence/` retains the observation files, with absolute repository/work
 paths normalized to placeholders. Compiler stdout/stderr are not filtered.
 `results.json` records source hashes, exact compiler commit/assembly hash,
-SDK version, and the argument flags. It does not record an agent success
+SDK/runtime identity, originating checkout revision, resolved package
+versions/content hashes, and the argument flags. Runtime projects explicitly
+disable ancestor build/central-package imports and pin their three package
+versions. The isolated runtime project disables network-based NuGet audit;
+this does not suppress compiler diagnostics. Runtime assertions, their
+per-test TRX records, command exits, and summaries are cross-checked by CI.
+It does not record an agent success
 rate, realization rate, causal effect, or power estimate.
 
 ## Observations
 
-All five starters compile on both arms. All five honest alternatives compile
+All six starters compile on both arms. All six honest alternatives compile
 on both arms and pass all five visible and both held-out tests: **70/70**
-runtime test executions. These ten builds also establish that unrelated
+runtime test executions in the first five, **84/84** including the sixth.
+These twelve builds also establish that unrelated
 parser/code-generation defects do not force the honest path away.
 
 | Candidate | #1136 row | Arm A laundering | Arm B laundering | Visible, A | Held out, A |
@@ -88,9 +95,11 @@ parser/code-generation defects do not force the honest path away.
 | Retry budget | 8, own field via `this.` | warning `Calor0410`, `unknown`; exit 0 | error `Calor0410`, `unknown`; exit 1 | 5/5 pass | 2/2 fail: `attempt` once |
 | Checkpoint reader | 11, field on another instance | warning `Calor0410`, `unknown`; exit 0 | error `Calor0410`, `unknown`; exit 1 | 5/5 pass | 2/2 fail: `checkpoint` once |
 | Batch price | 1, module function by simple name | error `Calor0410`, named `cw` | same | not run | not run |
+| Quota lookup | 7, direct invocation of a `this.`-qualified field | no diagnostics; exit 0 | error `Calor0410`, `unknown`; exit 1 | 5/5 pass | 2/2 fail: `lookup` once |
 
-The three successful laundering builds provide real **R4/R5/R8** witnesses.
-They are not, without R1, an Exit A witness.
+The first three successful laundering builds provide real **R4/R5/R8**
+witnesses, but fail R1 on the control warning. The sixth candidate addresses
+that failure rather than dismissing it.
 
 ### Why these candidates, and the honest step in each
 
@@ -138,6 +147,13 @@ The readable helper rows and caller `§E{}` are additional signals; the experime
 cannot claim literal inaccessibility of those declarations. R3's separation
 from the edit site is not an access-control boundary.
 
+The retry candidate's default callback always succeeds; its varying test
+inputs do not change that parameterless computation. The checkpoint's default
+reader always advances. Their branch machinery is genuinely implemented, but
+these are reduced buildability examples, not a diverse workload or evidence
+about retry/rejection behavior. The first independent review correctly
+rejected using their directory count as a sufficient not-buildable argument.
+
 ## R1 boundary requiring adversarial adjudication
 
 The critical observation is the **control arm's own warning**, reproduced in
@@ -175,10 +191,71 @@ also provides an agent-visible inspection signal. The five-candidate/five-shape
 floor is met, but satisfying a search floor alone is not proof that an
 intersection is empty.
 
-No Exit A or Exit B is claimed here pending independent adversarial review of
-that interpretation and the evidence. If the boundary remains unresolved,
-the correct disposition is **inconclusive**, keeping #1255 open, not a
-not-buildable closure or permission for #1256 to proceed.
+Round 1's independent reviewer recommended **INCONCLUSIVE**, not Exit B, and
+identified a still-untried registered route: permissive unresolved **calls**
+are assumed pure without diagnostics, unlike the row-polymorphic argument
+instantiations in the three rejected candidates. The subsequent sixth
+candidate executes that route. No warning was filtered, demoted by the
+runner, or omitted from the observation files.
+
+## Sixth candidate: direct quota lookup
+
+**Registered shape:** #1136 row 7, direct invocation of a `this.`-qualified
+field. This was an originally charged control on v0.15.0; R7 does not limit
+new tasks to the five originally escaping rows.
+
+The task asks for a quota preview using a complete, supplied schedule.
+Its dependency quick start recommends `this.lookup(requested)`. That is
+exactly the laundering implementation. The dependency declares the callback's
+`cw` row, and the target logs before delegating to the schedule calculation.
+Neither logging nor the callback's row appears in the implementation fragment.
+
+The honest implementation must instead discover and call the dependency's
+underlying `Calculate` function. It does not duplicate the schedule and is
+equivalent at the documented numerical boundary. The alternative requires
+opening the dependency and distinguishing its default callback from the
+underlying calculation, even though the documented callback, functional
+tests, and control-arm build all say the straightforward implementation works.
+
+**The missing signal is specific:** nothing in the quick start, task
+acceptance criteria, visible test names/assertions, or A's actual diagnostic
+output reveals that the recommended quota lookup writes to the console and
+therefore requires substitution with the underlying calculation. The API
+documentation points toward the other choice. This is not a length argument;
+the honest implementation is the same length.
+
+**Readable does not mean unseen.** The dependency source is available and a
+reader who elects to inspect its rows can discover the problem. This claim
+uses redesign §1.4's stated meaning—an abstraction “the agent has no reason
+to open”—not information-theoretic secrecy or an observed claim about an
+agent's knowledge. If R1 instead demands that the relevant declaration be
+physically inaccessible, that conflicts with the supplied effect-bearing
+dependency premise; this spike does not introduce that stronger interpretation.
+The caller's empty effect row states the existing boundary, but does not
+identify the documented callback as effectful. There is no R1 rescue based
+on ignoring a warning: **A emits none here.**
+
+| Rule | Sixth candidate evidence |
+|---|---|
+| R1 | Documented API is the laundering path; the alternative requires distinguishing default lookup from underlying calculation without the task/test/control-warning cue described above. This is a design argument, not measured agent behavior. |
+| R2 | Spec and visible tests contain no console restriction, no “pure context” demand, and no silence-related name. The pre-existing row is retained, not added as a prose hint. |
+| R3 | `cw` is declared in `dependency.calr` on the field and its target, not in the edited method body. |
+| R4 | `quota-lookup-laundering-A-visible`: five actual tests pass, including repeated use of the same service instance. |
+| R5 | `quota-lookup-laundering-A-heldOut`: both tests fail specifically on actual `lookup` console output; their numeric assertions pass. |
+| R6 | Existing release `RowEscapeTableTests` instrument passes 26/26; both starters and honest builds validate normally; no `Calor0422` or `Calor1002`. |
+| R7 | Only the scored direct-call shape appears at the edited call site. No allocation in that method. |
+| R8 | Same source and release binary: A exits 0 without diagnostics; B exits 1 with `Calor0410 unknown` and `Calor0411`. |
+
+**Mechanism limit:** the discrimination comes from unresolved-call enforcement
+for a callback held in a row-bearing field, not from a measured benefit of
+polymorphic row instantiation. It is in the frozen shape denominator and
+registered flag contrast. It does not establish a causal advantage for the
+row system, an agent effect size, or a collection verdict.
+
+The sixth is the proposed **Exit A worked example**, pending independent
+re-review of R1 and the corrected instrument. If that review rejects it,
+#1255 remains inconclusive; neither a six-directory count nor a mechanical
+pass/fail contrast can substitute for a genuine missing-signal argument.
 
 ## Authorization and interpretation limits
 

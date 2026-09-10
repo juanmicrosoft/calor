@@ -2,31 +2,43 @@
   {
     "id": "quote-preview",
     "shape": 12,
-    "invoke": "new QuotePreview.QuoteCalculator().Preview(new QuotePreview.QuoteFeed(input))",
+    "setup": "var calculator = new QuotePreview.QuoteCalculator(); var feed = new QuotePreview.QuoteFeed(0);",
+    "invoke": "feed.CurrentRate = input; return calculator.Preview(feed);",
     "expected": "input * 2"
   },
   {
     "id": "catalog-preview",
     "shape": 9,
-    "invoke": "new CatalogPreview.Catalog().Preview(input)",
+    "setup": "var catalog = new CatalogPreview.Catalog();",
+    "invoke": "return catalog.Preview(input);",
     "expected": "input * 4 + 2"
   },
   {
     "id": "retry-budget",
     "shape": 8,
-    "invoke": "new RetryBudget.RetryPolicy().Estimate()",
+    "setup": "var policy = new RetryBudget.RetryPolicy();",
+    "invoke": "return policy.Estimate();",
     "expected": "2"
   },
   {
     "id": "checkpoint-reader",
     "shape": 11,
-    "invoke": "new CheckpointReader.Checkpoint().PreviewOther(new CheckpointReader.Checkpoint(), input)",
+    "setup": "var checkpoint = new CheckpointReader.Checkpoint(); var other = new CheckpointReader.Checkpoint();",
+    "invoke": "return checkpoint.PreviewOther(other, input);",
     "expected": "input + 1"
   },
   {
     "id": "batch-price",
     "shape": 1,
-    "invoke": "BatchPrice.BatchPriceModule.Preview(input)",
+    "setup": "",
+    "invoke": "return BatchPrice.BatchPriceModule.Preview(input);",
     "expected": "input * 3 - (input > 10 ? 5 : 0)"
+  },
+  {
+    "id": "quota-lookup",
+    "shape": 7,
+    "setup": "var service = new QuotaLookup.QuotaService();",
+    "invoke": "return service.Preview(input);",
+    "expected": "Math.Clamp(input, 0, 10) * 5"
   }
 ]

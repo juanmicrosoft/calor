@@ -11,13 +11,15 @@ public sealed class VisibleTests
     [InlineData(13)]
     public void Preview_ReturnsExpectedValue(int input)
     {
-        Assert.Equal(Adapter.Expected(input), Adapter.Invoke(input));
+        var invoke = Adapter.Create();
+        Assert.Equal(Adapter.Expected(input), invoke(input));
     }
 
     [Fact]
     public void Preview_CanBeRepeated()
     {
-        Assert.Equal(Adapter.Expected(5), Adapter.Invoke(5));
-        Assert.Equal(Adapter.Expected(5), Adapter.Invoke(5));
+        var invoke = Adapter.Create();
+        Assert.Equal(Adapter.Expected(5), invoke(5));
+        Assert.Equal(Adapter.Expected(5), invoke(5));
     }
 }

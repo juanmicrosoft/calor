@@ -8,7 +8,12 @@
     "--results-directory",
     "<work>/catalog-preview/honest/B/heldOut/results",
     "--verbosity",
-    "quiet"
+    "quiet",
+    "-p:ImportDirectoryBuildProps=false",
+    "-p:ImportDirectoryBuildTargets=false",
+    "-p:ImportDirectoryPackagesProps=false",
+    "-p:ManagePackageVersionsCentrally=false",
+    "-p:RestoreConfigFile=<repo>/bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config"
   ],
   "exitCode": 0,
   "stdout": "Test run for <work>/catalog-preview/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\nResults File: <work>/catalog-preview/honest/B/heldOut/results/tests.trx\n\nPassed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 5 ms - RuntimeTests.dll (net10.0)\n",

@@ -16,10 +16,27 @@ RELEASE = "514f538024df990af86054af25975b756ba42ab1"
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
 TRX = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+RUNTIME_PROPERTIES = [
+    "-p:ImportDirectoryBuildProps=false",
+    "-p:ImportDirectoryBuildTargets=false",
+    "-p:ImportDirectoryPackagesProps=false",
+    "-p:ManagePackageVersionsCentrally=false",
+]
 
 
 def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def input_paths():
+    candidates = json.loads((HERE / "candidates.json").read_text())
+    paths = [HERE / "run.py", HERE / "candidates.json"]
+    paths += [HERE / "runtime" / name for name in
+              ("RuntimeTests.csproj", "VisibleTests.cs", "HeldOutTests.cs", "NuGet.Config")]
+    paths += [HERE / candidate["id"] / name for candidate in candidates
+              for name in ("dependency.calr", "starter.calr", "laundering.calr",
+                           "honest.calr", "spec.md")]
+    return paths
 
 
 def trx_results(path):
@@ -74,6 +91,12 @@ def run(compiler_root, output):
             text = text.replace(str(path), replacement)
         return text
 
+    def retain_trx(name, path):
+        xml = normalize(path.read_text())
+        for placeholder in ("work", "compiler-root", "repo"):
+            xml = xml.replace(f"<{placeholder}>", f"&lt;{placeholder}&gt;")
+        (observations / f"{name}.trx").write_text(xml)
+
     def execute(name, command):
         result = subprocess.run(command, cwd=REPO, env=env, text=True, capture_output=True)
         log = {
@@ -103,12 +126,15 @@ def run(compiler_root, output):
     if table.returncode:
         raise RuntimeError("Frozen RowEscapeTableTests failed")
     table_results = trx_results(output / "row-table/table.trx")
+    retain_trx("row-table", output / "row-table/table.trx")
     if table_results["total"] != 26 or table_results["passed"] != 26:
         raise RuntimeError("Expected all 26 frozen instrument tests, including the twelve shapes")
     compiler = compiler_root / "src/Calor.Compiler/bin/Debug/net10.0/calor.dll"
     sdk = execute("sdk", ["dotnet", "--version"])
+    runtime_info = execute("runtime-info", ["dotnet", "--info"])
     version = execute("compiler-version", ["dotnet", str(compiler), "--version"])
-    if sdk.returncode or version.returncode or not version.stdout.strip().startswith("0.18.0"):
+    if (sdk.returncode or runtime_info.returncode or version.returncode
+            or not version.stdout.strip().startswith("0.18.0")):
         raise RuntimeError("Unable to verify the registered compiler version")
     candidates = json.loads((HERE / "candidates.json").read_text())
     report = {
@@ -118,18 +144,19 @@ def run(compiler_root, output):
         "compilerCommit": RELEASE,
         "compilerAssemblySha256": sha256(compiler),
         "dotnetSdk": sdk.stdout.strip(),
+        "originatingCheckout": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=REPO, text=True
+        ).strip(),
+        "runtimeBuildProperties": RUNTIME_PROPERTIES,
+        "runtimeDependencies": None,
         "arms": {"A": ["--permissive-effects"], "B": []},
         "rowTable": table_results,
         "inputSha256": {
             str(path.relative_to(HERE)): sha256(path)
-            for path in sorted(HERE.rglob("*"))
-            if path.is_file() and (path.suffix in {".calr", ".cs", ".csproj", ".py"}
-                                   or path.name == "spec.md")
-            and "evidence" not in path.parts
+            for path in sorted(input_paths())
         },
         "candidates": [],
     }
-    report["inputSha256"]["candidates.json"] = sha256(HERE / "candidates.json")
     for candidate in candidates:
         item = {"id": candidate["id"], "shape": candidate["shape"], "variants": {}}
         directory = HERE / candidate["id"]
@@ -174,17 +201,33 @@ def run(compiler_root, output):
                         shutil.copyfile(HERE / "runtime" / suite_file, tests / "Tests.cs")
                         (tests / "Adapter.cs").write_text(
                             "internal static class Adapter\n{\n"
-                            f"    public static int Invoke(int input) => {candidate['invoke']};\n"
+                            "    public static Func<int, int> Create()\n    {\n"
+                            f"        {candidate['setup']}\n"
+                            f"        return input => {{ {candidate['invoke']} }};\n"
+                            "    }\n"
                             f"    public static int Expected(int input) => {candidate['expected']};\n"
                             "}\n"
                         )
+                        name = f"{candidate['id']}-{variant}-{arm}-{suite}"
                         runtime = execute(
-                            f"{candidate['id']}-{variant}-{arm}-{suite}",
+                            name,
                             ["dotnet", "test", str(tests / "RuntimeTests.csproj"),
                              "--logger", "trx;LogFileName=tests.trx",
-                             "--results-directory", str(tests / "results"), "--verbosity", "quiet"],
+                             "--results-directory", str(tests / "results"), "--verbosity", "quiet",
+                             *RUNTIME_PROPERTIES,
+                             f"-p:RestoreConfigFile={HERE / 'runtime/NuGet.Config'}"],
                         )
+                        retain_trx(name, tests / "results/tests.trx")
                         result[suite] = trx_results(tests / "results/tests.trx")
+                        assets = json.loads((tests / "obj/project.assets.json").read_text())
+                        dependencies = {
+                            key: {"type": value["type"], "sha512": value.get("sha512")}
+                            for key, value in assets["libraries"].items()
+                        }
+                        if report["runtimeDependencies"] is None:
+                            report["runtimeDependencies"] = dependencies
+                        elif report["runtimeDependencies"] != dependencies:
+                            raise RuntimeError("Runtime dependencies changed between executions")
                         expected_count = 5 if suite == "visible" else 2
                         if (result[suite]["total"] != expected_count
                                 or result[suite]["passed"] + result[suite]["failed"] != expected_count
