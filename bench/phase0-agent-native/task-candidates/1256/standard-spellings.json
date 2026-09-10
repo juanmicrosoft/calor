@@ -1,0 +1,454 @@
+{
+  "kind": "unregistered-standard-spelling-survey",
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "compilerSha256": "223b009f98fcbf8a9c552735897a2cf89782887f4c0978299c5c0d215e29a1e6",
+  "tableSource": "tests/Calor.Enforcement.Tests/RowEscapeTableTests.cs",
+  "tableBlob": "68405305f39d55bf99519c82b31cbfeb9a786516",
+  "source": "frozen RowEscapeTableTests.TwelveShapes(), console declaration/write replaced together with real mutation",
+  "shapes": [
+    {
+      "row": 1,
+      "name": "module function by simple name (module scope)",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7F{f003:Twice:pub} () -> i32\n    \u00a7E{}\n    \u00a7R \u00a7C{RunTwice} \u00a7A Beat \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "13cc54a542374413e1ed8abf385aff076a95fba644570c00a7d92b4e0880af49",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-01.calr",
+            "-o",
+            "<survey-work>/row-01-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-01.calr(14,5): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-01.calr",
+            "-o",
+            "<survey-work>/row-01-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-01.calr(14,5): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        }
+      }
+    },
+    {
+      "row": 2,
+      "name": "module function module-qualified (module scope)",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7F{f003:Twice:pub} () -> i32\n    \u00a7E{}\n    \u00a7R \u00a7C{RunTwice} \u00a7A RowTableModule.Beat \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "31c7ecb2f82d423d3c2ef08a725bb6e67255d70d5c69bfa30b3eb50a998ad892",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-02.calr",
+            "-o",
+            "<survey-work>/row-02-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-02.calr(14,5): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-02.calr",
+            "-o",
+            "<survey-work>/row-02-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-02.calr(14,5): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        }
+      }
+    },
+    {
+      "row": 3,
+      "name": "own rowed \u00a7FLD by simple name",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{RunTwice} \u00a7A stage \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "eca876fdd505a7c61a4504eccd677dbf931dc18846a911bd08fb22fd71374901",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-03.calr",
+            "-o",
+            "<survey-work>/row-03-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-03.calr(18,7): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-03.calr",
+            "-o",
+            "<survey-work>/row-03-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-03.calr(18,7): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        }
+      }
+    },
+    {
+      "row": 4,
+      "name": "static rowed \u00a7FLD by simple name",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri:stat} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{RunTwice} \u00a7A stage \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "0a8038ee78f8ef43c1624e03302d4753d57df9b0a5b3e54146a2f43105cc3442",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-04.calr",
+            "-o",
+            "<survey-work>/row-04-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-04.calr(18,7): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-04.calr",
+            "-o",
+            "<survey-work>/row-04-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-04.calr(18,7): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        }
+      }
+    },
+    {
+      "row": 5,
+      "name": "local bound from such a field",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7B{s:Func<i32>} stage\n      \u00a7R \u00a7C{RunTwice} \u00a7A s \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "7a9b77c364958f6a4db50be33250ef263ccee5d46e7f3c6bd290af1a26c4cd46",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-05.calr",
+            "-o",
+            "<survey-work>/row-05-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-05.calr(18,7): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-05.calr",
+            "-o",
+            "<survey-work>/row-05-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-05.calr(18,7): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        }
+      }
+    },
+    {
+      "row": 6,
+      "name": "\u00a7B-bound \u00a7LAM with its row omitted",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7F{f003:Twice:pub} () -> i32\n    \u00a7E{}\n    \u00a7B{report:Func<i32>} \u00a7LAM{lam1}\n      \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n      \u00a7R INT:1\n    \u00a7/LAM{lam1}\n    \u00a7R \u00a7C{RunTwice} \u00a7A report \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "99275648eb91d4570c1ca5b116a12b466a7d687c316736b32a119732a69a808e",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-06.calr",
+            "-o",
+            "<survey-work>/row-06-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-06.calr(14,5): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-06.calr",
+            "-o",
+            "<survey-work>/row-06-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-06.calr(14,5): error Calor0410: Function 'Twice' uses effect 'mut' but does not declare it\n  Effect row: effect variable 'e' of 'RunTwice' instantiated to mut at this call site\n"
+        }
+      }
+    },
+    {
+      "row": 7,
+      "name": "direct invocation of a this.-qualified field",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{this.stage} \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "f50e45d7450b1f0bb322f50dd48f6506323c07792f5850f8875db97263dc0b61",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-07.calr",
+            "-o",
+            "<survey-work>/row-07-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 0,
+          "stdout": "Compilation successful: <survey-work>/row-07-A.g.cs\n",
+          "stderr": ""
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-07.calr",
+            "-o",
+            "<survey-work>/row-07-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-07.calr(19,10): warning Calor0411: Unknown external call to 'this.stage'. Add effect declaration in a .calor-effects.json manifest.\n<survey-work>/row-07.calr(18,7): error Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        }
+      }
+    },
+    {
+      "row": 8,
+      "name": "own \u00a7FLD via this.",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{RunTwice} \u00a7A this.stage \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "44478de0c2234c5902c7c2eca77695a7d5d797cbd3eda380471ab5a31d2683e8",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-08.calr",
+            "-o",
+            "<survey-work>/row-08-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 0,
+          "stdout": "Compilation successful: <survey-work>/row-08-A.g.cs\n",
+          "stderr": "<survey-work>/row-08.calr(18,7): warning Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-08.calr",
+            "-o",
+            "<survey-work>/row-08-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-08.calr(19,10): warning Calor0425: Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. 'Twice' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<survey-work>/row-08.calr(18,7): error Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        }
+      }
+    },
+    {
+      "row": 9,
+      "name": "\u00a7PROP by simple name \u2014 no receiver at all",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7PROP{p001:Stage:Func<i32>:pub:get,set}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN Stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{RunTwice} \u00a7A Stage \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "4e493f4b899c6919e98a7aea4f83f147cb69b7ab560368bf57dd3a4c03240168",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-09.calr",
+            "-o",
+            "<survey-work>/row-09-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 0,
+          "stdout": "Compilation successful: <survey-work>/row-09-A.g.cs\n",
+          "stderr": "<survey-work>/row-09.calr(18,7): warning Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-09.calr",
+            "-o",
+            "<survey-work>/row-09-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-09.calr(19,10): warning Calor0425: Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: the row of argument 'Stage' could not be determined. 'Twice' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<survey-work>/row-09.calr(16,21): warning Calor0425: 'Stage' is function-typed with no effect row, so its effects are Unknown. Add \u00a7E{\u2026} on the same line as the type to state what callers may pass, or compile with --permissive-effects. Invoking a value whose row is Unknown charges Unknown to 'Holder..ctor'.\n<survey-work>/row-09.calr(18,7): error Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        }
+      }
+    },
+    {
+      "row": 10,
+      "name": "own \u00a7FLD via a local alias of this",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt001:Twice:pub} () -> i32\n      \u00a7E{}\n      \u00a7B{me:Holder} this\n      \u00a7R \u00a7C{RunTwice} \u00a7A me.stage \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "ad335f3fa321b39f7993dbba021415defcb862bedf7e617b5098c69b71cc52bd",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-10.calr",
+            "-o",
+            "<survey-work>/row-10-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 0,
+          "stdout": "Compilation successful: <survey-work>/row-10-A.g.cs\n",
+          "stderr": "<survey-work>/row-10.calr(18,7): warning Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-10.calr",
+            "-o",
+            "<survey-work>/row-10-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-10.calr(20,10): warning Calor0425: Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. 'Twice' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<survey-work>/row-10.calr(18,7): error Calor0410: Function 'Twice' uses effect 'unknown' but does not declare it\n"
+        }
+      }
+    },
+    {
+      "row": 11,
+      "name": "\u00a7FLD on another instance of the same class",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7FLD{Func<i32>:stage:pri} \u00a7E{mut}\n    \u00a7CTOR{ctor001:pub} ()\n      \u00a7ASSIGN stage RowTableModule.Beat\n    \u00a7MT{mt002:TwiceOf:pub} (Holder:other) -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{RunTwice} \u00a7A other.stage \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "b940cb3f5c60a8bc8a64ab5e312bb155d481eb1ce4e94c62665c8add55fbcb60",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-11.calr",
+            "-o",
+            "<survey-work>/row-11-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 0,
+          "stdout": "Compilation successful: <survey-work>/row-11-A.g.cs\n",
+          "stderr": "<survey-work>/row-11.calr(18,7): warning Calor0410: Function 'TwiceOf' uses effect 'unknown' but does not declare it\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-11.calr",
+            "-o",
+            "<survey-work>/row-11-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-11.calr(19,10): warning Calor0425: Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. 'TwiceOf' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<survey-work>/row-11.calr(18,7): error Calor0410: Function 'TwiceOf' uses effect 'unknown' but does not declare it\n"
+        }
+      }
+    },
+    {
+      "row": 12,
+      "name": "instance method group with a parameter receiver",
+      "source": "\u00a7M{m001:RowTable}\n  \u00a7F{f001:RunTwice:pub}<eff e> (Func<i32>:g \u00a7E{e}) -> i32\n    \u00a7E{e}\n    \u00a7B{first:i32} \u00a7C{g}\n    \u00a7B{second:i32} \u00a7C{g}\n    \u00a7R (+ first second)\n\n  \u00a7F{f002:Beat:pub} () -> i32\n    \u00a7E{mut}\n    \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n    \u00a7R INT:1\n\n  \u00a7CL{c002:Ticker:pub}\n    \u00a7MT{mt010:Beat:pub} () -> i32\n      \u00a7E{mut}\n      \u00a7ASSIGN Telemetry.Reads (+ Telemetry.Reads INT:1)\n      \u00a7R INT:1\n\n  \u00a7CL{c001:Holder:pub}\n    \u00a7MT{mt002:TwiceOf:pub} (Ticker:ticker) -> i32\n      \u00a7E{}\n      \u00a7R \u00a7C{RunTwice} \u00a7A ticker.Beat \u00a7/C\n\n  \u00a7CL{c900:Telemetry:pub}\n    \u00a7FLD{i32:Reads:pub:stat} INT:0\n",
+      "sourceSha256": "9979f11d2704c76bcdbb627a8415ec1619afdd488578855e9ad7b9bcc8549452",
+      "arms": {
+        "A": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-12.calr",
+            "-o",
+            "<survey-work>/row-12-A.g.cs",
+            "--no-telemetry",
+            "--permissive-effects"
+          ],
+          "exitCode": 0,
+          "stdout": "Compilation successful: <survey-work>/row-12-A.g.cs\n",
+          "stderr": "<survey-work>/row-12.calr(21,7): warning Calor0410: Function 'TwiceOf' uses effect 'unknown' but does not declare it\n"
+        },
+        "B": {
+          "command": [
+            "dotnet",
+            "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+            "-i",
+            "<survey-work>/row-12.calr",
+            "-o",
+            "<survey-work>/row-12-B.g.cs",
+            "--no-telemetry"
+          ],
+          "exitCode": 1,
+          "stdout": "",
+          "stderr": "<survey-work>/row-12.calr(22,10): warning Calor0425: Effect variable 'e' of 'RunTwice' instantiates to Unknown at this call site: argument 1 of 'RunTwice' is not a function value this pass can name. 'TwiceOf' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<survey-work>/row-12.calr(21,7): error Calor0410: Function 'TwiceOf' uses effect 'unknown' but does not declare it\n"
+        }
+      }
+    }
+  ]
+}

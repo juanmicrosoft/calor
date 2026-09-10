@@ -1,0 +1,11 @@
+§M{m001:PolicyCanary}
+  §F{f001:Value:pub} () -> i32
+    §E{}
+    §R 1
+  §CL{c001:Reader:pub}
+    §FLD{Func<i32>:read:pri} §E{mut}
+    §CTOR{ct001:pub} ()
+      §ASSIGN read PolicyCanaryModule.Value
+    §MT{mt001:Read:pub} () -> i32
+      §E{}
+      §R §C{this.read} §/C

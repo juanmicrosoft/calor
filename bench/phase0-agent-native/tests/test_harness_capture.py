@@ -40,7 +40,7 @@ REPO = os.path.dirname(os.path.dirname(BENCH))
 HELPER = os.path.join(BENCH, "harness-capture.py")
 RUN_PAIR = os.path.join(BENCH, "run-pair.sh")
 RUN_BUNDLE = os.path.join(BENCH, "run-bundle.sh")
-RUN_PPW = os.path.join(BENCH, "run-ppw-epoch.sh")
+RUN_PPW = os.path.join(BENCH, "run-ppw-legacy-epoch.sh")
 RUN_M5 = os.path.join(BENCH, "run-m5-epoch.sh")
 MARGIN = os.path.join(BENCH, "ppe1-margin-derivation.py")
 MARGIN_TXT = os.path.join(BENCH, "ppe1-margin-derivation.txt")
@@ -913,9 +913,9 @@ class RunPpwEpochFailsLoudOnMissingPairs(unittest.TestCase):
         """A harness dir holding just what run-ppw-epoch.sh reads from SCRIPT_DIR, and no pairs."""
         harness = os.path.join(tmp, "bench", "phase0-agent-native")
         os.makedirs(os.path.join(harness, "pairs"))
-        for name in ("run-ppw-epoch.sh", "harness-capture.py"):
+        for name in ("run-ppw-legacy-epoch.sh", "harness-capture.py"):
             shutil.copy(os.path.join(BENCH, name), os.path.join(harness, name))
-        return os.path.join(harness, "run-ppw-epoch.sh")
+        return os.path.join(harness, "run-ppw-legacy-epoch.sh")
 
     def _fake_root(self, tmp, name, tasks_bytes):
         root = os.path.join(tmp, name)
