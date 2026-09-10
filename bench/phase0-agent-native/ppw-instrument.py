@@ -130,6 +130,10 @@ def validate_pins(pins, registration, stage, epoch_id):
     require(pins.get("stage") == stage, "wrong-stage epoch: expected %s, got %s"
             % (stage, pins.get("stage")))
     selected = validate_registration(registration, stage, epoch_id)
+    for key in ("modelPin", "agentVersion"):
+        require(isinstance(selected.get(key), str) and selected[key].strip()
+                and pins.get(key) == selected[key],
+                "%s differs from the registered stage identity" % key)
     require(pins.get("runsPerArm") == selected["runsPerArm"], "run denominator differs from registration")
     require(pins.get("suite") == registration["tasks"], "task denominator differs from registration")
     require(pins.get("arms") == ARMS, "arms must differ solely by permissive-effects policy")

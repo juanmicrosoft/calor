@@ -3,7 +3,10 @@
 This is unpaid instrument engineering, **not collection authorization, a task
 freeze, or a new scientific registration**. The frozen design is
 [`2026-09-05-ppw-rows-fixture-redesign.md`](../../docs/plans/2026-09-05-ppw-rows-fixture-redesign.md).
-No real epoch or registration pins are created by this change.
+The original #1264 engineering created no real epoch pins. Subsequent
+task supersession (#1271) is described below; the separate
+[#1265 prospective pilot inputs](epochs/w-rows-pilot-001/README.md) are
+unfunded and unrun, not permission to collect.
 
 ## Historical compatibility and explicit supersession
 
@@ -266,9 +269,11 @@ crossing an editable/immutable boundary is unscorable rather than guessed.
 - an explicit unique `tasks` denominator and SHA-256 `artifacts` map covering
   **every** task-relative file, including each `pair.json`;
 - native `sourceInspections` control certificates for exactly those tasks;
-- a `stages` map. Each registered stage names its own `epochId` and
-  `runsPerArm`. Pilot and confirmatory ids cannot coincide. No count defaults;
-- for collection, each stage also supplies `modelPin`, `agentVersion`, and
+- a `stages` map. Each registered stage names its own `epochId`, `runsPerArm`,
+  `modelPin` and `agentVersion`. Epoch pins must match both nonempty stage
+  identities exactly, even before collection. Pilot and confirmatory ids
+  cannot coincide. No count defaults;
+- for collection, each stage also supplies
   `spendAuthorization`, `stageRegistration`, `modelRegistration` evidence
   objects (`path` relative to the registration, plus `sha256`).
 

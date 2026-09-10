@@ -77,8 +77,10 @@ def build(root, stage="pilot", epoch_id=None):
         "schemaVersion": 2, "id": "SYNTHETIC-NOT-A-REGISTRATION", "status": "frozen",
         "supersedes": "A-1.12", "cause": "Synthetic test of explicit supersession only",
         "reviews": ["synthetic-review-fixture-not-an-approval"], "compilerCommit": "a" * 40,
-        "stages": {"pilot": {"epochId": "synthetic-pilot", "runsPerArm": 2},
-                   "confirmatory": {"epochId": "synthetic-confirmatory", "runsPerArm": 2}},
+        "stages": {"pilot": {"epochId": "synthetic-pilot", "runsPerArm": 2,
+                             "modelPin": "SYNTHETIC", "agentVersion": "SYNTHETIC"},
+                   "confirmatory": {"epochId": "synthetic-confirmatory", "runsPerArm": 2,
+                                    "modelPin": "SYNTHETIC", "agentVersion": "SYNTHETIC"}},
         "tasks": [task], "artifacts": artifacts,
     }
     registration["stages"][stage]["epochId"] = epoch_id
