@@ -1484,6 +1484,7 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
 
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then
             python3 "$HARNESS_CAPTURE" isolate-workspace "$WS"
+            python3 "$HARNESS_CAPTURE" isolate-workspace "$WS_OUT"
         fi
         materialize "$WS" "$WS_OUT"
         write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"

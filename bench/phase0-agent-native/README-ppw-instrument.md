@@ -122,10 +122,12 @@ have zero replacement retries, including API failures; original transcripts,
 usage envelopes and invalid reasons survive. Historical arms retain their
 registered behavior.
 
-Generated workspaces include local build/package import boundaries, so an
+Generated workspaces **and the separate held-out output directories** include
+local build/package import boundaries, so an
 ordinary restore does not inherit root central-package/lock-file settings
 and get misclassified as policy tampering. A real .NET restore/build test
-checks that the integrity snapshot stays unchanged.
+checks that the integrity snapshot stays unchanged; another restores and
+executes the actual shell-generated held-out project without rewriting it.
 
 Every attempted run also records its product-canary compiler hash, independent
 of compilation-cache creation. Generated-C# validation failures can leave no

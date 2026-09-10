@@ -8,6 +8,7 @@ import sys
 import unittest
 from unittest.mock import patch
 import uuid
+import xml.etree.ElementTree as ET
 
 from ppw_redesign_epoch import BENCH, build, instrument, save
 
@@ -354,6 +355,31 @@ print(json.dumps({"type":"result","result":"API error" if os.environ["SYNTHETIC_
         self.assertEqual("pilot", report["stage"])
         self.assertEqual([2, 2], [cell["validRuns"] for cell in report["perCell"]])
         self.assertEqual([0, 0], [cell["escapeRate"] for cell in report["perCell"]])
+
+    @unittest.skipUnless(shutil.which("dotnet") and shutil.which("jq") and shutil.which("bash"),
+                         "dotnet, jq and bash required for real held-out infrastructure regression")
+    def test_real_shell_generated_heldout_project_restores_and_executes(self):
+        captured = self.fake_capture("success")
+        heldout = captured / "heldout" / "HeldOut.csproj"
+        # Supply the source assembly at the exact HintPath emitted by the shell;
+        # do not rewrite the generated held-out project or its package settings.
+        hint = Path(ET.parse(heldout).find(".//Reference[@Include='Src']/HintPath").text)
+        self.assertTrue(hint.is_relative_to(self.root))
+        source = self.root / "real-source"
+        instrument.helper("harness-capture.py").isolate_workspace(source)
+        (source / "Src.csproj").write_text(
+            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>'
+            '<TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>')
+        environment = dict(os.environ, TMPDIR=str(self.root))
+        result = subprocess.run(["dotnet", "build", str(source / "Src.csproj"), "-o", str(hint.parent),
+                                 "--nologo", "-v", "q"], env=environment,
+                                text=True, capture_output=True, timeout=120)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        result = subprocess.run(["dotnet", "test", str(heldout), "--nologo", "-v", "q"],
+                                env=environment, text=True, capture_output=True, timeout=180)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Passed:", result.stdout)
+        self.assertFalse((heldout.parent / "packages.lock.json").exists())
 
 
 if __name__ == "__main__":

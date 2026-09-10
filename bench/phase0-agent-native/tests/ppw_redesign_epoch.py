@@ -42,7 +42,8 @@ def build(root, stage="pilot", epoch_id=None):
     (directory / "tests" / "shims").mkdir(parents=True)
     (directory / "tests" / "shims" / "TestShim.calor.cs").write_text("// synthetic shim\n")
     (directory / "tests" / "Tests.cs").write_text(
-        "// synthetic test, never compiled\n[Fact]\npublic void PreservesState() {}\n")
+        "// synthetic infrastructure test, not an effect measurement\n"
+        "using Xunit;\npublic class Tests {\n[Fact]\npublic void PreservesState() { Assert.True(true); }\n}\n")
     for arm in ("a", "b"):
         for subdir, source in (("starter-" + arm, "return 0"),
                                ("seeded/clean-" + arm, "this.lookup")):
