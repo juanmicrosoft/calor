@@ -67,6 +67,33 @@ foreach (var value in new[] { 46340, 46341 })
   run([compiler, '--input', 'Imported.calr', '--output', 'Snippet.g.cs']);
   assert.equal(execute(), original);
   console.log('Published Square examples trap in debug/off with verification on/off; converted C# preserves unchecked results.');
+
+  const comparison = await readFile('src/components/landing/CodeComparison.tsx', 'utf8');
+  const calorFragment = comparison.match(/const calorCode = `([\s\S]*?)`;/)?.[1];
+  const csharpFragment = comparison.match(/const csharpCode = `([\s\S]*?)`;/)?.[1];
+  assert.ok(calorFragment && csharpFragment, 'Missing homepage comparison fragments');
+  await writeFile(path.join(workspace, 'Program.cs'), `
+using System.Reflection;
+var square = Assembly.GetExecutingAssembly().GetTypes()
+    .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+    .Single(method => method.Name == "Square");
+foreach (var value in new[] { 0, 3, -1, 46340, 46341 })
+{
+    try { Console.WriteLine($"{value}:{square.Invoke(null, new object[] { value })}"); }
+    catch (TargetInvocationException error) when (value == -1 && error.InnerException != null)
+    { Console.WriteLine("-1:Rejected"); }
+    catch (TargetInvocationException error) when (error.InnerException is OverflowException)
+    { Console.WriteLine($"{value}:OverflowException"); }
+}
+`);
+  const expected = '0:0\n3:9\n-1:Rejected\n46340:2147395600\n46341:OverflowException';
+  await writeFile(path.join(workspace, 'Snippet.calr'), calorFragment);
+  run([compiler, '--input', 'Snippet.calr', '--output', 'Snippet.g.cs']);
+  assert.equal(execute(), expected);
+  await writeFile(path.join(workspace, 'Snippet.g.cs'),
+    `using System; public static class ComparisonSquare { ${csharpFragment} }`);
+  assert.equal(execute(), expected);
+  console.log('Homepage Calor/C# fragments agree on valid results, negative-input rejection and checked overflow.');
 } finally {
   await rm(workspace, { recursive: true, force: true });
 }

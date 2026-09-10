@@ -12,10 +12,10 @@ order: 2
 ## Read the Results Carefully
 
 The static snapshot above covers **217 programs** and reports a legacy calculator
-score of **1.32x**, with Calor ahead in seven of eight metrics. This is not a
+score of **1.32x**. This is not a
 measured language advantage. Comprehension is
 1.84x, error detection is 1.49x, token economics is 1.42x, and information
-density is 0.97x—the one category where C# leads.
+density is 0.97x—the category where C# leads on the calculator score.
 
 The recorded source revision is `3a452b09`. Its `Directory.Build.props` declares
 compiler `0.19.0`; the JSON's `version: "1.0"` identifies the data format, not the
@@ -47,47 +47,100 @@ composite favors Calor.
 
 ---
 
-## Agent Proof Points
+## Separate Agent Studies
 
 The static dashboard does not measure effect rows or live coding-agent
 behavior. Those questions use separate, pre-registered agent studies.
 The [research evidence status](/docs/benchmarking/evidence-status/) explains
 why the proposed follow-on adopter study stopped unadjudicated.
 
-### Effect-row toolchain cost
+### Redesigned PP-W-rows: deferred
 
-The 0.15 PP-E1 study had two legs:
+**Recorded status, 2026-09-09: no redesigned confirmatory result exists.**
+The [M0 decision](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/safe-delegation-m0/decision.md)
+records formal M0 as **UNADJUDICATED**, with a separate maintainer
+**administrative stop**. It also defers the redesigned PP-W-rows proposal
+pending separate explicit approval. This is not a scientific verdict that
+effect rows help, fail, or cannot be studied.
 
-- The compiler caught all 10 seeded effect-laundering mistakes at the
-  registered locations. The unmutated fixtures reproduced their frozen
-  diagnostic baselines exactly.
+The [proposed methodology](/docs/benchmarking/effect-rows-study/) explains
+the old design defect: the unwanted behavior was already visibly forbidden,
+so avoiding it did not require effect enforcement. The redesigned question
+concerns violations hidden behind an abstraction while visible tests pass.
+Historical zero escapes do not answer that question.
+
+The [authoritative benefit ledger](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/effect-rows-benefit-ledger.json)
+still records the old registration as `UNDERPOWERED`, `epochRun: false`,
+and `legA`/`legB: null`. Null means uncollected, not zero violations.
+This publication neither creates `w-rows-001` nor changes its ledger or gate.
+There is no new sample size, budget, model pin, collection date, or result.
+
+The [buildability gate #1255](https://github.com/juanmicrosoft/calor/issues/1255),
+[authorization #1259](https://github.com/juanmicrosoft/calor/issues/1259),
+and task, oracle, registration, tooling, and independent-review prerequisites
+retain their owners. Later publication must follow their actual adjudication:
+a bounded buildability finding, a registered pilot stop, unaffordable
+confirmation, or an adjudicated confirmatory result—including a powered null.
+No branch is selected here beyond the recorded deferral, and no future run
+is promised.
+
+### Historical PP-E1: effect-row toolchain cost
+
+The [2026-08-27 PP-E1 report](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/2026-08-27-v0.15-ppe1-instrument-notes.md)
+records two distinct legs, not one pooled sample:
+
+- A seeded-fixture check caught 10 of 10 registered mutations at compiler
+  revision `121c6681`, with frozen unmutated diagnostic baselines reproduced.
+  These are hand-seeded cases, not agent trials or a population detection rate.
 - Four ordinary programming tasks ran five times on each of two compiler
-  configurations, for 40 green runs. The median paired output-token ratio was
-  1.18. Its 95% lower bound was 0.90, below the registered 1.0 bound gate, and
+  configurations, for 40 valid green runs, with no dropped task pairs or
+  censored runs in the
+  [archived analysis](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/epochs/e1-rows-parity-001/ppe1-analysis.json).
+  The median paired output-token ratio was 1.1835. Its one-sided 95%
+  two-level cluster-bootstrap lower bound was 0.9012, below the registered 1.0 bound gate, and
   the point estimate stayed below the 1.35 failure threshold.
+
+The [epoch pins](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/epochs/e1-rows-parity-001/pins.json)
+record `e1-rows-parity-001`, started 2026-08-27, `claude-opus-4-8`,
+Claude Code `2.1.243`, and the v0.14.3 control at `63316987` versus the
+0.15.0 release-build treatment at `b775acb4`. These are different compiler
+versions, not the redesigned one-compiler policy contrast.
 
 The combined registered verdict was **HIT**. The tasks measured compiler
 feedback cost on ordinary code; because they contained no callbacks, they did
 not measure the safety benefit of effect rows.
 
-### Effect-row safety benefit
+### Historical PP-W-rows: practice rounds, not confirmation
 
-The 0.16 practice study used six callback-heavy tasks designed to catch a
-hidden console effect. Across 28 usable runs, neither compiler arm produced the
-target hidden-effect behavior. The practice data estimated that the full study
-would need nine runs per task and compiler, while the registered budget could
-fund three, giving about 48% power at the registered effect size.
+The [2026-09-01 practice report](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/2026-09-01-ppw-rows-dry-run.md)
+describes historical dry runs used for sizing, not a confirmatory verdict.
+Both used `claude-opus-4-8` with permissive v0.14.3-pre-rows control
+`283ec9f9` versus strict v0.15.0 treatment `3bb2601e`.
 
-The recorded verdict is therefore **underpowered: the claim is neither
-supported nor refuted**. The stricter compiler cost about 12% more work to
-reach a green build on these tasks, below the registered “noticeable” threshold,
-but that is descriptive practice-round evidence rather than a product claim.
+| Archive | Date and agent | What can be read from it |
+|:--------|:---------------|:------------------------|
+| [`w-rows-dry-001` pins](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/epochs/w-rows-dry-001/pins.json) | 2026-08-28; Claude Code 2.1.248 | Usage-limit HTTP 429 runs were invalid. The report uses different “valid” and “readable” counts; this page does not pool them into a denominator. |
+| [`w-rows-dry-002` pins](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/epochs/w-rows-dry-002/pins.json) | 2026-09-01; Claude Code 2.1.252 | Three tasks, three runs per arm: 18 valid built runs, no exclusions. Zero observed escapes in either arm. This is a finite practice sample, not proof of a zero population escape rate. |
 
-Keep the three statements separate:
+The [second dry-run analysis](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/epochs/w-rows-dry-002/ppw-analysis.dry-run.json)
+reports a descriptive output-tokens-to-green ratio of 1.1175, with a
+one-sided 95% cluster-bootstrap lower bound of 0.8634, over its two
+cost-eligible task pairs (12 runs). It is not a result over all 18 runs or
+a measurement of general development effort.
+
+Its old-design sizing required nine runs per task/arm, while the retired
+ceiling afforded three, with calculated power 0.48 under that registration.
+These are historical sizing assumptions, not the redesigned sample size or
+funding. The benefit ledger therefore remains **UNDERPOWERED: the claim is
+neither supported nor refuted**. The redesigned defect analysis also means
+buying more of the old tasks would not isolate the intended benefit.
+
+Keep these statements separate:
 
 - The 1.32x dashboard is a deterministic source/structure comparison.
 - The 0.15 proof point did not detect a large toolchain tax.
-- The 0.16 proof point did not have enough evidence to judge the safety benefit.
+- The historical PP-W-rows registration did not run a confirmatory epoch.
+- The redesigned study remains deferred, with no new safety-benefit evidence.
 
 ---
 
@@ -109,7 +162,8 @@ Use C# when:
 
 ## Methodology
 
-All benchmarks are automated and reproducible. Each program is evaluated across 8 metrics comparing Calor and C# implementations.
+The static framework is automated. Reproduction requires its recorded source
+and corpus; the exact historical measurement binary remains unknown.
 
 The published dashboard framework:
 
@@ -118,7 +172,8 @@ The published dashboard framework:
    compilation results.
 3. Aggregates the per-program Calor/C# ratios.
 4. Repeats the deterministic evaluation 30 times for the reported statistical
-   artifact. Greater than 1.0 favors Calor; less than 1.0 favors C#.
+   artifact. Greater than 1.0 means a higher Calor calculator score; less than
+   1.0 means a higher C# score, not a measured language advantage.
 
 LLM-based task runners exist separately and are not folded into this dashboard
 result.
