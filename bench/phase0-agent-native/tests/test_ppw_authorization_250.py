@@ -101,13 +101,32 @@ class PilotAuthorization250Tests(unittest.TestCase):
 
     def test_billing_report_does_not_claim_a_zero_subscription_cost_or_hard_bound(self):
         evidence = load(ROOT / "billing-evidence.json")
-        self.assertEqual("claude.ai Max / firstParty", evidence["accountContext"]["reportedMode"])
-        self.assertIn("not a new authentication observation", evidence["accountContext"]["source"])
-        self.assertFalse(evidence["accountContext"]["credentialsOrPersonalBillingDetailsCollected"])
+        self.assertNotIn("accountContext", evidence)
+        controls = evidence["controlCapabilities"]
+        self.assertIn("no account profile retained", controls["source"])
+        self.assertFalse(controls["authoritativeBillingHardBoundEstablished"])
+        self.assertFalse(controls["accountSpecificDetailsRetained"])
+        self.assertFalse(controls["sharedGlobalBillingSettingsChanged"])
         self.assertFalse(evidence["experimentalModelInvoked"])
         self.assertFalse(evidence["billingGuaranteeEstablished"])
         self.assertTrue(all(item["url"] == "https://code.claude.com/docs/en/costs"
                             for item in evidence["officialDocumentation"]))
+
+    def test_authorization_artifacts_do_not_retain_account_payload_fields(self):
+        forbidden = {"accountContext", "reportedMode", "subscriptionTier", "accountId",
+                     "email", "credentials", "authStatus", "billingRecords", "settings"}
+
+        def check(value):
+            if isinstance(value, dict):
+                self.assertFalse(forbidden.intersection(value))
+                for nested in value.values():
+                    check(nested)
+            elif isinstance(value, list):
+                for nested in value:
+                    check(nested)
+
+        for name in ("authorization.json", "billing-evidence.json", "feasibility.json"):
+            check(load(ROOT / name))
 
     def test_existing_epoch_inputs_stay_unarmed_and_have_no_collection_results(self):
         pilot = BENCH / "epochs/w-rows-pilot-001"

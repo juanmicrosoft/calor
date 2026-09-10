@@ -612,10 +612,15 @@ redesigned pilot cannot cost less.**
 No experimental call is admitted until #1378 provides trustworthy reviewed
 enforcement/accounting, any execution-pin changes are coherently registered,
 and a defensible plan can support the **full unchanged pilot** within $250.
-Current evidence does not establish that plan. The parent reports a
-claude.ai Max/firstParty session; official documentation describes its local
-dollar figures as estimates, not authoritative billing. Subscription access
+Current evidence does not establish that plan. Nonsecret control-capability
+evidence does not establish an authoritative hard bound; official documentation
+describes local dollar figures as estimates, not authoritative billing. Subscription access
 is not reinterpreted as zero study cost.
+
+Only the project decision and necessary nonsecret capabilities/provenance are
+retained. No account profile, raw authentication status, unrelated billing
+records or credentials belong in this artifact. Shared global billing settings
+must not be changed to force feasibility.
 
 The present operational assessment is **BUDGET_NOT_RUN** because a defensible
 complete-pilot plan within the bound has not been established. Reassess it

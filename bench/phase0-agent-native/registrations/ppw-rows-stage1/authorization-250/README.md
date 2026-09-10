@@ -60,11 +60,18 @@ reference comes from the retired design; tasks, client behavior and actual
 costs may differ. **$900.3432 is not proof that the new pilot cannot cost less.**
 
 No current evidence establishes that the complete unchanged pilot can
-reasonably finish within $250 under trustworthy accounting. The parent reports
-a claude.ai Max/firstParty session. Official documentation describes local
-dollar figures as token-price estimates, not authoritative billing; see
+reasonably finish within $250 under trustworthy accounting. The retained
+control-capability evidence does not establish an authoritative hard bound.
+Official documentation describes local dollar figures as token-price estimates,
+not authoritative billing; see
 `billing-evidence.json`. Subscription access cannot be relabeled as zero study
 cost to evade the ceiling.
+
+The record retains only the supplied project decision and necessary nonsecret
+control-capability evidence. It contains no raw authentication status,
+subscription tier, account identifiers, credentials, unrelated settings or
+billing records. Shared global billing settings must not be changed to force
+feasibility.
 
 Accordingly `feasibility.json` records an operational
 **BUDGET_NOT_RUN — no defensible full-pilot execution plan established**,
