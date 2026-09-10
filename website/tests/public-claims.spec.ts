@@ -163,10 +163,10 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   await page.goto(`${base}/`);
-  const contract = page.getByRole('heading', { name: 'Explicit Contracts', exact: true }).locator('..');
+  const contract = page.getByRole('region', { name: 'Compare runtime contracts', exact: true });
   await expect(contract).toContainText('Optional --verify');
   await expect(contract).toContainText('Runtime checks depend on contract mode');
-  await contract.getByRole('link', { name: 'Learn more' }).click();
+  await contract.getByRole('link', { name: 'verification guarantees and limits' }).click();
   await expect(page).toHaveURL(/\/verification-guarantees\/$/);
   const article = page.locator('article');
   for (const text of ['--contract-mode debug', '--contract-mode release', '--contract-mode off',
