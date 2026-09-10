@@ -1,0 +1,18 @@
+{
+  "command": [
+    "dotnet",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "-i",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-003-frame-fingerprint/source.calr",
+    "-o",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-003-frame-fingerprint/A.generated.cs",
+    "--no-telemetry",
+    "--permissive-effects"
+  ],
+  "policyFlags": [
+    "--permissive-effects"
+  ],
+  "exitCode": 0,
+  "stdout": "Compilation successful: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-003-frame-fingerprint/A.generated.cs\n",
+  "stderr": ""
+}

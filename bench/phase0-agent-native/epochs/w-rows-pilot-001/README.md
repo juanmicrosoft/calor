@@ -58,11 +58,13 @@ approval or a per-call billing cap. A genuine approval under #1259 cannot be
 substituted with the historical cost estimate or an empty evidence file.
 No stage-2 sample size, effect size, margin, or registered stage is supplied.
 
-#1260 supplies the complete input task tree and a separate, non-runnable
-confirmatory reservation. These committed files are input templates, not a
-live output directory. A future authorized run must use a separate new
-output root; the runner's protection against overwriting an existing epoch
-remains in force.
+#1260 supplies the complete **85-file** input task tree here and the separate,
+[non-runnable confirmatory reservation](../w-rows-001/README.md). Both trees
+preserve the exact frozen task bytes and native control certificates. These
+committed files are input templates, not live output directories. A future
+authorized run must use a separate new output root; the runner's protection
+against overwriting an existing epoch remains in force. Analysis validates
+this complete input tree, then refuses the still-unrun pilot.
 
 The absolute product paths record the actually verified local installation.
 Moving the product requires a reviewed, hash-verified registration update,

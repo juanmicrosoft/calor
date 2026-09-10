@@ -881,6 +881,9 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
         raise SystemExit("ERROR: %s not found — not an epoch directory" % pins_path)
     with open(pins_path, encoding="utf-8") as fh:
         pins = json.load(fh)
+    if pins.get("kind") == "pp-w-rows-confirmatory-reservation":
+        raise SystemExit("ERROR: confirmatory reservation is unregistered; "
+                         "it cannot enter historical A-1.12 analysis, even under --dry-run")
     if pins.get("schemaVersion") == 2 or pins.get("kind") == "pp-w-rows-redesign":
         raise SystemExit("ERROR: redesigned epochs require --epoch-id and --stage; "
                          "they cannot enter historical A-1.12 analysis, even under --dry-run")
@@ -1940,6 +1943,60 @@ def serialize(obj):
 
 
 # ---------------------------------------------------------------------------
+def _unrun_confirmatory_reservation(epoch_dir):
+    """Recognize input-only metadata without treating directory existence as a run."""
+    if os.path.islink(epoch_dir):
+        return False
+    try:
+        with open(os.path.join(epoch_dir, "pins.json"), encoding="utf-8") as fh:
+            pins = json.load(fh)
+        with open(os.path.join(epoch_dir, "registration.json"), "rb") as fh:
+            registration_bytes = fh.read()
+        registration = json.loads(registration_bytes)
+    except (OSError, ValueError):
+        return False
+    if not isinstance(pins, dict) or not isinstance(registration, dict):
+        return False
+    pin_fields = {
+        "schemaVersion", "kind", "epochId", "stage", "lifecycle", "dataKind",
+        "collectionAuthorized", "fundingStatus", "sourcePilotEpochId", "compiler",
+        "arms", "modelPin", "agentVersion", "identityStatus", "suite", "runsPerArm",
+        "effectSizeDelta", "noninferiorityMargin", "registrationSha256",
+    }
+    registration_fields = {
+        "schemaVersion", "kind", "status", "epochId", "stage", "collectionAuthorized",
+        "fundingStatus", "sourcePilotEpochId", "taskSupersession", "pilotInputPins",
+        "identityStatus", "pendingGates", "dataPolicy",
+    }
+    if set(pins) != pin_fields or set(registration) != registration_fields:
+        return False
+    common = {"schemaVersion": 1, "epochId": EPOCH_ID, "stage": "confirmatory",
+              "fundingStatus": "unfunded"}
+    if any(value.get(key) != expected for value in (pins, registration)
+           for key, expected in common.items()):
+        return False
+    if any(type(value["schemaVersion"]) is not int or value.get("collectionAuthorized") is not False
+           for value in (pins, registration)):
+        return False
+    if (pins.get("kind") != "pp-w-rows-confirmatory-reservation"
+            or pins.get("lifecycle") != "reserved-unregistered"
+            or pins.get("dataKind") != "unrun"
+            or any(pins[key] is not None
+                   for key in ("runsPerArm", "effectSizeDelta", "noninferiorityMargin"))
+            or registration.get("kind") != "pp-w-rows-stage-reservation"
+            or registration.get("status") != "reserved-unregistered"
+            or pins.get("registrationSha256") != hashlib.sha256(registration_bytes).hexdigest()):
+        return False
+    run_files = {"result.json", "agent.json", "transcript.jsonl", "ppw-stage-ledger.json",
+                 "ppw-analysis.json", "ppw-analysis.dry-run.json"}
+    for root, directories, files in os.walk(epoch_dir):
+        if (any(name == "runs" or name.startswith("run-") for name in directories)
+                or run_files.intersection(files)
+                or any(os.path.islink(os.path.join(root, name)) for name in directories + files)):
+            return False
+    return True
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if "--epoch-id" in argv or any(arg.startswith("--epoch-id=") for arg in argv):
@@ -1982,7 +2039,10 @@ def main(argv=None):
     if args.ledger:
         epoch_dir = args.epoch_dir or os.path.join(args.epochs_root, EPOCH_ID)
         analysis = None
-        if os.path.exists(os.path.join(epoch_dir, "pins.json")):
+        if _unrun_confirmatory_reservation(epoch_dir):
+            print("unregistered input reservation %s is not a historical A-1.12 collection"
+                  % EPOCH_ID)
+        elif os.path.exists(os.path.join(epoch_dir, "pins.json")):
             analysis, lines = analyze(epoch_dir, dry_run=False,
                                       starter_compiles=args.starter_compiles,
                                       pairs_root=args.pairs_root)
