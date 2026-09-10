@@ -14,6 +14,32 @@ The capability list is not yet claimed to admit the pinned client's full request
 set, including its exact OAuth capability. No experimental invocation, live
 ledger, or scientific outcome is created by these fixtures.
 
+### Independent registered-argument probe
+
+Run the repository-owned no-forward launcher with the retained native client:
+
+```bash
+python3 bench/phase0-agent-native/probe-ppw-gateway.py \
+  --client <absolute-path-to-retained-2.1.266> \
+  --scratch-root <existing-private-scratch-directory>
+```
+
+The probe and gateway-mode runner consume the same client-flag helper and
+environment builder. It uses the current kernel policy, capability-prefixed
+loopback URL and registered model, with no safe-mode, tools-none, bare,
+settings-source or session-persistence override. It creates no spending ledger
+or epoch. Its HTTP server unconditionally rejects requests and has no provider
+forwarding implementation. Native stdout/stderr and request bodies stay in
+memory; the JSON report contains only sanitized capability/shape data and local
+control results. This tests native compatibility, not a complete isolation proof.
+
+The real frozen-task null-agent exercise additionally exposed two test-host
+requirements not covered by a console application: explicitly provisioning the
+existing NuGet cache, and VSTest's attempted loopback listener. With package
+resolution restored, VSTest currently aborts at `SocketServer.Start` /
+`TcpListener.Bind` under the network policy. Hosted-test execution is not yet
+claimed operational; arbitrary loopback access is not an acceptable workaround.
+
 ## One request must mean one model iteration
 
 `ppw-gateway-budget.py::price_contract` binds the model, limits, prices, capability

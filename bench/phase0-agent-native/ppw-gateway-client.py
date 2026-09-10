@@ -196,6 +196,25 @@ def read_isolation_evidence(context_path, workspace, output):
     return evidence
 
 
+def registered_client_flags():
+    return ["--print", "--verbose", "--output-format", "stream-json",
+            "--forward-subagent-text", "--dangerously-skip-permissions"]
+
+
+def client_environment(workspace, base_url):
+    workspace = canonical_path(workspace)
+    temporary = workspace / ".ppw-client-tmp"
+    temporary.mkdir(exist_ok=True)
+    dotnet_home = workspace / ".ppw-dotnet-home"
+    dotnet_home.mkdir(exist_ok=True)
+    return dict(os.environ, ANTHROPIC_BASE_URL=base_url, DISABLE_AUTOUPDATER="1",
+                TMPDIR=str(temporary), DOTNET_CLI_HOME=str(dotnet_home),
+                DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER="1", MSBUILDDISABLENODEREUSE="1",
+                GIT_OPTIONAL_LOCKS="0", PPW_INSPECTOR_READONLY="1", PPW_GATEWAY_ACTIVE="1",
+                PPW_PYTHON_EXECUTABLE=sys.executable,
+                PATH=str(Path(__file__).resolve().parent / "gateway-tools") + os.pathsep + os.environ["PATH"])
+
+
 def launch(context_path, workspace, output, arguments):
     context_path = canonical_path(context_path)
     require(context_path.is_file() and context_path.stat().st_mode & 0o077 == 0,
@@ -222,16 +241,7 @@ def launch(context_path, workspace, output, arguments):
     evidence = kernel_probe(policy, workspace, protected, endpoint.port, context["gatewayPid"])
     evidence.update(clientSha256=CLIENT_SHA256, policySha256=hashlib.sha256(policy.encode()).hexdigest())
     write_isolation_evidence(context_path, evidence)
-    temporary = workspace / ".ppw-client-tmp"
-    temporary.mkdir(exist_ok=True)
-    dotnet_home = workspace / ".ppw-dotnet-home"
-    dotnet_home.mkdir(exist_ok=True)
-    environment = dict(os.environ, ANTHROPIC_BASE_URL=context["baseUrl"], DISABLE_AUTOUPDATER="1",
-                       TMPDIR=str(temporary), DOTNET_CLI_HOME=str(dotnet_home),
-                       DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER="1", MSBUILDDISABLENODEREUSE="1",
-                       GIT_OPTIONAL_LOCKS="0", PPW_INSPECTOR_READONLY="1", PPW_GATEWAY_ACTIVE="1",
-                       PPW_PYTHON_EXECUTABLE=sys.executable,
-                       PATH=str(runner.parent / "gateway-tools") + os.pathsep + os.environ["PATH"])
+    environment = client_environment(workspace, context["baseUrl"])
     # exec keeps the existing runner's timeout/process-tree ownership intact.
     os.execve("/usr/bin/sandbox-exec",
               ["/usr/bin/sandbox-exec", "-p", policy, str(shell), "--noprofile", "--norc"] + arguments,
@@ -239,6 +249,9 @@ def launch(context_path, workspace, output, arguments):
 
 
 def main():
+    if sys.argv[1:] == ["--client-flags"]:
+        print(json.dumps(registered_client_flags()))
+        return
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--context", required=True)
     parser.add_argument("--workspace", required=True)

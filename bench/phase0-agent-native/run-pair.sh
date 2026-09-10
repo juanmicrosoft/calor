@@ -1187,6 +1187,13 @@ run_agent() {
     local client_command="claude"
     if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
         client_command="$PPW_GATEWAY_CLIENT"
+        local gateway_flags flag_lines flag
+        gateway_flags="$(python3 "$SCRIPT_DIR/ppw-gateway-client.py" --client-flags)" || exit 2
+        flag_lines="$(jq -er 'if type == "array" and length > 0 and all(.[]; type == "string")
+                              then .[] else error("invalid registered client flags") end' <<<"$gateway_flags")" \
+            || exit 2
+        claude_args=()
+        while IFS= read -r flag; do claude_args+=("$flag"); done <<<"$flag_lines"
     fi
     if [[ -n "$PPW_SPEND_TICKET" ]]; then
         local client_help budget_limit

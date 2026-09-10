@@ -322,7 +322,7 @@ class InstrumentTests(unittest.TestCase):
                                          self.root, "synthetic-pilot", "pilot")
 
     def fake_capture(self, behavior, arm="B", run=1, spending_ticket=None,
-                     budget_support=True, expect_refusal=None):
+                     budget_support=True, expect_refusal=None, gateway=False):
         """Execute the actual shell runner with deterministic local stand-ins.
 
         PATH resolves claude and dotnet to these files, never real agents or
@@ -423,6 +423,9 @@ print(json.dumps({"type":"result","result":"API error" if os.environ["SYNTHETIC_
         argv = instrument.pair_command(task, instrument.ARMS[arm], compiler, output, run - 1)
         if spending_ticket is not None:
             argv += ["--ppw-spend-ticket", str(spending_ticket)]
+        if gateway:
+            argv += ["--ppw-gateway-client", str(fake_agent)]
+            env["PPW_GATEWAY_ACTIVE"] = "1"
         result = subprocess.run(["bash"] + argv,
                                 env=env, text=True, capture_output=True, timeout=30)
         if expect_refusal:
