@@ -3528,13 +3528,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(OkExpressionNode node)
     {
         var value = node.Value.Accept(this);
-        return $"§OK{{{value}}}";
+        return $"§OK {value}";
     }
 
     public string Visit(ErrExpressionNode node)
     {
         var error = node.Error.Accept(this);
-        return $"§ERR{{{error}}}";
+        return $"§ERR {error}";
     }
 
     public string Visit(ArrayCreationNode node)

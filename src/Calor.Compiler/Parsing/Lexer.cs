@@ -625,7 +625,10 @@ public sealed class Lexer
                 yield break;
             }
 
-            yield return tok;
+            yield return new Token(tok.Kind, tok.Text, tok.Span, tok.Value)
+            {
+                IndentationDepth = indentStack.Count - 1
+            };
         }
     }
 

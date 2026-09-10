@@ -4726,6 +4726,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             && generic is { Identifier.ValueText: "Func" }
             && generic.TypeArgumentList.Arguments.Count > 0)
             return EmitLambda(lambda, generic.TypeArgumentList.Arguments[^1].ToString());
+        if (generic is { Identifier.ValueText: "Option", TypeArgumentList.Arguments.Count: 1 })
+        {
+            RequireNamespace("Calor.Runtime");
+            var elementType = generic.TypeArgumentList.Arguments[0].ToString();
+            return expression switch
+            {
+                SomeExpressionNode some =>
+                    $"Calor.Runtime.Option.Some<{elementType}>({EmitTypedExpression(some.Value, elementType)})",
+                NoneExpressionNode { TypeName: null } =>
+                    $"Calor.Runtime.Option.None<{elementType}>()",
+                ConditionalExpressionNode conditional =>
+                    EmitConditionalExpression(conditional, expectedType),
+                _ => expression.Accept(this)
+            };
+        }
         if (generic is not { Identifier.ValueText: "Result", TypeArgumentList.Arguments.Count: 2 })
             return expression.Accept(this);
 

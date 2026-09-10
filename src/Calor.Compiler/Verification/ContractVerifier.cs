@@ -218,6 +218,13 @@ public sealed class ContractVerifier
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
+            CharOperationNode operation => operation.Operation switch
+            {
+                CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
+                    or CharOp.IsUpper or CharOp.IsLower => PrimitiveType.Bool,
+                CharOp.CharCode => PrimitiveType.Int,
+                _ => PrimitiveType.Char
+            },
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
             UnaryOperationNode unaryOp => InferUnaryOperationType(unaryOp),
             ForallExpressionNode => PrimitiveType.Bool, // Quantifiers return bool
