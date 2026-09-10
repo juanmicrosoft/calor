@@ -54,3 +54,19 @@ references its exact execution-file hashes.
 Final independent re-review and final-head CI records must be posted in the
 separate #1265 PR and linked from its body before merge. This finding history
 does not substitute for those acceptance records.
+
+## CI: preserve the whole-directory census
+
+The first full final-head CI run found one failure among 404 Python checks:
+the PP-E1/W5 archive report's exhaustive directory census still listed 30
+entries, while this real pilot input added the 31st. Its registered rule
+lists every non-dot entry as analyzed or skipped; hiding an unrun directory
+from that denominator would weaken the existing rule.
+
+The existing generator was rerun without changing its algorithm. Only
+`entries` and the `skipped` list changed: `w-rows-pilot-001` is explicitly
+listed as a different-kind input with **zero shape-eligible runs**. All
+previous skipped entries, 120 analyzed runs, observations, statistics and
+other fields remain identical. Neither a benefit ledger nor a verdict was
+changed. This metadata-only correction receives a separate independent
+re-review and a fresh full final-head CI run.
