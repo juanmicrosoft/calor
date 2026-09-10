@@ -5,7 +5,8 @@ order: 1
 ---
 
 
-How the Calor evaluation framework measures language effectiveness for AI agents.
+What Calor's benchmark runners calculate, which artifacts actually ran, and
+which questions remain proposals.
 
 The [proposed Effect Rows Study](/docs/benchmarking/effect-rows-study/) has a
 separate two-stage protocol and remains deferred. It is not this static
@@ -15,7 +16,9 @@ evaluation framework or the outcome-based Effect Discipline runner.
 
 ## Evaluation Approach
 
-The framework compares Calor and C# implementations of the same programs across multiple dimensions. It combines deterministic static analysis with optional LLM-based evaluation for a comprehensive assessment.
+The repository contains several separate benchmark runners. They do not form
+one comprehensive assessment, and their results must not be combined unless a
+protocol explicitly registers that combination.
 
 The **published static dashboard** is narrower than the full framework: it uses
 217 paired programs and eight deterministic metrics. Optional LLM suites are
@@ -24,6 +27,31 @@ separate artifacts and do not contribute to the 1.32x headline.
 Its recorded source is `3a452b09`, which declares compiler `0.19.0`; the exact
 executed measurement binary was not independently recorded. The corpus is
 `tests/TestData/Benchmarks`. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
+
+### Published artifact inventory
+
+This table separates checked-in observations from runner capabilities and
+proposed methods. "Unknown" means the artifact does not independently record
+the field.
+
+| Artifact | Date and source | Denominator | Execution and configuration | Headline use |
+|:---------|:----------------|:------------|:----------------------------|:-------------|
+| [Eight-metric static dashboard](/docs/benchmarking/results/) | 2026-09-09; [source `3a452b09`](https://github.com/juanmicrosoft/calor/commit/3a452b09), declaring compiler `0.19.0` | 217 source pairs | Deterministic calculators repeated 30 times. No LLM. The exact measurement binary and working-tree state are unknown. | Supplies the legacy 1.32x composite. That composite is not a language or agent advantage. |
+| [Correctness estimation mode](/docs/benchmarking/metrics/correctness/) inside the static dashboard | Same artifact and 217 pairs | 217 source pairs | Historical heuristic scoring because no LLM provider was configured. It does not execute generated programs as an agent study. | Included as one of the eight legacy dashboard metrics. |
+| Historical [Safety estimation](/docs/benchmarking/metrics/safety/) | 2026-02-17; [artifact revision `e02684e1`](https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json), recording source `59799d1` | 40 programs | Historical heuristic estimate; no agent execution. Current provider-backed runners do not silently fall back to it. | Supplies the separate historical 1.59x Safety headline; not part of the 1.32x dashboard. |
+| Historical [Effect Discipline estimation](/docs/benchmarking/metrics/effect-discipline/) | 2026-02-17; [artifact revision `e02684e1`](https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json), recording source `59799d1` | 40 programs | Historical structural estimate; no agent execution. Current provider-backed runners do not silently fall back to it. | Supplies a separate historical 1.00x tie; not part of the 1.32x dashboard. |
+| [Checked-in 50-task LLM artifact](https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/llm-results.json) | 2026-02-21; source revision absent | 50 tasks | Provider `claude`; model is `null`. All calls recorded authentication failures, producing zero valid generations and zero compilation/test observations. | Does not contribute to any headline. Its numerical 1.00 ratio is only 0 divided against 0 by the exporter and is not a parity result. |
+| [Safety provider artifact](https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/safety-results.json) | 2026-02-21; source revision absent | 30 tasks, 60 language calls | Provider `claude`; model is `null`. All 60 calls recorded authentication failures, so there are no valid generation, compilation, test, violation-detection, or error-quality observations. | Does not support the separate historical 1.59x estimation headline or any other headline. |
+| [Effect Discipline provider artifact](https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/effect-discipline-results.json) | 2026-02-21; source revision absent | 40 tasks, 80 language calls | Provider `claude`; model is `null`. All 80 calls recorded authentication failures, so there are no valid generation, compilation, test, or bug-prevention observations. | Does not contribute to any headline. |
+| [Agent task snapshot](https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/agent-benchmark-results.json) | 2026-02-16; [source `107462e`](https://github.com/juanmicrosoft/calor/commit/107462e), declaring compiler `0.2.3` | 89 tasks. The summary says 17 categories and 77 passes; the 18 category entries total 78 passes. | Historical single-run Claude task snapshot; exact model and runtime configuration are not recorded in the public artifact. | Supplies the unreconciled public 86.5% summary headline. The category entries imply 87.6%; neither is part of the static composite. |
+| [Agent refactoring snapshot](https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/agent-refactoring-results.json) | 2026-02-15; [source `580e189`](https://github.com/juanmicrosoft/calor/commit/580e189), declaring compiler `0.2.3` | 20 tasks per language, three runs per task | `claude-code`, exact model unknown; majority vote requires two of three runs. | Supplies the separate public 95% snapshot headline for each language; not part of the static composite. |
+| [PP-E1 effect-row proof point](https://github.com/juanmicrosoft/calor/blob/3bb2601e3ff83597ddf2f27dcc334b6399ab97ea/bench/phase0-agent-native/effect-rows-probe-ledger.json) | 2026-08-27; artifact revision `3bb2601e3ff83597ddf2f27dcc334b6399ab97ea`, measured release commit `72d060f400b5787ba4ec11cb4dd8860c95173da3` | 10 seeded mutations plus 40 ordinary-task runs | `claude-opus-4-8`, Claude Code 2.1.243; v0.14.3 control versus v0.15.0 treatment, five runs per arm. Verdict **HIT** for its bounded toolchain-cost claim. | Separate proof point; no contribution to 1.32x. |
+| [PP-W-rows practice and sizing](https://github.com/juanmicrosoft/calor/blob/82a7c653cbf1ea2f6231e38cc328c74a34e6589b/bench/phase0-agent-native/effect-rows-benefit-ledger.json) | 2026-09-01; artifact revision `82a7c653cbf1ea2f6231e38cc328c74a34e6589b`. Its `measuredCommit` value `3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a` does not resolve; the pins record arm commits `283ec9f9964ddd5b21da15b646a0dd77d53de99e` and `3bb2601e3ff83597ddf2f27dcc334b6399ab97ea`. | 28 valid practice runs; registered main epoch had zero runs | `claude-opus-4-8`, Claude Code 2.1.248 and 2.1.252; v0.14.3 pre-rows/permissive control versus v0.15.0 strict treatment, three runs per arm. The main `w-rows-001` epoch never ran; verdict **UNDERPOWERED**. | No effect-row safety-benefit headline. |
+| [Redesigned PP-W-rows protocol](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md) | 2026-09-08; revision `16880d006db760d7b47d829fd4282b033c3158a0` | No pilot or confirmatory runs | Proposed method. R1/R4 buildability, tasks, model pin, independent review, budget, and approval remain unresolved. | No result. Deferred by the M0 administrative stop. |
+
+The [Results page](/docs/benchmarking/results/) explains the PP-W chronology
+and the [Effect Rows Study](/docs/benchmarking/effect-rows-study/) records the
+redesign gates.
 
 ### Statistical Rigor
 
@@ -222,23 +250,24 @@ as a static representation metric, not observed editing accuracy.
 
 ---
 
-## LLM-Based Metrics
+## LLM Runner Capabilities
 
-These metrics use actual LLM code generation to measure real-world effectiveness:
+The repository implements optional LLM runners. A runner's presence is not
+evidence that its proposed protocol ran successfully.
 
 ### 8. Task Completion
 
 **Measures:** LLM code generation success using language-neutral prompts.
 
-**Method:**
-- 50 programming tasks across 4 categories
-- Same prompt given to both Calor and C# (no language-specific hints)
-- Calor generation uses a skills file teaching Contract-First Methodology
-- Generated code is compiled and tested against test suites
+**Implemented method:**
+- Read task manifests
+- Request code from a configured provider
+- Compile generated code and run task tests
+- Score compilation and test outcomes
 
-**Scoring:** 40% compilation success + 60% test pass rate
-
-See the [LLM Task Completion Benchmark](#llm-task-completion-benchmark) section below for details.
+The scoring configuration is manifest-driven. See the
+[50-Task LLM Runner](#50-task-llm-runner) section below for the checked-in
+artifact's actual weights.
 
 ---
 
@@ -246,10 +275,9 @@ See the [LLM Task Completion Benchmark](#llm-task-completion-benchmark) section 
 
 **Measures:** Contract enforcement effectiveness and error quality for catching bugs.
 
-**Method:**
-- Tests whether Calor contracts catch more bugs than C# guard clauses
-- Evaluates error message quality (informative vs cryptic)
-- Measures violation detection rate across input categories
+**Current implementation:** Requires a configured provider and task manifest.
+The checked-in 1.59x figure came from a historical estimation path; it is not a
+current provider fallback or an observed bug-detection rate.
 
 **What it catches:**
 - Division by zero
@@ -264,10 +292,10 @@ See the [LLM Task Completion Benchmark](#llm-task-completion-benchmark) section 
 
 **Measures:** Side effect management quality and bug prevention.
 
-**Method:**
-- Tests whether code prevents real-world bugs caused by hidden side effects
-- Evaluates effect declaration completeness
-- Measures bug prevention rate for effect-related issues
+**Current implementation:** Requires a configured provider and task manifest.
+The separate structural estimate is a historical artifact, not a current
+provider fallback. Neither is the PP-W-rows study or evidence that effect rows
+prevent more bugs in agent-produced code.
 
 **What it catches:**
 - Flaky tests (non-determinism from hidden state)
@@ -287,13 +315,17 @@ The BCL effect manifest tracks which .NET methods have effects, enabling verific
 
 ---
 
-These metrics explain why Calor achieves its overall advantage despite losing on token efficiency: the semantic verification pipeline and effect system catch classes of bugs that syntax-only tools cannot detect.
+These calculators describe source features and runner outputs. They do not
+explain or establish an overall Calor advantage.
 
 ---
 
-## LLM Task Completion Benchmark
+## 50-Task LLM Runner
 
-The Task Completion metric uses a dedicated LLM benchmark that directly measures AI code generation success using **language-neutral prompts**.
+The task-completion runner has a 50-task manifest across four categories. The
+checked-in `website/public/data/llm-results.json` is not a successful benchmark:
+every provider call failed authentication, the recorded model is unknown, and
+no generated program compiled or ran.
 
 ### Design Philosophy: Neutral Prompts
 
@@ -305,62 +337,60 @@ of an integer n. The function must only accept non-negative values
 of n. The result is always at least 1.
 ```
 
-This tests whether an LLM can **learn** Calor and translate requirements into idiomatic code, rather than simply following syntax instructions.
+This is the intended comparison. It is not an observed result from the
+checked-in artifact.
 
 ### How It Works
 
-1. **50 programming tasks** defined across 4 categories
-2. **Same prompt** given to both Calor and C# (no language-specific hints)
-3. Calor generation uses a **skills file** teaching Contract-First Methodology
-4. Generated code is compiled and tested against test suites
-5. Scores computed based on compilation success and test pass rate
+1. Load **50 programming tasks** across four categories.
+2. Submit the configured prompt for each language.
+3. Compile generated code and run the task tests.
+4. Compute scores from compilation and test outcomes.
+
+The current JSON records `usesNeutralPrompt: false` for its tasks, so it cannot
+support the neutral-prompt claim previously made on this page.
 
 ### Task Categories
+
+The checked-in failed artifact used these categories:
 
 | Category | Count | Examples |
 |:---------|:------|:---------|
 | basic-algorithms | 15 | Factorial, Fibonacci, IsPrime, GCD, Power |
-| safety | 10 | SafeDivide, Clamp, SafeModulo, NormalizeScore |
+| contracts | 10 | SafeDivide, Clamp, SafeModulo, NormalizeScore |
 | data-structures | 10 | Sum, Max, Min, Average, Median |
 | logic | 15 | BoolToInt, LogicalAnd, IsMultipleOf, SameSign |
+
+The separate `task-manifest-neutral.json` uses a `safety` category instead of
+`contracts`. It was not the manifest serialized into the checked-in artifact.
 
 ### Scoring Formula
 
 ```
-Score = 0.4 × compilation + 0.6 × tests
+Score = compiled × compilation weight
+      + test pass rate × test weight
+      + contract result × contract weight
 ```
 
-| Factor | Weight | Description |
-|:-------|:-------|:------------|
-| Compilation | 40% | Does the generated code compile? |
-| Test Cases | 60% | Percentage of test cases passing |
+The checked-in artifact records either 30% compilation, 50% tests, and 20%
+contracts, or 30% compilation, 40% tests, and 30% contracts. Contract weight is
+applied only to Calor results. If Calor compiles without an explicit contract
+result, the runner awards half of the configured contract weight. The neutral
+manifest also defaults to a 20% contract weight when it omits the field. A
+future language-neutral study must register and justify its scoring before
+execution rather than describe this implementation as a 40/60 comparison.
 
-No bonus for contracts - we measure task completion fairly.
+### Checked-in artifact status
 
-### Results Summary
-
-| Metric | Calor | C# |
-|:-------|:------|:---|
-| Average Score | 1.00 | 1.00 |
-| Advantage Ratio | **1.00x (Tie)** | - |
-| Compilation Rate | 100% | 100% |
-| Test Pass Rate | 100% | 100% |
-
-That historical 1.00x run shows parity for its task set and model invocation.
-It does not establish model-independent learnability or feed into the historical
-static dashboard.
-
-### Contract Usage (Qualitative)
-
-While task completion scores are equal, examining the generated code shows Calor consistently produces contracts:
-
-| Requirement | Calor | C# |
-|:------------|:------|:---|
-| "must not be zero" | `§Q (!= b 0)` | `if (b == 0) throw...` |
-| "result is never negative" | `§S (>= result 0)` | *(no equivalent)* |
-| "must be between X and Y" | `§Q (>= n X)` + `§Q (<= n Y)` | Two guard clauses |
-
-Calor includes **postconditions** that C# cannot express - a qualitative advantage not captured by task completion scores.
+| Field | Recorded value |
+|:------|:---------------|
+| Timestamp | 2026-02-21 |
+| Source revision | Not recorded |
+| Provider / model | `claude` / unknown |
+| Tasks | 50 |
+| Valid generations | 0 |
+| Compilation and test observations | 0 |
+| Exported ratio | 1.00 from equal zero scores; not interpretable as parity |
 
 ### Running Locally
 
@@ -376,26 +406,21 @@ dotnet run --project tests/Calor.Evaluation -- llm-tasks \
   --refresh-cache
 ```
 
-### Cost Controls
+### Runner controls
 
 - **Caching:** Results cached to avoid redundant API calls
-- **Budget caps:** Maximum spend per run (~$0.76 for 50 tasks)
-- **Estimated cost displayed** before running
+- **Budget caps:** A configured run can enforce a spend limit
+- **Estimated cost:** The runner can display an estimate before API calls
 
 ---
 
-## LLM-Based Evaluation
+## Proposed LLM Evaluation
 
-### Multi-LLM Validation
+Multi-model validation, comprehension questions, repeated runs, and
+cross-model agreement are proposed methodology. No checked-in artifact on this
+page records an executed Claude 3.5 Sonnet/GPT-4o cross-validation.
 
-To ensure unbiased results, we test with multiple LLMs:
-
-| Provider | Model | Purpose |
-|:---------|:------|:--------|
-| Anthropic | Claude 3.5 Sonnet | Primary evaluation |
-| OpenAI | GPT-4o | Cross-validation |
-
-### Comprehension Questions
+### Proposed comprehension questions
 
 LLMs answer questions about code understanding:
 1. What is the main purpose of this code?
@@ -404,7 +429,7 @@ LLMs answer questions about code understanding:
 4. What side effects does this code have?
 5. What would happen if [edge case]?
 
-### Scoring
+### Proposed scoring
 
 - Correctness of answers (0-1) graded against ground truth
 - Tokens used to formulate answer
@@ -473,11 +498,11 @@ With statistical mode enabled:
 
 ### The Tradeoff
 
-Results consistently show:
-- Calor wins on **comprehension** metrics (structure, contracts, effects, refactoring)
-- C# wins on **efficiency** metrics (tokens, density)
-
-This reflects the designed tradeoff: **explicit semantics require more tokens but enable better agent reasoning and safer refactoring**.
+The legacy static snapshot scores Calor higher on several structural
+calculators and C# higher on information density. Because the pairs are not
+all behaviorally equivalent and the metrics are not agent outcomes, this does
+not establish better agent reasoning, safer refactoring, or a language
+advantage.
 
 ---
 
@@ -485,17 +510,14 @@ This reflects the designed tradeoff: **explicit semantics require more tokens bu
 
 ### Automated Benchmarks
 
-Benchmarks run automatically via GitHub Actions:
-- **On every push**: Quick validation run
-- **Weekly (Sunday)**: Full statistical analysis with LLM evaluation
-- **Manual trigger**: On-demand with custom parameters
+Repository workflows may run selected benchmark and regression commands.
+Workflow availability is not evidence that a weekly multi-model LLM study or
+the proposed PP-W redesign has executed.
 
 ### Regression Detection
 
-The CI pipeline checks for:
-- Any metric dropping by more than 10%
-- Statistical significance of changes
-- Failing compilation in any benchmark
+CI checks implementation and artifact invariants defined by the current
+workflow. It does not independently adjudicate scientific validity.
 
 ---
 
@@ -503,8 +525,12 @@ The CI pipeline checks for:
 
 1. **Corpus size**: 217 paired programs still may not cover all patterns
 2. **C# baseline**: Other languages might perform differently
-3. **Static analysis**: Some metrics don't capture runtime behavior
-4. **LLM variance**: Model updates can affect evaluation scores
+3. **Static analysis**: Most headline metrics do not capture runtime behavior
+4. **Artifact provenance**: Several historical artifacts omit an exact model,
+   runtime configuration, measurement binary, or source revision
+5. **LLM variance**: Model updates can affect evaluation scores
+6. **No adopter comparison**: There is no protected three-arm adopter study,
+   independent methods adjudication, or measured safety/economic advantage
 
 ---
 

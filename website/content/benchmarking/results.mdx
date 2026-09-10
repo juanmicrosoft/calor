@@ -83,11 +83,40 @@ supported nor refuted**. The stricter compiler cost about 12% more work to
 reach a green build on these tasks, below the registered “noticeable” threshold,
 but that is descriptive practice-round evidence rather than a product claim.
 
+The ledger must be read with care. Its top-level `achievablePower` field is
+`0.868`, but the recorded reason and power curve use `0.868` for the smallest
+unaffordable design, nine runs per cell. The largest affordable design was
+three runs per cell at **0.48 power**. The public interpretation therefore does
+not present `0.868` as affordable power.
+
+The practice result also exposed a fixture-design defect: the undesirable
+hidden effect was already forbidden by the visible task specification. The
+2026-09-08 redesign separates the visible requirements from a held-out
+effect-observing test and adds eight task-qualification rules. It remains a
+proposal. In particular, no candidate has established both R1 (a convenient
+effect-hiding API) and R4 (the laundering solution passes visible tests), and
+the required task set, independent review, model pin, stage-aware instrument,
+spend ceiling, and approval do not exist.
+
+On 2026-09-09, M0 recorded these missing prerequisites and the lack of a
+suitable isolated evaluator. Formal M0 status is **UNADJUDICATED**; the
+maintainer action was an **administrative stop**. No redesigned pilot or
+confirmatory collection was authorized. The registered `w-rows-001` epoch
+therefore remains unrun, not a null result.
+
 Keep the three statements separate:
 
 - The 1.32x dashboard is a deterministic source/structure comparison.
 - The 0.15 proof point did not detect a large toolchain tax.
 - The 0.16 proof point did not have enough evidence to judge the safety benefit.
+- The redesign and M0 records contain no protected three-arm adopter
+  comparison, independent methods adjudication, or safety/economic advantage
+  result.
+
+See the [artifact inventory](/docs/benchmarking/methodology/#published-artifact-inventory),
+the [proposed redesign](/docs/benchmarking/effect-rows-study/), and the
+[M0 evidence status](/docs/benchmarking/evidence-status/) for source links and
+execution states.
 
 ---
 
@@ -109,7 +138,11 @@ Use C# when:
 
 ## Methodology
 
-All benchmarks are automated and reproducible. Each program is evaluated across 8 metrics comparing Calor and C# implementations.
+The current static runner is automated and can regenerate a new artifact from
+the checked-out source. That is not the same as exactly reproducing every
+historical artifact: several omit the measurement binary, working-tree state,
+source revision, model, or runtime configuration. Proposed protocols have not
+run.
 
 The published dashboard framework:
 
