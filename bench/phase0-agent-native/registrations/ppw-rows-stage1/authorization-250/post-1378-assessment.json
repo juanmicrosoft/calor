@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-rows-post-guard-operational-assessment-not-observations",
+  "issue": 1393,
+  "assessmentDate": "2026-09-10",
+  "assessedAgainstCommit": "80e2d77579750e48d58088d4474ba5d3c35014c6",
+  "authorizationSha256": "59adf2fea004c4eae6e45adb85ccfa02b9d4181a1d40188dac9f3391d7c57480",
+  "priorAssessmentSha256": "4f04f1be57128f2bf72b179bf3de07804a6b1f3002988133ef6b7a5fef12576f",
+  "priorAssessmentPreserved": true,
+  "preservedGoverningRecord": {
+    "path": "docs/plans/2026-09-05-ppw-rows-fixture-redesign.md",
+    "prefixByteCount": 37132,
+    "sha256": "da609e37b5ad84e8ecac6c190f087c0442b71fd7a93f9fdc5f08f6fefc309a0e"
+  },
+  "financialAuthorizationGranted": true,
+  "scope": "pilot-only",
+  "authorizedTotalUsd": 250,
+  "newGrantOrBudgetReset": false,
+  "runtimeGuard": {
+    "issue": 1378,
+    "pullRequest": 1392,
+    "mergeCommit": "80e2d77579750e48d58088d4474ba5d3c35014c6",
+    "reviewedHead": "a639b646e84ca102af209fd32f4171daecebcca2",
+    "successfulFinalHeadCiChecks": 33,
+    "reviewRecord": "https://github.com/juanmicrosoft/calor/pull/1392#issuecomment-5618820844",
+    "validationRecord": "https://github.com/juanmicrosoft/calor/pull/1392#issuecomment-5618853416",
+    "mergeGate": "https://github.com/juanmicrosoft/calor/pull/1392#issuecomment-5619039526",
+    "amendment": {
+      "path": "registrations/ppw-rows-stage1/spending-instrument-amendment.json",
+      "sha256": "a3a33debc9ef5a6d995564ef553bbf08830a117165b212d2988c04ecbf9ec3c2"
+    },
+    "analysisRegistration": {
+      "path": "registrations/ppw-rows-stage1/analysis-registration.json",
+      "sha256": "c5ed1690e7d5f4d05e83fe4bf9df06b96d4ee9f3e2f3ead82748a542e2c0cbdd"
+    },
+    "capabilityFunction": "ppw-spending.py::verified_upper_bound",
+    "supportedControl": "claude-code-max-budget-usd",
+    "verifiedMaximumLiability": "UNKNOWN",
+    "actualProviderBoundEstablished": false,
+    "syntheticAccountingTestsAreProviderEvidence": false,
+    "refusalBeforeProductClientCommandsOrOutput": true
+  },
+  "runsPerTaskPerArm": 74,
+  "taskCount": 3,
+  "scheduledSlots": 444,
+  "fullPilotWithinCeilingEstablished": false,
+  "historicalEstimateIsCostLowerBound": false,
+  "costImpossibilityProven": false,
+  "perInvocationLimitUsd": null,
+  "ledgerPathSelected": false,
+  "operationalPinsActivated": false,
+  "originalScaffoldsPreserved": true,
+  "registeredProtocolChanged": false,
+  "collectionOperationallyAdmitted": false,
+  "status": "BUDGET_NOT_RUN",
+  "reasonCodes": [
+    "SUPPORTED_CONTROL_MAXIMUM_LIABILITY_UNKNOWN",
+    "NO_DEFENSIBLE_FULL_PILOT_PLAN_ESTABLISHED"
+  ],
+  "reason": "The merged guard safely refuses the supported locally estimated control; it does not establish a provider-enforced maximum liability. No evidence establishes a scientifically valid full unchanged 444-slot pilot within the approved total. A supplied threshold, valid JSON, a ledger or lower historical-cost guess cannot remove these gaps.",
+  "reassessment": "A genuinely evidenced bound covering both study cost and actual spending, plus a defensible complete-pilot plan and reviewed prospective operational bindings, is required before any experimental call. No higher ceiling, model/client change, protocol weakening or shared global billing-setting change is inferred.",
+  "newExperimentalCalls": 0,
+  "scientificVerdict": null,
+  "stage1Estimands": null,
+  "notBuildableClaimed": false,
+  "stage2Authorized": false,
+  "stage2N": null,
+  "stage2Delta": null,
+  "stage2UnderpoweredCarriedApplied": false,
+  "m0Rearmed": false,
+  "releaseAuthorized": false,
+  "remainingOpenIssues": [1254, 1267, 1262]
+}

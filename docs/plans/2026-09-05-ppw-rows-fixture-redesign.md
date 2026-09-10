@@ -633,3 +633,39 @@ This is not a not-buildable result (the genuine Exit A remains), an observed
 pilot null/negative, or the separately registered stage-2
 **UNDERPOWERED-CARRIED** off-ramp. No stage-2 N/Δ or outcome is supplied.
 #1267, #1262 and #1254 remain open until their actual requirements are met.
+
+## 12. Post-guard operational reassessment (#1393)
+
+**Date: 2026-09-10; after #1392 merged as
+`80e2d77579750e48d58088d4474ba5d3c35014c6`.** The
+[additive reassessment](../../bench/phase0-agent-native/registrations/ppw-rows-stage1/authorization-250/post-1378-assessment.json)
+binds the current financial receipt, preserved initial assessment and actual
+reviewed spending-instrument amendment. Sections 1–11 and the original
+receipt, method, model, task, epoch-pin and verdict records remain unchanged.
+
+#1378 is now implemented: source-bound admission, durable reservations,
+single-use tickets and explicit incomplete-run accounting have independent
+review and green CI. This establishes local fail-closed behavior, **not** a
+verified provider maximum liability. The supported estimated-cost control
+still returns **UNKNOWN** and refuses before product/client commands or
+collection-output creation. Synthetic controls are not provider evidence.
+
+The pilot-only **$250 total** financial decision remains valid. The actual
+operational assessment remains **BUDGET_NOT_RUN**: neither a trustworthy
+execution bound nor a defensible full unchanged 444-slot plan is established.
+The historical $900.3432 planning reference is not a lower bound or an
+impossibility proof; $250/444 is not a selected per-call truncation allowance.
+
+No operational activation, ledger path or per-call limit is invented. The
+reviewed instrument amendment and archived analysis manifest make the source
+change explicit without pretending original inactive pins match new code.
+Future admission needs genuine bound/feasibility evidence and compatible,
+reviewed prospective operational bindings. No model/client, N, stopping-rule
+or shared global billing-setting change is authorized by this reassessment.
+
+No experimental call or study outcome was produced. The genuine Exit A
+buildability result remains; neither a pilot null/negative nor the stage-2
+UNDERPOWERED-CARRIED off-ramp applies. #1259 and #1378 are complete for their
+actual financial-record and engineering scopes. #1267 collection/adjudication,
+#1262 conditional stage-2 requirements and epic #1254 remain open. No stage-2
+N/Δ, M0 re-arm or release permission is supplied.

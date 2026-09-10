@@ -35,7 +35,7 @@ subscription cannot override that decision. No provider setting, invoice cap,
 or maximum overshoot is invented.
 
 Both list-price-equivalent **study cost and actual spending** are conservatively
-within scope. The Max subscription is not a way to waive the ceiling.
+within scope. Subscription access does not waive the ceiling.
 `$250 / 444` is arithmetic, not a feasibility demonstration or permission to
 truncate each run to an invented allowance.
 

@@ -32,9 +32,10 @@ disposition or establish an experimental result.
 The approval is real; **collection is not yet operationally admitted**.
 Before any experimental call:
 
-1. #1378 must supply independently reviewed trustworthy spending enforcement,
-   with supported accounting and a safe bound that cannot exceed the total.
-   Local post-hoc estimates alone are not a hard cap.
+1. Spending enforcement must establish a trustworthy bound that cannot exceed
+   the total. #1378 has now supplied reviewed durable accounting and fail-closed
+   admission, but the supported client control still has an **unknown** maximum
+   liability. Local post-hoc estimates alone are not a hard cap.
 2. Any execution-code changes require explicit, reviewed, coherent prospective
    pin/analysis-manifest updates. No older code anchor may silently be reused.
 3. A defensible plan must support the **entire unchanged registered pilot**
@@ -78,6 +79,32 @@ Accordingly `feasibility.json` records an operational
 subject to reassessment after #1378 supplies its actual reviewed enforcement
 contract. It does not assert mathematical impossibility or a lower bound on
 the study's true cost.
+
+### Post-guard reassessment (#1393)
+
+The additive [`post-1378-assessment.json`](post-1378-assessment.json) now records
+that reassessment against actual merge
+`80e2d77579750e48d58088d4474ba5d3c35014c6`
+([#1392 final reviewed gate](https://github.com/juanmicrosoft/calor/pull/1392#issuecomment-5619039526)).
+The original receipt and initial assessment remain unchanged.
+
+The merged implementation provides source-bound spending plans, durable
+worst-case reservations and one-use tickets. Its real supported control still
+returns **UNKNOWN** maximum liability and refuses collection before product or
+client commands and output creation. Prescribed synthetic accounting and shell
+tests demonstrate local behavior, not a provider guarantee or study outcome.
+
+The assessment therefore remains **BUDGET_NOT_RUN**. Financial approval is no
+longer missing; a trustworthy bound and a defensible full-pilot plan are.
+Neither the historical planning estimate nor the average budget constraint
+proves that a cheaper valid pilot is impossible.
+
+The explicit #1378 instrument amendment preserves the original scaffolds and
+archives the old analysis manifest. Those original pins do **not** pretend to
+match the changed collector. This reassessment does not select a per-invocation
+limit or ledger path, activate operational pins, or create a collection epoch.
+Doing so without a supported bound and valid plan would imply readiness that
+the evidence does not establish.
 
 Prohibited shortcuts include reducing N, changing model/client/stopping
 rules, replacing invalid slots, pooling old data, or choosing per-run limits
