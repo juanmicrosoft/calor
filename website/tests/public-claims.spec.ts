@@ -12,6 +12,25 @@ const verificationPages = ['philosophy/static-verification', 'syntax-reference/c
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
 const currentRelease = '0.19.0';
 
+test('effect-rows methodology separates registration, tooling, observations and approval', async ({ page }) => {
+  const source = await readFile('content/benchmarking/effect-rows-study.mdx', 'utf8');
+  expect(source).toContain('16880d006db760d7b47d829fd4282b033c3158a0');
+  for (const rule of ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']) {
+    expect(source).toContain(`| ${rule} |`);
+  }
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  for (const path of ['benchmarking', 'benchmarking/methodology', 'benchmarking/metrics/effect-discipline']) {
+    await page.goto(`${base}/docs/${path}/`);
+    await page.locator('article a[href$="/docs/benchmarking/effect-rows-study/"]').click();
+    await expect(page).toHaveURL(/\/effect-rows-study\/$/);
+    for (const text of ['UNADJUDICATED', 'administrative stop', 'No redesigned confirmatory result',
+      'below 50%', 'UNDERPOWERED-CARRIED', 'not implemented evidence']) {
+      await expect(page.locator('article')).toContainText(text);
+    }
+  }
+});
+
 test('current version and explicitly historical result provenance cannot silently drift', async () => {
   const props = await readFile('../Directory.Build.props', 'utf8');
   expect(SITE_VERSION).toBe(props.match(/<Version>(.*?)<\/Version>/)![1]);

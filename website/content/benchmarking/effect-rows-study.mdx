@@ -1,0 +1,133 @@
+---
+title: "Effect Rows Study"
+section: "benchmarking"
+order: 8
+---
+
+# Effect Rows Study: Proposed Method
+
+**Reader question:** How would the redesigned PP-W-rows study test effect
+enforcement, and what must happen before it can run?
+
+**Status recorded 2026-09-09: deferred.** No redesigned confirmatory result
+exists. The [M0 decision](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/safe-delegation-m0/decision.md)
+records formal M0 as **UNADJUDICATED** and the maintainer action as an
+**administrative stop**. It separately defers this proposal. That is neither a
+scientific rejection of effect rows nor permission to run a narrower study.
+See [current evidence status](/docs/benchmarking/evidence-status/) for the
+distinction.
+
+## The question and the old design defect
+
+An **effect row** records the effects a function may perform, such as console
+output or network access. An **escape** is a hidden effect violation in final
+code that builds but fails the held-out effect-observing test. Compilation
+failures do not count as escapes. Passing the agent-visible suite is a
+separate task requirement. **Shape realization** means
+the agent actually constructs the registered abstraction pattern; solving the
+task another way does not exercise that pattern.
+
+PP-W-rows asks whether strict enforcement catches an effect hidden behind an
+abstraction while the tests available to the agent still pass. The old tasks
+already visibly forbade the undesirable behavior. An agent could avoid it
+from the specification alone, without effect enforcement. Historical zero
+escapes therefore do not demonstrate a benefit from rows.
+This defect analysis and the replacement rules are frozen in the
+[2026-09-08 redesign, revision `16880d00`, §§1–2](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#1-defect-analysis).
+
+This is not the [eight-metric static dashboard](/docs/benchmarking/results/),
+PP-E1's historical toolchain-cost comparison, or the separate
+[Effect Discipline runner](/docs/benchmarking/metrics/effect-discipline/).
+Those instruments cannot supply this study's result.
+
+## One compiler, two enforcement policies
+
+The [frozen arm definitions, §3](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#3-arm-definitions-re-registered)
+specify one 0.18 release compiler: arm A uses `--permissive-effects`; arm B
+uses strict enforcement with no waiver flag. This is the frozen 0.18-era
+design, not a claim that milestone 0.21 selects an experimental compiler pin.
+An approved supersession would be needed to change that design.
+
+The control still has effect rows. In the registered policy, permissive mode
+waives `Calor0425` and assumes unresolved calls pure; it does not demote named
+`Calor0410` violations. Tasks must therefore demonstrate different verdicts
+under the two policies rather than assume that any effect violation separates
+the arms. Comparing two different compiler versions would restore the old
+confound.
+
+## Task qualification before collection
+
+The [registered R1–R8 rules, §2](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#2-design-rules-for-the-replacement-task-set)
+require each task to meet all of these conditions:
+
+| Rule | Requirement |
+|:-----|:------------|
+| R1 | The documented, convenient API hides the effect; the honest alternative needs information the agent has no signal to seek. Length alone is not the test. |
+| R2 | Neither the visible specification nor visible test names forbid the effect. |
+| R3 | The effect is declared in a dependency's row, away from the edited body. |
+| R4 | The visible suite passes on the laundering solution: code that hides an effect from its caller's declared row. |
+| R5 | A held-out, effect-observing test fails on that solution. |
+| R6 | Unrelated compiler defects must not drive agents away from the intended syntax. |
+| R7 | Each task uses one shape from the frozen twelve-shape inventory. |
+| R8 | Compiling that shape under both policies produces different verdicts. |
+
+The [buildability gate #1255](https://github.com/juanmicrosoft/calor/issues/1255)
+comes before a task collection. Its 2026-09-09 acceptance rules require an
+executed example satisfying R1, R4, R5 and R8 for a buildable exit. A negative
+exit needs at least five attempted candidates across at least three shapes,
+with rejection reasons; an inconclusive search is not a negative verdict.
+These are gate rules, not a finding that either exit has been achieved.
+
+The [pre-collection requirements, §7](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#7-what-must-exist-before-collection)
+require checked tasks and frozen visible/held-out suites. The separate
+[independent-review checkpoint #1266](https://github.com/juanmicrosoft/calor/issues/1266)
+requires a second reader's written verdict on every task and recorded
+rejection, with findings resolved **before suites freeze**.
+Visible tests assess the task behavior available to the agent; held-out tests
+observe the hidden effect separately. This explanation publishes no new
+candidate answers or oracle details.
+
+## Pilot, confirmation, and stopping rules
+
+The [stage separation and stops, §§4–5](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#4-effect-size-sample-size-and-cost)
+are registered intent:
+
+1. Register the pilot size and its two estimands (quantities to estimate): shape realization and
+   control-arm escape rate ([#1261](https://github.com/juanmicrosoft/calor/issues/1261)).
+2. Collect and adjudicate the pilot separately
+   ([#1267](https://github.com/juanmicrosoft/calor/issues/1267)). Realization
+   below **50%**, or control-arm escape rate **zero**, stops confirmatory
+   funding and records a defect or unsuccessful redesign, not a confirmatory
+   null result about rows.
+3. If the pilot clears those stops, derive the confirmatory effect size and
+   sample size from its measured realization and escape rates, and register
+   them before collection
+   ([#1262](https://github.com/juanmicrosoft/calor/issues/1262)). Pilot runs
+   cannot be pooled into that epoch (separately identified collection) or used
+   to issue its verdict.
+4. If the required sample exceeds approved resources, publish
+   **UNDERPOWERED-CARRIED** with the calculated achievable power. Do not start
+   confirmatory collection at a reduced, inadequately powered size. A properly
+   powered null is published as a refutation of the registered claim.
+
+There is no new sample size, effect-size threshold, model pin, or budget in
+this page. A written ceiling, null-result acceptance, and separate explicit
+approval remain prerequisites under
+[#1259](https://github.com/juanmicrosoft/calor/issues/1259).
+
+## Protocol requirements are not implemented evidence
+
+The protocol requires distinct epoch IDs and an analyzer that accepts one
+epoch, so accidental pooling is prevented by the instrument. It does **not**
+establish that those safeguards already work. The one-compiler runner,
+stage-aware analysis, and scaffold/run distinction belong to
+[#1264](https://github.com/juanmicrosoft/calor/issues/1264); their regression
+tests and deliberate registration supersession belong to
+[#1271](https://github.com/juanmicrosoft/calor/issues/1271).
+
+No redesigned collection, functioning containment safeguard, empirical benefit,
+or scientific approval follows from this documentation. Scientific owners
+retain gate adjudication and ledger changes. Any later result must identify
+its epoch, pins (recorded versions and configuration), stage, denominators,
+exclusions, and uncertainty rather than
+reuse historical dry runs or seeded fixtures.
