@@ -17,7 +17,11 @@ public class AgentTaskReferenceTests
         var path = Path.Combine(directory.FullName, AgentTaskReferencePath);
         var content = File.ReadAllText(path);
         var programs = ExtractAgentTaskPrograms(content);
-        Assert.Equal(39, programs.Count);
+        // Ratchet: catches the extractor silently dropping examples, which is how a
+        // reference full of Phase-4d syntax went unchecked for months. Raise it only
+        // when examples are deliberately added -- 39 -> 43 for the do-while, console-read
+        // and two string/char examples the reference had been missing.
+        Assert.Equal(43, programs.Count);
         foreach (var name in new[] { "TryDouble", "SafeDivide", "HasNegative", "DigitValue", "Offset", "ClampScore" })
             Assert.Contains(programs, program => program.Source.Contains($":{name}:", StringComparison.Ordinal));
         var diagnostics = CheckAgentTaskReference(new(path, content));
