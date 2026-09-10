@@ -1365,8 +1365,19 @@ public sealed class TypeChecker
                 }
                 else if (!unifiedType.Equals(caseType) && caseType is not ErrorType && unifiedType is not ErrorType)
                 {
-                    _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
-                        $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
+                    if (IsNumeric(unifiedType) && IsNumeric(caseType) && IsAssignable(unifiedType, caseType))
+                    {
+                        // The existing common type already accommodates this arm.
+                    }
+                    else if (IsNumeric(unifiedType) && IsNumeric(caseType) && IsAssignable(caseType, unifiedType))
+                    {
+                        unifiedType = caseType;
+                    }
+                    else
+                    {
+                        _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
+                            $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
+                    }
                 }
             }
 

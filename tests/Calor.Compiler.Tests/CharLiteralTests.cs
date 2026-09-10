@@ -231,6 +231,30 @@ public class CharLiteralTests
         }
     }
 
+    [Theory]
+    [InlineData("'x'", "0", 120, 0)]
+    [InlineData("(char-lit \"x\")", "0", 120, 0)]
+    [InlineData("0", "'x'", 0, 120)]
+    [InlineData("0", "(char-lit \"x\")", 0, 120)]
+    public void MatchExpressions_WidenCharacterAndIntegerArms(
+        string whenTrue, string whenFalse, int trueValue, int falseValue)
+    {
+        var source = $$"""
+            §M{m1:Characters}
+              §F{f1:Probe:pub} (bool:flag) -> i32
+                §E{}
+                §R §W{w1} flag
+                  §K true → {{whenTrue}}
+                  §K _ → {{whenFalse}}
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var assembly = Compile(text);
+            Assert.Equal(trueValue, Invoke(assembly, "CharactersModule", "Probe", true));
+            Assert.Equal(falseValue, Invoke(assembly, "CharactersModule", "Probe", false));
+        }
+    }
+
     [Fact]
     public void CSharpMigration_PreservesOverloadsConstantsAndSurrogates()
     {
