@@ -71,7 +71,6 @@ public class EvaluationResult
             return 1.0;
 
         var product = Summary.CategoryAdvantages.Values
-            .Where(v => v > 0)
             .Aggregate(1.0, (acc, v) => acc * v);
 
         return Math.Pow(product, 1.0 / Summary.CategoryAdvantages.Count);

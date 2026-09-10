@@ -19,7 +19,7 @@ for (const width of [1366, 390]) {
     await expect(article).not.toContainText('demonstrating advantages');
     await expect(article).not.toContainText('Calor Wins');
     await expect(article).not.toContainText('C# better');
-    await expect(page.getByRole('columnheader', { name: 'Static-score composite', exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Direction-normalized composite', exact: true })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Token Economics', exact: true })).toHaveCount(1);
     await expect(page.getByRole('columnheader', { name: 'Tokens', exact: true })).toHaveCount(0);
     await expect(article).toContainText('not raw-token savings');
@@ -30,9 +30,11 @@ for (const width of [1366, 390]) {
     for (const name of staticMetricOrder) {
       const metric = fixture.metrics[name as keyof typeof fixture.metrics];
       const row = page.locator(`[data-static-metric="${name}"]`);
-      await expect(row).toContainText(`${metric.ratio.toFixed(2)}x Calor/C#`);
+      await expect(row).toContainText(`${metric.ratio.toFixed(2)}x direction-normalized`);
       await expect(row).toContainText(`${staticMetricLabels[name].name} static score`);
     }
+    await expect(article).toContainText('Lower-is-better metrics invert their raw score ratio');
+    await expect(article).not.toContainText('Calor/C# score ratio');
     await expect(page.getByRole('note', { name: 'Benchmark provenance' })).toContainText(fixture.commit);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
@@ -94,8 +96,8 @@ test('keyboard sort and filter expose state while preserving focus and membershi
   await expect(rows.locator('td:first-child')).toHaveText(
     fixture.programs.filter(p => p.level === 1).sort((a, b) => a.name.localeCompare(b.name)).map(p => p.name)
   );
-  await page.getByRole('button', { name: 'Static-score composite', exact: true }).press('Enter');
-  await expect(page.getByRole('columnheader', { name: 'Static-score composite', exact: true })).toHaveAttribute('aria-sort', 'ascending');
+  await page.getByRole('button', { name: 'Direction-normalized composite', exact: true }).press('Enter');
+  await expect(page.getByRole('columnheader', { name: 'Direction-normalized composite', exact: true })).toHaveAttribute('aria-sort', 'ascending');
   await expect(header).not.toHaveAttribute('aria-sort');
 });
 

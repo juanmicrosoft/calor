@@ -10,6 +10,70 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-10
+
+This release improves compiler fidelity for character literals and contextual
+returns, then makes the public evidence boundary explicit. The v0.20 planning
+tranche ended **UNADJUDICATED** with an administrative stop: it did not produce
+an adopter handoff or a comparative agent study.
+
+### Fixed
+
+- **Single-quoted character literals now preserve their meaning.** Lexing,
+  parsing, migration, emission, attributes, enum constants, numeric conversions,
+  contracts, and round trips now agree on ordinary and escaped character values.
+  Escaped lone surrogate code units round-trip unchanged. Malformed escapes and
+  supplementary Unicode scalars that require two UTF-16 code units are rejected.
+- **`Result` and `Option` returns keep their expected contextual types.**
+  Nested returns no longer lose payloads or choose the wrong wrapper while
+  moving through C# to Calor and back.
+- **Arrow conditionals preserve the enclosing indentation boundary.** Multiline
+  conditions and indented arrow bodies no longer consume statements belonging
+  to the surrounding block.
+- **Character predicates participate in contract verification.** Native
+  character types are recognized by the contract pipeline instead of being
+  treated as unsupported numeric expressions.
+- **The website's first path is executable and accessible.** The homepage,
+  workflow guide, conceptual references, examples, comparison labels, contrast,
+  motion, and large-media behavior were repaired.
+
+### Added
+
+- **A reviewed PP-W-rows buildability instrument.** The local buildability gate
+  now has held-out runtime checks and tamper-resistant fixtures. Passing that
+  gate establishes instrument buildability only; no agent collection or
+  effect-row benefit result followed.
+- **Public M0 evidence and benchmark inventories.** The website now separates
+  static calculators, failed provider artifacts, historical snapshots,
+  registered protocols, practice data, and unrun studies.
+- **Artifact-derived claim regressions.** Tests pin release surfaces, benchmark
+  provenance, verifier levels, denominators, configurations, and evidence links
+  so public claims cannot silently drift from checked-in records.
+
+### Changed
+
+- **The historical agent-task result is bounded to what it checked.** The site
+  preserves the artifact's 77/89 summary across 17 categories while exposing
+  that its 18 category entries total 78/89. All 89 tasks used Calor-to-C#
+  transpilation and text-pattern scripts; zero enabled contract-verdict checks
+  or behavioral executions. Its 80% threshold is a project gate, not calibrated
+  production reliability.
+- **The unsafe agent benchmark generator now fails closed.** It can no longer
+  overwrite the dated public artifact with fallback counts and a fresh timestamp.
+- **Adoption and benchmark guidance no longer turns missing evidence into a
+  positive claim.** The docs distinguish compiler behavior from workflow
+  evidence and label unknown model, runtime, and source provenance directly.
+
+### Known limits
+
+The M0 result remains **UNADJUDICATED**. No qualifying adopter, independent
+handoff, or protected C#/ordinary C#/Calor comparison was completed. The
+downstream study remained unauthorized, and the redesigned PP-W-rows protocol
+has no pilot or confirmatory runs. The static benchmark pairs are not all
+behaviorally equivalent. See the
+[research evidence status](/docs/benchmarking/evidence-status/) for the formal
+record.
+
 ## [0.19.0] - 2026-09-09
 
 This release closes 16 language-audit findings and 15 website-audit findings.

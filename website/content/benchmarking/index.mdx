@@ -6,10 +6,10 @@ hasChildren: true
 ---
 
 
-The historical dashboard covers **217 source pairs across eight
-deterministic metrics**, with **30 repetitions**. Its recorded source revision
-`3a452b09` declares compiler `0.19.0`; the executed binary was not independently
-recorded. It reports a 1.32x legacy Calor/C# static-score composite.
+The historical dashboard, published on **2026-09-10**, covers **217 source pairs
+across eight deterministic metrics**, with **30 repetitions**. Its recorded
+source revision `1caf9138` declares compiler `0.19.0`; the executed binary was
+not independently recorded. It reports a 1.32x legacy direction-normalized composite.
 The pairs are not all behaviorally equivalent, and the reported intervals do not
 establish independent sampling uncertainty. These scores cannot establish a
 language or coding-agent advantage. Read the
@@ -49,13 +49,14 @@ results are not included in the eight-metric headline or the 1.32x composite.
 
 ---
 
-## Static Score Ratios
+## Direction-Normalized Metric Ratios
 
 <BenchmarkSummaryTable />
 
-Ratios above 1 indicate a higher Calor calculator score; below 1 indicate a
-higher C# score. They are not measurements of language quality. The token
-economics composite must not be read as a raw-token saving. Use the
+Each metric is normalized so ratios above 1 favor Calor and ratios below 1
+favor C#, including lower-is-better metrics whose raw score ratios are
+inverted. They are not measurements of language quality. The token economics
+composite must not be read as a raw-token saving. Use the
 [dated source, method, and limitations](/docs/benchmarking/results/#read-the-results-carefully)
 when interpreting any row.
 

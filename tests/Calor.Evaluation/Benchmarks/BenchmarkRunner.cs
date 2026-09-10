@@ -399,7 +399,7 @@ public class BenchmarkRunner
     /// <summary>
     /// Calculates summary statistics from all benchmark results.
     /// </summary>
-    private static EvaluationSummary CalculateSummary(EvaluationResult result)
+    internal static EvaluationSummary CalculateSummary(EvaluationResult result)
     {
         var summary = new EvaluationSummary();
 
@@ -411,7 +411,7 @@ public class BenchmarkRunner
         // Calculate average advantage per category
         foreach (var (category, metrics) in byCategory)
         {
-            var validMetrics = metrics.Where(m => m.AdvantageRatio > 0).ToList();
+            var validMetrics = metrics.Where(m => !m.IsCalorOnly).ToList();
             if (validMetrics.Count > 0)
             {
                 // Use geometric mean for ratios

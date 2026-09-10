@@ -126,6 +126,50 @@ public class BenchmarkRunnerTests
         Assert.Equal(2.0, overall, 2); // Geometric mean of 2,2,2 = 2
     }
 
+    [Fact]
+    public void EvaluationResult_CalculateOverallAdvantage_PreservesZero()
+    {
+        var result = new EvaluationResult
+        {
+            Summary = new EvaluationSummary
+            {
+                CategoryAdvantages = new Dictionary<string, double>
+                {
+                    ["A"] = 0,
+                    ["B"] = 4
+                }
+            }
+        };
+
+        Assert.Equal(0, result.CalculateOverallAdvantage());
+    }
+
+    [Fact]
+    public void CalculateSummary_PreservesZeroAndExcludesCalorOnlyMetrics()
+    {
+        var result = new EvaluationResult
+        {
+            Metrics =
+            [
+                new MetricResult("Comparable", "Zero", 0, 1, 0, new()),
+                new MetricResult("Comparable", "Four", 4, 1, 4, new()),
+                new MetricResult(
+                    "CalorOnly",
+                    "Coverage",
+                    1,
+                    0,
+                    1,
+                    new Dictionary<string, object> { ["isCalorOnly"] = true })
+            ]
+        };
+
+        var summary = BenchmarkRunner.CalculateSummary(result);
+
+        Assert.Equal(0, summary.CategoryAdvantages["Comparable"]);
+        Assert.DoesNotContain("CalorOnly", summary.CategoryAdvantages.Keys);
+        Assert.Equal(0, summary.OverallCalorAdvantage);
+    }
+
     #endregion
 
     #region BenchmarkManifest Tests
@@ -245,7 +289,36 @@ public class BenchmarkRunnerTests
         Assert.Contains("# Calor vs C# Evaluation Report", markdown);
         Assert.Contains("## Executive Summary", markdown);
         Assert.Contains("## Category Breakdown", markdown);
-        Assert.Contains("## Conclusions", markdown);
+        Assert.Contains("## Interpretation Limits", markdown);
+        Assert.Contains("Legacy Composite Direction-Normalized Ratio", markdown);
+        Assert.Contains("Direction-normalized ratio", markdown);
+        Assert.Contains("Favored language", markdown);
+        Assert.Contains("Parse Check Results", markdown);
+        Assert.Contains("Source Commit:** `HEAD`", markdown);
+        Assert.Contains("Source-Declared Compiler Version", markdown);
+        Assert.Contains("Statistical Runs:** 7", markdown);
+        Assert.Contains("7 repetitions repeat deterministic observations", markdown);
+        Assert.Contains("Calor parse", markdown);
+        Assert.Contains("C# parse", markdown);
+        Assert.Contains("Average Direction-Normalized Ratio", markdown);
+        Assert.Contains("| TokenCount | 50.00 | 100.00 | 2.00x |", markdown);
+        Assert.Contains("These checks do not build or execute", markdown);
+        Assert.Contains("not all behaviorally equivalent", markdown);
+        Assert.Contains(
+            "not a measured language, agent-productivity, correctness, or safety advantage",
+            markdown);
+        Assert.DoesNotContain("Winner", markdown);
+        Assert.DoesNotContain("Calor/C# ratio", markdown);
+        Assert.DoesNotContain("higher calculator score", markdown, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Static Score Ratio", markdown);
+        Assert.DoesNotContain("Overall Winner", markdown);
+        Assert.DoesNotContain("Advantage Percentage", markdown);
+        Assert.DoesNotContain("Avg Advantage", markdown);
+        Assert.DoesNotContain("Calor OK", markdown);
+        Assert.DoesNotContain("C# OK", markdown);
+        Assert.DoesNotContain("Compilation Success", markdown);
+        Assert.DoesNotContain("Calor excels", markdown);
+        Assert.DoesNotContain("Recommendations", markdown);
     }
 
     [Fact]
@@ -346,6 +419,8 @@ public class BenchmarkRunnerTests
         return new EvaluationResult
         {
             BenchmarkCount = 2,
+            CommitHash = "HEAD",
+            StatisticalRunCount = 7,
             Metrics = new List<MetricResult>
             {
                 new("TokenEconomics", "TokenCount", 50, 100, 2.0, new()),

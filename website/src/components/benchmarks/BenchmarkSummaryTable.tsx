@@ -11,7 +11,7 @@ export function BenchmarkSummaryTable() {
         <thead>
           <tr className="border-b">
             <th className="text-left py-2 px-3 font-semibold">Static metric</th>
-            <th className="text-left py-2 px-3 font-semibold">Calor/C# score ratio</th>
+            <th className="text-left py-2 px-3 font-semibold">Direction-normalized ratio</th>
           </tr>
         </thead>
         <tbody>

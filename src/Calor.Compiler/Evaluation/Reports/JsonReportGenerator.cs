@@ -29,7 +29,7 @@ public class JsonReportGenerator
                 Version = result.Version,
                 BenchmarkCount = result.BenchmarkCount
             },
-            Summary = MapSummary(result.Summary),
+            Summary = MapSummary(result),
             CategoryResults = GroupByCategory(result),
             DetailedResults = MapDetailedResults(result)
         };
@@ -46,7 +46,13 @@ public class JsonReportGenerator
         {
             summary = new
             {
-                overallCalorAdvantage = result.Summary.OverallCalorAdvantage,
+                overallDirectionNormalizedRatio = result.Summary.CategoryAdvantages.Count > 0
+                    ? result.Summary.OverallCalorAdvantage
+                    : (double?)null,
+                categoryDirectionNormalizedRatios = result.Summary.CategoryAdvantages,
+                overallCalorAdvantage = result.Summary.CategoryAdvantages.Count > 0
+                    ? result.Summary.OverallCalorAdvantage
+                    : (double?)null,
                 categoryAdvantages = result.Summary.CategoryAdvantages
             }
         };
@@ -63,11 +69,18 @@ public class JsonReportGenerator
         await File.WriteAllTextAsync(path, json);
     }
 
-    private static JsonSummary MapSummary(EvaluationSummary summary)
+    private static JsonSummary MapSummary(EvaluationResult result)
     {
+        var summary = result.Summary;
         return new JsonSummary
         {
-            OverallCalorAdvantage = summary.OverallCalorAdvantage,
+            OverallDirectionNormalizedRatio = summary.CategoryAdvantages.Count > 0
+                ? summary.OverallCalorAdvantage
+                : null,
+            CategoryDirectionNormalizedRatios = summary.CategoryAdvantages,
+            OverallCalorAdvantage = summary.CategoryAdvantages.Count > 0
+                ? summary.OverallCalorAdvantage
+                : null,
             CategoryAdvantages = summary.CategoryAdvantages,
             CalorPassCount = summary.CalorPassCount,
             CSharpPassCount = summary.CSharpPassCount,
@@ -85,17 +98,34 @@ public class JsonReportGenerator
                 g => new JsonCategoryResult
                 {
                     MetricCount = g.Count(),
-                    AverageAdvantage = Math.Round(g.Average(m => m.AdvantageRatio), 2),
-                    CalorWins = g.Count(m => m.AdvantageRatio > 1.0),
-                    CSharpWins = g.Count(m => m.AdvantageRatio < 1.0),
-                    Ties = g.Count(m => Math.Abs(m.AdvantageRatio - 1.0) < 0.01),
+                    IsCalorOnly = g.All(IsCalorOnly),
+                    AverageDirectionNormalizedRatio = g.All(IsCalorOnly)
+                        ? null
+                        : Math.Round(g.Where(m => !IsCalorOnly(m)).Average(m => m.AdvantageRatio), 2),
+                    CalorFavoring = g.Count(m => !IsCalorOnly(m) && m.AdvantageRatio > 1.0),
+                    CSharpFavoring = g.Count(m => !IsCalorOnly(m) && m.AdvantageRatio < 1.0),
+                    Neutral = g.Count(m => !IsCalorOnly(m) && Math.Abs(m.AdvantageRatio - 1.0) < 0.01),
+                    AverageAdvantage = g.All(IsCalorOnly)
+                        ? null
+                        : Math.Round(g.Where(m => !IsCalorOnly(m)).Average(m => m.AdvantageRatio), 2),
+                    CalorWins = g.Count(m => !IsCalorOnly(m) && m.AdvantageRatio > 1.0),
+                    CSharpWins = g.Count(m => !IsCalorOnly(m) && m.AdvantageRatio < 1.0),
+                    Ties = g.Count(m => !IsCalorOnly(m) && Math.Abs(m.AdvantageRatio - 1.0) < 0.01),
                     Metrics = g.Select(m => new JsonMetric
                     {
                         Name = m.MetricName,
                         CalorScore = Math.Round(m.CalorScore, 2),
                         CSharpScore = Math.Round(m.CSharpScore, 2),
-                        AdvantageRatio = Math.Round(m.AdvantageRatio, 2),
-                        AdvantagePercent = Math.Round(m.AdvantagePercentage, 1)
+                        IsCalorOnly = IsCalorOnly(m),
+                        DirectionNormalizedRatio = IsCalorOnly(m)
+                            ? null
+                            : Math.Round(m.AdvantageRatio, 2),
+                        AdvantageRatio = IsCalorOnly(m)
+                            ? null
+                            : Math.Round(m.AdvantageRatio, 2),
+                        AdvantagePercent = IsCalorOnly(m)
+                            ? null
+                            : Math.Round(m.AdvantagePercentage, 1)
                     }).ToList()
                 });
     }
@@ -110,10 +140,18 @@ public class JsonReportGenerator
             Features = c.Features,
             CalorSuccess = c.CalorSuccess,
             CSharpSuccess = c.CSharpSuccess,
-            AverageAdvantage = Math.Round(c.AverageAdvantage, 2),
+            AverageDirectionNormalizedRatio = c.Metrics.Any(m => !IsCalorOnly(m))
+                ? Math.Round(c.Metrics.Where(m => !IsCalorOnly(m)).Average(m => m.AdvantageRatio), 2)
+                : null,
+            AverageAdvantage = c.Metrics.Any(m => !IsCalorOnly(m))
+                ? Math.Round(c.Metrics.Where(m => !IsCalorOnly(m)).Average(m => m.AdvantageRatio), 2)
+                : null,
             MetricCount = c.Metrics.Count
         }).ToList();
     }
+
+    private static bool IsCalorOnly(MetricResult metric) =>
+        metric.Details.TryGetValue("isCalorOnly", out var value) && value is true;
 }
 
 // JSON structure classes
@@ -135,7 +173,9 @@ internal class ReportMetadata
 
 internal class JsonSummary
 {
-    public double OverallCalorAdvantage { get; set; }
+    public double? OverallDirectionNormalizedRatio { get; set; }
+    public Dictionary<string, double> CategoryDirectionNormalizedRatios { get; set; } = new();
+    public double? OverallCalorAdvantage { get; set; }
     public Dictionary<string, double> CategoryAdvantages { get; set; } = new();
     public int CalorPassCount { get; set; }
     public int CSharpPassCount { get; set; }
@@ -146,7 +186,12 @@ internal class JsonSummary
 internal class JsonCategoryResult
 {
     public int MetricCount { get; set; }
-    public double AverageAdvantage { get; set; }
+    public bool IsCalorOnly { get; set; }
+    public double? AverageDirectionNormalizedRatio { get; set; }
+    public int CalorFavoring { get; set; }
+    public int CSharpFavoring { get; set; }
+    public int Neutral { get; set; }
+    public double? AverageAdvantage { get; set; }
     public int CalorWins { get; set; }
     public int CSharpWins { get; set; }
     public int Ties { get; set; }
@@ -158,8 +203,10 @@ internal class JsonMetric
     public string Name { get; set; } = "";
     public double CalorScore { get; set; }
     public double CSharpScore { get; set; }
-    public double AdvantageRatio { get; set; }
-    public double AdvantagePercent { get; set; }
+    public bool IsCalorOnly { get; set; }
+    public double? DirectionNormalizedRatio { get; set; }
+    public double? AdvantageRatio { get; set; }
+    public double? AdvantagePercent { get; set; }
 }
 
 internal class JsonCaseResult
@@ -170,6 +217,7 @@ internal class JsonCaseResult
     public List<string> Features { get; set; } = new();
     public bool CalorSuccess { get; set; }
     public bool CSharpSuccess { get; set; }
-    public double AverageAdvantage { get; set; }
+    public double? AverageDirectionNormalizedRatio { get; set; }
+    public double? AverageAdvantage { get; set; }
     public int MetricCount { get; set; }
 }

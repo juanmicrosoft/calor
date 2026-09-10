@@ -2,11 +2,11 @@ name: Website regressions
 
 on:
   pull_request:
-    branches: [main, release/v0.19]
-    paths: ['website/**', 'src/**', 'scripts/**', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
+    branches: [main, 'release/**']
+    paths: ['website/**', 'src/**', 'scripts/**', 'CHANGELOG.md', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
   push:
-    branches: [release/v0.19]
-    paths: ['website/**', 'src/**', 'scripts/**', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
+    branches: ['release/**']
+    paths: ['website/**', 'src/**', 'scripts/**', 'CHANGELOG.md', 'Directory.*', 'global.json', 'NuGet.Config', '.github/workflows/website-tests.yml']
 
 permissions:
   contents: read
@@ -39,6 +39,9 @@ jobs:
         working-directory: website
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Public-claim tests resolve historical benchmark source commits.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

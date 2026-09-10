@@ -122,7 +122,8 @@ timeout, crash). Exit codes are unchanged.
   native; substitutions and drops require `--lossy`. In text mode a conversion with losses
   prints a located loss summary instead of the `✓ Conversion successful` line.
 - `data.benchmark` — present with `--benchmark`: token/line/character counts
-  before and after, reduction percentages, and the advantage ratio.
+  before and after, reduction percentages, and `compactnessRatio`. The legacy
+  `advantageRatio` alias remains in schema v2.0 for compatibility.
 
 If `--output` is not specified:
 
