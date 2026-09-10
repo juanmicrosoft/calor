@@ -9,11 +9,16 @@ order: 8
 **Reader question:** How would the redesigned PP-W-rows study test effect
 enforcement, and what must happen before it can run?
 
-**Status recorded 2026-09-09: deferred.** No redesigned confirmatory result
-exists. The [M0 decision](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/safe-delegation-m0/decision.md)
+**Current status, 2026-09-10: pilot budget approved; collection not admitted.**
+The [recorded financial decision](/docs/benchmarking/results/#redesigned-pp-w-rows-deferred)
+sets a **USD250 total, pilot-only** ceiling and accepts the registered stopping
+rules and negative/null publication. Operational readiness remains a separate
+gate. No redesigned confirmatory result exists.
+
+The historical [M0 decision](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/safe-delegation-m0/decision.md)
 records formal M0 as **UNADJUDICATED** and the maintainer action as an
-**administrative stop**. It separately defers this proposal. That is neither a
-scientific rejection of effect rows nor permission to run a narrower study.
+**administrative stop**. The separate pilot financial decision does not
+re-arm M0 or establish scientific benefit.
 See [current evidence status](/docs/benchmarking/evidence-status/) for the
 distinction.
 
@@ -81,8 +86,13 @@ with rejection reasons; an inconclusive search is not a negative verdict.
 [reviewed gate closure](https://github.com/juanmicrosoft/calor/pull/1348)
 records Exit A: a buildable local example under the frozen v0.18 release
 criteria. This deterministic engineering check is not an agent observation.
-The replacement task set and collection prerequisites remain incomplete;
-no redesigned agent collection or benefit result exists.
+Task selection, second-reader review, frozen suites, and arm-discrimination
+evidence are recorded separately in [#1256](https://github.com/juanmicrosoft/calor/issues/1256),
+[#1266](https://github.com/juanmicrosoft/calor/issues/1266),
+[#1257](https://github.com/juanmicrosoft/calor/issues/1257), and
+[#1258](https://github.com/juanmicrosoft/calor/issues/1258). Those engineering
+gates do not admit collection. No redesigned agent collection or benefit
+result exists.
 
 The [pre-collection requirements, §7](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#7-what-must-exist-before-collection)
 require checked tasks and frozen visible/held-out suites. The separate
@@ -98,8 +108,10 @@ candidate answers or oracle details.
 The [stage separation and stops, §§4–5](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#4-effect-size-sample-size-and-cost)
 are registered intent:
 
-1. Register the pilot size and its two estimands (quantities to estimate): shape realization and
-   control-arm escape rate ([#1261](https://github.com/juanmicrosoft/calor/issues/1261)).
+1. Follow the registered pilot size and its two estimands (quantities to
+   estimate): shape realization and control-arm escape rate
+   ([#1261](https://github.com/juanmicrosoft/calor/issues/1261)). Registration is
+   not collection admission.
 2. Collect and adjudicate the pilot separately
    ([#1267](https://github.com/juanmicrosoft/calor/issues/1267)). Realization
    below **50%**, or control-arm escape rate **zero**, stops confirmatory
@@ -116,24 +128,39 @@ are registered intent:
    confirmatory collection at a reduced, inadequately powered size. A properly
    powered null is published as a refutation of the registered claim.
 
-There is no new sample size, effect-size threshold, model pin, or budget in
-this page. A written ceiling, null-result acceptance, and separate explicit
-approval remain prerequisites under
-[#1259](https://github.com/juanmicrosoft/calor/issues/1259).
+The last step is a stage-2 off-ramp, not the current pilot budget/not-run hold.
+Pilot-only financial approval does not fund confirmation.
 
-## Protocol requirements are not implemented evidence
+## Financial approval is not collection admission
 
-The protocol requires distinct epoch IDs and an analyzer that accepts one
-epoch, so accidental pooling is prevented by the instrument. It does **not**
-establish that those safeguards already work. The one-compiler runner,
-stage-aware analysis, and scaffold/run distinction belong to
+The [authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
+records real financial approval. Because the user quote left the stage choice
+unselected, its interpretation is the narrower pilot-only scope. **USD250 is
+the total ceiling**, not a per-task, per-arm, or per-run allowance. No cap
+increase or protocol weakening is authorized.
+
+Before experimental model calls, the instrument must establish
+[trustworthy enforced spending controls](https://github.com/juanmicrosoft/calor/issues/1378),
+compatible reviewed pins, and a defensible plan for the entire unchanged
+registered pilot within that ceiling. The current recorded assessment is
+**BUDGET_NOT_RUN**, not not-buildable, a pilot null/negative, or
+**UNDERPOWERED-CARRIED**. Historical planning costs do not prove that a valid
+cheaper plan is impossible. Do not shrink the pilot or alter its model,
+client, or stops to make it fit.
+
+## Tooling is not collection evidence
+
+Distinct epoch IDs, one-epoch analysis, the one-compiler runner, and the
+scaffold/run distinction belong to
 [#1264](https://github.com/juanmicrosoft/calor/issues/1264); their regression
-tests and deliberate registration supersession belong to
+tests and registration work belong to
 [#1271](https://github.com/juanmicrosoft/calor/issues/1271).
+These engineering artifacts are not experimental observations or financial
+enforcement evidence by themselves.
 
-No redesigned collection, functioning containment safeguard, empirical benefit,
-or scientific approval follows from this documentation. Scientific owners
-retain gate adjudication and ledger changes. Any later result must identify
+No redesigned collection or empirical benefit follows from this
+documentation. Scientific owners retain gate adjudication and ledger changes.
+Any later result must identify
 its epoch, pins (recorded versions and configuration), stage, denominators,
 exclusions, and uncertainty rather than
 reuse historical dry runs or seeded fixtures.
