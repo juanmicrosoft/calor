@@ -125,3 +125,23 @@ The reviewer explicitly did **not** approve a paid run, recruitment,
 participant involvement, epoch registration, ledger mutation, causal
 agent-effect claim, or human independent methods signoff. All such gates
 remain separate.
+
+## Round 4 — formatter-corpus integration
+
+CI found a concrete integration failure after the scientific review:
+`LosslessFormattingTests.CheckedInCalorCorpus_MatchesBaselineAndExercisesSafeTransformations`
+expected 940 tracked standalone Calor files but found 968. The 28 committed
+source fragments had incorrectly used the standalone `.calr` extension.
+
+**Fixed:** byte-preserving renames to `.calr.inc`, matching their actual role
+as incomplete source pieces. The runner still assembles and validates full
+`Candidate.calr` programs. Input inventories and filename references were
+updated, and the entire observation matrix was re-executed. No formatter
+baseline, formatter test, or compiler code was changed. The previously failing
+corpus test then passed locally (1/1); all twelve evidence tests also passed.
+
+Independent reviewer tool identity: `code-review`, review name
+`review-1255-r4`. It reviewed the narrow staged integration fix, including
+preserved source bytes, inventories, assembler paths, regenerated evidence,
+and absence of baseline weakening. **No significant issues found.**
+This did not change the scientific gate or add a new approval.

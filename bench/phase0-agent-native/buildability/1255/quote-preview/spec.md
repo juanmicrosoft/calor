@@ -10,4 +10,4 @@ The feed does not change during a preview. Preserve the existing public API.
 
 `QuoteFeed.Sample` is the standard callback for this accumulator. Pass
 `feed.Sample` to `SumSamples` to obtain two samples. A feed is constructed
-with its current rate. See `dependency.calr` for the implementation.
+with its current rate. See `dependency.calr.inc` for the implementation.

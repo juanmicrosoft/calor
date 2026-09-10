@@ -10,4 +10,4 @@ Keep the existing public surface and the dependency implementation.
 
 `Catalog.Formatter` is the standard formatting callback. Pass `Formatter`
 to `SumFormatted` along with the input value. The default formatting
-transformation doubles its input. `dependency.calr` contains the library.
+transformation doubles its input. `dependency.calr.inc` contains the library.

@@ -35,16 +35,16 @@ class BuildabilityEvidenceTests(unittest.TestCase):
                     "runtime/StateHeldOutTests.cs", "runtime/NuGet.Config"}
         for candidate in self.report["candidates"]:
             required.update(f"{candidate['id']}/{name}" for name in
-                            ("spec.md", "dependency.calr", "starter.calr",
-                             "laundering.calr", "honest.calr"))
+                            ("spec.md", "dependency.calr.inc", "starter.calr.inc",
+                             "laundering.calr.inc", "honest.calr.inc"))
         self.assertEqual(required, set(self.report["inputSha256"]))
         for path, expected in self.report["inputSha256"].items():
             with self.subTest(path=path):
                 actual = hashlib.sha256((SPIKE / path).read_bytes()).hexdigest()
                 self.assertEqual(expected, actual, "Re-run after changing an observed input")
         for candidate in self.report["candidates"]:
-            for filename in ("spec.md", "dependency.calr", "starter.calr",
-                             "laundering.calr", "honest.calr"):
+            for filename in ("spec.md", "dependency.calr.inc", "starter.calr.inc",
+                             "laundering.calr.inc", "honest.calr.inc"):
                 self.assertIn(f"{candidate['id']}/{filename}", self.report["inputSha256"])
 
     def test_starters_build_and_honest_alternatives_pass_both_suites(self):

@@ -9,5 +9,5 @@ the library and public API; do not duplicate the schedule in the new method.
 
 The service's configured quota lookup is `this.lookup(requested)`.
 Use that callback for the standard schedule. The dependency is already
-implemented in `dependency.calr`; the edit belongs in the supplied
+implemented in `dependency.calr.inc`; the edit belongs in the supplied
 `Preview` method.

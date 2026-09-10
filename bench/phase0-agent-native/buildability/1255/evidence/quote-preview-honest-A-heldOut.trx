@@ -1,26 +1,26 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TestRun id="d9d15578-e777-487a-8e04-d6a6ffca460e" name="@Juans-MacBook-Pro 2026-09-09 20:41:20" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <Times creation="2026-09-09T20:41:20.4727020-04:00" queuing="2026-09-09T20:41:20.4727020-04:00" start="2026-09-09T20:41:20.1618670-04:00" finish="2026-09-09T20:41:20.4746570-04:00" />
-  <TestSettings name="default" id="98bc07f4-db8b-4f78-a5f1-aa0a94f01164">
-    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_20_41_20" />
+<TestRun id="8624bf7a-310f-4ba3-b8d5-8c984c2d1004" name="@Juans-MacBook-Pro 2026-09-09 21:23:53" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T21:23:53.9617850-04:00" queuing="2026-09-09T21:23:53.9617850-04:00" start="2026-09-09T21:23:53.6123040-04:00" finish="2026-09-09T21:23:53.9642120-04:00" />
+  <TestSettings name="default" id="07df4b2d-512b-414e-a2d7-c084642e2f61">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_21_23_53" />
   </TestSettings>
   <Results>
-    <UnitTestResult executionId="2fd41ed4-2fdb-42a2-9948-b459fc0739c3" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0040897" startTime="2026-09-09T20:41:20.4270040-04:00" endTime="2026-09-09T20:41:20.4270100-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2fd41ed4-2fdb-42a2-9948-b459fc0739c3" />
-    <UnitTestResult executionId="7dc5bbb2-01c3-4e77-b14c-6531d8e5f79d" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001370" startTime="2026-09-09T20:41:20.4279900-04:00" endTime="2026-09-09T20:41:20.4279900-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7dc5bbb2-01c3-4e77-b14c-6531d8e5f79d" />
+    <UnitTestResult executionId="7e498ee1-bf64-4698-9d72-1de6057fc824" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001642" startTime="2026-09-09T21:23:53.9148350-04:00" endTime="2026-09-09T21:23:53.9148350-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7e498ee1-bf64-4698-9d72-1de6057fc824" />
+    <UnitTestResult executionId="8f088550-b647-4756-9c3e-651df530a0e0" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0046166" startTime="2026-09-09T21:23:53.9136770-04:00" endTime="2026-09-09T21:23:53.9136840-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8f088550-b647-4756-9c3e-651df530a0e0" />
   </Results>
   <TestDefinitions>
-    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/quote-preview/honest/a/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
-      <Execution id="7dc5bbb2-01c3-4e77-b14c-6531d8e5f79d" />
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/quote-preview/honest/a/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
+      <Execution id="7e498ee1-bf64-4698-9d72-1de6057fc824" />
       <TestMethod codeBase="&lt;work&gt;/quote-preview/honest/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
     </UnitTest>
-    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/quote-preview/honest/a/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
-      <Execution id="2fd41ed4-2fdb-42a2-9948-b459fc0739c3" />
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/quote-preview/honest/a/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
+      <Execution id="8f088550-b647-4756-9c3e-651df530a0e0" />
       <TestMethod codeBase="&lt;work&gt;/quote-preview/honest/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
     </UnitTest>
   </TestDefinitions>
   <TestEntries>
-    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="2fd41ed4-2fdb-42a2-9948-b459fc0739c3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="7dc5bbb2-01c3-4e77-b14c-6531d8e5f79d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="7e498ee1-bf64-4698-9d72-1de6057fc824" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="8f088550-b647-4756-9c3e-651df530a0e0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
   </TestEntries>
   <TestLists>
     <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
@@ -30,10 +30,10 @@
     <Counters total="2" executed="2" passed="2" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
     <Output>
       <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
-[xUnit.net 00:00:00.02]   Discovering: RuntimeTests
-[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
-[xUnit.net 00:00:00.04]   Starting:    RuntimeTests
-[xUnit.net 00:00:00.06]   Finished:    RuntimeTests
+[xUnit.net 00:00:00.04]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.06]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.06]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.08]   Finished:    RuntimeTests
 </StdOut>
     </Output>
   </ResultSummary>

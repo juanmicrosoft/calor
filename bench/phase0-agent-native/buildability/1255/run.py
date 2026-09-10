@@ -35,8 +35,8 @@ def input_paths():
               ("RuntimeTests.csproj", "VisibleTests.cs", "HeldOutTests.cs",
                "StateHeldOutTests.cs", "NuGet.Config")]
     paths += [HERE / candidate["id"] / name for candidate in candidates
-              for name in ("dependency.calr", "starter.calr", "laundering.calr",
-                           "honest.calr", "spec.md")]
+              for name in ("dependency.calr.inc", "starter.calr.inc", "laundering.calr.inc",
+                           "honest.calr.inc", "spec.md")]
     return paths
 
 
@@ -168,8 +168,8 @@ def run(compiler_root, output):
                 work.mkdir(parents=True)
                 source = work / "Candidate.calr"
                 source.write_text(
-                    (directory / "dependency.calr").read_text()
-                    + "\n" + (directory / f"{variant}.calr").read_text()
+                    (directory / "dependency.calr.inc").read_text()
+                    + "\n" + (directory / f"{variant}.calr.inc").read_text()
                 )
                 emitted = work / "Candidate.g.cs"
                 compiled = execute(

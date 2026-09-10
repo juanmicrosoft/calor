@@ -8,4 +8,4 @@ embedding a number. Keep the configured policy and existing public API.
 
 The policy stores its standard attempt as `this.attempt`. Supply
 `this.attempt` to `WithRetry` when calculating an attempt budget.
-The implementation lives in `dependency.calr`.
+The implementation lives in `dependency.calr.inc`.
