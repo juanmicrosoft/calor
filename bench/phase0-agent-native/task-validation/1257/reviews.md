@@ -87,3 +87,23 @@ control. The previously tracked 247 preparation files are unchanged; the
 additional 19 preserve the original locally observed bytes and manifest hashes.
 Clean-checkout validation and independent remediation review are required
 before acceptance.
+
+## Independent remediation acceptance
+
+Reviewer: `scoped-freeze-remediation-review`, independent read-only
+code-review agent, model **claude-sonnet-5**, reviewing
+`6df87a3615e5d808a381dec1cde3cbca44286524`.
+
+**Clean: no significant issue found in the remediation.** The reader used
+the unchanged clean detached checkout and executed all 19 guards: all passed.
+They independently verified all 266 preservation-manifest entries, all 64
+source/suite hashes, both report hashes, and the 38 tracked emitted-C# text
+snapshots. No source or recorded-observation byte changed; review prose was
+appended rather than rewriting prior findings.
+
+The reader confirmed that the local exception does not weaken the root
+build-artifact ignore rule elsewhere. Their acceptance concerns the narrow
+remediation and its clean-checkout reproducibility; the scoped freeze wording
+and R4/R5 evidence were covered by the preceding reviews. It is not a new
+R1–R8 task, operational-instrument, epoch, funding, or collection approval.
+Complete final-head CI is still required before merging the artifact freeze.
