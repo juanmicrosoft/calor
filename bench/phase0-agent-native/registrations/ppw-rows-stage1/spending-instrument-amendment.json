@@ -1,0 +1,51 @@
+{
+  "analysisArithmeticChanged": false,
+  "collectionAuthorized": false,
+  "effectiveOn": "independently reviewed merge of the #1378 implementation PR",
+  "frozenProtocolUnchanged": true,
+  "issue": 1378,
+  "kind": "pp-w-prospective-spending-instrument-amendment",
+  "preservedArtifacts": {
+    "effect-rows-benefit-ledger.json": "5fe3d0c2d927cf3b0a5d853f85eccd8c10a12ca2379a90b55cfafb4e6aefebfc",
+    "epochs/w-rows-pilot-001/pins.json": "73ab4b9df4d4520a7754a4fb30063e8a567a2c07a5ff6ea452985b0109694bf3",
+    "epochs/w-rows-pilot-001/registration.json": "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c",
+    "registrations/ppw-redesign-task-supersession.json": "b40bfe20e468145f083151e58a0264564a4c55ad7f580213b24bcafcba0e1a0d",
+    "registrations/ppw-rows-stage1/analysis-registration.pre-spending-1378.json": "18eda2b71723d4403da4052c8917240539f513e540ffd46e1335208e50657a7c",
+    "registrations/ppw-rows-stage1/model-registration.json": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27",
+    "registrations/ppw-rows-stage1/registration.json": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001"
+  },
+  "providerHardBound": "unknown; actual collection refused",
+  "registrationActivation": "none; approval, feasibility and new epoch pins remain separate",
+  "replacementHarnessArtifacts": {
+    "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
+    "ppw-instrument.py": "e6b133b07d9590911bb9562094aff12b850bf5c94e679a91869367c8cb91c8b5",
+    "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
+    "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
+    "ppw-source-assembly.py": "b9f53b6872fbca3feea75641673f0a4e20c766a9736d7d563f105a41bbb0bd57",
+    "ppw-source-inspection.py": "f4a211e6f10044a00d4b27b1afe673921b44ecfb9a9ac859594770a78aa214d8",
+    "ppw-spending.py": "c10bdea49416d0c08e1afe57dd4940808a78c14d078f8d29b2e21f59dc219bbd",
+    "run-pair.sh": "cace64c56b645805e558bcaf94e8685e9d0a11330a8e9e86bbfbce6157afbcdc",
+    "source-inspection/PpwSourceInspector.csproj": "be41403479c72037d16bf22500ab597f1c65babbb3f9935805c90c7a7d64ec62",
+    "source-inspection/Program.cs": "974bfa49a5a0c8435929cfcb5d408f3b26694580c412d5e29b0e5a499f2f1bef",
+    "telemetry-helpers.py": "161b98639de2ac4d7929098530e096cec14d63cb4d4be63ee510a61e4600849e",
+    "templates/calor-arm/CalorArm.csproj.template": "60b56d0475a5ce6f60493cffdab87eb8f90a17f058de7d6bff859769ae11f04c",
+    "templates/calor-arm/policy-canary.calr.txt": "205ad82b07e0781968425b414bde2aa817e93ca9a9392e6727167eed5b46f10e",
+    "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e",
+    "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
+  },
+  "schemaVersion": 1,
+  "stage": "pilot",
+  "supersededHarnessArtifacts": {
+    "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
+    "ppw-instrument.py": "8a1a9d54007b9fdefdf739da011cceab3bba7f94b33336d7dddd5f5c3b7482cd",
+    "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
+    "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
+    "ppw-source-assembly.py": "b9f53b6872fbca3feea75641673f0a4e20c766a9736d7d563f105a41bbb0bd57",
+    "run-pair.sh": "e74c4d51899721851d77ac51f2d26fbd5cbb1a230d55c0f8946a3c9dc0a5ce87",
+    "telemetry-helpers.py": "161b98639de2ac4d7929098530e096cec14d63cb4d4be63ee510a61e4600849e",
+    "templates/calor-arm/CalorArm.csproj.template": "60b56d0475a5ce6f60493cffdab87eb8f90a17f058de7d6bff859769ae11f04c",
+    "templates/calor-arm/policy-canary.calr.txt": "205ad82b07e0781968425b414bde2aa817e93ca9a9392e6727167eed5b46f10e",
+    "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e",
+    "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
+  }
+}

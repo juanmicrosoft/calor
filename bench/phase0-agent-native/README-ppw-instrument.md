@@ -8,6 +8,12 @@ task supersession (#1271) is described below; the separate
 [#1265 prospective pilot inputs](epochs/w-rows-pilot-001/README.md) are
 unfunded and unrun, not permission to collect.
 
+The subsequent pilot-only $250 authorization and conservative spending-control
+implementation are described in [README-ppw-spending.md](README-ppw-spending.md).
+Those historical input templates are not silently activated. In particular,
+the current CLI budget flag supplies no verified invoice/study-cost hard bound,
+so actual collection remains refused even with formal approval.
+
 ## Historical compatibility and explicit supersession
 
 The A-1.12 analyzer, its arithmetic, twelve starter slots, pair counts, old

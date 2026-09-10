@@ -178,6 +178,7 @@ TIMEOUT_SECS=600
 EXEMPLAR_FILE=""
 EDIT_MECHANISM="raw"
 CALOR_DLL_OVERRIDE=""
+PPW_SPEND_TICKET=""
 ARM_REPO_ROOT=""
 ARM_LABEL_OVERRIDE=""
 # W1 / roadmap §4.1: which `arms.<key>` entry of pair.json this invocation
@@ -206,6 +207,8 @@ while [[ $# -gt 0 ]]; do
         --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
         --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
+        --ppw-spend-ticket) [[ -z "$PPW_SPEND_TICKET" ]] || { echo "Duplicate spending ticket" >&2; exit 2; }
+                            PPW_SPEND_TICKET="$2"; shift 2 ;;
         --arm-repo-root) ARM_REPO_ROOT="$2"; shift 2 ;;
         --run-offset) RUN_OFFSET="$2"; shift 2 ;;
         --arm-label) ARM_LABEL_OVERRIDE="$2"; shift 2 ;;
@@ -220,6 +223,10 @@ if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-str
     # One attempted run per registered slot. Historical callers retain their
     # old retry policy, but the redesign must not silently buy replacement data.
     MAX_INVALID_RETRIES=0
+fi
+if [[ -n "$PPW_SPEND_TICKET" ]]; then
+    [[ $REDESIGNED_POLICY -eq 1 && $NULL_AGENT -eq 0 && $CANARY_ONLY -eq 0 && "$RUNS" == "1" ]] \
+        || { echo "PP-W spending tickets require exactly one non-null redesigned run" >&2; exit 2; }
 fi
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
@@ -1061,7 +1068,7 @@ kill_agent_tree() {
 }
 
 run_agent() {
-    local ws="$1" ws_out="$2" shim_dir="$3"
+    local ws="$1" ws_out="$2" shim_dir="$3" run_idx="$4"
     AGENT_RC=0
     local prompt
     local test_rule="Do not create test files; do not modify the project file."
@@ -1119,7 +1126,9 @@ run_agent() {
         return 0
     fi
 
-    # Portable timeout with a spend guarantee: prefer coreutils timeout/gtimeout
+    # Portable process timeout, NOT a provider spending guarantee: an in-flight
+    # request or remote descendant may still accrue cost after local termination.
+    # Prefer coreutils timeout/gtimeout
     # (kills the claude process itself, -k grace for cleanup). The bash-watchdog
     # fallback must kill the PROCESS GROUP: agent_pid is the subshell, and
     # SIGKILL on it alone leaves the claude child reparented to init and still
@@ -1162,6 +1171,19 @@ run_agent() {
     # (A-1.9.1) which already includes subagent tokens. pipefail (set at the
     # top) makes rc claude's exit when it fails, not tee's or jq's.
     local claude_args=(--print --verbose --output-format stream-json --forward-subagent-text --dangerously-skip-permissions)
+    if [[ -n "$PPW_SPEND_TICKET" ]]; then
+        local client_help budget_limit
+        client_help="$(claude --help)" \
+            || { echo "Cannot verify registered client spending-control support" >&2; return 2; }
+        grep -q -- '--max-budget-usd' <<<"$client_help" \
+            || { echo "Registered client lacks --max-budget-usd" >&2; return 2; }
+        budget_limit="$(python3 "$SCRIPT_DIR/ppw-spending.py" claim --ticket "$PPW_SPEND_TICKET" \
+                         --task "$PAIR_ID" --arm "$ARM_LABEL" --run "$run_idx")" || return 2
+        claude_args+=(--max-budget-usd "$budget_limit")
+        jq -n --arg limit "$budget_limit" \
+            '{kind:"claude-code-max-budget-usd",limitUsd:$limit,invoiceHardCap:false}' \
+            > "$ws_out/client-spending-control.json"
+    fi
     local rc=0
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
@@ -1198,6 +1220,9 @@ run_agent() {
         set +m
     fi
     AGENT_RC=$rc
+    if [[ -n "$PPW_SPEND_TICKET" ]]; then
+        jq -n --argjson code "$rc" '{exitCode:$code}' > "$ws_out/client-invocation.json"
+    fi
     if [[ $rc -ne 0 ]]; then echo "agent exit: $rc" >> "$ws_out/agent.err"; fi
 }
 
@@ -1518,7 +1543,7 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then
             python3 "$HARNESS_CAPTURE" policy-snapshot "$WS" > "$WS_OUT/policy-before.json"
         fi
-        run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
+        run_agent "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
 
         # #1094: the agent's declared-done build state, before anything
         # below rebuilds the workspace.
