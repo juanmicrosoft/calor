@@ -5597,84 +5597,63 @@ public sealed class Parser
         // Check for arrow syntax: §IF{id} condition → statement
         if (Check(TokenKind.Arrow))
         {
-            Advance(); // consume arrow
-            var singleStmt = ParseStatement();
-            if (singleStmt != null)
+            var lastBodySpan = startToken.Span;
+
+            List<StatementNode> ParseClauseBody(Token clauseToken)
             {
-                thenBody.Add(singleStmt);
+                var body = new List<StatementNode>();
+                var ownsDedent = true;
+                if (Check(TokenKind.Arrow))
+                {
+                    Advance();
+                    // An inline statement creates no indentation level. Its next
+                    // dedent belongs to the enclosing loop, branch, or function.
+                    ownsDedent = Current.Span.Line > clauseToken.Span.Line
+                        && Current.Span.Column > clauseToken.Span.Column;
+                    var statement = ParseStatement();
+                    if (statement != null)
+                        body.Add(statement);
+                }
+                else
+                {
+                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf)
+                        && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+                    {
+                        var statement = ParseStatement();
+                        if (statement != null)
+                            body.Add(statement);
+                    }
+                }
+
+                if (body.Count > 0)
+                    lastBodySpan = body[^1].Span;
+                if (ownsDedent && Check(TokenKind.Dedent))
+                    lastBodySpan = Advance().Span;
+                return body;
             }
+
+            thenBody = ParseClauseBody(startToken);
 
             // Parse optional §EI (else if) and §EL (else) with arrow syntax
             while (Check(TokenKind.ElseIf))
             {
                 var elseIfToken = Expect(TokenKind.ElseIf);
                 var elseIfCondition = ParseExpression();
-                var elseIfBody = new List<StatementNode>();
-
-                if (Check(TokenKind.Arrow))
-                {
-                    Advance(); // consume arrow
-                    var elseIfStmt = ParseStatement();
-                    if (elseIfStmt != null)
-                    {
-                        elseIfBody.Add(elseIfStmt);
-                    }
-                }
-                else
-                {
-                    // Multi-statement body (until next clause or end)
-                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
-                    {
-                        var stmt = ParseStatement();
-                        if (stmt != null)
-                        {
-                            elseIfBody.Add(stmt);
-                        }
-                    }
-                }
-
+                var elseIfBody = ParseClauseBody(elseIfToken);
                 elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
             }
 
             // Parse optional §EL (else) with arrow syntax
             if (Check(TokenKind.Else))
             {
-                Expect(TokenKind.Else);
-                elseBody = new List<StatementNode>();
-
-                if (Check(TokenKind.Arrow))
-                {
-                    Advance(); // consume arrow
-                    var elseStmt = ParseStatement();
-                    if (elseStmt != null)
-                    {
-                        elseBody.Add(elseStmt);
-                    }
-                }
-                else
-                {
-                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf))
-                    {
-                        var stmt = ParseStatement();
-                        if (stmt != null)
-                        {
-                            elseBody.Add(stmt);
-                        }
-                    }
-                }
+                var elseToken = Expect(TokenKind.Else);
+                elseBody = ParseClauseBody(elseToken);
             }
 
-            // Phase 4d: under indent-form, an arrow-form §IF that has no
-            // body block (i.e. no §EI/§EL chain present and no explicit
-            // §/I closer following) self-terminates after the inline
-            // statement. Only call ExpectBlockEnd if there is actually a
-            // block-end to consume -- otherwise the next token may be a
-            // sibling statement (e.g. another §IF at the same indent).
-            Token endToken;
-            bool hasChain = elseIfClauses.Count > 0 || elseBody != null;
-            if (hasChain || Check(TokenKind.EndIf) || Check(TokenKind.Dedent))
+            if (Check(TokenKind.EndIf))
             {
-                endToken = ExpectBlockEnd(TokenKind.EndIf);
+                var endToken = ExpectBlockEnd(TokenKind.EndIf);
+                lastBodySpan = endToken.Span;
                 var endAttrs = ParseAttributes();
                 var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
@@ -5683,15 +5662,7 @@ public sealed class Parser
                     _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
                 }
             }
-            else
-            {
-                // Arrow-only IF with no chain -- span ends at the inline statement.
-                endToken = singleStmt?.Span is { } stmtSpan
-                    ? new Token(TokenKind.Eof, "", stmtSpan)
-                    : startToken;
-            }
-
-            var span = startToken.Span.Union(endToken.Span);
+            var span = startToken.Span.Union(lastBodySpan);
             return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
         }
 
