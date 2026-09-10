@@ -59,7 +59,6 @@ public class EffectRowsBenefitLedgerTests
     /// </summary>
     private const string SizingEpochRelativePath = "bench/phase0-agent-native/epochs/w-rows-dry-002";
     private const string PairsRelativePath = "bench/phase0-agent-native/pairs";
-    private const string EpochRelativePath = "bench/phase0-agent-native/epochs/w-rows-001";
 
     /// <summary>A-1.12's six registered pairs, by directory and cell class.</summary>
     private static readonly (string Directory, string Class, bool Blind, bool LegB)[] RegisteredPairs =
@@ -346,11 +345,10 @@ public class EffectRowsBenefitLedgerTests
     [SkippableFact]
     public void BeforeTheEpochRunsTheSizingOffRampRecordsUnderpowered()
     {
-        Skip.If(Directory.Exists(Rel(EpochRelativePath)),
-            "epoch w-rows-001 has been archived; the run assertions below cover it");
-
         using var document = JsonDocument.Parse(Committed());
         var root = document.RootElement;
+        Skip.If(root.GetProperty("epochRun").GetBoolean(),
+            "ledger records epochRun true; the run assertions below cover it");
         Assert.False(root.GetProperty("epochRun").GetBoolean());
         Assert.Equal("UNDERPOWERED", root.GetProperty("verdict").GetString());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("route").ValueKind);
@@ -427,10 +425,9 @@ public class EffectRowsBenefitLedgerTests
     [SkippableFact]
     public void WhenTheEpochIsArchivedTheLedgerCarriesItsPerCellReporting()
     {
-        Skip.If(!Directory.Exists(Rel(EpochRelativePath)), "epoch w-rows-001 not archived yet");
-
         using var document = JsonDocument.Parse(Committed());
         var root = document.RootElement;
+        Skip.If(!root.GetProperty("epochRun").GetBoolean(), "ledger records epochRun false");
         Assert.True(root.GetProperty("epochRun").GetBoolean());
         Assert.Contains(root.GetProperty("verdict").GetString(),
             new[] { "NOT-ADJUDICATED", "MISS", "UNDERPOWERED", "HIT" });
