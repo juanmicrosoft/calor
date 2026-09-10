@@ -13421,7 +13421,7 @@ public sealed class Parser
     /// </summary>
     private string? ParseEnumOperand()
     {
-        if (Check(TokenKind.IntLiteral))
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
         {
             return Advance().Text;
         }
@@ -13494,7 +13494,7 @@ public sealed class Parser
     /// </summary>
     private bool IsEnumOperandStart()
     {
-        return Check(TokenKind.IntLiteral) || Check(TokenKind.Identifier) ||
+        return Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral) || Check(TokenKind.Identifier) ||
                Check(TokenKind.Tilde) || Check(TokenKind.OpenParen) ||
                (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral);
     }

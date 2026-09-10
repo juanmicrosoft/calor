@@ -154,6 +154,44 @@ public class CharLiteralTests
             Assert.Equal(expected, Invoke(Compile(text), "CharactersModule", "Probe"));
     }
 
+    [Theory]
+    [InlineData("'x'")]
+    [InlineData("(char-lit \"x\")")]
+    [InlineData("(char-from-code 120)")]
+    public void CharacterValues_WidenToDecimal(string expression)
+    {
+        var source = $$"""
+            §M{m1:Characters}
+              §F{f1:Probe:pub} () -> decimal
+                §E{}
+                §B{value:decimal} {{expression}}
+                §R value
+            """;
+        foreach (var text in RoundTrip(source))
+            Assert.Equal(120m, Invoke(Compile(text), "CharactersModule", "Probe"));
+    }
+
+    [Fact]
+    public void EnumInitializers_PreserveCharacterConstantsAndCasts()
+    {
+        const string source = """
+            §M{m1:Characters}
+              §EN{e1:Letters:pub}
+                A = 'A'
+                Newline = '\n'
+                Cast = (int)'B'
+                Sum = 'A' + 2
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var type = Compile(text).GetTypes().Single(t => t.Name == "Letters");
+            Assert.Equal(65, Convert.ToInt32(Enum.Parse(type, "A")));
+            Assert.Equal(10, Convert.ToInt32(Enum.Parse(type, "Newline")));
+            Assert.Equal(66, Convert.ToInt32(Enum.Parse(type, "Cast")));
+            Assert.Equal(67, Convert.ToInt32(Enum.Parse(type, "Sum")));
+        }
+    }
+
     [Fact]
     public void CSharpMigration_PreservesOverloadsConstantsAndSurrogates()
     {
