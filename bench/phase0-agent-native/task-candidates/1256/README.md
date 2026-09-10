@@ -1,8 +1,12 @@
-# Unregistered PP-W-rows task candidates (#1256)
+# Historical PP-W-rows authoring snapshot (#1256)
 
-**Authoring only. No final task count, task freeze, registration, collection
-authorization, or agent observation.** Three candidate workflows currently
-survive the author's checks under the source-available abstraction premise
+**Historical authoring evidence, not collection data or authorization.**
+The three workflows authored here are selected by the independently reviewed,
+unfunded stage-1 registration in frozen redesign §9. This directory preserves
+the original authoring inputs and observations; the selected
+[source/suite artifact freeze](../../task-validation/1257/README.md) and
+[R8 evidence](../../task-validation/1258/README.md) are recorded separately.
+The workflows survived the author's checks under the source-available abstraction premise
 of frozen redesign §1.4. All three use **one** registered compiler shape:
 #1136 row 7, direct invocation of a `this.`-qualified delegate field.
 They are not three shapes or independent mechanisms.
@@ -14,23 +18,26 @@ remain unchanged.
 
 ## Gate status
 
-- #1256 requires the final task count to be selected **with #1261 sizing**.
-  No approved sizing amendment exists. Three is the current candidate
-  inventory, not an adopted sample size or an assertion that the floor alone
-  makes a sound study. Repeated-shape dependence and limited coverage must
-  enter that decision.
+- #1261 / PR #1363 supplies the joint task-count/sizing decision: three fixed
+  workflows, one shape, 74 scheduled runs per task per arm (444 slots).
+  Frozen redesign §9 states the precision rationale, fixed-mixture scope,
+  limited shape coverage, and unfunded status. The task floor alone was not
+  treated as a sizing justification.
 - #1266's [independent AI second-reader checkpoint](second-reader-1266.md)
   is complete for this current inventory. All three candidates are retained;
   all six earlier rejections stand. The issue imposes no human qualification,
   and this review does not claim a human methods countersignature.
-- #1257 has not frozen these suites. They remain editable authoring inputs.
+- #1257 freezes a separate selected source/suite tree. This historical tree
+  retains its original combined numeric/state assertions and observation
+  hashes; do not rewrite them as observations of the later split suites.
 - #1264 owns collection layout and execution. These directories follow its
   neutral per-task structure; source-fragment assembly and shape-control
   integration must be verified before claiming end-to-end readiness.
-- No monetary ceiling, null-result acceptance, participant approval,
-  model selection, run count, or registered epoch is supplied here.
-  Unfunded prospective planning/registration is authorized work; missing
-  funding prevents collection, not that preparatory work.
+- Model/client choice and run count are registered prospectively in §9, not
+  retroactively inserted into these historical records. No monetary ceiling,
+  separate null-result acceptance, participant approval, collected epoch, or
+  benefit result is supplied here. Missing funding prevents collection,
+  not authorized unpaid preparation.
 
 ## Candidate inventory
 
@@ -66,6 +73,11 @@ actual subsequent before/after inequality emits
 `HELDOUT_EFFECT:state-change`. A numeric failure does not qualify.
 The tiny required shim files contain no adapter implementation: tests call
 the compiler-generated public API directly.
+
+The selected #1257 suites instead separate numeric and state cases, so a
+wrong value or caught exception cannot mask the state observation. Both
+versions' actual observations remain distinct; this paragraph describes the
+historical combined suite, not the current selected oracle.
 
 The laundering seeds are shape-positive. Starter and honest seeds are
 shape-negative. **An honest seed must not be mislabeled as a positive shape
