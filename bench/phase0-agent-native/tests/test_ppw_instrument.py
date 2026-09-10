@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 import uuid
 
 from ppw_redesign_epoch import BENCH, build, instrument, save
@@ -250,6 +251,14 @@ class InstrumentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "artifact path"):
             instrument.run_epoch(self.epoch / "registration.json", self.epoch / "tasks",
                                  self.root / "compiler", self.root, "synthetic-pilot", "pilot")
+
+    def test_collection_rejects_all_ambient_harness_test_overrides_before_io(self):
+        for name in ("CALOR_P0_TIMEOUT_OVERRIDE", "CALOR_P0_SHIM_OFF",
+                     "CALOR_P0_SKIP_ARM_CANARY", "CALOR_P0_VERIFY_GATE", "CALOR_LOOP_SNAPSHOTS"):
+            with self.subTest(name=name), patch.dict(os.environ, {name: "1"}):
+                with self.assertRaisesRegex(ValueError, name):
+                    instrument.run_epoch("missing-registration", "missing-tasks", "missing-compiler",
+                                         self.root, "synthetic-pilot", "pilot")
 
     def fake_capture(self, behavior, arm="B", run=1):
         """Execute the actual shell runner with deterministic local stand-ins.

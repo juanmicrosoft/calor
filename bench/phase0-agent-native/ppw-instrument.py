@@ -360,6 +360,7 @@ def product(root, commit):
 def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_id, stage,
               confirm_paid=False):
     """Collection driver. There is deliberately no compiler-per-arm argument."""
+    validate_collection_environment()
     identifier(epoch_id)
     registration_path = Path(registration_path).resolve()
     registration = load(registration_path)
@@ -385,8 +386,6 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     harness_hashes = {name: digest(BENCH / name) for name in harness_files}
     epoch = local(epochs_root, epoch_id)
     require(not epoch.exists(), "epoch already exists; use a reviewed new epoch id, never overwrite")
-    require(not os.environ.get("CALOR_P0_SKIP_ARM_CANARY"), "canary bypass forbidden")
-    require(not os.environ.get("CALOR_P0_VERIFY_GATE"), "unregistered verification option forbidden")
     # Canaries run outside the epoch and before any agent invocation.
     work = REPO / ".ppw-instrument-work" / epoch_id
     work.mkdir(parents=True, exist_ok=False)
@@ -445,6 +444,12 @@ def pair_command(task, arm, compiler, output, offset):
             "--arm-repo-root", compiler["repoRoot"], "--calor-dll", compiler["calorDll"],
             "--edit-mechanism", "raw", "--runs", "1", "--run-offset", str(offset),
             "--out", str(output)]
+
+
+def validate_collection_environment():
+    overrides = sorted(name for name, value in os.environ.items()
+                       if value and name.startswith(("CALOR_P0_", "CALOR_LOOP_")))
+    require(not overrides, "unregistered harness environment overrides forbidden: %s" % overrides)
 
 
 def stamp_run(result_path, pins):

@@ -149,6 +149,9 @@ Build the one shared Release compiler/Tasks/runtime product first. The runner
 verifies its release commit, checkout cleanliness, hashes, both canaries,
 model and agent version before invoking any agent. Product drift is checked
 before each run and after collection. Runs are interleaved A/B per task.
+Nonempty `CALOR_P0_*` and `CALOR_LOOP_*` environment overrides are rejected
+at collection admission, including the historical timeout test hook. They
+cannot silently change frozen task timeouts or disable capture.
 
 Lifecycle is explicit: `scaffolded` → `collecting` → `collected` →
 `archived`. Only the last two can produce stage records. Directory existence
