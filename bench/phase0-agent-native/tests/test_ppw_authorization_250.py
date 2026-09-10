@@ -162,7 +162,10 @@ class PilotAuthorization250Tests(unittest.TestCase):
         self.assertFalse(amendment["analysisArithmeticChanged"])
         for path, sha in amendment["preservedArtifacts"].items():
             self.assertEqual(digest(BENCH / path), sha, path)
-        for path, sha in amendment["replacementHarnessArtifacts"].items():
+        gateway = load(BENCH / "registrations/ppw-rows-stage1/gateway-instrument-amendment.json")
+        self.assertEqual(runtime["amendment"]["sha256"], gateway["supersedes"]["sha256"])
+        self.assertEqual(amendment["replacementHarnessArtifacts"], gateway["supersededHarnessArtifacts"])
+        for path, sha in gateway["replacementHarnessArtifacts"].items():
             self.assertEqual(digest(BENCH / path), sha, path)
 
     def test_post_guard_unknown_bound_does_not_activate_or_invent_a_scientific_result(self):

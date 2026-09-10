@@ -7,12 +7,13 @@ receipts and the estimate-only adapter remain separate.
 
 **Integration status:** the deterministic HTTP positive path and local kernel/SDK
 canaries exist. Independent no-forward diagnostic-client transport and protected
-control probes succeeded. Registered-argument/capability parity, the remaining
-IPC/socket checks, complete operational source/profile/funding supersession, and
-final review remain pending. Credential and model availability are not blockers.
-The capability list is not yet claimed to admit the pinned client's full request
-set, including its exact OAuth capability. No experimental invocation, live
-ledger, or scientific outcome is created by these fixtures.
+control probes succeeded. The author-run shared registered-argument probe also
+reached the gateway with two authenticated Opus 4.8 requests; their actual body
+and capability sets pass the request-price contract. The server forwarded zero
+requests. Remaining independent IPC/socket review, the parent-owned full-pilot
+forecast and final review are still pending. The additive 24-artifact execution
+profile and 250-to-500-to-1000 financial lineage do not create a live ledger,
+epoch or scientific outcome. Credential and model availability are not blockers.
 
 ### Independent registered-argument probe
 
@@ -107,6 +108,13 @@ block, changed model, incomplete usage or unrecognized usage component retains
 the entire reservation and stops admission. This response check is a failure
 detector, **not** a substitute for pre-forward request rejection.
 
+The native client advertises `advisor-tool-2026-03-01` even when its tool list
+contains no advisor. That header may pass, but the actual `advisor_20260301`
+tool definition is rejected. The provider's [advisor documentation](https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool)
+requires that explicit tool definition for the extra server-side model pass.
+URL-backed image/document sources are also rejected: the provider must not
+become an arbitrary remote-fetch relay around client network isolation.
+
 ## Transport and accounting
 
 `ppw-budget-gateway.py` exposes one capability-protected loopback endpoint per
@@ -117,6 +125,8 @@ local servers.
 
 Accepted body bytes, `anthropic-version`, `anthropic-beta` and authentication
 headers are forwarded unchanged. Stream bytes and pings are relayed immediately.
+The gateway requests identity content encoding so usage can be observed without
+altering the relayed entity bytes; it never negotiates an unimplemented decoder.
 The [general gateway compatibility guide](https://code.claude.com/docs/en/llm-gateway-protocol)
 recommends open capability lists for evolving clients. This frozen financial
 adapter deliberately rejects unsupported requests instead of silently stripping
@@ -154,6 +164,14 @@ process metadata and task ports, Mach lookup/registration, POSIX IPC, Apple Even
 and Launch Services. The Mach lookup allowlist is limited to `securityd.xpc`,
 `SecurityServer`, `cfprefsd.agent`, `cfprefsd.daemon` and `logd` in the
 `com.apple` namespace. No `trustd.agent` delegation is admitted.
+The gateway allowance is IPv4-only: a distinct IPv6 listener on the same port is
+not an alternate route. Preflight tests this with a real IPv6 listener, as well
+as a Unix socket, a delegated write to a disposable preferences sentinel, and
+hardlink writes to readable outside source. Only newly created sentinels are
+used; no user preferences or global settings are modified.
+Python, its TLS/SQLite native extensions, .NET executable/runtime versions,
+the operating-system release, Bash and the prebuilt test host are also bound
+to the execution plan and checked around each invocation.
 The implemented kernel probes establish only their stated
 controls; they are not a complete proof against every IPC/delegation route.
 The independent pinned-client probe must establish compatibility and any necessary
@@ -166,3 +184,42 @@ The provider, client/OS boundary, compiler product and authorization are explici
 synthetic doubles; this is not empirical collection or an independent kernel
 proof. Its negative controls prevent budget-stopped, missing-request, interrupted
 and unknown-charge collections from reaching stage analysis.
+
+`test_ppw_gateway_registered_collection.py` additionally sends that actual
+collector's complete 444-slot output directly to the registered adjudicator
+using the real frozen task inventory and current 24-file execution map.
+All observations and the provider/compiler/OS boundaries are explicit synthetic
+fixtures. Both frozen estimands remain exactly one half in that fixture; the
+reported decision remains `SYNTHETIC_ONLY`.
+
+## Operational entrypoint
+
+`registrations/ppw-rows-stage1/gateway-execution-profile.json` resolves the
+preserved registration without rewriting it. The new collector archives the
+resolved registration and every selected operational proof. The original
+eleven-file pins, inactive fifteen-file projection and dated assessment remain
+unchanged. Complete empirical archives have a real admission path; incomplete
+accounting, mismatched proof files or any missing slot are refused.
+
+The checked-in spending plan currently names the outstanding parent-owned
+forecast explicitly. Admission refuses that pending forecast before creating
+an epoch or ledger. This is not an unknown price bound: the per-request bound is
+implemented and positive. The forecast must describe all 444 slots, its
+no-charge method and point cost estimate; it must not claim guaranteed completion.
+
+After the real forecast and final independent review are registered and merged,
+the invocation is:
+
+```bash
+CLAUDE_MODEL=claude-opus-4-8 python3 bench/phase0-agent-native/ppw-instrument.py run \
+  --registration bench/phase0-agent-native/registrations/ppw-rows-stage1/gateway-execution-profile.json \
+  --tasks-root bench/phase0-agent-native/tasks/ppw-redesign \
+  --compiler-root <exact-frozen-v0.18.0-checkout> \
+  --epoch-id w-rows-pilot-gateway-001 --stage pilot \
+  --confirm-paid-epoch
+```
+
+This command is documentation, not evidence that collection ran. The fixed
+Git-common-directory ledger applies across worktrees/output roots and cannot be
+reset by selecting another path. The authorization is $1,000 total for the
+experiment, not an additional grant or a stage-2 allocation.

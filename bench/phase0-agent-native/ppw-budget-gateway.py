@@ -43,6 +43,10 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "PPW"
     sys_version = ""
 
+    def setup(self):
+        self.request.settimeout(30)
+        super().setup()
+
     def log_message(self, format, *args):
         pass
 
@@ -140,9 +144,10 @@ class Handler(BaseHTTPRequestHandler):
             upstream = gateway.connection_factory()
             headers = {}
             for name, value in self.headers.items():
-                if name.lower() not in HOP_HEADERS | connection_tokens:
+                if name.lower() not in HOP_HEADERS | connection_tokens | {"accept-encoding"}:
                     headers[name] = value
             headers["Content-Length"] = str(len(raw))
+            headers["Accept-Encoding"] = "identity"
             upstream.request("POST", path + ("?" + query if query else ""), body=raw, headers=headers)
             response = upstream.getresponse()
             self.send_response(response.status)

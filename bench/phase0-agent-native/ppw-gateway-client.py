@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """Isolate the entire pinned runner under a process-local kernel policy, never global settings."""
 import argparse
+import _sqlite3
+import _ssl
+from contextlib import ExitStack
 import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import platform
+import plistlib
 import secrets
+import shutil
 import socket
+import sqlite3
+import ssl
 import subprocess
 import sys
+import tempfile
 from urllib.parse import urlsplit
 
 CLIENT_VERSION = "2.1.266 (Claude Code)"
@@ -19,12 +27,16 @@ ISOLATION = "macos-seatbelt-request-gateway-v1"
 PROBE_EXPECTATIONS = {
     "gateway": True, "otherPort": False, "stateWrite": False, "stateRead": False,
     "outsideSignal": False, "hardlinkWrite": False, "symlinkWrite": False,
+    "samePortIpv6": False,
+    "unixSocket": False, "delegatedPreferencesWrite": False,
+    "readableSourceRead": True, "readableSourceHardlinkWrite": False,
 }
 BLOCKED_ENV = {
     "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN",
     "ANTHROPIC_CUSTOM_HEADERS", "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_USE_BEDROCK",
     "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_AWS",
     "NODE_OPTIONS", "BUN_OPTIONS", "BASH_ENV", "ENV", "SSL_CERT_FILE", "SSL_CERT_DIR",
+    "SSLKEYLOGFILE", "NODE_DEBUG", "NODE_DEBUG_NATIVE",
 }
 
 
@@ -59,7 +71,8 @@ def validate_client(path):
 
 def validate_environment():
     require(not any(os.environ.get(name) for name in BLOCKED_ENV)
-            and not any(name.startswith("DYLD_") and value for name, value in os.environ.items()),
+            and not any(name.startswith(("DYLD_", "CLAUDE_CODE_USE_")) and value
+                        for name, value in os.environ.items()),
             "unregistered credential/provider/injection environment override")
 
 
@@ -79,6 +92,35 @@ def validate_shell(path, sha256):
     return path
 
 
+def runtime_identity():
+    python = Path(sys.executable).resolve(strict=True)
+    dotnet_command = shutil.which("dotnet")
+    require(dotnet_command is not None, "the registered .NET runtime is required")
+    dotnet = Path(dotnet_command).resolve(strict=True)
+    versions = []
+    for option in ("--version", "--list-runtimes"):
+        result = subprocess.run([str(dotnet), option], capture_output=True, text=True, timeout=30)
+        require(result.returncode == 0 and result.stdout.strip(), "cannot identify the .NET runtime")
+        versions.append(result.stdout.strip())
+    runtimes = [line.split()[:2] for line in versions[1].splitlines()]
+    require(all(len(value) == 2 for value in runtimes), "unrecognized .NET runtime inventory")
+    return {
+        "pythonExecutable": str(python), "pythonSha256": hashlib.sha256(python.read_bytes()).hexdigest(),
+        "pythonVersion": list(sys.version_info[:3]),
+        "dotnetExecutable": str(dotnet), "dotnetSha256": hashlib.sha256(dotnet.read_bytes()).hexdigest(),
+        "dotnetSdkVersion": versions[0], "dotnetRuntimes": runtimes,
+        "opensslVersion": ssl.OPENSSL_VERSION, "sqliteVersion": sqlite3.sqlite_version,
+        "nativeModules": {name: hashlib.sha256(Path(value.__file__).read_bytes()).hexdigest()
+                          for name, value in (("_ssl", _ssl), ("_sqlite3", _sqlite3))},
+        "os": platform.system(), "osRelease": platform.release(), "architecture": platform.machine(),
+    }
+
+
+def validate_runtime(expected):
+    require(isinstance(expected, dict) and runtime_identity() == expected,
+            "Python/TLS/SQLite/.NET/OS runtime identity differs from the registered execution profile")
+
+
 def sandbox_policy(workspace, output, protected, port):
     workspace, output, protected = map(canonical_path, (workspace, output, protected))
     require(type(port) is int and 1 <= port <= 65535, "invalid gateway port")
@@ -90,7 +132,7 @@ def sandbox_policy(workspace, output, protected, port):
         "(version 1)",
         "(allow default)",
         "(deny network*)",
-        '(allow network-outbound (remote tcp "localhost:%d"))' % port,
+        '(allow network-outbound (remote tcp4 "localhost:%d"))' % port,
         "(deny file-write*)",
         '(allow file-write* (literal "/dev/null"))',
         "(allow file-write* (subpath %s) (subpath %s))" % (quote(workspace), quote(output)),
@@ -118,20 +160,44 @@ def sandbox_policy(workspace, output, protected, port):
 def kernel_probe(policy, workspace, protected, gateway_port, gateway_pid):
     """Cost-free live enforcement checks, not a caller's asserted JSON capability."""
     validate_platform()
-    listener = socket.socket()
-    listener.bind(("127.0.0.1", 0))
-    listener.listen()
-    sentinel = protected / "kernel-probe-sentinel"
-    sentinel.write_text("UNCHANGED")
-    alias_prefix = workspace / ("state-alias-probe-" + secrets.token_hex(8))
-    try:
+    with ExitStack() as resources:
+        listener = resources.enter_context(socket.socket())
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        ipv6_listener = resources.enter_context(socket.socket(socket.AF_INET6))
+        ipv6_listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        ipv6_listener.bind(("::1", gateway_port))
+        ipv6_listener.listen()
+        # AF_UNIX has a short pathname limit; deep worktrees cannot hold this
+        # sentinel. This private, disposable directory never holds user state.
+        ipc_root = Path(resources.enter_context(tempfile.TemporaryDirectory(prefix="ppw-ipc-", dir="/private/tmp")))
+        unix_listener = resources.enter_context(socket.socket(socket.AF_UNIX))
+        unix_path = ipc_root / "probe.sock"
+        unix_listener.bind(str(unix_path))
+        unix_listener.listen()
+        readable_source = ipc_root / "readable-source-sentinel"
+        readable_source.write_text("UNCHANGED")
+        require(readable_source.stat().st_dev == workspace.stat().st_dev,
+                "source-alias probe requires the workspace filesystem")
+        sentinel = protected / "kernel-probe-sentinel"
+        sentinel.write_text("UNCHANGED")
+        resources.callback(sentinel.unlink, missing_ok=True)
+        preferences = protected / "kernel-preferences-sentinel.plist"
+        preferences_bytes = plistlib.dumps({"value": "UNCHANGED"})
+        preferences.write_bytes(preferences_bytes)
+        resources.callback(preferences.unlink, missing_ok=True)
+        alias_prefix = workspace / ("state-alias-probe-" + secrets.token_hex(8))
+        for suffix in ("hardlink", "symlink", "source"):
+            resources.callback(Path(str(alias_prefix) + "-" + suffix).unlink, missing_ok=True)
         script = """
-import json,os,socket,sys
+import json,os,socket,subprocess,sys
 from pathlib import Path
 result={}
-for label,port in (("gateway",int(sys.argv[1])),("otherPort",int(sys.argv[2]))):
+for label,address,port in (("gateway","127.0.0.1",int(sys.argv[1])),
+                           ("otherPort","127.0.0.1",int(sys.argv[2])),
+                           ("samePortIpv6","::1",int(sys.argv[1]))):
     try:
-        with socket.create_connection(("127.0.0.1",port),timeout=2): pass
+        with socket.create_connection((address,port),timeout=2): pass
         result[label]=True
     except OSError: result[label]=False
 try: Path(sys.argv[3]).write_text("CHANGED");result["stateWrite"]=True
@@ -148,23 +214,36 @@ for kind in ("hardlink","symlink"):
         target.write_text("CHANGED")
         result[kind+"Write"]=True
     except OSError: result[kind+"Write"]=False
+with socket.socket(socket.AF_UNIX) as client:
+    try:
+        client.connect(sys.argv[6])
+        result["unixSocket"]=True
+    except OSError: result["unixSocket"]=False
+preferences=subprocess.run(["/usr/bin/defaults","write",sys.argv[7],"value","CHANGED"],
+                           capture_output=True,timeout=10)
+result["delegatedPreferencesWrite"]=preferences.returncode==0
+try: result["readableSourceRead"]=Path(sys.argv[8]).read_text()=="UNCHANGED"
+except OSError: result["readableSourceRead"]=False
+try:
+    source_alias=Path(sys.argv[5]+"-source")
+    os.link(sys.argv[8],source_alias)
+    source_alias.write_text("CHANGED")
+    result["readableSourceHardlinkWrite"]=True
+except OSError: result["readableSourceHardlinkWrite"]=False
 print(json.dumps(result))
 """
         result = subprocess.run(
             ["/usr/bin/sandbox-exec", "-p", policy, sys.executable, "-c", script,
              str(gateway_port), str(listener.getsockname()[1]), str(sentinel), str(gateway_pid),
-             str(alias_prefix)],
+             str(alias_prefix), str(unix_path), str(preferences.with_suffix("")), str(readable_source)],
             cwd=workspace, text=True, capture_output=True, timeout=15)
         require(result.returncode == 0, "kernel isolation probe could not execute")
         observed = json.loads(result.stdout)
         require(observed == PROBE_EXPECTATIONS
-                and sentinel.read_text() == "UNCHANGED", "kernel isolation controls did not hold")
+                and sentinel.read_text() == "UNCHANGED" and preferences.read_bytes() == preferences_bytes,
+                "kernel isolation controls did not hold")
+        require(readable_source.read_text() == "UNCHANGED", "readable source was modified through an alias")
         return {"kind": ISOLATION, "kernelProbe": observed, "modelInvoked": False}
-    finally:
-        listener.close()
-        sentinel.unlink(missing_ok=True)
-        for suffix in ("hardlink", "symlink"):
-            Path(str(alias_prefix) + "-" + suffix).unlink(missing_ok=True)
 
 
 def isolation_evidence_path(context_path):
@@ -226,6 +305,7 @@ def launch(context_path, workspace, output, arguments):
     require(contained(context_path, protected), "context is outside protected state")
     client = validate_client(context["clientExecutable"])
     shell = validate_shell(context["shellExecutable"], context["shellSha256"])
+    validate_runtime(context["executionRuntime"])
     validate_environment()
     endpoint = urlsplit(context["baseUrl"])
     require(endpoint.scheme == "http" and endpoint.hostname == "127.0.0.1"

@@ -28,6 +28,7 @@ GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "gateway-tools/python3",
     "templates/calor-arm/CalorArm.Gateway.csproj.template",
     "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
+    "ppw-gateway-registration.py",
 )
 
 
@@ -128,6 +129,19 @@ def verified_upper_bound(control):
     return None
 
 
+def validate_forecast(plan, ceiling, slot_count):
+    forecast = plan.get("forecast", {})
+    require(isinstance(forecast, dict) and forecast.get("status") == "registered"
+            and type(forecast.get("plannedInvocations")) is int
+            and forecast["plannedInvocations"] == slot_count
+            and type(forecast.get("experimentalObservations")) is int
+            and forecast["experimentalObservations"] == 0
+            and isinstance(forecast.get("method"), str) and forecast["method"].strip(),
+            "the independent, prospective full-pilot cost forecast is not registered")
+    require(0 < units(forecast.get("estimatedFullPilotUsd")) <= ceiling,
+            "the prospective full-pilot point forecast does not fit the authorized ceiling")
+
+
 def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(stage == "pilot", "this implementation admits pilot-only scope, not stage 2")
     path, plan = pinned_document(directory, selected.get("spendingPlan", {}), "spendingPlan")
@@ -162,6 +176,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(type(plan.get("plannedInvocations")) is int and plan["plannedInvocations"] == len(slots),
             "full unchanged registered slot inventory is required, not a budget-sized subset")
     if control.get("kind") == GATEWAY:
+        validate_forecast(plan, ceiling, len(slots))
         policy = module("ppw-gateway-budget.py")
         isolation = module("ppw-gateway-client.py")
         require(selected["modelPin"] == policy.MODEL
@@ -174,6 +189,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
         isolation.validate_platform()
         client = isolation.validate_client(control.get("clientExecutable"))
         shell = isolation.validate_shell(control.get("shellExecutable"), control.get("shellSha256"))
+        isolation.validate_runtime(control.get("executionRuntime"))
         ledger = gateway_ledger_location(plan["ledgerBinding"])
         policy.RequestLedger(ledger)
         return {
@@ -185,6 +201,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "shellExecutable": str(shell), "shellSha256": control["shellSha256"],
             "runtimeSha256": control.get("runtimeSha256"), "slots": slots,
             "testHost": control.get("testHost"),
+            "executionRuntime": control.get("executionRuntime"),
         }
     ledger = plan.get("ledgerPath")
     require(isinstance(ledger, str) and Path(ledger).is_absolute(),

@@ -1,0 +1,34 @@
+{
+  "additionalAllowance": false,
+  "approvalReference": "https://github.com/juanmicrosoft/calor/issues/1406#issuecomment-5621369028",
+  "approvedBy": "User; exact authorization relayed by coordinating parent",
+  "ceilingMeaning": "One total across all experiment charges and unresolved liabilities; not per stage/arm/task/run.",
+  "currency": "USD",
+  "epochId": "w-rows-pilot-gateway-001",
+  "financialAuthorizationGranted": true,
+  "kind": "pp-w-rows-spending-authorization",
+  "ledgerBinding": {
+    "anchor": "git-common-dir",
+    "anchorSha256": "92f3af069d320938c90c95b0eea775ccf62ac52d1377e4d73e809bcce6ea2a26",
+    "relativePath": "ppw-budget/epic1254-pilot.sqlite3"
+  },
+  "ledgerReset": false,
+  "notAStudyResult": true,
+  "nullResultAccepted": true,
+  "originalAcceptance": {
+    "path": "authorization-250/authorization.json",
+    "sha256": "59adf2fea004c4eae6e45adb85ccfa02b9d4181a1d40188dac9f3391d7c57480"
+  },
+  "registeredStoppingRulesAccepted": true,
+  "schemaVersion": 1,
+  "scope": "experiment-wide-total",
+  "sourceQuote": "if you need to spend $1000 on the experiment, please go ahead",
+  "spendingCeilingUsd": 1000,
+  "stage": "pilot",
+  "stage2Authorized": false,
+  "stage2Condition": "Actual pilot, prospective power/sample-size registration and affordability within the remaining shared ceiling.",
+  "supersedes": {
+    "path": "gateway-authorization-500.json",
+    "sha256": "2ce9835d4dd235bb7fbcba9dd52beaaeccb624da53a3cec2c8a4186b4db23d03"
+  }
+}

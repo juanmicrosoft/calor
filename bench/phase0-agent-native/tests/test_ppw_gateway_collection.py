@@ -45,6 +45,8 @@ class CollectionTests(unittest.TestCase):
         self.product = copy.deepcopy(instrument.load(self.seed / "pins.json")["compiler"])
         del self.product["compilerHash"]
         self.product["repoRoot"] = str(self.root / "SYNTHETIC-product")
+        self.compiler_root = self.product["repoRoot"]
+        self.compiler_hash = "d" * 64
         self.product["calorDll"] = str(self.root / "SYNTHETIC-product/calor.dll")
         runtime = Path(self.product["repoRoot"]) / "src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll"
         runtime.parent.mkdir(parents=True)
@@ -61,9 +63,11 @@ class CollectionTests(unittest.TestCase):
             "shellSha256": "e" * 64, "priceSha256": budget.price_identity(),
             "runtimeSha256": instrument.digest(runtime),
             "testHost": {"kind": "SYNTHETIC-nonexecutable-test-runtime"},
+            "executionRuntime": {"kind": "SYNTHETIC-local-runtime-double"},
         }
         self.launched = []
         self.failure = None
+        self.registration_file = self.inputs / "registration.json"
         self.prepare_inventory(3, 74)
 
     def prepare_inventory(self, tasks, runs):
@@ -113,7 +117,7 @@ class CollectionTests(unittest.TestCase):
         if argv[0] == str(BENCH / "run-pair.sh") and "--canary-only" in argv:
             arm = argv[argv.index("--arm-label") + 1]
             return json.dumps({"armCanary": "permissive-ok" if arm == "calor-permissive" else "strict-ok",
-                               "compilerHash": "d" * 64})
+                               "compilerHash": self.compiler_hash})
         self.assertEqual([sys.executable, str(BENCH / "ppw-gateway-client.py")], argv[:2])
         self.assertEqual("--ppw-gateway-client", argv[-2])
         context_path = Path(argv[argv.index("--context") + 1])
@@ -143,13 +147,16 @@ class CollectionTests(unittest.TestCase):
             client.close()
             if response.status != 200:
                 raise subprocess.CalledProcessError(1, argv)
-        seed = self.seed / "runs" / "SYNTHETIC-task" / arm / "run-1"
+        seed = self.seed_run(task, arm, run)
         shutil.copytree(seed, output, dirs_exist_ok=True)
         result = instrument.load(output / "result.json")
         result.update(pair=task, run=run, armRepoRoot=self.product["repoRoot"])
         save(output / "result.json", result)
         save(output / "client-invocation.json", {"exitCode": 124 if self.failure == "interrupted" else 0})
         return ""
+
+    def seed_run(self, task, arm, run):
+        return self.seed / "runs" / "SYNTHETIC-task" / arm / "run-1"
 
     def collect(self):
         factory, self.observed, _ = gateway_tests.TransportTests.provider(
@@ -174,6 +181,7 @@ class CollectionTests(unittest.TestCase):
                 patch.object(self.spending, "admit", return_value=self.admission), \
                 patch.object(self.inspection, "prepare"), \
                 patch.object(self.test_host, "validate_runtime"), \
+                patch.object(self.isolation, "validate_runtime"), \
                 patch.object(instrument, "product", side_effect=lambda *_: dict(self.product)), \
                 patch.object(instrument, "command", side_effect=self.command), \
                 patch.object(instrument, "validate_pins", side_effect=synthetic_pins), \
@@ -183,8 +191,8 @@ class CollectionTests(unittest.TestCase):
                              serve_forever(server, poll_interval=0.001)), \
                 patch.dict(os.environ, {"CLAUDE_MODEL": budget.MODEL}):
             return instrument.run_epoch(
-                self.inputs / "registration.json", self.inputs / "tasks",
-                self.product["repoRoot"], self.epochs, self.epoch_id, "pilot", True)
+                self.registration_file, self.inputs / "tasks",
+                self.compiler_root, self.epochs, self.epoch_id, "pilot", True)
 
     def test_real_gateway_collector_hands_complete_synthetic_data_to_stage_analysis(self):
         self.collect()

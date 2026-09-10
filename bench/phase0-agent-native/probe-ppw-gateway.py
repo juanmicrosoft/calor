@@ -23,6 +23,19 @@ CAPABILITY = re.compile(
     r"extended-cache|fast-mode|model-context|structured-outputs|task-budgets)"
     r"[-a-z0-9]*-20\d{2}-?\d{2}-?\d{2}\Z")
 PUBLIC_MODEL = re.compile(r"claude-(?:opus|sonnet|haiku|fable|mythos)-[0-9][a-z0-9.-]*\Z")
+PUBLIC_BETAS = {
+    "token-efficient-tools-2025-02-19", "cache-diagnosis-2026-04-07",
+    "mid-conversation-tool-changes-2026-07-01", "mid-conversation-output-config-2026-07-01",
+    "mid-conversation-system-clear-at-2026-08-21", "dev-full-thinking-2025-05-14",
+    "files-api-2025-04-14", "pdfs-2024-09-25", "mcp-client-2025-04-04",
+    "mcp-client-2025-11-20", "server-side-fallback-2026-06-01", "server-side-fallback-2026-07-01",
+    "fallback-credit-2026-06-01", "fallback-credit-2026-07-01", "compact-2026-01-12",
+    "advisor-tool-2026-03-01", "mid-conversation-system-2026-04-07",
+}
+
+
+def public_beta(value):
+    return value in PUBLIC_BETAS or bool(CAPABILITY.fullmatch(value))
 
 
 def module(name):
@@ -54,8 +67,8 @@ def footprint(raw, beta_header):
         and PUBLIC_MODEL.fullmatch(body["model"]) else "unrecognized",
         "maxTokens": body.get("max_tokens") if type(body.get("max_tokens")) is int else None,
         "stream": body.get("stream") if type(body.get("stream")) is bool else None,
-        "betaCapabilities": sorted(value for value in betas if CAPABILITY.fullmatch(value)),
-        "unclassifiedBetaCount": sum(not bool(CAPABILITY.fullmatch(value)) for value in betas),
+        "betaCapabilities": sorted(value for value in betas if public_beta(value)),
+        "unclassifiedBetaCount": sum(not public_beta(value) for value in betas),
         "thinkingKeys": keys(body.get("thinking")), "outputConfigKeys": keys(body.get("output_config")),
         "contextManagementKeys": keys(management),
         "contextEditKeys": [keys(edit) for edit in edits] if isinstance(edits, list) else None,

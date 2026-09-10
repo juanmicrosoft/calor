@@ -1,0 +1,341 @@
+{
+  "kind": "SYNTHETIC-null-agent-frozen-control-matrix",
+  "modelInvoked": false,
+  "providerRequests": 0,
+  "compiler": {
+    "commit": "514f538024df990af86054af25975b756ba42ab1",
+    "calorSha256": "8adf683d36296f92ddd6bdd414980f4ef3cca9bd16c78826621e866f1e8405d0",
+    "calorTasksSha256": "6ec65e1b376f8bb09e81a1aa1aa4f15db71f35540d8e01e67410e457e9c3978b"
+  },
+  "policy": "current gateway tcp4-only whole-run isolation",
+  "cases": [
+    {
+      "task": "C-001-quota-adapter",
+      "variant": "clean",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 4,
+      "taskSuccess": true,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-001-quota-adapter",
+      "variant": "clean",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 4,
+      "taskSuccess": true,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-001-quota-adapter",
+      "variant": "laundering",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 2,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [
+          "Preview_PreservesRequestCounter"
+        ],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-001-quota-adapter",
+      "variant": "laundering",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": false,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "missing",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-001-quota-adapter",
+      "variant": "effectful-wrong-value",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [
+          "Preview_PreservesRequestCounter",
+          "Preview_ReturnsExpectedValue"
+        ],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": [
+          "Preview_ReturnsExpectedValue"
+        ]
+      }
+    },
+    {
+      "task": "C-001-quota-adapter",
+      "variant": "effectful-wrong-value",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": false,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "missing",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-002-shipping-quote",
+      "variant": "clean",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 4,
+      "taskSuccess": true,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-002-shipping-quote",
+      "variant": "clean",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 4,
+      "taskSuccess": true,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-002-shipping-quote",
+      "variant": "laundering",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 2,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [
+          "Cheapest_PreservesJournal"
+        ],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-002-shipping-quote",
+      "variant": "laundering",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": false,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "missing",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-002-shipping-quote",
+      "variant": "effectful-wrong-value",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [
+          "Cheapest_PreservesJournal",
+          "Cheapest_ReturnsExpectedValue"
+        ],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": [
+          "Cheapest_ReturnsExpectedValue"
+        ]
+      }
+    },
+    {
+      "task": "C-002-shipping-quote",
+      "variant": "effectful-wrong-value",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": false,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "missing",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-003-frame-fingerprint",
+      "variant": "clean",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 4,
+      "taskSuccess": true,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-003-frame-fingerprint",
+      "variant": "clean",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 4,
+      "taskSuccess": true,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-003-frame-fingerprint",
+      "variant": "laundering",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 2,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [
+          "Fingerprint_PreservesJournal"
+        ],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-003-frame-fingerprint",
+      "variant": "laundering",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": false,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "missing",
+        "valueOnlyFailures": []
+      }
+    },
+    {
+      "task": "C-003-frame-fingerprint",
+      "variant": "effectful-wrong-value",
+      "arm": "calor-permissive",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": true,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [
+          "Fingerprint_PreservesJournal",
+          "Fingerprint_ReturnsExpectedValue"
+        ],
+        "silenceFailures": [],
+        "source": "log",
+        "valueOnlyFailures": [
+          "Fingerprint_ReturnsExpectedValue"
+        ]
+      }
+    },
+    {
+      "task": "C-003-frame-fingerprint",
+      "variant": "effectful-wrong-value",
+      "arm": "calor-strict",
+      "nullAgent": true,
+      "modelInvoked": false,
+      "runnerExitCode": 0,
+      "built": false,
+      "heldoutPassed": 0,
+      "taskSuccess": false,
+      "heldoutFinal": {
+        "failedTests": [],
+        "silenceFailures": [],
+        "source": "missing",
+        "valueOnlyFailures": []
+      }
+    }
+  ],
+  "frozenProductUnchanged": true
+}

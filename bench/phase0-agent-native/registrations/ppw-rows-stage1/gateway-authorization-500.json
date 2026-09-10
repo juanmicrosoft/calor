@@ -1,0 +1,17 @@
+{
+  "additionalAllowance": false,
+  "inheritedAcceptance": "registered stopping rules and publication of negative or null results",
+  "kind": "pp-w-rows-financial-ceiling-supersession",
+  "ledgerReset": false,
+  "notAStudyResult": true,
+  "schemaVersion": 1,
+  "scope": "total-pilot",
+  "sourceQuote": "lets budget $500, would that unblock you?",
+  "sourceReference": "https://github.com/juanmicrosoft/calor/issues/1406",
+  "spendingCeilingUsd": 500,
+  "stage2Authorized": false,
+  "supersedes": {
+    "path": "authorization-250/authorization.json",
+    "sha256": "59adf2fea004c4eae6e45adb85ccfa02b9d4181a1d40188dac9f3391d7c57480"
+  }
+}

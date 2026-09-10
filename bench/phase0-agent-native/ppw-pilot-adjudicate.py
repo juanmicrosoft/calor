@@ -20,6 +20,8 @@ PILOT_PINS = "epochs/w-rows-pilot-001/pins.json"
 GUARDED_PROJECTION = "registrations/ppw-rows-stage1/guarded-analysis-projection.json"
 SPENDING_AMENDMENT = "registrations/ppw-rows-stage1/spending-instrument-amendment.json"
 PRE_PROJECTION_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre-projection-1403.json"
+PRE_GATEWAY_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre-gateway-1406.json"
+GATEWAY_PROFILE = "registrations/ppw-rows-stage1/gateway-execution-profile.json"
 ARTIFACTS = (
     "ppw-pilot-adjudicate.py", "registrations/ppw-rows-stage1/precision.py",
     "ppw-instrument.py", "ppw-registration.py", "ppw-source-assembly.py",
@@ -27,6 +29,23 @@ ARTIFACTS = (
     "telemetry-helpers.py", "ppw-pins.schema.json", "effect-rows-benefit-ledger.json",
     METHOD, MODEL, TASKS, PILOT_PINS,
     GUARDED_PROJECTION, SPENDING_AMENDMENT, PRE_PROJECTION_MANIFEST,
+    PRE_GATEWAY_MANIFEST, GATEWAY_PROFILE,
+    "ppw-spending.py", "ppw-gateway-budget.py", "ppw-budget-gateway.py",
+    "ppw-gateway-client.py", "ppw-gateway-registration.py", "ppw-test-host.py",
+    "run-pair.sh", "token-usage.sh", "gateway-tools/python3",
+    "source-inspection/Program.cs", "source-inspection/PpwSourceInspector.csproj",
+    "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
+    "templates/calor-arm/CalorArm.csproj.template",
+    "templates/calor-arm/CalorArm.Gateway.csproj.template",
+    "templates/calor-arm/policy-canary.calr.txt",
+    "registrations/ppw-rows-stage1/gateway-instrument-amendment.json",
+    "registrations/ppw-rows-stage1/gateway-instrument-amendment.md",
+    "registrations/ppw-rows-stage1/gateway-authorization-500.json",
+    "registrations/ppw-rows-stage1/gateway-authorization.json",
+    "registrations/ppw-rows-stage1/gateway-spending-plan.json",
+    "registrations/ppw-rows-stage1/gateway-price-contract.json",
+    "probe-ppw-gateway.py",
+    "registrations/ppw-rows-stage1/gateway-evidence/author-native-no-forward.json",
 )
 CELL_FIELDS = {
     "pair", "arm", "plannedRuns", "validRuns", "invalidRuns", "censoredRuns",
@@ -73,8 +92,17 @@ def validate_analysis_registration():
     for relative, sha in expected.items():
         require(digest(BENCH / relative) == sha, "analysis artifact changed: " + relative)
     require(manifest.get("supersedes") == {
-        "path": PRE_PROJECTION_MANIFEST, "sha256": expected[PRE_PROJECTION_MANIFEST]},
+        "path": PRE_GATEWAY_MANIFEST, "sha256": expected[PRE_GATEWAY_MANIFEST]},
         "prior analysis registration must be explicitly preserved")
+    previous = load(BENCH / PRE_GATEWAY_MANIFEST)
+    require(previous["supersedes"] == {
+        "path": PRE_PROJECTION_MANIFEST, "sha256": expected[PRE_PROJECTION_MANIFEST]},
+        "the prior guarded projection lineage differs")
+    require(manifest.get("gatewayExecutionProfile") == {
+        "path": GATEWAY_PROFILE, "sha256": expected[GATEWAY_PROFILE]},
+        "operational gateway execution profile is not registered")
+    gateway_registration = module("registered_gateway_profile", "ppw-gateway-registration.py")
+    gateway_registration.resolve_profile(BENCH / GATEWAY_PROFILE)
     require(manifest.get("guardedExecutionProjection") == {
         "path": GUARDED_PROJECTION, "sha256": expected[GUARDED_PROJECTION]},
         "guarded execution projection is not registered")
@@ -106,6 +134,9 @@ def validate_analysis_registration():
 
 
 def execution_projection(pins, selected, epoch=None):
+    if "executionProfile" in selected:
+        gateway_registration = module("archived_gateway_profile", "ppw-gateway-registration.py")
+        return gateway_registration.validate_archive(epoch, pins, selected)
     baseline = load(BENCH / PILOT_PINS)
     if "instrumentAmendment" not in selected and "spendingPlan" not in selected:
         require(pins.get("harnessArtifacts") == baseline["harnessArtifacts"],

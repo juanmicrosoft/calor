@@ -27,6 +27,13 @@ BETA_CAPABILITIES = {
     "prompt-caching-2024-07-31", "extended-cache-ttl-2025-04-11",
     "interleaved-thinking-2025-05-14", "context-management-2025-06-27",
     "context-1m-2025-08-07", "fast-mode-2026-02-01",
+    "claude-code-20250219", "oauth-2025-04-20", "effort-2025-11-24",
+    "prompt-caching-scope-2026-01-05", "structured-outputs-2025-12-15",
+    "thinking-token-count-2026-05-13", "mid-conversation-system-2026-04-07",
+    "mid-conversation-tool-changes-2026-07-01",
+    # Native clients advertise this even without an advisor. The actual
+    # advisor_20260301 tool definition remains unconditionally unadmitted.
+    "advisor-tool-2026-03-01",
 }
 RESPONSE_CONTENT_TYPES = {"text", "thinking", "redacted_thinking", "tool_use"}
 REQUEST_CONTENT_FIELDS = {
@@ -106,6 +113,7 @@ def price_contract():
         "requestMultiplicity": "one model iteration only; no server-side compaction or fallback",
         "allowedBetaCapabilities": sorted(BETA_CAPABILITIES),
         "unknownBetaPolicy": "reject the entire request before reservation or upstream connection",
+        "advertisedAdvisorPolicy": "header may pass; advisor tool/type/model/server operations are refused",
         "sources": [
             "https://platform.claude.com/docs/en/models/opus-4-8/overview",
             "https://platform.claude.com/docs/en/about-claude/pricing",
@@ -115,6 +123,9 @@ def price_contract():
             "https://platform.claude.com/docs/en/build-with-claude/compaction",
             "https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback",
             "https://platform.claude.com/docs/en/build-with-claude/context-editing",
+            "https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool",
+            "https://platform.claude.com/docs/en/build-with-claude/thinking",
+            "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
             "https://code.claude.com/docs/en/llm-gateway-protocol",
         ],
     }
@@ -179,8 +190,8 @@ def validate_request_content(content):
             validate_request_content(block["content"])
         if block["type"] in ("image", "document"):
             source = block.get("source")
-            fields(source, {"type", "data", "media_type", "url", "content"}, "unpriced content source")
-            require(source.get("type") in ("base64", "url", "text", "content"),
+            fields(source, {"type", "data", "media_type", "content"}, "unadmitted remote content source")
+            require(source.get("type") in ("base64", "text", "content"),
                     "unpriced content source type")
             if source.get("type") == "content":
                 validate_request_content(source.get("content"))
@@ -256,11 +267,32 @@ def reconciled_cost(request, model, usage, stop_reason):
     require(request.get("serviceTier") in ("auto", "standard_only")
             and (request["serviceTier"] != "standard_only" or usage["service_tier"] == "standard"),
             "provider service tier differs from the admitted request")
-    require(usage.get("inference_geo", "global") in ("global", "us"), "unknown provider geography")
-    require(usage.get("speed", "standard") in ("standard", "fast"), "unknown provider speed")
-    allowed = set(COUNTERS) | {"service_tier", "inference_geo", "speed", "cache_creation", "server_tool_use"}
+    require(usage.get("inference_geo") in (None, "global", "us"), "unknown provider geography")
+    require(usage.get("speed") in (None, "standard", "fast"), "unknown provider speed")
+    allowed = set(COUNTERS) | {"service_tier", "inference_geo", "speed", "cache_creation", "server_tool_use",
+                              "output_tokens_details", "iterations", "fallback_credit"}
     require(set(usage) <= allowed, "unknown provider usage component")
+    require(usage.get("fallback_credit") is None, "unexpected fallback credit")
+    iterations = usage.get("iterations")
+    if iterations is not None:
+        require(isinstance(iterations, list) and len(iterations) == 1,
+                "multiple or ambiguous server iterations")
+        iteration = iterations[0]
+        fields(iteration, set(COUNTERS) | {"type", "model", "cache_creation"},
+               "unknown server iteration fields")
+        require(iteration.get("type") == "message" and iteration.get("model") == model
+                and all(type(iteration.get(name)) is int and iteration[name] == counts[name]
+                        for name in COUNTERS)
+                and iteration.get("cache_creation") == usage.get("cache_creation"),
+                "server iteration differs from the single admitted model turn")
+    details = usage.get("output_tokens_details")
+    if details is not None:
+        fields(details, {"thinking_tokens"}, "unknown output token category")
+        require(integer(details.get("thinking_tokens"), OUTPUT) <= counts["output_tokens"],
+                "thinking tokens exceed the inclusive output total")
     server = usage.get("server_tool_use")
+    if server is not None:
+        fields(server, {"web_search_requests", "web_fetch_requests"}, "unknown server operation counter")
     require(server is None or isinstance(server, dict) and all(
         type(value) is int and value == 0 for value in server.values()), "unexpected server operation")
     creation = usage.get("cache_creation")
@@ -282,7 +314,8 @@ def reconciled_cost(request, model, usage, stop_reason):
     numerator, denominator = (1, 1) if usage.get("inference_geo") == "global" else (11, 10)
     cost = (quarters * speed * numerator + 4 * denominator - 1) // (4 * denominator)
     require(cost <= request["maximumMicroUsd"], "request liability bound contradicted")
-    receipt = {name: usage[name] for name in allowed if name in usage}
+    receipt = {"model": model, "stopReason": stop_reason,
+               "usage": {name: usage[name] for name in allowed if name in usage}}
     return cost, receipt
 
 
@@ -474,6 +507,10 @@ class RequestLedger:
             else:
                 require(type(cost) is int and 0 <= cost <= row["reserved"], "invalid reconciliation")
                 require(isinstance(usage, dict), "provider usage evidence required")
+                verified_cost, verified_receipt = reconciled_cost(
+                    decode(row["request"]), usage.get("model"), usage.get("usage"), usage.get("stopReason"))
+                require(cost == verified_cost and usage == verified_receipt,
+                        "settlement differs from complete provider usage")
                 db.execute("UPDATE requests SET state='reconciled',charge=?,usage=? WHERE id=?",
                            (cost, canonical(usage), request_id))
                 self.event(db, "complete-provider-usage", request_id,

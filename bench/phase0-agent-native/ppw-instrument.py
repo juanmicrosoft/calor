@@ -455,6 +455,9 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     identifier(epoch_id)
     registration_path = Path(registration_path).resolve()
     registration = load(registration_path)
+    operational_profile = registration.get("kind") == "pp-w-request-gateway-execution-profile"
+    if operational_profile:
+        registration = helper("ppw-gateway-registration.py").resolve_profile(registration_path)
     selected = validate_registration(registration, stage, epoch_id)
     validate_tasks(tasks_root, registration)
     authorization = validate_collection_authorization(
@@ -524,7 +527,10 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
             ledger.initialize(admission)
         owner = ledger.start()
         epoch.mkdir(parents=True)
-        shutil.copy2(registration_path, epoch / "registration.json")
+        if operational_profile:
+            write_new(epoch / "registration.json", registration)
+        else:
+            shutil.copy2(registration_path, epoch / "registration.json")
         shutil.copytree(tasks_root, epoch / "tasks")
         write_new(epoch / "spending-initial.json", ledger.snapshot())
         shutil.copy2(local(registration_path.parent, selected["spendAuthorization"]["path"]),
@@ -535,8 +541,11 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
             proofs = [selected[name] for name in
                       ("spendAuthorization", "stageRegistration", "modelRegistration",
                        "instrumentAmendment", "spendingPlan")]
+            if operational_profile:
+                proofs.append(selected["executionProfile"])
             for proof in proofs:
                 destination = local(epoch, proof["path"])
+                require(not destination.exists(), "operational proof would overwrite an epoch artifact")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(local(registration_path.parent, proof["path"]), destination)
         pins = {"schemaVersion": 2, "kind": KIND, "epochId": epoch_id, "stage": stage,
@@ -574,6 +583,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                                         "shellExecutable": admission["shellExecutable"],
                                         "shellSha256": admission["shellSha256"],
                                         "testHost": admission["testHost"],
+                                        "executionRuntime": admission["executionRuntime"],
                                     }, stream)
                                 argv = [sys.executable, str(BENCH / "ppw-gateway-client.py"),
                                         "--context", str(context_path), "--workspace", str(work),
@@ -592,6 +602,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                         require(ledger.snapshot()["state"] == "collecting",
                                 "pilot incomplete: " + ledger.snapshot()["state"])
                         require(digest(runtime) == admission["runtimeSha256"], "runtime drift after run")
+                        isolation.validate_runtime(admission["executionRuntime"])
                         stamp_run(run_directory / "result.json", pins)
                         continue
                     ticket = ledger.reserve(owner, slot)

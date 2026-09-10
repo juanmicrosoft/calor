@@ -85,6 +85,38 @@ class Fixture(unittest.TestCase):
 
 
 class PriceTests(Fixture):
+    def test_native_advertised_advisor_beta_does_not_admit_server_advisor_or_url_fetch(self):
+        native = "oauth-2025-04-20,advisor-tool-2026-03-01,thinking-token-count-2026-05-13"
+        self.assertGreater(budget.admit_request(body(), native)["maximumMicroUsd"], 0)
+        with self.assertRaises(budget.Refusal):
+            budget.admit_request(body(tools=[{
+                "type": "advisor_20260301", "name": "advisor", "model": budget.MODEL,
+                "max_tokens": 1024, "max_uses": 1,
+            }]), native)
+        for kind in ("image", "document"):
+            with self.subTest(kind=kind), self.assertRaises(budget.Refusal):
+                budget.admit_request(body(messages=[{"role": "user", "content": [{
+                    "type": kind, "source": {"type": "url", "url": "https://example.invalid/SYNTHETIC"},
+                }]}]), native)
+
+    def test_provider_thinking_detail_and_single_iteration_are_not_double_billed(self):
+        request = budget.admit_request(body())
+        counters = usage(output_tokens_details={"thinking_tokens": 6},
+                         iterations=None, fallback_credit=None, speed=None, inference_geo=None)
+        expected = budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")[0]
+        counters["iterations"] = [{
+            "type": "message", "model": budget.MODEL,
+            **{name: counters[name] for name in budget.COUNTERS}, "cache_creation": None,
+        }]
+        cost, receipt = budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")
+        self.assertEqual(expected, cost)
+        self.assertEqual(counters, receipt["usage"])
+        self.assertEqual(budget.MODEL, receipt["model"])
+        self.assertEqual("end_turn", receipt["stopReason"])
+        counters["iterations"].append(dict(counters["iterations"][0]))
+        with self.assertRaises(budget.Refusal):
+            budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")
+
     def test_exact_metadata_limits_and_native_output_request_are_source_bound(self):
         self.assertEqual(1_000_000, budget.CONTEXT)
         self.assertEqual(128_000, budget.OUTPUT)
@@ -257,6 +289,9 @@ class AdmissionTests(Fixture):
             "protocolSha256": spending.protocol_identity(registration, selected, "pilot", "SYNTHETIC-pilot"),
             "ceilingUsd": 500, "costBasis": "both-list-price-study-cost-and-actual-spend",
             "plannedInvocations": 444, "ledgerBinding": binding,
+            "forecast": {"status": "registered", "plannedInvocations": 444,
+                         "experimentalObservations": 0, "estimatedFullPilotUsd": 400,
+                         "method": "SYNTHETIC deterministic test fixture; not empirical cost evidence"},
             "clientControl": {
                 "kind": spending.GATEWAY, "isolation": isolation.ISOLATION,
                 "priceContract": {"path": prices.name, "sha256": spending.digest(prices)},
@@ -621,6 +656,7 @@ class IsolationTests(Fixture):
                                         work, protected, port, os.getpid())
         self.assertTrue(result["kernelProbe"]["gateway"])
         self.assertFalse(result["kernelProbe"]["outsideSignal"])
+        self.assertFalse(result["kernelProbe"]["samePortIpv6"])
         self.assertFalse(result["modelInvoked"])
 
 

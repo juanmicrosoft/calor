@@ -1,0 +1,86 @@
+{
+  "authorizationSha256": "9eb64e3b11bbfad69a932c4075ba10cea39d1d21de2e860d3b2eefaacb9a3050",
+  "budgetExhaustion": "INCOMPLETE_BUDGET; preserve all slots, no adjudication or replacement",
+  "ceilingUsd": 1000,
+  "clientControl": {
+    "clientExecutable": "/Users/juanrivera/.local/share/claude/versions/2.1.266",
+    "executionRuntime": {
+      "architecture": "arm64",
+      "dotnetExecutable": "/opt/homebrew/Cellar/dotnet/10.0.400/bin/dotnet",
+      "dotnetRuntimes": [
+        [
+          "Microsoft.AspNetCore.App",
+          "10.0.11"
+        ],
+        [
+          "Microsoft.NETCore.App",
+          "10.0.11"
+        ]
+      ],
+      "dotnetSdkVersion": "10.0.400",
+      "dotnetSha256": "db9dc62e784008e9a01db9940162cead247ccedebe64ae9968b610ef2fa2e019",
+      "nativeModules": {
+        "_sqlite3": "15918e07380bf757bcb7ca2129451d1fbbc343905d9ba4f1adf802c1681781b3",
+        "_ssl": "63b4f5ffcae93366614877b682462f6d240402c2d7216dfc905e62d1b5ef9905"
+      },
+      "opensslVersion": "LibreSSL 2.8.3",
+      "os": "Darwin",
+      "osRelease": "25.6.0",
+      "pythonExecutable": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9",
+      "pythonSha256": "271143990bc83af0fb2404a255038f5faafb96df1584ed7f085e5018c0f33ffb",
+      "pythonVersion": [
+        3,
+        9,
+        6
+      ],
+      "sqliteVersion": "3.51.0"
+    },
+    "isolation": "macos-seatbelt-request-gateway-v1",
+    "kind": "pp-w-request-gateway-v1",
+    "priceContract": {
+      "path": "gateway-price-contract.json",
+      "sha256": "47d4fb49b74fcc7ceda777db8a3317fe8b69b146c9c7cfe282edd572f7dd3e65"
+    },
+    "runtimeSha256": "6003392185997b077fcc40d64f0f23925cb6e4f1bec849794d44aecd1d020bab",
+    "shellExecutable": "/opt/homebrew/Cellar/bash/5.3.15/bin/bash",
+    "shellSha256": "6ba6319962b59831740a56aa5f65e91d6467c72997f5d0a18be1ba1a6d8d378b",
+    "testHost": {
+      "binaries": {
+        "ppw-xunit-host.deps.json": "9016d8528f67bec1e53ee463167842da4af403a65b8ca85e9953d827d028a052",
+        "ppw-xunit-host.dll": "c1c479caa7ea47d947bd93f45090b85b6b4c94ff56c9a7555d009328fd27d1dd",
+        "ppw-xunit-host.runtimeconfig.json": "9950d4583cfc9a106857c0d5b8a75b53e8774852b57b80bc3823a74d44a4d87f",
+        "xunit.abstractions.dll": "3166dc70323fb30ccf1cedb0fe86f2ad122c46d254542342d90386efc4c9285c",
+        "xunit.runner.utility.netcoreapp10.dll": "ec705ad62e33f31fc46ad5800c9b1694c02d0ec4e1ee704712da9f24ebbea22e"
+      },
+      "binary": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/instrument/bench/phase0-agent-native/test-host/cache/e9a6cf260400f1742fc7594c374584e7f087ce998893250d6e34da472dd01145/bin/ppw-xunit-host.dll",
+      "dependencies": {
+        "xunit.assert/2.9.2/lib/net6.0/xunit.assert.dll": "50694822851cd81c29adcd0f33e4041d1605befcdc9384c02eadd62218b643b1",
+        "xunit.extensibility.core/2.9.2/lib/netstandard1.1/xunit.core.dll": "0ed5297c796b0225aab35564319ebb6600738e14e868fddb21c317e35b99513b",
+        "xunit.extensibility.execution/2.9.2/lib/netstandard1.1/xunit.execution.dotnet.dll": "d112327a738f816894cdd314b27b141a07d5550bc2a747c08d9cab0659a76887",
+        "xunit.runner.visualstudio/2.8.2/build/net6.0/xunit.abstractions.dll": "3166dc70323fb30ccf1cedb0fe86f2ad122c46d254542342d90386efc4c9285c",
+        "xunit.runner.visualstudio/2.8.2/build/net6.0/xunit.runner.utility.netcoreapp10.dll": "ec705ad62e33f31fc46ad5800c9b1694c02d0ec4e1ee704712da9f24ebbea22e"
+      },
+      "manifest": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/instrument/bench/phase0-agent-native/test-host/cache/e9a6cf260400f1742fc7594c374584e7f087ce998893250d6e34da472dd01145/runtime.json",
+      "packages": "/Users/juanrivera/.nuget/packages"
+    }
+  },
+  "completionGuaranteed": false,
+  "costBasis": "both-list-price-study-cost-and-actual-spend",
+  "epochId": "w-rows-pilot-gateway-001",
+  "forecast": {
+    "experimentalObservations": 0,
+    "status": "awaiting-independent-parent-forecast"
+  },
+  "kind": "pp-w-pilot-spending-plan",
+  "ledgerBinding": {
+    "anchor": "git-common-dir",
+    "anchorSha256": "92f3af069d320938c90c95b0eea775ccf62ac52d1377e4d73e809bcce6ea2a26",
+    "relativePath": "ppw-budget/epic1254-pilot.sqlite3"
+  },
+  "ordering": "run ordinal, frozen task list, A then B",
+  "perRunBudgetUsd": null,
+  "plannedInvocations": 444,
+  "protocolSha256": "527d8ab9b1ab99ab1f5a1ce614d6e8aaf8de0c6ad4fb55e7fb3b1640f44c3dd6",
+  "schemaVersion": 1,
+  "stage": "pilot"
+}

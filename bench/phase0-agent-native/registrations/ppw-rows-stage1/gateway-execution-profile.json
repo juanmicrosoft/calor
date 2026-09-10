@@ -1,0 +1,42 @@
+{
+  "allowedDataKinds": [
+    "synthetic",
+    "empirical"
+  ],
+  "baselineRegistration": {
+    "path": "epochs/w-rows-pilot-001/registration.json",
+    "sha256": "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c"
+  },
+  "createsEpochOrLedger": false,
+  "effectiveOn": "independently reviewed merge of the #1406 implementation PR",
+  "epochId": "w-rows-pilot-gateway-001",
+  "id": "request-reserving-gateway-1406",
+  "instrumentAmendment": {
+    "path": "gateway-instrument-amendment.json",
+    "sha256": "cf4284d9c80ca716948b49fbb3fb6659cb957466050520a48a18bce102d2ba60"
+  },
+  "kind": "pp-w-request-gateway-execution-profile",
+  "modelRegistration": {
+    "path": "model-registration.json",
+    "sha256": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27"
+  },
+  "schemaVersion": 1,
+  "spendAuthorization": {
+    "path": "gateway-authorization.json",
+    "sha256": "9eb64e3b11bbfad69a932c4075ba10cea39d1d21de2e860d3b2eefaacb9a3050"
+  },
+  "spendingPlan": {
+    "path": "gateway-spending-plan.json",
+    "sha256": "3face4157953f3a85c82bd5b61926d9b1fab450c435655078572255d6d6001d9"
+  },
+  "stage": "pilot",
+  "stage2Authorized": false,
+  "stageRegistration": {
+    "path": "gateway-admission/stage1-method.json",
+    "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001"
+  },
+  "transportEvidence": {
+    "path": "gateway-evidence/author-native-no-forward.json",
+    "sha256": "36f93ac3b461db2ca819c92309bfcf162778e156461b307350bf4b7d912fd0e3"
+  }
+}
