@@ -457,6 +457,9 @@ arm_canary() {
     # HERE, when the trap is set: a single-quoted body would be evaluated after the
     # function returned, when the local `dir` no longer exists (set -u -> unbound).
     trap "rm -rf '$dir'" RETURN
+    if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+        python3 "$HARNESS_CAPTURE" isolate-workspace "$dir"
+    fi
     mkdir -p "$dir/src"
     render_template "$dir/src/Src.csproj"
     cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
@@ -1365,6 +1368,7 @@ extract_metrics() {
         --arg arm_repo_root "$ARM_REPO_ROOT" \
         --argjson turns "$turns" --argjson agent_builds "$agent_builds" \
         --argjson compiler_hash "$compiler_hash" --argjson build_state "$build_state" \
+        --arg product_compiler_hash "$ARM_CANARY_COMPILER_HASH" \
         --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
         --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
@@ -1379,6 +1383,7 @@ extract_metrics() {
           mcpWrites:$mcp_writes, defect:$defect,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
           compilerHash:$compiler_hash, buildState:$build_state,
+          productCompilerHash:$product_compiler_hash,
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
@@ -1408,6 +1413,7 @@ write_invalid_result() {
         --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
         --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
+        --arg product_compiler_hash "$ARM_CANARY_COMPILER_HASH" \
         --arg reference "$REFERENCE_DIR" --arg reference_source "$REFERENCE_SOURCE" \
         --argjson has_transcript "$([[ -s "$ws_out/transcript.jsonl" ]] && echo true || echo false)" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
@@ -1418,6 +1424,7 @@ write_invalid_result() {
           invalid:true, defect:null,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
           compilerHash:null, buildState:{compilerHash:null, source:"invalid", archivedFrom:"none", file:null},
+          productCompilerHash:$product_compiler_hash,
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
@@ -1475,6 +1482,9 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         WS="$(cd "$WS" && pwd -P)"
         SHIM_DIR="$WS_OUT/.shim"
 
+        if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+            python3 "$HARNESS_CAPTURE" isolate-workspace "$WS"
+        fi
         materialize "$WS" "$WS_OUT"
         write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then

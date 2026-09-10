@@ -185,6 +185,35 @@ class InstrumentTests(unittest.TestCase):
         self.assertEqual(1, cell["didNotBuildAtDeclaredDone"])
         self.assertEqual(0.5, cell["escapeRate"])
 
+    def test_generated_validation_failure_without_cache_retains_nonbuilding_slot(self):
+        self.mutate(self.result(), lambda r: r.update(finalBuild={"ok": False},
+                                                    compilerHash=None, buildState={}))
+        cell = self.analyze()["perCell"][0]
+        self.assertEqual((2, 1, 0.5), (cell["validRuns"], cell["didNotBuildAtDeclaredDone"],
+                                      cell["escapeRate"]))
+        self.mutate(self.result(), lambda r: r.update(productCompilerHash="f" * 64))
+        with self.assertRaisesRegex(ValueError, "product canary"):
+            self.analyze()
+
+    @unittest.skipUnless(shutil.which("dotnet"), "dotnet required for real workspace build regression")
+    def test_real_restore_build_does_not_mutate_isolated_workspace_policy(self):
+        workspace = self.root / "real-build"
+        capture = instrument.helper("harness-capture.py")
+        capture.isolate_workspace(workspace)
+        (workspace / "src").mkdir()
+        (workspace / "src" / "Src.csproj").write_text(
+            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework>'
+            '<CalorEnforceEffects>true</CalorEnforceEffects>'
+            '<CalorPermissiveEffects>false</CalorPermissiveEffects>'
+            '</PropertyGroup></Project>')
+        before = capture.policy_snapshot(workspace)
+        result = subprocess.run(["dotnet", "build", str(workspace / "src" / "Src.csproj"), "--nologo", "-v", "q"],
+                                text=True, capture_output=True, timeout=120,
+                                env=dict(os.environ, TMPDIR=str(self.root)))
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertFalse((workspace / "src" / "packages.lock.json").exists())
+        self.assertEqual(before, capture.policy_snapshot(workspace))
+
     def test_registration_changes_and_unreviewed_supersession_are_rejected(self):
         self.mutate(self.epoch / "registration.json", lambda r: r.update(reviews=[]))
         with self.assertRaisesRegex(ValueError, "review references"):

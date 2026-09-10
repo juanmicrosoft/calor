@@ -425,6 +425,20 @@ def policy_snapshot(workspace):
     return {"policy": values, "configurationSha256": files}
 
 
+def isolate_workspace(workspace):
+    """Stop project-local scratch builds inheriting repository build policy."""
+    root = Path(workspace)
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("Directory.Build.props", "Directory.Build.targets"):
+        (root / name).write_text("<Project />\n", encoding="utf-8")
+    (root / "Directory.Packages.props").write_text(
+        "<Project><PropertyGroup>"
+        "<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>"
+        "<RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>"
+        "<RestoreLockedMode>false</RestoreLockedMode>"
+        "</PropertyGroup></Project>\n", encoding="utf-8")
+
+
 def resolve_reference(pair_json, pair, entry, fixture):
     """Locate the null-agent reference solution for one arm entry.
 
@@ -764,6 +778,7 @@ def main(argv=None):
     p = sub.add_parser("leg-b-pairs"); p.add_argument("pins_json")
     p = sub.add_parser("heldout-final"); p.add_argument("path")
     p = sub.add_parser("policy-snapshot"); p.add_argument("workspace")
+    p = sub.add_parser("isolate-workspace"); p.add_argument("workspace")
     sub.add_parser("self-test")
     args = parser.parse_args(argv)
     if args.cmd == "turns":
@@ -790,6 +805,9 @@ def main(argv=None):
         except (OSError, ValueError, ET.ParseError) as exc:
             sys.stderr.write("invalid workspace policy: %s\n" % exc)
             return 3
+    if args.cmd == "isolate-workspace":
+        isolate_workspace(args.workspace)
+        return 0
     if args.cmd == "pair-config":
         result = resolve_pair_config(args.pair_json, args.key, args.arm)
         json.dump(result, sys.stdout, sort_keys=True)

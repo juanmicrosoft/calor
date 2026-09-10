@@ -94,6 +94,7 @@ def build(root, stage="pilot", epoch_id=None):
                 "epochId": epoch_id, "stage": stage, "dataKind": "synthetic",
                 "pair": task, "arm": definition["label"], "run": run,
                 "compilerCommit": compiler["commit"], "compilerHash": compiler["compilerHash"],
+                "productCompilerHash": compiler["compilerHash"],
                 "armRepoRoot": compiler["repoRoot"], "armConfigKey": definition["label"],
                 "permissiveEffects": arm == "A", "controlArmKind": "permissive" if arm == "A" else None,
                 "editMechanism": "raw", "nullAgent": False, "invalid": False, "censored": False,

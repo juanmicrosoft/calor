@@ -122,6 +122,17 @@ have zero replacement retries, including API failures; original transcripts,
 usage envelopes and invalid reasons survive. Historical arms retain their
 registered behavior.
 
+Generated workspaces include local build/package import boundaries, so an
+ordinary restore does not inherit root central-package/lock-file settings
+and get misclassified as policy tampering. A real .NET restore/build test
+checks that the integrity snapshot stays unchanged.
+
+Every attempted run also records its product-canary compiler hash, independent
+of compilation-cache creation. Generated-C# validation failures can leave no
+cache: a nonbuilding slot remains in the denominator using that independent
+product witness. Any cache hash that does exist must still match the pin.
+Successful builds require their normal compiler-cache evidence.
+
 After those real prerequisites exist, the collection interface is:
 
 ```bash

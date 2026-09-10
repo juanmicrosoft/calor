@@ -247,6 +247,8 @@ def analyze(epochs_root, epoch_id, stage):
                 require(record.get("nullAgent") is False, "null-agent run is not a measurement")
                 require(record.get("compilerCommit") == pins["compiler"]["commit"],
                         "run compiler commit differs from shared compiler")
+                require(record.get("productCompilerHash") == pins["compiler"]["compilerHash"],
+                        "run product canary differs from shared compiler")
                 require(record.get("armRepoRoot") == pins["compiler"]["repoRoot"],
                         "run product root differs from shared compiler")
                 require(record.get("armConfigKey") == definition["label"]
@@ -275,16 +277,16 @@ def analyze(epochs_root, epoch_id, stage):
                                                 "CalorPermissiveEffects": arm == "A"},
                         "effective workspace policy differs from pinned arm")
                 state = record.get("buildState", {})
-                require(record.get("compilerHash") == pins["compiler"]["compilerHash"]
-                        and state.get("compilerHash") == pins["compiler"]["compilerHash"],
-                        "mixed compiler hashes within epoch")
-                require(record.get("armCanary") == ("permissive-ok" if arm == "A" else "strict-ok"),
-                        "wrong policy canary verdict")
-                require(isinstance(state.get("optionsHash"), str) and state["optionsHash"],
-                        "missing policy optionsHash")
-                cell["optionsHashes"].append(state["optionsHash"])
                 built = record.get("finalBuild", {}).get("ok")
                 require(type(built) is bool, "missing declared-done build outcome")
+                for value in (record.get("compilerHash"), state.get("compilerHash")):
+                    require(value == pins["compiler"]["compilerHash"] or (not built and value is None),
+                            "mixed compiler hashes within epoch")
+                require(record.get("armCanary") == ("permissive-ok" if arm == "A" else "strict-ok"),
+                        "wrong policy canary verdict")
+                require((isinstance(state.get("optionsHash"), str) and state["optionsHash"]) or not built,
+                        "missing policy optionsHash")
+                cell["optionsHashes"].append(state.get("optionsHash"))
                 cell["validRuns"] += 1
                 cell["censoredRuns"] += int(record["censored"])
                 cell["didNotBuildAtDeclaredDone"] += int(not built)
