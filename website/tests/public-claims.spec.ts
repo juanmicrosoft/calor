@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { SITE_VERSION } from '../src/lib/version';
 import data from '../public/data/benchmark-results.json';
 import agents from '../public/data/agent-benchmark-results.json';
@@ -11,6 +13,7 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
 const currentRelease = '0.19.0';
+const execFileAsync = promisify(execFile);
 
 test('effect-rows outcome publishes a no-run disposition without substituting historical data', async ({ page }) => {
   const ledger = JSON.parse(await readFile('../bench/phase0-agent-native/effect-rows-benefit-ledger.json', 'utf8'));
@@ -298,8 +301,8 @@ test('benchmark methodology distinguishes artifacts, failed runs and proposals',
     },
     {
       label: 'Agent task snapshot',
-      text: ['2026-02-16', '89 tasks', '18 category entries', '77 passes',
-        '78 passes', '86.5%', '87.6%'],
+      text: ['2026-02-16', '89 tasks', '17 categories', '18 category entries',
+        '77/89', '78/89', '86.5%', '87.6%'],
       href: 'https://github.com/juanmicrosoft/calor/commit/107462e',
     },
     {
@@ -337,6 +340,116 @@ test('benchmark methodology distinguishes artifacts, failed runs and proposals',
     }
     await expect(row.locator(`a[href="${item.href}"]`)).toHaveCount(1);
   }
+});
+
+test('agent task snapshot keeps provenance, verifier levels and interpretation bounded', async ({ page }) => {
+  const agentTasks = await readFile('content/benchmarking/agent-tasks.mdx', 'utf8');
+  const index = await readFile('content/benchmarking/index.mdx', 'utf8');
+  const methodology = await readFile('content/benchmarking/methodology.mdx', 'utf8');
+  const dashboard = await readFile('src/components/benchmarks/AgentBenchmarkDashboard.tsx', 'utf8');
+  const generator = await readFile('../tests/E2E/agent-tasks/generate-benchmark.sh', 'utf8');
+  const categoryTotals = Object.values(agents.categories)
+    .reduce((totals, category) => ({
+      passed: totals.passed + category.passed,
+      total: totals.total + category.total,
+    }), { passed: 0, total: 0 });
+  expect(agents.timestamp.slice(0, 10)).toBe('2026-02-16');
+  expect(agents.summary).toMatchObject({
+    totalTasks: 89,
+    passed: 77,
+    failed: 12,
+    passRate: 86.5,
+    categoryCount: 17,
+    threshold: 80,
+  });
+  expect(Object.keys(agents.categories)).toHaveLength(18);
+  expect(categoryTotals).toEqual({ passed: 78, total: 89 });
+  expect(provenance.agentTasks).toMatchObject({
+    sourceCommit: agents.commit,
+    model: null,
+    claudeCodeVersion: null,
+    calorInitRan: false,
+    transpilationChecks: 89,
+    syntaxPatternScripts: 89,
+    contractVerificationTasks: 0,
+    behavioralExecutionTasks: 0,
+  });
+  for (const source of [agentTasks, index, methodology]) {
+    const normalized = source.replace(/\s+/g, ' ');
+    for (const text of ['2026-02-16', '77/89', '17 categories', '18 category',
+      '78/89', '80%', 'project-defined']) {
+      expect(normalized).toContain(text);
+    }
+    expect(normalized).toContain('89 tasks');
+    expect(normalized).toMatch(/zero (?:enabled )?contract-verdict checks/i);
+    expect(normalized).toMatch(/zero (?:enabled )?behavioral executions/i);
+    expect(normalized).toContain('independent adopter handoff');
+    expect(normalized).toContain('C#/protected-C#/Calor');
+    expect(normalized).toMatch(/not (?:a )?(?:current model|calibrated reliability|part of)/i);
+    expect(source).not.toMatch(/users can expect|practical reliability|validates? that Claude/i);
+  }
+  const normalizedPage = agentTasks.replace(/\s+/g, ' ');
+  for (const text of ['107462e', 'exact Claude model', 'were not recorded',
+    'skipped `calor init`', 'lifecycle hooks', 'Syntax-pattern script',
+    'Calor transpilation', 'Contract verdict', 'Behavioral execution',
+    '89 of 89 tasks', '0 of 89 tasks', 'produced a `.g.cs` file',
+    'generated C# built', 'all 18 entries',
+    'not a current model-wide success rate', 'independent adopter handoff',
+    'C#/protected-C#/Calor result', '/docs/benchmarking/evidence-status/']) {
+    expect(normalizedPage).toContain(text);
+  }
+  for (const category of Object.values(agents.categories)) {
+    expect(agentTasks).toContain(`| ${category.name} | ${category.passed}/${category.total} |`);
+  }
+  expect(normalizedPage).toContain('not a provenance-preserving refresh path');
+  expect(normalizedPage).toContain('fail-closed archival stub');
+  expect(agentTasks).not.toContain('./tests/E2E/agent-tasks/generate-benchmark.sh');
+  expect(generator).toContain('exit 1');
+  expect(generator).toContain('archived and cannot refresh agent-benchmark-results.json');
+  expect(generator).not.toContain('OUTPUT_FILE');
+  expect(generator).not.toContain('TOTAL_PASS');
+  expect(generator).not.toContain('fallback data');
+  const artifactBefore = await readFile('public/data/agent-benchmark-results.json', 'utf8');
+  let generatorExitCode = 0;
+  try {
+    await execFileAsync('bash', [
+      '../tests/E2E/agent-tasks/generate-benchmark.sh',
+      '--output',
+      '/tmp/agent-benchmark-results-should-not-exist.json',
+    ]);
+  } catch (error) {
+    generatorExitCode = (error as { code?: number }).code ?? -1;
+  }
+  expect(generatorExitCode).toBe(1);
+  expect(await readFile('public/data/agent-benchmark-results.json', 'utf8')).toBe(artifactBefore);
+  expect(dashboard).toContain('provenance.transpilationChecks');
+  expect(dashboard).toContain('provenance.syntaxPatternScripts');
+  expect(dashboard).toContain('provenance.contractVerificationTasks');
+  expect(dashboard).toContain('provenance.behavioralExecutionTasks');
+  expect(dashboard).not.toMatch(/users can expect|practical reliability|validates? that Claude/i);
+
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.goto(`${base}/docs/benchmarking/agent-tasks/`);
+  const article = page.locator('article');
+  await expect(article).toContainText('77/89');
+  await expect(article).toContainText('78/89');
+  await expect(article).toContainText('17 categories');
+  await expect(article).toContainText('18 category entries');
+  await expect(article).toContainText('project-defined reporting gate');
+  await expect(article).toContainText('not a calibrated production reliability');
+  await expect(article).toContainText('Unreconciled artifact totals');
+  await expect(article).toContainText('Recorded Summary Rate');
+  await expect(article).toContainText('86.5%');
+  await expect(article).toContainText('87.6%');
+  await expect(article).toContainText('Recorded Summary Categories');
+  await expect(article).toContainText('17');
+  await expect(article).toContainText('18 entries');
+  await expect(article).toContainText('All 89 tasks required Calor-to-C# transpilation');
+  await expect(article).toContainText('all 89 used text-pattern scripts');
+  await expect(article).toContainText('0 enabled contract-verdict checks');
+  await expect(article).toContainText('0 behavioral executions');
+  await expect(article).toContainText('generated C# was not built or executed');
 });
 
 test('readers can distinguish runtime modes, optional proofs and historical measurements', async ({ page }) => {

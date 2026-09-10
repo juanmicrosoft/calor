@@ -10,7 +10,14 @@
     "sourceCommit": "107462e",
     "sourceDeclaredVersion": "0.2.3",
     "corpus": "tests/E2E/agent-tasks",
-    "method": "Historical single-run Claude task snapshot"
+    "method": "Historical single-run Claude task snapshot",
+    "model": null,
+    "claudeCodeVersion": null,
+    "calorInitRan": false,
+    "transpilationChecks": 89,
+    "syntaxPatternScripts": 89,
+    "contractVerificationTasks": 0,
+    "behavioralExecutionTasks": 0
   },
   "agentRefactoring": {
     "sourceCommit": "580e189",

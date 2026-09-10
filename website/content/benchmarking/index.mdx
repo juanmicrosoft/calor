@@ -64,9 +64,15 @@ when interpreting any row.
 ## Agent Task Benchmark
 
 The [Agent Task Benchmark](/docs/benchmarking/agent-tasks/) reports a separate
-historical prompt-to-code artifact. Its pass/fail results are not static
-calculator scores and are not part of the dashboard composite. That page
-records its date, task denominator, method, and missing provenance.
+historical prompt-to-code artifact from 2026-02-16. Its recorded summary is
+77/89 across 17 categories, while its 18 category entries sum to 78/89. The
+exact model and runtime configuration are unknown. Its mixed syntax-pattern,
+compilation, and optional contract checks are not a systematic behavioral test,
+and its 80% gate is project-defined rather than calibrated reliability. In the
+historical run, all 89 tasks used Calor-to-C# transpilation and text-pattern
+scripts; zero enabled contract-verdict checks and zero behavioral executions. The
+snapshot is not part of the dashboard composite and does not establish an
+independent adopter handoff or a C#/protected-C#/Calor comparison.
 
 ---
 
