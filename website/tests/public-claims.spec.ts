@@ -12,6 +12,24 @@ const verificationPages = ['philosophy/static-verification', 'syntax-reference/c
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
 const currentRelease = '0.19.0';
 
+test('effect-rows outcome publishes a no-run disposition without substituting historical data', async ({ page }) => {
+  const ledger = JSON.parse(await readFile('../bench/phase0-agent-native/effect-rows-benefit-ledger.json', 'utf8'));
+  expect(ledger.epochRun).toBe(false);
+  expect(ledger.verdict).toBe('UNDERPOWERED');
+  expect(ledger.legA).toBeNull();
+  expect(ledger.legB).toBeNull();
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.route('https://**/*', route => route.abort());
+  for (const path of ['benchmarking', 'benchmarking/agent-tasks', 'benchmarking/metrics/effect-discipline']) {
+    await page.goto(`${base}/docs/${path}/`);
+    await page.locator('article a[href$="/docs/benchmarking/results/#redesigned-pp-w-rows-deferred"]').click();
+    await expect(page.getByRole('heading', { name: 'Redesigned PP-W-rows: deferred' })).toBeInViewport();
+    await expect(page.locator('article')).toContainText('no redesigned confirmatory result exists');
+    await expect(page.locator('article')).toContainText('Null means uncollected');
+    await expect(page.locator('article')).toContainText('two cost-eligible task pairs (12 runs)');
+  }
+});
+
 test('effect-rows methodology separates registration, tooling, observations and approval', async ({ page }) => {
   const source = await readFile('content/benchmarking/effect-rows-study.mdx', 'utf8');
   expect(source).toContain('16880d006db760d7b47d829fd4282b033c3158a0');
