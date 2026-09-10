@@ -5599,7 +5599,7 @@ public sealed class Parser
         {
             var lastBodySpan = startToken.Span;
 
-            List<StatementNode> ParseClauseBody(Token clauseToken)
+            List<StatementNode> ParseClauseBody()
             {
                 var body = new List<StatementNode>();
                 var ownsDedent = true;
@@ -5608,8 +5608,7 @@ public sealed class Parser
                     var arrowToken = Advance();
                     // An inline statement creates no indentation level. Its next
                     // dedent belongs to the enclosing loop, branch, or function.
-                    ownsDedent = Current.Span.Line > arrowToken.Span.Line
-                        && Current.Span.Column > clauseToken.Span.Column;
+                    ownsDedent = Current.IndentationDepth > arrowToken.IndentationDepth;
                     var statement = ParseStatement();
                     if (statement != null)
                         body.Add(statement);
@@ -5632,22 +5631,22 @@ public sealed class Parser
                 return body;
             }
 
-            thenBody = ParseClauseBody(startToken);
+            thenBody = ParseClauseBody();
 
             // Parse optional §EI (else if) and §EL (else) with arrow syntax
             while (Check(TokenKind.ElseIf))
             {
                 var elseIfToken = Expect(TokenKind.ElseIf);
                 var elseIfCondition = ParseExpression();
-                var elseIfBody = ParseClauseBody(elseIfToken);
+                var elseIfBody = ParseClauseBody();
                 elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
             }
 
             // Parse optional §EL (else) with arrow syntax
             if (Check(TokenKind.Else))
             {
-                var elseToken = Expect(TokenKind.Else);
-                elseBody = ParseClauseBody(elseToken);
+                Expect(TokenKind.Else);
+                elseBody = ParseClauseBody();
             }
 
             if (Check(TokenKind.EndIf))

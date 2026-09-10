@@ -88,6 +88,28 @@ public class ArrowConditionalRuntimeTests
         Assert.Equal(3, Invoke(type, "Other"));
     }
 
+    [Theory]
+    [InlineData("§IF{if1} true → §IF{if2} true →\n        §C{trace.Add} §A i §/C")]
+    [InlineData("§IF{if1} false → §R §EL →\n        §C{trace.Add} §A i §/C")]
+    public void MidLineClauses_OwnTheirIndentedBodies(string branch)
+    {
+        var source = """
+            §M{m1:Arrow}
+              §F{f1:Probe:pub} (List<i32>:trace) -> void
+                §E{mut}
+                §L{for1:i:0:2:1}
+            """ + "\n      " + branch + "\n      §C{trace.Add} §A 99 §/C\n";
+        var module = Parse(source);
+        var loop = Assert.IsType<ForStatementNode>(Assert.Single(module.Functions[0].Body));
+        Assert.Equal(2, loop.Body.Count);
+        foreach (var text in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            var trace = new List<int>();
+            Invoke(Compile(text), "Probe", trace);
+            Assert.Equal([0, 99, 1, 99, 2, 99], trace);
+        }
+    }
+
     private static ModuleNode Parse(string source)
     {
         var diagnostics = new DiagnosticBag();
