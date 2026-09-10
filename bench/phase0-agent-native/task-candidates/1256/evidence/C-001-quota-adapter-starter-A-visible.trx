@@ -1,0 +1,183 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="cf3acf6d-c9ab-489d-9de1-81bf491b41c2" name="@Juans-MacBook-Pro 2026-09-09 23:21:50" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T23:21:50.0908610-04:00" queuing="2026-09-09T23:21:50.0908610-04:00" start="2026-09-09T23:21:49.7417010-04:00" finish="2026-09-09T23:21:50.0931720-04:00" />
+  <TestSettings name="default" id="f66d8b5a-c4ba-46f5-b0bd-aac8d445daaa">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_23_21_50" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="c8650480-936f-4e75-a61f-397ab6d7e678" testId="b345452f-6c2f-5d63-5593-543c70d5528e" testName="QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas" computerName="Juans-MacBook-Pro" duration="00:00:00.0001264" startTime="2026-09-09T23:21:50.0439350-04:00" endTime="2026-09-09T23:21:50.0439350-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c8650480-936f-4e75-a61f-397ab6d7e678">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 5
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas() in &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs:line 26
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5a204054-0323-41bf-b84a-24c47377eeec" testId="b4a15cef-c974-53ea-5e11-ed97bd5a8830" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000178" startTime="2026-09-09T23:21:50.0436370-04:00" endTime="2026-09-09T23:21:50.0436370-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5a204054-0323-41bf-b84a-24c47377eeec">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 5
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="4a51d852-c500-4179-8039-621e444bd3d9" testId="1e7efecc-8407-b7f6-6edb-3b9fb50f15df" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000261" startTime="2026-09-09T23:21:50.0433310-04:00" endTime="2026-09-09T23:21:50.0433310-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4a51d852-c500-4179-8039-621e444bd3d9">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 50
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="2ca289f3-ae78-43d2-a60c-a04e68f14d2e" testId="5cf9fa12-404b-fe6d-6868-c818bccd9a54" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000132" startTime="2026-09-09T23:21:50.0426520-04:00" endTime="2026-09-09T23:21:50.0426520-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2ca289f3-ae78-43d2-a60c-a04e68f14d2e" />
+    <UnitTestResult executionId="1193b3c4-625f-4789-a588-5dff94238d21" testId="607ada1e-71b4-fdff-9e41-ef67b5bf9f26" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000016" startTime="2026-09-09T23:21:50.0433490-04:00" endTime="2026-09-09T23:21:50.0433490-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1193b3c4-625f-4789-a588-5dff94238d21" />
+    <UnitTestResult executionId="109fe5ec-c860-4139-a8ad-899ac84f099e" testId="66314303-e776-a1d2-f692-d802e0d27614" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0006996" startTime="2026-09-09T23:21:50.0424460-04:00" endTime="2026-09-09T23:21:50.0424460-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="109fe5ec-c860-4139-a8ad-899ac84f099e">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 50
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="78bbbcc1-379e-4acc-bf8a-f8990735bd24" testId="17857ebc-578f-5671-ad6e-6ec2c3ae50e9" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0033976" startTime="2026-09-09T23:21:50.0318770-04:00" endTime="2026-09-09T23:21:50.0318840-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="78bbbcc1-379e-4acc-bf8a-f8990735bd24" />
+    <UnitTestResult executionId="da2055f0-e0d4-4764-884a-6f9ffaa1a812" testId="57877eef-5041-b5ab-8fce-3f2d9693c742" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000742" startTime="2026-09-09T23:21:50.0430370-04:00" endTime="2026-09-09T23:21:50.0430370-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="da2055f0-e0d4-4764-884a-6f9ffaa1a812">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 50
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="57877eef-5041-b5ab-8fce-3f2d9693c742">
+      <Execution id="da2055f0-e0d4-4764-884a-6f9ffaa1a812" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="66314303-e776-a1d2-f692-d802e0d27614">
+      <Execution id="109fe5ec-c860-4139-a8ad-899ac84f099e" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="17857ebc-578f-5671-ad6e-6ec2c3ae50e9">
+      <Execution id="78bbbcc1-379e-4acc-bf8a-f8990735bd24" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="b345452f-6c2f-5d63-5593-543c70d5528e">
+      <Execution id="c8650480-936f-4e75-a61f-397ab6d7e678" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="ConsecutiveRequestsReturnTheirQuotas" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="607ada1e-71b4-fdff-9e41-ef67b5bf9f26">
+      <Execution id="1193b3c4-625f-4789-a588-5dff94238d21" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="1e7efecc-8407-b7f6-6edb-3b9fb50f15df">
+      <Execution id="4a51d852-c500-4179-8039-621e444bd3d9" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="b4a15cef-c974-53ea-5e11-ed97bd5a8830">
+      <Execution id="5a204054-0323-41bf-b84a-24c47377eeec" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/starter/a/visible/bin/debug/net10.0/runtimetests.dll" id="5cf9fa12-404b-fe6d-6868-c818bccd9a54">
+      <Execution id="2ca289f3-ae78-43d2-a60c-a04e68f14d2e" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/starter/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="b345452f-6c2f-5d63-5593-543c70d5528e" executionId="c8650480-936f-4e75-a61f-397ab6d7e678" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b4a15cef-c974-53ea-5e11-ed97bd5a8830" executionId="5a204054-0323-41bf-b84a-24c47377eeec" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1e7efecc-8407-b7f6-6edb-3b9fb50f15df" executionId="4a51d852-c500-4179-8039-621e444bd3d9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5cf9fa12-404b-fe6d-6868-c818bccd9a54" executionId="2ca289f3-ae78-43d2-a60c-a04e68f14d2e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="607ada1e-71b4-fdff-9e41-ef67b5bf9f26" executionId="1193b3c4-625f-4789-a588-5dff94238d21" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="66314303-e776-a1d2-f692-d802e0d27614" executionId="109fe5ec-c860-4139-a8ad-899ac84f099e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="17857ebc-578f-5671-ad6e-6ec2c3ae50e9" executionId="78bbbcc1-379e-4acc-bf8a-f8990735bd24" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="57877eef-5041-b5ab-8fce-3f2d9693c742" executionId="da2055f0-e0d4-4764-884a-6f9ffaa1a812" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="8" executed="8" passed="3" failed="5" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.05]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.05]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 50
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 50
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 50
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 5
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 5
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         &lt;work&gt;/C-001-quota-adapter/starter/A/visible/Suite/VisibleTests.cs(26,0): at QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas()
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.08]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:21:50.0414210-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:21:50.0429660-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:21:50.0431680-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:21:50.0434570-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:21:50.0437820-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

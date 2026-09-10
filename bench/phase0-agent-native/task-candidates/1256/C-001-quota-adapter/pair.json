@@ -1,0 +1,60 @@
+{
+  "id": "C-001-quota-adapter",
+  "category": "PP-W-rows",
+  "authoringStatus": "unregistered-candidate",
+  "registeredShape": 7,
+  "shapeName": "direct invocation of a this-qualified rowed field",
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "spec": "spec.md",
+  "sourceAssembly": {
+    "parts": ["dependency.calr.inc", "task.calr.inc"]
+  },
+  "arms": {
+    "calor-permissive": {
+      "armId": "a",
+      "fixture": "starter-a",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "permissive",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor-strict": {
+      "armId": "b",
+      "fixture": "starter-b",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "laundering": {
+      "a": "seeded/laundering-a",
+      "b": "seeded/laundering-b"
+    },
+    "honest": {
+      "a": "seeded/honest-a",
+      "b": "seeded/honest-b"
+    }
+  },
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "count": 2,
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": ["Preview_PreservesRequestCounter"],
+    "effectFailureSignature": "HELDOUT_EFFECT:state-change"
+  },
+  "shapeRealizedIndicator": {
+    "sourceRegex": "§C\\{this\\.lookup\\}",
+    "measuredOn": "the archived editable task.calr.inc, not the dependency field declaration",
+    "note": "Laundering is positive; starter and honest are negative. This is a candidate indicator, not a registered collection rule."
+  },
+  "note": "Row 7 of #1136's twelve, frozen release RowEscapeTableTests: direct invocation of the this-qualified field, not passing a row-polymorphic argument. A accepts the unresolved call without a diagnostic; B rejects unknown. The dependency really declares and performs mut. This candidate is not registered or frozen and supplies no model, runsPerArm, budget, or collection authority."
+}
