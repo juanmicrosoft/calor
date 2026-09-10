@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 import unittest
+from unittest.mock import Mock, patch
 import uuid
 
 BENCH = Path(__file__).resolve().parents[1]
@@ -54,7 +55,8 @@ def event(value):
 def stream_bytes():
     return [
         b": SYNTHETIC keepalive\n\n", event({"type": "ping"}),
-        event({"type": "message_start", "message": message(usage=usage(output_tokens=0), stop_reason=None)}),
+        event({"type": "message_start", "message": message(
+            content=[], usage=usage(output_tokens=0), stop_reason=None)}),
         event({"type": "content_block_start", "index": 0,
                "content_block": {"type": "text", "text": ""}}),
         event({"type": "content_block_delta", "index": 0,
@@ -109,20 +111,66 @@ class PriceTests(Fixture):
             {"tools": [{"type": "web_search_20250305", "max_uses": 1}]},
             {"tools": [{"name": "x", "allowed_callers": ["code_execution_20260120"]}]},
             {"context_management": {"edits": [{"type": "compact_20260112"}]}},
+            {"context_management": {"edits": None}},
+            {"context_management": {"edits": {"type": "compact_20260112"}}},
+            {"context_management": {"edits": [
+                {"type": "clear_thinking_20251015", "fallbacks": "default"}]}},
+            {"fallbacks": "default"}, {"fallbacks": ["claude-opus-4-8"]},
+            {"thinking": {"type": "adaptive", "fallbacks": "default"}},
+            {"output_config": {"effort": "high", "fallbacks": "default"}},
+            {"tools": [{"name": "local", "fallbacks": "default"}]},
         ):
             with self.subTest(changes=changes), self.assertRaises(budget.Refusal):
                 budget.admit_request(body(**changes))
+
+    def test_beta_capabilities_are_closed_without_rewriting_approved_requests(self):
+        for header in ("compact-2026-01-12", "server-side-fallback-2026-07-01",
+                       "server-side-fallback-2026-06-01", "output-300k-2026-03-24",
+                       "context-1m-2025-08-07,unknown", "", "context-1m-2025-08-07,",
+                       "context-1m-2025-08-07,context-1m-2025-08-07"):
+            with self.subTest(header=header), self.assertRaises(budget.Refusal):
+                budget.admit_request(body(), header)
+        header = "context-management-2025-06-27, \tcontext-1m-2025-08-07"
+        request = budget.admit_request(body(context_management={
+            "edits": [{"type": "clear_thinking_20251015", "keep": "all"}]}), header)
+        self.assertEqual(["context-management-2025-06-27", "context-1m-2025-08-07"],
+                         request["betaCapabilities"])
 
     def test_duplicate_keys_and_nonfinite_numbers_refuse(self):
         for value in (b'{"model":"x","model":"y"}', b'{"temperature":NaN}'):
             with self.assertRaises(budget.Refusal):
                 budget.admit_request(value)
 
+    def test_nested_billing_controls_refuse_but_tool_payloads_remain_opaque(self):
+        for changes in (
+            {"tools": [{"type": []}]},
+            {"tools": [{"name": "local", "cache_control": {"type": "ephemeral", "ttl": "24h"}}]},
+            {"system": [{"type": "text", "text": "SYNTHETIC",
+                         "cache_control": {"type": "ephemeral", "ttl": "24h"}}]},
+            {"messages": [{"role": "user", "content": "SYNTHETIC",
+                           "cache_control": {"type": "ephemeral", "ttl": "24h"}}]},
+            {"messages": [{"role": "assistant", "content": [{"type": "compaction"}]}]},
+            {"messages": [{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "x",
+                           "content": [{"type": "text", "text": "SYNTHETIC",
+                                        "cache_control": {"type": "ephemeral", "ttl": "24h"}}]}]}]},
+        ):
+            with self.subTest(changes=changes), self.assertRaises(budget.Refusal):
+                budget.admit_request(body(**changes))
+        raw = body(messages=[{"role": "assistant", "content": [{
+            "type": "tool_use", "id": "SYNTHETIC", "name": "local",
+            "input": {"fallbacks": "user data, not an API control",
+                      "cache_control": {"ttl": "user data"}},
+            "cache_control": {"type": "ephemeral", "ttl": "1h"},
+        }]}])
+        self.assertGreater(budget.admit_request(raw)["maximumMicroUsd"], 0)
+
     def test_usage_requires_all_counters_model_tier_and_consistent_cache_breakdown(self):
         request = budget.admit_request(body())
         bad = [usage(output_tokens=129), usage(input_tokens=-1), usage(service_tier=None),
                usage(server_tool_use={"web_search_requests": 1}),
                usage(new_cost=1), usage(input_tokens=budget.CONTEXT),
+               usage(iterations=[{"type": "compaction", "output_tokens": 1}]),
+               usage(iterations=[{"type": "fallback_message", "model": budget.MODEL}]),
                usage(cache_creation={"ephemeral_5m_input_tokens": 2, "ephemeral_1h_input_tokens": 3})]
         missing = usage()
         del missing["cache_read_input_tokens"]
@@ -146,6 +194,104 @@ class PriceTests(Fixture):
             tracker.feed(malformed)
             with self.assertRaises(budget.Refusal):
                 tracker.finish()
+
+
+class AdmissionTests(Fixture):
+    def fixture(self):
+        from ppw_redesign_epoch import instrument, save
+        spending = instrument.helper("ppw-spending.py")
+        isolation = spending.module("ppw-gateway-client.py")
+        registration = {
+            "compilerCommit": "a" * 40, "tasks": ["SYNTHETIC-1", "SYNTHETIC-2", "SYNTHETIC-3"],
+            "artifacts": {"SYNTHETIC/pair.json": "b" * 64},
+        }
+        selected = {
+            "runsPerArm": 74, "modelPin": budget.MODEL, "agentVersion": isolation.CLIENT_VERSION,
+            "stageRegistration": {"path": "SYNTHETIC-method.json", "sha256": "c" * 64},
+            "modelRegistration": {"path": "SYNTHETIC-model.json", "sha256": "d" * 64},
+            "spendAuthorization": {"path": "SYNTHETIC-approval.json", "sha256": "e" * 64},
+        }
+        amendment = self.root / "SYNTHETIC-amendment.json"
+        save(amendment, {"schemaVersion": 1, "kind": "pp-w-prospective-spending-instrument-amendment",
+                         "stage": "pilot", "replacementHarnessArtifacts":
+                             spending.artifact_manifest(spending.GATEWAY)})
+        selected["instrumentAmendment"] = {"path": amendment.name, "sha256": spending.digest(amendment)}
+        prices = self.root / "SYNTHETIC-prices.json"
+        save(prices, budget.price_contract())
+        binding = {"anchor": "git-common-dir", "relativePath": "ppw-budget/epic1254-pilot.sqlite3",
+                   "anchorSha256": "f" * 64}
+        authorization = {"spendingCeilingUsd": 500, "ledgerBinding": binding}
+        plan = {
+            "schemaVersion": 1, "kind": "pp-w-pilot-spending-plan", "epochId": "SYNTHETIC-pilot",
+            "stage": "pilot", "authorizationSha256": selected["spendAuthorization"]["sha256"],
+            "protocolSha256": spending.protocol_identity(registration, selected, "pilot", "SYNTHETIC-pilot"),
+            "ceilingUsd": 500, "costBasis": "both-list-price-study-cost-and-actual-spend",
+            "plannedInvocations": 444, "ledgerBinding": binding,
+            "clientControl": {
+                "kind": spending.GATEWAY, "isolation": isolation.ISOLATION,
+                "priceContract": {"path": prices.name, "sha256": spending.digest(prices)},
+                "clientExecutable": str(self.root / "SYNTHETIC-client"),
+                "shellExecutable": str(self.root / "SYNTHETIC-shell"), "shellSha256": "1" * 64,
+                "runtimeSha256": "2" * 64,
+            },
+        }
+        return spending, isolation, registration, selected, authorization, plan
+
+    def check(self, values):
+        from ppw_redesign_epoch import save
+        spending, isolation, registration, selected, authorization, plan = values
+        path = self.root / "SYNTHETIC-plan.json"
+        save(path, plan)
+        selected["spendingPlan"] = {"path": path.name, "sha256": spending.digest(path)}
+        isolated = Mock(ISOLATION=isolation.ISOLATION, CLIENT_VERSION=isolation.CLIENT_VERSION)
+        isolated.validate_client.side_effect = Path
+        isolated.validate_shell.side_effect = lambda path, sha: Path(path)
+        modules = {"ppw-gateway-budget.py": budget, "ppw-gateway-client.py": isolated}
+        with patch.object(spending, "module", side_effect=modules.__getitem__), \
+                patch.object(spending, "gateway_ledger_location",
+                             return_value=self.root / "SYNTHETIC-never-created.sqlite3"):
+            admission = spending.admit(registration, selected, authorization, self.root,
+                                       "SYNTHETIC-pilot", "pilot")
+        isolated.validate_platform.assert_called_once_with()
+        isolated.validate_client.assert_called_once_with(plan["clientControl"]["clientExecutable"])
+        isolated.validate_shell.assert_called_once_with(plan["clientControl"]["shellExecutable"], "1" * 64)
+        return admission
+
+    def test_source_bound_gateway_admits_all_444_slots_without_per_run_budget_sizing(self):
+        values = self.fixture()
+        admission = self.check(values)
+        self.assertEqual(444, len(admission["slots"]))
+        self.assertEqual(444, len({slot["id"] for slot in admission["slots"]}))
+        self.assertEqual(500_000_000, admission["ceilingUnits"])
+        self.assertEqual(budget.KIND, admission["mechanism"])
+        self.assertGreater(budget.admit_request(body())["maximumMicroUsd"] * 444,
+                           admission["ceilingUnits"])
+        self.assertFalse(Path(admission["ledgerPath"]).exists())
+
+    def test_price_manifest_stage_and_shared_budget_cannot_be_asserted_away(self):
+        from ppw_redesign_epoch import save
+        for change in ("price", "source", "stage", "ledger", "model"):
+            values = self.fixture()
+            spending, _, _, selected, _, plan = values
+            if change == "price":
+                prices = self.root / plan["clientControl"]["priceContract"]["path"]
+                save(prices, dict(budget.price_contract(), contextUpperTokens=1))
+                plan["clientControl"]["priceContract"]["sha256"] = spending.digest(prices)
+            elif change == "source":
+                amendment = self.root / selected["instrumentAmendment"]["path"]
+                document = json.loads(amendment.read_text())
+                document["replacementHarnessArtifacts"]["ppw-gateway-budget.py"] = "0" * 64
+                save(amendment, document)
+                selected["instrumentAmendment"]["sha256"] = spending.digest(amendment)
+            elif change == "stage":
+                plan["stage"] = "confirmatory"
+            elif change == "ledger":
+                plan["ledgerBinding"] = dict(plan["ledgerBinding"], anchorSha256="0" * 64)
+            else:
+                selected["modelPin"] = "SYNTHETIC-unregistered-model"
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.check(values)
+        self.assertFalse((self.root / "SYNTHETIC-never-created.sqlite3").exists())
 
 
 class LedgerTests(Fixture):
@@ -207,7 +353,7 @@ class LedgerTests(Fixture):
 
 
 class TransportTests(Fixture):
-    def provider(self, payload=None, status=200, streaming=False, pause=False):
+    def provider(self, payload=None, status=200, streaming=False, pause=False, chunks=None):
         observed = []
         received_first = threading.Event()
         release = threading.Event()
@@ -220,8 +366,9 @@ class TransportTests(Fixture):
                 self.send_response(status)
                 self.send_header("Content-Type", "text/event-stream" if streaming else "application/json")
                 self.end_headers()
-                chunks = stream_bytes() if streaming else [json.dumps(payload or message()).encode()]
-                for index, chunk in enumerate(chunks):
+                parts = chunks if chunks is not None else (
+                    stream_bytes() if streaming else [json.dumps(payload or message()).encode()])
+                for index, chunk in enumerate(parts):
                     self.wfile.write(chunk)
                     self.wfile.flush()
                     if index == 0 and pause:
@@ -236,13 +383,15 @@ class TransportTests(Fixture):
         self.addCleanup(release.set)
         return lambda: http.client.HTTPConnection("127.0.0.1", server.server_port), observed, release
 
-    def send(self, proxy, raw, suffix="/v1/messages?beta=true"):
+    def send(self, proxy, raw, suffix="/v1/messages?beta=true", headers=None):
         client = http.client.HTTPConnection("127.0.0.1", proxy.port, timeout=10)
-        client.request("POST", "/" + proxy.capability + suffix, raw, {
+        request_headers = {
             "Content-Type": "application/json", "anthropic-version": "2023-06-01",
-            "anthropic-beta": "SYNTHETIC-oauth, SYNTHETIC-capability",
+            "anthropic-beta": "context-management-2025-06-27, context-1m-2025-08-07",
             "Authorization": "Bearer SYNTHETIC-credential-never-persist",
-        })
+        }
+        request_headers.update(headers or {})
+        client.request("POST", "/" + proxy.capability + suffix, raw, request_headers)
         response = client.getresponse()
         return client, response
 
@@ -257,7 +406,8 @@ class TransportTests(Fixture):
             client.close()
         self.assertEqual("/v1/messages?beta=true", observed[0][0])
         self.assertEqual(raw, observed[0][2])
-        self.assertEqual("SYNTHETIC-oauth, SYNTHETIC-capability", observed[0][1]["anthropic-beta"])
+        self.assertEqual("context-management-2025-06-27, context-1m-2025-08-07",
+                         observed[0][1]["anthropic-beta"])
         self.assertEqual("Bearer SYNTHETIC-credential-never-persist", observed[0][1]["Authorization"])
         self.assertEqual("reconciled", ledger.snapshot()["requests"][0]["state"])
         self.assertNotIn(b"SYNTHETIC-credential", ledger.path.read_bytes())
@@ -307,6 +457,58 @@ class TransportTests(Fixture):
                 self.assertEqual("unknown", ledger.snapshot()["requests"][0]["state"])
                 self.assertEqual(budget.admit_request(body())["maximumMicroUsd"],
                                  ledger.snapshot()["exposureMicroUsd"])
+
+
+    def test_compaction_fallback_and_unknown_capabilities_refuse_before_connection(self):
+        factory, observed, _ = self.provider()
+        connections = []
+        def counted_connection():
+            connections.append(True)
+            return factory()
+        cases = [
+            (body(context_management={"edits": [{"type": "compact_20260112",
+                                                "pause_after_compaction": True}]}), {}),
+            (body(fallbacks="default"), {}),
+            (body(fallbacks=[budget.MODEL]), {}),
+            (body(), {"anthropic-beta": "compact-2026-01-12"}),
+            (body(), {"anthropic-beta": "server-side-fallback-2026-07-01"}),
+            (body(), {"anthropic-beta": "context-1m-2025-08-07, unknown"}),
+            (body(), {"anthropic-unpriced-feature": "enabled"}),
+            (body(), {"Connection": "anthropic-beta"}),
+        ]
+        for raw, headers in cases:
+            with self.subTest(raw=raw, headers=headers):
+                ledger, owner = self.ledger()
+                with gateway.Gateway(ledger, owner, "SYNTHETIC-slot", counted_connection) as proxy:
+                    client, response = self.send(proxy, raw, headers=headers)
+                    self.assertEqual(400, response.status)
+                    response.read()
+                    client.close()
+                self.assertEqual([], connections)
+                self.assertEqual([], observed)
+                self.assertEqual([], ledger.snapshot()["requests"])
+                self.assertEqual("INCOMPLETE_POLICY", ledger.snapshot()["state"])
+
+    def test_unexpected_server_iterations_never_release_the_reservation(self):
+        for kind in ("compaction", "fallback"):
+            for streaming in (False, True):
+                with self.subTest(kind=kind, streaming=streaming):
+                    chunks = stream_bytes()
+                    chunks[3] = event({"type": "content_block_start", "index": 0,
+                                       "content_block": {"type": kind}})
+                    factory, observed, _ = self.provider(
+                        payload=message(content=[{"type": kind}]), streaming=streaming,
+                        chunks=chunks if streaming else None)
+                    ledger, owner = self.ledger()
+                    with gateway.Gateway(ledger, owner, "SYNTHETIC-slot", factory) as proxy:
+                        client, response = self.send(proxy, body(stream=streaming))
+                        response.read()
+                        client.close()
+                    self.assertEqual(1, len(observed))
+                    self.assertEqual("unknown", ledger.snapshot()["requests"][0]["state"])
+                    self.assertEqual("INCOMPLETE_UNKNOWN_CHARGE", ledger.snapshot()["state"])
+                    self.assertEqual(budget.admit_request(body())["maximumMicroUsd"],
+                                     ledger.snapshot()["exposureMicroUsd"])
 
 
 class IsolationTests(Fixture):

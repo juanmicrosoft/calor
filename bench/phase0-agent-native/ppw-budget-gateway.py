@@ -107,12 +107,20 @@ class Handler(BaseHTTPRequestHandler):
             budget.require(self.headers.get_content_type() == "application/json", "JSON body required")
             budget.require(self.headers.get("anthropic-version") == "2023-06-01",
                            "unregistered API version")
+            budget.require(all(name.lower() in ("anthropic-version", "anthropic-beta")
+                               for name in self.headers
+                               if name.lower().startswith(("anthropic-", "x-anthropic-"))),
+                           "unregistered provider capability header")
             length = int(self.headers.get("Content-Length", "-1"))
             budget.require(0 < length <= MAX_BODY, "invalid request body length")
             self.connection.settimeout(30)
             raw = self.rfile.read(length)
             budget.require(len(raw) == length, "truncated request body")
-            request = budget.admit_request(raw)
+            request = budget.admit_request(raw, self.headers.get("anthropic-beta"))
+            connection_tokens = {p.strip().lower() for p in self.headers.get("Connection", "").split(",")}
+            budget.require(not connection_tokens.intersection(
+                {"authorization", "x-api-key", "anthropic-version", "anthropic-beta"}),
+                "capability headers cannot be hop-by-hop")
         except (budget.Refusal, ValueError, TimeoutError, OSError):
             gateway.fail("INCOMPLETE_POLICY")
             self.reply(400, "request is outside the registered price contract")
@@ -131,10 +139,6 @@ class Handler(BaseHTTPRequestHandler):
             # Reservation is durable before the first upstream byte or connection.
             upstream = gateway.connection_factory()
             headers = {}
-            connection_tokens = {p.strip().lower() for p in self.headers.get("Connection", "").split(",")}
-            budget.require(not connection_tokens.intersection(
-                {"authorization", "x-api-key", "anthropic-version", "anthropic-beta"}),
-                "capability headers cannot be hop-by-hop")
             for name, value in self.headers.items():
                 if name.lower() not in HOP_HEADERS | connection_tokens:
                     headers[name] = value
@@ -176,6 +180,7 @@ class Handler(BaseHTTPRequestHandler):
                     message = budget.decode(receipt)
                     budget.require(isinstance(message, dict) and message.get("type") == "message"
                                    and message.get("role") == "assistant", "invalid provider message")
+                    budget.validate_response_content(message.get("content"))
                     cost, usage = budget.reconciled_cost(
                         request, message.get("model"), message.get("usage"), message.get("stop_reason"))
         except (budget.Refusal, OSError, http.client.HTTPException, ValueError, TypeError, AttributeError):

@@ -23,6 +23,22 @@ CLIENT_TOOL_TYPES = {
     "custom", "bash_20250124", "text_editor_20250124", "text_editor_20250429",
     "text_editor_20250728", "memory_20250818",
 }
+BETA_CAPABILITIES = {
+    "prompt-caching-2024-07-31", "extended-cache-ttl-2025-04-11",
+    "interleaved-thinking-2025-05-14", "context-management-2025-06-27",
+    "context-1m-2025-08-07", "fast-mode-2026-02-01",
+}
+RESPONSE_CONTENT_TYPES = {"text", "thinking", "redacted_thinking", "tool_use"}
+REQUEST_CONTENT_FIELDS = {
+    "text": {"text", "citations"},
+    "thinking": {"thinking", "signature"},
+    "redacted_thinking": {"data"},
+    "tool_use": {"id", "name", "input"},
+    "tool_result": {"tool_use_id", "content", "is_error"},
+    "tool_reference": {"tool_name"},
+    "image": {"source"},
+    "document": {"source", "title", "context", "citations"},
+}
 COUNTERS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 
 
@@ -75,11 +91,18 @@ def price_contract():
         "reservation": "full context at fast 1h-write rate plus requested output at fast rate; 1.1x",
         "reconciliation": "complete provider category counts; higher priced speed/residency/cache TTL if absent",
         "serverOperations": "not admitted; request fails before forwarding, never stripped",
+        "requestMultiplicity": "one model iteration only; no server-side compaction or fallback",
+        "allowedBetaCapabilities": sorted(BETA_CAPABILITIES),
+        "unknownBetaPolicy": "reject the entire request before reservation or upstream connection",
         "sources": [
             "https://platform.claude.com/docs/en/models/opus-4-8/overview",
             "https://platform.claude.com/docs/en/about-claude/pricing",
             "https://platform.claude.com/docs/en/api/messages/create",
             "https://platform.claude.com/docs/en/api/service-tiers",
+            "https://platform.claude.com/docs/en/build-with-claude/compaction",
+            "https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback",
+            "https://platform.claude.com/docs/en/build-with-claude/context-editing",
+            "https://code.claude.com/docs/en/llm-gateway-protocol",
         ],
     }
 
@@ -88,12 +111,83 @@ def price_identity():
     return hashlib.sha256(canonical(price_contract()).encode()).hexdigest()
 
 
-def admit_request(raw):
+def fields(value, allowed, reason):
+    require(isinstance(value, dict) and set(value) <= allowed, reason)
+
+
+def admitted_betas(header):
+    if header is None:
+        return []
+    require(isinstance(header, str) and not any(ord(c) < 32 and c != "\t" for c in header),
+            "invalid beta capability header")
+    capabilities = [part.strip(" \t") for part in header.split(",")]
+    require(len(set(capabilities)) == len(capabilities)
+            and all(value in BETA_CAPABILITIES for value in capabilities),
+            "unpriced or ambiguous beta capability")
+    return capabilities
+
+
+def validate_context_management(management):
+    fields(management, {"edits"}, "unpriced context management")
+    edits = management.get("edits", [])
+    require(isinstance(edits, list), "invalid context edits")
+    for edit in edits:
+        require(isinstance(edit, dict), "invalid context edit")
+        if edit.get("type") == "clear_thinking_20251015":
+            fields(edit, {"type", "keep"}, "unpriced thinking edit")
+        elif edit.get("type") == "clear_tool_uses_20250919":
+            fields(edit, {"type", "keep", "trigger", "clear_at_least",
+                          "clear_tool_inputs", "exclude_tools"}, "unpriced tool edit")
+        else:
+            raise Refusal("unpriced context-management operation")
+        for name in ("keep", "trigger", "clear_at_least"):
+            if isinstance(edit.get(name), dict):
+                fields(edit[name], {"type", "value"}, "unpriced context-edit control")
+
+
+def validate_cache_control(value):
+    fields(value, {"type", "ttl"}, "unpriced cache control")
+    require(value.get("type") == "ephemeral" and value.get("ttl", "5m") in ("5m", "1h"),
+            "unpriced cache lifetime")
+
+
+def validate_request_content(content):
+    if isinstance(content, str):
+        return
+    require(isinstance(content, list), "invalid request content")
+    for block in content:
+        require(isinstance(block, dict) and isinstance(block.get("type"), str)
+                and block["type"] in REQUEST_CONTENT_FIELDS, "unpriced request content type")
+        fields(block, REQUEST_CONTENT_FIELDS[block["type"]] | {"type", "cache_control"},
+               "unpriced request content field")
+        if "cache_control" in block:
+            validate_cache_control(block["cache_control"])
+        if block["type"] == "tool_result" and "content" in block:
+            validate_request_content(block["content"])
+        if block["type"] in ("image", "document"):
+            source = block.get("source")
+            fields(source, {"type", "data", "media_type", "url", "content"}, "unpriced content source")
+            require(source.get("type") in ("base64", "url", "text", "content"),
+                    "unpriced content source type")
+            if source.get("type") == "content":
+                validate_request_content(source.get("content"))
+
+
+def admit_request(raw, beta_header=None):
+    capabilities = admitted_betas(beta_header)
     body = decode(raw)
     require(isinstance(body, dict) and set(body) <= REQUEST_FIELDS, "unpriced request field")
     require(body.get("model") == MODEL, "unregistered or unpriced model")
     maximum = integer(body.get("max_tokens"), OUTPUT)
     require(isinstance(body.get("messages"), list) and body["messages"], "missing messages")
+    for message in body["messages"]:
+        fields(message, {"role", "content", "cache_control"}, "unpriced message field")
+        require(message.get("role") in ("user", "assistant", "system"), "unpriced message role")
+        validate_request_content(message.get("content"))
+        if "cache_control" in message:
+            validate_cache_control(message["cache_control"])
+    if "system" in body:
+        validate_request_content(body["system"])
     require(type(body.get("stream", False)) is bool, "invalid stream mode")
     require(body.get("service_tier", "auto") in ("auto", "standard_only"), "unpriced service tier")
     require(body.get("speed", "standard") in ("standard", "fast"), "unpriced speed")
@@ -101,19 +195,38 @@ def admit_request(raw):
     tools = body.get("tools", [])
     require(isinstance(tools, list), "invalid tools")
     for tool in tools:
-        require(isinstance(tool, dict) and tool.get("type", "custom") in CLIENT_TOOL_TYPES,
+        require(isinstance(tool, dict) and isinstance(tool.get("type", "custom"), str)
+                and tool.get("type", "custom") in CLIENT_TOOL_TYPES,
                 "unadmitted server operation or tool")
+        fields(tool, {"type", "name", "description", "input_schema", "cache_control",
+                      "allowed_callers", "strict", "defer_loading", "max_characters"},
+               "unpriced tool field")
         require(tool.get("allowed_callers", ["direct"]) == ["direct"],
                 "unadmitted server tool caller")
-    management = body.get("context_management", {})
-    require(isinstance(management, dict) and set(management) <= {"edits"},
-            "unpriced context management")
-    for edit in management.get("edits", []):
-        require(isinstance(edit, dict) and edit.get("type") in
-                ("clear_thinking_20251015", "clear_tool_uses_20250919"),
-                "unpriced context-management operation")
+        if "cache_control" in tool:
+            validate_cache_control(tool["cache_control"])
+    validate_context_management(body.get("context_management", {}))
+    if "thinking" in body:
+        fields(body["thinking"], {"type", "budget_tokens", "display"}, "unpriced thinking field")
+        require(body["thinking"].get("type") in ("enabled", "disabled", "adaptive"),
+                "unpriced thinking mode")
+    if "output_config" in body:
+        fields(body["output_config"], {"effort", "format"}, "unpriced output configuration")
+    for output_format in (body.get("output_format"), body.get("output_config", {}).get("format")):
+        if output_format is not None:
+            fields(output_format, {"type", "schema"}, "unpriced output format")
+            require(output_format.get("type") == "json_schema", "unpriced output format type")
+    if "cache_control" in body:
+        validate_cache_control(body["cache_control"])
     return {"model": MODEL, "maxTokens": maximum, "stream": body.get("stream", False),
-            "maximumMicroUsd": upper_cost(CONTEXT, maximum), "priceSha256": price_identity()}
+            "maximumMicroUsd": upper_cost(CONTEXT, maximum), "priceSha256": price_identity(),
+            "betaCapabilities": capabilities}
+
+
+def validate_response_content(content):
+    require(isinstance(content, list) and all(
+        isinstance(block, dict) and block.get("type") in RESPONSE_CONTENT_TYPES for block in content),
+        "unexpected server-side response content")
 
 
 def reconciled_cost(request, model, usage, stop_reason):
@@ -198,14 +311,18 @@ class UsageStream:
                     message = event.get("message", {})
                     require(message.get("type") == "message" and message.get("role") == "assistant",
                             "invalid provider message")
+                    require(message.get("content") == [], "nonempty initial provider content")
                     self.started = True
                     self.model = message.get("model")
                     self.update_usage(message.get("usage"))
                 elif kind == "message_delta":
                     require(self.started, "invalid terminal delta order")
                     self.update_usage(event.get("usage"))
-                    reason = event.get("delta", {}).get("stop_reason")
+                    delta = event.get("delta")
+                    fields(delta, {"stop_reason", "stop_sequence"}, "unadmitted message delta")
+                    reason = delta.get("stop_reason")
                     if reason is not None:
+                        require("output_tokens" in event["usage"], "missing final output usage")
                         require(self.stop_reason in (None, reason), "conflicting terminal reasons")
                         self.stop_reason = reason
                         self.delta_seen = True
@@ -215,9 +332,7 @@ class UsageStream:
                 elif kind in ("content_block_start", "content_block_delta", "content_block_stop"):
                     require(self.started and not self.delta_seen, "content outside message")
                     if kind == "content_block_start":
-                        require(event.get("content_block", {}).get("type") in
-                                ("text", "thinking", "redacted_thinking", "tool_use"),
-                                "unexpected server-side response content")
+                        validate_response_content([event.get("content_block")])
                 else:
                     raise Refusal("unknown or error provider event")
         except (Refusal, TypeError, KeyError, AttributeError):
