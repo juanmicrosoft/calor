@@ -1,0 +1,24 @@
+§M{m101:ShippingQuote}
+  §CL{c101:QuoteJournal:pub}
+    §FLD{i32:LastZone:pub:stat} INT:-1
+
+  §F{f101:Calculate:pub} (i32:zone, i32:weight) -> i32
+    §E{}
+    §IF{if101} (<= weight INT:0)
+      §R INT:0
+    §IF{if102} (== zone INT:1)
+      §R (+ (* weight INT:3) INT:5)
+    §R (+ (* weight INT:2) INT:12)
+
+  §F{f102:Quote:pub} (i32:zone, i32:weight) -> i32
+    §E{mut}
+    §ASSIGN QuoteJournal.LastZone zone
+    §R §C{Calculate} §A zone §A weight §/C
+
+  §CL{c102:ShippingService:pub}
+    §FLD{Func<i32,i32,i32>:quote:pri} §E{mut}
+    §CTOR{ctor101:pub} ()
+      §ASSIGN quote ShippingQuoteModule.Quote
+    §MT{mt101:Cheapest:pub} (i32:weight) -> i32
+      §E{}
+      §R INT:0

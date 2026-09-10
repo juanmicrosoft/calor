@@ -12,10 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Src">
-      <HintPath>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Src.dll</HintPath>
+      <HintPath>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Src.dll</HintPath>
     </Reference>
-    <Reference Include="Calor.Runtime" Condition="Exists('/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Calor.Runtime.dll')">
-      <HintPath>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>
+    <Reference Include="Calor.Runtime" Condition="Exists('/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Calor.Runtime.dll')">
+      <HintPath>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

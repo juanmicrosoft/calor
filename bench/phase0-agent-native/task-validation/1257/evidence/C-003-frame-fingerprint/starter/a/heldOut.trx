@@ -1,60 +1,60 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TestRun id="8d03c49b-4400-4a8e-a43d-bd756bad516a" name="@Juans-MacBook-Pro 2026-09-10 02:38:22" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <Times creation="2026-09-10T02:38:22.0398510-04:00" queuing="2026-09-10T02:38:22.0398510-04:00" start="2026-09-10T02:38:21.6285220-04:00" finish="2026-09-10T02:38:22.0420630-04:00" />
-  <TestSettings name="default" id="264f5839-12e4-4e70-bcaf-8595d9d827e8">
-    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_38_22" />
+<TestRun id="4978d304-299a-4a38-bde5-480f72fa1a01" name="@Juans-MacBook-Pro 2026-09-10 03:15:21" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T03:15:21.3649760-04:00" queuing="2026-09-10T03:15:21.3649760-04:00" start="2026-09-10T03:15:20.9910100-04:00" finish="2026-09-10T03:15:21.3672060-04:00" />
+  <TestSettings name="default" id="34466a51-1fab-40d6-8d14-30d63941496e">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_03_15_21" />
   </TestSettings>
   <Results>
-    <UnitTestResult executionId="9db75f40-fe82-4540-858d-1b6248afeb84" testId="7e9e88a9-50bc-2593-9e54-989fc2a71098" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0004996" startTime="2026-09-10T02:38:22.0026010-04:00" endTime="2026-09-10T02:38:22.0026010-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9db75f40-fe82-4540-858d-1b6248afeb84" />
-    <UnitTestResult executionId="28c2fbf0-5914-45b7-96f2-362e859f319a" testId="37697050-ecf4-16ef-cd6c-b1497f91c9d6" testName="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001577" startTime="2026-09-10T02:38:22.0023560-04:00" endTime="2026-09-10T02:38:22.0023560-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="28c2fbf0-5914-45b7-96f2-362e859f319a">
+    <UnitTestResult executionId="3df35683-7f83-41fb-8b6a-21cfcb3c676e" testId="ef6ff985-4f65-b311-ac1f-78b8a64070bd" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000572" startTime="2026-09-10T03:15:21.3282360-04:00" endTime="2026-09-10T03:15:21.3282360-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3df35683-7f83-41fb-8b6a-21cfcb3c676e" />
+    <UnitTestResult executionId="eac6d3f9-71db-44a2-86a8-b1bfb81284e6" testId="37697050-ecf4-16ef-cd6c-b1497f91c9d6" testName="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001302" startTime="2026-09-10T03:15:21.3279670-04:00" endTime="2026-09-10T03:15:21.3279670-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="eac6d3f9-71db-44a2-86a8-b1bfb81284e6">
       <Output>
         <ErrorInfo>
           <Message>Assert.Equal() Failure: Values differ
 Expected: 10105
 Actual:   0</Message>
-          <StackTrace>   at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs:line 14
+          <StackTrace>   at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs:line 14
    at InvokeStub_FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Object, Span`1)
    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>
-    <UnitTestResult executionId="e869cf68-1af9-454e-83ea-d649d99ff772" testId="ef6ff985-4f65-b311-ac1f-78b8a64070bd" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000748" startTime="2026-09-10T02:38:22.0026340-04:00" endTime="2026-09-10T02:38:22.0026340-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e869cf68-1af9-454e-83ea-d649d99ff772" />
-    <UnitTestResult executionId="9ffe48d3-fa71-4984-aee5-d31780c73239" testId="c21207a6-2f79-be4b-bf07-4849c2b81630" testName="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)" computerName="Juans-MacBook-Pro" duration="00:00:00.0073128" startTime="2026-09-10T02:38:22.0011610-04:00" endTime="2026-09-10T02:38:22.0011690-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9ffe48d3-fa71-4984-aee5-d31780c73239">
+    <UnitTestResult executionId="ec2615a7-7907-42bc-9f7a-3df1cb45c432" testId="c21207a6-2f79-be4b-bf07-4849c2b81630" testName="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)" computerName="Juans-MacBook-Pro" duration="00:00:00.0068493" startTime="2026-09-10T03:15:21.3267960-04:00" endTime="2026-09-10T03:15:21.3268030-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ec2615a7-7907-42bc-9f7a-3df1cb45c432">
       <Output>
         <ErrorInfo>
           <Message>Assert.Equal() Failure: Values differ
 Expected: 103
 Actual:   0</Message>
-          <StackTrace>   at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs:line 14
+          <StackTrace>   at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs:line 14
    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>
+    <UnitTestResult executionId="7aa0d64c-97d7-45ff-9077-d9ad17146041" testId="7e9e88a9-50bc-2593-9e54-989fc2a71098" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0004555" startTime="2026-09-10T03:15:21.3282010-04:00" endTime="2026-09-10T03:15:21.3282020-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7aa0d64c-97d7-45ff-9077-d9ad17146041" />
   </Results>
   <TestDefinitions>
-    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="ef6ff985-4f65-b311-ac1f-78b8a64070bd">
-      <Execution id="e869cf68-1af9-454e-83ea-d649d99ff772" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="ef6ff985-4f65-b311-ac1f-78b8a64070bd">
+      <Execution id="3df35683-7f83-41fb-8b6a-21cfcb3c676e" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
     </UnitTest>
-    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="c21207a6-2f79-be4b-bf07-4849c2b81630">
-      <Execution id="9ffe48d3-fa71-4984-aee5-d31780c73239" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_ReturnsExpectedValue" />
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="c21207a6-2f79-be4b-bf07-4849c2b81630">
+      <Execution id="ec2615a7-7907-42bc-9f7a-3df1cb45c432" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="7e9e88a9-50bc-2593-9e54-989fc2a71098">
-      <Execution id="9db75f40-fe82-4540-858d-1b6248afeb84" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="7e9e88a9-50bc-2593-9e54-989fc2a71098">
+      <Execution id="7aa0d64c-97d7-45ff-9077-d9ad17146041" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
     </UnitTest>
-    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="37697050-ecf4-16ef-cd6c-b1497f91c9d6">
-      <Execution id="28c2fbf0-5914-45b7-96f2-362e859f319a" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_ReturnsExpectedValue" />
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/heldout.dll" id="37697050-ecf4-16ef-cd6c-b1497f91c9d6">
+      <Execution id="eac6d3f9-71db-44a2-86a8-b1bfb81284e6" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_ReturnsExpectedValue" />
     </UnitTest>
   </TestDefinitions>
   <TestEntries>
-    <TestEntry testId="7e9e88a9-50bc-2593-9e54-989fc2a71098" executionId="9db75f40-fe82-4540-858d-1b6248afeb84" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="37697050-ecf4-16ef-cd6c-b1497f91c9d6" executionId="28c2fbf0-5914-45b7-96f2-362e859f319a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="ef6ff985-4f65-b311-ac1f-78b8a64070bd" executionId="e869cf68-1af9-454e-83ea-d649d99ff772" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="c21207a6-2f79-be4b-bf07-4849c2b81630" executionId="9ffe48d3-fa71-4984-aee5-d31780c73239" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ef6ff985-4f65-b311-ac1f-78b8a64070bd" executionId="3df35683-7f83-41fb-8b6a-21cfcb3c676e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="37697050-ecf4-16ef-cd6c-b1497f91c9d6" executionId="eac6d3f9-71db-44a2-86a8-b1bfb81284e6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c21207a6-2f79-be4b-bf07-4849c2b81630" executionId="ec2615a7-7907-42bc-9f7a-3df1cb45c432" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7e9e88a9-50bc-2593-9e54-989fc2a71098" executionId="7aa0d64c-97d7-45ff-9077-d9ad17146041" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
   </TestEntries>
   <TestLists>
     <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
@@ -64,32 +64,32 @@ Actual:   0</Message>
     <Counters total="4" executed="4" passed="2" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
     <Output>
       <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
-[xUnit.net 00:00:00.04]   Discovering: HeldOut
+[xUnit.net 00:00:00.03]   Discovering: HeldOut
 [xUnit.net 00:00:00.05]   Discovered:  HeldOut
 [xUnit.net 00:00:00.05]   Starting:    HeldOut
-[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
-[xUnit.net 00:00:00.08]       Expected: 103
-[xUnit.net 00:00:00.08]       Actual:   0
-[xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs(14,0): at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected)
-[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
-[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
-[xUnit.net 00:00:00.08]       Expected: 10105
-[xUnit.net 00:00:00.08]       Actual:   0
-[xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs(14,0): at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected)
-[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Object, Span`1)
-[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
-[xUnit.net 00:00:00.08]   Finished:    HeldOut
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 103
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs(14,0): at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 10105
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/heldout/HeldOutTests.cs(14,0): at FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]   Finished:    HeldOut
 </StdOut>
     </Output>
     <RunInfos>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:22.0002680-04:00">
-        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103) [FAIL]</Text>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:15:21.3258830-04:00">
+        <Text>[xUnit.net 00:00:00.07]     FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103) [FAIL]</Text>
       </RunInfo>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:22.0024370-04:00">
-        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105) [FAIL]</Text>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:15:21.3280570-04:00">
+        <Text>[xUnit.net 00:00:00.07]     FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105) [FAIL]</Text>
       </RunInfo>
     </RunInfos>
   </ResultSummary>

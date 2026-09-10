@@ -1,0 +1,18 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/a/heldout/HeldOut.csproj",
+    "--nologo",
+    "-v:q",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--logger",
+    "console;verbosity=normal",
+    "--results-directory",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/a/heldout/results"
+  ],
+  "exitCode": 0,
+  "stdout": "Test run for /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/a/heldout/bin/Debug/net10.0/HeldOut.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)\n[xUnit.net 00:00:00.03]   Discovering: HeldOut\n[xUnit.net 00:00:00.05]   Discovered:  HeldOut\n[xUnit.net 00:00:00.05]   Starting:    HeldOut\n[xUnit.net 00:00:00.07]   Finished:    HeldOut\n  Passed QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5) [7 ms]\n  Passed QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35) [< 1 ms]\n  Passed QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7) [< 1 ms]\n  Passed QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1) [< 1 ms]\nResults File: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/a/heldout/results/tests.trx\n\nTest Run Successful.\nTotal tests: 4\n     Passed: 4\n Total time: 0.3642 Seconds\n",
+  "stderr": ""
+}

@@ -1,56 +1,56 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TestRun id="4e509278-b5b6-4b1f-91a4-9f12ebd1bc19" name="@Juans-MacBook-Pro 2026-09-10 02:37:46" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <Times creation="2026-09-10T02:37:46.1247910-04:00" queuing="2026-09-10T02:37:46.1247910-04:00" start="2026-09-10T02:37:45.7511690-04:00" finish="2026-09-10T02:37:46.1268860-04:00" />
-  <TestSettings name="default" id="a5d9b2bf-6b3f-448a-9bc1-cdc602a1624f">
-    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_37_46" />
+<TestRun id="c3b375e5-b01a-4586-9fca-6411de14c0b2" name="@Juans-MacBook-Pro 2026-09-10 03:14:56" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T03:14:56.6526990-04:00" queuing="2026-09-10T03:14:56.6526990-04:00" start="2026-09-10T03:14:56.2695680-04:00" finish="2026-09-10T03:14:56.6550300-04:00" />
+  <TestSettings name="default" id="70d33437-0365-4472-9cf0-6ee810eca751">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_03_14_56" />
   </TestSettings>
   <Results>
-    <UnitTestResult executionId="5361c6d7-c718-40b8-859b-95e980b01710" testId="d72e8f54-d25b-1772-1f0f-eee8fa9955ba" testName="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000966" startTime="2026-09-10T02:37:46.0897690-04:00" endTime="2026-09-10T02:37:46.0897690-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5361c6d7-c718-40b8-859b-95e980b01710">
+    <UnitTestResult executionId="8e16f84e-eb8f-43e6-98a1-58c724d19509" testId="3fe78738-a54e-fb15-becd-1040ef993035" testName="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000647" startTime="2026-09-10T03:14:56.6163110-04:00" endTime="2026-09-10T03:14:56.6163110-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8e16f84e-eb8f-43e6-98a1-58c724d19509" />
+    <UnitTestResult executionId="2cd467d4-3290-41d0-8357-54e20a153223" testId="d72e8f54-d25b-1772-1f0f-eee8fa9955ba" testName="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000916" startTime="2026-09-10T03:14:56.6160470-04:00" endTime="2026-09-10T03:14:56.6160470-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2cd467d4-3290-41d0-8357-54e20a153223">
       <Output>
         <ErrorInfo>
           <Message>HELDOUT_EFFECT:state-change before=-1; after=2</Message>
-          <StackTrace>   at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs:line 29
+          <StackTrace>   at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs:line 29
    at InvokeStub_ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Object, Span`1)
    at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>
-    <UnitTestResult executionId="93308949-c5a3-412e-b177-c26ca8bf172c" testId="3fe78738-a54e-fb15-becd-1040ef993035" testName="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000692" startTime="2026-09-10T02:37:46.0900500-04:00" endTime="2026-09-10T02:37:46.0900500-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="93308949-c5a3-412e-b177-c26ca8bf172c" />
-    <UnitTestResult executionId="62f78105-d34a-43fb-8aae-7bfc93e9ba87" testId="c540d5ac-e174-5e42-aca2-d1cf085795ff" testName="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0057018" startTime="2026-09-10T02:37:46.0886680-04:00" endTime="2026-09-10T02:37:46.0886740-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="62f78105-d34a-43fb-8aae-7bfc93e9ba87">
+    <UnitTestResult executionId="2241a139-eabc-48bc-9890-58bf7483f4af" testId="c9de6b23-3dbb-ce16-3933-7e8bf082e620" testName="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)" computerName="Juans-MacBook-Pro" duration="00:00:00.0014127" startTime="2026-09-10T03:14:56.6162800-04:00" endTime="2026-09-10T03:14:56.6162800-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2241a139-eabc-48bc-9890-58bf7483f4af" />
+    <UnitTestResult executionId="8892b7e4-8d93-428a-84c0-1762e29d36b9" testId="c540d5ac-e174-5e42-aca2-d1cf085795ff" testName="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0051224" startTime="2026-09-10T03:14:56.6149140-04:00" endTime="2026-09-10T03:14:56.6149240-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8892b7e4-8d93-428a-84c0-1762e29d36b9">
       <Output>
         <ErrorInfo>
           <Message>HELDOUT_EFFECT:state-change before=-1; after=2</Message>
-          <StackTrace>   at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs:line 29
+          <StackTrace>   at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs:line 29
    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>
-    <UnitTestResult executionId="b673dd36-d919-48fb-b887-7bc172d29de3" testId="c9de6b23-3dbb-ce16-3933-7e8bf082e620" testName="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)" computerName="Juans-MacBook-Pro" duration="00:00:00.0014380" startTime="2026-09-10T02:37:46.0900180-04:00" endTime="2026-09-10T02:37:46.0900180-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b673dd36-d919-48fb-b887-7bc172d29de3" />
   </Results>
   <TestDefinitions>
-    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="3fe78738-a54e-fb15-becd-1040ef993035">
-      <Execution id="93308949-c5a3-412e-b177-c26ca8bf172c" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_ReturnsExpectedValue" />
+    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="3fe78738-a54e-fb15-becd-1040ef993035">
+      <Execution id="8e16f84e-eb8f-43e6-98a1-58c724d19509" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="c9de6b23-3dbb-ce16-3933-7e8bf082e620">
-      <Execution id="b673dd36-d919-48fb-b887-7bc172d29de3" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_ReturnsExpectedValue" />
+    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="c9de6b23-3dbb-ce16-3933-7e8bf082e620">
+      <Execution id="2241a139-eabc-48bc-9890-58bf7483f4af" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="d72e8f54-d25b-1772-1f0f-eee8fa9955ba">
-      <Execution id="5361c6d7-c718-40b8-859b-95e980b01710" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_PreservesJournal" />
+    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="d72e8f54-d25b-1772-1f0f-eee8fa9955ba">
+      <Execution id="2cd467d4-3290-41d0-8357-54e20a153223" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_PreservesJournal" />
     </UnitTest>
-    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="c540d5ac-e174-5e42-aca2-d1cf085795ff">
-      <Execution id="62f78105-d34a-43fb-8aae-7bfc93e9ba87" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_PreservesJournal" />
+    <UnitTest name="ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-002-shipping-quote/laundering/a/heldout/bin/debug/net10.0/heldout.dll" id="c540d5ac-e174-5e42-aca2-d1cf085795ff">
+      <Execution id="8892b7e4-8d93-428a-84c0-1762e29d36b9" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteHeldOutTests" name="Cheapest_PreservesJournal" />
     </UnitTest>
   </TestDefinitions>
   <TestEntries>
-    <TestEntry testId="d72e8f54-d25b-1772-1f0f-eee8fa9955ba" executionId="5361c6d7-c718-40b8-859b-95e980b01710" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="3fe78738-a54e-fb15-becd-1040ef993035" executionId="93308949-c5a3-412e-b177-c26ca8bf172c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="c540d5ac-e174-5e42-aca2-d1cf085795ff" executionId="62f78105-d34a-43fb-8aae-7bfc93e9ba87" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="c9de6b23-3dbb-ce16-3933-7e8bf082e620" executionId="b673dd36-d919-48fb-b887-7bc172d29de3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3fe78738-a54e-fb15-becd-1040ef993035" executionId="8e16f84e-eb8f-43e6-98a1-58c724d19509" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d72e8f54-d25b-1772-1f0f-eee8fa9955ba" executionId="2cd467d4-3290-41d0-8357-54e20a153223" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c9de6b23-3dbb-ce16-3933-7e8bf082e620" executionId="2241a139-eabc-48bc-9890-58bf7483f4af" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c540d5ac-e174-5e42-aca2-d1cf085795ff" executionId="8892b7e4-8d93-428a-84c0-1762e29d36b9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
   </TestEntries>
   <TestLists>
     <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
@@ -60,28 +60,28 @@
     <Counters total="4" executed="4" passed="2" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
     <Output>
       <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
-[xUnit.net 00:00:00.04]   Discovering: HeldOut
+[xUnit.net 00:00:00.03]   Discovering: HeldOut
 [xUnit.net 00:00:00.05]   Discovered:  HeldOut
-[xUnit.net 00:00:00.06]   Starting:    HeldOut
-[xUnit.net 00:00:00.08]       HELDOUT_EFFECT:state-change before=-1; after=2
-[xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs(29,0): at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight)
-[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
-[xUnit.net 00:00:00.08]       HELDOUT_EFFECT:state-change before=-1; after=2
-[xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs(29,0): at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight)
-[xUnit.net 00:00:00.08]            at InvokeStub_ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Object, Span`1)
-[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
-[xUnit.net 00:00:00.08]   Finished:    HeldOut
+[xUnit.net 00:00:00.05]   Starting:    HeldOut
+[xUnit.net 00:00:00.07]       HELDOUT_EFFECT:state-change before=-1; after=2
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs(29,0): at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.07]       HELDOUT_EFFECT:state-change before=-1; after=2
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-002-shipping-quote/laundering/a/heldout/HeldOutTests.cs(29,0): at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight)
+[xUnit.net 00:00:00.07]            at InvokeStub_ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]   Finished:    HeldOut
 </StdOut>
     </Output>
     <RunInfos>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:46.0878960-04:00">
-        <Text>[xUnit.net 00:00:00.08]     ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1) [FAIL]</Text>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:56.6140330-04:00">
+        <Text>[xUnit.net 00:00:00.07]     ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1) [FAIL]</Text>
       </RunInfo>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:46.0898520-04:00">
-        <Text>[xUnit.net 00:00:00.08]     ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13) [FAIL]</Text>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:56.6161440-04:00">
+        <Text>[xUnit.net 00:00:00.07]     ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13) [FAIL]</Text>
       </RunInfo>
     </RunInfos>
   </ResultSummary>

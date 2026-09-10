@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <CalorTasksAssembly>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
+    <CalorOutputDirectory>$(MSBuildThisFileDirectory)obj/calor/</CalorOutputDirectory>
+    <CalorEnforceEffects>true</CalorEnforceEffects>
+    <CalorPermissiveEffects>true</CalorPermissiveEffects>
+    
+    <CalorVerify Condition="'$(CALOR_P0_VERIFY_GATE)' != ''">true</CalorVerify>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Runtime/Calor.Runtime.csproj" />
+    <ProjectReference Include="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Tasks/Calor.Tasks.csproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CalorCompile Include="$(MSBuildThisFileDirectory)obj/ppw-source/Program.calr" />
+  </ItemGroup>
+
+  <Import Project="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Sdk/Sdk/Sdk.targets" />
+
+<Target Name="_PpwAssembleSources" BeforeTargets="CompileCalorFiles"><Exec Command="/Applications/Xcode.app/Contents/Developer/usr/bin/python3 /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/instrument-reference/bench/phase0-agent-native/ppw-source-assembly.py compose /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/effectful-wrong-value/a/workspace/src/.ppw-source-assembly.json" /></Target><Target Name="_PpwResetSdkSources" BeforeTargets="GenerateGlobalUsings;CoreGenerateAssemblyInfo;GenerateTargetFrameworkMonikerAttribute"><Exec Command="/Applications/Xcode.app/Contents/Developer/usr/bin/python3 /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/instrument-reference/bench/phase0-agent-native/ppw-source-assembly.py reset-sdk /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/effectful-wrong-value/a/workspace/src &quot;$(GeneratedGlobalUsingsFile)&quot; &quot;$(GeneratedAssemblyInfoFile)&quot; &quot;$(TargetFrameworkMonikerAssemblyAttributesPath)&quot;" /></Target><Target Name="AddCalorGeneratedFilesToCompile" BeforeTargets="CoreCompile" DependsOnTargets="CompileCalorFiles" Condition="'@(CalorCompile)' != ''"><ItemGroup><_PpwUnexpectedCompile Include="@(Compile)" Exclude="$(GeneratedGlobalUsingsFile);$(GeneratedAssemblyInfoFile);$(TargetFrameworkMonikerAssemblyAttributesPath);@(CalorGeneratedFiles)" /></ItemGroup><Error Condition="'@(_PpwUnexpectedCompile)' != ''" Text="Unregistered C# input: @(_PpwUnexpectedCompile)" /><ItemGroup><Compile Include="@(CalorGeneratedFiles)" /></ItemGroup></Target></Project>

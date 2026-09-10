@@ -8,7 +8,7 @@
     "Directory.Packages.props": "a927bac7a1b524f48ffd80dc82ab3014d84b8894c59d82e58263a37e582f3e40",
     "Directory.Build.targets": "17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea",
     "src/.ppw-source-assembly.json": "dda3bd7e4bf87cd1f080bff4ea8b5882858a1416fc017017d53878bb1db4c74d",
-    "src/Src.csproj": "ce649c0c33ff4a82476d4593cebbd261a614e2bfa53102b038c3ac9d8c4ae9bb"
+    "src/Src.csproj": "125dc202f5a1530289652e16bbdb3315394203d10d816207534e23a348695ed6"
   },
   "immutableSourcesSha256": {
     "dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df"

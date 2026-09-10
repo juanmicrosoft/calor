@@ -33,13 +33,41 @@ class SuiteFreezeEvidenceTests(unittest.TestCase):
         for task in self.report["tasks"]:
             pair = json.loads((TASKS / task["id"] / "pair.json").read_text())
             self.assertEqual(7, pair["registeredShape"])
-            self.assertEqual("prepared-not-frozen", pair["freezeStatus"])
+            self.assertEqual("source-suites-frozen-on-merge-of-1364", pair["freezeStatus"])
+            self.assertIn("not full task", pair["freezeScope"])
 
     def test_derived_evidence_does_not_change_frozen_execution_inputs(self):
         self.assertFalse(self.runner.is_task_input(Path("C-001/evidence/r8/a.json")))
         for path in ("C-001/pair.json", "C-001/spec.md", "C-001/starter-a/task.calr.inc",
                      "C-001/tests/HeldOutTests.cs", "C-001/starter-a/evidence/extra.calr"):
             self.assertTrue(self.runner.is_task_input(Path(path)))
+
+    def test_scoped_freeze_locks_source_suites_and_observed_report(self):
+        freeze = json.loads((VALIDATION / "artifact-freeze.json").read_text())
+        self.assertEqual("pp-w-1257-source-suite-artifact-freeze", freeze["kind"])
+        self.assertEqual("merge of PR #1364", freeze["effectiveOn"])
+        self.assertIn("epoch registration or pins", freeze["notClaimed"])
+        self.assertIn("spending or collection authorization", freeze["notClaimed"])
+        self.assertEqual(hashlib.sha256((EVIDENCE / "results.json").read_bytes()).hexdigest(),
+                         freeze["observationReportSha256"])
+        expected = {k: v for k, v in self.report["taskArtifactSha256"].items()
+                    if k.endswith((".calr.inc", ".cs"))}
+        self.assertEqual(64, len(expected))
+        self.assertEqual(expected, freeze["sourceAndSuiteSha256"])
+        old = json.loads((VALIDATION / "evidence-preparation/results.json").read_text())
+        for path, sha in expected.items():
+            self.assertEqual(sha, old["taskArtifactSha256"][path])
+
+    def test_preparation_observations_are_preserved_byte_for_byte(self):
+        preservation = json.loads((VALIDATION / "preparation-preservation.json").read_text())
+        root = VALIDATION / "evidence-preparation"
+        actual = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in root.rglob("*") if path.is_file()}
+        self.assertEqual(266, len(actual))
+        self.assertEqual(preservation["files"], actual)
+        freeze = json.loads((VALIDATION / "artifact-freeze.json").read_text())
+        self.assertEqual(hashlib.sha256((root / "results.json").read_bytes()).hexdigest(),
+                         freeze["preservedPreparationReportSha256"])
 
     def test_actual_control_outcomes_and_complete_case_counts(self):
         self.runner.validate_observations(self.report, EVIDENCE)

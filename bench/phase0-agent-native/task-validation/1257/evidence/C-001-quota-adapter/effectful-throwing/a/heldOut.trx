@@ -1,76 +1,76 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TestRun id="0ef482a4-8861-472b-b612-d0ed1de6e9fe" name="@Juans-MacBook-Pro 2026-09-10 02:37:26" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <Times creation="2026-09-10T02:37:26.7749340-04:00" queuing="2026-09-10T02:37:26.7749340-04:00" start="2026-09-10T02:37:26.4009500-04:00" finish="2026-09-10T02:37:26.7769700-04:00" />
-  <TestSettings name="default" id="a2d292a6-9d9a-4137-9856-dd74eaeed5fc">
-    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_37_26" />
+<TestRun id="f50e6b3e-dce0-405c-b6f5-bf86b7f566e7" name="@Juans-MacBook-Pro 2026-09-10 03:14:39" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T03:14:39.2457100-04:00" queuing="2026-09-10T03:14:39.2457100-04:00" start="2026-09-10T03:14:38.8675060-04:00" finish="2026-09-10T03:14:39.2480340-04:00" />
+  <TestSettings name="default" id="3e2de196-33ab-4865-92b1-490c2572f086">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_03_14_39" />
   </TestSettings>
   <Results>
-    <UnitTestResult executionId="c1b37c14-720d-4532-96b0-a51e8bbc0520" testId="109ecbd3-5ed7-4c17-01dd-bd5df8792607" testName="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0058775" startTime="2026-09-10T02:37:26.7380690-04:00" endTime="2026-09-10T02:37:26.7380760-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c1b37c14-720d-4532-96b0-a51e8bbc0520">
+    <UnitTestResult executionId="ced3311f-390b-48bb-b292-389f4fe606e8" testId="2e1a287b-e8ed-db25-e43a-eb08665f5213" testName="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001424" startTime="2026-09-10T03:14:39.2074750-04:00" endTime="2026-09-10T03:14:39.2074750-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ced3311f-390b-48bb-b292-389f4fe606e8">
       <Output>
         <ErrorInfo>
           <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
-          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
-   at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 14
-   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
-        </ErrorInfo>
-      </Output>
-    </UnitTestResult>
-    <UnitTestResult executionId="b60fac65-de94-45cd-aca2-9c64844766e9" testId="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0002120" startTime="2026-09-10T02:37:26.7398040-04:00" endTime="2026-09-10T02:37:26.7398040-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b60fac65-de94-45cd-aca2-9c64844766e9">
-      <Output>
-        <ErrorInfo>
-          <Message>HELDOUT_EFFECT:state-change before=0; after=1</Message>
-          <StackTrace>   at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 29
-   at InvokeStub_QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Object, Span`1)
-   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
-        </ErrorInfo>
-      </Output>
-    </UnitTestResult>
-    <UnitTestResult executionId="88968ac4-c408-4169-acb6-37d1cebfc119" testId="2e1a287b-e8ed-db25-e43a-eb08665f5213" testName="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001028" startTime="2026-09-10T02:37:26.7392650-04:00" endTime="2026-09-10T02:37:26.7392650-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="88968ac4-c408-4169-acb6-37d1cebfc119">
-      <Output>
-        <ErrorInfo>
-          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
-          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
-   at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 14
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 14
    at InvokeStub_QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Object, Span`1)
    at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>
-    <UnitTestResult executionId="b05c52d4-e164-4804-b230-8959997e616c" testId="3dd9eed7-74d8-6797-7577-2687cc9d7ee7" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0002587" startTime="2026-09-10T02:37:26.7396630-04:00" endTime="2026-09-10T02:37:26.7396630-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b05c52d4-e164-4804-b230-8959997e616c">
+    <UnitTestResult executionId="cbeaf3de-755d-46ed-8633-67b14763749f" testId="109ecbd3-5ed7-4c17-01dd-bd5df8792607" testName="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0051872" startTime="2026-09-10T03:14:39.2061110-04:00" endTime="2026-09-10T03:14:39.2061170-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cbeaf3de-755d-46ed-8633-67b14763749f">
       <Output>
         <ErrorInfo>
-          <Message>HELDOUT_EFFECT:state-change before=0; after=1</Message>
-          <StackTrace>   at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 29
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 14
    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>
+    <UnitTestResult executionId="128adeaa-829b-4558-ac3b-d95bea4d1de6" testId="3dd9eed7-74d8-6797-7577-2687cc9d7ee7" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0002988" startTime="2026-09-10T03:14:39.2078470-04:00" endTime="2026-09-10T03:14:39.2078470-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="128adeaa-829b-4558-ac3b-d95bea4d1de6">
+      <Output>
+        <ErrorInfo>
+          <Message>HELDOUT_EFFECT:state-change before=0; after=1</Message>
+          <StackTrace>   at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 29
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="0b229e52-3865-4e43-880c-ee7c7e365a7d" testId="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001073" startTime="2026-09-10T03:14:39.2081210-04:00" endTime="2026-09-10T03:14:39.2081210-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0b229e52-3865-4e43-880c-ee7c7e365a7d">
+      <Output>
+        <ErrorInfo>
+          <Message>HELDOUT_EFFECT:state-change before=0; after=1</Message>
+          <StackTrace>   at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs:line 29
+   at InvokeStub_QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
   </Results>
   <TestDefinitions>
-    <UnitTest name="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="2e1a287b-e8ed-db25-e43a-eb08665f5213">
-      <Execution id="88968ac4-c408-4169-acb6-37d1cebfc119" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_ReturnsExpectedValue" />
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="2e1a287b-e8ed-db25-e43a-eb08665f5213">
+      <Execution id="ced3311f-390b-48bb-b292-389f4fe606e8" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2">
-      <Execution id="b60fac65-de94-45cd-aca2-9c64844766e9" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2">
+      <Execution id="0b229e52-3865-4e43-880c-ee7c7e365a7d" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
     </UnitTest>
-    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="3dd9eed7-74d8-6797-7577-2687cc9d7ee7">
-      <Execution id="b05c52d4-e164-4804-b230-8959997e616c" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="3dd9eed7-74d8-6797-7577-2687cc9d7ee7">
+      <Execution id="128adeaa-829b-4558-ac3b-d95bea4d1de6" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
     </UnitTest>
-    <UnitTest name="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="109ecbd3-5ed7-4c17-01dd-bd5df8792607">
-      <Execution id="c1b37c14-720d-4532-96b0-a51e8bbc0520" />
-      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_ReturnsExpectedValue" />
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-throwing/a/heldout/bin/debug/net10.0/heldout.dll" id="109ecbd3-5ed7-4c17-01dd-bd5df8792607">
+      <Execution id="cbeaf3de-755d-46ed-8633-67b14763749f" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_ReturnsExpectedValue" />
     </UnitTest>
   </TestDefinitions>
   <TestEntries>
-    <TestEntry testId="109ecbd3-5ed7-4c17-01dd-bd5df8792607" executionId="c1b37c14-720d-4532-96b0-a51e8bbc0520" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2" executionId="b60fac65-de94-45cd-aca2-9c64844766e9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="2e1a287b-e8ed-db25-e43a-eb08665f5213" executionId="88968ac4-c408-4169-acb6-37d1cebfc119" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="3dd9eed7-74d8-6797-7577-2687cc9d7ee7" executionId="b05c52d4-e164-4804-b230-8959997e616c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2e1a287b-e8ed-db25-e43a-eb08665f5213" executionId="ced3311f-390b-48bb-b292-389f4fe606e8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="109ecbd3-5ed7-4c17-01dd-bd5df8792607" executionId="cbeaf3de-755d-46ed-8633-67b14763749f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3dd9eed7-74d8-6797-7577-2687cc9d7ee7" executionId="128adeaa-829b-4558-ac3b-d95bea4d1de6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2" executionId="0b229e52-3865-4e43-880c-ee7c7e365a7d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
   </TestEntries>
   <TestLists>
     <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
@@ -85,40 +85,40 @@
 [xUnit.net 00:00:00.05]   Starting:    HeldOut
 [xUnit.net 00:00:00.07]       System.DivideByZeroException : Attempted to divide by zero.
 [xUnit.net 00:00:00.07]       Stack Trace:
-[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
-[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(14,0): at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(14,0): at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected)
 [xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
 [xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
 [xUnit.net 00:00:00.08]       System.DivideByZeroException : Attempted to divide by zero.
 [xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(14,0): at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(14,0): at QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Int32 requested, Int32 expected)
 [xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(Object, Span`1)
 [xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
 [xUnit.net 00:00:00.08]       HELDOUT_EFFECT:state-change before=0; after=1
 [xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(29,0): at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(29,0): at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested)
 [xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
 [xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
 [xUnit.net 00:00:00.08]       HELDOUT_EFFECT:state-change before=0; after=1
 [xUnit.net 00:00:00.08]       Stack Trace:
-[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(29,0): at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-throwing/a/heldout/HeldOutTests.cs(29,0): at QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Int32 requested)
 [xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(Object, Span`1)
 [xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
 [xUnit.net 00:00:00.08]   Finished:    HeldOut
 </StdOut>
     </Output>
     <RunInfos>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:26.7371580-04:00">
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:39.2052890-04:00">
         <Text>[xUnit.net 00:00:00.07]     QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5) [FAIL]</Text>
       </RunInfo>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:26.7393380-04:00">
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:39.2076470-04:00">
         <Text>[xUnit.net 00:00:00.08]     QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35) [FAIL]</Text>
       </RunInfo>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:26.7396210-04:00">
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:39.2079130-04:00">
         <Text>[xUnit.net 00:00:00.08]     QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7) [FAIL]</Text>
       </RunInfo>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:26.7399300-04:00">
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:39.2082090-04:00">
         <Text>[xUnit.net 00:00:00.08]     QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1) [FAIL]</Text>
       </RunInfo>
     </RunInfos>

@@ -1,7 +1,8 @@
 {
   "id": "C-001-quota-adapter",
   "category": "PP-W-rows",
-  "freezeStatus": "prepared-not-frozen",
+  "freezeStatus": "source-suites-frozen-on-merge-of-1364",
+  "freezeScope": "Source fragments and visible/held-out suites only; not full task, instrument, epoch or collection admission.",
   "class": "blind",
   "legB": true,
   "iterationBudget": 10,
@@ -67,7 +68,7 @@
   "shapeRealizedIndicator": {
     "sourceRegex": "§C\\s*\\{\\s*this\\.lookup\\s*\\}",
     "measuredOn": "the archived editable task.calr.inc, not the dependency field declaration",
-    "note": "Laundering is positive; starter and honest are negative. This is a candidate indicator, not a registered collection rule."
+    "note": "Laundering is positive; starter and honest are negative. This syntactic-call pattern does not by itself establish code-only detection, runtime execution or collection admission."
   },
-  "note": "Row 7 of #1136's twelve, frozen release RowEscapeTableTests: direct invocation of the this-qualified field, not passing a row-polymorphic argument. A accepts the unresolved call without a diagnostic; B rejects unknown. The dependency really declares and performs mut. This candidate is not registered or frozen and supplies no model, runsPerArm, budget, or collection authority."
+  "note": "Row 7 of #1136's twelve, frozen release RowEscapeTableTests: direct invocation of the this-qualified field, not passing a row-polymorphic argument. A accepts the unresolved call without a diagnostic; B rejects unknown. The dependency really declares and performs mut. The source/suite artifact freeze supplies no full task or operational-instrument admission, epoch pins, budget or collection authority."
 }

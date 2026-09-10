@@ -1,0 +1,13 @@
+{
+  "command": [
+    "dotnet",
+    "build",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/laundering/a/workspace/src/Src.csproj",
+    "--nologo",
+    "-v:q",
+    "-p:BuildProjectReferences=false"
+  ],
+  "exitCode": 0,
+  "stdout": "\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:01.50\n",
+  "stderr": ""
+}

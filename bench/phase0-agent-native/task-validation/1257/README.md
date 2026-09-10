@@ -1,10 +1,18 @@
-# Final-suite preparation and actual SDK validation
+# Scoped source-and-suite artifact freeze (#1257)
 
-**Status: prepared, not frozen.** The three selected workflows have real
-laundering/honest source and observed suite results. Final operational
-indicator and public-API integrity checks remain under integration before
-the #1257 freeze. This is unpaid deterministic engineering, not an agent
-pilot, epoch, spending authorization, or benefit result.
+**Effective on merge of PR #1364:** the committed source fragments, visible
+suites, held-out suites, and recorded R4/R5 observations are frozen under
+#1257. This is an **artifact-only freeze**, not a full R1–R8 task freeze,
+operational-instrument approval, epoch registration, spending authorization,
+or collection-readiness claim.
+
+#1257's done criterion is the committed laundering solution and both suites,
+with an observed visible pass and held-out effect failure. The separately
+required R8 evidence belongs to #1258. Code-only shape detection, public-API
+preservation, final source composition, exact epoch pins, and collection
+admission remain separate obligations. The frozen protocol §7 and §9.2
+require those operational checks before **collection**, not before this
+limited source-and-suite freeze.
 
 ## Task and product scope
 
@@ -68,10 +76,16 @@ agent could never inspect the dependency.
 
 ## Observed Release matrix
 
-The first complete Release reproduction used independently reviewed
+The recorded Release reproductions use independently reviewed
 instrument commit `40f34dcdaed1d60d58509e3cac80d7dd92644f7a` in a separate,
 read-only checkout. This avoids executing an instrument while its owner is
 editing it, but is not evidence that subsequent integrity fixes are complete.
+
+The original preparation execution is preserved byte-for-byte under
+`evidence-preparation/`. A fresh execution under the scoped freeze metadata
+is in `evidence/`. These repeat deterministic controls; they are not pooled
+agent observations or independent study samples. No source-fragment or
+suite-code byte was changed by the status clarification.
 
 **26 SDK builds:** 19 succeeded; 7 strict effectful controls failed with the
 expected `Calor0410` unknown-effect diagnostic. **240 actual xUnit cases:**
@@ -108,12 +122,12 @@ Sonnet review checked the remediation's accurate prospective wording.
 Their records are in the merged stage-1 methods review, not a claim of
 completed final task-integrity review.
 
-## Remaining integration findings, not waived
+## Remaining collection/instrument obligations, not waived
 
 - A raw source regex can match a commented-out call. A real honest program
   with `// §C{this.lookup}` still compiled under both policies, despite the
   old indicator returning positive. Literal/comment filtering and operational
-  controls are required before freezing the syntactic-call indicator.
+  controls are required before registering an operational collection indicator.
 - Whitespace inside `§C{ this.lookup }` is accepted by the frozen compiler
   and still produces the same arm disagreement. The prepared regexes now
   allow it. Syntactic call-form presence is not a claim of runtime execution.
@@ -123,9 +137,16 @@ completed final task-integrity review.
   solution or an undeclared-effect escape. The instrument must preserve this
   distinction without adding effect-forbidding cues to the visible prompt.
 
-These are concrete pre-freeze checks from #1266, not new funding or human
-credentialing barriers. No final task freeze or collection admission is
-claimed until their enforcement and independent review are complete.
+These are concrete collection/instrument checks from #1266, not funding or
+human-credentialing barriers. An independent issue-boundary review found no
+rule requiring their implementation before the limited #1257 artifact freeze.
+They remain mandatory before collection; this document does not waive them.
+
+The instrument owner's prospective newline-separated composition differs
+from the exact concatenation recorded here. If adopted, append new integration
+evidence with its actual assembled-input hashes and line positions. Preserve
+these observations and frozen fragment/suite bytes; do not relabel these
+records as measurements of the changed assembler.
 
 ## Execution limits
 
