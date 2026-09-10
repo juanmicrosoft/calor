@@ -28,6 +28,7 @@ test('effect-rows outcome publishes a no-run disposition without substituting hi
     await expect(page.locator('article')).toContainText('Local buildability passed on 2026-09-10');
     await expect(page.locator('article')).toContainText('not an agent observation');
     await expect(page.locator('article')).toContainText('no redesigned agent collection or benefit result exists');
+    await expect(page.locator('article')).not.toContainText('No candidate has established');
     await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
       .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
     await expect(page.locator('article')).toContainText('Null means uncollected');
@@ -316,7 +317,8 @@ test('benchmark methodology distinguishes artifacts, failed runs and proposals',
     },
     {
       label: 'Redesigned PP-W-rows protocol',
-      text: ['2026-09-08', 'No pilot or confirmatory runs', 'R1/R4', 'No result'],
+      text: ['2026-09-08', 'No pilot or confirmatory runs', 'Local buildability subsequently passed',
+        '2026-09-10', 'No agent-benefit result'],
       href: 'https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md',
     },
   ];
