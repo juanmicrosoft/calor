@@ -40,7 +40,7 @@ test('effect-rows methodology separates registration, tooling, observations and 
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   for (const path of ['benchmarking', 'benchmarking/methodology', 'benchmarking/metrics/effect-discipline']) {
     await page.goto(`${base}/docs/${path}/`);
-    await page.locator('article a[href$="/docs/benchmarking/effect-rows-study/"]').click();
+    await page.locator('article a[href$="/docs/benchmarking/effect-rows-study/"]').first().click();
     await expect(page).toHaveURL(/\/effect-rows-study\/$/);
     for (const text of ['UNADJUDICATED', 'administrative stop', 'No redesigned confirmatory result',
       'below 50%', 'UNDERPOWERED-CARRIED', 'not implemented evidence']) {
@@ -180,6 +180,144 @@ test('adoption guidance separates compiler behavior from workflow evidence', asy
   expect(tradeoffs).not.toContain('tradeoff pays off');
   for (const source of [howItWorks, adoption, philosophy, tradeoffs]) {
     expect(source).toContain('/docs/benchmarking/evidence-status/');
+  }
+});
+
+test('benchmark methodology distinguishes artifacts, failed runs and proposals', async ({ page }) => {
+  const methodology = await readFile('content/benchmarking/methodology.mdx', 'utf8');
+  const results = await readFile('content/benchmarking/results.mdx', 'utf8');
+  const llm = JSON.parse(await readFile('public/data/llm-results.json', 'utf8')) as {
+    timestamp: string;
+    provider: string;
+    summary: { totalTasks: number; calorCompilationRate: number; cSharpCompilationRate: number };
+    results: Array<{ task: { category: string; scoring: {
+      compilation: number; testCases: number; contracts: number;
+    } } }>;
+  };
+  const safety = JSON.parse(await readFile('public/data/safety-results.json', 'utf8')) as {
+    timestamp: string; provider: string; summary: { totalTasks: number };
+  };
+  const effectDiscipline = JSON.parse(
+    await readFile('public/data/effect-discipline-results.json', 'utf8'),
+  ) as { timestamp: string; provider: string; summary: { totalTasks: number } };
+  const agentCategoryTotals = Object.values(agents.categories)
+    .reduce((totals, category) => ({
+      passed: totals.passed + category.passed,
+      total: totals.total + category.total,
+    }), { passed: 0, total: 0 });
+  const normalizedMethodology = methodology.replace(/\s+/g, ' ');
+  const normalizedResults = results.replace(/\s+/g, ' ');
+  expect(methodology).toContain(provenance.sourceCommit);
+  expect(methodology).toContain(provenance.agentTasks.sourceCommit);
+  expect(methodology).toContain(provenance.agentRefactoring.sourceCommit);
+  expect(methodology).toContain(llm.timestamp.slice(0, 10));
+  expect(methodology).toContain(`${llm.summary.totalTasks} tasks`);
+  expect(methodology).toContain(`Provider \`${llm.provider}\``);
+  expect(llm.summary.calorCompilationRate).toBe(0);
+  expect(llm.summary.cSharpCompilationRate).toBe(0);
+  expect(normalizedMethodology).toContain('zero valid generations');
+  expect(normalizedMethodology).toContain('not interpretable as parity');
+  expect(normalizedMethodology).toContain('proposed methodology');
+  expect(new Set(llm.results.map(result => result.task.category)))
+    .toEqual(new Set(['basic-algorithms', 'contracts', 'data-structures', 'logic']));
+  expect(llm.results.filter(result => result.task.scoring.contracts === 0.2)).toHaveLength(40);
+  expect(llm.results.filter(result => result.task.scoring.contracts === 0.3)).toHaveLength(10);
+  expect(Object.keys(agents.categories)).toHaveLength(18);
+  expect(agentCategoryTotals).toEqual({ passed: 78, total: 89 });
+  expect(agents.summary.passed).toBe(77);
+  expect(methodology).not.toContain('measure real-world effectiveness');
+  expect(methodology).not.toContain('explain why Calor achieves its overall advantage');
+  expect(normalizedResults).toContain('largest affordable design was three runs per cell at **0.48 power**');
+  expect(normalizedResults).toContain('does not present `0.868` as affordable power');
+  expect(normalizedResults).toContain('Formal M0 status is **UNADJUDICATED**');
+  expect(normalizedResults).toContain('protected three-arm adopter comparison');
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.goto(`${base}/docs/benchmarking/results/`);
+  await page.locator('article a[href$="/docs/benchmarking/methodology/#published-artifact-inventory"]').click();
+  await expect(page).toHaveURL(/\/methodology\/#published-artifact-inventory$/);
+  await expect(page.getByRole('heading', { name: 'Published artifact inventory' })).toBeInViewport();
+  const rows = page.getByRole('row');
+  const inventory = [
+    {
+      label: 'Eight-metric static dashboard',
+      text: ['2026-09-09', '217 source pairs', 'legacy 1.32x composite'],
+      href: 'https://github.com/juanmicrosoft/calor/commit/3a452b09',
+    },
+    {
+      label: 'Correctness estimation mode',
+      text: ['217 source pairs', 'Historical heuristic scoring', 'one of the eight'],
+      href: `${base}/docs/benchmarking/metrics/correctness/`,
+    },
+    {
+      label: 'Historical Safety estimation',
+      text: ['2026-02-17', 'e02684e1', '59799d1', '40 programs',
+        'historical 1.59x Safety headline'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json',
+    },
+    {
+      label: 'Historical Effect Discipline estimation',
+      text: ['2026-02-17', 'e02684e1', '59799d1', '40 programs',
+        'historical 1.00x tie'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json',
+    },
+    {
+      label: 'Checked-in 50-task LLM artifact',
+      text: ['2026-02-21', '50 tasks', 'zero valid generations', 'not a parity result'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/llm-results.json',
+    },
+    {
+      label: 'Safety provider artifact',
+      text: [safety.timestamp.slice(0, 10), `${safety.summary.totalTasks} tasks`,
+        `Provider ${safety.provider}`, 'All 60 calls', 'Does not support'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/safety-results.json',
+    },
+    {
+      label: 'Effect Discipline provider artifact',
+      text: [effectDiscipline.timestamp.slice(0, 10),
+        `${effectDiscipline.summary.totalTasks} tasks`, `Provider ${effectDiscipline.provider}`,
+        'All 80 calls', 'Does not contribute'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/effect-discipline-results.json',
+    },
+    {
+      label: 'Agent task snapshot',
+      text: ['2026-02-16', '89 tasks', '18 category entries', '77 passes',
+        '78 passes', '86.5%', '87.6%'],
+      href: 'https://github.com/juanmicrosoft/calor/commit/107462e',
+    },
+    {
+      label: 'Agent refactoring snapshot',
+      text: ['2026-02-15', '20 tasks per language', 'three runs per task', '95%'],
+      href: 'https://github.com/juanmicrosoft/calor/commit/580e189',
+    },
+    {
+      label: 'PP-E1 effect-row proof point',
+      text: ['2026-08-27', '10 seeded mutations plus 40 ordinary-task runs',
+        'claude-opus-4-8', 'Claude Code 2.1.243', 'v0.14.3 control',
+        'v0.15.0 treatment', 'HIT'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/3bb2601e3ff83597ddf2f27dcc334b6399ab97ea/bench/phase0-agent-native/effect-rows-probe-ledger.json',
+    },
+    {
+      label: 'PP-W-rows practice and sizing',
+      text: ['2026-09-01', '28 valid practice runs', 'zero runs', 'claude-opus-4-8',
+        'Claude Code 2.1.248 and 2.1.252', 'pre-rows/permissive control',
+        'strict treatment', 'does not resolve', '283ec9f9964ddd5b21da15b646a0dd77d53de99e',
+        '3bb2601e3ff83597ddf2f27dcc334b6399ab97ea', 'UNDERPOWERED'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/82a7c653cbf1ea2f6231e38cc328c74a34e6589b/bench/phase0-agent-native/effect-rows-benefit-ledger.json',
+    },
+    {
+      label: 'Redesigned PP-W-rows protocol',
+      text: ['2026-09-08', 'No pilot or confirmatory runs', 'R1/R4', 'No result'],
+      href: 'https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md',
+    },
+  ];
+  for (const item of inventory) {
+    const row = rows.filter({ hasText: item.label });
+    await expect(row).toHaveCount(1);
+    for (const text of item.text) {
+      await expect(row).toContainText(text);
+    }
+    await expect(row.locator(`a[href="${item.href}"]`)).toHaveCount(1);
   }
 });
 
