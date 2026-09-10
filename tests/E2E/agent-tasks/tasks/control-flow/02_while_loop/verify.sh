@@ -7,17 +7,13 @@ CALR_FILE="$WORKSPACE/Effects.calr"
 
 [[ -f "$CALR_FILE" ]] || { echo "Effects.calr not found"; exit 1; }
 
-# Check for Countdown function
-grep -q "Countdown" "$CALR_FILE" || { echo "Countdown function not found"; exit 1; }
+# Scope every check to the declaration the task asked for. A file-global grep passes a
+# wrong answer where the construct sits in some unrelated function and the target is an
+# empty stub -- demonstrated against this verifier.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/lib/verify-lib.sh"
 
-# Check for while loop syntax §WH{
-grep -q "§WH{" "$CALR_FILE" || { echo "While loop (§WH) not found"; exit 1; }
-
-# Check for while loop closing tag
-grep -q "§/WH{" "$CALR_FILE" || { echo "While loop closing tag not found"; exit 1; }
-
-# Check for variable binding or assignment
-grep -qE "(§B\{|§ASSIGN)" "$CALR_FILE" || { echo "Variable binding/assignment not found"; exit 1; }
+require_in_body "$CALR_FILE" 'Countdown' '-q' '§WH{' -- 'While loop (§WH) not found in Countdown'
+require_in_body "$CALR_FILE" 'Countdown' '-qE' '(§B\{|§ASSIGN)' -- 'Variable binding/assignment not found in Countdown'
 
 echo "Verification passed: Countdown function found with while loop"
 exit 0

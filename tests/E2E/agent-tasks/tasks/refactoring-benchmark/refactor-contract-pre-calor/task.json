@@ -3,7 +3,7 @@
   "name": "Add precondition (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-contract-calor",
-  "prompt": "In Contract.calr, add a precondition to the `Sqrt` function (f001) requiring that the input x is non-negative. Add:\n\n\u00a7Q (>= x 0)\n\nThe function should look like:\n\u00a7F{f001:Sqrt:pub}\n  \u00a7I{i32:x}\n  \u00a7O{i32}\n  \u00a7Q (>= x 0)\n  \u00a7R x\n\u00a7/F{f001}\n\nIMPORTANT: The function ID f001 must NOT change.",
+  "prompt": "In Contract.calr, add a precondition to the `Sqrt` function (f001) requiring that the input x is non-negative. Add:\n\n§Q (>= x 0)\n\nThe function should look like:\n§F{f001:Sqrt:pub}\n  §I{i32:x}\n  §O{i32}\n  §Q (>= x 0)\n  §R x\n\nIMPORTANT: The function ID f001 must NOT change.",
   "verification": {
     "compilation": {
       "mustSucceed": true

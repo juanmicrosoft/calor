@@ -3,7 +3,7 @@
   "name": "Inline with contracts (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-inline-calor",
-  "prompt": "In Inline.calr, inline the `Clamp` function (f003) into `NormalizeScore` (f004). The Clamp function has contracts that should inform the inlined code.\n\nBefore NormalizeScore:\n§R §C{Clamp}\n    §A score\n    §A 0\n    §A 100\n  §/C\n\nAfter NormalizeScore (with Clamp's logic inlined):\n§F{f004:NormalizeScore:pub}\n  §I{i32:score}\n  §O{i32}\n  §S (>= result 0)\n  §S (<= result 100)\n  §R (? (< score 0) 0 (? (> score 100) 100 score))\n§/F{f004}\n\nNote: The postconditions from Clamp align with NormalizeScore's existing postconditions. Keep the function ID f004 unchanged.",
+  "prompt": "In Inline.calr, inline the `Clamp` function (f003) into `NormalizeScore` (f004). The Clamp function has contracts that should inform the inlined code.\n\nBefore NormalizeScore:\n§R §C{Clamp}\n    §A score\n    §A 0\n    §A 100\n  §/C\n\nAfter NormalizeScore (with Clamp's logic inlined):\n§F{f004:NormalizeScore:pub}\n  §I{i32:score}\n  §O{i32}\n  §S (>= result 0)\n  §S (<= result 100)\n  §R (? (< score 0) 0 (? (> score 100) 100 score))\n\nNote: The postconditions from Clamp align with NormalizeScore's existing postconditions. Keep the function ID f004 unchanged.",
   "verification": {
     "compilation": {
       "mustSucceed": true

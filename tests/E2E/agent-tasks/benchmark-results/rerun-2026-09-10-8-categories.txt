@@ -1,0 +1,98 @@
+# Agent-task re-run, 2026-09-10 — the 8 categories that were failing
+#
+# READ THIS BEFORE QUOTING THE NUMBER.
+#
+# Mode: --single-run (no majority voting). The harness DEFAULTS to 3 runs passing at
+# 2/3; single-run was chosen only to match the published February artifact's mode. A
+# single unvoted pass is a sample of a stochastic process, not a stable score — cf-007
+# fails here and passes on an immediate re-run, and pattern-matching moved 5/6 -> 4/6
+# between two single runs of an unchanged task set.
+#
+# This is NOT a controlled measurement of the reference fix. The February baseline
+# (commit 107462e, Calor v0.2.3) predates Phase 4d (2026-06-02) by 3.5 months, so the
+# stale-closer defect did not exist when it was taken. Any delta against it also
+# contains 7 months of compiler change and a different model generation. The controlled
+# comparison — same day, same compiler, defect present vs absent — was not run.
+#
+# Compiler: 0.19.0. Reference fingerprint and commit on the first line below.
+#
+reference md5: 7fc2c434a4a102c1a5fc44c1bed3ec20  commit: dcef7ffb  calor 0.19.0  mode: single-run
+########## CATEGORY: async-functions ##########
+[PASS] async-001: 1/1 passed
+[PASS] async-002: 1/1 passed
+[PASS] async-003: 1/1 passed
+[PASS] async-004: 1/1 passed
+Passed:  4
+Failed:  0
+Pass Rate: 100%
+########## CATEGORY: collections ##########
+[PASS] coll-001: 1/1 passed
+[PASS] coll-002: 1/1 passed
+[PASS] coll-003: 1/1 passed
+[PASS] coll-004: 1/1 passed
+[PASS] coll-005: 1/1 passed
+[PASS] coll-006: 1/1 passed
+Passed:  6
+Failed:  0
+Pass Rate: 100%
+########## CATEGORY: control-flow ##########
+[PASS] cf-001: 1/1 passed
+[PASS] cf-002: 1/1 passed
+[PASS] cf-003: 1/1 passed
+[PASS] cf-004: 1/1 passed
+[PASS] cf-005: 1/1 passed
+[PASS] cf-006: 1/1 passed
+[FAIL] cf-007: 0/1 passed (need 1)
+[PASS] cf-008: 1/1 passed
+Passed:  7
+Failed:  1
+Pass Rate: 87%
+########## CATEGORY: effects-system ##########
+[PASS] eff-001: 1/1 passed
+[PASS] eff-002: 1/1 passed
+[FAIL] eff-003: 0/1 passed (need 1)
+[PASS] eff-004: 1/1 passed
+[PASS] eff-005: 1/1 passed
+[PASS] eff-006: 1/1 passed
+Passed:  5
+Failed:  1
+Pass Rate: 83%
+########## CATEGORY: lambdas-delegates ##########
+[PASS] lam-001: 1/1 passed
+[PASS] lam-002: 1/1 passed
+[PASS] lam-003: 1/1 passed
+[PASS] lam-004: 1/1 passed
+Passed:  4
+Failed:  0
+Pass Rate: 100%
+########## CATEGORY: pattern-matching ##########
+[PASS] pm-001: 1/1 passed
+[PASS] pm-002: 1/1 passed
+[PASS] pm-003: 1/1 passed
+[FAIL] pm-004: 0/1 passed (need 1)
+[FAIL] pm-005: 0/1 passed (need 1)
+[PASS] pm-006: 1/1 passed
+Passed:  4
+Failed:  2
+Pass Rate: 66%
+########## CATEGORY: refactoring ##########
+[PASS] ref-001: 1/1 passed
+[PASS] ref-002: 1/1 passed
+[PASS] ref-003: 1/1 passed
+[PASS] ref-004: 1/1 passed
+[PASS] ref-005: 1/1 passed
+[PASS] ref-006: 1/1 passed
+[PASS] ref-007: 1/1 passed
+[FAIL] ref-008: 0/1 passed (need 1)
+Passed:  7
+Failed:  1
+Pass Rate: 87%
+########## CATEGORY: string-operations ##########
+[PASS] str-001: 1/1 passed
+[PASS] str-002: 1/1 passed
+[PASS] str-003: 1/1 passed
+[PASS] str-004: 1/1 passed
+[PASS] str-005: 1/1 passed
+Passed:  5
+Failed:  0
+Pass Rate: 100%

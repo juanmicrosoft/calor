@@ -3,7 +3,7 @@
   "name": "Add array bounds contract (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-contract-calor",
-  "prompt": "In Contract.calr, add bounds-checking contracts to the `GetElement` function (f003). Add preconditions ensuring the index is within bounds:\n\n\u00a7Q (>= index 0)\n\u00a7Q (< index length)\n\u00a7Q (> length 0)\n\nThe function should look like:\n\u00a7F{f003:GetElement:pub}\n  \u00a7I{i32:index}\n  \u00a7I{i32:length}\n  \u00a7O{i32}\n  \u00a7Q (>= index 0)\n  \u00a7Q (< index length)\n  \u00a7Q (> length 0)\n  \u00a7R (? (and (>= index 0) (< index length)) index (- 0 1))\n\u00a7/F{f003}\n\nIMPORTANT: The function ID f003 must NOT change.",
+  "prompt": "In Contract.calr, add bounds-checking contracts to the `GetElement` function (f003). Add preconditions ensuring the index is within bounds:\n\n§Q (>= index 0)\n§Q (< index length)\n§Q (> length 0)\n\nThe function should look like:\n§F{f003:GetElement:pub}\n  §I{i32:index}\n  §I{i32:length}\n  §O{i32}\n  §Q (>= index 0)\n  §Q (< index length)\n  §Q (> length 0)\n  §R (? (and (>= index 0) (< index length)) index (- 0 1))\n\nIMPORTANT: The function ID f003 must NOT change.",
   "verification": {
     "compilation": {
       "mustSucceed": true

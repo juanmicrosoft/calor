@@ -3,7 +3,7 @@
   "name": "Reorder parameters (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-signature-calor",
-  "prompt": "In Signature.calr, reorder the parameters of `CreateRange` (f003) to be (step, start, end) instead of (start, end, step). Also update the caller `CountSteps` (f004) to pass arguments in the new order.\n\nBefore CreateRange:\n\u00a7F{f003:CreateRange:pub}\n  \u00a7I{i32:start}\n  \u00a7I{i32:end}\n  \u00a7I{i32:step}\n  ...\n\nAfter CreateRange:\n\u00a7F{f003:CreateRange:pub}\n  \u00a7I{i32:step}\n  \u00a7I{i32:start}\n  \u00a7I{i32:end}\n  \u00a7O{i32}\n  \u00a7Q (> step 0)\n  \u00a7Q (<= start end)\n  \u00a7R (/ (- end start) step)\n\u00a7/F{f003}\n\nUpdate CountSteps to call with new parameter order:\n\u00a7R \u00a7C{CreateRange}\n    \u00a7A 1\n    \u00a7A 0\n    \u00a7A max\n  \u00a7/C\n\nIMPORTANT: Function IDs f003 and f004 must NOT change. Update the precondition order to match new parameter order.",
+  "prompt": "In Signature.calr, reorder the parameters of `CreateRange` (f003) to be (step, start, end) instead of (start, end, step). Also update the caller `CountSteps` (f004) to pass arguments in the new order.\n\nBefore CreateRange:\n§F{f003:CreateRange:pub}\n  §I{i32:start}\n  §I{i32:end}\n  §I{i32:step}\n  ...\n\nAfter CreateRange:\n§F{f003:CreateRange:pub}\n  §I{i32:step}\n  §I{i32:start}\n  §I{i32:end}\n  §O{i32}\n  §Q (> step 0)\n  §Q (<= start end)\n  §R (/ (- end start) step)\n\nUpdate CountSteps to call with new parameter order:\n§R §C{CreateRange}\n    §A 1\n    §A 0\n    §A max\n  §/C\n\nIMPORTANT: Function IDs f003 and f004 must NOT change. Update the precondition order to match new parameter order.",
   "verification": {
     "compilation": {
       "mustSucceed": true
