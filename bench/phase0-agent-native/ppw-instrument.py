@@ -444,6 +444,7 @@ def validate_collection_authorization(registration, selected, directory, epoch_i
         require(isinstance(authorization.get(name), str) and authorization[name].strip(),
                 "spending authorization requires %s" % name)
     require(confirm_paid, "paid collection requires --confirm-paid-epoch and written authorization")
+    return authorization
 
 
 def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_id, stage,
@@ -455,26 +456,28 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     registration = load(registration_path)
     selected = validate_registration(registration, stage, epoch_id)
     validate_tasks(tasks_root, registration)
-    validate_collection_authorization(
+    authorization = validate_collection_authorization(
         registration, selected, registration_path.parent, epoch_id, stage, confirm_paid)
     require(selected.get("modelPin") and selected.get("agentVersion"),
             "model/agent pin must be registered before collection")
+    spending = helper("ppw-spending.py")
+    admission = spending.admit(
+        registration, selected, authorization, registration_path.parent, epoch_id, stage)
     require(not command(["git", "-C", str(REPO), "status", "--porcelain",
                          "--", str(BENCH)]), "harness checkout is dirty")
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
     require(command(["claude", "--version"]) == selected["agentVersion"], "agent version differs from registration")
     shared = product(compiler_root, registration["compilerCommit"])
-    harness_files = ("run-pair.sh", "harness-capture.py", "ppw-instrument.py", "ppw-registration.py",
-                     "ppw-source-assembly.py",
-                     "token-usage.py", "token-usage.sh", "telemetry-helpers.py", "ppw-pins.schema.json",
-                     "templates/calor-arm/CalorArm.csproj.template",
-                     "templates/calor-arm/policy-canary.calr.txt")
-    harness_hashes = {name: digest(BENCH / name) for name in harness_files}
+    harness_hashes = admission["harnessArtifacts"]
+    harness_files = tuple(harness_hashes)
+    require(spending.artifact_manifest() == harness_hashes, "registered harness changed after admission")
     epoch = local(epochs_root, epoch_id)
     require(not epoch.exists(), "epoch already exists; use a reviewed new epoch id, never overwrite")
     # Canaries run outside the epoch and before any agent invocation.
     work = REPO / ".ppw-instrument-work" / epoch_id
     work.mkdir(parents=True, exist_ok=False)
+    ledger = None
+    owner = None
     try:
         env = dict(os.environ, TMPDIR=str(work))
         hashes = []
@@ -491,9 +494,17 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         require(product(compiler_root, registration["compilerCommit"]) ==
                 {k: v for k, v in shared.items() if k != "compilerHash"},
                 "compiler product changed during preflight")
+        ledger = spending.Ledger(admission["ledgerPath"])
+        ledger.initialize(admission)
+        owner = ledger.start()
         epoch.mkdir(parents=True)
         shutil.copy2(registration_path, epoch / "registration.json")
         shutil.copytree(tasks_root, epoch / "tasks")
+        write_new(epoch / "spending-initial.json", ledger.snapshot())
+        shutil.copy2(local(registration_path.parent, selected["spendAuthorization"]["path"]),
+                     epoch / "spending-authorization.json")
+        shutil.copy2(local(registration_path.parent, selected["spendingPlan"]["path"]),
+                     epoch / "spending-plan.json")
         pins = {"schemaVersion": 2, "kind": KIND, "epochId": epoch_id, "stage": stage,
                 "dataKind": "empirical", "mode": "live", "lifecycle": "collecting",
                 "harnessCommit": command(["git", "-C", str(REPO), "rev-parse", "HEAD"]),
@@ -511,15 +522,55 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                     require(product(compiler_root, registration["compilerCommit"]) ==
                             {k: v for k, v in shared.items() if k != "compilerHash"},
                             "shared compiler drift before run")
-                    command(pair_command(epoch / "tasks" / task, definition, shared,
-                                         epoch / "runs", run - 1), env=env)
-                    result_path = epoch / "runs" / task / definition["label"] / ("run-%d" % run) / "result.json"
+                    slot = "%s/%s/%d" % (task, definition["label"], run)
+                    ticket = ledger.reserve(owner, slot)
+                    ticket_path = epoch / "spend-tickets" / task / definition["label"] / ("run-%d.json" % run)
+                    ticket_path.parent.mkdir(parents=True, exist_ok=True)
+                    write_new(ticket_path, ticket)
+                    run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
+                    exit_code = -1
+                    try:
+                        command(pair_command(epoch / "tasks" / task, definition, shared,
+                                             epoch / "runs", run - 1)
+                                + ["--ppw-spend-ticket", str(ticket_path)], env=env)
+                        exit_code = 0
+                    except subprocess.CalledProcessError as error:
+                        exit_code = error.returncode
+                        raise
+                    finally:
+                        try:
+                            cost_report = load(run_directory / "agent.json")
+                        except (ValueError, OSError):
+                            cost_report = None
+                        try:
+                            client_exit = load(run_directory / "client-invocation.json")["exitCode"]
+                            require(type(client_exit) is int, "client exit code is missing")
+                        except (ValueError, OSError, KeyError, TypeError):
+                            client_exit = -1
+                        stop_reason = ledger.settle(
+                            owner, ticket, cost_report, client_exit if exit_code == 0 else exit_code)
+                    require(stop_reason is None, "pilot incomplete: " + str(stop_reason))
+                    result_path = run_directory / "result.json"
                     stamp_run(result_path, pins)
         require(product(compiler_root, registration["compilerCommit"]) ==
                 {k: v for k, v in shared.items() if k != "compilerHash"}, "compiler drift after collection")
+        ledger.complete(owner)
+        write_new(epoch / "spending-final.json", ledger.snapshot())
         pins["lifecycle"] = "collected"
         (epoch / "pins.json").write_text(json.dumps(pins, indent=2) + "\n")
         record_stage(epochs_root, epoch_id, stage)
+    except BaseException:
+        if ledger is not None and owner is not None:
+            ledger.stop(owner, "interrupted-or-incomplete-collection")
+            if epoch.is_dir() and not (epoch / "collection-outcome.json").exists():
+                write_new(epoch / "collection-outcome.json", {
+                    "kind": "pp-w-incomplete-collection", "epochId": epoch_id, "stage": stage,
+                    "complete": False, "verdict": None,
+                    "reason": "Collection did not complete the unchanged registered inventory; "
+                              "this is not a null, negative, positive, or underpowered result.",
+                    "spending": ledger.snapshot(),
+                })
+        raise
     finally:
         shutil.rmtree(work)
 

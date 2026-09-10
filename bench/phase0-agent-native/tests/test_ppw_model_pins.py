@@ -72,8 +72,30 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         for observation in canaries["observations"].values():
             self.assertEqual(self.pins["compiler"]["compilerHash"], observation["compilerHash"])
         self.assertNotEqual(self.pins["compiler"]["compilerHash"], self.pins["compiler"]["calorSha256"])
-        for filename, sha in self.pins["harnessArtifacts"].items():
+        amendment = load(METHOD / "spending-instrument-amendment.json")
+        self.assertEqual(self.pins["harnessArtifacts"], amendment["supersededHarnessArtifacts"])
+        for filename, sha in amendment["replacementHarnessArtifacts"].items():
             self.assertEqual(digest(BENCH / filename), sha)
+
+    def test_spending_amendment_preserves_historical_inputs_without_activating_collection(self):
+        amendment = load(METHOD / "spending-instrument-amendment.json")
+        self.assertEqual("pp-w-prospective-spending-instrument-amendment", amendment["kind"])
+        self.assertFalse(amendment["collectionAuthorized"])
+        self.assertFalse(amendment["analysisArithmeticChanged"])
+        self.assertTrue(amendment["frozenProtocolUnchanged"])
+        for relative, sha in amendment["preservedArtifacts"].items():
+            self.assertEqual(digest(BENCH / relative), sha, relative)
+        spending = self.instrument.helper("ppw-spending.py")
+        self.assertEqual(spending.artifact_manifest(), amendment["replacementHarnessArtifacts"])
+        analysis = load(METHOD / "analysis-registration.json")
+        for reference in ("supersedes", "instrumentAmendment"):
+            proof = analysis[reference]
+            self.assertEqual(digest(BENCH / proof["path"]), proof["sha256"])
+        old_analysis = load(BENCH / analysis["supersedes"]["path"])
+        self.assertEqual(old_analysis["artifacts"]["ppw-instrument.py"],
+                         self.pins["harnessArtifacts"]["ppw-instrument.py"])
+        self.assertFalse(self.registration["collectionAuthorized"])
+        self.assertNotEqual(self.pins["harnessArtifacts"], amendment["replacementHarnessArtifacts"])
 
     def test_actual_stage_rejects_model_or_client_drift_and_missing_identity(self):
         for field in ("modelPin", "agentVersion"):

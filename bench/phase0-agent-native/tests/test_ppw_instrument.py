@@ -321,7 +321,8 @@ class InstrumentTests(unittest.TestCase):
                     instrument.run_epoch("missing-registration", "missing-tasks", "missing-compiler",
                                          self.root, "synthetic-pilot", "pilot")
 
-    def fake_capture(self, behavior, arm="B", run=1):
+    def fake_capture(self, behavior, arm="B", run=1, spending_ticket=None,
+                     budget_support=True, expect_refusal=None):
         """Execute the actual shell runner with deterministic local stand-ins.
 
         PATH resolves claude and dotnet to these files, never real agents or
@@ -384,8 +385,12 @@ if "test" in sys.argv:
 """)
         fake_agent = executable / "claude"
         fake_agent.write_text("""#!/usr/bin/env python3
-import json, os, pathlib, subprocess
+import json, os, pathlib, subprocess, sys
+if "--help" in sys.argv:
+    print("--max-budget-usd" if os.environ["SYNTHETIC_BUDGET_SUPPORT"] == "1" else "no budget control")
+    sys.exit(0)
 with open(os.environ["SYNTHETIC_CALLS"], "a") as f: f.write("attempt\\n")
+pathlib.Path(os.environ["SYNTHETIC_CALLS"]+".arguments.json").write_text(json.dumps(sys.argv[1:]))
 if os.environ["SYNTHETIC_BEHAVIOR"] == "policy-change":
     p=pathlib.Path("Src.csproj")
     p.write_text(p.read_text().replace("<CalorPermissiveEffects>false", "<CalorPermissiveEffects>true"))
@@ -398,6 +403,7 @@ if os.environ["SYNTHETIC_BEHAVIOR"] == "extra-source":
     pathlib.Path("Bypass.cs").write_text("// unregistered source\\n")
 print(json.dumps({"type":"assistant","message":{"id":"synthetic","content":[]}}))
 print(json.dumps({"type":"result","result":"API error" if os.environ["SYNTHETIC_BEHAVIOR"] == "api-error" else "synthetic done",
+                  "total_cost_usd":0.05,
                   "usage":{"output_tokens":1},"modelUsage":{"SYNTHETIC":{"outputTokens":100}}}))
 """)
         fake_dotnet.chmod(0o755)
@@ -412,10 +418,18 @@ print(json.dumps({"type":"result","result":"API error" if os.environ["SYNTHETIC_
         output = self.root / "captured"
         env = dict(os.environ, PATH=str(executable) + os.pathsep + os.environ["PATH"],
                    TMPDIR=str(self.root), SYNTHETIC_CALLS=str(calls), SYNTHETIC_BEHAVIOR=behavior,
+                   SYNTHETIC_BUDGET_SUPPORT="1" if budget_support else "0",
                    CALOR_P0_SKIP_ARM_CANARY="0")
-        result = subprocess.run(["bash"] + instrument.pair_command(task, instrument.ARMS[arm],
-                                                                   compiler, output, run - 1),
+        argv = instrument.pair_command(task, instrument.ARMS[arm], compiler, output, run - 1)
+        if spending_ticket is not None:
+            argv += ["--ppw-spend-ticket", str(spending_ticket)]
+        result = subprocess.run(["bash"] + argv,
                                 env=env, text=True, capture_output=True, timeout=30)
+        if expect_refusal:
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(expect_refusal, result.stderr)
+            self.assertEqual(prior_calls, len(calls.read_text().splitlines()) if calls.exists() else 0)
+            return None
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(prior_calls + 1, len(calls.read_text().splitlines()))
         captured = output / "SYNTHETIC-task" / instrument.ARMS[arm]["label"] / ("run-%d" % run)

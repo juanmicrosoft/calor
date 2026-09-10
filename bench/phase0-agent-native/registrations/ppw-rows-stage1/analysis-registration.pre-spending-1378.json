@@ -3,7 +3,7 @@
     "effect-rows-benefit-ledger.json": "5fe3d0c2d927cf3b0a5d853f85eccd8c10a12ca2379a90b55cfafb4e6aefebfc",
     "epochs/w-rows-pilot-001/pins.json": "73ab4b9df4d4520a7754a4fb30063e8a567a2c07a5ff6ea452985b0109694bf3",
     "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
-    "ppw-instrument.py": "e6b133b07d9590911bb9562094aff12b850bf5c94e679a91869367c8cb91c8b5",
+    "ppw-instrument.py": "8a1a9d54007b9fdefdf739da011cceab3bba7f94b33336d7dddd5f5c3b7482cd",
     "ppw-pilot-adjudicate.py": "e3c3a2e1847b84a4b6b321fe68810aa674fc690005fe495623d430f368f9bb9e",
     "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
     "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
@@ -17,21 +17,13 @@
     "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e"
   },
   "collectionAuthorized": false,
-  "collectionHarnessChanged": true,
-  "effectiveOn": "independently reviewed merge of the #1378 implementation PR",
-  "instrumentAmendment": {
-    "path": "registrations/ppw-rows-stage1/spending-instrument-amendment.json",
-    "sha256": "a3a33debc9ef5a6d995564ef553bbf08830a117165b212d2988c04ecbf9ec3c2"
-  },
+  "collectionHarnessChanged": false,
+  "effectiveOn": "merge of the independently reviewed #1267 aggregation integration PR",
   "kind": "pp-w-rows-stage1-analysis-registration",
   "methodSection": 9,
   "newEstimands": false,
   "schemaVersion": 1,
-  "scope": "Explicit read-only analysis fingerprint supersession; frozen math, original prospective epoch pins and all source/task registrations preserved. No collection activation.",
+  "scope": "Separate read-only analysis layer; existing collection pins and frozen method remain unchanged.",
   "stage": "pilot",
-  "supersedes": {
-    "path": "registrations/ppw-rows-stage1/analysis-registration.pre-spending-1378.json",
-    "sha256": "18eda2b71723d4403da4052c8917240539f513e540ffd46e1335208e50657a7c"
-  },
   "thresholdChanges": false
 }
