@@ -49,6 +49,22 @@ test('effect-rows methodology separates registration, tooling, observations and 
   }
 });
 
+test('task-first workflow keeps an account-free path and bounded provider guidance', async ({ page }) => {
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.goto(`${base}/docs/getting-started/how-it-works/`);
+  const article = page.locator('article');
+  await expect(article).toContainText('without an AI account');
+  await expect(article).toContainText('not a filesystem sandbox');
+  await expect(article).not.toContainText('reliable system, not a hopeful one');
+  const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
+    [...new Set(elements.map(element => element.getAttribute('href')!))]);
+  for (const link of links) {
+    const response = await page.request.get(link);
+    expect(response.status(), link).toBe(200);
+  }
+});
+
 test('current version and explicitly historical result provenance cannot silently drift', async () => {
   const props = await readFile('../Directory.Build.props', 'utf8');
   expect(SITE_VERSION).toBe(props.match(/<Version>(.*?)<\/Version>/)![1]);

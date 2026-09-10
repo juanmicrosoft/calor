@@ -4,183 +4,93 @@ section: "getting-started"
 order: 3
 ---
 
+Project instructions and syntax references guide source generation. The
+compiler reports diagnostics; the agent or developer revises the source and
+runs it again. You can use this workflow without an AI account.
 
-If you're skeptical about Calor, you're in good company. The most common question we hear is:
+**Reader question:** How do I make, check, and revise a small Calor change?
 
-> "AI models were trained on millions of files of Python, JavaScript, C#, and other languages. They've never seen Calor. How can they possibly write it?"
+## Run one change
 
-This is a completely valid concern. Let's address it directly.
-
----
-
-## The Chicken and Egg Problem
-
-Traditional programming languages succeed because:
-1. Developers learn them
-2. Developers write code in them
-3. That code becomes training data for AI
-4. AI learns to write that language
-
-Calor breaks this cycle. It's a new language designed *for* AI agents, but AI agents weren't trained on it. So how can this work?
-
----
-
-## Our Approach: Teach at Runtime
-
-Instead of waiting for AI models to be trained on Calor (which could take years), we teach them at runtime using three mechanisms:
-
-### 1. Project Instructions (CLAUDE.md)
-
-When Claude Code starts a session, it reads `CLAUDE.md` from your project root. This file contains:
-
-- **Clear rules**: "All new code MUST be written in Calor"
-- **Syntax overview**: Key constructs and their meanings
-- **Type mappings**: How C# types translate to Calor (`int` → `i32`)
-
-Modern AI models can follow novel syntax instructions, but reliability depends
-on the model, task, context, and feedback loop. The compiler, not the
-instruction alone, determines whether generated Calor is valid.
-
-### 2. Skills (Detailed Syntax Reference)
-
-The `.claude/skills/` directory contains detailed syntax documentation that Claude can consult. Think of it as giving Claude a language reference manual it can look up when needed.
-
-The `calor` skill includes:
-- Complete syntax for all constructs
-- Working templates (FizzBuzz, functions with contracts, classes)
-- ID naming conventions
-
-When Claude needs to write a loop or a conditional, it has the reference right there.
-
-### 3. Hooks (Enforcement)
-
-Here's where healthy skepticism meets practical engineering. What if Claude "forgets" the instructions? What if it falls back to C# out of habit?
-
-The hook mechanism catches this:
-
-```
-Claude tries to create: UserService.cs
-Hook response: BLOCKED
-
-"This is a Calor-first project. Create UserService.calr instead."
-```
-
-The agent receives this feedback and may retry with the correct file extension.
-The hook blocks the selected file operation; it does not guarantee a correct
-retry or remove the need for review.
-
----
-
-## Why This Can Work
-
-### Models Can Use Runtime Guidance
-
-Depending on the model and task, runtime guidance can help an agent:
-
-- **Follow novel instructions** - use a syntax reference supplied in context
-- **Generalize from examples** - adapt templates to related constructs
-- **Respond to constraints** - revise an attempt after a hook or compiler error
-
-These are capabilities to evaluate, not guaranteed outcomes.
-
-### Calor's Syntax Is Designed for This
-
-Calor's syntax is designed to make structure and constraints explicit. Whether
-that makes a particular model more reliable is an empirical question:
-
-| Design Choice | Why It Helps |
-|:--------------|:-------------|
-| Indentation-defined blocks | Scope is visible without structural closer tags |
-| Optional stable IDs on structural targets | Clear targets when durable identity is needed |
-| Lisp-style expressions | Unambiguous operator precedence |
-| Declared effects | AI knows what side effects are allowed |
-
-The syntax uses recurring declaration patterns such as `§F{id:Name:vis}`,
-`§M{id:Name}`, and `§L{id:var:from:to:step}`. The reference documents those
-patterns; it does not prove that every model extrapolates them correctly.
-
-### The Feedback Loop Works
-
-When the hook blocks a `.cs` file, the agent receives actionable feedback and
-can retry with Calor. The repository has not measured how often one correction
-is sufficient across current models and real projects.
-
----
-
-## Evidence from Practice
-
-The repository contains bounded tests of this approach:
-
-The repository includes deterministic generation and structure calculators, but
-they are not a substitute for a blinded, live-agent success study. In practice,
-agents should use the compiler feedback loop: generate a small change, run
-`calor -i change.calr -o change.g.cs`, and repair any syntax, type, contract,
-or effect diagnostics. MCP clients can use the equivalent `calor_check` tool.
-
-Instructions, skills, hooks, and compiler diagnostics form a concrete feedback
-loop. The dated agent-task snapshot records 77 successful tasks out of 89 for
-its model, prompt, and verifier configuration. That runner skipped lifecycle
-hooks and made one agent invocation per task, so it did not test the full
-feedback loop. It is not a model-wide reliability result or an independent
-adopter study.
-
----
-
-## Addressing Remaining Concerns
-
-### "But what about complex programs?"
-
-Calor compiles to C#. Claude already knows C# deeply. It's translating concepts it understands into a new syntax, not learning new programming concepts.
-
-### "What if Claude hallucinates syntax?"
-
-The Calor compiler rejects invalid syntax and reports diagnostics. An agent can
-use those diagnostics to retry, but a diagnostic does not guarantee that the
-next attempt compiles or satisfies the intended behavior.
-
-### "Is this just prompt engineering?"
-
-Yes and no. Project instructions and skills describe what to do. Hooks can block selected
-operations, and compiler diagnostics reject invalid programs. Their combined
-reliability has not been established across adopters or current models.
-
-### "Will this work with other AI models?"
-
-We provide integration guidance for Claude Code, Gemini CLI, Codex CLI, and
-GitHub Copilot. Their lifecycle and policy-hook capabilities differ and evolve;
-see the [integration pages](/docs/getting-started/) for the current setup and
-verify the behavior of the installed client.
-
----
-
-## The Bottom Line
-
-The Calor workflow is designed around:
-
-1. **Novel instructions** - CLAUDE.md provides the rules
-2. **Reference documentation helps** - Skills provide syntax details
-3. **Mechanical feedback** - Hooks block selected policy violations and the compiler rejects invalid programs
-
-You do not need to assume that an agent already knows Calor. You still need to
-measure the workflow on your tasks, review the generated behavior, and keep the
-documented exit path. The
-[research evidence status](/docs/benchmarking/evidence-status/) explains what
-has and has not been established.
-
-Try it yourself. Initialize a project, ask Claude to write some code, and see what happens:
+Install the [.NET 10 SDK and Calor](/docs/getting-started/installation/).
+Check that `calor --version` works. These commands assume a terminal and an
+empty directory, not an existing application's source folder.
 
 ```bash
-dotnet new console -o TestProject
-cd TestProject
-calor init --ai claude
+mkdir CalorWorkflow
+cd CalorWorkflow
 ```
 
-Then open Claude Code and ask: "Write a function that calculates factorial."
+Save this complete program as UTF-8 `Program.calr`. It uses the same
+module, entry point, and console effect as the
+[tested Hello World example](/docs/getting-started/hello-world/).
 
----
+```calor
+§M{m001:HelloApp}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §P "Hello from Calor!"
+```
 
-## Next Steps
+Compile it to inspect the generated C#, then run the Calor source:
 
-- [Claude Integration](/docs/getting-started/claude-integration/) - Detailed setup for Claude Code
-- [Hello World](/docs/getting-started/hello-world/) - See the workflow in action
-- [Syntax Reference](/docs/syntax-reference/) - Understand what Claude generates
+```bash
+calor --input Program.calr --output Program.g.cs
+calor run Program.calr
+```
+
+Compilation creates `Program.g.cs`; the run command prints:
+
+```text
+Hello from Calor!
+```
+
+Change the string to `"Hello again!"` and repeat both commands. The program
+now prints `Hello again!`. No project template, agent, or `calor init` is
+required. `calor run` builds its own managed workspace; the generated C# here
+is for inspection, not an automatically updated project input.
+
+If a command fails, read the first diagnostic's file, location, and message.
+Check that the source uses two-space indentation and that `§E{cw}` declares
+the console output. Fix the source rather than editing generated C#, then
+rerun. A missing tool or SDK is an
+[installation problem](/docs/getting-started/installation/), not a source
+diagnostic. See [compile options](/docs/cli/compile/) for diagnostic output
+and [project integration](/docs/getting-started/) when you want MSBuild to
+regenerate C# automatically.
+
+## Add an agent, if useful
+
+Initialize the integration for your chosen client in a project. Calor writes
+project instructions describing file conventions and syntax, plus references
+the agent can consult for constructs it needs. These guide generation; they
+do not guarantee compliance or successful repair.
+
+| Client setup | Configuration and boundary |
+|:-------------|:---------------------------|
+| [Claude Code](/docs/getting-started/claude-integration/) | `calor init --ai claude` installs instructions, references, and configured write-validation hooks. |
+| [Gemini CLI](/docs/getting-started/gemini-integration/) | `calor init --ai gemini` configures `BeforeTool` validation in supported hook-enabled clients. |
+| [Codex CLI](/docs/getting-started/codex-integration/) | `calor init --ai codex` installs project hooks. Review and trust them with `/hooks`; coverage is limited to supported tool paths. |
+| [GitHub Copilot](/docs/getting-started/github-integration/) | `calor init --ai github` installs guidance and MCP configuration; check that page for client-specific setup. |
+
+Hooks can reject covered file writes, such as attempts to create C# source
+where the project requires Calor. They are not a filesystem sandbox:
+configuration, client support, and the tool used determine coverage.
+Hook feedback does not guarantee a correct retry.
+
+Ask for one small change, compile it, inspect diagnostics and generated code,
+and run the behavior tests. Repeat only after understanding the failure.
+Supported MCP clients can also request compiler diagnostics through
+`calor_check`; that does not replace executing the application tests.
+
+## Know what a successful check establishes
+
+A successful compilation is not proof of every behavior, complete effect
+coverage, or production safety. Contract runtime modes and optional static
+verification have different boundaries; use the
+[verification guarantees](/docs/guides/verification-guarantees/) as the
+canonical reference. The [evidence status](/docs/benchmarking/evidence-status/)
+separates implemented behavior from historical measurements and deferred
+studies. The historical task runner did not test the full feedback loop;
+its scores are not a model-wide reliability result. Neither a hook nor a
+passing example establishes an agent-productivity advantage.
